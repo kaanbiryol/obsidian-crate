@@ -3,17 +3,16 @@ import { createModalActions } from '../../plugin/modal-elements';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../../main';
 import { SharedModal } from '../../plugin/SharedModal';
-import { loadEncryptionKeys, saveEncryptionKeys } from '../../../plugin/encryption-storage';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRecoveryBundle, type VaultKeyBundle } from '../../../encryption/key-bundle';
+import { addEncryptedReading, encryptVault, loadDeviceEncryptionKeys, prepareEncryptionKeys, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
+import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import { WorkerApiHttpClient } from '../../../sync/worker-api/http';
-import { convertEncryptedVault, readServerEncryption, assertEncryptionKeys } from '../../../sync/encryption/conversion';
-import { isReadingScopeExtension, createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
+import { readServerEncryption } from '../../../sync/encryption/conversion';
+import type { EncryptionServerState } from '../../../encryption/server-state';
 import { createLogger, errorMessage } from '../../../sync/logger';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
 import { normalizeWorkerUrl } from '../../../sync/connection/worker-url';
 import { EncryptionResetModal } from './encryption-reset-modal';
 import { renderRecoveryVerification } from './recovery-verification';
-import { verifyRecoveryCode } from '../../../encryption/recovery-verification';
 import { resumeEncryptedFolderMoves, useServerEncryptionFolders } from '../../../plugin/encryption-folder-moves';
 import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-setup-ui';
 import { renderEncryptionManagement } from './encryption-manage-ui';
@@ -157,25 +156,13 @@ class EncryptionModal extends SharedModal {
 		const state = await readServerEncryption(this.http);
 		this.assertCurrentConnection();
 		this.setLayoutTitle(encryptionModalTitle(state));
-		let keys: VaultKeyBundle | null = null;
-		try { keys = loadEncryptionKeys(this.plugin.secretStorage); if (state && keys && !isReadingScopeExtension(state, createEncryptionState(keys, state.recovery))) assertEncryptionKeys(state, keys); }
-		catch (error) { if (!state) throw error; keys = null; }
+		const keys = loadDeviceEncryptionKeys(this.plugin, state);
 		if (state?.mode === 'resetting') { this.clearContent(); this.bodyEl.createEl('p', { text: 'An encryption reset is in progress. Resume it on the Obsidian device that started it.' }); return; }
 		if (state && !keys) { this.clearContent(); this.status(state, null); this.recover(state); return; }
 		if (state?.mode === 'active' && keys) { this.clearContent(); this.ready(keys, state); return; }
-		let bundle = keys;
-		let recovery = this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
-		if (!bundle) {
-			bundle = createVaultKeyBundle();
-			const { folders, readingFolder } = await this.http.requestJson<{ folders: string[]; readingFolder?: string | null }>('/encryption/folders');
-			for (const folder of new Set([...folders, this.plugin.remindersSettings.remindersFolderPath])) bundle = addReminderScope(bundle, folder);
-			bundle = addReminderScope(bundle, readingFolder ?? this.plugin.settings.reading.folderPath, 'reading');
-			recovery = await generateRecoveryCode();
-		}
+		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin, this.http, keys);
 		if (!recovery) { this.clearContent(); this.status(state, keys); this.bodyEl.createEl('p', { text: 'Restore the recovery key from your saved copy before resuming encryption.' }); if (state) this.recover(state); return; }
-		const finalBundle = bundle, finalRecovery = recovery;
-		const recoveryEnvelope = state?.recovery ?? await sealRecoveryBundle(finalBundle, finalRecovery);
-		try { await verifyRecoveryCode(recoveryEnvelope, finalRecovery, finalBundle); }
+		try { await verifySetupRecovery(state, bundle, recovery); }
 		catch (error) {
 			this.assertCurrentConnection();
 			if (!state) throw error;
@@ -185,7 +172,7 @@ class EncryptionModal extends SharedModal {
 		}
 		this.assertCurrentConnection();
 		this.clearContent();
-		this.disposeContent = renderEncryptionSetup(this.bodyEl, { recovery: finalRecovery, resuming: Boolean(state),
+		this.disposeContent = renderEncryptionSetup(this.bodyEl, { recovery, resuming: Boolean(state),
 			automaticSync: () => this.plugin.settings.automaticSync,
 			setTitle: title => this.setLayoutTitle(title), close: () => this.close(),
 			manage: () => { this.setLayoutTitle('Manage encryption'); void this.load().catch(error => this.unavailable(error)); },
@@ -194,13 +181,7 @@ class EncryptionModal extends SharedModal {
 			this.running = true;
 			try {
 				this.assertCurrentConnection();
-				// Freeze the engine before changing server mode. Local changes and
-				// durable upload receipts reconcile through encrypted sync afterward.
-				await this.plugin.syncRuntime.runEncryptionSetup(async () => {
-					this.assertCurrentConnection();
-					saveEncryptionKeys(this.plugin.secretStorage, finalBundle, verifiedRecovery);
-					await convertEncryptedVault(this.http, finalBundle, verifiedRecovery, progress);
-				});
+				await encryptVault(this.plugin, this.http, bundle, verifiedRecovery, progress, () => this.assertCurrentConnection());
 			} finally { this.running = false; this.onChanged(); }
 		} });
 	}
@@ -227,8 +208,7 @@ class EncryptionModal extends SharedModal {
 			const recoveryCode = code;
 			button.setDisabled(true);
 			try {
-				const bundle = await openRecoveryBundle(state.recovery, recoveryCode); assertEncryptionKeys(state, bundle);
-				await this.plugin.syncRuntime.runEncryptionSetup(async () => { this.assertCurrentConnection(); saveEncryptionKeys(this.plugin.secretStorage, bundle, recoveryCode); });
+				await unlockVault(this.plugin, state, recoveryCode, () => this.assertCurrentConnection());
 				await this.load();
 			} catch (error) { status.setText(errorMessage(error)); }
 			finally { button.setDisabled(false); }
@@ -240,13 +220,7 @@ class EncryptionModal extends SharedModal {
         button.setDisabled(true);
         const progress = this.bodyEl.createEl('p', { attr: { role: 'status' } });
         try {
-          const recovery = this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
-          if (!recovery) throw new Error('Recover this vault with your saved recovery key first.');
-          const bundle = addReminderScope(keys, this.plugin.settings.reading.folderPath, 'reading');
-          await this.plugin.syncRuntime.runEncryptionSetup(async () => {
-            this.assertCurrentConnection(); saveEncryptionKeys(this.plugin.secretStorage, bundle, recovery);
-            await convertEncryptedVault(this.http, bundle, recovery, message => progress.setText(message));
-          });
+          await addEncryptedReading(this.plugin, this.http, keys, message => progress.setText(message), () => this.assertCurrentConnection());
           await this.load();
         } catch (error) { progress.setText(errorMessage(error) + ' Reopen Manage encryption to resume.'); }
         finally { button.setDisabled(false); this.onChanged(); }
