@@ -35,6 +35,6 @@ show-completed: true
 
 The block is a view of your reminders. Changing a task here updates its source in your reminders folder.
 
-If you only see the block's code, switch to Reading view or Live Preview and make sure Crate is enabled. The `reminders-tasks` alias works only in Reading view; use `reminders` for new notes.
+If you only see the block's code, switch to Reading view or Live Preview and make sure Crate is enabled.
 
 For parser details and further examples, see the [embedded-reminders reference](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/embedded-reminders.md).

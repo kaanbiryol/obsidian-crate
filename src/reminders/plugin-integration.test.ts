@@ -229,10 +229,10 @@ describe('initializeReminders', () => {
 		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex, moveJournal);
 		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
-		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(4);
+		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(3);
 		for (const [language, processor] of plugin.registerMarkdownCodeBlockProcessor.mock.calls as Array<[string, (source: string, el: unknown, ctx: unknown) => void]>) {
 			processor('source', 'el', 'ctx');
-			expect(reminderQueryOnBlock).toHaveBeenLastCalledWith(language === 'reminders-tasks' ? 'reminders' : language, 'source', 'el', 'ctx');
+			expect(reminderQueryOnBlock).toHaveBeenLastCalledWith(language, 'source', 'el', 'ctx');
 		}
 		expect(plugin.registerEditorExtension).toHaveBeenCalledWith('extension');
 		expect(plugin.registerView).toHaveBeenCalledWith('reminders-view', expect.any(Function));
@@ -263,7 +263,7 @@ describe('initializeReminders', () => {
 		await initializeReminders(plugin as never);
 		await initializeReminders(plugin as never);
 
-		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(4);
+		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(3);
 		expect(plugin.registerView).toHaveBeenCalledTimes(1);
 		expect(plugin.addRibbonIcon).toHaveBeenCalledTimes(1);
 		expect(plugin.addCommand).toHaveBeenCalledTimes(1);

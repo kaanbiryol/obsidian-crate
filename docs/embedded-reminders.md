@@ -10,8 +10,6 @@ Add a fenced code block to an Obsidian note to display a reminder list in Readin
 | `reminders-today` | Today |
 | `reminders-upcoming` | Upcoming |
 
-`reminders-tasks` is an alias for `reminders` in Reading view. Use `reminders` for Live Preview support.
-
 ## Project filter
 
 Use your project's name in any reminders block. Omit `project` to include all projects.
