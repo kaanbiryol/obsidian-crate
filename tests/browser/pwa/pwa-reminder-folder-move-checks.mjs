@@ -33,9 +33,9 @@ export async function verifyReminderFolderMove({ admin, page, origin, owner, set
         const nextPath = to + path.slice(from.length), file = await api.downloadFile(path);
         const content = new Uint8Array(file.content);
         const sealed = await t.sealFile({ path: nextPath, content, contentType: 'text/markdown', publicData: await t.createReminderProjection(next, nextPath, content.buffer) }, keys.forPath(nextPath));
-        await api.uploadFile(nextPath, sealed.bytes.buffer, sealed.hash, sealed.bytes.length, 'application/vnd.crate.encrypted-file', null,
+        await api.unjournaled.uploadFile(nextPath, sealed.bytes.buffer, sealed.hash, sealed.bytes.length, 'application/vnd.crate.encrypted-file', null,
           `e1_${String(info.reminderOperationDay).padStart(8, '0')}_${crypto.randomUUID()}`);
-        const old = (await api.getFileMetadata([path])).files[path]; await api.deleteFile(path, old.hash, old.revision);
+        const old = (await api.getFileMetadata([path])).files[path]; await api.unjournaled.deleteFile(path, old.hash, old.revision);
       }
       bundle = next;
     }

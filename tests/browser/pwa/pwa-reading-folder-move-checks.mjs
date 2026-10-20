@@ -35,10 +35,10 @@ export async function verifyReadingFolderMove({ t, page, origin, owner, bundle, 
     const keys = await t.FileKeyAuthority.fromVault(next);
     const sealed = await t.sealFile({ path: nextPath, content: new Uint8Array(file.content), contentType: 'text/markdown', publicData: null }, keys.forPath(nextPath));
     const info = await http.getServerInfo();
-    await api.uploadFile(nextPath, sealed.bytes.buffer, sealed.hash, sealed.bytes.length, 'application/vnd.crate.encrypted-file', null,
+    await api.unjournaled.uploadFile(nextPath, sealed.bytes.buffer, sealed.hash, sealed.bytes.length, 'application/vnd.crate.encrypted-file', null,
       `e1_${String(info.reminderOperationDay).padStart(8, '0')}_${crypto.randomUUID()}`);
     const old = (await api.getFileMetadata([oldPath])).files[oldPath];
-    await api.deleteFile(oldPath, old.hash, old.revision);
+    await api.unjournaled.deleteFile(oldPath, old.hash, old.revision);
     assert.equal((await fetch(origin + '/reading/encryption', { headers: { Authorization: `Bearer ${oldSession.token}`, 'X-Crate-Protocol': '1' } })).status, 200);
     // The same open PWA follows the rename on refresh, without another link/key.
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
