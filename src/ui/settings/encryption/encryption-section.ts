@@ -8,7 +8,7 @@ import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecov
 import { WorkerApiHttpClient } from '../../../sync/worker-api/http';
 import { convertEncryptedVault, readServerEncryption, assertEncryptionKeys } from '../../../sync/encryption/conversion';
 import { isReadingScopeExtension, createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
-import { errorMessage } from '../../../sync/logger';
+import { createLogger, errorMessage } from '../../../sync/logger';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
 import { normalizeWorkerUrl } from '../../../sync/connection/worker-url';
 import { EncryptionResetModal } from './encryption-reset-modal';
@@ -19,6 +19,8 @@ import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-set
 import { renderEncryptionManagement } from './encryption-manage-ui';
 import { WebAppPairingModal } from '../web-app-pairing-modal';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
+
+const log = createLogger('EncryptionSettings');
 
 function encryptionModalTitle(state: EncryptionServerState | null): string {
 	return state?.mode === 'converting' ? 'Resume encryption' : state ? 'Manage encryption' : 'Enable encryption';
@@ -67,8 +69,9 @@ export function renderEncryptionSection(container: HTMLElement, plugin: CratePlu
 			else if (state?.mode === 'converting') show('Converting…', 'Sync and notifications are paused until conversion finishes.', 'Resume conversion');
 			else if (state) show('On', 'Synced notes, attachments and history are encrypted.', 'Manage encryption');
 			else show('Off', 'Keep synced notes, attachments and history private from your server.', 'Enable encryption');
-		} catch {
+		} catch (error) {
 			if (!active() || request !== revision) return;
+			log.warn('Could not check server encryption status:', errorMessage(error));
 			loading = false; retry = true;
 			show('Status unavailable', 'Could not check this server. Retry to see whether encryption is on.', 'Retry');
 		}

@@ -3,8 +3,8 @@ import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 
 
 export class DeploymentRecoveryRequiredError extends Error {
-    constructor(message: string) {
-        super(message);
+    constructor(message: string, options?: ErrorOptions) {
+        super(message, options);
         this.name = 'DeploymentRecoveryRequiredError';
     }
 }
@@ -93,9 +93,9 @@ export class DeploymentFence {
                 [next, DEPLOYMENT_FENCE_KEY, this.value])).flatMap(result => result.results ?? []);
             if (rows.length !== 1 || rows[0]?.value !== next) throw new Error('Deployment ownership changed');
             this.value = next;
-        } catch {
+        } catch (error) {
             this.uncertain = true;
-            throw new DeploymentRecoveryRequiredError('Could not checkpoint the server operation. Keep the deployment fence held and inspect its recorded step before recovery.');
+            throw new DeploymentRecoveryRequiredError('Could not checkpoint the server operation. Keep the deployment fence held and inspect its recorded step before recovery.', { cause: error });
         }
     }
 
@@ -124,8 +124,8 @@ export class DeploymentFence {
 		try {
 			await this.api.queryD1(this.account, this.database,
 				'DELETE FROM maintenance_state WHERE key = ? AND value = ?;', [DEPLOYMENT_FENCE_KEY, this.value]);
-		} catch {
-			throw new DeploymentRecoveryRequiredError('Could not confirm release of the deployment fence. Inspect it with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');
+		} catch (error) {
+			throw new DeploymentRecoveryRequiredError('Could not confirm release of the deployment fence. Inspect it with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.', { cause: error });
 		}
 	}
 }

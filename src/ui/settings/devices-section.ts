@@ -4,6 +4,9 @@ import type CratePlugin from '../../main';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { openConfirmationModal } from '../confirmation-modal';
 import { createSettingsDisclosure } from './section-helpers';
+import { createLogger, errorMessage } from '../../sync/logger';
+
+const log = createLogger('DeviceSettings');
 
 export interface DevicesSectionContext {
 	containerEl: HTMLElement;
@@ -87,7 +90,8 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 						renderList();
 						new Notice(`Removed ${label}`);
 						await refresh();
-					} catch {
+					} catch (error) {
+						log.warn(`Could not remove ${label}:`, errorMessage(error));
 						if (isActive()) {
 							new Notice('Failed to remove device');
 							button.setDisabled(false);
@@ -107,7 +111,8 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 			if (!isActive()) return;
 			renderList();
 			statusEl.setText('');
-		} catch {
+		} catch (error) {
+			log.warn('Could not load connected devices:', errorMessage(error));
 			if (!isActive()) return;
 			statusEl.setText(cache.tokens === null
 				? 'Failed to load connected devices.'
