@@ -21,8 +21,11 @@ async function apply(plugin: CratePlugin, policy: FeaturePolicy, activate: boole
     if (activate && policy.reading) startReading(plugin);
   }
   if (plugin.remindersSettings.enabled !== policy.reminders) {
-    if (activate) await plugin.setRemindersEnabled(policy.reminders, assertCurrent);
-    else await plugin.writeRemindersSettings({ enabled: policy.reminders }, assertCurrent);
+    if (activate) {
+      // Loaded on demand so settings screens do not load the reminders UI.
+      const { setRemindersEnabled } = await import('../reminders/plugin-integration');
+      await setRemindersEnabled(plugin, policy.reminders, assertCurrent);
+    } else await plugin.writeRemindersSettings({ enabled: policy.reminders }, assertCurrent);
   }
   assertCurrent();
 }

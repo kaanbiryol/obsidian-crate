@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReminderIndexOptions } from './data/reminder-index';
 
 type RemindersSettingsStub = {
+	enabled: boolean;
 	remindersFolderPath: string;
 	autoOpenView: 'sidebar' | 'none';
 };
@@ -18,6 +19,7 @@ type MockPlugin = {
 		workspace: {
 			layoutReady: boolean;
 			onLayoutReady: ReturnType<typeof vi.fn<(callback: () => void) => void>>;
+			detachLeavesOfType: ReturnType<typeof vi.fn>;
 		};
 	};
 	settings: {
@@ -31,7 +33,7 @@ type MockPlugin = {
 		addStateChangeListener: ReturnType<typeof vi.fn>;
 		removeStateChangeListener: ReturnType<typeof vi.fn>;
 	};
-	activateRemindersView: ReturnType<typeof vi.fn<() => Promise<void>>>;
+	writeRemindersSettings: ReturnType<typeof vi.fn<(update: Partial<RemindersSettingsStub>) => Promise<void>>>;
 	registerMarkdownCodeBlockProcessor: ReturnType<typeof vi.fn>;
 	registerEditorExtension: ReturnType<typeof vi.fn>;
 	registerView: ReturnType<typeof vi.fn>;
@@ -63,6 +65,7 @@ const pendingMoveFile = vi.fn(() => false);
 const moveJournal = { recover: recoverMoves, hasPending: pendingMoves, isPendingFile: pendingMoveFile,
 	assertActive: vi.fn(), assertWritable: vi.fn(), execute: vi.fn() };
 const createMoveJournal = vi.fn(() => moveJournal);
+const activateOrRevealRemindersLeaf = vi.fn(async (..._args: unknown[]) => {});
 
 let latestWriter: MockWriter;
 let latestWatcher: {
@@ -119,6 +122,7 @@ async function loadPluginIntegrationModule() {
 			constructor(public readonly plugin: unknown, public readonly reminderIndex: unknown) {}
 		},
 	}));
+	vi.doMock('./ui/plugin/workspaceLayout', () => ({ activateOrRevealRemindersLeaf }));
 	vi.doMock('./ui/plugin/reminders-view', () => ({
 		RemindersView: class RemindersView {
 			constructor(public readonly leaf: unknown, public readonly plugin: unknown) {}
@@ -139,7 +143,7 @@ async function loadPluginIntegrationModule() {
 function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 	let layoutReadyHandler: (() => void) | undefined;
 
-	return {
+	const plugin: MockPlugin = {
 		manifest: { dir: '.obsidian/plugins/crate' },
 		app: {
 			workspace: {
@@ -147,12 +151,14 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 				onLayoutReady: vi.fn((callback: () => void) => {
 					layoutReadyHandler = callback;
 				}),
+				detachLeavesOfType: vi.fn(),
 			},
 		},
 		settings: {
 			workerUrl: 'https://worker.example',
 		},
 		remindersSettings: {
+			enabled: true,
 			remindersFolderPath: 'Reminders',
 			autoOpenView: 'sidebar',
 		},
@@ -163,7 +169,7 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 			addStateChangeListener: vi.fn(),
 			removeStateChangeListener: vi.fn(),
 		},
-		activateRemindersView: vi.fn(async () => {}),
+		writeRemindersSettings: vi.fn(async (update: Partial<RemindersSettingsStub>) => { Object.assign(plugin.remindersSettings, update); }),
 		registerMarkdownCodeBlockProcessor: vi.fn(),
 		registerEditorExtension: vi.fn(),
 		registerView: vi.fn(),
@@ -172,6 +178,7 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 		...overrides,
 		getLayoutReadyHandler: () => layoutReadyHandler,
 	};
+	return plugin;
 }
 
 beforeEach(() => {
@@ -183,6 +190,7 @@ beforeEach(() => {
 	reminderIndexGetAll.mockReset();
 	reminderIndexRescanFile.mockReset();
 	reminderIndexFactory.mockReset();
+	activateOrRevealRemindersLeaf.mockReset().mockResolvedValue(undefined);
 	createMarkdownWriter.mockReset();
 	createReminderRepository.mockReset();
 	reminderQueryOnBlock.mockReset();
@@ -224,6 +232,7 @@ afterEach(() => {
 	vi.doUnmock('./query/remindersBlockLivePreview');
 	vi.doUnmock('./commands');
 	vi.doUnmock('./services/vaultWatcher');
+	vi.doUnmock('./ui/plugin/workspaceLayout');
 	vi.doUnmock('./ui/plugin/reminders-view');
 	vi.doUnmock('./utils/logger');
 });
@@ -261,7 +270,7 @@ describe('initializeReminders', () => {
 		expect(layoutReadyHandler).toEqual(expect.any(Function));
 		layoutReadyHandler?.();
 		await flushMicrotasks();
-		expect(plugin.activateRemindersView).toHaveBeenCalledTimes(1);
+		expect(activateOrRevealRemindersLeaf).toHaveBeenCalledExactlyOnceWith(plugin.app.workspace, 'reminders-view', undefined, expect.any(AbortSignal));
 
 		await latestWriter.onFileWritten?.({ path: 'Reminders/Work.md' });
 		expect(reminderIndexRescanFile).toHaveBeenCalledWith({ path: 'Reminders/Work.md' });
@@ -288,10 +297,10 @@ describe('initializeReminders', () => {
 		let finish!: () => void;
 		const ready = new Promise<void>(resolve => { finish = resolve; });
 		plugin.app.workspace.onLayoutReady.mockImplementation(callback => callback());
-		plugin.activateRemindersView.mockReturnValue(ready);
+		activateOrRevealRemindersLeaf.mockReturnValue(ready);
 		let initialized = false;
 		const initializing = initializeReminders(plugin as never).then(() => { initialized = true; });
-		await vi.waitFor(() => expect(plugin.activateRemindersView).toHaveBeenCalledOnce());
+		await vi.waitFor(() => expect(activateOrRevealRemindersLeaf).toHaveBeenCalledOnce());
 		expect(initialized).toBe(false);
 		finish(); await initializing;
 		expect(initialized).toBe(true);
@@ -357,7 +366,7 @@ it('does not auto-open the view after unloading before layout is ready', async (
   const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
   endPluginLifecycle(plugin as never);
   plugin.getLayoutReadyHandler()?.();
-  expect(plugin.activateRemindersView).not.toHaveBeenCalled();
+  expect(activateOrRevealRemindersLeaf).not.toHaveBeenCalled();
 });
 
 it('flushes deferred scans on sync state changes and removes the listener on unload', async () => {
@@ -468,4 +477,51 @@ it('stops the backend signal and watcher when reminders are disabled', async () 
   stopReminderBackend(plugin as never);
   expect(signal.aborted).toBe(true);
   expect(latestWatcher.unregister).toHaveBeenCalledOnce();
+});
+
+describe('setRemindersEnabled', () => {
+	it('stops local reminders without deleting notes when disabled and restarts them when enabled', async () => {
+		const { setRemindersEnabled } = await loadPluginIntegrationModule();
+		const watcher = { unregister: vi.fn() };
+		const plugin = createPlugin({ remindersVaultWatcher: watcher });
+		await setRemindersEnabled(plugin as never, false);
+		expect(plugin.remindersSettings.enabled).toBe(false);
+		expect(watcher.unregister).toHaveBeenCalledOnce();
+		expect(plugin.app.workspace.detachLeavesOfType).toHaveBeenCalledWith('reminders-view');
+		expect(reminderIndexFactory).not.toHaveBeenCalled();
+		await setRemindersEnabled(plugin as never, true);
+		expect(plugin.remindersSettings.enabled).toBe(true);
+		expect(reminderIndexLoad).toHaveBeenCalledOnce();
+	});
+
+	it('turns reminders back off when initialization fails', async () => {
+		const { setRemindersEnabled } = await loadPluginIntegrationModule();
+		const plugin = createPlugin();
+		plugin.remindersSettings.enabled = false;
+		reminderIndexLoad.mockRejectedValueOnce(new Error('Unreadable folder'));
+		await expect(setRemindersEnabled(plugin as never, true)).rejects.toThrow('Unreadable folder');
+		expect(plugin.writeRemindersSettings.mock.calls.map(([update]) => update)).toEqual([{ enabled: true }, { enabled: false }]);
+		expect(plugin.remindersSettings.enabled).toBe(false);
+	});
+});
+
+it('opens the reminders view only while reminders are enabled', async () => {
+	const { activateRemindersView } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	await activateRemindersView(plugin as never, 'Work');
+	expect(activateOrRevealRemindersLeaf).toHaveBeenCalledExactlyOnceWith(plugin.app.workspace, 'reminders-view', 'Work', expect.any(AbortSignal));
+	plugin.remindersSettings.enabled = false;
+	await activateRemindersView(plugin as never);
+	expect(activateOrRevealRemindersLeaf).toHaveBeenCalledOnce();
+});
+
+it('rebuilds the backend for a new folder only while reminders are enabled', async () => {
+	const { reinitializeWithFolder } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	plugin.remindersSettings.enabled = false;
+	await reinitializeWithFolder(plugin as never, 'Tasks');
+	expect(reminderIndexFactory).not.toHaveBeenCalled();
+	plugin.remindersSettings.enabled = true;
+	await reinitializeWithFolder(plugin as never, 'Tasks');
+	expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Tasks', gatedIndexOptions);
 });

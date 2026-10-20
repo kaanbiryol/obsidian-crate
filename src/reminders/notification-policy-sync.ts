@@ -37,7 +37,10 @@ export async function changeReminderFolder(plugin: CratePlugin, folderPath: stri
 		pendingServerFolder: plugin.settings.workerUrl
 			? { id: crypto.randomUUID(), workerUrl: plugin.settings.workerUrl, folderPath: folder } : undefined });
 	void ensureReminderNotificationPolicy(plugin);
-	if (plugin.remindersSettings.enabled) await plugin.reinitializeWithFolder(folder);
+	if (!plugin.remindersSettings.enabled) return;
+	// Loaded on demand: plugin integration also imports this module.
+	const { reinitializeWithFolder } = await import('./plugin-integration');
+	await reinitializeWithFolder(plugin, folder);
 }
 
 async function synchronizePolicy(plugin: CratePlugin, state: PolicySyncState): Promise<void> {

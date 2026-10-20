@@ -4,10 +4,10 @@ import { normalizeCrateSettings } from '../plugin/settings';
 import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from './settings';
 import { changeReminderFolder, ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from './notification-policy-sync';
 import { beginPluginLifecycle } from '../plugin/lifecycle-state';
+import { reinitializeWithFolder } from './plugin-integration';
 
 vi.mock('../plugin/lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
-vi.mock('./plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));
-vi.mock('./ui/plugin/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
+vi.mock('./plugin-integration', () => ({ reinitializeWithFolder: vi.fn(async () => {}) }));
 beforeEach(() => useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS, enabled: true }, true));
 afterEach(() => vi.restoreAllMocks());
 
@@ -28,13 +28,11 @@ function harness() {
 	const getApiClient = vi.fn(() => api);
 	const plugin = new CratePlugin({} as never, {} as never);
 	const saveData = vi.fn(async (next: unknown) => { data = structuredClone(next); });
-	const reinitializeWithFolder = vi.fn(async () => {});
 	Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } },
 		secretStorage: { get: () => null },
 		settings: normalizeCrateSettings({ workerUrl: 'https://first.example' }, '.obsidian'),
-		syncRuntime: { getApiClient }, saveData, loadData: async () => data,
-		reinitializeWithFolder });
-	return { plugin, api, getApiClient, saveData, reinitializeWithFolder, ensureNotificationPolicy, updateNotificationPolicy,
+		syncRuntime: { getApiClient }, saveData, loadData: async () => data });
+	return { plugin, api, getApiClient, saveData, ensureNotificationPolicy, updateNotificationPolicy,
 		setOnline: (value: boolean) => { online = value; }, policy: () => policy };
 }
 
@@ -43,7 +41,7 @@ it('saves and applies an offline edit, then retries its persisted intent after r
 	await changeReminderFolder(h.plugin, ' /Tasks/Work/ ');
 	await ensureReminderNotificationPolicy(h.plugin);
 	expect(h.plugin.remindersSettings.remindersFolderPath).toBe('Tasks/Work');
-	expect(h.reinitializeWithFolder).toHaveBeenCalledWith('Tasks/Work');
+	expect(reinitializeWithFolder).toHaveBeenCalledWith(h.plugin, 'Tasks/Work');
 	expect(h.plugin.remindersSettings.pendingServerFolder).toMatchObject({ folderPath: 'Tasks/Work', workerUrl: 'https://first.example' });
 	useRemindersSettingsStore.setState(DEFAULT_REMINDERS_SETTINGS, true);
 	await h.plugin.loadSettings(); h.setOnline(true);

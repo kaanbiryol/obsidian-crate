@@ -12,7 +12,7 @@ import { CRATE_ICON_ID, CRATE_ICON_SVG } from '../ui/crate-icon';
 const remindersLogger = createLogger('Reminders');
 const registeredReminderUi = new WeakSet<CratePlugin>();
 
-export async function registerReminderIntegrations(plugin: CratePlugin): Promise<void> {
+export async function registerReminderIntegrations(plugin: CratePlugin, openView: () => Promise<void>): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
 	if (registeredReminderUi.has(plugin)) {
@@ -45,7 +45,7 @@ export async function registerReminderIntegrations(plugin: CratePlugin): Promise
 		(leaf) => new RemindersView(leaf, plugin),
 	);
 	const ribbon = plugin.addRibbonIcon(CRATE_ICON_ID, 'Open reminders', () => {
-		void plugin.activateRemindersView();
+		void openView();
 	});
 
 	setReminderRibbon(plugin, ribbon);
@@ -54,7 +54,7 @@ export async function registerReminderIntegrations(plugin: CratePlugin): Promise
 	plugin.addCommand({
 		id: 'open-reminders-view',
 		name: 'Open reminders sidebar',
-		callback: () => plugin.activateRemindersView(),
+		callback: () => openView(),
 	});
 
 	if (plugin.remindersSettings.autoOpenView !== 'none') {
@@ -62,7 +62,7 @@ export async function registerReminderIntegrations(plugin: CratePlugin): Promise
 		plugin.app.workspace.onLayoutReady(() => {
 			if (signal.aborted) return;
 			if (plugin.remindersSettings.autoOpenView === 'sidebar') {
-				opening = plugin.activateRemindersView();
+				opening = openView();
 				void opening.catch(error => remindersLogger.error('Failed to open reminders:', error));
 			}
 		});

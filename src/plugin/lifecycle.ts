@@ -5,7 +5,7 @@ import { stopReading } from '../reading/runtime';
 import { SecretStorageService } from "./secret-storage";
 import { createLogger, errorMessage } from "../sync/logger";
 import { CrateSettingTab } from "../ui/settings-tab";
-import { initializeReminders } from "../reminders/plugin-integration";
+import { activateRemindersView, initializeReminders } from "../reminders/plugin-integration";
 import { ensureReminderNotificationPolicy } from "../reminders/notification-policy-sync";
 import {
   initializeSyncManagers,
@@ -160,7 +160,7 @@ function registerPluginProtocols(plugin: CratePlugin): void {
       plugin.openSettingsTab();
       return;
     }
-    void plugin.activateRemindersView(params.project || undefined).catch((error: unknown) => {
+    void activateRemindersView(plugin, params.project || undefined).catch((error: unknown) => {
       logger.error("Failed to open reminders:", errorMessage(error));
       new Notice("Could not open reminders. Please try again.");
     });

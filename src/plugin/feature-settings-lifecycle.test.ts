@@ -6,12 +6,14 @@ import { normalizeCrateSettings } from './settings';
 import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from '../reminders/settings';
 import { startReading, stopReading } from '../reading/runtime';
 import { endPluginLifecycle } from './lifecycle-state';
-import { initializeReminders } from '../reminders/plugin-integration';
+import { setupReminderBackend } from '../reminders/runtime';
 
 vi.mock('./lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
 vi.mock('./server-request', async importOriginal => ({ ...await importOriginal<typeof import('./server-request')>(), serverRequest: vi.fn() }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn() }));
-vi.mock('../reminders/plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));
+vi.mock('../reminders/runtime', async importOriginal => ({ ...await importOriginal<typeof import('../reminders/runtime')>(), setupReminderBackend: vi.fn() }));
+vi.mock('../reminders/register-integrations', () => ({ registerReminderIntegrations: vi.fn() }));
+vi.mock('../reminders/ui/plugin/reminders-view', () => ({ VIEW_TYPE_REMINDERS: 'reminders-view' }));
 vi.mock('../reminders/ui/plugin/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
 
 beforeEach(() => {
@@ -101,7 +103,7 @@ it.each(['reading', 'reminders'] as const)('does not publish an in-flight %s sav
   expect(f.saveData.mock.lastCall?.[0]).toMatchObject({ workerUrl: 'https://replacement.example', reading: { enabled: true }, reminders: { enabled: true } });
   expect(stopReading).not.toHaveBeenCalled();
   expect(startReading).not.toHaveBeenCalled();
-  expect(initializeReminders).not.toHaveBeenCalled();
+  expect(setupReminderBackend).not.toHaveBeenCalled();
   expect(f.detachLeaves).not.toHaveBeenCalled();
   expect(f.refresh).not.toHaveBeenCalled();
 });
@@ -117,11 +119,11 @@ it('does not roll back the new connection when old reminder initialization fails
   const f = fixture();
   useRemindersSettingsStore.setState({ enabled: false });
   let fail!: (error: Error) => void;
-  vi.mocked(initializeReminders).mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+  vi.mocked(setupReminderBackend).mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
   vi.mocked(serverRequest).mockResolvedValue({ reading: true, reminders: true, revision: 'original' });
   const pending = refreshSharedFeatures(f.plugin);
   const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
-  await vi.waitFor(() => expect(initializeReminders).toHaveBeenCalledOnce());
+  await vi.waitFor(() => expect(setupReminderBackend).toHaveBeenCalledOnce());
   f.changeToken();
   fail(new Error('Old initialization failed'));
   await rejected;

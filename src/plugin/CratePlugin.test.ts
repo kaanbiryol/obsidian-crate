@@ -4,19 +4,11 @@ import { normalizeCrateSettings } from './settings';
 import { ensurePluginDeviceId } from './deviceId';
 import { recordSyncHistory } from '../sync/runtime/history';
 import { createEmptySyncResult } from '../sync/sync-result';
-import { initializeReminders } from '../reminders/plugin-integration';
 import {
 	DEFAULT_REMINDERS_SETTINGS,
 	useRemindersSettingsStore,
 } from '../reminders/settings';
 
-vi.mock('../reminders/plugin-integration', () => ({
-	initializeReminders: vi.fn(),
-	reinitializeReminders: vi.fn(),
-}));
-vi.mock('../reminders/ui/plugin/workspaceLayout', () => ({
-	activateOrRevealRemindersLeaf: vi.fn(),
-}));
 vi.mock('./lifecycle', () => ({
 	bootstrapPlugin: vi.fn(),
 	shutdownPlugin: vi.fn(),
@@ -24,7 +16,6 @@ vi.mock('./lifecycle', () => ({
 
 describe('CratePlugin settings persistence', () => {
 	beforeEach(() => {
-		vi.mocked(initializeReminders).mockReset();
 		useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS }, true);
 	});
 
@@ -129,25 +120,6 @@ describe('CratePlugin settings persistence', () => {
 		expect(settings.syncHistory).toHaveLength(1);
 		expect(settings.syncInterval).toBe(300);
 		expect(saveData).toHaveBeenLastCalledWith(expect.objectContaining({ lastSeq: 11, syncHistory: settings.syncHistory, syncInterval: 300 }));
-	});
-
-
-	it('stops local reminders without deleting notes when disabled', async () => {
-		const plugin = new CratePlugin({} as never, {} as never);
-		const unregister = vi.fn();
-		const detachLeavesOfType = vi.fn();
-		Object.assign(plugin, {
-			app: { vault: { configDir: '.obsidian' }, workspace: { detachLeavesOfType } },
-			settings: normalizeCrateSettings({}, '.obsidian'),
-			saveData: vi.fn(async () => {}), remindersVaultWatcher: { unregister },
-		});
-		await plugin.setRemindersEnabled(false);
-		expect(plugin.remindersSettings.enabled).toBe(false);
-		expect(unregister).toHaveBeenCalledOnce();
-		expect(detachLeavesOfType).toHaveBeenCalledWith('reminders-view');
-		await plugin.setRemindersEnabled(true);
-		expect(plugin.remindersSettings.enabled).toBe(true);
-		expect(initializeReminders).toHaveBeenCalledOnce();
 	});
 
 	it.each([true, false])('loads the single debug setting: %s', async debugLogging => {

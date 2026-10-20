@@ -30,7 +30,7 @@ it.each(['single', 'rapid', 'previous rename', 'paused rename'] as const)('prese
     remindersSettings: { enabled: false, remindersFolderPath: 'Reminders' },
     writeSettings: async (patch: object) => { Object.assign(h.settings, patch); },
     writeRemindersSettings: async (update: (settings: object) => object) => { Object.assign(plugin.remindersSettings, update(plugin.remindersSettings)); },
-    reinitializeWithFolder: async () => {}, refreshSettingsTab: () => {},
+    refreshSettingsTab: () => {},
   }) as unknown as CratePlugin;
   const keys = addReminderScope(createVaultKeyBundle(), 'Reading', 'reading');
   saveEncryptionKeys(plugin.secretStorage, keys, await generateRecoveryCode());

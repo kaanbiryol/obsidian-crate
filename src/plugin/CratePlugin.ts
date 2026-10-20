@@ -1,23 +1,19 @@
-import { stopReminderBackend } from '../reminders/runtime';
-import { updateReminderVisibility } from '../reminders/visibility';
 /**
  * Crate - Sync your vault to Cloudflare R2 + Reminders
  */
 
-import { Notice, Plugin } from 'obsidian';
+import { Plugin } from 'obsidian';
 import type { CloudflareUsageConnection } from '../cloudflare/usage/connection';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment/service';
 import { type ReminderIndex } from '../reminders/data/reminder-index';
 import { type MarkdownWriter } from '../reminders/data/markdown-writer';
 import { type ReminderRepository } from '../reminders/data/reminder-repository';
-import { initializeReminders, reinitializeReminders } from '../reminders/plugin-integration';
 import {
 	type RemindersSettings,
 	normalizeRemindersSettings,
 	useRemindersSettingsStore,
 } from '../reminders/settings';
 import { type VaultWatcher } from '../reminders/services/vaultWatcher';
-import { activateOrRevealRemindersLeaf } from '../reminders/ui/plugin/workspaceLayout';
 import { configureLogger as configureRemindersLogger } from '../reminders/logger';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import type { CrateSettingTab } from '../ui/settings-tab';
@@ -119,39 +115,6 @@ export default class CratePlugin extends Plugin {
 		await this.writeSettings({ debugLogging: enabled });
 		configureSyncLogger({ enabled });
 		configureRemindersLogger({ prefix: 'Crate', enabled });
-	}
-
-	async setRemindersEnabled(enabled: boolean, assertCurrent?: () => void): Promise<void> {
-		await this.writeRemindersSettings({ enabled }, assertCurrent);
-		assertCurrent?.();
-		if (enabled) {
-			try { await initializeReminders(this); }
-			catch (error) {
-				assertCurrent?.();
-				stopReminderBackend(this);
-				await this.writeRemindersSettings({ enabled: false }, assertCurrent);
-				assertCurrent?.();
-				updateReminderVisibility(this);
-				throw error;
-			}
-		} else {
-			stopReminderBackend(this);
-			this.app.workspace.detachLeavesOfType('reminders-view');
-		}
-		assertCurrent?.();
-		updateReminderVisibility(this);
-	}
-
-	async activateRemindersView(project?: string): Promise<void> {
-		if (!this.remindersSettings.enabled) { new Notice('Enable reminders in Crate settings first.'); return; }
-		await activateOrRevealRemindersLeaf(this.app.workspace, 'reminders-view', project, getPluginLifecycleSignal(this));
-	}
-
-	async reinitializeWithFolder(newFolderPath: string): Promise<void> {
-		if (!this.remindersSettings.enabled) {
-			return;
-		}
-		await reinitializeReminders(this, newFolderPath);
 	}
 
 	clearSettingsUiState(): void {

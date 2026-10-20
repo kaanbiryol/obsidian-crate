@@ -12,6 +12,13 @@ import { SECRET_KEYS } from '../platform/secret-keys';
 
 const running = new WeakMap<CratePlugin, Promise<void>>();
 
+// Loaded on demand so sync modules that import this one do not load the reminders UI.
+async function restartReminders(plugin: CratePlugin): Promise<void> {
+  if (!plugin.remindersSettings.enabled) return;
+  const { reinitializeWithFolder } = await import('../reminders/plugin-integration');
+  await reinitializeWithFolder(plugin, plugin.remindersSettings.remindersFolderPath);
+}
+
 /** Persist before stopping sync or attempting the network. Rapid/offline renames
  * keep their order, and an uncertain conversion retains its exact next bundle. */
 export function queueEncryptedFolderMove(plugin: CratePlugin, from: string, to: string, rename = true): boolean {
@@ -58,7 +65,7 @@ export function resumeEncryptedFolderMoves(plugin: CratePlugin, progress: (messa
     })) { /* Drain all persisted moves before restarting the runtimes. */ }
   }); } while (plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES));
     connection.assertCurrent();
-    if (plugin.remindersSettings.enabled) await plugin.reinitializeWithFolder(plugin.remindersSettings.remindersFolderPath);
+    await restartReminders(plugin);
     connection.assertCurrent();
     // A rename can arrive while reminders are restarting. Release this task
     // before recursing so callers wait for every persisted move to finish.
@@ -114,6 +121,6 @@ export async function useServerEncryptionFolders(plugin: CratePlugin): Promise<v
     writeFolderMoves(plugin.secretStorage, { version: 1, moves: [] });
   });
   connection.assertCurrent();
-  if (plugin.remindersSettings.enabled) await plugin.reinitializeWithFolder(plugin.remindersSettings.remindersFolderPath);
+  await restartReminders(plugin);
   connection.assertCurrent(); startReading(plugin); plugin.refreshSettingsTab(); plugin.syncRuntime.triggerForegroundSync('focus');
 }

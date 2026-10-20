@@ -5,12 +5,14 @@ import { saveEncryptionKeys, loadEncryptionKeys } from '../sync/encryption/key-s
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves, useServerEncryptionFolders } from './encryption-folder-moves';
 import type CratePlugin from './CratePlugin';
 import { SECRET_KEYS } from '../platform/secret-keys';
+import { reinitializeWithFolder } from '../reminders/plugin-integration';
 
 const mocks = vi.hoisted(() => ({ convert: vi.fn(), info: vi.fn(), state: vi.fn() }));
 vi.mock('../sync/encryption/conversion', async importOriginal => ({ ...await importOriginal<object>(), convertEncryptedVault: mocks.convert, readServerEncryption: mocks.state }));
 vi.mock('../sync/worker-api/http', () => ({ WorkerApiHttpClient: class { setAbortSignal() {} getServerInfo = mocks.info; } }));
 vi.mock('../sync/encryption/rename-checkpoint', () => ({ checkpointEncryptionRenames: vi.fn(async () => {}) }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), waitForStoppedReading: vi.fn(async () => {}) }));
+vi.mock('../reminders/plugin-integration', () => ({ reinitializeWithFolder: vi.fn(async () => {}) }));
 vi.mock('./server-request', () => ({ captureServerConnection: () => ({ origin: 'https://crate.test', token: 'token', signal: new AbortController().signal, assertCurrent: () => {} }) }));
 afterEach(() => vi.resetAllMocks());
 async function setup() {
@@ -21,7 +23,7 @@ async function setup() {
     settings: { workerUrl: 'https://crate.test', reading: { enabled: true, folderPath: 'Reading' } },
     remindersSettings: { enabled: true, remindersFolderPath: 'Reminders' },
     syncRuntime: { getRenameDependencies: () => ({}), destroy: vi.fn(), runEncryptionSetup: vi.fn(async (work: () => Promise<void>) => work()), triggerForegroundSync: vi.fn() },
-    reinitializeWithFolder: vi.fn(async () => {}), refreshSettingsTab: vi.fn(),
+    refreshSettingsTab: vi.fn(),
     writeSettings: vi.fn(async (patch: object) => { Object.assign(plugin.settings, patch); }),
     writeRemindersSettings: vi.fn(async (update: (current: typeof plugin.remindersSettings) => object) => { Object.assign(plugin.remindersSettings, update(plugin.remindersSettings)); }),
   };
@@ -116,7 +118,7 @@ it.each(['initialization', 'reminders'])('drains a rename arriving during %s bef
   const h = await setup(); queueEncryptedFolderMove(h.plugin, 'Reading', 'Articles');
   const append = () => { queueEncryptedFolderMove(h.plugin, 'Articles', 'Saved/Articles'); };
   if (phase === 'initialization') h.fake.syncRuntime.runEncryptionSetup.mockImplementationOnce(async work => { await work(); append(); });
-  else h.fake.reinitializeWithFolder.mockImplementationOnce(async () => { append(); });
+  else vi.mocked(reinitializeWithFolder).mockImplementationOnce(async () => { append(); });
   await resumeEncryptedFolderMoves(h.plugin);
   expect(loadEncryptionKeys(h.plugin.secretStorage)?.scopes[1]?.folderPath).toBe('Saved/Articles');
   expect(h.plugin.settings.reading.folderPath).toBe('Saved/Articles');

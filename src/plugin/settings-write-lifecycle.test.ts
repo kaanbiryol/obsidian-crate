@@ -6,8 +6,6 @@ import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from '../remind
 import * as syncLogger from '../sync/logger';
 import * as remindersLogger from '../reminders/logger';
 
-vi.mock('../reminders/plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));
-vi.mock('../reminders/ui/plugin/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
 vi.mock('./lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
 
 function createPlugin() {

@@ -12,6 +12,7 @@ type SyncRuntimeTarget = {
 };
 
 const initializeReminders = vi.fn();
+const activateRemindersView = vi.fn(async (..._args: unknown[]) => {});
 const ensureReminderNotificationPolicy = vi.fn();
 const initializeSyncManagers = vi.fn<(target: SyncRuntimeTarget) => void>();
 const registerSyncCommands = vi.fn();
@@ -78,6 +79,7 @@ async function loadLifecycleModule() {
 		},
 	}));
 	vi.doMock('../reminders/plugin-integration', () => ({
+		activateRemindersView,
 		initializeReminders,
 	}));
 	vi.doMock('../reminders/notification-policy-sync', () => ({
@@ -119,7 +121,6 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 		remindersSettings: { enabled: true },
 		registerSettingsTab: vi.fn(),
 		openSettingsTab: vi.fn(),
-		activateRemindersView: vi.fn(async () => {}),
 		registerObsidianProtocolHandler: vi.fn(),
 		...overrides,
 	};
@@ -203,7 +204,7 @@ describe('bootstrapPlugin', () => {
 		remindersHandler?.({ project: 'Work' });
 		cloudflareHandler?.({ code: 'authorization-code', state: 'oauth-state' });
 
-		expect(plugin.activateRemindersView).toHaveBeenCalledWith('Work');
+		expect(activateRemindersView).toHaveBeenCalledWith(plugin, 'Work');
 		expect(handleCloudflareOAuthProtocol).toHaveBeenCalledWith(plugin, {
 			code: 'authorization-code',
 			state: 'oauth-state',
@@ -256,7 +257,7 @@ describe('bootstrapPlugin', () => {
 		)?.[1] as ProtocolHandler | undefined;
 		remindersHandler?.({ project: 'Work' });
 
-		expect(plugin.activateRemindersView).not.toHaveBeenCalled();
+		expect(activateRemindersView).not.toHaveBeenCalled();
 		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(1);
 		expect(noticeMessages).toContain(
 			'Reminders are unavailable. Check your folder in Crate settings.',

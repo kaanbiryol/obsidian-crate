@@ -11,11 +11,11 @@ import { SyncRuntime } from '../sync/runtime/runtime';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { convertEncryptedVault } from '../sync/encryption/conversion';
 import { startReading } from '../reading/runtime';
+import { reinitializeWithFolder } from '../reminders/plugin-integration';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
 vi.mock('./lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
-vi.mock('../reminders/plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));
-vi.mock('../reminders/ui/plugin/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
+vi.mock('../reminders/plugin-integration', () => ({ reinitializeWithFolder: vi.fn() }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), waitForStoppedReading: vi.fn(async () => {}) }));
 vi.mock('../sync/encryption/rename-checkpoint', () => ({ checkpointEncryptionRenames: vi.fn(async () => {}) }));
 vi.mock('../sync/encryption/conversion', async original => ({ ...await original<object>(), convertEncryptedVault: vi.fn(async () => {}) }));
@@ -44,7 +44,7 @@ async function fixture() {
   saveEncryptionKeys(plugin.secretStorage, keys, await generateRecoveryCode());
   plugin.syncRuntime = new SyncRuntime(plugin, plugin.settings, plugin.secretStorage, () => plugin.saveSettings());
   const initialize = vi.spyOn(plugin.syncRuntime, 'initialize').mockResolvedValue();
-  const reinitialize = vi.spyOn(plugin, 'reinitializeWithFolder').mockResolvedValue();
+  const reinitialize = vi.mocked(reinitializeWithFolder).mockResolvedValue();
   const refresh = vi.spyOn(plugin, 'refreshSettingsTab');
   vi.spyOn(WorkerApiHttpClient.prototype, 'getServerInfo').mockResolvedValue({ capabilities: ['e2ee-folder-moves-v1'] } as never);
   queueEncryptedFolderMove(plugin, 'Notes', 'Archive');
