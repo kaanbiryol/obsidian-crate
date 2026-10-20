@@ -6,8 +6,9 @@ import {
 	getReminderSheetClosedOffset,
 	useReminderSheetNavigation,
 } from '../hooks/useReminderSheetNavigation';
-import { discardReminderDraft, inspectReminderDraft, restoreReminderDraft, saveReminderDraft } from '../reminders/editor/reminder-drafts';
-import type { ModalDraft, ModalState } from '../types';
+import { inspectReminderDraft } from '../reminders/editor/reminder-drafts';
+import { usePersistedReminderDraft } from '../hooks/usePersistedReminderDraft';
+import type { ModalState } from '../types';
 import {
 	ReminderEditorScreen,
 	type ReminderEditorScreenHandle,
@@ -60,7 +61,7 @@ function ReminderEditorSheet({
 	onDelete,
 }: ReminderSheetProps) {
 	// Keep keystrokes local so the reminder list does not render behind the sheet.
-	const [modal, setModal] = useState(() => restoreReminderDraft(initialModal, folderPath));
+	const { modal, patchDraft, discardDraft } = usePersistedReminderDraft(initialModal, folderPath);
 	const [pickerReady, setPickerReady] = useState(false);
 	const handlePickerReady = useCallback(() => setPickerReady(true), []);
 	const [preloadedPicker, setPreloadedPicker] = useState<typeof import('./ReminderPickerSheet').ReminderPickerSheet | null>(null);
@@ -81,7 +82,7 @@ function ReminderEditorSheet({
 	const editorScreenRef = useRef<ReminderEditorScreenHandle | null>(null);
 	const onClose = () => {
 		editorScreenRef.current?.dismissKeyboard();
-		discardReminderDraft(modal, folderPath);
+		discardDraft();
 		dismissModal();
 	};
 	useLayoutEffect(() => {
@@ -98,13 +99,6 @@ function ReminderEditorSheet({
 		() => ['Inbox', ...projects.filter((project) => project !== 'Inbox')],
 		[projects],
 	);
-	const patchDraft = useCallback((patch: Partial<ModalDraft>) => {
-		setModal((current) => {
-			const next = { ...current, draft: { ...current.draft, ...patch } };
-				saveReminderDraft(next, folderPath);
-			return next;
-		});
-	}, [folderPath]);
 	const dismissEditorKeyboard = useCallback(() => {
 		pickerTransitionClosedOffsetRef.current = getReminderSheetClosedOffset(
 			reminderStageRef.current?.getBoundingClientRect().height ?? 0,
