@@ -57,7 +57,7 @@ describe('reminderIndex', () => {
 
   it.each([false, true])('waits for an initial scan deferred by sync (partial: %s)', async (partial) => {
     let syncing = !partial;
-    const index = createReminderIndex(app, 'Reminders', undefined, () => syncing);
+    const index = createReminderIndex(app, 'Reminders', { shouldDeferScan: () => syncing });
     const result: ScanResult = {
       reminders: [makeReminder({ id: 'today', dueDate: '2026-09-11' })],
       filesScanned: 1, totalLines: 1, issues: [], scanDurationMs: 1, discoveredProjects: ['Work'],

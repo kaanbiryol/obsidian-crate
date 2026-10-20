@@ -156,7 +156,7 @@ it('flushes deferred file scans with one owner map and one notification', async 
   const paths = ['Reminders/A.md', 'Reminders/B.md', 'Reminders/C.md'];
   const files = new Map(paths.map(path => [path, Object.assign(new TFile(), { path, basename: path.slice(10, 11), extension: 'md' })]));
   const index = createReminderIndex({ vault: { getAbstractFileByPath: (path: string) => files.get(path) ?? null } } as unknown as App,
-    'Reminders', undefined, () => syncing);
+    'Reminders', { shouldDeferScan: () => syncing });
   vi.mocked(scanVault).mockResolvedValue(snapshot([reminder()]));
   await index.load();
   syncing = true;

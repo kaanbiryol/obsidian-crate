@@ -270,7 +270,7 @@ it.each([
     read, process,
   } } as unknown as App);
   // Collision repair cannot proceed offline or before sync verification.
-  const index = createReminderIndex(app, 'Reminders', undefined, () => false, () => true);
+  const index = createReminderIndex(app, 'Reminders', { shouldDeferCollisionRepair: () => true });
   await index.load();
   expect(index.isInitialLoadComplete).toBe(true);
   expect(index.sourceIssues).toEqual([]);

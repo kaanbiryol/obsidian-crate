@@ -8,6 +8,7 @@ import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { Notice } from 'obsidian';
 import { validateReadingFolder } from '../reading/settings';
 import { createReminderMoveJournal, type ReminderMoveJournal } from './data/reminder-move-journal';
+import { createReminderScanGate } from './scan-gate';
 
 const remindersLogger = createLogger('Reminders');
 const backends = new WeakMap<CratePlugin, AbortController>();
@@ -50,23 +51,15 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	}
 	if (controller.signal.aborted) return false;
 
-	let verifiedApi = plugin.syncRuntime.getApiClient();
-	let syncingApi: typeof verifiedApi = null;
-	const index = createReminderIndex(plugin.app, folderPath, controller.signal,
-		path => !plugin.app.workspace.layoutReady || plugin.syncRuntime.getState().status === 'syncing' || Boolean(path && journal.isPendingFile(path)),
-		() => {
-			const api = plugin.syncRuntime.getApiClient();
-			return journal.hasPending() || plugin.syncRuntime.isConfigured() && (!api || api !== verifiedApi)
-				|| ['error', 'offline'].includes(plugin.syncRuntime.getState().status);
-		});
+	const gate = createReminderScanGate({ workspace: plugin.app.workspace, syncRuntime: plugin.syncRuntime, journal });
+	const index = createReminderIndex(plugin.app, folderPath, {
+		signal: controller.signal,
+		shouldDeferScan: gate.shouldDeferScan,
+		shouldDeferCollisionRepair: gate.shouldDeferCollisionRepair,
+	});
 	const onSyncStateChanged = () => {
+		gate.onSyncStateChanged();
 		const { status } = plugin.syncRuntime.getState();
-		const api = plugin.syncRuntime.getApiClient();
-		if (status === 'syncing') syncingApi = api;
-		else {
-			if (status === 'idle' && api && syncingApi === api) verifiedApi = api;
-			syncingApi = null;
-		}
 		const refresh = async () => {
 			if (status === 'syncing' || controller.signal.aborted) return;
 			if (journal.hasPending()) {

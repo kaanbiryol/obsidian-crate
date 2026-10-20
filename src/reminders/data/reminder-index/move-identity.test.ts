@@ -14,7 +14,11 @@ async function workspace(source = 'A', destination = 'Z') {
 	folders.add('Reminders');
 	const lifetime = new AbortController();
 	let status = 'idle';
-	const index = createReminderIndex(app, 'Reminders', lifetime.signal, () => status === 'syncing', () => status === 'error' || status === 'offline');
+	const index = createReminderIndex(app, 'Reminders', {
+		signal: lifetime.signal,
+		shouldDeferScan: () => status === 'syncing',
+		shouldDeferCollisionRepair: () => status === 'error' || status === 'offline',
+	});
 	function file(path: string): TFile {
 		const current = app.vault.getAbstractFileByPath(path);
 		if (!(current instanceof TFile)) throw new Error('Test file is missing');
@@ -213,7 +217,7 @@ describe('reminder identity ownership during moves', () => {
 			? Object.assign(new TFolder(), { path, children: entries })
 			: entries.find(entry => entry.path === path) ?? null;
 		let waitingForSync = true;
-		const index = createReminderIndex(app, 'Reminders', undefined, () => false, () => waitingForSync);
+		const index = createReminderIndex(app, 'Reminders', { shouldDeferCollisionRepair: () => waitingForSync });
 		const result = await index.load();
 
 		expect(result.deferred).toBe(true);

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReminderIndexOptions } from './data/reminder-index';
 
 type RemindersSettingsStub = {
 	remindersFolderPath: string;
@@ -67,6 +68,16 @@ let latestWriter: MockWriter;
 let latestWatcher: {
 	register: ReturnType<typeof vi.fn>;
 	unregister: ReturnType<typeof vi.fn>;
+};
+
+function indexOptions(call = 0): ReminderIndexOptions {
+	return reminderIndexFactory.mock.calls[call]?.[2] as ReminderIndexOptions;
+}
+
+const gatedIndexOptions: Record<keyof ReminderIndexOptions, unknown> = {
+	signal: expect.any(AbortSignal),
+	shouldDeferScan: expect.any(Function),
+	shouldDeferCollisionRepair: expect.any(Function),
 };
 
 async function flushMicrotasks(): Promise<void> {
@@ -224,7 +235,7 @@ describe('initializeReminders', () => {
 
 		await initializeReminders(plugin as never);
 
-		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders', expect.any(AbortSignal), expect.any(Function), expect.any(Function));
+		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders', gatedIndexOptions);
 		expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
 		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex, moveJournal);
 		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
@@ -298,7 +309,7 @@ describe('reinitializeReminders', () => {
 		await reinitializeReminders(plugin as never, ' Reminders/Work/ ');
 
 		expect(oldWatcher.unregister).toHaveBeenCalledTimes(1);
-		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders/Work', expect.any(AbortSignal), expect.any(Function), expect.any(Function));
+		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders/Work', gatedIndexOptions);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 	});
 });
@@ -336,7 +347,7 @@ it('keeps the newer folder backend when an older scan finishes last', async () =
   expect(latestWatcher.register).toHaveBeenCalledOnce();
   expect(plugin.registerView).toHaveBeenCalledOnce();
   expect(registerReminderCommands).toHaveBeenCalledOnce();
-  expect((reminderIndexFactory.mock.calls[0]?.[2] as AbortSignal).aborted).toBe(true);
+  expect(indexOptions().signal?.aborted).toBe(true);
 });
 
 it('does not auto-open the view after unloading before layout is ready', async () => {
@@ -368,7 +379,7 @@ it('defers startup collision repair until the configured connection finishes a s
 	const plugin = createPlugin();
 	plugin.syncRuntime.isConfigured.mockReturnValue(true);
 	await initializeReminders(plugin as never);
-	const shouldDefer = reminderIndexFactory.mock.calls[0]?.[4] as () => boolean;
+	const shouldDefer = indexOptions().shouldDeferCollisionRepair!;
 	const listener = plugin.syncRuntime.addStateChangeListener.mock.calls[0]?.[0] as () => void;
 	expect(shouldDefer()).toBe(true);
 	plugin.syncRuntime.getApiClient.mockReturnValue({});
@@ -396,7 +407,7 @@ it('recovers interrupted moves before scanning and protects unresolved file path
 	recoverMoves.mockResolvedValueOnce(['Review both copies before retrying recovery.']);
 	await initializeReminders(plugin as never);
 	expect(recoverMoves.mock.invocationCallOrder[0]).toBeLessThan(reminderIndexLoad.mock.invocationCallOrder[0]!);
-	const defer = reminderIndexFactory.mock.calls[0]?.[3] as (path?: string) => boolean;
+	const defer = indexOptions().shouldDeferScan!;
 	plugin.app.workspace.layoutReady = true;
 	expect(defer()).toBe(false);
 	expect(defer('Reminders/Healthy.md')).toBe(false);
@@ -423,7 +434,7 @@ it('does not start normalization when unloaded during journal recovery', async (
   const { initializeReminders } = await loadPluginIntegrationModule();
   const plugin = createPlugin();
   await initializeReminders(plugin as never);
-  const defer = reminderIndexFactory.mock.calls[0]?.[3] as (path?: string) => boolean;
+  const defer = indexOptions().shouldDeferScan!;
   expect(defer()).toBe(true);
   expect(defer('Reminders/Inbox.md')).toBe(true);
   expect(plugin.registerView).toHaveBeenCalled();
@@ -452,7 +463,7 @@ it('stops the backend signal and watcher when reminders are disabled', async () 
   const { stopReminderBackend } = await import('./runtime');
   const plugin = createPlugin();
   await initializeReminders(plugin as never);
-  const signal = reminderIndexFactory.mock.calls[0]![2] as AbortSignal;
+  const signal = indexOptions().signal!;
   expect(signal.aborted).toBe(false);
   stopReminderBackend(plugin as never);
   expect(signal.aborted).toBe(true);

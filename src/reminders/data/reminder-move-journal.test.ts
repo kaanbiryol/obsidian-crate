@@ -28,7 +28,11 @@ async function workspace(sourceTask = task) {
 		const lifetime = new AbortController();
 		const journal = createReminderMoveJournal(app, directory, folderPath, lifetime.signal);
 		const issues = await journal.recover();
-		const index = createReminderIndex(app, folderPath, lifetime.signal, path => Boolean(path && journal.isPendingFile(path)), () => journal.hasPending());
+		const index = createReminderIndex(app, folderPath, {
+			signal: lifetime.signal,
+			shouldDeferScan: path => Boolean(path && journal.isPendingFile(path)),
+			shouldDeferCollisionRepair: () => journal.hasPending(),
+		});
 		for (const path of [sourcePath, destinationPath]) {
 			const file = app.vault.getAbstractFileByPath(path);
 			if (file instanceof TFile) await index.rescanFile(file);

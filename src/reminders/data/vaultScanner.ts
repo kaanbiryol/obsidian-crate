@@ -191,6 +191,14 @@ export async function scanFile(
   }
 }
 
+interface ScanVaultOptions {
+  signal?: AbortSignal;
+  /** Called without a path before each file, then with the path during its normalization. */
+  shouldDeferNormalization?: (filePath?: string) => boolean;
+  shouldDeferCollisionRepair?: () => boolean;
+  knownOwners?: ReminderIdentityOwner[];
+}
+
 /**
  * Scan only the reminders folder for reminder files
  * @param app - Obsidian app instance
@@ -199,10 +207,12 @@ export async function scanFile(
 export async function scanVault(
   app: App,
   remindersFolderPath: string,
-  signal?: AbortSignal,
-  shouldDeferNormalization: (filePath?: string) => boolean = () => false,
-  shouldDeferCollisionRepair = () => false,
-  knownOwners: ReminderIdentityOwner[] = [],
+  {
+    signal,
+    shouldDeferNormalization = () => false,
+    shouldDeferCollisionRepair = () => false,
+    knownOwners = [],
+  }: ScanVaultOptions = {},
 ): Promise<ScanResult> {
   const startTime = Date.now();
   const allReminders: IndexedReminder[] = [];

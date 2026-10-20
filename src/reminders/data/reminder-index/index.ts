@@ -63,7 +63,19 @@ export interface ReminderIndex {
   clearOptimistic(id: string): void;
 }
 
-export function createReminderIndex(app: App, remindersFolderPath: string, signal?: AbortSignal, shouldDeferScan: (filePath?: string) => boolean = () => false, shouldDeferCollisionRepair = () => false): ReminderIndex {
+export interface ReminderIndexOptions {
+  signal?: AbortSignal;
+  /** Holds scans until the vault and sync can be read safely; whole-vault checks omit the path. */
+  shouldDeferScan?: (filePath?: string) => boolean;
+  /** Holds duplicate-ID repair until sync has reconciled file ownership. */
+  shouldDeferCollisionRepair?: () => boolean;
+}
+
+export function createReminderIndex(
+  app: App,
+  remindersFolderPath: string,
+  { signal, shouldDeferScan = () => false, shouldDeferCollisionRepair = () => false }: ReminderIndexOptions = {},
+): ReminderIndex {
   let reminders: IndexedReminder[] = [];
   let isLoaded = false;
   let isInitialLoadComplete = false;
@@ -229,9 +241,12 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       let revision: number;
       do {
         revision = structureRevision;
-        result = await scanVault(app, remindersFolderPath, signal,
-          path => revision !== structureRevision || shouldDeferScan(path),
-          shouldDeferCollisionRepair, [...reminders, ...ambiguousOwners]);
+        result = await scanVault(app, remindersFolderPath, {
+          signal,
+          shouldDeferNormalization: path => revision !== structureRevision || shouldDeferScan(path),
+          shouldDeferCollisionRepair,
+          knownOwners: [...reminders, ...ambiguousOwners],
+        });
         // A rename or deletion updates the visible index immediately. Re-read
         // the inventory before publishing a snapshot that crossed that event.
       } while (!signal?.aborted && revision !== structureRevision);
