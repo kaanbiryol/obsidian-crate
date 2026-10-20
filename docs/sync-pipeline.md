@@ -81,11 +81,11 @@ and an edit before retry receives normal conflict handling. A populated local
 vault and subsequent syncs always use normal reconciliation. The setup intent is
 removed after successful reconciliation.
 
-### 5. Initial Sync
+### 5. Initial Import
 
-First-time upload of all vault files. Files are prepared and uploaded in sequential byte-budgeted chunks so binary contents cannot accumulate without bound in memory.
+There is no separate initial-sync command. Each sync first asks the server for an unfinished initial import; while one is open, the vault is uploaded through it before any incremental or full reconciliation. Server files missing locally are pruned from the import, files are prepared in byte-budgeted chunks so binary contents cannot accumulate without bound in memory, and small files are committed in batches of up to 32. Finishing the import sets the changelog cursor.
 
-Entry point: `engine/engine.ts:initialSync()`
+Entry point: `engine/engine.ts:sync()` -> `engine/initial-import.ts:runInitialImport()`
 
 ### 6. Force Full Sync
 
@@ -234,7 +234,7 @@ Release and transfer values are also checked against source in [current contract
 
 ## Batching Strategy
 
-Manual, selected-file, incremental, initial, forced and edit-triggered automatic
+Manual, selected-file, incremental, forced and edit-triggered automatic
 sync use `transfer/upload.ts:uploadPreparedFiles()` for ordinary uploads. Files
 are prepared in byte-bounded chunks and split at `BATCH_FILE_SIZE_LIMIT` (1 MB):
 

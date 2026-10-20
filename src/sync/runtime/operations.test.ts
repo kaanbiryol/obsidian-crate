@@ -121,14 +121,14 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(persistSettings).not.toHaveBeenCalled();
 	});
 
-	it.each(['sync', 'initialSync', 'forceFullSync'] as const)('shows saving progress until %s history and settings are persisted', async method => {
+	it.each(['sync', 'forceFullSync'] as const)('shows saving progress until %s history and settings are persisted', async method => {
 		const { runtime, persistSettings } = createRuntimeHarness();
 		const checkpoint = createDeferred<undefined>();
 		const persistence = createDeferred<void>();
 		const state = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 } as const;
 		const sync = vi.fn(async () => createEmptySyncResult());
 		const engine = {
-			getState: () => state, sync, initialSync: sync, forceFullSync: sync,
+			getState: () => state, sync, forceFullSync: sync,
 			saveSharedHistoryCheckpoint: vi.fn(() => checkpoint.promise),
 		};
 		await initializeRuntime(runtime, engine);
@@ -153,7 +153,6 @@ describe('SyncRuntime operation wrappers', () => {
 
 	it.each([
 		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.sync(callback), historyType: 'sync' as const },
-		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.initialSync(callback), historyType: 'initial' as const },
 		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.forceFullSync(callback), historyType: 'force' as const },
 	])('records history, persists settings, and clears progress for $method', async ({ method, historyType }) => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness({}, async () => { throw new Error('reminder settings unavailable'); });
@@ -173,10 +172,6 @@ describe('SyncRuntime operation wrappers', () => {
 
 		await initializeRuntime(runtime, {
 			sync: vi.fn(async (callback: (current: number, total: number) => void) => {
-				callback(1, 2);
-				return result;
-			}),
-			initialSync: vi.fn(async (callback: (current: number, total: number) => void) => {
 				callback(1, 2);
 				return result;
 			}),
@@ -215,7 +210,6 @@ describe('SyncRuntime operation wrappers', () => {
 				uploaded: uploadedPaths.length,
 				uploadedPaths,
 			})),
-			initialSync: vi.fn(async () => createEmptySyncResult()),
 			forceFullSync: vi.fn(async () => createEmptySyncResult()),
 		});
 
@@ -237,7 +231,6 @@ describe('SyncRuntime operation wrappers', () => {
 		const engine = {
 			getState: () => state,
 			sync: vi.fn(async () => createEmptySyncResult()),
-			initialSync: vi.fn(async () => createEmptySyncResult()),
 			forceFullSync: vi.fn(async () => createEmptySyncResult()),
 		};
 		const result: SyncResult = {
@@ -347,7 +340,6 @@ describe('SyncRuntime operation wrappers', () => {
 
 		await initializeRuntime(runtime, {
 			sync: vi.fn(async () => createEmptySyncResult()),
-			initialSync: vi.fn(async () => createEmptySyncResult()),
 			forceFullSync: vi.fn(async () => createEmptySyncResult()),
 		});
 

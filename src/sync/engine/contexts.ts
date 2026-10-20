@@ -239,19 +239,6 @@ export class SyncEngineContexts {
 		};
 	}
 
-	initialSyncWorkflow() {
-		const dependencies = this.dependencies;
-		return {
-			...this.workflowBase(),
-			tryInitialImport: (result: SyncResult, progress?: (current: number, total: number) => void) => this.tryInitialImport(result, progress),
-			vault: dependencies.vault,
-			shouldIgnore: dependencies.shouldIgnore,
-			prepareUploadsFromVaultFiles: this.prepareUploadsFromVaultFiles.bind(this),
-			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
-			createVaultFileChunks: createByteBudgetedVaultFileChunks,
-		};
-	}
-
 	finishInitialSetup(): Promise<void> {
 		const dependencies = this.dependencies;
 		return finishInitialSetup({

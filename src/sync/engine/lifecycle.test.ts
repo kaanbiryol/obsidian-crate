@@ -76,7 +76,7 @@ describe('SyncEngine abort-on-destroy', () => {
 		expect(harness.settings.lastSeq).toBe(42);
 	});
 
-	it.each(['sync', 'initialSync', 'forceFullSync'] as const)('drains %s without continuing a cancelled vault scan or advancing the cursor', async operation => {
+	it.each(['sync', 'forceFullSync'] as const)('drains %s without continuing a cancelled vault scan or advancing the cursor', async operation => {
 		const harness = createHarness({ automaticSync: false, lastSeq: 42 });
 		const listed = createDeferred<void>();
 		const listing = createDeferred<{ files: string[]; folders: string[] }>();
@@ -185,28 +185,6 @@ describe('SyncEngine abort-on-destroy', () => {
 		const result = await syncPromise;
 
 		// Should not have set error state (abort is not an error)
-		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
-		expect(harness.engine.getState().status).not.toBe('error');
-	});
-
-	it('initialSync aborts cleanly when destroyed during chunk processing', async () => {
-		const harness = createHarness();
-		const file = {
-			path: 'notes/a.md',
-			extension: 'md',
-			stat: { size: 1, mtime: 1700000000000 },
-		};
-		harness.vault.getFiles.mockReturnValue([file]);
-		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		harness.vault.adapter.readBinary.mockImplementation(async () => {
-			harness.engine.destroy();
-			return toArrayBuffer('A');
-		});
-
-		const result = await harness.engine.initialSync();
-
-		expect(harness.vault.adapter.readBinary).toHaveBeenCalled();
-		expect(harness.api.batchUpload).not.toHaveBeenCalled();
 		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 		expect(harness.engine.getState().status).not.toBe('error');
 	});

@@ -35,7 +35,6 @@ import {
 import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';
-import { runInitialSyncWorkflow } from './initial-sync-workflow';
 import { runSyncWorkflow } from './standard-sync-workflow';
 import { completeWorkflowResult, handleWorkflowError } from './workflow-shared';
 import { SyncEngineContexts } from './contexts';
@@ -695,10 +694,6 @@ export class SyncEngine {
 			processDiff: (diff, localFiles, syncResult) =>
 				this.contexts.processDiff(diff, localFiles, syncResult),
 		}, queueKeys);
-	}
-
-	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		return this.runTrackedWorkflow(() => runInitialSyncWorkflow(this.contexts.initialSyncWorkflow(), progressCallback));
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {

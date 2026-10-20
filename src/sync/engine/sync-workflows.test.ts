@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDeferred } from '../runtime/runtime-test-harness';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import {
 	createHarness,
@@ -91,76 +90,6 @@ describe('SyncEngine full sync safeguards', () => {
 });
 
 describe('SyncEngine slice 5 safeguards', () => {
-	it('rejects initial sync while another sync is in progress', async () => {
-		const harness = createHarness();
-		const gate = createDeferred<void>();
-		harness.api.getManifest.mockImplementation(async () => {
-			await gate.promise;
-			return { version: 1, files: {}, lastSeq: 1 };
-		});
-		harness.vault.getFiles.mockReturnValue([]);
-		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		const running = harness.engine.sync();
-		await vi.waitFor(() => expect(harness.api.getManifest).toHaveBeenCalledOnce());
-
-		const result = await harness.engine.initialSync();
-
-		expect(result.success).toBe(false);
-		expect(result.errors).toEqual(['Sync already in progress']);
-		expect(harness.vault.getFiles).not.toHaveBeenCalled();
-		gate.resolve();
-		expect((await running).success).toBe(true);
-		harness.engine.destroy();
-	});
-
-	it('sets state to error when initial sync finishes with per-file errors', async () => {
-		const harness = createHarness();
-		const file = {
-			path: 'notes/a.md',
-			extension: 'md',
-			stat: { size: 1, mtime: 1700000000000 },
-		};
-		harness.vault.getFiles.mockReturnValue([file]);
-		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
-		harness.api.batchUpload.mockResolvedValue({
-			success: false,
-			results: [{ path: 'notes/a.md', success: false, error: 'quota exceeded' }],
-		});
-
-		const result = await harness.engine.initialSync();
-		const state = harness.engine.getState();
-
-		expect(result.success).toBe(false);
-		expect(result.errors).toContain('notes/a.md: quota exceeded');
-		expect(state.status).toBe('error');
-		expect(state.lastError).toBe('notes/a.md: quota exceeded');
-		expect(harness.settings.lastSync).toBeNull();
-	});
-
-		it('restats files during initial sync uploads', async () => {
-		const harness = createHarness();
-		const mtime = 1700000000000;
-		const file = {
-			path: 'notes/a.md',
-			extension: 'md',
-			stat: { size: 1, mtime },
-		};
-		harness.vault.getFiles.mockReturnValue([file]);
-		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
-		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: 1, mtime: mtime + 5000 });
-
-		const result = await harness.engine.initialSync();
-
-		expect(result.success).toBe(true);
-			expect(harness.vault.adapter.stat).toHaveBeenCalledWith('notes/a.md');
-			expect(harness.localManifest.setEntry).toHaveBeenCalledWith(
-				'notes/a.md',
-				expect.objectContaining({ modified: new Date(mtime + 5000).toISOString() }),
-			);
-	});
-
 	it('sets state to error when force full sync finishes with non-fatal errors', async () => {
 		const harness = createHarness();
 		harness.api.getManifest.mockResolvedValue({

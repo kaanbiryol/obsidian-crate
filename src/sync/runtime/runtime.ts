@@ -705,14 +705,6 @@ export class SyncRuntime {
 		this.assertCurrentEngine(engine, () => new Error(HISTORY_CHANGED));
 	}
 
-	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		return this.runSyncOperation(
-			'initial',
-			(syncEngine, wrappedCallback) => syncEngine.initialSync(wrappedCallback),
-			progressCallback,
-		);
-	}
-
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		return this.runSyncOperation(
 			'force',

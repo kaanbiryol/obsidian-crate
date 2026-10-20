@@ -21,7 +21,6 @@ describe('SyncRuntime foreground sync', () => {
 		await initializeRuntime(runtime, {
 			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
 			sync,
-			initialSync: vi.fn(async () => createEmptySyncResult()),
 			forceFullSync: vi.fn(async () => createEmptySyncResult()),
 		});
 
@@ -43,7 +42,6 @@ describe('SyncRuntime foreground sync', () => {
 		await initializeRuntime(runtime, {
 			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
 			sync,
-			initialSync: vi.fn(async () => createEmptySyncResult()),
 			forceFullSync: vi.fn(async () => createEmptySyncResult()),
 		});
 
@@ -75,7 +73,6 @@ describe('SyncRuntime foreground sync', () => {
 		await initializeRuntime(disabledRuntime, {
 			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
 			sync: disabledSync,
-			initialSync: vi.fn(async () => createEmptySyncResult()),
 			forceFullSync: vi.fn(async () => createEmptySyncResult()),
 		});
 

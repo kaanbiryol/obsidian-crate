@@ -253,6 +253,8 @@ recovery guidance while redacting unknown transport failures.
 The engine supplies live state, pending paths, lifecycle guards and reconciliation;
 planner and transfer calls do not round-trip through engine forwarding methods.
 The ordered completion of the initial configuration pull and reminder setup lives in `sync/engine/initial-setup.ts`.
+`sync()` runs an unfinished server initial import (`sync/engine/initial-import.ts`) before
+reconciliation; the engine has no separate initial-sync mode.
 Planner cancellation checks, transfer baseline reads and workflow setup completion
 are required context dependencies, including in test fixtures.
 `sync/planner/types.ts` owns `FullSyncPlan`, shared by the planner and the workflow
