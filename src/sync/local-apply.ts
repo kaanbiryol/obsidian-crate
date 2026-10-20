@@ -7,7 +7,7 @@ import { IncomingFileReviewError, preserveIncomingForReview } from './incoming-f
 import type { RecordConflictInput } from './conflict/store';
 import { isVaultTFileLike } from './planner/helpers';
 import type { DiffApplyOutcome } from './transfer/types';
-import { isCurrentVaultFile } from '../platform/vault-file-identity';
+import { isCurrentVaultFile } from './vault-file-identity';
 
 const MAX_CONFLICT_COPY_ATTEMPTS = 3;
 const textDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });

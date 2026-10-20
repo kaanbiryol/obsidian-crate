@@ -517,7 +517,9 @@ focus restoration together; `PwaRemindersAppShell` renders that navigation state
 
 `protocol/shared-settings.ts` defines and validates shared settings for both hosts.
 `sync/shared-settings.ts` applies them to plugin settings. Production Worker modules
-cannot import plugin or sync implementation modules; ESLint enforces this boundary.
+may import only an allowlist: `protocol/`, `encryption/`, `platform/`, the shared
+reminder and Reading domain folders, release metadata and the PWA shell in
+`pwa/shell/`. `scripts/worker-import-boundary.mjs` enforces it through ESLint.
 
 `pwa/reminder-outbox.ts` owns automatic retry eligibility. Mount, foreground,
 connectivity and timer wakeups honor the stored deadline and attempt budget.

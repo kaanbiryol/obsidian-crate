@@ -1,12 +1,23 @@
-import { dirname, resolve, sep } from 'node:path';
+import { dirname, relative, resolve, sep } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const hostDirectories = ['sync', 'plugin'].map(name => resolve(root, 'src', name));
-// Plugin-side Cloudflare modules sit beside the Worker; only release metadata is shared.
-const cloudflareHost = resolve(root, 'src', 'cloudflare');
-const sharedCloudflareModules = new Set(['server-release.json', 'schema.sql', 'migrations']);
-const isCloudflareHostModule = target => dirname(target) === cloudflareHost
-  && !sharedCloudflareModules.has(target.slice(cloudflareHost.length + 1).split('?')[0]);
+// Worker code may import only portable modules shared with the plugin and PWA,
+// release metadata, and the PWA shell it serves. Directories end with a slash.
+const allowed = [
+  'src/cloudflare/worker/',
+  'src/cloudflare/server-release.json', 'src/cloudflare/schema.sql', 'src/cloudflare/migrations/',
+  'src/protocol/', 'src/encryption/', 'src/platform/',
+  'src/reminders/core/', 'src/reminders/types/', 'src/reminders/utils/',
+  'src/reading/core/', 'src/reading/extraction/', 'src/reading/shortcut', 'src/reading/settings', 'src/reading/ui/reading.scss',
+  'src/pwa/shell/', 'src/pwa/service-worker/config', 'src/pwa/styles/', 'src/pwa/reading/web.scss',
+  'site/assets/',
+];
+const blockedPackages = new Set(['obsidian']);
+
+const isAllowed = target => {
+  const path = relative(root, target).split(sep).join('/').split('?')[0].replace(/\.(?:ts|tsx|js|mjs)$/, '');
+  return allowed.some(entry => entry.endsWith('/') ? path.startsWith(entry) : path === entry);
+};
 
 /**
  * Resolve paths so Worker-local modules named sync remain valid at any depth.
@@ -15,7 +26,7 @@ const isCloudflareHostModule = target => dirname(target) === cloudflareHost
 export default {
   meta: {
     type: 'problem', schema: [],
-    messages: { hostImport: 'Worker code uses portable protocol/domain modules; keep plugin and sync implementation in the Obsidian host.' },
+    messages: { hostImport: 'Worker code uses portable protocol/domain modules and the PWA shell; keep plugin, sync and UI implementation in the Obsidian host.' },
   },
   create(context) {
     const check = source => {
@@ -24,7 +35,7 @@ export default {
       const target = specifier.startsWith('@/') ? resolve(root, 'src', specifier.slice(2))
         : specifier.startsWith('src/') ? resolve(root, specifier)
         : specifier.startsWith('.') ? resolve(dirname(context.filename), specifier) : null;
-      if (target && (hostDirectories.some(directory => target === directory || target.startsWith(directory + sep)) || isCloudflareHostModule(target))) {
+      if (target ? !isAllowed(target) : blockedPackages.has(specifier)) {
         context.report({ node: source, messageId: 'hostImport' });
       }
     };

@@ -179,7 +179,7 @@ export default tseslint.config(
 		files: [
 			'src/reminders/{core,utils,types}/**/*.{ts,tsx}',
 			'src/reading/{core,extraction}/**/*.{ts,tsx}',
-			'src/{protocol,encryption}/**/*.{ts,tsx}',
+			'src/{protocol,encryption,platform}/**/*.{ts,tsx}',
 		],
 		rules: {
 			'@typescript-eslint/no-restricted-imports': ['error', {

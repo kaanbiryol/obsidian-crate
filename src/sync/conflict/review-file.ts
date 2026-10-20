@@ -1,7 +1,7 @@
 import { TFile, type App } from 'obsidian';
 import { isHiddenPath } from '../file-discovery';
 import { assertLocalSyncPath } from '../local-path-safety';
-import { isCurrentVaultFile } from '../../platform/vault-file-identity';
+import { isCurrentVaultFile } from '../vault-file-identity';
 import { replaceLocalFileWithRecovery } from '../local-recovery-write';
 import { deletePathLocallyIfUnchanged } from '../planner/helpers';
 import { computeHash } from '../hasher';
