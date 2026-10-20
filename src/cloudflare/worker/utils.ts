@@ -1,6 +1,7 @@
 import { corsResponse } from './cors';
 import { getSyncPathIssue } from '../../protocol/portable-path';
 import { readLimitedRequestBody } from './body-reader';
+import { isRecord } from '../../platform/validation';
 
 function containsControlCharacters(value: string): boolean {
 	for (const character of value) {
@@ -10,10 +11,6 @@ function containsControlCharacters(value: string): boolean {
 		}
 	}
 	return false;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export async function parseJsonObject(
