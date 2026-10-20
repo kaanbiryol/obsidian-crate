@@ -13,10 +13,6 @@ describe('normalizeRemindersSettings', () => {
 			enabled: true,
 			taskCreationDefaultDueDate: 'tomorrow',
 			remindersFolderPath: ' /Reminders/Work/ ',
-			queryViewPreferences: {
-				today: { showCompleted: true },
-				broken: { showCompleted: 'yes' },
-			} as never,
 			upcomingDaysDefault: 14,
 			autoOpenView: 'sidebar',
 			sidebarDefaultTab: 'today',
@@ -28,9 +24,6 @@ describe('normalizeRemindersSettings', () => {
 			listStyle: 'flat',
 			taskCreationDefaultDueDate: 'tomorrow',
 			remindersFolderPath: 'Reminders/Work',
-			queryViewPreferences: {
-				today: { showCompleted: true },
-			},
 			upcomingDaysDefault: 14,
 			autoOpenView: 'sidebar',
 			sidebarDefaultTab: 'today',
@@ -42,7 +35,6 @@ describe('normalizeRemindersSettings', () => {
 		const settings = normalizeRemindersSettings({
 			taskCreationDefaultDueDate: 'later' as never,
 			remindersFolderPath: '   ',
-			queryViewPreferences: 'broken' as never,
 			upcomingDaysDefault: 0,
 			autoOpenView: 'modal' as never,
 			sidebarDefaultTab: 'other' as never,
@@ -58,6 +50,13 @@ describe('normalizeRemindersSettings', () => {
 		expect(normalizeRemindersSettings({}).enabled).toBe(true);
 		expect(normalizeRemindersSettings(undefined)).toEqual(DEFAULT_REMINDERS_SETTINGS);
 		expect(normalizeRemindersSettings(null)).toEqual(DEFAULT_REMINDERS_SETTINGS);
+	});
+
+	it('drops retired embedded-block preferences from saved settings', () => {
+		const saved = { enabled: false, queryViewPreferences: { abc123: { showCompleted: true } } };
+		const settings = normalizeRemindersSettings(saved);
+		expect(settings).not.toHaveProperty('queryViewPreferences');
+		expect(settings).toEqual({ ...DEFAULT_REMINDERS_SETTINGS, enabled: false });
 	});
 
 	it('preserves explicitly disabled Reminders', () => {

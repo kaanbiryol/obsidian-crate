@@ -130,6 +130,19 @@ describe('CratePlugin settings persistence', () => {
 		expect(plugin.remindersSettings).not.toHaveProperty('debugLogging');
 	});
 
+	it('loads reminder settings saved with embedded-block preferences and drops them on the next save', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const saveData = vi.fn(async (_data: unknown) => {});
+		const reminders = { remindersFolderPath: 'Tasks', queryViewPreferences: { abc123: { showCompleted: true } } };
+		Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } }, loadData: vi.fn(async () => ({ reminders })), saveData });
+		await plugin.loadSettings();
+		expect(plugin.remindersSettings.remindersFolderPath).toBe('Tasks');
+		await plugin.saveSettings();
+		const saved = saveData.mock.calls[0]![0] as { reminders: Record<string, unknown> };
+		expect(saved.reminders).toMatchObject({ remindersFolderPath: 'Tasks' });
+		expect(saved.reminders).not.toHaveProperty('queryViewPreferences');
+	});
+
 	it.each([true, false])('saves the debug setting atomically when logging is %s', async enabled => {
 		const plugin = new CratePlugin({} as never, {} as never);
 		const saveData = vi.fn(async (_data: unknown) => {});

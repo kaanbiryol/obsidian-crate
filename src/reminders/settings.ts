@@ -15,10 +15,6 @@ const VALID_AUTO_OPEN_SETTINGS = new Set<string>(['none', 'sidebar']);
 const VALID_TAB_IDS = new Set<string>(['inbox', 'today', 'upcoming', 'browse']);
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-type QueryViewPreference = {
-	showCompleted?: boolean;
-};
-
 export type RemindersSettings = {
 	/** Explicit local edit waiting for this server, never copied to another connection. */
 	pendingServerFolder?: { id: string; workerUrl: string; folderPath: string };
@@ -27,7 +23,6 @@ export type RemindersSettings = {
 	listStyle: ListStyle;
 	taskCreationDefaultDueDate: DueDateDefaultSetting;
 	remindersFolderPath: string;
-	queryViewPreferences: Record<string, QueryViewPreference>;
 	upcomingDaysDefault: number;
 	autoOpenView: AutoOpenSetting;
 	sidebarDefaultTab: TabId;
@@ -39,33 +34,11 @@ export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
 	listStyle: DEFAULT_LIST_STYLE,
 	taskCreationDefaultDueDate: 'none',
 	remindersFolderPath: DEFAULT_REMINDERS_FOLDER_PATH,
-	queryViewPreferences: {},
 	upcomingDaysDefault: 7,
 	autoOpenView: 'none',
 	sidebarDefaultTab: 'inbox',
 	allDayNotificationTime: null,
 };
-
-function normalizeQueryViewPreferences(
-	value: unknown,
-): Record<string, QueryViewPreference> {
-	if (!isRecord(value)) {
-		return {};
-	}
-
-	const normalized: Record<string, QueryViewPreference> = {};
-	for (const [key, preference] of Object.entries(value)) {
-		if (!key.trim() || !isRecord(preference)) {
-			continue;
-		}
-
-		if (typeof preference.showCompleted === 'boolean') {
-			normalized[key] = { showCompleted: preference.showCompleted };
-		}
-	}
-
-	return normalized;
-}
 
 function isTabId(value: unknown): value is TabId {
 	return typeof value === 'string' && VALID_TAB_IDS.has(value);
@@ -157,7 +130,6 @@ export function normalizeRemindersSettings(
 			? value.taskCreationDefaultDueDate
 			: DEFAULT_REMINDERS_SETTINGS.taskCreationDefaultDueDate,
 		remindersFolderPath: normalizeRemindersFolderPath(value?.remindersFolderPath),
-		queryViewPreferences: normalizeQueryViewPreferences(value?.queryViewPreferences),
 		upcomingDaysDefault: normalizePositiveInteger(
 			value?.upcomingDaysDefault,
 			DEFAULT_REMINDERS_SETTINGS.upcomingDaysDefault,
