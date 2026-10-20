@@ -1,16 +1,15 @@
 import { SESSION_RECOVERY_ISSUE, type ConnectionIssue } from './issues';
-import { clearReadingData, readingSession, READING_SESSION_KEY } from '../reading/storage';
+import { readingSession, READING_SESSION_KEY } from '../reading/storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { invalidatePwaSession } from '../session-generation';
 import { clearReminderDrafts } from '../reminders/editor/reminder-drafts';
-import { clearReminderOutbox } from '../reminders/outbox/reminder-outbox-storage';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY, finishEnrollment, loadStoredConfig } from '../config';
-import { clearCachedReminderSnapshots } from '../reminders/cache/reminder-cache';
 import type { ApiFetch, ShowToast, StoredConfig } from '../types';
-import { captureEncryptionCleanupAuthority, clearEncryptionSessionMarkers, clearPersistedEncryption } from '../encryption/encryption-cleanup';
+import { captureEncryptionCleanupAuthority } from '../encryption/encryption-cleanup';
 import { resetPwaEncryption } from '../encryption/encryption-session';
 import { resetReadingEncryption } from '../reading/encryption-lifecycle';
+import { clearLocalData } from './local-data-cleanup';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 
 interface PwaLogoutOperations {
@@ -104,21 +103,7 @@ export function usePwaSessionLifecycle({
 		let isCurrent: () => boolean;
 		try { isCurrent = captureEncryptionCleanupAuthority(); }
 		catch { isCurrent = () => { throw new Error('Browser storage is unavailable'); }; }
-		if (discardPrivateData) {
-			try { clearEncryptionSessionMarkers(isCurrent); }
-			catch { reportCleanupFailure('The previous encryption session could not be cleared. Clear this site’s data before enrolling again.'); }
-		}
-		if (discardPrivateData && !clearReminderDrafts()) reportCleanupFailure('Drafts could not be cleared. Clear this site’s data in browser settings.');
-		try { if (discardPrivateData) clearReminderOutbox(); }
-		catch { reportCleanupFailure('Could not clear pending changes from this device. Clear this site’s data in browser settings.'); }
-		if (discardPrivateData) { try { await clearReadingData(isCurrent); } catch { reportCleanupFailure('Reading data could not be cleared. Clear this site’s data in browser settings.'); } }
-		if (!await clearCachedReminderSnapshots(isCurrent).catch(() => false)) {
-			reportCleanupFailure('Offline data could not be cleared. Close other Crate tabs, then clear this site’s data in browser settings.');
-		}
-		if (discardPrivateData) {
-			try { await clearPersistedEncryption(isCurrent); }
-			catch { reportCleanupFailure('Encrypted data or keys could not be removed. Clear this site’s data in browser settings.'); }
-		}
+		await clearLocalData(isCurrent, reportCleanupFailure, discardPrivateData);
 	}, [
 		resetView,
 		setAuthToken,
