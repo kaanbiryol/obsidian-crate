@@ -2,7 +2,7 @@ import { beginReminderOperation, reminderOperationEffects } from '../operations'
 import { corsResponse } from '../../cors';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../../storage';
 import type { Env } from '../../types';
-import { parseJsonObject, parseStringArray } from '../../utils';
+import { parseJsonObject, parseStringArray } from '../../request-validation';
 import { getProjectFilePath, reorderReminderBlocksInFileContent } from '../file-content';
 import { parseFolderPath, parseProjectPath } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';

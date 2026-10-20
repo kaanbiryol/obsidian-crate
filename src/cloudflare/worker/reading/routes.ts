@@ -8,7 +8,7 @@ import { limitNotificationAction } from '../rate-limit';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import { policy, authority, readingResponse, ReadingError } from './common';
 import { issueReadingAccess, prepareHandoff, updatePolicy, exchangeReadingAccess, handoffAuthority } from './access';
 import { mutateReading } from './mutations';

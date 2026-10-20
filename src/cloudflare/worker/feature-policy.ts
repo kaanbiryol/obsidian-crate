@@ -1,5 +1,5 @@
 import { corsResponse } from './cors';
-import { parseJsonObject } from './utils';
+import { parseJsonObject } from './request-validation';
 
 export interface FeaturePolicy { reading: boolean; reminders: boolean; revision: string | null }
 export const FEATURE_POLICY_KEY = 'crate_feature_policy';

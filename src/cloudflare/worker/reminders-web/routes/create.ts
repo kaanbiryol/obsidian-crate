@@ -4,7 +4,7 @@ import { buildCreateReminderArgs } from '@/reminders/core/reminderMutationPlan';
 import { corsResponse } from '../../cors';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../../storage';
 import type { Env } from '../../types';
-import { parseJsonObject, parseOptionalString } from '../../utils';
+import { parseJsonObject, parseOptionalString } from '../../request-validation';
 import {
 	createReminderInFileContent,
 	getInitialProjectFileContent,

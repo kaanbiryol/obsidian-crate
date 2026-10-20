@@ -3,7 +3,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { ENCRYPTION_FILE_PREFIX, validateEncryptedContent } from './state';
 import { corsResponse } from '../cors';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import type { Env } from '../types';
 import { createManagedObjectKey } from '../../../protocol/storage-keys';
 import { sha256Hex } from '../../../platform/sha256';

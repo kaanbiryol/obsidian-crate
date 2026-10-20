@@ -1,5 +1,5 @@
 import { corsResponse } from '../cors';
-import { parseOptionalString } from '../utils';
+import { parseOptionalString } from '../request-validation';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../../../protocol/web-session';
 import { validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';

@@ -1,5 +1,5 @@
 import { corsResponse } from '../cors';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
 
 export const INITIAL_REMINDERS_PENDING = 'initial_import_reminders_pending';

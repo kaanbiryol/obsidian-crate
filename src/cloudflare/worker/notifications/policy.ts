@@ -3,7 +3,7 @@ import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import type { NotificationPolicy } from '../../../protocol/notification-policy';
 import { changedRows } from '../db';
 import { corsResponse } from '../cors';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import { parseFolderPath } from '../reminders-web/requests';
 import { readEncryptionState } from '../encryption/state';
 

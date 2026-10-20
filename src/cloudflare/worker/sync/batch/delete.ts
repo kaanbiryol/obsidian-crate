@@ -1,6 +1,6 @@
 import { corsResponse } from '../../cors';
 import { commitFileDelete } from '../mutations';
-import { parseJsonObject, parseOptionalString, sanitizePath } from '../../utils';
+import { parseJsonObject, parseOptionalString, sanitizePath } from '../../request-validation';
 import {
 	formatMetadataCommitFailure,
 	formatMutationError,

@@ -24,7 +24,6 @@ import {
 import { handleServerInfo } from '../server-info';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
-import { withDatabase } from './shared';
 
 export async function handlePublicRoute(
 	request: Request,
@@ -56,7 +55,7 @@ export async function handlePublicRoute(
 	if (path === '/notifications/open-obsidian.js' && method === 'GET') return handleOpenObsidianScript(request);
 	if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
 	if (path === '/notifications/reminders-exchange' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleExchangeRemindersEnrollmentToken(request, requiredDb));
+		return await handleExchangeRemindersEnrollmentToken(request, db);
 	}
 
 	return null;

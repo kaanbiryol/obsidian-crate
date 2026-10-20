@@ -5,7 +5,7 @@ import { EncryptionStateError, validateUploadEncryption } from '../encryption/st
 import { beginUploadOperation } from './upload-operations';
 import { exactArrayBuffer, readLimitedRequestBody } from '../body-reader';
 import { corsHeaders, corsResponse } from '../cors';
-import { parseJsonObject, parseOptionalString, sanitizePath } from '../utils';
+import { parseJsonObject, parseOptionalString, sanitizePath } from '../request-validation';
 import { commitFileDelete } from './mutations';
 import type { UploadCommitters } from './upload-committers';
 import { FileNamespaceConflictError } from './file-namespace';

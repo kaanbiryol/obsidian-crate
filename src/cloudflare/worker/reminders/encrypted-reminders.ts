@@ -3,7 +3,7 @@ import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES, isReceiptEnvelope } from '../../.
 import { ENCRYPTED_INVENTORY_PAGE } from '../../../encryption/file-inventory';
 import { fileFolderArgs } from '../sync/file-identity';
 import { corsHeaders, corsResponse } from '../cors';
-import { parseJsonObject, sanitizePath } from '../utils';
+import { parseJsonObject, sanitizePath } from '../request-validation';
 import { readEncryptionState, prepareEncryptedFileCommit, EncryptionStateError } from '../encryption/state';
 import { encryptionScopeForPath, type EncryptionServerState } from '../../../encryption/server-state';
 import { getStoredFileRow, storedObjectMatchesMetadata } from '../sync/storage';

@@ -1,7 +1,7 @@
 import { portablePathKey } from '../../../protocol/portable-path';
 import { readInitialImport } from './initial-import';
 import { corsResponse } from '../cors';
-import { parseJsonObject, sanitizePath } from '../utils';
+import { parseJsonObject, sanitizePath } from '../request-validation';
 import { isSha256Hex } from '../../../platform/validation';
 
 /** Remove files deleted locally while an unpublished import was paused. */

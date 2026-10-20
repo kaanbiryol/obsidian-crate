@@ -5,7 +5,7 @@ import { portablePathKey } from '../../../protocol/portable-path';
 import { corsHeaders, corsResponse } from '../cors';
 import { fileTransportLimit } from '../../../encryption/file-format';
 import { storedObjectMatchesMetadata } from './storage';
-import { sanitizePath } from '../utils';
+import { sanitizePath } from '../request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
 

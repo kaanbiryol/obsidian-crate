@@ -1,7 +1,7 @@
 import { featureEnabled, handleFeaturePolicy, parseFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES } from '../../encryption/receipt-format';
-import { parseJsonObject } from './utils';
+import { parseJsonObject } from './request-validation';
 import { limitNotificationAction } from './rate-limit';
 import { handleAuthRoute } from './routes/auth';
 import { handleNotificationsRoute } from './routes/notifications';

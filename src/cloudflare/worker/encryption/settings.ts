@@ -1,7 +1,7 @@
 import { MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES, validateEncryptedSettings } from '../../../encryption/settings-format';
 import { readEncryptionState, encryptionWriteGuard } from './state';
 import { corsResponse } from '../cors';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import { changedRows } from '../db';
 
 export const ENCRYPTED_SETTINGS_KEY = 'e2ee:settings';

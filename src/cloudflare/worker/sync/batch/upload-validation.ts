@@ -2,7 +2,7 @@ import type { EncryptionServerState } from '../../../../encryption/server-state'
 import { BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../../../protocol/sync-limits';
 import type { BatchUploadResponse } from '../../../../protocol/sync-types';
 import { corsResponse } from '../../cors';
-import { parseJsonObject, parseNonNegativeInteger, parseOptionalString, sanitizePath } from '../../utils';
+import { parseJsonObject, parseNonNegativeInteger, parseOptionalString, sanitizePath } from '../../request-validation';
 import {
 	formatMutationError, MAX_BATCH_UPLOAD_FILES, MAX_BATCH_TOTAL_BYTES,
 	parseExpectedFileHash, type ExpectedFileHash,

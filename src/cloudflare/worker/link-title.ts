@@ -1,5 +1,5 @@
 import { corsResponse } from './cors';
-import { parseJsonObject } from './utils';
+import { parseJsonObject } from './request-validation';
 import type { Env } from './types';
 
 const MAX_HTML_BYTES = 256 * 1024;

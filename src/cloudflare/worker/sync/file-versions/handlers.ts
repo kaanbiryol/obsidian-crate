@@ -10,7 +10,7 @@ import {
 	storedObjectMatchesMetadata,
 } from '../storage';
 import { parseExpectedFileHash } from '../storage';
-import { parseJsonObject, parseOptionalString, sanitizePath } from '../../utils';
+import { parseJsonObject, parseOptionalString, sanitizePath } from '../../request-validation';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
 import { sha256Hex } from '@/platform/sha256';
 export { handleListFileVersions } from './list';

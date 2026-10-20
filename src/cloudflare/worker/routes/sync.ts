@@ -20,7 +20,6 @@ import { retryPausedNotifications } from '../notifications/retry-handler';
 import { handleDiagnostics } from '../maintenance/diagnostics';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
-import { withDatabase } from './shared';
 import type { MutationAuditContext } from '../request-diagnostics';
 import { beginInitialImport, finishInitialImport } from '../sync/initial-import';
 import { pruneInitialImport } from '../sync/initial-import-prune';
@@ -62,46 +61,46 @@ export async function handleSyncRoute(
 
 	if (path === '/health' && method === 'GET') return await handleHealth();
 	if (path === '/diagnostics' && method === 'GET') {
-		return await withDatabase(db, requiredDb => handleDiagnostics(requiredDb));
+		return await handleDiagnostics(db);
 	}
 	if (path === '/sync/check' && method === 'GET') {
-		return await withDatabase(db, requiredDb => handleCheckChanges(request, requiredDb));
+		return await handleCheckChanges(request, db);
 	}
 	if (path === '/sync/changes' && method === 'GET') {
-		return await withDatabase(db, requiredDb => handleGetChanges(request, requiredDb));
+		return await handleGetChanges(request, db);
 	}
 	if (path === '/sync/manifest' && method === 'GET') {
-		return await withDatabase(db, requiredDb => handleGetManifest(request, requiredDb));
+		return await handleGetManifest(request, db);
 	}
 	if (path === '/sync/metadata' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleGetFileMetadata(request, requiredDb));
+		return await handleGetFileMetadata(request, db);
 	}
 	if (path === '/sync/upload' && method === 'PUT') {
-		return await withDatabase(db, requiredDb => handleUpload(request, bucket, requiredDb, uploadCommitters, encryption, resetGeneration));
+		return await handleUpload(request, bucket, db, uploadCommitters, encryption, resetGeneration);
 	}
 	if (path === '/sync/download' && method === 'GET') {
-		return await withDatabase(db, requiredDb => handleDownload(request, bucket, requiredDb));
+		return await handleDownload(request, bucket, db);
 	}
 	if (path === '/sync/delete' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleDelete(request, bucket, requiredDb, audit));
+		return await handleDelete(request, bucket, db, audit);
 	}
 	if (path === '/sync/batch-upload' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb, uploadCommitters, encryption, resetGeneration));
+		return await handleBatchUpload(request, bucket, db, uploadCommitters, encryption, resetGeneration);
 	}
 	if (path === '/sync/batch-download' && method === 'POST') {
 		return forwardTransferRequest(request, env, '/batch-download');
 	}
 	if (path === '/sync/batch-delete' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleBatchDelete(request, bucket, requiredDb, audit));
+		return await handleBatchDelete(request, bucket, db, audit);
 	}
 	if (path === '/sync/version-preview' && method === 'GET') {
-		return await withDatabase(db, requiredDb => handleFileVersionPreview(request, bucket, requiredDb));
+		return await handleFileVersionPreview(request, bucket, db);
 	}
 	if (path === '/sync/versions' && method === 'GET') {
-		return await withDatabase(db, requiredDb => handleListFileVersions(request, requiredDb));
+		return await handleListFileVersions(request, db);
 	}
 	if (path === '/sync/restore-version' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleRestoreFileVersion(request, bucket, requiredDb));
+		return await handleRestoreFileVersion(request, bucket, db);
 	}
 	if (path === '/settings' && method === 'GET') return await handleGetSettings(bucket);
 	if (path === '/settings' && method === 'PUT') return await handlePutSettings(request, bucket);

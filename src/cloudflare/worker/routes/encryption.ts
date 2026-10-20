@@ -3,7 +3,7 @@ import { ENCRYPTION_METADATA_BATCH } from '../../../protocol/sync-limits';
 import { handleEncryptionPairing } from '../encryption/pairing';
 import { ENCRYPTION_FILE_PREFIX, readEncryptionState } from '../encryption/state';
 import { validateFileDescriptor } from '../../../encryption/file-format';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import { corsResponse } from '../cors';
 import type { AuthPrincipal } from '../auth/index';
 import { handleEncryptedSettings } from '../encryption/settings';

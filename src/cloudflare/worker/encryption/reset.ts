@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import { ENCRYPTION_STATE_KEY, readEncryptionState } from './state';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';

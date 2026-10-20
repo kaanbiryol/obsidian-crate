@@ -1,7 +1,7 @@
 import { INITIAL_IMPORT_VERIFY_PAGE, type ImportInventoryEntry, type InitialImport } from '@/protocol/initial-import';
 import { queryRows } from '../db';
 import { corsResponse } from '../cors';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import { INITIAL_REMINDERS_PENDING } from './initial-import-readiness';
 
 const IMPORT_VERIFICATION_KEY = 'initial_import_verification';

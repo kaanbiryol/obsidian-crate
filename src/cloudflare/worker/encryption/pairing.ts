@@ -3,7 +3,7 @@ import { decodeBase64Url, isEncryptionId } from '../../../encryption/encoding';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import { authority as readingAuthority, ReadingError } from '../reading/common';
 
 const PREFIX = 'crate_web_pairing:', END = 'crate_web_pairing;';

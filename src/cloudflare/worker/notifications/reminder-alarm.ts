@@ -5,7 +5,7 @@ import { withD1Usage } from '../d1-usage';
 import { PushPayloadError } from './payload-budget';
 import type { Env } from '../types';
 import { changedRows } from '../db';
-import { parseJsonObject, parseOptionalString } from '../utils';
+import { parseJsonObject, parseOptionalString } from '../request-validation';
 import { listPushSubscriptions, sendToAllSubscriptions, type PushSubscriptionRow } from './push';
 import { hasNotificationAuthority } from '../reminders/source-state';
 import { NOTIFICATION_DELIVERY_WINDOW_MS } from './projection-plan';

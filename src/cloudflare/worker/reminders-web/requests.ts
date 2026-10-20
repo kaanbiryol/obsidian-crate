@@ -2,7 +2,7 @@ import type { RecurrenceRule } from '@/reminders/types/reminder';
 import { normalizeReminderProjectPath } from '@/reminders/core/reminderProjectPath';
 import { validateRecurrence } from '@/reminders/core/recurrence/validateRecurrence';
 import { corsResponse } from '../cors';
-import { parseOptionalString, sanitizePath } from '../utils';
+import { parseOptionalString, sanitizePath } from '../request-validation';
 import type { ReminderMutationWorkspace } from './types';
 
 export type RecurrenceMutationResult =

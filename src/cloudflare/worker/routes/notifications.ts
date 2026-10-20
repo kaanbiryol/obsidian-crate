@@ -9,7 +9,6 @@ import {
 	handleUnsubscribe,
 } from '../notifications/subscription-handlers';
 import type { RouteMethod } from './shared';
-import { withDatabase } from './shared';
 
 export async function handleNotificationsRoute(
 	request: Request,
@@ -19,20 +18,20 @@ export async function handleNotificationsRoute(
 	principal: AuthPrincipal,
 ): Promise<Response | null> {
 	if (path === '/notifications/subscribe' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleSubscribe(request, requiredDb, principal.tokenId));
+		return await handleSubscribe(request, db, principal.tokenId);
 	}
 	if (path === '/notifications/subscribe' && method === 'DELETE') {
-		return await withDatabase(db, requiredDb => handleUnsubscribe(request, requiredDb, principal.scope === 'reminders' ? principal.tokenId : undefined));
+		return await handleUnsubscribe(request, db, principal.scope === 'reminders' ? principal.tokenId : undefined);
 	}
 	if (path === '/notifications/subscriptions' && method === 'GET') {
-		return await withDatabase(db, requiredDb => handleListSubscriptions(requiredDb));
+		return await handleListSubscriptions(db);
 	}
 
 	if (path === '/notifications/reminders-enrollment-token' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleCreateRemindersEnrollmentToken(requiredDb, request));
+		return await handleCreateRemindersEnrollmentToken(db, request);
 	}
 	if (path === '/notifications/test' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleTestPush(requiredDb, new URL(request.url).origin));
+		return await handleTestPush(db, new URL(request.url).origin);
 	}
 
 	return null;

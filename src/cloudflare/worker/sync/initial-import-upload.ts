@@ -3,7 +3,7 @@ import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { BATCH_UPLOAD_MAX_BYTES, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { corsResponse } from '../cors';
-import { parseJsonObject, sanitizePath } from '../utils';
+import { parseJsonObject, sanitizePath } from '../request-validation';
 import { readInitialImport } from './initial-import';
 import { loadStoredFileRows, parseExpectedFileHash } from './storage';
 import { trackStagedBatch, finishStagedBatches } from './staged-upload-batches';

@@ -1,6 +1,6 @@
 import { corsResponse } from '../cors';
 import { queryRows } from '../db';
-import { parseJsonObject, parseOptionalString } from '../utils';
+import { parseJsonObject, parseOptionalString } from '../request-validation';
 import { sha256Hex } from '../../../platform/sha256';
 
 export async function handleRevokeToken(request: Request, db: D1Database): Promise<Response> {

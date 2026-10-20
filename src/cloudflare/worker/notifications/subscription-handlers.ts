@@ -4,7 +4,7 @@ import { isValidPushEndpoint } from './push-endpoint';
 import { corsResponse } from '../cors';
 import { changedRows, queryRows } from '../db';
 import { sendToAllSubscriptions } from './push';
-import { parseJsonObject, parseOptionalString } from '../utils';
+import { parseJsonObject, parseOptionalString } from '../request-validation';
 
 export async function handleSubscribe(request: Request, db: D1Database, ownerTokenId: string): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);

@@ -6,7 +6,7 @@ import { ENCRYPTION_STATE_KEY, ENCRYPTION_FILE_PREFIX, readEncryptionState } fro
 import { ENCRYPTED_SETTINGS_KEY } from './settings';
 import { CONVERSION_FILES, convertFile } from './conversion-objects';
 import { corsResponse } from '../cors';
-import { parseJsonObject } from '../utils';
+import { parseJsonObject } from '../request-validation';
 import { MAX_CONVERTED_RECEIPT_BYTES, isReceiptEnvelope } from '../../../encryption/receipt-format';
 import { isEncryptionId } from '../../../encryption/encoding';
 import { prepareEncryptedReceipt } from './receipt-storage';

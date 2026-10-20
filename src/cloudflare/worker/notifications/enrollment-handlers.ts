@@ -2,7 +2,7 @@ import { limitNotificationAction } from '../rate-limit';
 import { parseFolderPath } from '../reminders-web/requests';
 import { corsResponse } from '../cors';
 import { getOrCreateVapidKeys } from './push';
-import { parseJsonObject, parseOptionalString } from '../utils';
+import { parseJsonObject, parseOptionalString } from '../request-validation';
 import { issueWebEnrollmentToken } from '../auth/web-enrollment';
 import { changedRows } from '../db';
 import { readEncryptionState } from '../encryption/state';

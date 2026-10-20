@@ -1,5 +1,5 @@
 import { corsResponse } from '../../cors';
-import { parseJsonObject, sanitizePath } from '../../utils';
+import { parseJsonObject, sanitizePath } from '../../request-validation';
 import {
 	loadStoredFileRows,
 	MAX_BATCH_DOWNLOAD_BYTES,

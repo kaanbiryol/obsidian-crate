@@ -11,7 +11,7 @@ import {
 	writeCommittedMarkdownFile,
 } from '../../storage';
 import type { Env } from '../../types';
-import { parseJsonObject, parseOptionalString } from '../../utils';
+import { parseJsonObject, parseOptionalString } from '../../request-validation';
 import {
 	createReminderInFileContent,
 	deleteReminderFromFileContent,

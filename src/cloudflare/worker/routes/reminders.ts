@@ -7,7 +7,6 @@ import { handleReorderReminders } from '../reminders-web/routes/reorder';
 import { handleUpdateReminder } from '../reminders-web/routes/update';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
-import { withDatabase } from './shared';
 
 export async function handleRemindersRoute(
 	request: Request,
@@ -19,22 +18,22 @@ export async function handleRemindersRoute(
 	if (path === '/reminders/notification-policy' && ['GET', 'POST', 'PUT'].includes(method)) return handleNotificationPolicy(request, db);
 
 	if (path === '/reminders/list' && method === 'GET') {
-		return await withDatabase(db, () => handleListReminders(request, env));
+		return await handleListReminders(request, env);
 	}
 	if (path === '/reminders/create' && method === 'POST') {
-		return await withDatabase(db, () => handleCreateReminder(request, env));
+		return await handleCreateReminder(request, env);
 	}
 	if (path === '/reminders/update' && method === 'POST') {
-		return await withDatabase(db, () => handleUpdateReminder(request, env));
+		return await handleUpdateReminder(request, env);
 	}
 	if (path === '/reminders/set-completed' && method === 'POST') {
-		return await withDatabase(db, () => handleSetReminderCompleted(request, env));
+		return await handleSetReminderCompleted(request, env);
 	}
 	if (path === '/reminders/delete' && method === 'DELETE') {
-		return await withDatabase(db, () => handleDeleteReminder(request, env));
+		return await handleDeleteReminder(request, env);
 	}
 	if (path === '/reminders/reorder' && method === 'POST') {
-		return await withDatabase(db, () => handleReorderReminders(request, env));
+		return await handleReorderReminders(request, env);
 	}
 
 
