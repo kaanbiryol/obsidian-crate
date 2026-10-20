@@ -21,8 +21,6 @@ data.json
 # Build output
 dist
 
-# Deploy config (local vault path)
-deploy.local.json
 .wrangler/
 .crate/
 crate-backup*.tgz

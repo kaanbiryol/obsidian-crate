@@ -52,8 +52,6 @@
 		"notices:generate": "node scripts/generate-third-party-notices.mjs",
 		"notices:check": "node scripts/generate-third-party-notices.mjs --check",
 		"release:check": "npm run security:check && npm run check && npm run test:pwa-preview && npm run test:reading && npm run build:plugin && npm run check:css-scope && npm run size-check && npm run verify:release-artifacts && npm run typecheck:visual && npm run test:visual && npm run test:activity-browser && npm run test:file-history-browser && npm run test:pwa-browser && npm run release:candidate",
-		"deploy:plugin": "node scripts/deploy.mjs",
-		"deploy:plugin:configure": "node scripts/deploy.mjs --configure",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint .",
 		"deadcode": "knip && knip --production --include files,dependencies",
