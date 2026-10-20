@@ -12,16 +12,13 @@ import {
 import { useAppUpdate } from './PwaUpdateProvider';
 import { ReminderCacheNotice } from './ReminderCacheNotice';
 import { ReminderSourceNotice } from './ReminderSourceNotice';
+import { ReminderRecoveryNotices } from './ReminderRecoveryNotices';
 import { WebReminderCard } from './WebReminderCard';
 
 // Keep the editor ready for the tap's synchronous focus/keyboard activation.
 import { ReminderSheet } from './ReminderSheet';
 const ReminderSyncNotice = lazy(() => import('./ReminderSyncNotice')
 	.then(module => ({ default: module.ReminderSyncNotice })));
-const ReminderRecoveryNotice = lazy(() => import('./ReminderRecoveryNotice')
-	.then(module => ({ default: module.ReminderRecoveryNotice })));
-const ReminderQuarantineNotice = lazy(() => import('./ReminderQuarantineNotice')
-	.then(module => ({ default: module.ReminderQuarantineNotice })));
 
 import { AppSyncIndicator } from '../sync/AppSyncIndicator';
 import { useRemindersRuntime } from './RemindersRuntime';
@@ -138,8 +135,8 @@ export function RemindersApp() {
 								onEdit={editFailedChange}
 								onDiscard={discardChange}
 							/></DeferredNotice>}
-							{recoveryChanges.length > 0 && <DeferredNotice><ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={recoverChanges} /></DeferredNotice>}
-							{quarantinedChanges.length > 0 && <DeferredNotice><ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} /></DeferredNotice>}
+							<ReminderRecoveryNotices recoveryChanges={recoveryChanges} quarantinedChanges={quarantinedChanges} folderPath={config.folderPath}
+								onResume={recoverChanges} onRemove={removeQuarantinedChanges} />
 						</PwaTopNotices>
 					</>
 				) : undefined}

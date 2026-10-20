@@ -1,5 +1,5 @@
 import { reminderUpdateReadiness } from '../sync/update-readiness';
-import { createContext, lazy, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { isStandaloneApp } from '../config';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
 import { capturePwaSession } from '../session-generation';
@@ -20,14 +20,10 @@ import { isInitialPwaContentReady } from '../initial-content-readiness';
 import { useSharedFeatures } from '../shared-features';
 import { toSharedReminder } from '../reminders/outbox/reminder-list-state';
 import { useFeatureSettings, useSettingsOpen } from '../settings-context';
-import { DeferredNotice } from './DeferredNotice';
-import { reminderSyncStatus } from '../sync/reminder-status';
+import { ReminderRecoveryNotices } from './ReminderRecoveryNotices';
+import { reminderFeatureStatus, reminderSyncStatus } from '../sync/reminder-status';
 import { reminderRetryAt } from '../reminders/outbox/reminder-outbox';
 
-const ReminderRecoveryNotice = lazy(() => import('./ReminderRecoveryNotice')
-	.then(module => ({ default: module.ReminderRecoveryNotice })));
-const ReminderQuarantineNotice = lazy(() => import('./ReminderQuarantineNotice')
-	.then(module => ({ default: module.ReminderQuarantineNotice })));
 
 
 function useRemindersController() {
@@ -195,18 +191,14 @@ function useRemindersController() {
 			loading, refreshing, isOffline, unsettled: Boolean(storageError) || changes.length > 0 || needsRecovery,
 		}),
 		canApplyUpdate: () => !isPreparingMutation(),
-		status: enabled ? syncStatus : { state: needsRecovery || storageError ? 'error' : 'cached', label: changes.length ? `Paused: ${changes.length} ${changes.length === 1 ? 'change' : 'changes'} saved on this device` : 'Paused' },
-		attention: needsRecovery ? 'Saved reminder changes need review.' : syncStatus.state === 'error' ? syncStatus.label : null,
-		unsynced: changes.length > 0 || needsRecovery || Boolean(storageError),
+		...reminderFeatureStatus({ enabled, syncStatus, pendingCount: changes.length, needsRecovery, storageError }),
 		onRefresh: handlePullRefresh,
 		onExport: changes.length || recoveryChanges.length ? () => exportPendingChanges([...changes, ...recoveryChanges]) : undefined,
 		onEnablePush: enablePushNotifications,
 		onLogout: logOut,
 		clearView: resetView,
-		recovery: <>
-			{recoveryChanges.length > 0 && <DeferredNotice><ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={enabled ? recoverChanges : undefined} /></DeferredNotice>}
-			{quarantinedChanges.length > 0 && <DeferredNotice><ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} /></DeferredNotice>}
-		</>,
+		recovery: <ReminderRecoveryNotices recoveryChanges={recoveryChanges} quarantinedChanges={quarantinedChanges} folderPath={config.folderPath}
+			onResume={enabled ? recoverChanges : undefined} onRemove={removeQuarantinedChanges} />,
 	});
 
 	return {

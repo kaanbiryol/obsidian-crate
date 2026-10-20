@@ -35,3 +35,19 @@ export function reminderSyncStatus({ changes, isOffline, refreshing, loading, in
 	if (dataMode === 'cached') return { state: 'syncing', label: 'Checking reminders' };
 	return { state: 'synced', label: 'All changes synced' };
 }
+
+/** Feature-level status: a paused feature reports saved work instead of sync progress. */
+export function reminderFeatureStatus({ enabled, syncStatus, pendingCount, needsRecovery, storageError }: {
+	enabled: boolean;
+	syncStatus: { state: SyncIndicatorState; label: string };
+	pendingCount: number;
+	needsRecovery: boolean;
+	storageError: string | null;
+}) {
+	const pausedLabel = pendingCount ? `Paused: ${pendingCount} ${pendingCount === 1 ? 'change' : 'changes'} saved on this device` : 'Paused';
+	return {
+		status: enabled ? syncStatus : { state: needsRecovery || storageError ? 'error' as const : 'cached' as const, label: pausedLabel },
+		attention: needsRecovery ? 'Saved reminder changes need review.' : syncStatus.state === 'error' ? syncStatus.label : null,
+		unsynced: pendingCount > 0 || needsRecovery || Boolean(storageError),
+	};
+}
