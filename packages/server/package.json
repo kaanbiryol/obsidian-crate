@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Run Crate sync and its reminders PWA on your computer with automatic remote access.",
   "type": "module",
-  "license": "0BSD",
+  "license": "MIT",
   "author": "Kaan Biryol",
   "repository": {
     "type": "git",
