@@ -69,7 +69,7 @@ it.each(['old 100% details', 'line one\nline two %20 café 😀'])('completes in
   const content = `${note('2099-01-01T12:00:00.000Z')}\n<!-- crate-desc:${description} -->\n`;
   device.disk.write(path, content);
   device.disk.write('note.md', 'ordinary note');
-  const syncing = device.engine.initialSync();
+  const syncing = device.engine.sync();
   await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
   const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
   await runDurableObjectAlarm(coordinator);
@@ -116,7 +116,7 @@ it('carries a source failure into sync activity and clears it after the note is 
   const path = 'Reminders/broken.md';
   const task = note('2099-01-01T12:00:00.000Z');
   device.disk.write(path, `${task}\n<!-- crate-desc:v2:unsupported -->\n`);
-  const syncing = device.engine.initialSync();
+  const syncing = device.engine.sync();
   await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
   const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
   await runDurableObjectAlarm(coordinator);
@@ -169,7 +169,7 @@ it.each([false, true])('resumes reminder setup and syncs a local repair before w
   device.disk.write('Reminders/tasks.md', repair ? `${duplicate}\n${duplicate}` : content);
   device.disk.write('Notes/ignored.md', content);
   vi.spyOn(device.api.initialImport, 'waitUntilReady').mockRejectedValueOnce(new Error('offline during reminder setup'));
-  const interrupted = await device.engine.initialSync();
+  const interrupted = await device.engine.sync();
   expect(interrupted.errors).toEqual(['offline during reminder setup']);
   expect(interrupted).toMatchObject({ success: false, uploaded: 2 });
   if (repair) {
@@ -198,7 +198,7 @@ it('keeps first-time sync active until the reminder schedule is ready', async ()
   const device = new SyncTestDevice('fresh-reminder-setup', env); clients.push(device);
   await device.authorize(); await device.open(); await device.disk.vault.createFolder('Reminders');
   device.disk.write('Reminders/task.md', note('2099-01-01T12:00:00.000Z'));
-  const syncing = device.engine.initialSync();
+  const syncing = device.engine.sync();
   await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 5_000 });
   expect(device.engine.getState().status).toBe('syncing');
   const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
@@ -214,7 +214,7 @@ it('preserves initial uploads when reminder settings fail and resumes without up
   await device.authorize(); await device.open(); await device.disk.vault.createFolder('Reminders');
   device.disk.write('Reminders/task.md', note('2099-01-01T12:00:00.000Z'));
   device.engine.setReminderScopePreparation(async () => { throw new Error('reminder settings unavailable'); });
-  const interrupted = await device.engine.initialSync();
+  const interrupted = await device.engine.sync();
   expect(interrupted).toMatchObject({ success: false, uploaded: 1, errors: ['reminder settings unavailable'] });
   expect(await env.DB.prepare('SELECT state FROM initial_import').first()).toEqual({ state: 'importing' });
   expect(await env.DB.prepare("SELECT 1 FROM files WHERE portable_path = 'reminders/task.md'").first()).not.toBeNull();
@@ -240,7 +240,7 @@ it.each(['failed', 'pending'])('syncs an ordinary edit while reminder settings a
   const device = new SyncTestDevice(`incremental-policy-${status}`, env); clients.push(device);
   await device.authorize(); await device.open();
   device.disk.write('note.md', 'original');
-  expect((await device.engine.initialSync()).success).toBe(true);
+  expect((await device.engine.sync()).success).toBe(true);
   // Reopening also exercises discovery that this remote already finished initial setup.
   device.close(); await device.open();
   let release!: () => void;

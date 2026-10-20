@@ -115,7 +115,7 @@ describe('ignored remote cleanup', () => {
 		const cleaning = review.execute();
 		await vi.waitFor(() => expect(h.localManifest.save).toHaveBeenCalledOnce());
 		expect(h.engine.getState().status).toBe('syncing');
-		expect((await h.engine.initialSync()).errors).toEqual(['Sync already in progress']);
+		expect((await h.engine.sync()).errors).toEqual(['Sync already in progress']);
 		saved.resolve();
 		await cleaning;
 		expect(h.engine.getState().status).toBe('idle');

@@ -127,7 +127,7 @@ it('finishes on the first device, then downloads the vault onto a new device', a
   await first.disk.vault.createFolder('Notes'); await first.disk.vault.createFolder('Assets');
   first.disk.write('Notes/note.md', 'My note'); first.disk.write('Assets/data.bin', 'data');
   const put = vi.spyOn(env.BUCKET, 'put');
-  expect((await first.engine.initialSync()).errors).toEqual([]);
+  expect((await first.engine.sync()).errors).toEqual([]);
   expect(first.requests).toContain('POST /sync/import/upload');
   expect(await env.DB.prepare('SELECT 1 FROM upload_operations').first()).toBeNull();
   const second = new SyncTestDevice('second-import', env); clients.push(second); await second.authorize(); await second.open();
@@ -169,7 +169,7 @@ it('resumes changed attachments in larger batches and sends large files as binar
   for (let index = 0; index < 17; index++) client.disk.write(`asset-${index}.bin`, 'original');
   client.disk.write('large.bin', 'x'.repeat(1024 * 1024));
   vi.spyOn(client.api.initialImport, 'finish').mockRejectedValueOnce(new Error('Connection lost before completion'));
-  const interrupted = await client.engine.initialSync();
+  const interrupted = await client.engine.sync();
   expect(interrupted.success).toBe(false);
   expect(interrupted.uploaded).toBe(18);
   expect(interrupted.uploadedPaths).toHaveLength(18);
@@ -203,7 +203,7 @@ it('recovers a lost completion response after restarting without uploading commi
   vi.spyOn(client.api.initialImport, 'finish').mockImplementationOnce(async (...args) => {
     await finish(...args); throw new Error('Completion response lost');
   });
-  expect((await client.engine.initialSync()).success).toBe(false);
+  expect((await client.engine.sync()).success).toBe(false);
   client.close(); await client.open();
   const put = vi.spyOn(env.BUCKET, 'put');
   expect((await client.engine.sync()).errors).toEqual([]);
@@ -241,7 +241,7 @@ it('splits larger import batches at the existing byte limit', async () => {
   await client.authorize(); await client.open();
   for (let index = 0; index < 12; index++) client.disk.write(`asset-${index}.bin`, 'x'.repeat(900 * 1024));
   const upload = vi.spyOn(client.api.initialImport, 'upload');
-  expect((await client.engine.initialSync()).errors).toEqual([]);
+  expect((await client.engine.sync()).errors).toEqual([]);
   expect(upload.mock.calls.map(([, files]) => files.length)).toEqual([11, 1]);
 });
 

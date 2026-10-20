@@ -41,16 +41,16 @@ async function device(id: string) {
 	return device;
 }
 
-async function checkedSync(device: SyncTestDevice, initial = false) {
-	const result = await (initial ? device.engine.initialSync() : device.engine.sync());
+async function checkedSync(device: SyncTestDevice) {
+	const result = await device.engine.sync();
 	expect(result.errors, JSON.stringify(result)).toEqual([]);
 	expect(result.success).toBe(true);
 	return result;
 }
 
-it.for([1000, 10000].flatMap(count => [false, true].map(initial => ({ count, initial }))))(
-	'converges $count nested notes through cold, warm and restarted synchronization (explicit initial=$initial)',
-	{ timeout: 900_000 }, async ({ count, initial }, context) => {
+it.for([1000, 10000].map(count => ({ count })))(
+	'converges $count nested notes through cold, warm and restarted synchronization',
+	{ timeout: 900_000 }, async ({ count }, context) => {
 		const first = await device('capacity-first');
 		const expected = new Map<string, string>();
 		for (let directory = 0; directory < 100; directory++) {
@@ -66,11 +66,11 @@ it.for([1000, 10000].flatMap(count => [false, true].map(initial => ({ count, ini
 		const get = vi.spyOn(env.BUCKET, 'get');
 		const put = vi.spyOn(env.BUCKET, 'put');
 		const samples: unknown[] = [];
-		async function measure(phase: string, client: SyncTestDevice, initial = false) {
+		async function measure(phase: string, client: SyncTestDevice) {
 			prepare.mockClear(); get.mockClear(); put.mockClear();
 			const start = performance.now();
 			const offset = client.responses.length;
-			const result = await checkedSync(client, initial);
+			const result = await checkedSync(client);
 			const responses = client.responses.slice(offset);
 			const routes: Record<string, number> = {};
 			for (const response of responses) routes[response.route] = (routes[response.route] ?? 0) + 1;
@@ -86,7 +86,7 @@ it.for([1000, 10000].flatMap(count => [false, true].map(initial => ({ count, ini
 				uploaded: result.uploaded, downloaded: result.downloaded, deleted: result.deleted });
 			return result;
 		}
-		await measure(initial ? 'explicit-initial-upload' : 'cold-full-upload', first, initial);
+		await measure('cold-full-upload', first);
 		expect(first.disk.paths()).toHaveLength(count);
 		const second = await device('capacity-second');
 		await measure('cold-download', second);
@@ -126,5 +126,5 @@ it.for([1000, 10000].flatMap(count => [false, true].map(initial => ({ count, ini
 		}
 		for (const [path, content] of expected) expect(manifest.files[path]!.hash, path).toBe(await sha256Hex(content));
 		await context.annotate(JSON.stringify({ scenario: 'real-sync-engine-capacity', localOnly: true,
-			files: count, directories: 100, explicitInitial: initial, offlineOperations: 100, samples }), 'capacity');
+			files: count, directories: 100, offlineOperations: 100, samples }), 'capacity');
 	});

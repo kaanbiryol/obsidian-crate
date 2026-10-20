@@ -4,7 +4,7 @@ These are local regression measurements of the production SyncEngine calling the
 
 ## Repeatable workload
 
-Run `npm run benchmark:sync` for the four capacity cases. The ordinary Worker runtime suite also includes them. Each case starts with empty test bindings, places roughly 1 KiB of distinct Markdown in each of 1,000 or 10,000 files across 100 nested folders, uploads to R2, downloads to a second independent device, performs unchanged syncs, closes both engines, then makes 100 disconnected edits, deletes, creates and renames. Both engines restart from their persisted checkpoints and converge. Every final local byte sequence, checkpoint path and remote manifest hash is checked.
+Run `npm run benchmark:sync` for the two capacity cases. The ordinary Worker runtime suite also includes them. Each case starts with empty test bindings, places roughly 1 KiB of distinct Markdown in each of 1,000 or 10,000 files across 100 nested folders, uploads to R2, downloads to a second independent device, performs unchanged syncs, closes both engines, then makes 100 disconnected edits, deletes, creates and renames. Both engines restart from their persisted checkpoints and converge. Every final local byte sequence, checkpoint path and remote manifest hash is checked.
 
 The benchmark explicitly clears its test database and bucket between cases: the local runtime's reset helper alone retained D1 rows after a 10,000-file run. Setup/cleanup are outside the measurements. SQL counts are prepared statements, not billed D1 rows read or written. Response sizes include API bodies and base64 encoding where applicable. Timing assertions are intentionally absent; correctness and convergence are required regardless of machine load.
 
