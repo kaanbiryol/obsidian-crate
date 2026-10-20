@@ -6,6 +6,7 @@ import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, 
 import { capturePwaSession } from '../session-generation';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
 import type { ApiFetch } from '../types';
+import { takeFragmentValues } from './encryption-fragments';
 
 type ScopeState = ScopedEncryptionState;
 type EncryptionView = { status: 'checking' | 'legacy' } | { status: 'ready'; folderPath: string }
@@ -20,14 +21,9 @@ export const subscribeEncryption = (listener: () => void) => { listeners.add(lis
 export const encryptionSnapshot = () => view;
 function publish(next: EncryptionView) { view = next; for (const listener of listeners) listener(); }
 
-/** Fragments never travel in HTTP requests, cookies, manifests or referrers. */
 export function consumeEncryptionFragment(): void {
-	const fragment = new URLSearchParams(window.location.hash.slice(1));
-	const code = fragment.get('crateKey');
-	if (!code) return;
-	fragmentCode = code;
-	fragment.delete('crateKey');
-	window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (fragment.size ? '#' + fragment.toString() : ''));
+	const { crateKey } = takeFragmentValues(['crateKey']);
+	if (crateKey) fragmentCode = crateKey;
 }
 
 export function resetPwaEncryption(discardKeys = false): void {
