@@ -31,9 +31,9 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
         const wire = url.searchParams.get('wire') === '1';
         const row = await (wire ? env.DB.prepare('SELECT response_json FROM reminder_operations WHERE operation_id=?').bind(id)
           : env.DB.prepare('SELECT response_json FROM reading_operations WHERE operation_id=? AND generation=?').bind(id, current.generation)).first<{ response_json: string }>();
-        const legacy = row ? (await readEncryptedReceipt(env.DB, wire ? 'reminder' : 'reading', id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
+        const converted = row ? (await readEncryptedReceipt(env.DB, wire ? 'reminder' : 'reading', id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
         const scope = encryption?.scopes.find(scope => scope.folderPath === current.folder_path);
-        return readingResponse({ envelope: legacy?.scopes.find(item => item.id === scope?.id)?.envelope ?? null });
+        return readingResponse({ envelope: converted?.scopes.find(item => item.id === scope?.id)?.envelope ?? null });
       }
       return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path) ?? readingResponse({ error: 'Not found' }, 404);
     }

@@ -250,25 +250,25 @@ export class SyncWorkerApi {
 			body: JSON.stringify({ path, expectedHash, expectedRevision }),
 		});
 	}
-	requiresLegacyUploadRecovery(file: JournalUpload): boolean { return !!this.encryption && file.encryptedWire?.generation !== this.encryption.generation; }
-	async resolveLegacyUpload(file: JournalUpload): Promise<UploadResult | null> {
+	requiresConvertedReceipt(file: JournalUpload): boolean { return !!this.encryption && file.encryptedWire?.generation !== this.encryption.generation; }
+	async resolveConvertedUpload(file: JournalUpload): Promise<UploadResult | null> {
 		if (!this.encryption || file.encryptedWire?.generation === this.encryption.generation) return null;
 		const wire = file.encryptedWire;
-		if (!wire) return this.encryption.resolveLegacyOperation(file.operationId,
+		if (!wire) return this.encryption.resolveConvertedOperation(file.operationId,
 			{ path: file.path, hash: file.hash, size: file.size, contentType: file.contentType, expectedHash: file.expectedHash });
 		if (wire.generation > this.encryption.generation) throw new Error('Unlock the original vault keys before resuming this upload');
 		const descriptor = parseEncryptedFile(new Uint8Array(base64ToArrayBuffer(wire.content))).descriptor;
 		if (descriptor.vaultId !== this.encryption.keys.vaultId) throw new Error('Unlock the original vault keys before resuming this upload');
 		// A generation fence proves that an older in-flight write can no longer
 		// commit. Recover its exact receipt, or reconcile without replaying it.
-		return this.encryption.resolveLegacyOperation(file.operationId,
+		return this.encryption.resolveConvertedOperation(file.operationId,
 			{ path: file.path, hash: wire.hash, size: wire.size, contentType: wire.contentType, expectedHash: wire.expectedHash });
 	}
-	async resolveLegacyRestore(intent: RestoreIntent): Promise<UploadResult | null> {
+	async resolveConvertedRestore(intent: RestoreIntent): Promise<UploadResult | null> {
 		if (!this.encryption || intent.encryptedWire?.generation === this.encryption.generation) return null;
 		if (intent.encryptedWire && (intent.encryptedWire.vaultId !== this.encryption.keys.vaultId || intent.encryptedWire.generation > this.encryption.generation)) throw new Error('Unlock the original vault keys before resuming this restore');
 		const request = intent.request;
-		const result = await this.encryption.resolveLegacyOperation(request.operationId, { kind: 'restore', path: request.path,
+		const result = await this.encryption.resolveConvertedOperation(request.operationId, { kind: 'restore', path: request.path,
 			storageKey: request.storageKey, expectedHash: intent.encryptedWire ? intent.encryptedWire.expectedHash : request.expectedHash, expectedRevision: request.expectedRevision });
 		if (!result.success) throw new HttpError(result.error ?? 'Restore precondition changed', result.status ?? 409, null, result.code);
 		return result;

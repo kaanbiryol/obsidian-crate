@@ -41,7 +41,7 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
   } : null;
   const other = section === 'reading' ? 'reminders' : 'reading';
   const otherReady = features[other] && (other === 'reminders'
-    ? app.authToken && ['ready', 'legacy'].includes(app.encryption.status) : reading.session);
+    ? app.authToken && ['ready', 'unencrypted'].includes(app.encryption.status) : reading.session);
   const switchFeature = otherReady && <Button ref={returnButton} data-feature-recovery-switch onClick={() => onOpenFeature(other)}>Open {other === 'reading' ? 'Reading' : 'Reminders'}</Button>;
   const connectionScreen = () => {
     if (browserSetup) return shell(<BrowserSetup onContinue={() => setBrowserSetup(false)} />);

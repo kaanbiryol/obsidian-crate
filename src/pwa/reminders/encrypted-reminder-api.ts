@@ -198,11 +198,11 @@ export class EncryptedReminderApi {
 			const query = new URLSearchParams({ folderPath: this.keys.folderPath, operationId: body.operationId });
 			const receipt = await json<{ envelope: string | null }>(await this.fetch(`/reminders/encrypted-receipt?${query}`));
 			if (receipt.envelope) {
-				const legacy = await decryptJson(receipt.envelope, this.keys.data, this.context(body.operationId)) as { requestHash: string; response: unknown };
-				if (legacy.requestHash !== await reminderRequestHash(attempt ? 'encrypted-files' : action === 'set-completed' ? 'complete' : action,
+				const converted = await decryptJson(receipt.envelope, this.keys.data, this.context(body.operationId)) as { requestHash: string; response: unknown };
+				if (converted.requestHash !== await reminderRequestHash(attempt ? 'encrypted-files' : action === 'set-completed' ? 'complete' : action,
 					attempt ? JSON.parse(attempt.body) as Record<string, unknown> : original)) throw new ReminderCommandError('The original reminder operation has different saved content. Preserve it before recovery.', 409, 'operation_mismatch');
-				const encrypted = (legacy.response as { encrypted?: unknown })?.encrypted;
-				return Response.json(typeof encrypted === 'string' ? await decryptJson(encrypted, this.keys.data, this.context(body.operationId)) : legacy.response);
+				const encrypted = (converted.response as { encrypted?: unknown })?.encrypted;
+				return Response.json(typeof encrypted === 'string' ? await decryptJson(encrypted, this.keys.data, this.context(body.operationId)) : converted.response);
 			}
 			if (attempt) {
 				// The old generation can no longer publish. An absent converted receipt

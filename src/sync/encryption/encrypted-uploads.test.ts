@@ -95,7 +95,7 @@ it('settles a saved plaintext upload from its converted receipt without retransm
 	await manifest.uploadJournal.prepare([{ ...file, intent: { kind: 'local' } }], 20000, crypto.randomUUID());
 	const uploadFile = vi.fn(), batchUpload = vi.fn(), cache = { putBase: vi.fn(async () => {}) };
 	await new DurableUploads(manifest, { getServerInfo: async () => ({ reminderOperationDay: 20000 }),
-		resolveLegacyUpload: async () => ({ success: true, path: file.path, hash: file.hash, revision: 'old-accepted-revision' }),
+		resolveConvertedUpload: async () => ({ success: true, path: file.path, hash: file.hash, revision: 'old-accepted-revision' }),
 		assertPreparedUpload: async () => { throw new Error('Plaintext must not be dispatched'); }, uploadFile, batchUpload,
 	}, cache as never, crypto.randomUUID()).recover();
 	expect(uploadFile).not.toHaveBeenCalled(); expect(batchUpload).not.toHaveBeenCalled();
@@ -104,13 +104,13 @@ it('settles a saved plaintext upload from its converted receipt without retransm
 	await manifest.close();
 });
 
-it('preserves a legacy upload when encryption cannot establish its old outcome', async () => {
+it('preserves a pre-encryption upload when encryption cannot establish its old outcome', async () => {
 	const { create, file } = await fixture();
 	const manifest = create();
 	await manifest.uploadJournal.prepare([{ ...file, intent: { kind: 'local' } }], 20000, crypto.randomUUID());
 	const uploadFile = vi.fn();
 	await expect(new DurableUploads(manifest, { getServerInfo: async () => ({ reminderOperationDay: 20000 }),
-		resolveLegacyUpload: async () => { throw new Error('Old receipt expired'); }, uploadFile, batchUpload: vi.fn(),
+		resolveConvertedUpload: async () => { throw new Error('Old receipt expired'); }, uploadFile, batchUpload: vi.fn(),
 	}, { putBase: vi.fn() } as never, crypto.randomUUID()).recover()).rejects.toThrow('Old receipt expired');
 	expect(uploadFile).not.toHaveBeenCalled(); expect(manifest.uploadJournal.pending()).toHaveLength(1);
 	await manifest.close();

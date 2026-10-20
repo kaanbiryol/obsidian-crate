@@ -37,7 +37,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
     const local = await unlockLocalState(keys);
     if (!current()) { local.destroy(); throw new Error('Reading sign-in changed.'); }
     unlockReadingStorage(local);
-    // All this session's legacy records migrate atomically before hydration. Never
+    // All this session's plaintext records migrate atomically before hydration. Never
     // reinterpret another session's unreadable records or silently discard them.
     const db = await readingDatabase();
     if (!current()) throw new Error('Reading sign-in changed.');

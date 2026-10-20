@@ -30,7 +30,7 @@ export async function getPwaPushManager({
 	windowPushManager = getWindowPushManager(),
 	registerServiceWorker = registerPwaServiceWorker,
 }: PwaPushManagerOptions = {}): Promise<PushManager | null> {
-	if (windowPushManager && encryptionSnapshot().status === 'legacy') return windowPushManager;
+	if (windowPushManager && encryptionSnapshot().status === 'unencrypted') return windowPushManager;
 	const registration = await registerServiceWorker();
 	return registration?.pushManager ?? null;
 }

@@ -1,5 +1,5 @@
 import { sha256Hex } from '../platform/sha256';
-/** Shared with the legacy server contract, for recovering accepted edits whose
+/** Shared with the pre-encryption server contract, for recovering accepted edits whose
  * response was lost before encryption was enabled. */
 function canonical(value: unknown): unknown {
 	if (Array.isArray(value)) return value.map(canonical);

@@ -128,7 +128,7 @@ async function verify(type) {
 			if (JSON.stringify((await api.getSharedSettings()).settings) !== JSON.stringify(seedSettings)) throw new Error('First encrypted settings write failed');
 			const files = await t.EncryptedFiles.create(http, bundle, async () => null);
 			for (const old of legacyUploads) {
-				const receipt = await files.resolveLegacyOperation(old.operationId, old.payload);
+				const receipt = await files.resolveConvertedOperation(old.operationId, old.payload);
 				if (!receipt.success || receipt.hash !== old.payload.hash) throw new Error('Pre-conversion upload receipt was lost');
 			}
 			if (new TextDecoder().decode((await api.downloadFile('Private.md')).content) !== 'Current secret paragraph') throw new Error('Current note did not decrypt');

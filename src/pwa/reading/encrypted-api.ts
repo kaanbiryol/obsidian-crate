@@ -169,9 +169,9 @@ export class EncryptedReadingApi {
     if (saved && (saved.requestHash !== requestHash || typeof saved.body !== 'string')) throw new Error('This encrypted Reading attempt belongs to a different change.');
     let attempt = saved;
     if (attempt && attempt.generation !== this.options.generation) {
-      const legacy = await this.json<{ envelope: string | null }>(`/reading/encrypted-receipt?operationId=${encodeURIComponent(id)}&wire=1`);
-      if (legacy.envelope) {
-        const receipt = await decryptJson(legacy.envelope, this.options.authority.key, this.context(id)) as { requestHash: string; response: { encrypted?: string } };
+      const converted = await this.json<{ envelope: string | null }>(`/reading/encrypted-receipt?operationId=${encodeURIComponent(id)}&wire=1`);
+      if (converted.envelope) {
+        const receipt = await decryptJson(converted.envelope, this.options.authority.key, this.context(id)) as { requestHash: string; response: { encrypted?: string } };
         if (receipt.requestHash !== await reminderRequestHash('encrypted-files', JSON.parse(attempt.body) as Record<string, unknown>) || typeof receipt.response?.encrypted !== 'string') throw new Error('The saved Reading receipt does not match its original attempt.');
         const result = await decryptJson(receipt.response.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
         if (result.requestHash !== requestHash) throw new Error('The saved Reading receipt belongs to another change.');
@@ -182,9 +182,9 @@ export class EncryptedReadingApi {
       attempt = undefined;
     }
     if (!attempt) {
-      const legacy = await this.json<{ envelope: string | null }>(`/reading/encrypted-receipt?operationId=${encodeURIComponent(id)}`);
-      if (legacy.envelope) {
-        const result = await decryptJson(legacy.envelope, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
+      const converted = await this.json<{ envelope: string | null }>(`/reading/encrypted-receipt?operationId=${encodeURIComponent(id)}`);
+      if (converted.envelope) {
+        const result = await decryptJson(converted.envelope, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
         if (result.requestHash !== requestHash) throw this.options.error('The saved operation belongs to a different change.', 409);
         return result.response;
       }

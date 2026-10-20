@@ -9,7 +9,7 @@ import type { ApiFetch } from '../types';
 import { takeFragmentValues } from './encryption-fragments';
 
 type ScopeState = ScopedEncryptionState;
-type EncryptionView = { status: 'checking' | 'legacy' } | { status: 'ready'; folderPath: string }
+type EncryptionView = { status: 'checking' | 'unencrypted' } | { status: 'ready'; folderPath: string }
 	| { status: 'locked'; message: string; converting: boolean; setupRequired: boolean };
 let view: EncryptionView = { status: 'checking' };
 const listeners = new Set<() => void>();
@@ -46,7 +46,7 @@ export function preparePwaEncryption(token: string, rawFetch: ApiFetch, refresh 
 		if (!expected) {
 			useUnencryptedStorage();
 			state = undefined;
-			publish({ status: 'legacy' });
+			publish({ status: 'unencrypted' });
 			return null;
 		}
 		state = expected;

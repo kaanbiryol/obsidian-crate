@@ -47,7 +47,7 @@ function useReadingController() {
   useFeatureSettings('reading', {
     ready: ready && !connecting, connected: Boolean(session), enabled, pendingCount: pending.length,
     encryption: lockedSession ? { status: 'locked', folderPath: lockedSession.folderPath }
-      : session ? { status: readingKeys() ? 'ready' : 'legacy', folderPath: readingKeys()?.folderPath ?? session.folderPath } : undefined,
+      : session ? { status: readingKeys() ? 'ready' : 'unencrypted', folderPath: readingKeys()?.folderPath ?? session.folderPath } : undefined,
     retryAt: Math.min(...pending.map(readingRetryAt).filter(deadline => deadline !== undefined)),
     status: enabled ? status : { state: recovery ? 'error' : 'cached', label: pending.length ? `Paused: ${pending.length} ${pending.length === 1 ? 'change' : 'changes'} saved on this device` : 'Paused' },
     ...readingUpdateReadiness({ ready, connecting, enabled, connected: Boolean(session), hasCache: Boolean(cache),

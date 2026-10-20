@@ -38,7 +38,7 @@ export async function prepareConversionFile(file: ConversionFile, body: ArrayBuf
 	return { bytes, plainHash };
 }
 
-/** Preserve the legacy receipt audience without granting access to other folders. */
+/** Preserve a pre-encryption receipt's audience without granting access to other folders. */
 export async function prepareConversionReceipt(receipt: ConversionReceipt, kind: 'reminder' | 'reading' | 'upload', bundle: VaultKeyBundle, keys: FileKeyAuthority) {
 	const response: unknown = JSON.parse(receipt.response_json);
 	const value = { ...(kind === 'upload' ? { kind } : {}), requestHash: receipt.request_hash, response };
@@ -47,7 +47,7 @@ export async function prepareConversionReceipt(receipt: ConversionReceipt, kind:
 	for (const scope of bundle.scopes) {
 		if (kind === 'upload' || kind === 'reading' && scope.purpose !== 'reading') continue;
 		if (kind === 'reminder') {
-			// Legacy responses contain either one reminder or only a success flag.
+			// Pre-encryption responses contain either one reminder or only a success flag.
 			const reminder = (response as { reminder?: { filePath?: unknown } } | null)?.reminder;
 			if (reminder && (typeof reminder.filePath !== 'string' || !reminder.filePath.startsWith(scope.folderPath + '/'))) continue;
 		}

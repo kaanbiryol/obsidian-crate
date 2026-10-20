@@ -12,8 +12,8 @@ import type { UploadPreconditions } from '../encryption/encrypted-files';
 import { sha256Hex } from '@/platform/sha256';
 
 interface UploadTransport {
-	requiresLegacyUploadRecovery?(file: JournalUpload): boolean;
-	resolveLegacyUpload?(file: JournalUpload): Promise<UploadResult | null>;
+	requiresConvertedReceipt?(file: JournalUpload): boolean;
+	resolveConvertedUpload?(file: JournalUpload): Promise<UploadResult | null>;
 	prepareUploadWire?(file: JournalUpload, preconditions?: UploadPreconditions): ReturnType<PrepareUploadWire>;
 	/** Resolve encrypted preconditions for a batch in one request instead of one per file. */
 	preloadUploadPreconditions?(files: Array<{ path: string; expectedHash: string | null }>): Promise<UploadPreconditions | undefined>;
@@ -53,7 +53,7 @@ export class DurableUploads {
 	}
 
 	private async sendBatch(durable: JournalUpload[], onSettled?: () => Promise<void>): Promise<BatchUploadResponse> {
-		if (durable.some(file => this.transport.requiresLegacyUploadRecovery?.(file))) {
+		if (durable.some(file => this.transport.requiresConvertedReceipt?.(file))) {
 			const results = [];
 			for (const file of durable) { const result = await this.sendSingle(file); results.push(result); if (result.success || this.definitive(result)) await onSettled?.(); }
 			return { success: results.every(result => result.success), results };
@@ -139,8 +139,8 @@ export class DurableUploads {
 		try {
 			let result: UploadResult;
 			try {
-				const legacy = await this.transport.resolveLegacyUpload?.(file);
-				if (legacy) result = legacy;
+				const converted = await this.transport.resolveConvertedUpload?.(file);
+				if (converted) result = converted;
 				else {
 					await this.transport.assertPreparedUpload?.(file);
 					const wire = uploadWire(file);

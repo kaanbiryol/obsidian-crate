@@ -34,7 +34,7 @@ describe('service worker startup registration', () => {
 
 describe('getPwaPushManager', () => {
 	it('uses the window-level manager exposed by declarative Web Push', async () => {
-		vi.spyOn(encryptionSession, 'encryptionSnapshot').mockReturnValue({ status: 'legacy' });
+		vi.spyOn(encryptionSession, 'encryptionSnapshot').mockReturnValue({ status: 'unencrypted' });
 		const windowPushManager = {} as PushManager;
 		const registerServiceWorker = vi.fn<() => Promise<ServiceWorkerRegistration | null>>();
 

@@ -170,7 +170,7 @@ export class EncryptedFiles {
 		const plain = await this.download(file.path, base64ToArrayBuffer(file.encryptedWire.content), file.encryptedWire);
 		if (plain.metadata.hash !== file.hash || plain.metadata.size !== file.size) throw new Error('Encrypted upload does not match its saved local content');
 	}
-	async resolveLegacyOperation(operationId: string, payload: Record<string, unknown>): Promise<UploadResult> {
+	async resolveConvertedOperation(operationId: string, payload: Record<string, unknown>): Promise<UploadResult> {
 		const saved = await this.http.requestJson<{ envelope: string | null; retryValid: boolean }>(`/encryption/upload-receipt?operationId=${encodeURIComponent(operationId)}`);
 		if (!saved.envelope) {
 			if (!saved.retryValid) throw new Error('This old upload is outside its retry window. Preserve local files and compare the server before resetting sync.');
@@ -180,7 +180,7 @@ export class EncryptedFiles {
 		}
 		const authority = this.keys.forVaultMetadata();
 		const receipt = await decryptJson(saved.envelope, authority.key, { vaultId: authority.vaultId, scopeId: 'vault', objectId: operationId, purpose: 'reminder' }) as { kind: string; requestHash: string; response: UploadResult };
-		if (receipt.kind !== 'upload' || receipt.requestHash !== await sha256Hex(new TextEncoder().encode(JSON.stringify(payload)).buffer)) throw new Error('The encrypted legacy receipt does not match the saved operation');
+		if (receipt.kind !== 'upload' || receipt.requestHash !== await sha256Hex(new TextEncoder().encode(JSON.stringify(payload)).buffer)) throw new Error('The converted receipt does not match the saved operation');
 		return receipt.response;
 	}
 

@@ -72,12 +72,12 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 		const files = await env.DB.prepare(`SELECT f.*, (SELECT value FROM maintenance_state WHERE key = 'e2ee:prior-file:' || f.revision) AS previous_descriptor
 			FROM (${pending('files')} UNION ${pending('file_versions')}) f ORDER BY revision LIMIT ${CONVERSION_PAGE_SIZE}`)
 			.bind(cursor.file, ENCRYPTION_FILE_PREFIX, cursor.file, ENCRYPTION_FILE_PREFIX).all<{ revision: string }>();
-		const legacy = (table: string, after: string) => env.DB.prepare(`SELECT operation_id, request_hash, response_json FROM ${table}
+		const unconverted = (table: string, after: string) => env.DB.prepare(`SELECT operation_id, request_hash, response_json FROM ${table}
 			WHERE operation_id > ? AND json_type(response_json, '$.e2eeLegacy') IS NULL ORDER BY operation_id LIMIT ${CONVERSION_PAGE_SIZE}`).bind(after).all<{ operation_id: string }>();
-		const receipts = await legacy('reminder_operations', cursor.reminder);
-		const uploads = await legacy('upload_operations', cursor.upload);
+		const receipts = await unconverted('reminder_operations', cursor.reminder);
+		const uploads = await unconverted('upload_operations', cursor.upload);
 		const folders = await env.DB.prepare("SELECT folder_path FROM auth_tokens WHERE scope = 'reminders' UNION SELECT folder_path FROM notification_policy").all();
-		const reading = await legacy('reading_operations', cursor.reading);
+		const reading = await unconverted('reading_operations', cursor.reading);
 		const captures = await env.DB.prepare(`SELECT c.id, c.note, p.folder_path FROM reading_captures c JOIN reading_policy p ON c.generation=p.generation LIMIT ${CONVERSION_PAGE_SIZE}`).all<{ id: string; note: string; folder_path: string }>();
 		const next: ConversionCursor = {
 			file: files.results.at(-1)?.revision ?? cursor.file,
@@ -116,6 +116,7 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 		if (!isEncryptionId(operationId) || !isReceiptEnvelope(vault) || !Array.isArray(scopes) || scopes.length > state.scopes.length
 			|| scopes.some((item: unknown) => !item || typeof item !== 'object' || !('id' in item) || !('envelope' in item) || !isReceiptEnvelope(item.envelope) || !state.scopes.some(scope => scope.id === item.id))) return corsResponse({ error: 'Invalid encrypted receipt' }, 400);
 		const table = kind === 'upload' ? 'upload_operations' : kind === 'reading' ? 'reading_operations' : 'reminder_operations';
+		// `e2eeLegacy` and 'e2ee-legacy' are stored markers for converted pre-encryption receipts; keep them.
 		const predicate = "operation_id = ? AND json_type(response_json, '$.e2eeLegacy') IS NULL";
 		const receipt = prepareEncryptedReceipt(env.DB, kind, operationId, { e2eeLegacy: { vault, scopes } },
 			{ sql: `EXISTS (SELECT 1 FROM ${table} WHERE ${predicate})`, args: [operationId] });
@@ -160,7 +161,7 @@ async function beginConversion(request: Request, env: Env, state: EncryptionServ
 		if (JSON.stringify(state) === JSON.stringify(configuration)) return corsResponse({ encryption: state });
 		return corsResponse({ error: 'This vault already has a different encryption configuration. Recover its keys first.' }, 409);
 	}
-	// Reject unsupported legacy data before freezing sync. All settings accepted
+	// Reject unsupported pre-encryption data before freezing sync. All settings accepted
 	// by the plaintext API fit the encrypted envelope and request limits.
 	const settings = await env.BUCKET.head(SHARED_SETTINGS_KEY);
 	if (settings && settings.size > MAX_SHARED_SETTINGS_BYTES) {

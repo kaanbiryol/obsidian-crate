@@ -40,7 +40,7 @@ it('keeps the confirmed push provider during a same-session encryption recheck',
 	const fetch = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
 	const refreshing = preparePwaEncryption('session', fetch);
 	await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
-	expect(encryptionSnapshot().status).toBe('legacy');
+	expect(encryptionSnapshot().status).toBe('unencrypted');
 	const windowPushManager = {} as PushManager;
 	const registerServiceWorker = vi.fn(async () => null);
 	await expect(getPwaPushManager({ windowPushManager, registerServiceWorker })).resolves.toBe(windowPushManager);
@@ -72,7 +72,7 @@ it('restores durable writes when an open encrypted tab adopts a verified unencry
 	localStorage.setItem(retainedKey, retained);
 	expect(() => sealPrivateValue('before confirmation', 'test')).toThrow('Unlock');
 	await preparePwaEncryption('new-session', async () => Response.json({ encryption: null }));
-	expect(encryptionSnapshot().status).toBe('legacy');
+	expect(encryptionSnapshot().status).toBe('unencrypted');
 	expect(privateStorageEnabled()).toBe(false);
 	const outbox = await createReminderOutboxStorage('new-session', 'Reminders');
 	const operationId = crypto.randomUUID();

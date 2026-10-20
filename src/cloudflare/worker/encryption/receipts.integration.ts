@@ -19,7 +19,7 @@ const operationId = () => createReminderOperationId(Math.floor(Date.now() / 8640
 const envelope = (size = 1_100_000) => `header.key.iv.${'a'.repeat(size)}.tag`;
 const chunkCount = async () => (await env.DB.prepare("SELECT COUNT(*) AS count FROM maintenance_state WHERE key GLOB 'e2ee:receipt:*'").first<{ count: number }>())!.count;
 
-it('converts large legacy responses atomically, preserves first ciphertext on retry, and restricts folder receipts', async () => {
+it('converts large pre-encryption responses atomically, preserves first ciphertext on retry, and restricts folder receipts', async () => {
 	const bundle = addReminderScope(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Private');
 	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
 	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_STATE_KEY, JSON.stringify(state)).run();

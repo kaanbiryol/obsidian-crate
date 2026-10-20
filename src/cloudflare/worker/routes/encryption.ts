@@ -41,8 +41,8 @@ export async function handleEncryptionRoute(request: Request, db: D1Database, pa
 		const scope = state?.scopes.find(scope => scope.folderPath === folder);
 		if (!id || !scope) return corsResponse({ error: 'Invalid receipt scope' }, 400);
 		const row = await db.prepare('SELECT response_json FROM reminder_operations WHERE operation_id = ?').bind(id).first<{ response_json: string }>();
-		const legacy = row ? (await readEncryptedReceipt(db, 'reminder', id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
-		return corsResponse({ envelope: legacy?.scopes.find(item => item.id === scope.id)?.envelope ?? null });
+		const converted = row ? (await readEncryptedReceipt(db, 'reminder', id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
+		return corsResponse({ envelope: converted?.scopes.find(item => item.id === scope.id)?.envelope ?? null });
 	}
 	if (path === '/settings' && principal.scope === 'vault') return handleEncryptedSettings(request, db);
 	if (path === '/encryption' && request.method === 'GET') {

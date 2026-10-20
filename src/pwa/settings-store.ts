@@ -31,7 +31,7 @@ export interface RemindersSettings extends FeatureSettings {
 
 interface ReadingSettings extends FeatureSettings {
 	unavailable?: string;
-	encryption?: { status: 'ready' | 'legacy' | 'locked'; folderPath: string };
+	encryption?: { status: 'ready' | 'unencrypted' | 'locked'; folderPath: string };
 	shortcut: ReactNode;
 	issues: ReactNode;
 }

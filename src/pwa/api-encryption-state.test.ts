@@ -6,7 +6,7 @@ import type { ApiFetch } from './types';
 
 vi.mock('./encryption/encryption-session', () => ({
 	preparePwaEncryption: vi.fn(async (_token: string, rawFetch: ApiFetch) => { await rawFetch('/encryption'); return null; }),
-	encryptionSnapshot: () => ({ status: 'legacy' }),
+	encryptionSnapshot: () => ({ status: 'unencrypted' }),
 }));
 
 beforeEach(() => {

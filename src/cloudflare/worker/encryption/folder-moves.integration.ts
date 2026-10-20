@@ -144,9 +144,9 @@ it('settles accepted uploads and restores from their original receipts after a f
   const next = moveEncryptionScopes(h.keys, 'Projects', 'Personal');
   await convertEncryptedVault(h.http, next, h.recovery, () => {});
   transport.setEncryption(await EncryptedFiles.create(h.http, next, (path, bytes) => createReminderProjection(next, path, bytes)));
-  expect(await transport.resolveLegacyUpload(accepted)).toEqual(response);
-  expect(await transport.resolveLegacyUpload(unsent)).toMatchObject({ success: false, status: 409, code: 'version_conflict' });
-  expect(await transport.resolveLegacyRestore(restore)).toEqual(restored);
+  expect(await transport.resolveConvertedUpload(accepted)).toEqual(response);
+  expect(await transport.resolveConvertedUpload(unsent)).toMatchObject({ success: false, status: 409, code: 'version_conflict' });
+  expect(await transport.resolveConvertedRestore(restore)).toEqual(restored);
   expect(await env.DB.prepare('SELECT 1 FROM files WHERE path=?').bind(unsent.path).first()).toBeNull();
 });
 

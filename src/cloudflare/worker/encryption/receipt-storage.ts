@@ -26,8 +26,8 @@ export function prepareEncryptedReceipt(db: D1Database, kind: ReceiptKind, id: s
 
 export async function readEncryptedReceipt(db: D1Database, kind: ReceiptKind, id: string, json: string): Promise<Record<string, unknown>> {
 	const response = JSON.parse(json) as Record<string, unknown>;
-	const legacy = response.e2eeLegacy as { chunks?: unknown } | undefined;
-	const count = legacy?.chunks ?? response.e2eeChunks;
+	const converted = response.e2eeLegacy as { chunks?: unknown } | undefined;
+	const count = converted?.chunks ?? response.e2eeChunks;
 	if (count === undefined) return response;
 	if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > MAX_CHUNKS) throw new Error('Invalid encrypted receipt chunks');
 	const keys = Array.from({ length: count }, (_, index) => chunkKey(kind, id, index));

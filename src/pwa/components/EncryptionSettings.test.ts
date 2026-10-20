@@ -12,18 +12,18 @@ vi.mock('react', async importOriginal => ({
 	useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
 }));
 
-function reading(status?: 'legacy' | 'ready' | 'locked', ready = true): SettingsSnapshot['reading'] {
+function reading(status?: 'unencrypted' | 'ready' | 'locked', ready = true): SettingsSnapshot['reading'] {
 	return { updateReady: true, updateContentReady: true, canApplyUpdate: () => true, ready, connected: ready, status: { state: 'synced', label: 'Synced' }, attention: null, unsynced: false,
 		onRefresh: async () => {}, onLogout: async () => {}, shortcut: null, issues: null,
 		encryption: status ? { status, folderPath: 'Reading' } : undefined };
 }
-function render(readingState: SettingsSnapshot['reading'] = reading('legacy'), remindersConnected = true) {
+function render(readingState: SettingsSnapshot['reading'] = reading('unencrypted'), remindersConnected = true) {
 	const markup = renderToStaticMarkup(React.createElement(EncryptionSettings, { reading: readingState, remindersConnected }));
 	return parseHTML(`<html><body>${markup}</body></html>`).document;
 }
 const statusRows = (document: Document) => [...document.querySelectorAll('.settings-group > .settings-row')].map(row => row.textContent);
 
-beforeEach(() => vi.mocked(encryptionSnapshot).mockReturnValue({ status: 'legacy' }));
+beforeEach(() => vi.mocked(encryptionSnapshot).mockReturnValue({ status: 'unencrypted' }));
 
 describe('settings encryption status', () => {
 	it('shows one setup explanation for two unencrypted features', () => {

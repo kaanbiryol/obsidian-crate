@@ -6,15 +6,15 @@ import { SettingsRow } from './SettingsRow';
 
 export function EncryptionSettings({ reading, remindersConnected }: { reading: SettingsSnapshot['reading']; remindersConnected: boolean }) {
 	const encryption = useSyncExternalStore(subscribeEncryption, encryptionSnapshot);
-	const reminderStatus = encryption.status === 'ready' ? 'Unlocked' : encryption.status === 'legacy' ? 'Not enabled'
+	const reminderStatus = encryption.status === 'ready' ? 'Unlocked' : encryption.status === 'unencrypted' ? 'Not enabled'
 		: encryption.status === 'locked' ? encryption.converting ? 'Converting' : 'Locked' : remindersConnected ? 'Checking…' : 'Not connected';
-	const readingStatus = reading?.encryption?.status === 'ready' ? 'Unlocked' : reading?.encryption?.status === 'legacy' ? 'Not enabled'
+	const readingStatus = reading?.encryption?.status === 'ready' ? 'Unlocked' : reading?.encryption?.status === 'unencrypted' ? 'Not enabled'
 		: reading?.encryption?.status === 'locked' ? 'Locked' : reading?.ready ? 'Not connected' : 'Checking…';
 	const reminderDescription = encryption.status === 'locked' ? encryption.message
 		: encryption.status === 'checking' && !remindersConnected ? 'Connect Reminders to check this device.' : undefined;
 	const readingDescription = reading?.encryption?.status === 'locked' ? 'Unlock or verify Reading in the app before using this folder.'
 		: reading?.ready && !reading.encryption ? 'Connect Reading to check this device.' : undefined;
-	const showSetup = encryption.status === 'legacy' || reading?.encryption?.status === 'legacy';
+	const showSetup = encryption.status === 'unencrypted' || reading?.encryption?.status === 'unencrypted';
 	const hasUnlockedFolder = encryption.status === 'ready' || reading?.encryption?.status === 'ready';
 	return <SettingsSection title="Encryption" groupProps={{ 'aria-live': 'polite' }}>
 		<SettingsRow title="Reminders" description={reminderDescription}><span className="settings-value">{reminderStatus}</span></SettingsRow>
