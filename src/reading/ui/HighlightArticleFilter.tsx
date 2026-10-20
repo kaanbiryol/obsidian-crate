@@ -5,7 +5,7 @@ import { IconButton } from '../../ui/shared/IconButton';
 import { TextField } from '../../ui/shared/TextField';
 import { ThemeIcon } from '../../ui/shared/ThemeIcon';
 import { ReadingDialog } from './ReadingDialog';
-import { readingTitle } from './reading-presentation';
+import { readingTitle } from '../core/reading-presentation';
 
 export function HighlightArticleFilter({ items, value, onChange }: { items: ReadingItem[]; value: string; onChange: (value: string) => void }) {
 	const [open, setOpen] = useState(false);

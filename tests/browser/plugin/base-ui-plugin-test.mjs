@@ -24,7 +24,7 @@ const { outputFiles } = await build({
     import { PluginContext } from './src/reminders/ui/plugin/reminders-context';
     import { BaseUiModal } from './src/ui/plugin/BaseUiModal';
     import { useReminderModalPresentation } from './src/reminders/ui/reminder-modal/useReminderModalPresentation';
-    import { BaseModal } from './src/ui/plugin/BaseModal';
+    import { BaseModal } from './src/ui/shared/BaseModal';
     import { ActivityTabs } from './src/ui/activity/ActivityTabs';
     import { ActivitySheet } from './src/ui/activity/ActivitySheet';
     import { ExclusionSheet } from './src/ui/ExclusionSheet';

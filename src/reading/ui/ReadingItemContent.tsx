@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ReadingItem } from '../core/model';
 import { youtubeVideoId } from '../core/youtube';
-import { readingSource, readingTitle } from './reading-presentation';
+import { readingSource, readingTitle } from '../core/reading-presentation';
 import { ReadingSourceIcon } from './ReadingSourceIcon';
 import { ReadingVideoThumbnail } from './ReadingVideo';
 

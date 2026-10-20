@@ -12,7 +12,7 @@ import { parseReminderEditorContent } from '../../core/grammar/reminderEditorPar
 
 // Portals do not render during SSR; keep these assertions focused on the editor's content.
 // Modal lifecycle, focus and keyboard behavior run in base-ui-plugin-test.mjs.
-vi.mock('../../../ui/plugin/BaseModal', () => ({
+vi.mock('../../../ui/shared/BaseModal', () => ({
     BaseModal: ({ children, isOpen = true, className, role = 'dialog', ariaLabel, ariaLabelledBy, ariaDescribedBy }: {
         children: React.ReactNode; isOpen?: boolean; className?: string; role?: string;
         ariaLabel?: string; ariaLabelledBy?: string; ariaDescribedBy?: string;

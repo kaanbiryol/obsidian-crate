@@ -4,7 +4,7 @@ import type { ReadingHighlight } from '../core/highlights';
 import { Button } from '../../ui/shared/Button';
 import { ThemeIcon } from '../../ui/shared/ThemeIcon';
 import { HighlightList } from './HighlightList';
-import { groupReadingHighlights, readingTitle } from './reading-presentation';
+import { groupReadingHighlights, readingTitle } from '../core/reading-presentation';
 
 type Entry = { item: ReadingItem; highlight: ReadingHighlight };
 

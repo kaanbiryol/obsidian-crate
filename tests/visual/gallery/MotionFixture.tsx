@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/ui/shared/Button';
-import { BaseModal } from '@/ui/plugin/BaseModal';
+import { BaseModal } from '@/ui/shared/BaseModal';
 import { EmptyState } from '@/reminders/ui/shared/EmptyState';
 import { ProgressMeter } from '@/reminders/ui/shared/ProgressMeter';
 import { ReminderCard } from '@/reminders/ui/shared/ReminderCard';

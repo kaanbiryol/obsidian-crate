@@ -154,7 +154,8 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['src/ui/shared/**/*.{ts,tsx}', 'src/reminders/ui/shared/**/*.{ts,tsx}'],
+		files: ['src/ui/shared/**/*.{ts,tsx}', 'src/reminders/ui/shared/**/*.{ts,tsx}', 'src/reading/ui/**/*.{ts,tsx}'],
+		ignores: ['src/reading/ui/plugin/**'],
 		rules: {
 			'@typescript-eslint/no-restricted-imports': ['error', {
 				paths: [{ name: 'obsidian', message: 'Shared UI must work in both the plugin and PWA; keep Obsidian APIs in ui/plugin.' }],

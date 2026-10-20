@@ -12,7 +12,7 @@ import { FloatingActionButton } from '../../reminders/ui/shared/FloatingActionBu
 import { EmptyState } from '../../reminders/ui/shared/EmptyState';
 import type { ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
-import { filterReadingHighlights, filterReadingItems, groupReadingItems, groupReadingHighlights, readingSections, readingSource, readingTitle, type ReadingSection } from './reading-presentation';
+import { filterReadingHighlights, filterReadingItems, groupReadingItems, groupReadingHighlights, readingSections, readingSource, readingTitle, type ReadingSection } from '../core/reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { HighlightGroups } from './HighlightGroups';
 import { HighlightArticleFilter } from './HighlightArticleFilter';

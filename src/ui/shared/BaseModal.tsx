@@ -3,7 +3,7 @@ import { Dialog } from '@base-ui/react/dialog';
 import { Drawer } from '@base-ui/react/drawer';
 import type { AnimationConfig, ModalVariant } from '../../reminders/types/componentAdapter';
 import { useObsidianOverlayActive } from './useObsidianOverlayActive';
-import { useReducedMotion } from '../shared/useReducedMotion';
+import { useReducedMotion } from './useReducedMotion';
 
 interface BaseModalProps {
     /** Controls modal visibility - triggers enter/exit animations */

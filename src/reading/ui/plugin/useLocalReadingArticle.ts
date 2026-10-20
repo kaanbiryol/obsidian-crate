@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Notice } from 'obsidian';
-import type { ReadingLibrary } from '../data/library';
-import type { ReadingChanges, ReadingItem } from '../core/model';
-import type { ReadingHighlight } from '../core/highlights';
+import type { ReadingLibrary } from '../../data/library';
+import type { ReadingChanges, ReadingItem } from '../../core/model';
+import type { ReadingHighlight } from '../../core/highlights';
 
 type Article = Awaited<ReturnType<ReadingLibrary['read']>>;
 interface OpenedArticle { library: ReadingLibrary; article: Article; highlight?: ReadingHighlight }

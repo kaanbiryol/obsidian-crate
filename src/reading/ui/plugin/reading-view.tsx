@@ -1,7 +1,7 @@
 import { ItemView, Platform, type WorkspaceLeaf } from 'obsidian';
-import type CratePlugin from '../../plugin/CratePlugin';
-import { createShadowReactMount, type ShadowReactMount } from '../../ui/plugin/shadowReactMount';
-import { getReadingLibrary } from '../runtime';
+import type CratePlugin from '../../../plugin/CratePlugin';
+import { createShadowReactMount, type ShadowReactMount } from '../../../ui/plugin/shadowReactMount';
+import { getReadingLibrary } from '../../runtime';
 import { PluginWorkspace } from '@/ui/plugin/PluginWorkspace';
 export const READING_VIEW_TYPE = 'crate-reading';
 export class ReadingView extends ItemView {

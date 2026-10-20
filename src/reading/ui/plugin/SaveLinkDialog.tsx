@@ -1,7 +1,7 @@
 import React, { useId } from 'react';
-import { readingUrl } from '../core/model';
-import { ReadingDialog, type ReadingDialogProps } from './ReadingDialog';
-import { SaveLinkForm } from './SaveLinkForm';
+import { readingUrl } from '../../core/model';
+import { ReadingDialog, type ReadingDialogProps } from '../ReadingDialog';
+import { SaveLinkForm } from '../SaveLinkForm';
 
 /** Plugin capture uses the same header action and native field as the reminder editor. */
 export function SaveLinkDialog({ url, onUrl, saving, error, onSave, onClose, variant, showBackdrop, captureOnDevice }: {

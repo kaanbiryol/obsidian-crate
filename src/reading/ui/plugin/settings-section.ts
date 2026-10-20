@@ -1,12 +1,12 @@
-import { setSharedFeature } from '../../plugin/feature-settings';
-import { captureServerConnection } from '../../plugin/server-request';
+import { setSharedFeature } from '../../../plugin/feature-settings';
+import { captureServerConnection } from '../../../plugin/server-request';
 import { Notice, Setting } from 'obsidian';
-import type CratePlugin from '../../plugin/CratePlugin';
-import { createSettingsDisclosure } from '../../ui/settings/section-helpers';
-import { FolderSuggest } from '../../ui/settings/folder-suggest';
-import { bindCommittedText } from '../../ui/settings/input-helpers';
-import { readingServerRequest, type ServerReadingPolicy } from '../server';
-import { startReading, stopReading, validateReadingConfiguration } from '../runtime';
+import type CratePlugin from '../../../plugin/CratePlugin';
+import { createSettingsDisclosure } from '../../../ui/settings/section-helpers';
+import { FolderSuggest } from '../../../ui/settings/folder-suggest';
+import { bindCommittedText } from '../../../ui/settings/input-helpers';
+import { readingServerRequest, type ServerReadingPolicy } from '../../server';
+import { startReading, stopReading, validateReadingConfiguration } from '../../runtime';
 import { READING_VIEW_TYPE } from './reading-view';
 
 export function renderReadingSettings(container: HTMLElement, plugin: CratePlugin, rerender: () => void): () => void {
@@ -33,7 +33,7 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 						const { assertCurrent } = captureServerConnection(plugin);
 						const reading = { enabled: true, folderPath };
 						validateReadingConfiguration(plugin, reading);
-						const { changeEncryptedFolder } = await import('../../plugin/encryption-folder-moves');
+						const { changeEncryptedFolder } = await import('../../../plugin/encryption-folder-moves');
 						if (await changeEncryptedFolder(plugin, plugin.settings.reading.folderPath, folderPath)) { rerender(); return; }
 						if (plugin.settings.workerUrl) {
 							const { policy } = await readingServerRequest<{ policy: ServerReadingPolicy | null }>(plugin, '/reading/policy');

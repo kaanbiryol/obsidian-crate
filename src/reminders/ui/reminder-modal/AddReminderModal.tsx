@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useMemo } from 'react';
 
 import type { RichTextInputHandle } from '../shared/RichTextInput';
-import { BaseModal } from '../../../ui/plugin/BaseModal';
+import { BaseModal } from '../../../ui/shared/BaseModal';
 import { AddReminderModalBody } from './AddReminderModalBody';
 import { AddReminderModalHeader } from './AddReminderModalHeader';
 import { AddReminderModalOverlays } from './AddReminderModalOverlays';

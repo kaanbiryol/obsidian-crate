@@ -1,4 +1,4 @@
-import { ObsidianReadingDialog } from '@/reading/ui/ObsidianReadingDialog';
+import { ObsidianReadingDialog } from '@/reading/ui/plugin/ObsidianReadingDialog';
 import { ReminderListStyleFixture } from './ReminderListStyleFixture';
 import { ReminderDraftFixture } from './ReminderDraftFixture';
 import { NavigationFixture } from './NavigationFixture';

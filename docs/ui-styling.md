@@ -339,7 +339,7 @@ Dock morphs use the shared collapsed height.
   keyboard focus. Verify the status-bar gesture in an installed app on an iPhone;
   desktop browser automation cannot establish that OS behavior.
 
-- `src/ui/plugin/BaseModal.tsx` uses Base UI Dialog on desktop and
+- `src/ui/shared/BaseModal.tsx` uses Base UI Dialog on desktop and
   Drawer for mobile sheets. Portals remain inside the same themed mount and
   owner document, including Obsidian Shadow DOM and popout windows. Nested
   pickers share the parent's dialog tree and restore editor focus. Pending

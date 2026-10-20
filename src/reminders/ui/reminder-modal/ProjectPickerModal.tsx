@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { BaseModal } from '../../../ui/plugin/BaseModal';
+import { BaseModal } from '../../../ui/shared/BaseModal';
 import { ThemeIconProvider } from '../../../ui/shared/ThemeIcon';
 import { ObsidianIcon } from '../../../ui/obsidian-icon';
 import type { AnimationConfig } from '../plugin/animations';

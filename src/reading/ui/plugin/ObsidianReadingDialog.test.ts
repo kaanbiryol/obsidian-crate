@@ -1,9 +1,9 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { renderHook } from '../../test/react-hooks';
+import { renderHook } from '../../../test/react-hooks';
 
-vi.mock('./ReadingDialog', () => ({ PluginReadingDialog: ({ children }: { children: React.ReactNode }) => React.createElement('div', { role: 'dialog' }, children) }));
+vi.mock('../ReadingDialog', () => ({ PluginReadingDialog: ({ children }: { children: React.ReactNode }) => React.createElement('div', { role: 'dialog' }, children) }));
 import { ObsidianReadingDialog } from './ObsidianReadingDialog';
 
 it('portals to the owning pane outside its tab layer and removes the overlay on unmount', () => {

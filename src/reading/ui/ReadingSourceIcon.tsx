@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { readingFaviconUrl, type ReadingMetadata } from '../core/model';
-import { readingSource } from './reading-presentation';
+import { readingSource } from '../core/reading-presentation';
 
 export function sourceIconUrl(item: ReadingMetadata): string | null {
 	if (item.favicon_url) {

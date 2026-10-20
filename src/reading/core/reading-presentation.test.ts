@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ReadingItem } from '../core/model';
+import type { ReadingItem } from './model';
 import { filterReadingItems, groupReadingItems, filterReadingHighlights, groupReadingHighlights } from './reading-presentation';
 
 const item = (id: string, savedAt: string, overrides: Partial<ReadingItem> = {}): ReadingItem => ({

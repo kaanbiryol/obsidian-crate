@@ -3,7 +3,7 @@ import { ReadingLibraryPanel, type ReadingLibraryProps } from '@/reading/ui/Read
 import { ReadingReader } from '@/reading/ui/Reader';
 import type { ReadingItem } from '@/reading/core/model';
 import { ReadingDialog, ReadingDialogHost, PluginReadingDialog } from '@/reading/ui/ReadingDialog';
-import { SaveLinkDialog } from '@/reading/ui/SaveLinkDialog';
+import { SaveLinkDialog } from '@/reading/ui/plugin/SaveLinkDialog';
 import { SaveLinkForm } from '@/reading/ui/SaveLinkForm';
 
 const initial: ReadingItem[] = [{

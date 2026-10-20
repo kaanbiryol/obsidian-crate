@@ -1,5 +1,5 @@
-import type { ReadingItem } from '../core/model';
-import { youtubeVideoId } from '../core/youtube';
+import type { ReadingItem } from './model';
+import { youtubeVideoId } from './youtube';
 
 export type ReadingSection = 'inbox' | 'favorites' | 'archived' | 'highlights';
 export const readingSections = [

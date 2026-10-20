@@ -7,7 +7,7 @@ import React, { useContext, useEffect, useEffectEvent, useLayoutEffect } from 'r
 import { useToast } from '../hooks/useToast';
 import { PwaToast } from './PwaToast';
 import type { NavigationItem } from '@/ui/shared/NavigationBar';
-import type { ReadingSection } from '@/reading/ui/reading-presentation';
+import type { ReadingSection } from '@/reading/core/reading-presentation';
 import { FeatureNavigationContext, type CrateSection } from './FeatureSwitcherButton';
 
 /** PWA navigation; shared feature panels supply their destinations and actions. */

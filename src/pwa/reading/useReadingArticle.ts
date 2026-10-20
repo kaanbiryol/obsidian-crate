@@ -2,7 +2,7 @@ import type { PendingReading } from './outbox';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readingUrlIdentity, type ReadingItem } from '@/reading/core/model';
-import type { ReadingSection } from '@/reading/ui/reading-presentation';
+import type { ReadingSection } from '@/reading/core/reading-presentation';
 import { loadReadingArticle } from './api';
 import { assertReadingSession, readReadingArticle, cacheReadingArticle, type ReadingSession, type ReadingCache } from './storage';
 import { presentReadingItems } from './pending-view';

@@ -16,7 +16,7 @@ import { renderSyncSection } from './settings/sync-section';
 import { renderRemindersSection } from './settings/reminders-section';
 import { renderNotificationsSection } from './settings/notifications-section';
 import { renderCrateWebApp } from './settings/reminders-web-app';
-import { renderReadingSettings } from '../reading/ui/settings-section';
+import { renderReadingSettings } from '../reading/ui/plugin/settings-section';
 import { captureSettingsView, restoreSettingsView } from './settings/settings-view-state';
 import { getSettingsTabSections } from './settings/settings-tab-model';
 import { createSharedSettingsPush } from './settings/shared-settings-push';

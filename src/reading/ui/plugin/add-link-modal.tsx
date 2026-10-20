@@ -1,11 +1,11 @@
-import type { ReadingItem } from '../core/model';
+import type { ReadingItem } from '../../core/model';
 import React, { useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Notice, Platform } from 'obsidian';
-import type CratePlugin from '../../plugin/CratePlugin';
-import { BaseUiModal } from '../../ui/plugin/BaseUiModal';
-import { hideNativeModalCloseButton } from '../../ui/plugin/modalShell';
-import { getReadingLibrary } from '../runtime';
+import type CratePlugin from '../../../plugin/CratePlugin';
+import { BaseUiModal } from '../../../ui/plugin/BaseUiModal';
+import { hideNativeModalCloseButton } from '../../../ui/plugin/modalShell';
+import { getReadingLibrary } from '../../runtime';
 import { SaveLinkDialog } from './SaveLinkDialog';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { ObsidianIcon } from '@/ui/obsidian-icon';

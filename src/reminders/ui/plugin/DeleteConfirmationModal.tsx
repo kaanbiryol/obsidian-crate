@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { BaseModal } from '../../../ui/plugin/BaseModal';
+import { BaseModal } from '../../../ui/shared/BaseModal';
 import { Button } from '../../../ui/shared/Button';
 import { ModalLayout } from '../../../ui/shared/ModalLayout';
 

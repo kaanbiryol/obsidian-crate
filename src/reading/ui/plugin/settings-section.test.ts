@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { FakeElement, MockSetting, openSettingsDisclosures, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
+import { FakeElement, MockSetting, openSettingsDisclosures, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../../../test/fakes/obsidian-ui';
 
 const request = vi.fn();
 const validate = vi.fn();
@@ -8,11 +8,11 @@ const policy = { enabled: 1, folder_path: 'Articles', generation: 'g', revision:
 beforeEach(() => {
 	// These cases exercise plaintext policy changes; encrypted folder moves have
 	// their own runtime tests and should not delay this test's async assertions.
-	vi.doMock('../../plugin/encryption-folder-moves', () => ({ changeEncryptedFolder: vi.fn(async () => false) }));
-	vi.doMock('../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
+	vi.doMock('../../../plugin/encryption-folder-moves', () => ({ changeEncryptedFolder: vi.fn(async () => false) }));
+	vi.doMock('../../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isDesktopApp: true } }));
-	vi.doMock('../server', () => ({ readingServerRequest: request }));
-	vi.doMock('../runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), validateReadingConfiguration: validate }));
+	vi.doMock('../../server', () => ({ readingServerRequest: request }));
+	vi.doMock('../../runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), validateReadingConfiguration: validate }));
 	vi.doMock('./reading-view', () => ({ READING_VIEW_TYPE: 'crate-reading' }));
 	request.mockImplementation(async (_plugin, path) => path === '/reading/fetching' ? { enabled: true, revision: 'r' } : { policy });
 });
@@ -63,7 +63,7 @@ it.each([true, false])('sets local Reading to %s without changing another device
  expect(plugin.settings.reading).toEqual({ enabled, folderPath: 'Reading' });
  expect(request).not.toHaveBeenCalled();
  expect(plugin.app.workspace.detachLeavesOfType).toHaveBeenCalledWith('crate-reading');
- const { startReading, stopReading } = await import('../runtime');
+ const { startReading, stopReading } = await import('../../runtime');
  expect(stopReading).toHaveBeenCalledOnce();
  expect(startReading).toHaveBeenCalledTimes(enabled ? 1 : 0);
 });
@@ -95,6 +95,6 @@ it.each(['read', 'pause', 'update'])('does not continue a folder change after sw
  await vi.waitFor(() => expect(noticeMessages.some(message => message.includes('connection changed'))).toBe(true));
  expect(request).toHaveBeenCalledTimes(calls[step as keyof typeof calls]);
  expect(plugin.writeSettings).not.toHaveBeenCalled();
- const { startReading } = await import('../runtime');
+ const { startReading } = await import('../../runtime');
  expect(startReading).not.toHaveBeenCalled();
 });

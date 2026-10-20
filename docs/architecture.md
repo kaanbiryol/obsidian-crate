@@ -354,7 +354,7 @@ enrolled folder before the reader or offline cache receives them.
 List pages are validated before accumulation. The loader rejects repeated cursors
 and bounds page, item and issue counts before committing a complete cache revision;
 rejected pagination leaves the prior cache and unsettled commands available.
-The plugin's `reading/ui/useLocalReadingArticle.ts` owns reader navigation and
+The plugin's `reading/ui/plugin/useLocalReadingArticle.ts` owns reader navigation and
 invalidates late reads on Back, a newer open, library replacement or unmount.
 `reading/ui/useReadingReaderActions.ts` scopes mutation and sharing feedback to the
 displayed article's lifetime. The two action channels remain independent; replacing

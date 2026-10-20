@@ -23,7 +23,7 @@ import { youtubeVideoId } from '../core/youtube';
 import { ReadingVideo } from './ReadingVideo';
 import { decorateTranscript } from './transcript-content';
 import { transcriptSegments, transcriptMoment } from '../core/transcript';
-import { readingSource, readingTitle } from './reading-presentation';
+import { readingSource, readingTitle } from '../core/reading-presentation';
 import { ReadingSourceIcon } from './ReadingSourceIcon';
 import { LoadingIndicator } from '../../ui/shared/LoadingIndicator';
 

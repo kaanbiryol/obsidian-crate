@@ -1,16 +1,16 @@
-import { youtubeVideoId } from '../core/youtube';
+import { youtubeVideoId } from '../../core/youtube';
 import { useRemindersSettingsStore } from '@/reminders/settings';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import React, { useSyncExternalStore } from 'react';
 import { Notice } from 'obsidian';
-import type CratePlugin from '../../plugin/CratePlugin';
-import type { ReadingLibrary } from '../data/library';
-import { ReadingLibraryPanel, type ReadingLibraryProps } from './ReadingLibrary';
+import type CratePlugin from '../../../plugin/CratePlugin';
+import type { ReadingLibrary } from '../../data/library';
+import { ReadingLibraryPanel, type ReadingLibraryProps } from '../ReadingLibrary';
 import { useLocalReadingArticle } from './useLocalReadingArticle';
-import { ReadingReader } from './Reader';
+import { ReadingReader } from '../Reader';
 import { AddReadingLinkModal } from './add-link-modal';
-import './reading.scss';
-import { ReadingDialogHost } from './ReadingDialog';
+import '../reading.scss';
+import { ReadingDialogHost } from '../ReadingDialog';
 import { ObsidianReadingDialog } from './ObsidianReadingDialog';
 
 import { TabTransition } from '@/ui/shared/navigation/TabTransition';

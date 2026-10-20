@@ -2,7 +2,7 @@ import React, { useCallback, useEffectEvent, useLayoutEffect, useRef, useState }
 import { AppDock } from '../shared/navigation/AppDock';
 import { DOCK_TABS, dockDestinationIndex, type DockTab } from '../shared/navigation/dock-destinations';
 import type { TabId } from '@/reminders/ui/shared/layoutConstants';
-import type { ReadingSection } from '@/reading/ui/reading-presentation';
+import type { ReadingSection } from '@/reading/core/reading-presentation';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { useSpring, type MotionValue } from 'motion/react';
 import { PWA_CONTROL_SPRING } from '../shared/navigation/motion';

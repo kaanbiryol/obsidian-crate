@@ -1,8 +1,8 @@
 import { act } from 'react';
 import { expect, it, vi } from 'vitest';
-import { renderHook } from '../../test/react-hooks';
-import { ReadingLibrary } from '../data/library';
-import type { ReadingItem } from '../core/model';
+import { renderHook } from '../../../test/react-hooks';
+import { ReadingLibrary } from '../../data/library';
+import type { ReadingItem } from '../../core/model';
 import { useLocalReadingArticle } from './useLocalReadingArticle';
 
 const first: ReadingItem = { crate_reading_version: 1, crate_reading_id: 'first', source_url: 'https://example.com',

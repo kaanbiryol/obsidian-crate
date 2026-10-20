@@ -2,7 +2,7 @@ import React, { useCallback, useState, useSyncExternalStore } from 'react';
 import { Notice } from 'obsidian';
 import type CratePlugin from '@/plugin/CratePlugin';
 import { getReadingLibrary, subscribeReadingRuntime } from '@/reading/runtime';
-import { LocalReadingLibrary } from '@/reading/ui/LocalReadingLibrary';
+import { LocalReadingLibrary } from '@/reading/ui/plugin/LocalReadingLibrary';
 import { RemindersViewContent } from '@/reminders/ui/plugin/RemindersViewContent';
 import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 import { useRemindersSettingsStore } from '@/reminders/settings';

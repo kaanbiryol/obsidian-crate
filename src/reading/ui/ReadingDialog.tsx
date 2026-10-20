@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useRef, useState } from 'react';
-import { BaseModal } from '../../ui/plugin/BaseModal';
+import { BaseModal } from '../../ui/shared/BaseModal';
 import { ModalHeader } from '../../ui/shared/ModalHeader';
 import { useObsidianKeyboardHeight } from '../../reminders/ui/hooks/useObsidianKeyboardHeight';
 
