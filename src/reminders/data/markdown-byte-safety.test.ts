@@ -30,7 +30,6 @@ describe('plugin reminder byte safety', () => {
 		const h = await workspace(bytes);
 		expect(h.index.getAll()).toEqual([]);
 		expect(h.index.sourceIssues).toEqual([expect.objectContaining({ path: source, diagnostic: { code: 'invalid-markdown-encoding' } })]);
-		expect(h.index.isComplete).toBe(false);
 		expect(await h.readBytes(source)).toEqual(bytes);
 		expect(h.vault.process).not.toHaveBeenCalled();
 	});

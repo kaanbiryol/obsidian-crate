@@ -273,7 +273,7 @@ it.each([
   const index = createReminderIndex(app, 'Reminders', undefined, () => false, () => true);
   await index.load();
   expect(index.isInitialLoadComplete).toBe(true);
-  expect(index.isComplete).toBe(true);
+  expect(index.sourceIssues).toEqual([]);
   expect(index.getAll().map(item => [item.id, item.filePath])).toEqual([['rem-1', live.path]]);
   expect(index.getProjects()).toEqual(['Work']);
   expect(index.isReminderFile(conflictPath)).toBe(false);

@@ -87,7 +87,7 @@ describe('reminderIndex', () => {
     });
     await index.load();
     expect(index.isInitialLoadComplete).toBe(true);
-    expect(index.isComplete).toBe(!hasIssues);
+    expect(index.sourceIssues).toHaveLength(hasIssues ? 1 : 0);
   });
 
   it('updates indexes when renaming files', () => {

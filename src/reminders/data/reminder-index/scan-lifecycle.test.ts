@@ -55,7 +55,6 @@ it('does not restore a deleted-file warning from a late failed scan', async () =
   result.resolve({ filePath: oldPath, reminders: [], lineCount: 0, error: 'File is gone' });
   await scanning;
   expect(index.sourceIssues).toEqual([]);
-  expect(index.isComplete).toBe(true);
 });
 
 it.each(['delete', 'rename'] as const)('re-reads a whole-vault snapshot invalidated by %s', async action => {
@@ -72,7 +71,7 @@ it.each(['delete', 'rename'] as const)('re-reads a whole-vault snapshot invalida
   await scanning;
   expect(index.getAll()).toEqual(current);
   expect(index.getProjects()).toEqual(action === 'delete' ? [] : ['New']);
-  expect(index.isComplete).toBe(true);
+  expect(index.sourceIssues).toEqual([]);
 });
 
 it('invalidates a queued file scan before it starts, while allowing scans of a recreated file', async () => {

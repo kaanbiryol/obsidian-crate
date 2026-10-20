@@ -39,12 +39,8 @@ export interface IndexedReminder {
 }
 
 export interface ReminderIndex {
-  isLoaded: boolean;
   readonly isInitialLoadComplete: boolean;
   readonly sourceIssues: ReminderSourceIssue[];
-  readonly isComplete: boolean;
-  lastScanTime?: Date;
-  scanDurationMs?: number;
   remindersFolderPath: string;
 
   getAll(): IndexedReminder[];
@@ -71,8 +67,6 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
   let reminders: IndexedReminder[] = [];
   let isLoaded = false;
   let isInitialLoadComplete = false;
-  let lastScanTime: Date | undefined;
-  let scanDurationMs: number | undefined;
   let discoveredProjects = new Set<string>();
   let ambiguousOwners: ReminderIdentityOwner[] = [];
   let sourceIssues = new Map<string, ReminderSourceIssue>();
@@ -199,18 +193,8 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
   }
 
   const index: ReminderIndex = {
-    get isLoaded() {
-      return isLoaded;
-    },
     get isInitialLoadComplete() { return isInitialLoadComplete; },
     get sourceIssues() { return [...sourceIssues.values()]; },
-    get isComplete() { return isLoaded && !sourceIssues.size && !deferredLoad && !deferredPaths.size; },
-    get lastScanTime() {
-      return lastScanTime;
-    },
-    get scanDurationMs() {
-      return scanDurationMs;
-    },
     get remindersFolderPath() {
       return remindersFolderPath;
     },
@@ -272,8 +256,6 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       reminders = [...result.reminders, ...reminders.filter(reminder => sourceIssues.has(reminder.filePath))];
       ambiguousOwners = [];
       isLoaded = true;
-      if (!sourceIssues.size) lastScanTime = new Date();
-      scanDurationMs = result.scanDurationMs;
       discoveredProjects = new Set(result.discoveredProjects);
 
       lookupStore.rebuild(reminders);

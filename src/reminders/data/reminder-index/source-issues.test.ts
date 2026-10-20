@@ -21,7 +21,6 @@ afterEach(async () => { for (const h of fixtures.splice(0)) await h.dispose(); }
 describe('incomplete reminder sources', () => {
 	it('retains failed-file entries while updating healthy files, blocks stale edits, and clears the warning after recovery', async () => {
 		const h = await workspace();
-		const completedScan = h.index.lastScanTime;
 		const listener = vi.fn();
 		h.index.onIndexChange(listener);
 		await h.put(b, '- [ ] Healthy update <!-- crate-id:two -->\n');
@@ -29,9 +28,6 @@ describe('incomplete reminder sources', () => {
 		expect(result.filesScanned).toBe(1);
 		expect(result.issues).toEqual([{ path: a, reason: 'Temporary read failure' }]);
 		expect(h.index.getAll().map(reminder => reminder.content).sort()).toEqual(['Healthy update', 'Original']);
-		expect(h.index.isLoaded).toBe(true);
-		expect(h.index.isComplete).toBe(false);
-		expect(h.index.lastScanTime).toBe(completedScan);
 		expect(listener).toHaveBeenCalledOnce();
 		const writer = createMarkdownWriter(h.app, h.index);
 		await expect(writer.updateReminder(h.index.getById('one')!, { content: 'Unsafe edit' })).rejects.toThrow('Refresh reminders');
@@ -41,7 +37,6 @@ describe('incomplete reminder sources', () => {
 		await h.put(a, task.replace('Original', 'Recovered update'));
 		await h.index.load();
 		expect(h.index.sourceIssues).toEqual([]);
-		expect(h.index.isComplete).toBe(true);
 		expect(h.index.getById('one')?.content).toBe('Recovered update');
 	});
 
@@ -53,7 +48,7 @@ describe('incomplete reminder sources', () => {
 		expect(h.index.getById('one')?.content).toBe('Original');
 		h.vault.adapter.readBinary.mockImplementation(h.read);
 		await h.index.rescanFile(file);
-		expect(h.index.isComplete).toBe(true);
+		expect(h.index.sourceIssues).toEqual([]);
 		h.vault.adapter.readBinary.mockRejectedValueOnce(new Error('Read failed again'));
 		await h.index.rescanFile(file);
 		await h.vault.adapter.remove(a);
@@ -82,7 +77,7 @@ describe('incomplete reminder sources', () => {
 		h.index.renameFile(a, renamed);
 		expect(h.index.sourceIssues).toEqual([{ path: renamed, reason: 'Temporary read failure' }]);
 		await h.index.rescanFile(h.files.get(renamed)!);
-		expect(h.index.isComplete).toBe(true);
+		expect(h.index.sourceIssues).toEqual([]);
 		expect(h.index.getById('one')?.filePath).toBe(renamed);
 	});
 
