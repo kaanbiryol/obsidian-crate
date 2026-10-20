@@ -86,11 +86,11 @@ it('restores durable writes when an open encrypted tab adopts a verified unencry
 	expect(() => openPrivateValue(retained, retainedKey)).toThrow('Unlock');
 });
 
-it.each([200, 404])('keeps a previous encrypted enrollment locked when a %s response omits encryption', async status => {
+it.each([[200, 'no longer reports'], [404, 'Could not verify encryption']] as const)('keeps a previous encrypted enrollment locked when a %s response omits encryption', async (status, message) => {
 	unlockPreviousSession(); resetPwaEncryption();
 	localStorage.setItem('crate-encryption-session:previous-session', 'encrypted enrollment');
 	await expect(preparePwaEncryption('session', async () => Response.json({ encryption: null }, { status })))
-		.rejects.toThrow('no longer reports');
+		.rejects.toThrow(message);
 	expect(encryptionSnapshot().status).toBe('locked');
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 });

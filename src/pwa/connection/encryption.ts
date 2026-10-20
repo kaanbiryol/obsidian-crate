@@ -19,9 +19,8 @@ export async function loadEncryptionState({ token, purpose, fragment, request, c
       throw new EncryptionVerificationUnavailableError('Could not verify encryption. Check your connection and retry.', { cause });
     });
     if (response.status === 401 && current()) reportExpiredConnection(token);
-    const oldServer = purpose === 'reminders' && response.status === 404;
-    if (!response.ok && !oldServer) throw new Error('Could not verify encryption. Check your connection and retry.');
-    const data = oldServer ? { encryption: null } : await response.json() as { encryption: unknown };
+    if (!response.ok) throw new Error('Could not verify encryption. Check your connection and retry.');
+    const data = await response.json() as { encryption: unknown };
     expected = data.encryption === null ? null : parseScopedEncryptionState(data.encryption, purpose);
     if (!expected && hasEncryptedSessionEvidence(remembered, fragment)) throw new Error('The server no longer reports this vault’s encryption configuration. Reconnect from Obsidian before syncing.');
   } catch (cause) {

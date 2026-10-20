@@ -44,8 +44,8 @@ describe('encryption verification', () => {
 		await expect(load(async () => Response.json({ encryption: null }))).rejects.toThrow('no longer reports');
 	});
 
-	it('treats a missing endpoint on an older reminders server as unencrypted', async () => {
-		expect(await load(async () => new Response(null, { status: 404 }))).toBeNull();
+	it('does not treat a missing encryption endpoint as an unencrypted vault', async () => {
+		await expect(load(async () => new Response(null, { status: 404 }))).rejects.toThrow('Could not verify encryption');
 	});
 
 	it('reports an expired connection and an unreachable server separately', async () => {
