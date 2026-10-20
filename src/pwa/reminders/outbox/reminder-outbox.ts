@@ -3,6 +3,7 @@ import type { ReminderOutboxStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import type { ApiFetch } from '../../types';
 import { sha256Hex } from '../../../platform/sha256';
+import { hasAutomaticRetry, automaticRetryDelayMs } from '../../sync/retry-policy';
 
 function requestFingerprint(change: PendingReminderChange): Promise<string> {
 	return sha256Hex(JSON.stringify([change.method, change.path, change.body]));
@@ -10,7 +11,7 @@ function requestFingerprint(change: PendingReminderChange): Promise<string> {
 
 /** Automatic wakeups share the saved deadline and budget; only user retries reset them. */
 export function reminderRetryAt(change: PendingReminderChange): number | undefined {
-	return change.status === 'uncertain' && !change.reviewRequired && change.attempts < 3 ? change.retryAt : undefined;
+	return change.status === 'uncertain' && !change.reviewRequired && hasAutomaticRetry(change.attempts) ? change.retryAt : undefined;
 }
 
 export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutation, commit, onChange, onScan = () => {}, onError, onSettled, withLock = work => work(), canSend = () => true }: {
@@ -143,7 +144,7 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 						update({ ...change, status: definite || reviewRequired ? 'failed' : 'uncertain', reviewRequired,
 							ambiguous: !definite,
 							error: error instanceof Error ? error.message : String(error),
-							retryAt: Date.now() + 2_000 * 2 ** (change.attempts - 1) });
+							retryAt: Date.now() + automaticRetryDelayMs(change.attempts) });
 					} finally { finish(); settled = true; }
 				}
 			});

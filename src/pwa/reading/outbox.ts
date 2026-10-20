@@ -5,6 +5,7 @@ import { loadReading, readingRequest } from './api';
 import { ReadingApiError } from './api-error';
 import { assertReadingSession, readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, savePendingReading, type ReadingSession, type ReadingCache } from './storage';
 import { isReadingCommand } from './storage-validation';
+import { hasAutomaticRetry, automaticRetryDelayMs } from '@/pwa/sync/retry-policy';
 
 export interface ReadingUpdateIntent { id: string; changes: ReadingChanges; before: ReadingChanges }
 export type ReadingCommand =
@@ -19,7 +20,7 @@ export type ReadingRetryMode = 'automatic' | 'manual';
 
 /** The timer and every dispatch path use the same persisted retry budget. */
 export function readingRetryAt(op: PendingReading): number | undefined {
-  return op.error !== undefined && !op.review && (op.attempts ?? 0) < 3 ? op.retryAt : undefined;
+  return op.error !== undefined && !op.review && hasAutomaticRetry(op.attempts ?? 0) ? op.retryAt : undefined;
 }
 export function readingNeedsAttention(op: PendingReading): boolean {
   return Boolean(op.review || op.error && readingRetryAt(op) === undefined);
@@ -93,7 +94,7 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
           failed.review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
           failed.attempts = (failed.attempts ?? 0) + 1;
           failed.retryAt = !failed.review && (!(error instanceof ReadingApiError) || error.status >= 500 || error.status === 429)
-            ? Date.now() + 2_000 * 2 ** Math.min(failed.attempts - 1, 5) : undefined;
+            ? Date.now() + automaticRetryDelayMs(failed.attempts) : undefined;
           // Later edits depend on the rejected value. Keep them for recovery,
           // but never send them or present them as if that value had committed.
           if (failed.review && failed.action !== 'capture') {
