@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { PluginContext } from '../plugin/reminders-context';
 import { PageTitleContext } from '../shared/lexical/pageTitles';
 import type { RichTextInputHandle } from '../shared/RichTextInput';
-import type { RecurrenceRule } from '../../types';
+import type { ReminderDraft } from './useReminderDraft';
 import { getProjectColor } from '../format/projectColors';
 import { ReminderActionChips } from './ReminderActionChips';
 import { PluginReminderEditorFields as ReminderEditorFields } from '../plugin/PluginReminderEditorFields';
@@ -11,22 +11,14 @@ import { ObsidianIcon } from '../../../ui/obsidian-icon';
 
 interface AddReminderModalBodyProps {
     isDark: boolean;
-    content: string;
-    onContentChange: (value: string) => void;
-    description: string;
-    onDescriptionChange: (value: string) => void;
+    draft: ReminderDraft;
     onKeyDown: (event: React.KeyboardEvent) => void;
     allowAutoFocus: boolean;
     projects: string[];
     textareaRef: React.RefObject<HTMLDivElement | null>;
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
     descriptionInputRef: React.RefObject<RichTextInputHandle | null>;
-    dueDate: string | null;
-    hasTime?: boolean;
-    project: string;
     defaultProject: string;
-    priority: number;
-    recurrence?: RecurrenceRule;
     onOpenDatePicker: () => void;
     onOpenProjectPicker: () => void;
     onOpenRecurrencePicker: () => void;
@@ -35,22 +27,14 @@ interface AddReminderModalBodyProps {
 
 export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     isDark,
-    content,
-    onContentChange,
-    description,
-    onDescriptionChange,
+    draft,
     onKeyDown,
     allowAutoFocus,
     projects,
     textareaRef,
     richTextInputRef,
     descriptionInputRef,
-    dueDate,
-    hasTime,
-    project,
     defaultProject,
-    priority,
-    recurrence,
     onOpenDatePicker,
     onOpenProjectPicker,
     onOpenRecurrencePicker,
@@ -62,7 +46,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
         const title = await api?.fetchPageTitle(url) ?? null;
         return api === plugin.syncRuntime.getApiClient() ? title : null;
     }, [plugin]);
-    const projectColor = getProjectColor(project || defaultProject)[isDark ? 'dark' : 'light'].accent;
+    const projectColor = getProjectColor(draft.project || defaultProject)[isDark ? 'dark' : 'light'].accent;
 
     return (
         <ThemeIconProvider renderer={ObsidianIcon}>
@@ -73,10 +57,10 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
             >
                 <PageTitleContext.Provider value={plugin.syncRuntime.getApiClient() ? resolvePageTitle : undefined}>
                     <ReminderEditorFields
-                        content={content}
-                        onContentChange={onContentChange}
-                        description={description}
-                        onDescriptionChange={onDescriptionChange}
+                        content={draft.content}
+                        onContentChange={draft.setContent}
+                        description={draft.description}
+                        onDescriptionChange={draft.setDescription}
                         onKeyDown={onKeyDown}
                         allowAutoFocus={allowAutoFocus}
                         projects={projects}
@@ -88,12 +72,12 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                 </PageTitleContext.Provider>
 
                 <ReminderActionChips
-                    dueDate={dueDate}
-                    hasTime={hasTime}
-                    project={project}
+                    dueDate={draft.dueDate}
+                    hasTime={draft.hasTime}
+                    project={draft.project}
                     defaultProject={defaultProject}
-                    priority={priority}
-                    recurrence={recurrence}
+                    priority={draft.priority}
+                    recurrence={draft.recurrence}
                     onOpenDatePicker={onOpenDatePicker}
                     onOpenProjectPicker={onOpenProjectPicker}
                     onOpenRecurrencePicker={onOpenRecurrencePicker}

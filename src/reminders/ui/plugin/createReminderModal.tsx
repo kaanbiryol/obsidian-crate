@@ -116,9 +116,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     }
   };
 
-  // Render the shared AddReminderModal directly
-  // On mobile: bottom-sheet with animations and backdrop
-  // On desktop: centered modal without animations
+  // Mobile uses a bottom sheet; desktop uses a centered modal.
   return (
     <SharedAddReminderModal
       onClose={() => modal.close()}
@@ -130,8 +128,6 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
       defaultProject={initialProject}
       initialDueDate={defaultDueDate}
       variant={isMobile ? "bottom-sheet" : "centered"}
-      showBackdrop={isMobile}
-      pickerMode={isMobile ? "replace" : "overlay"}
       keyboardOffset={keyboardHeight}
     />
   );

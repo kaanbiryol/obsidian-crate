@@ -145,3 +145,5 @@ export function useReminderDraft({
 		togglePriority,
 	};
 }
+
+export type ReminderDraft = ReturnType<typeof useReminderDraft>;

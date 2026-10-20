@@ -27,14 +27,11 @@ interface AddReminderModalProps {
     defaultProject?: string;
     initialDueDate?: string;
     animationConfig?: AnimationConfig;
-    variant?: 'bottom-sheet' | 'centered';
-    showBackdrop?: boolean;
     /**
-     * Controls how picker modals (date, project, recurrence) are displayed:
-     * - 'replace' (default): Main modal is hidden when picker opens
-     * - 'overlay': Main modal stays visible, picker opens as centered modal on top
+     * 'bottom-sheet' (default, mobile) dims the backdrop and replaces the editor while a picker
+     * (date, project, recurrence) is open. 'centered' (desktop) opens pickers over the editor.
      */
-    pickerMode?: 'replace' | 'overlay';
+    variant?: 'bottom-sheet' | 'centered';
     /**
      * Keyboard offset in pixels - used to position modal above on-screen keyboard on mobile.
      * When set, the modal container's bottom will be offset by this amount.
@@ -54,35 +51,21 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     initialDueDate,
     animationConfig = { enabled: true },
     variant = 'bottom-sheet',
-    showBackdrop = true,
-    pickerMode = 'replace',
     keyboardOffset = 0,
 }) => {
+    const pickerMode = variant === 'centered' ? 'overlay' : 'replace';
     const isEditing = !!reminder;
     const focusDelayMs = 0;
     const textareaRef = useRef<HTMLDivElement>(null);
     const richTextInputRef = useRef<RichTextInputHandle>(null);
     const descriptionInputRef = useRef<RichTextInputHandle>(null);
-    const {
-        content,
-        setContent,
-        description,
-        setDescription,
-        project,
-        priority,
-        dueDate,
-        hasTime,
-        recurrence,
-        applyDateSelection,
-        applyProjectSelection,
-        applyRecurrenceSelection,
-        togglePriority,
-    } = useReminderDraft({
+    const draft = useReminderDraft({
         reminder,
         projects,
         defaultProject,
         initialDueDate,
     });
+    const { content, description, project, priority, dueDate, hasTime, recurrence, togglePriority } = draft;
     const hasTitle = useMemo(
         () => Boolean(parseReminderEditorContent(content, projects).cleanContent.trim()),
         [content, projects],
@@ -162,7 +145,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             variant={variant}
             className={`crate-reminder-editor-surface${reduceMotion ? ' is-reduced-motion' : ''}`}
             ariaLabel={isEditing ? 'Edit reminder' : 'New reminder'}
-            showBackdrop={showBackdrop}
+            showBackdrop={variant === 'bottom-sheet'}
             dismissible={!isSaving && !isDeleting && !showDeleteConfirm && currentView === 'main'}
             disableSwipeToDismiss={isSaving || isDeleting || currentView !== 'main'}
             style={{
@@ -192,20 +175,12 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                     isClosing={isClosing}
                     animationConfig={animationConfig}
                     pickerMode={pickerMode}
-                    dueDate={dueDate}
-                    hasTime={hasTime}
+                    draft={draft}
                     isDark={isDark}
                     projects={projects}
-                    project={project}
                     defaultProject={defaultProject}
-                    recurrence={recurrence}
                     onClosePicker={closePickerModal}
                     editorFocus={() => richTextInputRef.current?.getElement() ?? false}
-                    onDateTimeChange={applyDateSelection}
-                    onSelectProject={applyProjectSelection}
-                    onApplyRecurrence={(rule) => {
-                        applyRecurrenceSelection(rule);
-                    }}
                     showDeleteConfirm={showDeleteConfirm}
                     onCloseDeleteConfirm={closeDeleteConfirm}
                     onConfirmDelete={() => {
@@ -229,22 +204,14 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             <div inert={isSaving || isDeleting}>
                 <AddReminderModalBody
                     isDark={isDark}
-                    content={content}
-                    onContentChange={setContent}
-                    description={description}
-                    onDescriptionChange={setDescription}
+                    draft={draft}
                     onKeyDown={handleKeyDown}
                     allowAutoFocus={allowAutoFocus}
                     projects={projects}
                     textareaRef={textareaRef}
                     richTextInputRef={richTextInputRef}
                     descriptionInputRef={descriptionInputRef}
-                    dueDate={dueDate}
-                    hasTime={hasTime}
-                    project={project}
                     defaultProject={defaultProject}
-                    priority={priority}
-                    recurrence={recurrence}
                     onOpenDatePicker={() => transitionToView('date')}
                     onOpenProjectPicker={() => transitionToView('project')}
                     onOpenRecurrencePicker={() => transitionToView('recurrence')}

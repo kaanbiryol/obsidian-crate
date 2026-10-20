@@ -26,7 +26,7 @@ export function ProjectInteractionFixture({ host, isDark }: { host: 'plugin' | '
       onTouchMove={() => setGestures(value => ({ ...value, touch: value.touch + 1 }))}>
       <div style={{ height: 96 }} />
       {mode === 'overlay' ? open && <PluginContext.Provider value={plugin}><AddReminderModal onClose={() => setOpen(false)} projects={projects}
-        defaultProject={project} pickerMode="overlay" variant="centered" animationConfig={{ enabled: params.has('motion') }} /></PluginContext.Provider>
+        defaultProject={project} variant="centered" animationConfig={{ enabled: params.has('motion') }} /></PluginContext.Provider>
         : mode === 'autocomplete' ? <section data-testid="picker-surface"
           className={host === 'plugin' ? 'base-modal-surface crate-reminder-editor-surface' : 'modal-card pwa-reminder-editor'}
           style={{ position: 'relative', height: 540, width: '100%', maxWidth: 560, margin: '0 auto', padding: 18 }}>

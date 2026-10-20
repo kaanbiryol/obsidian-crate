@@ -1,6 +1,6 @@
 import React from "react";
 import type { AnimationConfig } from "@/reminders/ui/plugin/animations";
-import type { RecurrenceRule } from "@/reminders/types";
+import type { ReminderDraft } from "./useReminderDraft";
 import { DeleteConfirmationModal } from "../plugin/DeleteConfirmationModal";
 import { DatePickerModal } from "./DatePickerModal";
 import { ProjectPickerModal } from "./ProjectPickerModal";
@@ -13,18 +13,12 @@ interface AddReminderModalOverlaysProps {
   isClosing: boolean;
   animationConfig: AnimationConfig;
   pickerMode: "replace" | "overlay";
-  dueDate: string | null;
-  hasTime?: boolean;
+  draft: ReminderDraft;
   isDark: boolean;
   projects: string[];
-  project: string;
   defaultProject: string;
-  recurrence?: RecurrenceRule;
   onClosePicker: () => void;
   editorFocus: () => HTMLElement | false;
-  onDateTimeChange: (value: string | null, hasTime?: boolean) => void;
-  onSelectProject: (project: string) => void;
-  onApplyRecurrence: (rule: RecurrenceRule | null) => void;
   showDeleteConfirm: boolean;
   onCloseDeleteConfirm: () => void;
   onConfirmDelete: () => void;
@@ -37,18 +31,12 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
   isClosing,
   animationConfig,
   pickerMode,
-  dueDate,
-  hasTime,
+  draft,
   isDark,
   projects,
-  project,
   defaultProject,
-  recurrence,
   onClosePicker,
   editorFocus,
-  onDateTimeChange,
-  onSelectProject,
-  onApplyRecurrence,
   showDeleteConfirm,
   onCloseDeleteConfirm,
   onConfirmDelete,
@@ -63,10 +51,10 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
         finalFocus={editorFocus}
         animationConfig={animationConfig}
         pickerMode={pickerMode}
-        dueDate={dueDate}
-        hasTime={hasTime}
+        dueDate={draft.dueDate}
+        hasTime={draft.hasTime}
         isDark={isDark}
-        onDateTimeChange={onDateTimeChange}
+        onDateTimeChange={draft.applyDateSelection}
       />
       <ProjectPickerModal
         isOpen={currentView === "project" && !isClosing}
@@ -75,10 +63,10 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
         animationConfig={animationConfig}
         pickerMode={pickerMode}
         projects={projects}
-        project={project}
+        project={draft.project}
         defaultProject={defaultProject}
         isDark={isDark}
-        onSelectProject={onSelectProject}
+        onSelectProject={draft.applyProjectSelection}
       />
       <RecurrencePickerModal
         isOpen={currentView === "recurrence" && !isClosing}
@@ -87,8 +75,8 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
         animationConfig={animationConfig}
         pickerMode={pickerMode}
         isDark={isDark}
-        recurrence={recurrence}
-        onApply={(rule) => onApplyRecurrence(rule ?? null)}
+        recurrence={draft.recurrence}
+        onApply={(rule) => draft.applyRecurrenceSelection(rule ?? null)}
       />
       <DeleteConfirmationModal
         isOpen={showDeleteConfirm}

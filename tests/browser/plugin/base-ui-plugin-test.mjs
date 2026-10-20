@@ -79,7 +79,7 @@ const { outputFiles } = await build({
         <Button onClick={() => setOpen('tabs')}>Activity tabs</Button>
         <Button onClick={() => setOpen('exclusion')}>Exclusions</Button>
         {open === 'editor' && <AddReminderModal reminder={reminder} projects={['Inbox','Work','Personal']}
-          variant={mode} pickerMode={mode==='centered'?'overlay':'replace'}
+          variant={mode}
           onClose={() => setOpen(null)}
           onSave={() => new Promise(resolve => {window.finishSave=resolve})}
           onDelete={() => new Promise(resolve => {window.finishDelete=resolve})} />}
