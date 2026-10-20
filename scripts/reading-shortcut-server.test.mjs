@@ -78,7 +78,7 @@ test('the distributed pairing and save requests reach a durable Reading receipt'
     const invalidBody = await dispatch({ ...saveRequest, body: JSON.stringify({ url: sharedUrl, operationId: 'not-a-shortcut-field' }) });
     assert.equal(invalidBody.status, 400); assert.equal(invalidBody.body.code, 'invalid_shortcut_request');
     const newerContract = await dispatch({ ...saveRequest, url: `${origin}/reading/shortcut/v2/prepare` });
-    assert.equal(newerContract.status, 426); assert.equal(newerContract.body.code, 'server_update_required');
+    assert.equal(newerContract.status, 404);
     const vaultNative = await dispatch({ ...saveRequest, headers: { ...saveRequest.headers, Authorization: `Bearer ${vault.token}` } });
     assert.equal(vaultNative.status, 403);
   } finally { await runtime?.close(); await rm(dir, { recursive: true, force: true }); }

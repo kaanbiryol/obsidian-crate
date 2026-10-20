@@ -229,9 +229,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.screenshot({ path: `test-results/reading/${name}-shortcut-error-${colorScheme}.png`, fullPage: true, animations: 'disabled' });
     }
 
-    const newer = await (await post('/reading/shortcut/v2/prepare', { url: articleUrl }, authorization)).json();
-    await page.goto(newer.launchUrl);
-    await expect(page.getByRole('heading', { name: 'Update your Crate server', exact: true })).toBeVisible(); await noSuccess();
+    assert.equal((await post('/reading/shortcut/v2/prepare', { url: articleUrl }, authorization)).status, 404);
     const badPair = await (await post(contract.exchangePath, { token: 'expired-pairing-secret' }, '')).json();
     await page.goto(badPair.launchUrl);
     await expect(page.getByRole('heading', { name: 'Pairing did not finish', exact: true })).toBeVisible(); await noSuccess();

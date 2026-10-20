@@ -15,7 +15,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
   const update = element('update'), download = element<HTMLAnchorElement>('download'), reconnect = element<HTMLAnchorElement>('reconnect');
   const reload = element<HTMLButtonElement>('reload');
   const number = (value: unknown): number | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : null;
-  const codes = new Set(['reading_error', 'reading_not_configured', 'feature_paused', 'protocol_incompatible', 'server_update_required',
+  const codes = new Set(['reading_error', 'reading_not_configured', 'feature_paused', 'protocol_incompatible',
     'shortcut_update_required', 'shortcut_access_required', 'invalid_shortcut_request', 'invalid_response', 'request_failed',
     'network_error', 'save_link_expired', 'missing_save_link']);
   const normalize = (value: unknown): Record<string, unknown> => {
@@ -105,8 +105,6 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
       title.textContent = 'Share this link again'; message.textContent = 'This link has expired or is missing. Share the article to Crate again.';
     } else if (status === 423) {
       title.textContent = 'Reading is paused'; message.textContent = 'Enable Reading in Crate settings, then share the article again.';
-    } else if (code === 'server_update_required') {
-      title.textContent = 'Update your Crate server'; message.textContent = 'Update the Crate plugin in Obsidian, then update the server in Crate settings. Share the article again when both updates finish.';
     } else if (code === 'shortcut_update_required') {
       title.textContent = 'Update your shortcut'; message.textContent = 'Install the latest Save to Crate shortcut and reconnect it to your library.';
     } else if (status === 428) {

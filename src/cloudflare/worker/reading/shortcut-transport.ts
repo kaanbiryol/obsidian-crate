@@ -5,18 +5,17 @@ import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 import { ReadingError } from './common';
 import { isSha256Hex } from '@/platform/validation';
 
-export interface ShortcutTransport { kind: 'prepare' | 'exchange'; version: number; revision: number }
+export interface ShortcutTransport { kind: 'prepare' | 'exchange'; revision: number }
 const revision = (value: string | null) => value && /^[1-9]\d{0,5}$/.test(value) ? Number(value) : 1;
+/** Only the current contract's routes are shortcut transport; other versions are not admitted. */
 export function shortcutTransport(request: Request): ShortcutTransport | null {
   if (request.method !== 'POST') return null;
   const path = new URL(request.url).pathname;
-  const current = /^\/reading\/shortcut\/v(0|[1-9]\d{0,2})\/(prepare|exchange)$/.exec(path);
-  if (current) return { kind: current[2] as ShortcutTransport['kind'], version: Number(current[1]), revision: revision(request.headers.get(contract.revisionHeader)) };
-  return null;
+  const kind = path === contract.preparePath ? 'prepare' : path === contract.exchangePath ? 'exchange' : null;
+  return kind && { kind, revision: revision(request.headers.get(contract.revisionHeader)) };
 }
 export function shortcutCompatibility(transport: ShortcutTransport): ReadingError | null {
-  if (transport.version > contract.version) return new ReadingError('Update Crate in Obsidian and its server in Crate settings, then share the link again.', 426, 'server_update_required');
-  if (transport.version !== contract.version || transport.revision < contract.minimumRevision) return new ReadingError('Install the latest Save to Crate shortcut, then reconnect it in Reading settings.', 426, 'shortcut_update_required');
+  if (transport.revision < contract.minimumRevision) return new ReadingError('Install the latest Save to Crate shortcut, then reconnect it in Reading settings.', 426, 'shortcut_update_required');
   return null;
 }
 export function validateShortcutBody(body: Record<string, unknown>, kind: ShortcutTransport['kind']): void {
@@ -40,12 +39,12 @@ export async function shortcutLaunchResponse(request: Request, response: Respons
       code: typeof data.code === 'string' && /^[a-z_]{1,64}$/.test(data.code) ? data.code : 'request_failed', requestId,
       serverRevision: release.revision, serverFingerprint: serverFingerprint && isSha256Hex(serverFingerprint) ? serverFingerprint : null,
       pwaVersion: PWA_ASSET_VERSION, wireProtocol: CRATE_PLUGIN_PROTOCOL.current,
-      shortcutContract: transport.version, shortcutRevision: transport.revision };
+      shortcutContract: contract.version, shortcutRevision: transport.revision };
     data.launchUrl = `${new URL(request.url).origin}/notifications/save-reading#error=${encodeURIComponent(JSON.stringify(diagnostic))}`;
   } else if (transport.kind === 'prepare' && typeof data.launchUrl === 'string') {
     const launch = new URL(data.launchUrl);
     launch.searchParams.set('shortcut', String(transport.revision));
-    launch.searchParams.set('contract', String(transport.version));
+    launch.searchParams.set('contract', String(contract.version));
     data.launchUrl = launch.href;
   }
   data.shortcut = { version: contract.version, revision: contract.revision, updateAvailable: transport.revision < contract.revision, downloadUrl: contract.downloadUrl };

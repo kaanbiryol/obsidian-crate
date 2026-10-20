@@ -119,16 +119,10 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /reading/list': { scopes: LIBRARY, execution: COORDINATOR },
 	'GET /reading/item': { scopes: LIBRARY, execution: COORDINATOR },
 	[`POST ${shortcut.preparePath}`]: { scopes: ['reading_capture'], execution: COORDINATOR },
+	[`POST ${shortcut.exchangePath}`]: { scopes: VAULT, execution: READING_GRANT },
 };
 
 export function apiRoutePolicy(path: string, method: string): ApiRoutePolicy | undefined {
 	const key = `${method} ${path}`;
-	if (Object.hasOwn(routes, key)) return routes[key];
-	// Older and newer transports must reach compatibility handling, including
-	// the public one-use exchange, rather than failing admission with a 404.
-	if (method === 'POST') {
-		const legacyShortcut = /^\/reading\/shortcut\/v(?:0|[1-9]\d{0,2})\/(prepare|exchange)$/.exec(path);
-		if (legacyShortcut) return { scopes: VAULT, execution: legacyShortcut[1] === 'exchange' ? READING_GRANT : COORDINATOR };
-	}
-	return undefined;
+	return Object.hasOwn(routes, key) ? routes[key] : undefined;
 }

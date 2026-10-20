@@ -121,9 +121,9 @@ Recognized native requests return `shortcut: { version, revision,
 updateAvailable, downloadUrl }`. Preparation successes return the opaque launch
 URL; failures return an error launch URL even for authentication, admission, or
 compatibility rejection. Its fragment contains only allowlisted diagnostic
-fields. A newer unsupported capture contract receives 426
-`server_update_required`; a contract or template below the supported minimum
-receives 426 `shortcut_update_required`. The live, uncached save page performs the handoff
+fields. Only the current contract's routes are admitted; other contract
+versions receive 404. A template below the supported minimum revision receives
+426 `shortcut_update_required`. The live, uncached save page performs the handoff
 with the server's current app wire protocol.
 
 Only the versioned shortcut routes bypass the general app protocol. Other routes enforce the normal protocol checks.

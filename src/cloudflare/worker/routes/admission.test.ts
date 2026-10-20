@@ -63,20 +63,17 @@ it.each(['/', '/.well-known/crate', '/notifications', '/notifications/sw.js', '/
 	expect(requestAdmissionKind(new Request(`https://test${path}`, { method: 'POST' }))).toBe('unknown');
 });
 
-it.each([0, 1, 2, 999])('admits Shortcut v%s for transport compatibility responses', version => {
-	for (const action of ['prepare', 'exchange']) {
-		const path = `/reading/shortcut/v${version}/${action}`;
-		const url = `https://test${path}`;
-		expect(requestAdmissionKind(new Request(url, { method: 'POST' }))).toBe('api');
-		expect(requestAdmissionKind(new Request(url))).toBe('unknown');
-		expect(apiRoutePolicy(path, 'POST')?.execution).toEqual(action === 'exchange'
-			? { kind: 'reading-grant' } : { kind: 'coordinator', wake: true });
-	}
+it.each([[shortcut.preparePath, { kind: 'coordinator', wake: true }], [shortcut.exchangePath, { kind: 'reading-grant' }]] as const)('admits the current Shortcut route %s', (path, execution) => {
+	const url = `https://test${path}`;
+	expect(requestAdmissionKind(new Request(url, { method: 'POST' }))).toBe('api');
+	expect(requestAdmissionKind(new Request(url))).toBe('unknown');
+	expect(apiRoutePolicy(path, 'POST')?.execution).toEqual(execution);
 });
 
 it.each([
 	['DELETE', '/sync/manifest'], ['POST', '/sync/upload'], ['GET', '/reminders/update'],
 	['PATCH', '/reading/capture'], ['POST', '/encryption/conversion/file'],
+	['POST', '/reading/shortcut/v0/prepare'], ['POST', '/reading/shortcut/v2/exchange'],
 	['POST', '/reading/shortcut/v01/prepare'], ['POST', '/reading/shortcut/v1000/prepare'],
 	['GET', '/unknown'], ['GET', '/notifications/unknown'], ['GET', '/__proto__'],
 ])('rejects unsupported %s %s before authentication or coordination', (method, path) => {

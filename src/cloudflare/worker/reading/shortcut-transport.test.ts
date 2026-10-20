@@ -9,11 +9,13 @@ it('does not treat unversioned requests as shortcut transport', () => {
   for (const path of ['/reading/capture', '/sync/upload', '/reading/prepare']) {
     expect(shortcutTransport(new Request(`https://crate.example${path}`, { method: 'POST', headers: { 'X-Crate-Protocol': '12' } }))).toBeNull();
   }
-  expect(shortcutTransport(new Request('https://crate.example/reading/shortcut/v01/exchange', { method: 'POST' }))).toBeNull();
+  for (const path of ['/reading/shortcut/v0/prepare', '/reading/shortcut/v2/prepare', '/reading/shortcut/v01/exchange']) {
+    expect(shortcutTransport(new Request(`https://crate.example${path}`, { method: 'POST' })), path).toBeNull();
+  }
 });
-it('requires an explicit server or shortcut update for unsupported capture contracts', () => {
-  expect(shortcutCompatibility({ kind: 'prepare', version: 2, revision: 2 })?.code).toBe('server_update_required');
-  expect(shortcutCompatibility({ kind: 'prepare', version: 0, revision: 1 })?.code).toBe('shortcut_update_required');
+it('requires a shortcut update below the minimum template revision', () => {
+  expect(shortcutCompatibility({ kind: 'prepare', revision: 0 })?.code).toBe('shortcut_update_required');
+  expect(shortcutCompatibility({ kind: 'exchange', revision: 1 })).toBeNull();
 });
 it('limits version-one capture payloads to their original semantics', () => {
   expect(() => validateShortcutBody({ url: 'https://example.com', title: 'Example' }, 'prepare')).not.toThrow();
