@@ -6,7 +6,8 @@ import { createEmptySyncResult } from '../sync-result';
 import type { CrateSettings } from '../../plugin/settings-types';
 import type { FileManifest, UploadResult } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
-import type { LocalManifest } from '../manifest/manifest';
+import { LocalManifest } from '../manifest/manifest';
+import { getCheckpointAuthority } from '../connection/worker-url';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
@@ -113,6 +114,9 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 		setAbortSignal: vi.fn(),
 		createFileOperations: vi.fn(),
 		getRequestDiagnostics: vi.fn(() => ({ clientSession: 'test-session', requests: [] })),
+		// Local bookkeeping rather than requests, so offline tests do not count them.
+		getRequestTimings: () => undefined,
+		resetRequestTimings: () => {},
 		recoverUploads: vi.fn(async () => {}),
 		getChanges: vi.fn(),
 		uploadFile: vi.fn<(
@@ -138,17 +142,13 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 		})),
 	};
 
-	let manifest!: LocalManifest;
-	api.createFileOperations.mockImplementation((current: LocalManifest) => {
-		manifest = current;
-		return {
-			...api,
-			getUploadDiagnostics: () => [],
-			recordMergeApplication: vi.fn(async () => {}),
-			restoreFileVersion: vi.fn(async () => {}),
-			finishRestore: vi.fn(async () => {}),
-		};
-	});
+	api.createFileOperations.mockImplementation(() => ({
+		...api,
+		getUploadDiagnostics: () => [],
+		recordMergeApplication: vi.fn(async () => {}),
+		restoreFileVersion: vi.fn(async () => {}),
+		finishRestore: vi.fn(async () => {}),
+	}));
 
 	const fileManager = {
 		trashFile: vi.fn(),
@@ -166,7 +166,8 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 		manifest: { dir: PLUGIN_DIR },
 	};
 
-	const engine = new SyncEngine(plugin as never, api as never, settings);
+	const manifest = new LocalManifest(plugin.app as never, plugin.manifest as never, getCheckpointAuthority(settings) || 'unconfigured');
+	const engine = new SyncEngine(plugin as never, api as never, settings, { localManifest: manifest });
 
 	const spies = {
 		load: vi.spyOn(manifest, 'load'),

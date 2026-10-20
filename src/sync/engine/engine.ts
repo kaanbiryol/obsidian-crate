@@ -65,7 +65,7 @@ export class SyncEngine {
 	private lifecycle: SyncEngineLifecycle;
 	private contexts: SyncEngineContexts;
 	private timingRecorder = new SyncTimingRecorder();
-	getTimings() { return { ...this.timingRecorder.snapshot(), requests: this.api.getRequestTimings?.() }; }
+	getTimings() { return { ...this.timingRecorder.snapshot(), requests: this.api.getRequestTimings() }; }
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private activeWork = new Set<Promise<unknown>>();
 	private shutdownTask: Promise<void> | null = null;
@@ -82,13 +82,15 @@ export class SyncEngine {
 	constructor(
 		plugin: Plugin,
 		api: SyncApiClient,
-		settings: SyncSettings
+		settings: SyncSettings,
+		/** Tests pass a manifest they observe; production lets the engine create it. */
+		stores: { localManifest?: LocalManifest } = {},
 	) {
 		this.plugin = plugin;
 		this.vault = plugin.app.vault;
 		this.api = api;
 		this.settings = settings;
-		this.localManifest = new LocalManifest(plugin.app, plugin.manifest, getCheckpointAuthority(settings) || 'unconfigured');
+		this.localManifest = stores.localManifest ?? new LocalManifest(plugin.app, plugin.manifest, getCheckpointAuthority(settings) || 'unconfigured');
 		this.contentVerifier = new LocalContentVerifier({
 			adapter: this.vault.adapter,
 			path: `${plugin.manifest.dir}/content-verification.json`,
@@ -408,7 +410,7 @@ export class SyncEngine {
 		if (this.lifecycle?.isDestroyed) return;
 		if (updates.status === 'syncing' && this.state.status !== 'syncing') {
 			this.syncActivityRevision++;
-			this.timingRecorder.start(); this.api.resetRequestTimings?.();
+			this.timingRecorder.start(); this.api.resetRequestTimings();
 		}
 		this.timingRecorder.change(updates.work);
 		if (updates.status && updates.status !== 'syncing') this.timingRecorder.stop();
