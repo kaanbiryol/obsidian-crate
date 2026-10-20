@@ -23,7 +23,7 @@ show-completed: false
 
 ## Completed reminders
 
-`show-completed` accepts `true` or `false`, and defaults to `false`. It is supported by all three block types. The view's completed-reminders toggle can override this initial preference.
+`show-completed` accepts `true` or `false`, and defaults to `false`. It is supported by all three block types. Selecting the view's completed-reminders toggle in Reading view or Live Preview saves the choice in the block's `show-completed` line.
 
 ````markdown
 ```reminders-upcoming

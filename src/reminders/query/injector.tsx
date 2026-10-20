@@ -1,5 +1,5 @@
-import type { MarkdownPostProcessorContext, MarkdownSectionInformation } from "obsidian";
-import { MarkdownRenderChild, Notice, Platform } from "obsidian";
+import type { MarkdownPostProcessorContext } from "obsidian";
+import { MarkdownRenderChild, Notice, Platform, TFile } from "obsidian";
 import type React from "react";
 import type { Root } from "react-dom/client";
 
@@ -12,8 +12,8 @@ import {
 } from "@/ui/plugin/shadowReactMount";
 import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
 import { RemindersList } from "@/reminders/ui/plugin/reminder-list/RemindersList";
-import { hashFileContent } from "@/reminders/query/hashing";
-import { parseRemindersBlockOptions, type RemindersBlockType } from "./remindersBlockOptions";
+import { processVaultMarkdown } from "@/reminders/data/vault-markdown";
+import { parseRemindersBlockOptions, setRemindersBlockShowCompleted, type RemindersBlockType } from "./remindersBlockOptions";
 
 export class ReminderQueryInjector {
   private readonly plugin: CratePlugin;
@@ -25,15 +25,13 @@ export class ReminderQueryInjector {
   onBlock(type: RemindersBlockType, source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
     const options = parseRemindersBlockOptions({ type, content: source });
 
-    const sectionInfo = ctx.getSectionInfo(el);
-    const preferenceKey = buildQueryPreferenceKey(ctx.sourcePath, source, sectionInfo, type);
-    const savedPreference = preferenceKey
-      ? this.plugin.remindersSettings.queryViewPreferences[preferenceKey]?.showCompleted
-      : undefined;
-    const effectiveShowCompleted = savedPreference ?? options.showCompleted;
-
-    const toggleShowCompleted = preferenceKey
-      ? this.createPreferenceSaver(preferenceKey)
+    // Like Live Preview, the toggle rewrites the block's own show-completed option.
+    const toggleShowCompleted = ctx.sourcePath && ctx.getSectionInfo(el)
+      ? (showCompleted: boolean) => {
+        void writeShowCompleted(this.plugin, el, ctx, showCompleted).catch((error: unknown) => {
+          new Notice(`Failed to save reminder view preference: ${errorMessage(error)}`);
+        });
+      }
       : undefined;
 
     const child = new ReactRenderer(
@@ -42,7 +40,7 @@ export class ReminderQueryInjector {
       RemindersList,
       {
         projectFilter: options.projectFilter,
-        showCompleted: effectiveShowCompleted,
+        showCompleted: options.showCompleted,
         showToday: options.showToday,
         showUpcoming: options.showUpcoming,
         onToggleShowCompleted: toggleShowCompleted,
@@ -50,40 +48,28 @@ export class ReminderQueryInjector {
     );
     ctx.addChild(child);
   }
-
-  private createPreferenceSaver(key: string) {
-    return (newValue: boolean) => {
-      const current = this.plugin.remindersSettings.queryViewPreferences ?? {};
-      const nextPreferences = {
-        ...current,
-        [key]: {
-          ...current[key],
-          showCompleted: newValue,
-        },
-      };
-
-      void this.plugin.writeRemindersSettings({
-        queryViewPreferences: nextPreferences,
-      }).catch((error: unknown) => {
-        new Notice(`Failed to save reminder view preference: ${errorMessage(error)}`);
-      });
-    };
-  }
 }
 
-function buildQueryPreferenceKey(
-  filePath: string,
-  source: string,
-  sectionInfo: MarkdownSectionInformation | null,
-  blockType: RemindersBlockType,
-): string | undefined {
-  if (!filePath || !sectionInfo) {
-    return undefined;
-  }
-
-  const normalizedSource = source.trim();
-  const keySeed = `${filePath}::${blockType}::${sectionInfo.lineStart ?? "?"}::${sectionInfo.lineEnd ?? "?"}::${normalizedSource}`;
-  return hashFileContent(keySeed);
+async function writeShowCompleted(
+  plugin: CratePlugin,
+  el: HTMLElement,
+  ctx: MarkdownPostProcessorContext,
+  showCompleted: boolean,
+): Promise<void> {
+  // Read the section when the toggle is used; edits above the block move it.
+  const section = ctx.getSectionInfo(el);
+  const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+  if (!section || !(file instanceof TFile)) throw new Error("This reminders block is no longer in the note.");
+  const block = section.text.split("\n").slice(section.lineStart, section.lineEnd + 1).join("\n");
+  const updated = setRemindersBlockShowCompleted(block, showCompleted);
+  if (!updated) return;
+  await processVaultMarkdown(plugin.app, file, content => {
+    const lines = content.split("\n");
+    if (lines.slice(section.lineStart, section.lineEnd + 1).join("\n") !== block) {
+      throw new Error("This reminders block changed. Try again.");
+    }
+    return [...lines.slice(0, section.lineStart), updated, ...lines.slice(section.lineEnd + 1)].join("\n");
+  });
 }
 
 class ReactRenderer<T extends object> extends MarkdownRenderChild {
