@@ -18,10 +18,11 @@ test('every browser test script runs from the registry or a package script', () 
 	// Manual diagnostics documented in docs/ui-styling.md.
 	const manual = new Set(['tests/browser/pwa/pwa-sync-indicator-test.mjs']);
 	const packageScripts = Object.values(JSON.parse(readFileSync('package.json', 'utf8')).scripts).join('\n');
-	const unlisted = readdirSync('scripts')
-		.filter(name => /(?:-test|\.browser\.test)\.mjs$/.test(name))
-		.map(name => `scripts/${name}`)
-		.filter(script => !browserScripts.includes(script) && !packageScripts.includes(script) && !manual.has(script));
+	const scripts = readdirSync('tests/browser', { recursive: true })
+		.filter(name => /(?:-test|\.test)\.mjs$/.test(name))
+		.map(name => `tests/browser/${name}`);
+	assert.ok(scripts.length > browserScripts.length);
+	const unlisted = scripts.filter(script => !browserScripts.includes(script) && !packageScripts.includes(script) && !manual.has(script));
 	assert.deepEqual(unlisted, []);
 });
 
