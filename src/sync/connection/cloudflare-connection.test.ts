@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { endPluginLifecycle } from '../plugin/lifecycle-state';
-import { DEFAULT_SETTINGS } from '../plugin/settings';
-import { SyncApiClient } from './api';
-import { configureCloudflareAuthorizedDevice } from './plugin-integration';
+import { endPluginLifecycle } from '../../plugin/lifecycle-state';
+import { DEFAULT_SETTINGS } from '../../plugin/settings';
+import { SyncApiClient } from '../api';
+import { configureCloudflareAuthorizedDevice } from './cloudflare-connection';
 
 afterEach(() => vi.restoreAllMocks());
 

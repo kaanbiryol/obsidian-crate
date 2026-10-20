@@ -13,7 +13,7 @@ import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { CloudflareDeploymentService } from './deployment/service';
 import { loadEmbeddedCloudflareArtifacts } from './deployment/embedded-artifacts';
 import { obsidianHttpTransport } from './http';
-import { configureCloudflareAuthorizedDevice } from '../sync/plugin-integration';
+import { configureCloudflareAuthorizedDevice } from '../sync/connection/cloudflare-connection';
 import { isSelfHostedConnectionPending } from '../sync/connection/self-hosted-connection';
 import { generateSecureToken, hashToken } from './device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';

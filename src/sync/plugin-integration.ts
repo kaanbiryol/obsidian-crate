@@ -1,5 +1,4 @@
 import { registerSyncStatus } from '../plugin/sync-status';
-import type { ConnectionTestResult } from './types';
 import { openRemoteRecoveryModal } from '../ui/activity/remote-recovery-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, TFile, type Events, type TAbstractFile } from 'obsidian';
@@ -7,8 +6,6 @@ import type CratePlugin from '../main';
 import { SyncRuntime } from './runtime/runtime';
 import { notifyConflicts } from './conflict/conflict';
 import { ActivityModal } from '../ui/activity/activity-modal';
-import { applySharedSettings } from './connection/shared-settings';
-import { SyncApiClient } from './api';
 import { errorMessage } from './logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-state';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from '../plugin/encryption-folder-moves';
@@ -185,32 +182,4 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 			triggerForegroundSync('visible');
 		}
 	});
-}
-
-export async function configureCloudflareAuthorizedDevice(
-	plugin: CratePlugin,
-	workerUrl: string,
-	authToken: string,
-	expected?: { workerUrl: string; authToken: string },
-): Promise<ConnectionTestResult> {
-	const signal = getPluginLifecycleSignal(plugin);
-	signal.throwIfAborted();
-	const api = new SyncApiClient(workerUrl, authToken);
-	try {
-		const { settings } = await api.getSharedSettings();
-		signal.throwIfAborted();
-		if (settings) applySharedSettings(plugin.settings, settings);
-	} catch {
-		// Shared settings are optional during first connection.
-	}
-	signal.throwIfAborted();
-
-	await plugin.syncRuntime.applyInfrastructureConfig({
-		workerUrl,
-		authToken,
-	}, signal, ...(expected ? [expected] : []));
-	signal.throwIfAborted();
-
-	void plugin.syncRuntime.pushSharedSettingsBestEffort();
-	return await plugin.syncRuntime.testConnection();
 }
