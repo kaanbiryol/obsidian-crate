@@ -4,6 +4,7 @@ import { Modal, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ModalLayout } from '../shared/ModalLayout';
+import { applySharedModalShell } from '../plugin/SharedModal';
 import { StatusContent } from '../shared/StatusContent';
 import { Button } from '../shared/Button';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
@@ -57,9 +58,8 @@ export class CloudflareDeploymentModal extends Modal {
 	onOpen(): void {
 		this.closed = false;
 		if (this.content.state === 'working') activeOperations.set(this.app, this);
-		this.modalEl.addClass('crate-shared-modal', 'crate-cloudflare-deployment-modal');
-		this.modalEl.addClass('crate-custom-modal-close');
-		this.contentEl.addClass('crate-reminders-ui');
+		applySharedModalShell(this);
+		this.modalEl.addClass('crate-cloudflare-deployment-modal');
 		this.root = createRoot(this.contentEl);
 		this.render();
 	}
