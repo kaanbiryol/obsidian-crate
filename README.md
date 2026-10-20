@@ -243,24 +243,6 @@ Copy `dist/main.js`, `manifest.json`, and `dist/styles.css` into:
 
 Then reload Obsidian and enable **Crate** in **Settings -> Community plugins**.
 
-## Local Vault Deploys
-
-For repeated local testing, save a vault path:
-
-```bash
-npm run deploy:plugin:configure
-```
-
-This writes `deploy.local.json`, which is ignored by git.
-
-Deploy to that vault:
-
-```bash
-npm run deploy:plugin
-```
-
-`npm run deploy:plugin` builds the plugin and copies `dist/main.js`, `manifest.json`, and `dist/styles.css` into the configured vault plugin folder. You can also set `OBSIDIAN_VAULT` for one-off deploys.
-
 Automatic sync is off by default on each new installation. After connecting a server, select **Crate: Sync now** to start your first sync, or enable **Automatic sync** in Crate settings. Opening **Sync activity** or **History** does not start a sync. Manual syncing leaves automatic sync off.
 
 To stop a running sync, select **Pause sync** in sync activity or **Stop sync** in Crate settings, or run **Crate: Stop sync** from the command palette. This also turns off automatic sync on this device, including after restarting Obsidian. Completed transfers remain; a request or local write already dispatched may still finish. Select **Sync now** to sync manually, or enable **Automatic sync** in settings to resume automatic syncing.

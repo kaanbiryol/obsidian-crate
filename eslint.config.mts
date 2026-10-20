@@ -250,7 +250,6 @@ export default tseslint.config(
 		"playwright-report/**",
 		"esbuild.config.mjs",
 		"eslint.config.js",
-		"deploy.local.json",
 		"deploy.yml",
 		"version-bump.mjs",
 		"versions.json",
