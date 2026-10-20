@@ -10,6 +10,8 @@ import { createObsidianReadingVault } from './obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
+export const READING_VIEW_TYPE = 'crate-reading';
+
 const runtimes = new WeakMap<CratePlugin, { library: ReadingLibrary; stop: () => Promise<void> }>();
 const stopping = new WeakMap<CratePlugin, Promise<void>>();
 const listeners = new WeakMap<CratePlugin, Set<() => void>>();

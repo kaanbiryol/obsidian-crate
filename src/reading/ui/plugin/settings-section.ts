@@ -6,8 +6,7 @@ import { createSettingsDisclosure } from '../../../ui/plugin/settings-disclosure
 import { FolderSuggest } from '../../../ui/settings/folder-suggest';
 import { bindCommittedText } from '../../../ui/settings/input-helpers';
 import { readReadingPolicy, writeReadingPolicy } from '../../server';
-import { startReading, stopReading, validateReadingConfiguration } from '../../runtime';
-import { READING_VIEW_TYPE } from './reading-view';
+import { READING_VIEW_TYPE, startReading, stopReading, validateReadingConfiguration } from '../../runtime';
 
 export function renderReadingSettings(container: HTMLElement, plugin: CratePlugin, rerender: () => void): () => void {
 	let folderSuggest: FolderSuggest | undefined;

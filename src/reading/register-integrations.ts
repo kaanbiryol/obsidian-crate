@@ -1,9 +1,9 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
-import { startReading, stopReading } from './runtime';
+import { READING_VIEW_TYPE, startReading, stopReading } from './runtime';
 import { AddReadingLinkModal } from './ui/plugin/add-link-modal';
-import { READING_VIEW_TYPE, ReadingView } from './ui/plugin/reading-view';
+import { ReadingView } from './ui/plugin/reading-view';
 
 async function openReading(plugin: CratePlugin): Promise<void> {
 	if (!plugin.settings.reading.enabled) { new Notice('Enable reading in Crate settings first.'); return; }
