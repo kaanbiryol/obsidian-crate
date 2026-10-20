@@ -1,4 +1,4 @@
-import { canReplaceServerBuild } from '../server-build';
+import { canReplaceServerBuild } from '../../protocol/server-build';
 import { releaseUpgradeGuards } from './upgrade-checkpoint';
 import type { CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';

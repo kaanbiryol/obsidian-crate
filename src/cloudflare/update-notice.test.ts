@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import release from './server-release.json';
-import type { DevelopmentBuild } from './server-build';
+import type { DevelopmentBuild } from '../protocol/server-build';
 
 const notices: FakeDocumentFragment[] = [];
 const embeddedArtifact = {

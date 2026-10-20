@@ -1,4 +1,4 @@
-import type { DevelopmentBuild } from '../server-build';
+import type { DevelopmentBuild } from '../../protocol/server-build';
 import { sha256Hex } from '../../platform/sha256';
 
 export interface CloudflareDeploymentArtifacts {

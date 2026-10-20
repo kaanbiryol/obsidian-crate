@@ -1,5 +1,5 @@
 import release from '../../cloudflare/server-release.json';
-import type { DevelopmentBuild } from '../../cloudflare/server-build';
+import type { DevelopmentBuild } from '../../protocol/server-build';
 import { afterEach, expect, it, vi } from 'vitest';
 import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 

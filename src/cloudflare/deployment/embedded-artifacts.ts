@@ -1,4 +1,4 @@
-import { DEVELOPMENT_BUILD } from '../server-build';
+import { DEVELOPMENT_BUILD } from '../../protocol/server-build';
 import {
 	artifactFingerprint,
 	artifactVersion,

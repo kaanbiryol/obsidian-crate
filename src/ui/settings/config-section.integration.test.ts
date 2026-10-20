@@ -1,5 +1,5 @@
 import release from '../../cloudflare/server-release.json';
-import type { DevelopmentBuild } from '../../cloudflare/server-build';
+import type { DevelopmentBuild } from '../../protocol/server-build';
 import type { ConfirmationModalOptions } from '../confirmation-modal';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {

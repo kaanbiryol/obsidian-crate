@@ -1,4 +1,4 @@
-import { parseDevelopmentBuild, type DevelopmentBuild } from '../server-build';
+import { parseDevelopmentBuild, type DevelopmentBuild } from '../../protocol/server-build';
 import { CRATE_SERVICE_ID } from '../../protocol/server-info';
 import release from '../server-release.json';
 import type { HttpTransport } from '../http';

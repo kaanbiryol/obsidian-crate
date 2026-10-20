@@ -1,4 +1,4 @@
-import { canReplaceServerBuild, serverBuildLabel, type DevelopmentBuild } from '../../cloudflare/server-build';
+import { canReplaceServerBuild, serverBuildLabel, type DevelopmentBuild } from '../../protocol/server-build';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import release from '../../cloudflare/server-release.json';

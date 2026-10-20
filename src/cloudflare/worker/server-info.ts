@@ -1,4 +1,4 @@
-import { DEVELOPMENT_BUILD } from '../server-build';
+import { DEVELOPMENT_BUILD } from '../../protocol/server-build';
 import { SHARED_CHECKPOINT_CAPABILITY } from '../../protocol/history-checkpoints';
 import { PWA_ASSET_VERSION } from './pwa/version';
 import release from '../server-release.json';

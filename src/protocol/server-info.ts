@@ -1,4 +1,4 @@
-import { parseDevelopmentBuild, type DevelopmentBuild } from '../cloudflare/server-build';
+import { parseDevelopmentBuild, type DevelopmentBuild } from './server-build';
 import { isSha256Hex } from '../platform/validation';
 export const CRATE_SERVICE_ID = 'crate';
 

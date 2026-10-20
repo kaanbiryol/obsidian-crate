@@ -2,9 +2,9 @@ import { dirname, resolve, sep } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const hostDirectories = ['sync', 'plugin'].map(name => resolve(root, 'src', name));
-// Plugin-side Cloudflare modules sit beside the Worker; only build identity is shared.
+// Plugin-side Cloudflare modules sit beside the Worker; only release metadata is shared.
 const cloudflareHost = resolve(root, 'src', 'cloudflare');
-const sharedCloudflareModules = new Set(['server-build', 'server-release.json', 'schema.sql', 'migrations']);
+const sharedCloudflareModules = new Set(['server-release.json', 'schema.sql', 'migrations']);
 const isCloudflareHostModule = target => dirname(target) === cloudflareHost
   && !sharedCloudflareModules.has(target.slice(cloudflareHost.length + 1).split('?')[0]);
 
