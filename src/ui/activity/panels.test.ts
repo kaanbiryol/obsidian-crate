@@ -7,10 +7,10 @@ import { pendingChangeKey } from '../../sync/pending/pending-change';
 
 afterEach(() => vi.clearAllMocks());
 
-it('shows active initial upload with an empty pending queue', () => {
+it('shows active sync progress with an empty pending queue', () => {
     const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], false, false, { type: 'initial', current: 12, total: 20 });
-    expect(element.collectText()).toContain('Preparing files: 12/20');
+    renderPendingPanel(element as never, [], false, false, { type: 'sync', current: 12, total: 20 });
+    expect(element.collectText()).toContain('Processing changes: 12/20');
     expect(element.children[0]?.attributes.get('role')).toBe('status');
     expect(element.collectText()).not.toContain('All synced');
 });

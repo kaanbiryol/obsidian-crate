@@ -21,15 +21,13 @@ it('shares concurrent checks and rechecks after 30 seconds', async () => {
   await http.getServerInfo();
   expect(transport).toHaveBeenCalledTimes(2);
 });
-it('invalidates metadata on credential and sync lifecycle changes', async () => {
+it('invalidates metadata on sync lifecycle changes', async () => {
   const { http, transport } = harness();
-  await http.getServerInfo();
-  http.updateCredentials('https://other', 'new-token');
   await http.getServerInfo();
   const controller = new AbortController();
   http.setAbortSignal(controller.signal);
   await http.getServerInfo();
-  expect(transport).toHaveBeenCalledTimes(3);
+  expect(transport).toHaveBeenCalledTimes(2);
   controller.abort();
   await expect(http.getServerInfo()).rejects.toMatchObject({ name: 'AbortError' });
 });
@@ -46,10 +44,10 @@ it('checks compatibility once across concurrent mutations', async () => {
   expect(transport.mock.calls.filter(([request]) => request.url.endsWith('/.well-known/crate'))).toHaveLength(1);
   expect(transport.mock.calls.filter(([request]) => request.url.endsWith('/sync/batch-upload'))).toHaveLength(4);
 });
-it('rejects a check superseded by new credentials', async () => {
+it('rejects a check superseded by a new sync signal', async () => {
   const { http } = harness();
   const pending = http.getServerInfo();
-  http.updateCredentials('https://other', 'new-token');
+  http.setAbortSignal(new AbortController().signal);
   await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
   await expect(http.getServerInfo()).resolves.toMatchObject({ service: 'crate' });
 });

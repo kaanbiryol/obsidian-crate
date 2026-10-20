@@ -620,7 +620,7 @@ export class SyncRuntime {
 	}
 
 	private async runSyncOperation(
-		type: SyncHistoryEntry['type'],
+		type: SyncActivityProgress['type'],
 		operation: (engine: SyncEngine, progress: (current: number, total: number) => void) => Promise<SyncResult>,
 		progressCallback?: (current: number, total: number) => void,
 		logMessage?: string,

@@ -153,7 +153,7 @@ export interface PreparedUpload {
 }
 
 export interface SyncActivityProgress {
-	type: SyncHistoryEntry['type'];
+	type: Exclude<SyncHistoryEntry['type'], 'initial'>;
 	current: number;
 	total: number;
 	work?: SyncWork;

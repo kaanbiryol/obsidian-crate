@@ -15,23 +15,35 @@ function harness() {
   return { transport, http: new WorkerApiHttpClient('https://old.example', 'old-token', transport) };
 }
 
-it.each(['credentials', 'signal'] as const)('rejects a mutation prepared before changing %s, even with cached metadata', async change => {
+it('rejects a mutation prepared before changing the sync signal, even with cached metadata', async () => {
   const { http, transport } = harness();
   await http.getServerInfo();
   transport.mockClear();
   const writing = http.requestJson('/sync/batch-upload', { method: 'POST', body: '{}' });
-  if (change === 'credentials') http.updateCredentials('https://new.example', 'new-token');
-  else http.setAbortSignal(new AbortController().signal);
+  http.setAbortSignal(new AbortController().signal);
   await expect(writing).rejects.toMatchObject({ name: 'AbortError' });
   expect(transport).not.toHaveBeenCalled();
   await http.requestJson('/sync/batch-upload', { method: 'POST', body: '{}' });
   expect(transport).toHaveBeenCalledTimes(2);
   const dispatched = transport.mock.lastCall?.[0];
-  expect(dispatched?.url).toBe(`https://${change === 'credentials' ? 'new' : 'old'}.example/sync/batch-upload`);
-  expect(dispatched?.headers?.Authorization).toBe(`Bearer ${change === 'credentials' ? 'new' : 'old'}-token`);
+  expect(dispatched?.url).toBe('https://old.example/sync/batch-upload');
+  expect(dispatched?.headers?.Authorization).toBe('Bearer old-token');
 });
 
-for (const kind of ['json', 'binary'] as const) it.each(['success', 'http error', 'network error'] as const)(`rejects an old ${kind} %s after replacing credentials`, async outcome => {
+// Replacing credentials stops the old engine, which aborts its client's signal, and connects a new client.
+it('rejects a mutation prepared before its sync lifecycle aborts, even with cached metadata', async () => {
+  const { http, transport } = harness();
+  const lifecycle = new AbortController();
+  http.setAbortSignal(lifecycle.signal);
+  await http.getServerInfo();
+  transport.mockClear();
+  const writing = http.requestJson('/sync/batch-upload', { method: 'POST', body: '{}' });
+  lifecycle.abort();
+  await expect(writing).rejects.toMatchObject({ name: 'AbortError' });
+  expect(transport).not.toHaveBeenCalled();
+});
+
+for (const kind of ['json', 'binary'] as const) it.each(['success', 'http error', 'network error'] as const)(`rejects an old ${kind} %s after the sync signal changes`, async outcome => {
   const { http, transport } = harness();
   let release!: () => void;
   transport.mockImplementationOnce(async () => {
@@ -41,7 +53,7 @@ for (const kind of ['json', 'binary'] as const) it.each(['success', 'http error'
     return response({ old: true });
   });
   const reading = kind === 'json' ? http.requestJson('/sync/manifest') : http.requestBinary('/sync/download');
-  http.updateCredentials('https://new.example', 'new-token');
+  http.setAbortSignal(new AbortController().signal);
   release();
   await expect(reading).rejects.toMatchObject({ name: 'AbortError' });
 });

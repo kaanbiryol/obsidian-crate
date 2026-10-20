@@ -55,7 +55,6 @@ it.each([[30_000, 'Synced just now'], [120_000, 'Synced 2m ago'], [7_200_000, 'S
 	},
 );
 
-it('distinguishes initial upload progress from a vault that has never synced', () => {
+it('reports a vault that has never synced', () => {
 	expect(describeActivityStatus({ ...state, lastSync: null }, null, 0, true, false, now).lastSyncLabel).toBe('Not synced yet');
-	expect(describeActivityStatus(state, { type: 'initial', current: 0, total: 1 }, 0, true, false, now).lastSyncLabel).toBe('Uploading vault…');
 });

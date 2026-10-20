@@ -196,13 +196,6 @@ export class WorkerApiHttpClient {
 		this.externalSignal = signal;
 	}
 
-	updateCredentials(workerUrl: string, authToken: string): void {
-		this.invalidateRequests();
-		this.encryptionHeaders = {};
-		this.workerUrl = normalizeWorkerUrl(workerUrl);
-		this.authToken = authToken;
-	}
-
 	isConfigured(): boolean {
 		return this.workerUrl.length > 0 && this.authToken.length > 0;
 	}

@@ -1,7 +1,6 @@
 import type { SyncActivityProgress, SyncState } from '../../sync/types';
 
 function lastSyncLabel(state: SyncState, progress: SyncActivityProgress | null, now: number): string {
-	if (progress?.type === 'initial') return 'Uploading vault…';
 	if (state.status === 'syncing' || progress) return 'Syncing…';
 	if (state.status === 'error') return 'Last sync had errors';
 	if (state.status === 'offline') return 'Server unavailable';

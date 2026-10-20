@@ -35,7 +35,6 @@ export function formatSyncProgress(progress?: SyncActivityProgress | null, work?
         }
         return `${label}…`;
     }
-    if (progress?.type === 'initial' && progress.total > 0) return `Preparing files: ${progress.current}/${progress.total}`;
     if (progress && progress.total > 0) return `Processing changes: ${progress.current}/${progress.total}`;
     return 'Starting sync…';
 }
