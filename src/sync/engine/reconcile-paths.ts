@@ -62,7 +62,9 @@ export async function reconcileQueuePaths(
 		const deletions: string[] = [];
 		const deleteCandidates = new Map<string, { file: ConditionalDeleteCandidate; keys: string[] }>();
 		const uploads = new Map<string, { diff: UploadDiff; keys: string[] }>();
-		async function reconcile(queueKey: string, allowDelete: boolean, firstAttempt = 1, collectUploads = false, collectDeletes = false) {
+		/** A retry starts at attempt 2; collected uploads and deletes run in one batch after the scan. */
+		async function reconcile(queueKey: string, options: { allowDelete: boolean; firstAttempt?: number; collectUploads?: boolean; collectDeletes?: boolean }) {
+			const { allowDelete, firstAttempt = 1, collectUploads = false, collectDeletes = false } = options;
 			const path = decodePendingChange(queueKey).path;
 			if (context.shouldIgnore(path)) {
 				result.settledPaths.push(queueKey);
@@ -157,7 +159,7 @@ export async function reconcileQueuePaths(
 				reportProgress();
 			}
 		}
-		for (const queueKey of uniqueQueueKeys) await reconcile(queueKey, false, 1, true);
+		for (const queueKey of uniqueQueueKeys) await reconcile(queueKey, { allowDelete: false, collectUploads: true });
 		if (uploads.size && context.uploadDiffs) {
 			const retryPaths = new Set(await context.uploadDiffs([...uploads.values()].map(upload => upload.diff), result));
 			const uploadedPaths = new Set(result.uploadedPaths);
@@ -172,7 +174,7 @@ export async function reconcileQueuePaths(
 						reportProgress();
 						continue;
 					}
-					for (const key of upload.keys) await reconcile(key, false, 2);
+					for (const key of upload.keys) await reconcile(key, { allowDelete: false, firstAttempt: 2 });
 				} else {
 					if (uploadedPaths.has(path)) result.settledPaths.push(...upload.keys);
 					processed += upload.keys.length;
@@ -180,7 +182,7 @@ export async function reconcileQueuePaths(
 				}
 			}
 		}
-		for (const queueKey of deletions) await reconcile(queueKey, true, 1, false, true);
+		for (const queueKey of deletions) await reconcile(queueKey, { allowDelete: true, collectDeletes: true });
 		if (deleteCandidates.size) {
 			const retryKeys = new Set<string>();
 			await context.deleteRemoteFiles([...deleteCandidates.values()].map(candidate => candidate.file), result, {
@@ -199,7 +201,7 @@ export async function reconcileQueuePaths(
 						processed++;
 						continue;
 					}
-					for (const key of candidate.keys) await reconcile(key, true, 2);
+					for (const key of candidate.keys) await reconcile(key, { allowDelete: true, firstAttempt: 2 });
 				} else if (deleted.has(path)) result.settledPaths.push(...candidate.keys);
 			}
 		}

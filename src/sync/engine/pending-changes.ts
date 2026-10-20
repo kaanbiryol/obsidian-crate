@@ -13,6 +13,7 @@ import { loadRemotePendingBase } from '../pending/pending-baseline';
 import { loadPendingDiff } from '../pending/pending-diff';
 import { createPendingDiscard } from '../pending/pending-discard';
 import { createEmptySyncResult } from '../sync-result';
+import { MAX_PREVIEW_BYTES } from '../history/preview-format';
 
 interface EnginePendingChangesContext {
     vault: Vault;
@@ -41,7 +42,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
                 async (filePath, hash) => {
                     const cached = await context.cache.readBase(filePath, hash);
                     verifyBaseline();
-                    return cached ?? (baseline ? await loadRemotePendingBase(context.api, filePath, baseline, 256_000) : null);
+                    return cached ?? (baseline ? await loadRemotePendingBase(context.api, filePath, baseline, MAX_PREVIEW_BYTES) : null);
                 }, path, deleted);
             verifyBaseline();
             return preview;
