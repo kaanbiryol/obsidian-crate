@@ -28,3 +28,10 @@ test('source paths referenced by browser tests and scripts exist', () => {
 	}
 	assert.deepEqual(missing, []);
 });
+
+test('files named by package scripts exist', () => {
+	const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts).join(' ');
+	const missing = [...new Set(scripts.match(/(?:src|tests|scripts)\/[\w@./-]+\.(?:mjs|ts|tsx|json|py)/g))]
+		.filter(path => !existsSync(join(root, path)));
+	assert.deepEqual(missing, []);
+});
