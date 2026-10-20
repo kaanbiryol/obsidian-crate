@@ -3,7 +3,7 @@ import CratePlugin from './CratePlugin';
 import { SecretStorageService } from './secret-storage';
 import { normalizeCrateSettings } from './settings';
 import { endPluginLifecycle } from './lifecycle-state';
-import { saveEncryptionKeys } from './encryption-storage';
+import { saveEncryptionKeys } from '../sync/encryption/key-storage';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from './encryption-folder-moves';
 import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from '../reminders/settings';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../encryption/key-bundle';

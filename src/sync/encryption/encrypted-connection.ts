@@ -1,6 +1,6 @@
 import { openRecoveryBundle } from '../../encryption/key-bundle';
-import { readFolderMoves } from '../../plugin/encryption-folder-move-journal';
-import { loadEncryptionKeys } from '../../plugin/encryption-storage';
+import { readFolderMoves } from './folder-move-journal';
+import { loadEncryptionKeys } from './key-storage';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { assertEncryptionKeys, readServerEncryption } from './conversion';
 import type { WorkerApiHttpClient } from '../worker-api/http';

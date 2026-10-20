@@ -1,7 +1,7 @@
-import { isEncryptionFolderPath, moveEncryptionScopes, sameVaultKeyBundle, validateVaultKeyBundle, type VaultKeyBundle } from '../encryption/key-bundle';
-import type { SecretStorageService } from './secret-storage';
-import { parseRenameDependencies } from '../sync/manifest/rename-dependencies';
-import { SECRET_KEYS } from '../platform/secret-keys';
+import { isEncryptionFolderPath, moveEncryptionScopes, sameVaultKeyBundle, validateVaultKeyBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
+import type { SecretStorageService } from '../../plugin/secret-storage';
+import { parseRenameDependencies } from '../manifest/rename-dependencies';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 interface FolderSetting { from: string; to: string }
 export interface FolderMove {

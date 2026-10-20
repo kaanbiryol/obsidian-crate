@@ -1,6 +1,6 @@
 import type CratePlugin from './CratePlugin';
 import { captureServerConnection } from './server-request';
-import { loadEncryptionKeys } from './encryption-storage';
+import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { createReminderKeyGrant, sameVaultKeyBundle } from '../encryption/key-bundle';
 import { PAIRING_PATH, type PairingContext, type PairingTransport } from '../encryption/pairing/protocol';
 import { obsidianHttpTransport, WorkerApiHttpClient } from '../sync/worker-api/http';

@@ -1,5 +1,5 @@
 import type CratePlugin from '../../plugin/CratePlugin';
-import { readFolderMoves } from '../../plugin/encryption-folder-move-journal';
+import { readFolderMoves } from './folder-move-journal';
 import { LocalManifest } from '../manifest/manifest';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { createIgnoreMatcherContext, shouldIgnoreSyncPath } from '../engine/ignore';

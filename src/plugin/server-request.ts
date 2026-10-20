@@ -1,4 +1,4 @@
-import { loadEncryptionKeys } from './encryption-storage';
+import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { obsidianHttpTransport, WorkerApiHttpClient } from '../sync/worker-api/http';

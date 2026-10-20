@@ -1,5 +1,5 @@
 import type CratePlugin from './CratePlugin';
-import { loadEncryptionKeys, saveEncryptionKeys } from './encryption-storage';
+import { loadEncryptionKeys, saveEncryptionKeys } from '../sync/encryption/key-storage';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRecoveryBundle, type VaultKeyBundle } from '../encryption/key-bundle';
 import { createEncryptionState, isReadingScopeExtension, type EncryptionServerState } from '../encryption/server-state';
 import { verifyRecoveryCode } from '../encryption/recovery-verification';

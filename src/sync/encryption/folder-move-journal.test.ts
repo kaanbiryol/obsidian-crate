@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import type { SecretStorageService } from './secret-storage';
-import { completeFolderMoveHead, readFolderMoves, replaceFolderMoveHead, writeFolderMoves } from './encryption-folder-move-journal';
+import type { SecretStorageService } from '../../plugin/secret-storage';
+import { completeFolderMoveHead, readFolderMoves, replaceFolderMoveHead, writeFolderMoves } from './folder-move-journal';
 
 function storage() {
   const saved = new Map<string, string>();

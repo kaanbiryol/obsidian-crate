@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, moveEncryptionScopes, sealRecoveryBundle } from '../encryption/key-bundle';
 import { createEncryptionState, ENCRYPTION_FOLDER_MOVES_CAPABILITY } from '../encryption/server-state';
-import { saveEncryptionKeys, loadEncryptionKeys } from './encryption-storage';
+import { saveEncryptionKeys, loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves, useServerEncryptionFolders } from './encryption-folder-moves';
 import type CratePlugin from './CratePlugin';
 import { SECRET_KEYS } from '../platform/secret-keys';

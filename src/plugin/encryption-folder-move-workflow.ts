@@ -2,7 +2,7 @@ import type { VaultKeyBundle } from '../encryption/key-bundle';
 import type { ReadingSettings } from '../reading/settings';
 import type { RemindersSettings } from '../reminders/settings';
 import type { SecretStorageService } from './secret-storage';
-import { loadEncryptionKeys, saveEncryptionKeys } from './encryption-storage';
+import { loadEncryptionKeys, saveEncryptionKeys } from '../sync/encryption/key-storage';
 import {
   applyFolderSetting,
   completeFolderMoveHead,
@@ -10,7 +10,7 @@ import {
   folderMoveTarget,
   readFolderMoves,
   replaceFolderMoveHead,
-} from './encryption-folder-move-journal';
+} from '../sync/encryption/folder-move-journal';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
 interface FolderMoveWorkflowContext {

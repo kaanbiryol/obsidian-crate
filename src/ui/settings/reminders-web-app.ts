@@ -3,7 +3,7 @@ import type CratePlugin from '../../main';
 import { errorMessage } from '../../sync/logger';
 import { QRModal } from '../qr-modal';
 import { openExternalBrowserModal } from '../external-browser-modal';
-import { loadEncryptionKeys } from '../../plugin/encryption-storage';
+import { loadEncryptionKeys } from '../../sync/encryption/key-storage';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 
 export function renderCrateWebApp(containerEl: HTMLElement, plugin: CratePlugin): void {

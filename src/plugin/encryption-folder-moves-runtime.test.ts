@@ -7,7 +7,7 @@ import { LocalManifest } from '../sync/manifest/manifest';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { assertRenamePreserved } from '../sync/manifest/rename-dependencies';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../encryption/key-bundle';
-import { saveEncryptionKeys } from './encryption-storage';
+import { saveEncryptionKeys } from '../sync/encryption/key-storage';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from './encryption-folder-moves';
 import { sha256Hex } from '@/platform/sha256';
 

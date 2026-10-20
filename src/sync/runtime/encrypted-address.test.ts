@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, moveEncryptionScopes, sealRecoveryBundle } from '../../encryption/key-bundle';
 import { createEncryptionState } from '../../encryption/server-state';
-import { readFolderMoves, writeFolderMoves } from '../../plugin/encryption-folder-move-journal';
+import { readFolderMoves, writeFolderMoves } from '../encryption/folder-move-journal';
 import { SecretStorageService } from '../../plugin/secret-storage';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../../plugin/settings';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SecretStorageService } from './secret-storage';
 import { createVaultKeyBundle, generateRecoveryCode } from '../encryption/key-bundle';
-import { loadEncryptionKeys, saveEncryptionKeys } from './encryption-storage';
+import { loadEncryptionKeys, saveEncryptionKeys } from '../sync/encryption/key-storage';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
 function createSecretStorage(scopeProvider?: () => string | null) {

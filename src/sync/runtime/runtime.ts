@@ -10,7 +10,7 @@ import type { SyncActivityProgress } from '../types';
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger, errorMessage } from '../logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
-import { loadEncryptionKeys } from '../../plugin/encryption-storage';
+import { loadEncryptionKeys } from '../encryption/key-storage';
 import { runEncryptionReset } from './encryption-reset-workflow';
 import { changeEncryptedServerAddress, changeEncryptionResetAddress } from './address-workflow';
 import { changeServerConnection, disconnectServerConnection } from './connection-workflow';

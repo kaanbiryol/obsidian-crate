@@ -5,7 +5,7 @@ import { SyncApiClient } from '../api';
 import { requireNormalizedWorkerUrl } from './worker-url';
 import { applySharedSettings } from './shared-settings';
 import { exchangeSelfHostedPairingCode } from './self-hosted-pairing';
-import { loadEncryptionKeys } from '../../plugin/encryption-storage';
+import { loadEncryptionKeys } from '../encryption/key-storage';
 import { isSha256Hex } from '../../platform/validation';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 

@@ -1,4 +1,4 @@
-import { loadEncryptionKeys } from '../plugin/encryption-storage';
+import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { readReadingPolicy, writeReadingPolicy } from './server';
 import { captureServerConnection } from '../plugin/server-request';
 import { Notice, TFolder } from 'obsidian';

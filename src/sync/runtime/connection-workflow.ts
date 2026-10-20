@@ -1,5 +1,5 @@
 import { ConnectionSetupError } from '../connection/connection-errors';
-import { saveEncryptionKeys } from '../../plugin/encryption-storage';
+import { saveEncryptionKeys } from '../encryption/key-storage';
 import { createLogger } from '../logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import type { SyncApiClient } from '../api';
