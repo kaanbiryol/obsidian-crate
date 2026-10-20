@@ -1,7 +1,8 @@
 import type { DataAdapter } from 'obsidian';
 import type { FileEntry } from '../../protocol/sync-types';
 import { assertLocalSyncPath } from '../local/local-path-safety';
-import { decodePreviewText, isBinaryPreviewPath, MAX_PREVIEW_BYTES } from '../history/preview-format';
+import { decodePreviewText, isBinaryPreviewPath } from '../history/preview-format';
+import { MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 
 export interface PendingDiff {

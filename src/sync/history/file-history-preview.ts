@@ -3,7 +3,8 @@ import type { DataAdapter } from 'obsidian';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
 import type { SyncApiClient } from '../api';
 import { assertLocalSyncPath } from '../local/local-path-safety';
-import { decodePreviewText, isBinaryPreviewPath, MAX_PREVIEW_BYTES } from './preview-format';
+import { decodePreviewText, isBinaryPreviewPath } from './preview-format';
+import { MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 
 export interface FileHistoryPreview {

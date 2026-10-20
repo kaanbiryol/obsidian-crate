@@ -4,6 +4,7 @@ import { isSyncRevision } from '../../../../protocol/sync-validation';
 import { storedObjectMatchesMetadata } from '../storage';
 import type { RemoteFileVersion } from '../../../../protocol/sync-types';
 import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES } from '../../../../encryption/file-format';
+import { MAX_PREVIEW_BYTES } from '../../../../protocol/sync-limits';
 import { sha256Hex } from '../../../../platform/sha256';
 
 /** Read-only, bounded access to a retained object; never accepts arbitrary R2 keys. */
@@ -17,7 +18,7 @@ export async function handleFileVersionPreview(request: Request, bucket: R2Bucke
 	if (!version) return corsResponse({ error: 'File version not found or expired' }, 404);
 	if (version.size > MAX_ENCRYPTED_FILE_BYTES) return corsResponse({ error: 'This file is too large to preview.' }, 413);
 	const object = await bucket.get(key);
-	const limit = object?.httpMetadata?.contentType === ENCRYPTED_FILE_CONTENT_TYPE ? MAX_ENCRYPTED_FILE_BYTES : 256_000;
+	const limit = object?.httpMetadata?.contentType === ENCRYPTED_FILE_CONTENT_TYPE ? MAX_ENCRYPTED_FILE_BYTES : MAX_PREVIEW_BYTES;
 	if (version.size > limit) return corsResponse({ error: 'This file is too large to preview (limit: 256 KB).' }, 413);
 	if (!object || object.size > limit || !storedObjectMatchesMetadata(object, { hash: version.hash, size: version.size, storageKey: key })) {
 		return corsResponse({ error: 'Stored file version content is unavailable' }, 503);

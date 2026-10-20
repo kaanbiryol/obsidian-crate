@@ -1,6 +1,7 @@
 import { Notice, Platform, setIcon, type App } from 'obsidian';
 import { SharedModal } from '../plugin/SharedModal';
 import type { FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
+import { MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import type { SyncRuntime } from '../../sync/runtime/runtime';
 import type { FileHistoryPreview } from '../../sync/history/file-history-preview';
 import { buildDiff } from './diff-model';
@@ -162,7 +163,7 @@ class RemoteRecoveryModal extends SharedModal {
 		if (local) {
 			this.previewHeader(this.formatHistoryDate(new Date(local.stat.mtime)), `Current local file · ${formatSize(local.stat.size)}`).setAttribute('title', new Date(local.stat.mtime).toLocaleString());
 			const content = this.previewEl.createDiv({ cls: 'crate-history-preview-output' });
-			if (local.stat.size > 256_000 || local.extension !== 'md') { content.createEl('p', { text: 'Preview is available for Markdown files up to 250 KiB. Select a saved version to compare or restore it.' }); return; }
+			if (local.stat.size > MAX_PREVIEW_BYTES || local.extension !== 'md') { content.createEl('p', { text: 'Preview is available for Markdown files up to 250 KiB. Select a saved version to compare or restore it.' }); return; }
 			try {
 				const text = await this.app.vault.cachedRead(local);
 				if (!this.closed && revision === this.previewRevision) filePreview(content, text, 'Current local file contents');

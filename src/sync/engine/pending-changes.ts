@@ -1,6 +1,6 @@
 import { pendingChangeKey, decodePendingChange } from '../pending/pending-change';
 import type { Vault } from 'obsidian';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { MAX_FILE_SIZE_BYTES, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import type { SyncApiClient } from '../api';
 import type { LocalManifest } from '../manifest/manifest';
 import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
@@ -13,7 +13,6 @@ import { loadRemotePendingBase } from '../pending/pending-baseline';
 import { loadPendingDiff } from '../pending/pending-diff';
 import { createPendingDiscard } from '../pending/pending-discard';
 import { createEmptySyncResult } from '../sync-result';
-import { MAX_PREVIEW_BYTES } from '../history/preview-format';
 
 interface EnginePendingChangesContext {
     vault: Vault;

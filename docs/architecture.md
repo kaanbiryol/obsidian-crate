@@ -141,8 +141,9 @@ settling an earlier upload cannot silently bypass the guard for a newer local ed
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
 
-`sync/history/preview-format.ts` owns text decoding, binary control-character rejection and
-the 256 KB preview limit. Each preview loader retains its storage access and integrity
+`sync/history/preview-format.ts` owns text decoding and binary control-character rejection.
+`protocol/sync-limits.ts` owns the 256 KB preview limit shared with the Worker's version
+preview route. Each preview loader retains its storage access and integrity
 checks. File history hides the UTF-8 BOM for display; pending diffs, restore comparisons
 and conflict review preserve it. Conflict review retains its separate 1 MB edit limit.
 

@@ -5,7 +5,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryptio
 import { base64ToArrayBuffer } from '../encoding';
 import type { RestoreIntent } from '../durability/restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
@@ -393,7 +393,7 @@ export class SyncWorkerApi {
 		const params = new URLSearchParams({ path: version.path, storageKey: version.storage_key });
 		let { body } = await this.http.requestBinary(`/sync/version-preview?${params}`, {}, TRANSFER_TIMEOUT_MS);
 		if (this.encryption) body = (await this.encryption.download(version.path, body)).content;
-		if (body.byteLength > 256_000 || body.byteLength !== version.size || await sha256Hex(body) !== version.hash) {
+		if (body.byteLength > MAX_PREVIEW_BYTES || body.byteLength !== version.size || await sha256Hex(body) !== version.hash) {
 			throw new Error('Saved version failed integrity validation.');
 		}
 		return body;
