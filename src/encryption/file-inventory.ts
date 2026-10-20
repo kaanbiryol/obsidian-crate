@@ -1,4 +1,6 @@
 import { isRecord, isSha256Hex } from '@/platform/validation';
+import { sha256Hex } from '@/platform/sha256';
+import { openFile, type FileEncryptionAuthority } from './file-codec';
 
 export interface EncryptedInventoryFile { path: string; hash: string; size: number; revision: string }
 export interface EncryptedInventoryPage {
@@ -51,4 +53,13 @@ export function createEncryptedInventoryProgress(limits: { maxFiles: number; max
 		}
 		cursor = page.nextCursor;
 	};
+}
+
+/** Coarse ciphertext bound checked before download; features enforce their plaintext limit after opening. */
+export const MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES = 4 * 1024 * 1024;
+
+/** Open transferred ciphertext only when it matches its inventory entry byte for byte. */
+export async function openVerifiedInventoryFile(bytes: Uint8Array<ArrayBuffer>, file: EncryptedInventoryFile, authority: FileEncryptionAuthority, integrityError: string) {
+	if (bytes.byteLength !== file.size || await sha256Hex(bytes) !== file.hash) throw new Error(integrityError);
+	return openFile(bytes, file.path, authority);
 }

@@ -1,4 +1,4 @@
-import { openFile, sealFile } from '../../encryption/file-codec';
+import { sealFile } from '../../encryption/file-codec';
 import { decryptJson, encryptJson } from '../../encryption/envelope';
 import { createReminderProjectionWithKeys } from '../../encryption/reminder-projection';
 import { scanReminderMarkdownContent, getProjectFromPath } from '../../reminders/core/markdownScan';
@@ -15,12 +15,13 @@ import { requireCompatibleServer } from '../server-compatibility';
 import type { StoredReminderKeys } from '../encryption/encryption-keys';
 import type { ApiFetch, ReminderSourceIssue } from '../types';
 import { routeFolderPath } from '../encryption/encryption-folder-routing';
-import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage } from '../../encryption/file-inventory';
+import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '../../encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { isReminderOperationId } from '@/protocol/reminder-operation';
 import { isSyncPath } from '@/protocol/sync-validation';
 import { REMINDER_OUTBOX_LOCK } from '@/pwa/reminders/outbox/reminder-storage-keys';
 import { sha256Hex } from '@/platform/sha256';
+import { trimContentCache } from '@/pwa/storage/content-cache';
 
 const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
 const NOTE_CONCURRENCY = 6;
@@ -100,24 +101,19 @@ export class EncryptedReminderApi {
 		const cached = cache.get(file.revision);
 		if (cached && cached.file.path === file.path && cached.file.hash === file.hash && cached.file.size === file.size) return cached;
 		// Coarse ciphertext bound before download; the 1 MiB plaintext limit is checked after opening.
-		if (file.size > 4 * 1024 * 1024) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
+		if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
 		const query = new URLSearchParams({ folderPath: this.keys.folderPath, path: file.path, revision: file.revision });
 		const response = await this.fetch(`/reminders/encrypted-file?${query}`);
 		if (!response.ok) await json(response);
-		const bytes = await response.arrayBuffer();
-		if (bytes.byteLength !== file.size || await sha256Hex(bytes) !== file.hash) throw new Error('Encrypted reminder transfer failed integrity validation');
-		const opened = await openFile(new Uint8Array(bytes), file.path, this.authority(file.path));
+		const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, this.authority(file.path),
+			'Encrypted reminder transfer failed integrity validation');
 		if (opened.content.byteLength > 1024 * 1024) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
 		const content = decodeMarkdownBytes(opened.content);
 		validateEncryptedSchedules(opened.publicData);
 		const issue = opened.publicData.issue === 'scheduling-capacity' ? ENCRYPTED_SCHEDULING_CAPACITY_ISSUE : undefined;
 		this.assertCurrent();
 		cache.set(file.revision, { file, content, issue });
-		let bytesCached = [...cache.values()].reduce((bytes, entry) => bytes + entry.content.length * 2, 0);
-		while (bytesCached > 16 * 1024 * 1024 || cache.size > 1000) {
-			const first = cache.keys().next().value!;
-			bytesCached -= cache.get(first)!.content.length * 2; cache.delete(first);
-		}
+		trimContentCache(cache, 1000);
 		return { content, issue };
 	}
 

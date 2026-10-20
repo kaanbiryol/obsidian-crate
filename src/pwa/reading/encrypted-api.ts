@@ -1,7 +1,7 @@
 import { applyLocalArticle } from '../../reading/core/article';
 import { isEmptyReadingCapture, readingUpdateIssue } from '../../reading/core/mutation-policy';
 import type { CapturedArticle } from '../../reading/extraction/types';
-import { openFile, sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
+import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
 import { decryptJson, encryptJson } from '@/encryption/envelope';
 import { createReadingNote, parseReadingNote, updateReadingNote, readingImportId } from '../../reading/core/notes';
 import { readReadingFrontmatter, patchReadingFrontmatter } from '../../reading/core/frontmatter';
@@ -9,9 +9,10 @@ import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } f
 import { readingCapturePath } from '../../reading/core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { reminderRequestHash } from '@/encryption/reminder-receipt';
-import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, type EncryptedInventoryPage } from '@/encryption/file-inventory';
+import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, type EncryptedInventoryPage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '@/encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { sha256Hex } from '@/platform/sha256';
+import { trimContentCache } from '@/pwa/storage/content-cache';
 
 const MAX_READING_FILES = 100_000;
 const MAX_READING_METADATA_BYTES = 64 * 1024 * 1024;
@@ -69,12 +70,11 @@ export class EncryptedReadingApi {
     const folder = encodeURIComponent(this.options.folderPath);
     let source = sources.get(file.path);
     if (!source || !sameFile(source.file, file)) {
-      if (file.size > 4 * 1024 * 1024) throw new Error('This Reading note is too large.');
+      if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new Error('This Reading note is too large.');
       const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`);
       if (!response.ok) throw new Error('Article changed or is unavailable. Refresh to retry.');
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.length !== file.size || await sha256Hex(bytes) !== file.hash) throw new Error('Encrypted article failed integrity verification.');
-      const opened = await openFile(bytes, file.path, this.options.authority);
+      const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, this.options.authority,
+        'Encrypted article failed integrity verification.');
       if (opened.content.byteLength > MAX_READING_BYTES) throw new Error('Reading notes must be smaller than 1 MB.');
       const content = new TextDecoder('utf-8', { fatal: true }).decode(opened.content);
       const metadata = parseReadingNote(content);
@@ -83,11 +83,7 @@ export class EncryptedReadingApi {
     }
 
     sources.set(file.path, source);
-    let bytes = [...sources.values()].reduce((sum, value) => sum + value.content.length * 2, 0);
-    while (bytes > 16 * 1024 * 1024 || sources.size > 100) {
-      const first = sources.keys().next().value!;
-      bytes -= sources.get(first)!.content.length * 2; sources.delete(first);
-    }
+    trimContentCache(sources, 100);
     return source;
   }
   private async inventory(): Promise<EncryptedReadingInventory> {
