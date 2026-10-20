@@ -794,10 +794,13 @@ snapshot cannot reload or break active fixtures. Build the plugin before startin
 tests; a missing stylesheet fails with an actionable error. Source changes made
 after the snapshot require a new run.
 
-The gallery snapshot stays in `.generated/visual-runs/<run-id>/`; results and HTML
-reports stay in `test-results/visual-<run-id>/` and
-`playwright-report/visual-<run-id>/`. These ignored directories can be removed after
-review. `npm run preview:ui` remains the live editing server on port 8790.
+A run writes its gallery snapshot to `.generated/visual-runs/<run-id>/`, results to
+`test-results/visual-<run-id>/` and the HTML report to
+`playwright-report/visual-<run-id>/`. The launcher deletes that run's directories when
+a local run passes. Failed runs keep them for diagnosis, and CI keeps them for artifact
+upload. `npm run clean` removes accumulated output (`dist/`, `.generated/visual-runs/`,
+`playwright-report/` and `test-results/`), refusing any path Git tracks.
+`npm run preview:ui` remains the live editing server on port 8790.
 `npm run test:ci` checks that concurrent gallery snapshots retain their own styles
 even after the input stylesheet changes or disappears.
 
