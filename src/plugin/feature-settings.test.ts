@@ -2,11 +2,11 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type CratePlugin from './CratePlugin';
 import { refreshSharedFeatures, registerSharedFeatures, setSharedFeature, SHARED_FEATURES_REFRESH_INTERVAL_MS } from './feature-settings';
 import type { SyncState } from '../sync/types';
-import { startReading, stopReading } from '../reading/runtime';
+import { restartReading } from '../reading/runtime';
 import { serverRequest } from './server-request';
 import { setRemindersEnabled } from '../reminders/plugin-integration';
 vi.mock('./server-request', async importOriginal => ({ ...await importOriginal<typeof import('./server-request')>(), serverRequest: vi.fn() }));
-vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn() }));
+vi.mock('../reading/runtime', () => ({ restartReading: vi.fn() }));
 vi.mock('../reminders/plugin-integration', () => ({
   setRemindersEnabled: vi.fn(async (plugin: { remindersSettings: { enabled: boolean } }, enabled: boolean) => { plugin.remindersSettings.enabled = enabled; }),
 }));
@@ -29,7 +29,7 @@ it('changes the shared policy before applying local state and keeps other featur
   await setSharedFeature(plugin as unknown as CratePlugin, 'reading', false);
   expect(serverRequest).toHaveBeenLastCalledWith(plugin, '/features', { feature: 'reading', enabled: false, revision: 'one' }, expect.objectContaining({ timeout: 5_000 }));
   expect(plugin.settings.reading.enabled).toBe(false);
-  expect(stopReading).toHaveBeenCalledOnce();
+  expect(restartReading).toHaveBeenCalledExactlyOnceWith(plugin, false);
   expect(setRemindersEnabled).not.toHaveBeenCalled();
 });
 it('does not pretend to change the shared feature when the server rejects it', async () => {
@@ -46,13 +46,13 @@ it('pulls paused state before initialization without writing stale local flags b
   expect(plugin.remindersSettings.enabled).toBe(false);
   expect(serverRequest).toHaveBeenCalledExactlyOnceWith(plugin, '/features', undefined, { timeout: 5_000 });
   expect(setRemindersEnabled).not.toHaveBeenCalled();
-  expect(startReading).not.toHaveBeenCalled();
+  expect(restartReading).toHaveBeenCalledExactlyOnceWith(plugin, false);
 });
 it('resumes local backends when another device resumes the server features', async () => {
   const plugin = fixture(); plugin.settings.reading.enabled = false; plugin.remindersSettings.enabled = false;
   vi.mocked(serverRequest).mockResolvedValue({ reading: true, reminders: true, revision: 'one' });
   await refreshSharedFeatures(plugin as unknown as CratePlugin);
-  expect(startReading).toHaveBeenCalledOnce();
+  expect(restartReading).toHaveBeenCalledExactlyOnceWith(plugin, true);
   expect(setRemindersEnabled).toHaveBeenCalledWith(plugin, true, expect.any(Function));
   expect(plugin.refreshSettingsTab).toHaveBeenCalledOnce();
 });

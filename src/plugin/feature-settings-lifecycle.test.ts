@@ -4,13 +4,13 @@ import { refreshSharedFeatures, setSharedFeature } from './feature-settings';
 import { serverRequest } from './server-request';
 import { normalizeCrateSettings } from './settings';
 import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from '../reminders/settings';
-import { startReading, stopReading } from '../reading/runtime';
+import { restartReading } from '../reading/runtime';
 import { endPluginLifecycle } from './lifecycle-state';
 import { setupReminderBackend } from '../reminders/runtime';
 
 vi.mock('./lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
 vi.mock('./server-request', async importOriginal => ({ ...await importOriginal<typeof import('./server-request')>(), serverRequest: vi.fn() }));
-vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn() }));
+vi.mock('../reading/runtime', () => ({ restartReading: vi.fn() }));
 vi.mock('../reminders/runtime', async importOriginal => ({ ...await importOriginal<typeof import('../reminders/runtime')>(), setupReminderBackend: vi.fn() }));
 vi.mock('../reminders/register-integrations', () => ({ registerReminderIntegrations: vi.fn() }));
 vi.mock('../reminders/ui/plugin/reminders-view', () => ({ VIEW_TYPE_REMINDERS: 'reminders-view' }));
@@ -44,7 +44,7 @@ it.each(['server', 'token'] as const)('does not send a shared policy mutation wh
   await expect(setSharedFeature(f.plugin, 'reading', false)).rejects.toMatchObject({ name: 'AbortError' });
   expect(serverRequest).toHaveBeenCalledOnce();
   expect(f.saveData).not.toHaveBeenCalled();
-  expect(stopReading).not.toHaveBeenCalled();
+  expect(restartReading).not.toHaveBeenCalled();
 });
 
 it('keeps queued feature intent bound to the connection on which it was requested', async () => {
@@ -101,8 +101,7 @@ it.each(['reading', 'reminders'] as const)('does not publish an in-flight %s sav
   expect(f.plugin.settings.reading.enabled).toBe(true);
   expect(f.plugin.remindersSettings.enabled).toBe(true);
   expect(f.saveData.mock.lastCall?.[0]).toMatchObject({ workerUrl: 'https://replacement.example', reading: { enabled: true }, reminders: { enabled: true } });
-  expect(stopReading).not.toHaveBeenCalled();
-  expect(startReading).not.toHaveBeenCalled();
+  expect(restartReading).not.toHaveBeenCalled();
   expect(setupReminderBackend).not.toHaveBeenCalled();
   expect(f.detachLeaves).not.toHaveBeenCalled();
   expect(f.refresh).not.toHaveBeenCalled();
@@ -138,5 +137,5 @@ it('keeps local feature toggles available without a server connection', async ()
   await setSharedFeature(f.plugin, 'reading', false);
   expect(f.plugin.settings.reading.enabled).toBe(false);
   expect(serverRequest).not.toHaveBeenCalled();
-  expect(stopReading).toHaveBeenCalledOnce();
+  expect(restartReading).toHaveBeenCalledExactlyOnceWith(f.plugin, false);
 });

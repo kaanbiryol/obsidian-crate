@@ -133,3 +133,10 @@ export function startReading(plugin: CratePlugin): void {
 	notifyRuntime(plugin);
 	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) schedule(); });
 }
+
+/** Applies changed Reading settings; open views close because they hold the previous library. */
+export function restartReading(plugin: CratePlugin, start = true): void {
+	stopReading(plugin);
+	plugin.app.workspace.detachLeavesOfType(READING_VIEW_TYPE);
+	if (start) startReading(plugin);
+}

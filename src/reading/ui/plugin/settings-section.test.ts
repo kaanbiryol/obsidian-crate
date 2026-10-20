@@ -12,7 +12,7 @@ beforeEach(() => {
 	vi.doMock('../../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isDesktopApp: true } }));
 	vi.doMock('../../../plugin/server-request', async () => ({ ...await vi.importActual<typeof import('../../../plugin/server-request')>('../../../plugin/server-request'), serverRequest: request }));
-	vi.doMock('../../runtime', () => ({ READING_VIEW_TYPE: 'crate-reading', startReading: vi.fn(), stopReading: vi.fn(), validateReadingConfiguration: validate }));
+	vi.doMock('../../runtime', () => ({ restartReading: vi.fn(), validateReadingConfiguration: validate }));
 	request.mockImplementation(async (_plugin, path) => path === '/reading/fetching' ? { enabled: true, revision: 'r' } : { policy });
 });
 afterEach(() => {
@@ -60,10 +60,8 @@ it.each([true, false])('sets local Reading to %s without changing another device
  await vi.waitFor(() => expect(rerender).toHaveBeenCalled());
  expect(plugin.settings.reading).toEqual({ enabled, folderPath: 'Reading' });
  expect(request).not.toHaveBeenCalled();
- expect(plugin.app.workspace.detachLeavesOfType).toHaveBeenCalledWith('crate-reading');
- const { startReading, stopReading } = await import('../../runtime');
- expect(stopReading).toHaveBeenCalledOnce();
- expect(startReading).toHaveBeenCalledTimes(enabled ? 1 : 0);
+ const { restartReading } = await import('../../runtime');
+ expect(restartReading).toHaveBeenCalledExactlyOnceWith(plugin, enabled);
 });
 
 it('hides preferences when Reading is disabled', async () => {
@@ -93,6 +91,6 @@ it.each(['read', 'pause', 'update'])('does not continue a folder change after sw
  await vi.waitFor(() => expect(noticeMessages.some(message => message.includes('connection changed'))).toBe(true));
  expect(request).toHaveBeenCalledTimes(calls[step as keyof typeof calls]);
  expect(plugin.writeSettings).not.toHaveBeenCalled();
- const { startReading } = await import('../../runtime');
- expect(startReading).not.toHaveBeenCalled();
+ const { restartReading } = await import('../../runtime');
+ expect(restartReading).not.toHaveBeenCalled();
 });

@@ -1,7 +1,7 @@
 import type CratePlugin from './CratePlugin';
 import type { SyncState } from '../sync/types';
 import { captureServerConnection, serverRequest } from './server-request';
-import { startReading, stopReading } from '../reading/runtime';
+import { restartReading } from '../reading/runtime';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { parseFeaturePolicy, type FeaturePolicy } from '../protocol/feature-policy';
 
@@ -16,9 +16,7 @@ async function apply(plugin: CratePlugin, policy: FeaturePolicy, activate: boole
   if (plugin.settings.reading.enabled !== policy.reading) {
     await plugin.writeSettings({ reading: { ...plugin.settings.reading, enabled: policy.reading } }, assertCurrent);
     assertCurrent();
-    stopReading(plugin);
-    plugin.app.workspace.detachLeavesOfType('crate-reading');
-    if (activate && policy.reading) startReading(plugin);
+    restartReading(plugin, activate && policy.reading);
   }
   if (plugin.remindersSettings.enabled !== policy.reminders) {
     if (activate) {

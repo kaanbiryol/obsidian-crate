@@ -6,7 +6,7 @@ import { createSettingsDisclosure } from '../../../ui/plugin/settings-disclosure
 import { FolderSuggest } from '../../../ui/settings/folder-suggest';
 import { bindCommittedText } from '../../../ui/settings/input-helpers';
 import { readReadingPolicy, writeReadingPolicy } from '../../server';
-import { READING_VIEW_TYPE, startReading, stopReading, validateReadingConfiguration } from '../../runtime';
+import { restartReading, validateReadingConfiguration } from '../../runtime';
 
 export function renderReadingSettings(container: HTMLElement, plugin: CratePlugin, rerender: () => void): () => void {
 	let folderSuggest: FolderSuggest | undefined;
@@ -48,7 +48,7 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 						assertCurrent();
 						await plugin.writeSettings({ reading }, assertCurrent);
 						assertCurrent();
-						stopReading(plugin); plugin.app.workspace.detachLeavesOfType(READING_VIEW_TYPE); startReading(plugin);
+						restartReading(plugin);
 						rerender();
 					} catch (error) { new Notice(error instanceof Error ? error.message : 'Could not change the Reading folder.'); }
 				});

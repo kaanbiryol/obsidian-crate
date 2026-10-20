@@ -5,7 +5,7 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { createReadingNote, parseReadingNote, updateReadingNote } from './core/notes';
-import { getReadingLibrary, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
+import { getReadingLibrary, restartReading, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
 import { readReadingPolicy } from './server';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
@@ -168,6 +168,21 @@ describe('Reading runtime lifecycle', () => {
     unsubscribe(); listener.mockClear();
     startReading(h.plugin);
     expect(listener).not.toHaveBeenCalled();
+    stopReading(h.plugin);
+  });
+  it('closes open Reading views when restarting and starts only when requested', () => {
+    const h = harness();
+    const detachLeavesOfType = vi.fn();
+    Object.assign(h.workspace, { detachLeavesOfType });
+    startReading(h.plugin);
+    const first = getReadingLibrary(h.plugin);
+    restartReading(h.plugin, false);
+    expect(getReadingLibrary(h.plugin)).toBeUndefined();
+    expect(detachLeavesOfType).toHaveBeenCalledExactlyOnceWith('crate-reading');
+    restartReading(h.plugin);
+    expect(getReadingLibrary(h.plugin)).toBeDefined();
+    expect(getReadingLibrary(h.plugin)).not.toBe(first);
+    expect(detachLeavesOfType).toHaveBeenCalledTimes(2);
     stopReading(h.plugin);
   });
 	it('discovers a normal clip after the vault is ready without a template marker', async () => {
