@@ -1,4 +1,4 @@
-import type { Priority, Reminder } from "@/reminders/types/plugin-reminder";
+import type { Priority, Reminder } from "@/reminders/types/reminder";
 
 export function buildCreatedReminderFallback(params: {
   id: string;

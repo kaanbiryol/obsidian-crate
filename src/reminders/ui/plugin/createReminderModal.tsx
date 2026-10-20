@@ -11,7 +11,7 @@ const log = createLogger('ReminderModal');
 import { today } from "@/reminders/core/dates/time";
 import { type DueDateDefaultSetting, useRemindersSettingsStore } from "@/reminders/settings";
 import { ModalContext, PluginContext } from "@/reminders/ui/plugin/reminders-context";
-import type { Reminder } from "@/reminders/types/plugin-reminder";
+import type { Reminder } from "@/reminders/types/reminder";
 import { useObsidianKeyboardHeight } from "@/reminders/ui/hooks/useObsidianKeyboardHeight";
 
 type ReminderModalProps = {

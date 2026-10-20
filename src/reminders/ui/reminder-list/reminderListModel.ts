@@ -5,7 +5,7 @@ import {
 } from "@/reminders/core/reminderSort";
 import { formatDateHeader, isReminderOverdue } from "@/reminders/ui/format/dateFormatting";
 import type { ReminderRepository } from "@/reminders/data/reminder-repository";
-import type { Reminder } from "@/reminders/types/plugin-reminder";
+import type { Reminder } from "@/reminders/types/reminder";
 import { DEFAULT_PROJECT } from "../../core/constants";
 
 export interface RemindersListLoadOptions {

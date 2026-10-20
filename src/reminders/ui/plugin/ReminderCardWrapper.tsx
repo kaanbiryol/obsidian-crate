@@ -12,7 +12,7 @@ import { useReminderCardInteractions } from '@/reminders/ui/shared/useReminderCa
 import { createLogger } from '@/reminders/logger';
 
 const log = createLogger('ReminderCardWrapper');
-import type { Reminder } from '@/reminders/types/plugin-reminder';
+import type { Reminder } from '@/reminders/types/reminder';
 import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 import { openReminderEditModal } from '@/reminders/ui/plugin/reminderEditorModals';
 import type { ProjectColorScheme } from '@/reminders/ui/format/projectColors';

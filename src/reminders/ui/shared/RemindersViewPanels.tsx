@@ -12,7 +12,7 @@ import {
   PAGE_TRANSITION_DURATION,
 } from "@/reminders/ui/shared/layoutConstants";
 import type { Reminder as SharedReminder } from "@/reminders/types/reminder";
-import type { Reminder } from "@/reminders/types/plugin-reminder";
+import type { Reminder } from "@/reminders/types/reminder";
 import type { ViewMode } from "./remindersViewModel";
 import type { ProjectColorScheme } from "@/reminders/ui/format/projectColors";
 

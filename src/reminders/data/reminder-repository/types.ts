@@ -1,6 +1,6 @@
 import type { MarkdownWriter } from "../markdown-writer";
 import type { ReminderIndex } from "../reminder-index";
-import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
+import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/reminder";
 
 export interface ReminderRepository {
   getAll(): Reminder[];

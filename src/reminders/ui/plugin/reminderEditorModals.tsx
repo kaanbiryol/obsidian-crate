@@ -5,7 +5,7 @@ import type { ReactElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import type CratePlugin from "@/main";
 import { createLogger } from "@/reminders/logger";
-import type { Reminder } from "@/reminders/types/plugin-reminder";
+import type { Reminder } from "@/reminders/types/reminder";
 import { ReminderModal } from "./createReminderModal";
 import { ModalContext, PluginContext } from "./reminders-context";
 import { hideNativeModalCloseButton } from "../../../ui/plugin/modalShell";

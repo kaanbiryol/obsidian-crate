@@ -3,7 +3,7 @@ import { createReminderId } from "../../core/reminderIdentity";
 import { buildCreatedReminderFallback } from "./shared";
 import { buildCreateReminderArgs, buildReminderUpdate } from "../../core/reminderMutationPlan";
 import type { ReminderRepositoryContext } from "./types";
-import type { CreateReminderParams, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
+import type { CreateReminderParams, UpdateReminderParams } from "@/reminders/types/reminder";
 import { getReminderProjectFilePath } from "@/reminders/core/reminderProjectPath";
 import { toReminder } from "../toReminder";
 

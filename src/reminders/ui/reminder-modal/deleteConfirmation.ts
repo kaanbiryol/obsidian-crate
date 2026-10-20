@@ -1,4 +1,4 @@
-import type { Reminder } from "@/reminders/types/plugin-reminder";
+import type { Reminder } from "@/reminders/types/reminder";
 
 const MAX_PREVIEW_LENGTH = 50;
 

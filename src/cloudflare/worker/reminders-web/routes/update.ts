@@ -1,7 +1,7 @@
 import { assertReminderMutationInput } from '@/reminders/core/reminderMutationInput';
 import { beginReminderOperation, reminderOperationEffects } from '../operations';
 import { buildReminderUpdate } from '@/reminders/core/reminderMutationPlan';
-import type { UpdateReminderParams } from '@/reminders/types/plugin-reminder';
+import type { UpdateReminderParams } from '@/reminders/types/reminder';
 import { parseStoredReminderDate, reminderHasTime } from '@/reminders/core/dates/reminderDate';
 import { normalizeRecurrenceRule } from '@/reminders/core/recurrence/recurrenceRule';
 import { writeCommittedMarkdownFilePair } from '../../sync/atomic-markdown-write';

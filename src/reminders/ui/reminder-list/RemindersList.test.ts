@@ -1,7 +1,7 @@
 import React, { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { renderHook } from '@/test/react-hooks';
-import type { Reminder } from '@/reminders/types/plugin-reminder';
+import type { Reminder } from '@/reminders/types/reminder';
 import type CratePlugin from '@/main';
 
 vi.mock('@/reminders/ui/plugin/ReminderCardWrapper', () => ({

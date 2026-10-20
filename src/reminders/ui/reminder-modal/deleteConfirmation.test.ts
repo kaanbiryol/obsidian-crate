@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Reminder } from "@/reminders/types/plugin-reminder";
+import type { Reminder } from "@/reminders/types/reminder";
 import { buildDeleteConfirmationMessage } from "./deleteConfirmation";
 
 function makeReminder(content: string): Reminder {

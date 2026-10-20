@@ -16,13 +16,11 @@ import {
   getFile,
   getOrCreateProjectFile,
 } from "./helpers";
-import {
-  createReminderInMarkdown,
-  deleteReminderInMarkdown,
-  reorderRemindersInMarkdown,
-  toggleReminderCompletionInMarkdown,
-  updateReminderInMarkdown,
-} from "./operations";
+import { createReminderInMarkdown } from "./create";
+import { deleteReminderInMarkdown } from "./delete";
+import { reorderRemindersInMarkdown } from "./reorder";
+import { toggleReminderCompletionInMarkdown } from "./toggle";
+import { updateReminderInMarkdown } from "./update";
 import type {
   MarkdownWriter,
   MarkdownWriterContext,
