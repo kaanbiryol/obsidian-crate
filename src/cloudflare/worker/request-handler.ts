@@ -4,7 +4,7 @@ import { withD1Usage } from './d1-usage';
 import { coordinatedNewFiles } from './sync/bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
-import { ReminderFileSizeError } from './reminders-web/limits';
+import { ReminderFileSizeError } from './reminders/limits';
 import { ReminderIdentityConflictError } from './reminders/source-identity';
 import { logMutation } from './request-diagnostics';
 import { limitNotificationRequest } from './rate-limit';

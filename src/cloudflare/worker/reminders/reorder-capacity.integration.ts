@@ -4,9 +4,9 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleReorderReminders } from '../reminders-web/routes/reorder';
+import { handleReorderReminders } from './routes/reorder';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
-import { scanReminderMarkdownFile } from '../reminders-web/scan';
+import { scanReminderMarkdownFile } from './scan';
 
 const path = 'Reminders/Inbox.md';
 beforeEach(async () => {

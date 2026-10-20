@@ -7,10 +7,10 @@ import { parseStringArray } from '../request-validation';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
 import type { Env } from '../types';
-import { assertUniqueReminderSources } from '../reminders/source-identity';
+import { assertUniqueReminderSources } from './source-identity';
 import { ReminderFileSizeError } from './limits';
 import { reminderOperationEffects, type ReminderOperation } from './operations';
-import { saveReminderFileCache } from './reminder-cache';
+import { saveReminderFileCache } from './cache/index';
 import { scanReminderMarkdownFile } from './scan';
 
 type ReminderAction = 'create' | 'update' | 'set-completed' | 'delete' | 'reorder';

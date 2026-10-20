@@ -11,7 +11,7 @@ import { meterD1Usage } from '../d1-usage';
 import { meterD1Writes } from '../test-support/d1-write-meter-test-harness';
 import { handleGetChanges, handleGetManifest } from './metadata-handlers';
 import { revalidateReminderSources } from '../reminders/source-migration';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
+import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import { drainNotificationProjections } from '../notifications/projection';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';

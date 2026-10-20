@@ -3,9 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleListReminders } from '../reminders-web/routes/list';
-import { scanReminderMarkdownFile } from '../reminders-web/scan';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache';
+import { handleListReminders } from './routes/list';
+import { scanReminderMarkdownFile } from './scan';
+import { REMINDER_CACHE_PARSER_VERSION } from './cache/index';
 import { sha256Hex } from '../../../platform/sha256';
 
 // A repeatable local workerd/D1/R2 measurement, not a hosted CPU or mobile claim.

@@ -5,7 +5,7 @@ import { parseFolderPath } from '../requests';
 import {
 	loadIncrementalReminderIndex,
 	REMINDER_CACHE_PARSER_VERSION,
-} from '../reminder-cache';
+} from '../cache/index';
 import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { changedPathsSince, deltaBase, parseChangeEtags, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../../vault-change-token';
 import { sha256Hex } from '../../../../platform/sha256';

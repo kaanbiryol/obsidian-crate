@@ -15,7 +15,7 @@ import { ENCRYPTION_STATE_KEY } from './state';
 import { handleEncryptionConversion } from './conversion';
 import { handleUpload } from '../sync/file-handlers';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
+import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import { revalidateReminderSources } from '../reminders/source-migration';
 import { drainNotificationProjections } from '../notifications/projection';
 import { drainNotificationJobs } from '../notifications/outbox';

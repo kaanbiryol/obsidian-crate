@@ -1,5 +1,5 @@
 import { limitNotificationAction } from '../rate-limit';
-import { parseFolderPath } from '../reminders-web/requests';
+import { parseFolderPath } from '../reminders/requests';
 import { corsResponse } from '../cors';
 import { getOrCreateVapidKeys } from './push';
 import { parseJsonObject, parseOptionalString } from '../request-validation';

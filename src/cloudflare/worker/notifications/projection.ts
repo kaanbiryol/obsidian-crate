@@ -13,7 +13,7 @@ import { getNotificationPolicy } from './policy';
 import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, REMINDER_PROJECTION_SIZE_ISSUE, DUPLICATE_COMMITTED_REMINDER_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from '../reminders/source-parse';
 import { hasVerifiedReminderSource } from '../reminders/source-state';
 import type { Env } from '../types';
-import type { RemoteReminderRecord } from '../reminders-web/types';
+import type { RemoteReminderRecord } from '../reminders/types';
 import type { NotificationPolicy } from '../../../protocol/notification-policy';
 import { isReminderPath } from '../reminders/scope';
 import { readEncryptionState } from '../encryption/state';

@@ -6,7 +6,7 @@ import {
 	parseReminderMutationWorkspace,
 	parseReminderSourceFilePath,
 } from '../requests';
-import { assertUniqueReminderSources } from '../../reminders/source-identity';
+import { assertUniqueReminderSources } from '../source-identity';
 import { commitReminderCommand } from '../command';
 
 export async function handleUpdateReminder(request: Request, env: Env): Promise<Response> {

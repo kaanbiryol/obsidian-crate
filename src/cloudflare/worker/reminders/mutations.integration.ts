@@ -4,12 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleCreateReminder } from '../reminders-web/routes/create';
-import { handleUpdateReminder } from '../reminders-web/routes/update';
-import { handleSetReminderCompleted } from '../reminders-web/routes/complete';
-import { handleDeleteReminder } from '../reminders-web/routes/delete';
+import { handleCreateReminder } from './routes/create';
+import { handleUpdateReminder } from './routes/update';
+import { handleSetReminderCompleted } from './routes/complete';
+import { handleDeleteReminder } from './routes/delete';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
-import { scanReminderMarkdownFile } from '../reminders-web/scan';
+import { scanReminderMarkdownFile } from './scan';
 import type { ReminderRecord } from '@/pwa/reminders/types';
 
 const path = 'Reminders/Inbox.md';

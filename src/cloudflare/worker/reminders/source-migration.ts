@@ -7,7 +7,7 @@ import { enqueueFileProjection } from '../notifications/projection-queue';
 import { recordReminderSourceState } from './source-state';
 import { readStoredMarkdownFiles } from '../storage';
 import { REMINDER_SOURCE_SIZE_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from './source-parse';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
+import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 import type { Env } from '../types';
 import { getReminderFolder } from './scope';
 import { retireOutOfScopeSources } from './scope-cleanup';

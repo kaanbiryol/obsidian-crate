@@ -274,6 +274,8 @@ Request: `{ settings: { ignorePatterns: [...], syncInterval: 300, pushEnabled: f
 
 Response: `{ success: true, settingsVersion }`. A stale version returns `409` instead of overwriting another device's edit.
 
+Reminder handlers live in `src/cloudflare/worker/reminders/routes/`. Mutations apply the shared Markdown command described in the [architecture](architecture.md).
+
 ### GET /reminders/list
 
 Query: `?folderPath=<reminders-folder>`

@@ -1,4 +1,4 @@
-import type { RemoteReminderRecord } from '../reminders-web/types';
+import type { RemoteReminderRecord } from './types';
 
 /** Keep duplicate counts and the first observed due key identical across commit paths. */
 export function summarizeReminderSources(reminders: readonly Pick<RemoteReminderRecord, 'id' | 'dueDate' | 'dueDatetime'>[]) {

@@ -11,7 +11,7 @@ import { stageMarkdownFile } from '../sync/markdown-file-staging';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
 import { commitStagedFile } from '../sync/mutations';
 import { FileVersionConflictError } from '../storage';
-import { beginReminderOperation, reminderOperationEffects } from '../reminders-web/operations';
+import { beginReminderOperation, reminderOperationEffects } from '../reminders/operations';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { portablePathKey } from '../../../protocol/portable-path';
 import type { Env } from '../types';

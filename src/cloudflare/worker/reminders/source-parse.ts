@@ -2,9 +2,9 @@ import { ReminderIdentityConflictError } from './source-identity';
 import { decodeMarkdownBytes, MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import { reminderDescriptionErrorFromMessage } from '@/reminders/core/reminderDescription';
 import type { SyncIssueCode } from '@/protocol/sync-issues';
-import { scanReminderMarkdownFile } from '../reminders-web/scan';
-import { REMINDER_INDEX_MAX_FILE_BYTES } from '../reminders-web/reminder-cache/types';
-import type { RemoteReminderRecord } from '../reminders-web/types';
+import { scanReminderMarkdownFile } from './scan';
+import { REMINDER_INDEX_MAX_FILE_BYTES } from './cache/types';
+import type { RemoteReminderRecord } from './types';
 import { MAX_ENCRYPTED_PUBLIC_DATA_BYTES, parseEncryptedFile } from '../../../encryption/file-format';
 import { validateEncryptedSchedules, ENCRYPTED_NOTIFICATION_PREFIX, ENCRYPTED_SCHEDULING_CAPACITY_ISSUE } from '../../../encryption/notification-format';
 

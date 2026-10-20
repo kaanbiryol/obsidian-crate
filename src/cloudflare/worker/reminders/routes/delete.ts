@@ -3,7 +3,7 @@ import { corsResponse } from '../../cors';
 import type { Env } from '../../types';
 import { parseJsonObject, parseOptionalString } from '../../request-validation';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
-import { assertUniqueReminderSources } from '../../reminders/source-identity';
+import { assertUniqueReminderSources } from '../source-identity';
 import { commitReminderCommand } from '../command';
 
 export async function handleDeleteReminder(request: Request, env: Env): Promise<Response> {

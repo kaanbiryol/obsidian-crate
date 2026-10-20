@@ -13,7 +13,7 @@ import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { buildCreatedReminderBlock } from '@/reminders/core/markdownReminderMutation';
 import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
-import { PLAINTEXT_COMMAND_OPTIONS } from '../reminders-web/command';
+import { PLAINTEXT_COMMAND_OPTIONS } from './command';
 import { sha256Hex } from '@/platform/sha256';
 
 // The plaintext Worker routes apply the shared command used by encrypted web

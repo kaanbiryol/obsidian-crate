@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleListReminders } from './routes/list';
-import { saveReminderFileCache } from './reminder-cache';
+import { saveReminderFileCache } from './cache/index';
 import { scanReminderMarkdownFile } from './scan';
 import { createEnv } from '../test-support/reminders-web-test-harness';
 

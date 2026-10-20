@@ -7,7 +7,7 @@ import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
-import { scanReminderMarkdownFile } from '../reminders-web/scan';
+import { scanReminderMarkdownFile } from './scan';
 import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';

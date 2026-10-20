@@ -1,7 +1,7 @@
 import { portablePathKey } from '../../../protocol/portable-path';
 import { parseReminderSource } from '../reminders/source-parse';
 import { summarizeReminderSources } from '../reminders/source-summary';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
+import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import { getReminderFolder, isReminderPath } from '../reminders/scope';
 
 /** The same source/identity publication as a single upload, grouped by live revision. */

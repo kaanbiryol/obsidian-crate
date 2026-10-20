@@ -9,8 +9,8 @@ import { writeCommittedMarkdownFile } from '../storage';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { meterD1Writes } from '../test-support/d1-write-meter-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
-import { handleListReminders } from '../reminders-web/routes/list';
+import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
+import { handleListReminders } from '../reminders/routes/list';
 import type { ReminderSetupStatus } from '../../../protocol/initial-import';
 
 const clients: SyncTestDevice[] = [];

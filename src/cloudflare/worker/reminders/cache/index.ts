@@ -1,20 +1,20 @@
-import type { StoredMarkdownFileMetadata } from '../storage';
-import type { Env } from '../types';
-import { loadReminderFileCache } from './reminder-cache/load';
+import type { StoredMarkdownFileMetadata } from '../../storage';
+import type { Env } from '../../types';
+import { loadReminderFileCache } from './load';
 import {
 	pruneReminderFileCache,
 	saveReminderFileCache,
 	writeReminderFileCacheEntries,
-} from './reminder-cache/persist';
+} from './persist';
 import {
 	REMINDER_CACHE_PARSER_VERSION,
 	type IncrementalReminderIndexResult,
 	type ReminderFileCacheEntry,
-} from './reminder-cache/types';
-import { parseReminderCacheEntries, selectReminderIndexWarmBatch } from './reminder-cache/warm';
-import { getProjectFromPath } from './scan';
-import type { RemoteReminderRecord } from './types';
-import { ReminderIdentityConflictError } from '../reminders/source-identity';
+} from './types';
+import { parseReminderCacheEntries, selectReminderIndexWarmBatch } from './warm';
+import { getProjectFromPath } from '../scan';
+import type { RemoteReminderRecord } from '../types';
+import { ReminderIdentityConflictError } from '../source-identity';
 
 export { REMINDER_CACHE_PARSER_VERSION, saveReminderFileCache };
 

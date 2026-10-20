@@ -1,6 +1,6 @@
 import { corsResponse } from '../cors';
 import { PUSH_RECIPIENT_AUTHORITY } from '../notifications/recipient-authority';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
+import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 
 function firstCount(result: unknown): number {
 	if (!result || typeof result !== 'object') return 0;

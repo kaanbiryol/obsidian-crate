@@ -11,7 +11,7 @@ import { ENCRYPTION_STATE_KEY } from './state';
 import { handleEncryptionConversion } from './conversion';
 import { handleEncryptionRoute } from '../routes/encryption';
 import { prepareEncryptedReceipt, readEncryptedReceipt, pruneEncryptedReceiptChunks, RECEIPT_CHUNK_PAGE } from './receipt-storage';
-import { beginReminderOperation, reminderOperationEffects } from '../reminders-web/operations';
+import { beginReminderOperation, reminderOperationEffects } from '../reminders/operations';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });

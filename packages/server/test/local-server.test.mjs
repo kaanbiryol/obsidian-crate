@@ -151,7 +151,7 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		// Persist a real ReminderAlarm with verified authority. With no push
 		// recipients it completes locally when its alarm wakes after restart.
 		const due = new Date(Date.now() + 3000).toISOString();
-		const parserSource = await readFile(new URL('../../../src/cloudflare/worker/reminders-web/reminder-cache/types.ts', import.meta.url), 'utf8');
+		const parserSource = await readFile(new URL('../../../src/cloudflare/worker/reminders/cache/types.ts', import.meta.url), 'utf8');
 		const parserVersion = Number(/REMINDER_CACHE_PARSER_VERSION = (\d+)/.exec(parserSource)[1]);
 		const file = await runtime.db.prepare("SELECT storage_key FROM files WHERE path = 'hello.txt'").first();
 		await runtime.db.prepare("INSERT INTO notification_policy (id, folder_path, timezone, revision, enabled) VALUES (1, 'Reminders', 'UTC', 'policy', 1)").run();

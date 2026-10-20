@@ -4,7 +4,7 @@ import type { NotificationPolicy } from '../../../protocol/notification-policy';
 import { changedRows } from '../db';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../request-validation';
-import { parseFolderPath } from '../reminders-web/requests';
+import { parseFolderPath } from '../reminders/requests';
 import { readEncryptionState } from '../encryption/state';
 
 export async function getNotificationPolicy(db: D1Database): Promise<NotificationPolicy | null> {

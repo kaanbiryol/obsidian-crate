@@ -201,7 +201,9 @@ Encrypted web apps run it in the browser. The plaintext Worker routes run it wit
 their released size and verification options, then add operation receipts,
 identity checks, conditional writes and parsed caches. They map its failures to
 their released responses; `reminders/plaintext-parity.integration.ts` records
-where those differ from the web app's answers.
+where those differ from the web app's answers. `cloudflare/worker/reminders/`
+holds these routes in `routes/`, the parsed reminder cache in `cache/`, and the
+operation receipts and notification source records they share.
 
 `cloudflare/worker/request-handler.ts` distinguishes public, coordinator and
 transfer execution with a tagged argument. `request-guards.ts` owns stateless

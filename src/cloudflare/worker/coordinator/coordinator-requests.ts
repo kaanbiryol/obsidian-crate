@@ -1,6 +1,6 @@
 import { armNotificationCoordinator } from '../notifications/lifecycle';
 import { fetchWorkerRequest } from '../request-handler';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
+import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import type { Env } from '../types';
 
 import { publishExtraction, type Publication } from '../reading/extraction/jobs';

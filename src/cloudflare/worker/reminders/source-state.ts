@@ -1,6 +1,6 @@
 import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
 import { portablePathKey } from '../../../protocol/portable-path';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
+import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 
 /** This durable authority is separate from the disposable, folder-specific UI cache. */
 export function recordReminderSourceState(db: D1Database, path: string, storageKey: string | null, verified: boolean): D1PreparedStatement {

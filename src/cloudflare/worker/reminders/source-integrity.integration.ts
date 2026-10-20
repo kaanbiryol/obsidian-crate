@@ -7,7 +7,7 @@ import { writeCommittedMarkdownFile } from '../storage';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
 import { drainNotificationProjections } from '../notifications/projection';
 import { handleNotificationPolicy } from '../notifications/policy';
-import { handleListReminders } from '../reminders-web/routes/list';
+import { handleListReminders } from './routes/list';
 import { handleDelete } from '../sync/file-handlers';
 import { getStoredFileRow } from '../sync/storage';
 import { ReminderAlarm } from '../coordinator/reminder-alarm';

@@ -469,7 +469,7 @@ retain entry-identity checks, checkpoint round trips, conflicting recovery metad
 torn-write recovery and overlapping saves. Content-verifier and pending-verification
 races ensure an older asynchronous read cannot replace or settle a newer baseline.
 
-`reminders-web/moves.integration.ts` runs the production handlers against real D1/R2
+`reminders/moves.integration.ts` runs the production handlers against real D1/R2
 bindings, including completed reminders, source conflicts and destination write
 failures. Unit tests retain lightweight reorder coverage without simulating the
 atomic SQL publication. Operation-expiry and upload-retry integration tests exercise

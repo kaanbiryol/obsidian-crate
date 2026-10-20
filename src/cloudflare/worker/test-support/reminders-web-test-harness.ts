@@ -1,5 +1,5 @@
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { scanReminderMarkdownFile } from '../reminders-web/scan';
+import { scanReminderMarkdownFile } from '../reminders/scan';
 import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { vi } from 'vitest';
 import { sha256Hex } from '@/platform/sha256';

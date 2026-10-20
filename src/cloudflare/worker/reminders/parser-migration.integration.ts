@@ -9,9 +9,9 @@ import { revalidateReminderSources } from './source-migration';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from '../notifications/push';
-import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
+import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 import { runNotificationCoordinator } from '../notifications/coordinator';
-import { handleListReminders } from '../reminders-web/routes/list';
+import { handleListReminders } from './routes/list';
 import { sha256Hex } from '../../../platform/sha256';
 
 vi.mock('../notifications/push', () => ({ listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
