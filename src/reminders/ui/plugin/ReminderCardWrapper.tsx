@@ -21,8 +21,6 @@ import { useRemindersSettingsStore } from '@/reminders/settings';
 interface ReminderCardWrapperProps {
   reminder: Reminder;
   onUpdate?: () => void;
-  onToggleCompleteOverride?: () => Promise<void> | void;
-  onEditOverride?: () => void;
   index?: number;
   hideProject?: boolean;
   colorScheme?: ProjectColorScheme;
@@ -37,8 +35,6 @@ interface ReminderCardWrapperProps {
 export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
   reminder,
   onUpdate,
-  onToggleCompleteOverride,
-  onEditOverride,
   index,
   hideProject = false,
   colorScheme = 'dark',
@@ -59,19 +55,6 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
     // and let the next repository snapshot take over without a timer or delay.
     setCompletionPreview({ source: reminder, completed: !reminder.completed });
 
-    if (onToggleCompleteOverride) {
-      try {
-        await onToggleCompleteOverride();
-        onUpdate?.();
-        return;
-      } catch (error) {
-        setCompletionPreview(undefined);
-        throw error;
-      } finally {
-        isTogglingRef.current = false;
-      }
-    }
-
     try {
       if (reminder.completed) {
         await plugin.reminderRepository.uncomplete(reminder.id);
@@ -85,18 +68,14 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
     } finally {
       isTogglingRef.current = false;
     }
-  }, [onToggleCompleteOverride, onUpdate, plugin, reminder]);
+  }, [plugin, reminder]);
 
   /**
    * Handle reminder edit
    */
   const handleEdit = useCallback(() => {
-    if (onEditOverride) {
-      onEditOverride();
-      return;
-    }
     openReminderEditModal(plugin, reminder, onUpdate ?? (() => undefined));
-  }, [onEditOverride, onUpdate, plugin, reminder]);
+  }, [onUpdate, plugin, reminder]);
 
   const wrapperRef = useReminderCardInteractions({
     onEdit: handleEdit,
