@@ -1,7 +1,7 @@
 import { buildCreatedReminderBlock, buildReminderCompletionPlan } from '@/reminders/core/markdownReminderMutation';
 import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
 import { parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
-import { mergeProject, reorderProjectReminders } from './reminder-list-state';
+import { applyReminderListEffect, type ReminderList } from './reminder-list-state';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import type { ReminderMutationBody, ReminderRecord } from '../../types';
 
@@ -27,26 +27,16 @@ export function predictReminderCompletion(reminder: ReminderRecord, completed: b
 	return { ...reminder, completed: plan.completed, dueDate: plan.dueDate, dueDatetime: plan.dueDatetime, recurrence: plan.recurrence };
 }
 
-export function mergeReminderRecord(reminders: ReminderRecord[], record: ReminderRecord): ReminderRecord[] {
-	return reminders.some(item => item.id === record.id)
-		? reminders.map(item => item.id === record.id ? record : item)
-		: [...reminders, record];
-}
-
 /** Render pending changes over confirmed data; rollback never restores an old list snapshot. */
 export function applyReminderChanges(reminders: ReminderRecord[], projects: string[], changes: PendingReminderChange[]) {
-	let visibleReminders = reminders;
-	let visibleProjects = projects;
+	let visible: ReminderList = { reminders, projects };
 	for (const change of changes) {
 		// Expired attempts are compared with current confirmed data during review.
 		if (change.reviewRequired) continue;
 		if (change.status === 'failed' && change.kind !== 'save') continue;
-		if (change.kind === 'delete') visibleReminders = visibleReminders.filter(item => item.id !== change.recordId);
-		else if (change.kind === 'reorder') visibleReminders = reorderProjectReminders(visibleReminders, change.project, change.orderedIds);
-		else if (change.optimistic) {
-			visibleReminders = mergeReminderRecord(visibleReminders, change.optimistic);
-			visibleProjects = mergeProject(visibleProjects, change.optimistic.project);
-		}
+		if (change.kind === 'delete') visible = applyReminderListEffect(visible, { kind: 'delete', recordId: change.recordId });
+		else if (change.kind === 'reorder') visible = applyReminderListEffect(visible, change);
+		else if (change.optimistic) visible = applyReminderListEffect(visible, { kind: 'upsert', record: change.optimistic });
 	}
-	return { visibleReminders, visibleProjects };
+	return { visibleReminders: visible.reminders, visibleProjects: visible.projects };
 }

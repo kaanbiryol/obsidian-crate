@@ -1,6 +1,5 @@
 import { isConfirmedReminder } from './reminder-change-request';
-import { mergeReminderRecord } from './reminder-optimistic-state';
-import { mergeProject, reorderProjectReminders } from './reminder-list-state';
+import { applyReminderListEffect } from './reminder-list-state';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import type { ReminderRecord } from '../../types';
 import { sealPrivateValue, openPrivateValue } from '../../storage/private-storage';
@@ -63,11 +62,11 @@ export function applyReminderSettlement(reminders: ReminderRecord[], projects: s
 	if (settled.kind === 'reorder') {
 		const currentOrder = reminders.filter(item => item.project === settled.project).map(item => item.id);
 		if (JSON.stringify(currentOrder) !== JSON.stringify(settled.expectedOrder)) return null;
-		return { reminders: reorderProjectReminders(reminders, settled.project!, settled.orderedIds!), projects };
+		return applyReminderListEffect({ reminders, projects }, { kind: 'reorder', project: settled.project!, orderedIds: settled.orderedIds! });
 	}
 	const current = reminders.find(item => item.id === settled.recordId);
 	if (current ? !settled.previousRevision || current.revision !== settled.previousRevision : settled.previousRevision) return null;
-	if (settled.reminder) return { reminders: mergeReminderRecord(reminders, settled.reminder), projects: mergeProject(projects, settled.reminder.project) };
-	if (settled.kind === 'delete') return { reminders: reminders.filter(item => item.id !== settled.recordId), projects };
+	if (settled.reminder) return applyReminderListEffect({ reminders, projects }, { kind: 'upsert', record: settled.reminder });
+	if (settled.kind === 'delete') return applyReminderListEffect({ reminders, projects }, { kind: 'delete', recordId: settled.recordId! });
 	return null;
 }

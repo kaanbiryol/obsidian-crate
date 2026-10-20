@@ -47,3 +47,23 @@ export function mergeProject(projects: string[], project: string): string[] {
 	const normalized = project.trim() || 'Inbox';
 	return projects.includes(normalized) ? projects : [...projects, normalized].sort((a, b) => a.localeCompare(b));
 }
+
+export function mergeReminderRecord(reminders: ReminderRecord[], record: ReminderRecord): ReminderRecord[] {
+	return reminders.some(item => item.id === record.id)
+		? reminders.map(item => item.id === record.id ? record : item)
+		: [...reminders, record];
+}
+
+export type ReminderListEffect =
+	| { kind: 'upsert'; record: ReminderRecord }
+	| { kind: 'delete'; recordId: string }
+	| { kind: 'reorder'; project: string; orderedIds: string[] };
+
+export interface ReminderList { reminders: ReminderRecord[]; projects: string[] }
+
+/** The one way a confirmed, settled or pending change alters the visible list. */
+export function applyReminderListEffect(list: ReminderList, effect: ReminderListEffect): ReminderList {
+	if (effect.kind === 'upsert') return { reminders: mergeReminderRecord(list.reminders, effect.record), projects: mergeProject(list.projects, effect.record.project) };
+	if (effect.kind === 'delete') return { reminders: list.reminders.filter(item => item.id !== effect.recordId), projects: list.projects };
+	return { reminders: reorderProjectReminders(list.reminders, effect.project, effect.orderedIds), projects: list.projects };
+}

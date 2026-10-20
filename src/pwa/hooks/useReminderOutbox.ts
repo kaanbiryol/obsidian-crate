@@ -3,8 +3,7 @@ import { useSyncFailureToast } from './useSyncFailureToast';
 import { createReminderOutbox, reminderRetryAt } from '../reminders/outbox/reminder-outbox';
 import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from '../reminders/outbox/reminder-outbox-storage';
 import { capturePwaSession } from '../session-generation';
-import { mergeReminderRecord } from '../reminders/outbox/reminder-optimistic-state';
-import { mergeProject, reorderProjectReminders } from '../reminders/outbox/reminder-list-state';
+import { applyReminderListEffect } from '../reminders/outbox/reminder-list-state';
 import { createReminderSettlementChannel } from '../reminders/outbox/reminder-settlement';
 import { subscribeReminderOutboxEvents } from '../reminders/outbox/reminder-outbox-events';
 import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
@@ -70,13 +69,11 @@ export function useReminderOutbox(options: {
 				onSettled: () => { void optionsRef.current.loadReminders({ silent: true }); },
 				commit: async (change, result) => {
 					const current = optionsRef.current;
-					let { reminders, projects } = current.getSnapshot();
-					if (result.reminder) {
-						reminders = mergeReminderRecord(reminders, result.reminder);
-						projects = mergeProject(projects, result.reminder.project);
-					} else if (change.kind === 'delete') reminders = reminders.filter(item => item.id !== change.recordId);
-					else if (change.kind === 'reorder') reminders = reorderProjectReminders(reminders, change.project, change.orderedIds);
-					await current.commitReminderState(reminders, projects);
+					let list = current.getSnapshot();
+					if (result.reminder) list = applyReminderListEffect(list, { kind: 'upsert', record: result.reminder });
+					else if (change.kind === 'delete') list = applyReminderListEffect(list, { kind: 'delete', recordId: change.recordId });
+					else if (change.kind === 'reorder') list = applyReminderListEffect(list, change);
+					await current.commitReminderState(list.reminders, list.projects);
 					if (isCurrent()) settlement.publish(change, result);
 					if (isCurrent() && result.notificationWarning) current.showToast('info', `Saved. Notification sync failed: ${result.notificationWarning}`);
 					if (isCurrent() && change.kind === 'save' && !result.notificationWarning) {
