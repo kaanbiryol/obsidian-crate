@@ -73,7 +73,9 @@ it('allows scoped encryption discovery but rejects plaintext saves and sibling-f
   expect((await h.request('/sync/manifest')).status).toBe(403);
   expect((await h.request('/settings')).status).toBe(403);
   expect((await h.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example' }))).status).toBe(428);
-  expect((await h.request('/reading/encrypted-files?folderPath=Reminders')).status).toBe(403);
+  const sibling = await h.request('/reading/encrypted-files?folderPath=Reminders');
+  expect(sibling.status).toBe(403);
+  expect(await sibling.json()).toMatchObject({ error: 'Unknown encrypted Reading folder' });
   expect((await h.request('/reminders/encrypted-files?folderPath=Reminders')).status).toBe(403);
   const manifest = await worker.fetch(new Request('https://test/notifications/manifest.json'), env);
   expect(await manifest.text()).not.toContain('share_target');

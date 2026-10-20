@@ -4,7 +4,7 @@ import { ENCRYPTED_INVENTORY_PAGE } from '../../../encryption/file-inventory';
 import { fileFolderArgs } from '../sync/file-identity';
 import { corsHeaders, corsResponse } from '../cors';
 import { parseJsonObject, sanitizePath } from '../request-validation';
-import { readEncryptionState, prepareEncryptedFileCommit, EncryptionStateError } from '../encryption/state';
+import { readEncryptionState, prepareEncryptedFileCommit, EncryptionStateError } from './state';
 import { encryptionScopeForPath, type EncryptionServerState } from '../../../encryption/server-state';
 import { getStoredFileRow, storedObjectMatchesMetadata } from '../sync/storage';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
@@ -28,15 +28,20 @@ function scopedPath(value: unknown, folder: string, state: EncryptionServerState
 		&& scope && encryptionScopeForPath(state, path).id === scope.id ? path : null;
 }
 
-export async function handleEncryptedReminders(request: Request, env: Env, path: string, prefix = '/reminders', expectedFolder?: string): Promise<Response | null> {
+const FEATURE_LABELS = { reminders: 'reminders', reading: 'Reading' } as const;
+
+/** Serve encrypted note inventory, downloads and commits for the reminders and Reading apps. */
+export async function handleEncryptedFolderFiles(request: Request, env: Env, path: string, feature: keyof typeof FEATURE_LABELS = 'reminders', expectedFolder?: string): Promise<Response | null> {
+	const prefix = `/${feature}`;
+	const label = FEATURE_LABELS[feature];
 	if (![`${prefix}/encrypted-files`, `${prefix}/encrypted-file`, `${prefix}/encrypted-commit`].includes(path)) return null;
 	const state = await readEncryptionState(env.DB);
-	if (!state || state.mode !== 'active') throw new EncryptionStateError('Finish setting up encryption before using encrypted reminders');
-	if (path === `${prefix}/encrypted-commit` && request.method === 'POST') return commitReminderFiles(request, env, state, expectedFolder);
+	if (!state || state.mode !== 'active') throw new EncryptionStateError(`Finish setting up encryption before using encrypted ${label}`);
+	if (path === `${prefix}/encrypted-commit` && request.method === 'POST') return commitEncryptedFiles(request, env, state, expectedFolder);
 	if (request.method !== 'GET') return null;
 	const params = new URL(request.url).searchParams;
 	const folder = params.get('folderPath');
-	if (!folder || (expectedFolder && folder !== expectedFolder) || !state.scopes.some(scope => scope.folderPath === folder)) return corsResponse({ error: 'Unknown encrypted reminders folder' }, 403);
+	if (!folder || (expectedFolder && folder !== expectedFolder) || !state.scopes.some(scope => scope.folderPath === folder)) return corsResponse({ error: `Unknown encrypted ${label} folder` }, 403);
 	if (path === `${prefix}/encrypted-files`) {
 		const after = params.get('after') ?? '';
 		if (after.length > 1024) return corsResponse({ error: 'Invalid file cursor' }, 400);
@@ -59,16 +64,16 @@ export async function handleEncryptedReminders(request: Request, env: Env, path:
 	const filePath = scopedPath(params.get('path'), folder, state);
 	if (!filePath) return corsResponse({ error: 'File is outside this enrollment' }, 403);
 	const file = await getStoredFileRow(env.DB, filePath);
-	if (!file) return corsResponse({ error: 'Reminder file not found' }, 404);
-	if (params.get('revision') && params.get('revision') !== file.storageKey) return corsResponse({ error: 'Reminder file changed', code: 'version_conflict' }, 409);
-	if (file.size > MAX_WEB_FILE_BYTES) return corsResponse({ error: 'This note is too large for the reminders app' }, 413);
+	if (!file) return corsResponse({ error: 'Note not found' }, 404);
+	if (params.get('revision') && params.get('revision') !== file.storageKey) return corsResponse({ error: 'Note changed', code: 'version_conflict' }, 409);
+	if (file.size > MAX_WEB_FILE_BYTES) return corsResponse({ error: `This note is too large for the ${label} app` }, 413);
 	const object = await env.BUCKET.get(file.storageKey);
-	if (!object || !storedObjectMatchesMetadata(object, file)) return corsResponse({ error: 'Reminder file is unavailable' }, 503);
+	if (!object || !storedObjectMatchesMetadata(object, file)) return corsResponse({ error: 'Note is unavailable' }, 503);
 	return new Response(object.body, { headers: { ...corsHeaders(), 'Content-Type': 'application/vnd.crate.encrypted-file',
 		'Content-Length': String(file.size), 'Cache-Control': 'private, no-store', 'X-File-Hash': file.hash, 'X-Crate-Revision': file.storageKey } });
 }
 
-async function commitReminderFiles(request: Request, env: Env, state: EncryptionServerState, expectedFolder?: string): Promise<Response> {
+async function commitEncryptedFiles(request: Request, env: Env, state: EncryptionServerState, expectedFolder?: string): Promise<Response> {
 	const parsed = await parseJsonObject(request, MAX_ENCRYPTED_REMINDER_REQUEST_BYTES);
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
@@ -112,7 +117,7 @@ async function commitReminderFiles(request: Request, env: Env, state: Encryption
 		// A concurrent copy may have committed the same immutable attempt.
 		const replay = await beginReminderOperation(env.DB, body, 'encrypted-files');
 		if (replay instanceof Response) return replay;
-		if (error instanceof FileVersionConflictError) return corsResponse({ error: 'A reminder note changed. Refresh before retrying.', code: 'version_conflict' }, 409);
+		if (error instanceof FileVersionConflictError) return corsResponse({ error: 'A note changed. Refresh before retrying.', code: 'version_conflict' }, 409);
 		throw error;
 	}
 }

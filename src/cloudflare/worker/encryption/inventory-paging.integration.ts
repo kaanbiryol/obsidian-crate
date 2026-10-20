@@ -8,7 +8,7 @@ import { createEncryptionState } from '../../../encryption/server-state';
 import { ENCRYPTED_INVENTORY_PAGE } from '../../../encryption/file-inventory';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { ENCRYPTION_STATE_KEY } from './state';
-import { handleEncryptedReminders } from '../reminders/encrypted-reminders';
+import { handleEncryptedFolderFiles } from './encrypted-folder-files';
 import { meterD1Usage } from '../d1-usage';
 
 const FILES = 2500;
@@ -34,7 +34,7 @@ async function seed(): Promise<string[]> {
 async function page(after?: string) {
 	const meter = meterD1Usage(env.DB);
 	const query = new URLSearchParams({ folderPath: 'Reminders', ...(after ? { after } : {}) });
-	const response = await handleEncryptedReminders(new Request(`https://test/reminders/encrypted-files?${query}`), { ...env, DB: meter.db }, '/reminders/encrypted-files');
+	const response = await handleEncryptedFolderFiles(new Request(`https://test/reminders/encrypted-files?${query}`), { ...env, DB: meter.db }, '/reminders/encrypted-files');
 	const body = await response!.json() as { files: Array<{ path: string }>; nextCursor: string | null };
 	return { ...body, rowsRead: meter.usage.rowsRead };
 }

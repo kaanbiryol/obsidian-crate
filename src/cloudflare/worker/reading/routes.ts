@@ -1,6 +1,6 @@
 import { readEncryptedReceipt } from '../encryption/receipt-storage';
 import { readEncryptionState } from '../encryption/state';
-import { handleEncryptedReminders } from '../reminders/encrypted-reminders';
+import { handleEncryptedFolderFiles } from '../encryption/encrypted-folder-files';
 import { issueShortcutPairing, exchangeShortcutPairing } from './shortcut-pairing';
 import { shortcutTransport, validateShortcutBody } from './shortcut-transport';
 import { armNotificationCoordinator } from '../notifications/lifecycle';
@@ -35,7 +35,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
         const scope = encryption?.scopes.find(scope => scope.folderPath === current.folder_path);
         return readingResponse({ envelope: legacy?.scopes.find(item => item.id === scope?.id)?.envelope ?? null });
       }
-      return await handleEncryptedReminders(request, env, path, '/reading', current.folder_path) ?? readingResponse({ error: 'Not found' }, 404);
+      return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path) ?? readingResponse({ error: 'Not found' }, 404);
     }
     if (encryption && (shortcut?.kind === 'prepare' || ['/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
     if (path === '/reading/encryption' && request.method === 'GET' && principal) {

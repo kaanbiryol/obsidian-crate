@@ -16,7 +16,7 @@ import { mutationAuditContext } from './request-diagnostics';
 import { handleLinkTitle } from './link-title';
 import { apiRoutePolicy } from './routes/policy';
 import { handleEncryptionRoute } from './routes/encryption';
-import { handleEncryptedReminders } from './reminders/encrypted-reminders';
+import { handleEncryptedFolderFiles } from './encryption/encrypted-folder-files';
 import { handleEncryptionReset } from './encryption/reset';
 import { handleEncryptionConversion } from './encryption/conversion';
 import type { EncryptionServerState } from '../../encryption/server-state';
@@ -84,7 +84,7 @@ export async function handleAuthenticatedRoute(
 	return await handleEncryptionReset(request, env, path, principal)
 		?? (principal.scope === 'vault' ? await handleEncryptionConversion(request, env, path) : null)
 		?? await handleEncryptionRoute(request, db, path, principal, encryption)
-		?? await handleEncryptedReminders(request, env, path)
+		?? await handleEncryptedFolderFiles(request, env, path)
 		?? await handleSyncRoute(request, env, uploadCommitters, path, method, resetGeneration, mutationAuditContext(request, principal, requestId), encryption)
 		?? await handleAuthRoute(request, env, path, method)
 		?? await handleRemindersRoute(request, env, path, method)
