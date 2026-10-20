@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { PwaThemeContext } from '../hooks/usePwaColorScheme';
-import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from '@/cloudflare/worker/pwa/pwa-params';
+import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from '@/pwa/shell/pwa-params';
 import {
 	lightThemeMediaForPreference,
 	loadPwaThemePreference,
@@ -13,7 +13,7 @@ import {
 	savePwaThemePreference,
 	type PwaColorScheme,
 	type PwaThemePreference,
-} from '../theme';
+} from '../shell/theme';
 
 function applyPwaColorScheme(preference: PwaThemePreference, colorScheme: PwaColorScheme): void {
 	const isLight = colorScheme === 'light';

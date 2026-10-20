@@ -9,8 +9,8 @@ import {
 	createPwaHtml,
 	createPwaVersionJson,
 } from './index';
-import { PWA_ASSET_VERSION } from './version';
-import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
+import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
+import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from '../../../pwa/shell/pwa-params';
 import statusStyles from '../../../../site/assets/status.css?raw-css';
 
 describe('PWA activation metadata', () => {

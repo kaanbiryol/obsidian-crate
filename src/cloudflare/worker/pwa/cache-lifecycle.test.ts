@@ -1,7 +1,7 @@
 import { Script } from 'node:vm';
 import { expect, it, vi } from 'vitest';
 import { SERVICE_WORKER_JS } from './index';
-import { PWA_ASSET_VERSION } from './version';
+import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 
 it('waits for explicit activation and retains assets for every live client version', async () => {
 	const handlers = new Map<string, (event: Record<string, unknown>) => void>();

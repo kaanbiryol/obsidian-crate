@@ -1,7 +1,7 @@
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import release from '../../server-release.json';
-import { PWA_ASSET_VERSION } from '../pwa/version';
+import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 import { ReadingError } from './common';
 import { isSha256Hex } from '@/platform/validation';
 

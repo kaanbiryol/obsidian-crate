@@ -1,5 +1,5 @@
 import { readEncryptionState } from '../encryption/state';
-import { readingShareFallback } from '../reading/share-target';
+import { readingShareFallback } from '../../../pwa/shell/share-target';
 import { readingSavePage, readingSaveScript } from '../reading/save-page';
 import {
 	handleExchangeRemindersEnrollmentToken,

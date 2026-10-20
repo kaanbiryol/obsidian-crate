@@ -1,6 +1,6 @@
 import { pwaSyncState } from '../sync/state';
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa/version';
+import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { fetchPwaAssetVersion } from '../api';
 import { usePwaUpdate } from '../hooks/usePwaUpdate';
 import { useToast } from '../hooks/useToast';

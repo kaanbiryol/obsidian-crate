@@ -1,4 +1,4 @@
-import { pwaStartSearchFromUrl } from '../cloudflare/worker/pwa/pwa-params';
+import { pwaStartSearchFromUrl } from './shell/pwa-params';
 import { isSha256Hex } from '../platform/validation';
 export { stringDigest as enrollmentFingerprint } from './string-digest';
 

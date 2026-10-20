@@ -3,7 +3,7 @@ import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker, { ReminderAlarm } from './index';
-import { PWA_ASSET_VERSION } from './pwa/version';
+import { PWA_ASSET_VERSION } from '../../pwa/shell/version';
 import { CRATE_SERVER_INFO } from './server-info';
 import type { Env } from './types';
 

@@ -1,5 +1,5 @@
-import { PWA_ASSET_VERSION } from './version';
-import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR, pwaStartSearchFromUrl } from './pwa-params';
+import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
+import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR, pwaStartSearchFromUrl } from '../../../pwa/shell/pwa-params';
 
 export function createManifestJson(requestUrl?: string, encrypted = false): string {
 	return JSON.stringify({

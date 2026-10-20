@@ -1,6 +1,6 @@
 import { DEVELOPMENT_BUILD } from '../../protocol/server-build';
 import { SHARED_CHECKPOINT_CAPABILITY } from '../../protocol/history-checkpoints';
-import { PWA_ASSET_VERSION } from './pwa/version';
+import { PWA_ASSET_VERSION } from '../../pwa/shell/version';
 import release from '../server-release.json';
 import type { Env } from './types';
 import { BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';

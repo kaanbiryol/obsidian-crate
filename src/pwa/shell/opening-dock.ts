@@ -1,8 +1,8 @@
-import { normalizeDockTabs, applyOpeningDockPreferences, dockDestinationIndex } from './dock-preferences';
-import { PWA_PREFERENCES_KEY } from './preferences';
-import { resolvePwaOpeningDestination } from './opening-destination';
+import { normalizeDockTabs, applyOpeningDockPreferences, dockDestinationIndex } from '../dock-preferences';
+import { PWA_PREFERENCES_KEY } from '../preferences';
+import { resolvePwaOpeningDestination } from '../opening-destination';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
-import type { StartTab } from './types';
+import type { StartTab } from '../types';
 
 // Static, build-owned chrome for the HTML shell and React loading screens.
 // The SVG paths match the Lucide icons in PwaDock; browser coverage compares

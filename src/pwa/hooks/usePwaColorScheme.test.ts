@@ -7,7 +7,7 @@ import {
 	preferredPwaColorScheme,
 	resolvePwaColorScheme,
 	savePwaThemePreference,
-} from '../theme';
+} from '../shell/theme';
 
 describe('preferredPwaColorScheme', () => {
 	it('uses the light scheme when the system prefers light', () => {

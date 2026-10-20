@@ -1,7 +1,7 @@
 import React from 'react';
 import { ExternalLink, RefreshCw, Link2Off, WifiOff, TriangleAlert } from 'lucide-react';
 import { PwaButton as Button } from './PwaButton';
-import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa/version';
+import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { isStandaloneApp } from '../config';
 import { FeatureSwitcherButton } from './FeatureSwitcherButton';
 import type { ConnectionIssue } from '../connection/issues';

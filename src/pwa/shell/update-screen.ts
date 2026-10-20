@@ -1,4 +1,4 @@
-import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa/version';
+import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 
 // Build-owned markup shared by React's launch splash and the pre-JS reload
 // curtain. Keep this free of user content so both screens paint identically.

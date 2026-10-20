@@ -58,7 +58,7 @@ Dock morphs use the shared collapsed height.
   system-theme and cross-tab subscriptions, theme preferences, document colors,
   the light stylesheet, and browser theme-color metadata. `usePwaColorScheme`
   only reads that shared context. Keep the early launch theme in the HTML shell
-  and the parsing/persistence helpers in `src/pwa/theme.ts` so first paint stays
+  and the parsing/persistence helpers in `src/pwa/shell/theme.ts` so first paint stays
   correct before React loads.
 - `src/ui/shared/styles/_list-item.scss` owns the surface, interaction states,
   primary spacing, and title typography shared by reminder and Reading items.
@@ -508,7 +508,7 @@ the page backdrop has no gradient that can show through during mounting.
 `scripts/pwa-startup-empty-test.mjs` samples launch frames with delayed JavaScript
 and data in both engines, including saved themes opposite to the system theme.
 The initial HTML includes the selected title, settings icon, bottom dock, and
-a small, muted content loading indicator. `src/pwa/opening-screen.ts` and `opening-dock.ts` supply the
+a small, muted content loading indicator. `src/pwa/shell/opening-screen.ts` and `opening-dock.ts` supply the
 same appearance while the app module, session, and update check load. The cached
 HTML stays free of account data; nonce-authorized bootstraps resolve the current
 URL and saved default tab before app.js. Browser checks delay scripts, session

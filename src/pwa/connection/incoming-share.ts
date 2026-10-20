@@ -5,7 +5,7 @@ import { readingUrl } from '@/reading/core/model';
 export async function preserveIncomingShare(current: () => boolean): Promise<void> {
   const incoming = pendingReadingCapture();
   if (!incoming) return;
-  const { receiveReadingShare } = await import('@/cloudflare/worker/reading/share-target');
+  const { receiveReadingShare } = await import('@/pwa/shell/share-target');
   if (!current()) return;
   const saved = await receiveReadingShare(new Request(location.origin + '/notifications/share/reading', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

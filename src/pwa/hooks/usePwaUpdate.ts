@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { startAutoPwaUpdate } from '../auto-update';
 import { applyPwaUpdate, preparePwaUpdate } from '../apply-update';
-import { advancePwaUpdateProgress, finishPwaUpdateTransition, preparePwaUpdateTransition, showPwaUpdateTransition } from '../update-transition';
+import { advancePwaUpdateProgress, finishPwaUpdateTransition, preparePwaUpdateTransition, showPwaUpdateTransition } from '../shell/update-transition';
 import { whenUpdateLayoutSettles } from '../update-layout-readiness';
 import type { ShowToast } from '../types';
 

@@ -1,5 +1,5 @@
 import type { ServiceWorkerConfig } from '../../../pwa/service-worker/config';
-import { PWA_ASSET_VERSION } from './version';
+import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 import { PWA_CLIENT_ASSETS, PWA_ON_DEMAND_ASSETS } from './client-bundle';
 
 declare const __CRATE_SERVICE_WORKER_JS__: string | undefined;

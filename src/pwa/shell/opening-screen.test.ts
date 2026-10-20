@@ -2,7 +2,7 @@ import { Script } from 'node:vm';
 import { parseHTML } from 'linkedom';
 import { expect, it } from 'vitest';
 import { PWA_OPENING_DOCK_INIT_JS } from './opening-dock';
-import { resolvePwaOpeningDestination } from './opening-destination';
+import { resolvePwaOpeningDestination } from '../opening-destination';
 import { createPwaOpeningScreenHtml, PWA_OPENING_SCREEN_INIT_JS } from './opening-screen';
 
 it.each([

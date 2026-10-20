@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type ReactNode, type SetStateAction } from 'react';
-import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa/version';
+import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { makeApiFetch, registerPwaServiceWorker } from '../api';
 import { onConnectionExpired } from './expiration';
 import type { ConnectionIssue } from './issues';

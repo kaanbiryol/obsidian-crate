@@ -1,4 +1,4 @@
-import { receiveReadingShare } from '../../cloudflare/worker/reading/share-target';
+import { receiveReadingShare } from '../shell/share-target';
 import { decryptPushDisplay } from '../encrypted-push';
 import type { ServiceWorkerConfig } from './config';
 

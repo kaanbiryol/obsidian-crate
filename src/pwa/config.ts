@@ -1,5 +1,5 @@
 import type { StartTab, StoredConfig } from './types';
-import { manifestHrefForUrl } from '../cloudflare/worker/pwa/pwa-params';
+import { manifestHrefForUrl } from './shell/pwa-params';
 import { clearInstallEnrollment, preserveInstallEnrollment, restoreInstallEnrollment } from './install-enrollment';
 
 export const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';

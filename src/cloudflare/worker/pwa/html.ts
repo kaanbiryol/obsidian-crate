@@ -1,18 +1,18 @@
 import { PWA_THEME_INIT_JS, PWA_THEME_STYLES_JS } from './theme-bootstrap';
 import { PWA_STATUS_BAR_INIT_JS } from './status-bar-bootstrap';
-import { PWA_ASSET_VERSION, PWA_ASSET_VERSION_META } from './version';
+import { PWA_ASSET_VERSION, PWA_ASSET_VERSION_META } from '../../../pwa/shell/version';
 import { PWA_STARTUP_ASSETS } from './client-bundle';
-import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
+import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from '../../../pwa/shell/pwa-params';
 import { PWA_LIGHT_THEME_STYLES, PWA_STYLES } from './styles';
-import { PWA_OPENING_DOCK_INIT_JS } from '../../../pwa/opening-dock';
-import { createPwaOpeningScreenHtml, PWA_OPENING_SCREEN_INIT_JS } from '../../../pwa/opening-screen';
-import { createPwaUpdateScreenHtml } from '../../../pwa/update-screen';
+import { PWA_OPENING_DOCK_INIT_JS } from '../../../pwa/shell/opening-dock';
+import { createPwaOpeningScreenHtml, PWA_OPENING_SCREEN_INIT_JS } from '../../../pwa/shell/opening-screen';
+import { createPwaUpdateScreenHtml } from '../../../pwa/shell/update-screen';
 import { CRATE_ICON_192_PNG } from './install-assets';
 import {
 	PWA_LIGHT_SCHEME_MEDIA,
 	PWA_LIGHT_THEME_STYLE_ID,
 	PWA_THEME_COLOR_META_ID,
-} from '../../../pwa/theme';
+} from '../../../pwa/shell/theme';
 
 // The reload curtain must paint its logo with the document, even before the
 // service worker responds to image requests. Keep these bytes out of app.js.

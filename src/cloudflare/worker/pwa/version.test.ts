@@ -10,17 +10,17 @@ it('reads the client asset version from the shell when the build omits it', asyn
 		? { getAttribute: (name: string) => name === 'content' ? 'shell-version' : null }
 		: null);
 	vi.stubGlobal('document', { querySelector });
-	const { PWA_ASSET_VERSION } = await import('./version');
+	const { PWA_ASSET_VERSION } = await import('../../../pwa/shell/version');
 	expect(PWA_ASSET_VERSION).toBe('shell-version');
 });
 
 it('publishes the asset version in the shell it serves', async () => {
 	const { createPwaHtml } = await import('./html');
-	const { PWA_ASSET_VERSION, PWA_ASSET_VERSION_META } = await import('./version');
+	const { PWA_ASSET_VERSION, PWA_ASSET_VERSION_META } = await import('../../../pwa/shell/version');
 	expect(createPwaHtml()).toContain(`<meta name="${PWA_ASSET_VERSION_META}" content="${PWA_ASSET_VERSION}">`);
 });
 
 it('falls back to a development version without a shell', async () => {
-	const { PWA_ASSET_VERSION } = await import('./version');
+	const { PWA_ASSET_VERSION } = await import('../../../pwa/shell/version');
 	expect(PWA_ASSET_VERSION).toBe('dev');
 });

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { PwaColorScheme, PwaThemePreference } from '../theme';
+import type { PwaColorScheme, PwaThemePreference } from '../shell/theme';
 
 interface PwaThemeState {
 	colorScheme: PwaColorScheme;

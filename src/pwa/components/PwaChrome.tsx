@@ -9,10 +9,10 @@ import {
 } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { DataMode } from '../types';
-import { createPwaOpeningScreenHtml } from '../opening-screen';
+import { createPwaOpeningScreenHtml } from '../shell/opening-screen';
 import { resolvePwaOpeningDestination } from '../opening-destination';
 import { loadPwaPreferences } from '../preferences';
-import { createPwaUpdateScreenHtml } from '../update-screen';
+import { createPwaUpdateScreenHtml } from '../shell/update-screen';
 import { IconButton } from '@/ui/shared/IconButton';
 
 function PwaSettingsButton({
