@@ -1,10 +1,10 @@
-import { sha256Hex } from '../auth/crypto';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { OPERATION_VALID } from '../operation-expiry';
 import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
 import { ReadingError, readingResponse, type ReadingPolicy } from './common';
 import type { AuthPrincipal } from '../auth/authenticate';
 import type { CommitEffects } from '../commit-effects';
+import { sha256Hex } from '@/platform/sha256';
 
 export interface ReadingOperation { id: string; principal: string; generation: string; hash: string; day: number }
 export async function beginOperation(db: D1Database, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string) {

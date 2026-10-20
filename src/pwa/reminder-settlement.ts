@@ -1,4 +1,3 @@
-import { stringDigest } from './string-digest';
 import { isConfirmedReminder } from './reminder-change-request';
 import { mergeReminderRecord } from './reminder-optimistic-state';
 import { mergeProject, reorderProjectReminders } from './reminder-list-state';
@@ -7,6 +6,7 @@ import type { ReminderRecord } from './types';
 import { sealPrivateValue, openPrivateValue } from './private-storage';
 import { isReminderOperationId } from '../protocol/reminder-operation';
 import { REMINDER_OUTBOX_PREFIX } from './reminder-storage-keys';
+import { sha256Hex } from '../platform/sha256';
 
 interface ReminderSettlement {
 	version: 1;
@@ -24,7 +24,7 @@ const strings = (value: unknown): value is string[] => Array.isArray(value) && v
 
 /** Uses the same storage-event ordering as removing an acknowledged command. */
 export async function createReminderSettlementChannel(authToken: string, folderPath: string) {
-	const hash = await stringDigest(authToken);
+	const hash = await sha256Hex(authToken);
 	// Old clients ignore this reserved namespace, while their logout still erases it.
 	const key = `${REMINDER_OUTBOX_PREFIX}confirmed:${hash}:${encodeURIComponent(folderPath)}`;
 	return {

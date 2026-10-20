@@ -5,9 +5,9 @@ import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
-import { sha256Hex, sha256HexBytes } from '../auth/crypto';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { MAX_FILE_SIZE_BYTES } from '../../../protocol/sync-limits';
+import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => {
 	vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -31,7 +31,7 @@ it('round-trips the exact 25 MiB attachment boundary through authenticated Worke
 	{ timeout: 120_000 }, async () => {
 		const content = new Uint8Array(MAX_FILE_SIZE_BYTES);
 		for (let offset = 0; offset < content.length; offset += 1024) content[offset] = (offset / 1024) % 251;
-		const hash = await sha256HexBytes(content);
+		const hash = await sha256Hex(content);
 		const uploaded = await request('/sync/upload?path=attachment.bin', { method: 'PUT', body: content,
 			headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', 'X-File-Size': String(content.length), 'X-File-Hash': hash } });
 		expect(uploaded.status).toBe(200);
@@ -40,7 +40,7 @@ it('round-trips the exact 25 MiB attachment boundary through authenticated Worke
 		expect(downloaded.status).toBe(200);
 		const body = await downloaded.arrayBuffer();
 		expect(body.byteLength).toBe(MAX_FILE_SIZE_BYTES);
-		expect(await sha256HexBytes(body)).toBe(hash);
+		expect(await sha256Hex(body)).toBe(hash);
 	});
 
 it('rejects an undeclared streamed byte over the attachment limit without touching the previous incarnation',

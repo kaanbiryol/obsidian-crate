@@ -1,4 +1,4 @@
-import { sha256Hex } from './crypto';
+import { sha256Hex } from '../../../platform/sha256';
 
 interface Budget { expires: number; count: number }
 interface AdmissionState { credentials: Map<string, number>; budgets: Map<string, Budget>; overflow: Budget }

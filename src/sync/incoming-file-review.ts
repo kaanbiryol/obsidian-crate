@@ -1,7 +1,7 @@
 import type { Vault } from 'obsidian';
 import { getIncomingConflictFileName } from './conflict/conflict';
-import { computeHash } from './hasher';
 import type { RecordConflictInput } from './conflict/store';
+import { sha256Hex } from '../platform/sha256';
 
 export class IncomingFileReviewError extends Error {}
 
@@ -13,10 +13,10 @@ export async function preserveIncomingForReview(
 	localHash: string,
 	reason = 'This file needs manual review because it cannot be replaced atomically.',
 ): Promise<never> {
-	const hash = await computeHash(content);
+	const hash = await sha256Hex(content);
 	let copy = getIncomingConflictFileName(path, hash);
 	for (let variant = 0; await context.vault.adapter.exists(copy); variant++) {
-		if (await computeHash(await context.vault.adapter.readBinary(copy)) === hash) break;
+		if (await sha256Hex(await context.vault.adapter.readBinary(copy)) === hash) break;
 		if (variant >= 100) throw new IncomingFileReviewError('Too many edited incoming copies. Review them before syncing this file again.');
 		copy = getIncomingConflictFileName(path, hash, variant + 1);
 	}

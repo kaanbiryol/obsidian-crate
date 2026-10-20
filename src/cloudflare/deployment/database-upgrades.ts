@@ -1,6 +1,6 @@
 import release from '../server-release.json';
-import { sha256Hex } from './artifacts';
 import { isSha256Hex } from '../../platform/validation';
+import { sha256Hex } from '../../platform/sha256';
 
 export interface DatabaseMigration {
   id: string;

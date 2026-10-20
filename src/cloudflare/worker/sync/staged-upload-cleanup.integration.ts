@@ -8,8 +8,8 @@ import { trackStagedUpload } from './staged-uploads';
 import { commitStagedFile } from './mutations';
 import { writeCommittedMarkdownFile } from '../storage';
 import { getStoredFileRow } from './storage';
-import { sha256Hex } from '../auth/crypto';
 import { createManagedObjectKey } from '../../../protocol/storage-keys';
+import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => {
   for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();

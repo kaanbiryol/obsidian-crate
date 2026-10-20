@@ -4,8 +4,8 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import currentSchema from '../schema.sql?raw';
 import { migrationTransaction, planDatabaseUpgrade, SERVER_RELEASE } from '../deployment/database-upgrades';
-import { sha256Hex } from '../deployment/artifacts';
 import { inspectDeploymentDatabase } from '../deployment/database';
+import { sha256Hex } from '../../platform/sha256';
 
 afterEach(reset);
 const statements = (sql: string) => sql.split(';').map(value => value.trim()).filter(Boolean).map(value => env.DB.prepare(value));

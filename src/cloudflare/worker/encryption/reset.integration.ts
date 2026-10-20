@@ -9,7 +9,6 @@ import worker from '../index';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
 import { createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { readEncryptionState } from './state';
-import { sha256Hex } from '../auth/crypto';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { handleUpload } from '../sync/file-handlers';
 import { getStoredFileRow } from '../sync/storage';
@@ -18,6 +17,7 @@ import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
+import { sha256Hex } from '../../../platform/sha256';
 
 const id = 'reset-operation', nextToken = 'b'.repeat(64);
 let state: EncryptionServerState;

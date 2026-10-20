@@ -1,7 +1,7 @@
 import { corsResponse } from '../cors';
-import { sha256Hex } from './crypto';
 import { queryRows } from '../db';
 import { parseJsonObject, parseOptionalString } from '../utils';
+import { sha256Hex } from '../../../platform/sha256';
 
 export async function handleRevokeToken(request: Request, db: D1Database): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -32,10 +32,7 @@ export async function handleRevokeCurrentToken(request: Request, db: D1Database)
 export async function handleListTokens(request: Request, db: D1Database): Promise<Response> {
 	const authHeader = request.headers.get('Authorization') || '';
 	const currentToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
-	const currentTokenHash = currentToken
-		? await crypto.subtle.digest('SHA-256', new TextEncoder().encode(currentToken)).then((hash) =>
-			Array.from(new Uint8Array(hash)).map((value) => value.toString(16).padStart(2, '0')).join(''))
-		: '';
+	const currentTokenHash = currentToken ? await sha256Hex(currentToken) : '';
 	const currentTokenRow = currentTokenHash
 		? await db.prepare('SELECT id FROM auth_tokens WHERE token_hash = ?').bind(currentTokenHash).first<{ id: string }>()
 		: null;

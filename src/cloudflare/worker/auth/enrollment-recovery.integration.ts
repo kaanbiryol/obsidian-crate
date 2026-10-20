@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import { handleExchangeRemindersEnrollmentToken } from '../notifications/enrollment-handlers';
 import { issueWebEnrollmentToken } from './web-enrollment';
-import { sha256Hex } from './crypto';
+import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { await reset(); });

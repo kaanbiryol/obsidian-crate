@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { migrationTransaction, planDatabaseUpgrade, validateMigrationHistory, SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
-import { sha256Hex } from './artifacts';
+import { sha256Hex } from '../../platform/sha256';
 
 const step: DatabaseMigration = { id: 'add-example', from: 1, to: 2, file: 'add-example.sql', checksum: 'a'.repeat(64) };
 const future = { revision: 2, minimumSchemaVersion: 1, schemaVersion: 2, migrations: [step] };

@@ -2,13 +2,13 @@ import { featureEnabled } from '../feature-policy';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
-import { sha256Hex } from '../auth/crypto';
 import { getStoredFileRow } from '../sync/storage';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import { MAX_READING_BYTES } from '@/reading/core/model';
 import { parseReadingNote } from '@/reading/core/notes';
 import { apiRoutePolicy } from '../routes/policy';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
+import { sha256Hex } from '@/platform/sha256';
 
 export interface ReadingPolicy { enabled: number; folder_path: string; generation: string; revision: string }
 /** Preparation and capability redemption must recognize the same issuer scopes. */

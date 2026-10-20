@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { createUpgradeCheckpoint, releaseUpgradeGuards, removeUpgradeGuards, upgradeGuards } from './upgrade-checkpoint';
 import { migrationTransaction, SERVER_RELEASE } from './database-upgrades';
-import { sha256Hex } from './artifacts';
 import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
 import type { DeploymentFence } from './fence';
+import { sha256Hex } from '../../platform/sha256';
 
 it('freezes old writers, verifies paired bytes, migrates atomically and restores an independently readable archive', async () => {
   const db = new DatabaseSync(':memory:'); db.exec(readFileSync('src/cloudflare/schema.sql', 'utf8'));

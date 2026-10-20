@@ -3,11 +3,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
-import { sha256Hex } from '../auth/crypto';
 import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
+import { sha256Hex } from '../../../platform/sha256';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {

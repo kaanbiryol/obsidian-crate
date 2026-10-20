@@ -4,7 +4,6 @@ import { BATCH_UPLOAD_MAX_BYTES, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-lim
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { corsResponse } from '../cors';
 import { parseJsonObject, sanitizePath } from '../utils';
-import { sha256HexBytes } from '../auth/crypto';
 import { readInitialImport } from './initial-import';
 import { loadStoredFileRows, parseExpectedFileHash } from './storage';
 import { trackStagedBatch, finishStagedBatches } from './staged-upload-batches';
@@ -12,6 +11,7 @@ import { uploadMutation } from './mutations';
 import { readLimitedRequestBody } from '../body-reader';
 import { isSha256Hex } from '@/platform/validation';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
+import { sha256Hex } from '@/platform/sha256';
 
 interface ImportFile {
   path: string; hash: string; size: number; content: ArrayBuffer;
@@ -64,7 +64,7 @@ export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db:
     } catch { return corsResponse({ error: 'Invalid import content' }, 400); }
     total += content.byteLength;
     if (content.byteLength > MAX_FILE_SIZE_BYTES || request.method !== 'PUT' && total > BATCH_UPLOAD_MAX_BYTES) return corsResponse({ error: 'Import payload too large' }, 413);
-    if (await sha256HexBytes(content) !== value.hash) return corsResponse({ error: 'Import content hash mismatch' }, 400);
+    if (await sha256Hex(content) !== value.hash) return corsResponse({ error: 'Import content hash mismatch' }, 400);
     files.push({ path, hash: value.hash, size: content.byteLength, content,
       contentType: typeof value.contentType === 'string' ? value.contentType : 'application/octet-stream', expectedHash });
   }

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { computeHash } from '../hasher';
 import { createHarness, toArrayBuffer } from './engine-test-harness';
+import { sha256Hex } from '../../platform/sha256';
 
 async function revertedEdit(lastSeq: number, mtime = 2000) {
 	const h = createHarness({ lastSeq, automaticSync: false });
 	const path = 'note.md';
 	const content = toArrayBuffer('original');
-	const entry = { hash: await computeHash(content), size: content.byteLength, modified: new Date(1000).toISOString() };
+	const entry = { hash: await sha256Hex(content), size: content.byteLength, modified: new Date(1000).toISOString() };
 	h.localManifest.setEntry(path, entry);
 	h.vault.getFiles.mockReturnValue([{ path, extension: 'md', stat: { size: content.byteLength, mtime } }]);
 	h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });

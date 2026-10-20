@@ -4,7 +4,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, type EncryptedFileDescriptor } from '../..
 import { encryptJson } from '../../encryption/envelope';
 import { createReminderProjection } from '../../encryption/reminder-projection';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 export interface ConversionFile { path: string; revision: string; hash: string; size: number; previous_descriptor?: string | null }
 export interface ConversionReceipt { operation_id: string; request_hash: string; response_json: string }
@@ -14,7 +14,7 @@ export async function prepareConversionFile(file: ConversionFile, body: ArrayBuf
 	let bytes: Uint8Array<ArrayBuffer>;
 	let plainHash: string;
 	// Original metadata is authoritative even if plaintext resembles our wire format.
-	const original = body.byteLength === file.size && await computeHash(body) === file.hash;
+	const original = body.byteLength === file.size && await sha256Hex(body) === file.hash;
 	if (file.previous_descriptor) {
 		const previousDescriptor = JSON.parse(file.previous_descriptor) as EncryptedFileDescriptor;
 		const previousAuthority = keys.forPriorScope(previousDescriptor.scopeId, previousDescriptor.keyId);

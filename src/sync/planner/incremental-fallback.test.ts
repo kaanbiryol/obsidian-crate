@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { computeHash } from '../hasher';
 import type { PreparedUpload } from '../types';
 import { runIncrementalSync } from './planner';
 import { createSettings } from './planner-test-harness';
 import { HttpError, SyncTransportError } from '../api';
+import { sha256Hex } from '../../platform/sha256';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({
 	getAllVaultFiles: vi.fn(),
@@ -78,7 +78,7 @@ it('falls back to full sync when cursor is expired', async () => {
 	it('reclassifies own queue uploads as local changes instead of conflicts', async () => {
 		const queueUploadHash = 'abc123';
 		const newLocalContent = new TextEncoder().encode('edited-after-queue').buffer;
-		const newLocalHash = await computeHash(newLocalContent);
+		const newLocalHash = await sha256Hex(newLocalContent);
 		const settings = createSettings({ lastSeq: 10 });
 		const localManifest = {
 			save: vi.fn(async () => {}),
@@ -163,7 +163,7 @@ it('falls back to full sync when cursor is expired', async () => {
 		const manifestHash = 'manifest-hash';
 		const remoteHash = 'other-device-hash';
 		const localContent = new TextEncoder().encode('local-edit').buffer;
-		const localHash = await computeHash(localContent);
+		const localHash = await sha256Hex(localContent);
 		const settings = createSettings({ lastSeq: 10 });
 		const localManifest = {
 			save: vi.fn(async () => {}),

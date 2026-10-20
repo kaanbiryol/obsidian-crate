@@ -3,7 +3,6 @@ import { trackStagedUploads } from './staged-uploads';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit, MAX_ENCRYPTED_FILE_BYTES } from '../../../encryption/file-format';
 import { EncryptionStateError, validateUploadEncryption } from '../encryption/state';
 import { beginUploadOperation } from './upload-operations';
-import { sha256HexBytes } from '../auth/crypto';
 import { exactArrayBuffer, readLimitedRequestBody } from '../body-reader';
 import { corsHeaders, corsResponse } from '../cors';
 import { parseJsonObject, parseOptionalString, sanitizePath } from '../utils';
@@ -23,6 +22,7 @@ import {
 } from './storage';
 import { isSha256Hex } from '../../../platform/validation';
 import { createManagedObjectKey } from '../../../protocol/storage-keys';
+import { sha256Hex } from '../../../platform/sha256';
 
 export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, committers: UploadCommitters, expectedEncryption?: EncryptionServerState | null, resetGeneration?: string | null): Promise<Response> {
 	const limit = fileTransportLimit(request.headers.get('Content-Type') ?? undefined);
@@ -67,7 +67,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 			return corsResponse({ error: 'File size does not match X-File-Size header' }, 400);
 		}
 
-		const computedHash = await sha256HexBytes(body);
+		const computedHash = await sha256Hex(body);
 		if (hashHeader && hashHeader !== computedHash) {
 			return corsResponse({ error: 'File hash does not match X-File-Hash header' }, 400);
 		}

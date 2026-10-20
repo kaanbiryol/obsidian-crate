@@ -1,4 +1,3 @@
-import { computeHash } from "../hasher";
 import { SkippedFileError, withSyncFileContext } from '../issues';
 import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from "../file-discovery";
 import { isVaultTFileLike } from '../planner/helpers';
@@ -13,6 +12,7 @@ import {
 } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import type { TransferContext } from "./types";
+import { sha256Hex } from '../../platform/sha256';
 
 const logger = createLogger("SyncTransfer");
 
@@ -53,7 +53,7 @@ export async function prepareUploadFromVaultFile(
 
     const hash = context.plannedContent
       ? await context.plannedContent.hash(file.path, content)
-      : await computeHash(content);
+      : await sha256Hex(content);
 
     if (!options?.force && context.localManifest.hashMatches(file.path, hash)) {
       context.localManifest.setEntry(file.path, {

@@ -7,10 +7,10 @@ import type { ApiHttpTransport } from '../../../sync/worker-api/http';
 import type { FileManifest } from '../../../protocol/sync-types';
 import { parseCheckpoint, type ManifestCheckpoint } from '../../../sync/manifest-checkpoint';
 import { replayManifestLog } from '../../../sync/manifest-log';
-import { sha256Hex } from '../auth/crypto';
 import worker from '../index';
 import type { Env } from '../types';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
+import { sha256Hex } from '@/platform/sha256';
 
 interface PausedResponse {
 	committed(): void;

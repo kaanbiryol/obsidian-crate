@@ -6,10 +6,10 @@ import type { LocalManifest } from './manifest';
 import { base64ToArrayBuffer } from './encoding';
 import { mergeUploadIntent, uploadWire, type IntendedUpload, type JournalUpload, type PrepareUploadWire } from './upload-intent';
 import { UNVERIFIED_MODIFIED } from './applied-content';
-import { computeHash } from './hasher';
 import type { UploadApplyPhase, UploadPhase } from './upload-diagnostics';
 import { HttpError } from './worker-api/http';
 import type { UploadPreconditions } from './encryption/encrypted-files';
+import { sha256Hex } from '@/platform/sha256';
 
 interface UploadTransport {
 	requiresLegacyUploadRecovery?(file: JournalUpload): boolean;
@@ -193,7 +193,7 @@ export class DurableUploads {
 	private async trace(file: JournalUpload, phase: UploadPhase): Promise<void> {
 		this.manifest.recordUploadDiagnostic({ clientSession: phase === 'prepared' ? file.origin.clientSession : this.clientSession,
 			...(phase === 'prepared' ? { at: file.origin.at } : {}), operationId: file.operationId, phase, kind: file.intent.kind,
-			pathHash: await computeHash(new TextEncoder().encode(file.path).buffer), uploadHash: file.hash,
+			pathHash: await sha256Hex(new TextEncoder().encode(file.path).buffer), uploadHash: file.hash,
 			baseHash: file.intent.kind === 'merge' ? file.intent.preimage.hash : file.hash });
 	}
 
@@ -202,7 +202,7 @@ export class DurableUploads {
 	async recordMergeApplication(path: string, hash: string, phase: UploadApplyPhase): Promise<void> {
 		const rows = this.manifest.getUploadDiagnostics();
 		if (!rows.some(row => row.kind === 'merge')) return;
-		const pathHash = await computeHash(new TextEncoder().encode(path).buffer);
+		const pathHash = await sha256Hex(new TextEncoder().encode(path).buffer);
 		const prior = rows.reverse().find(row => row.kind === 'merge' && row.pathHash === pathHash);
 		if (!prior || prior.appliedHash || prior.phase === 'rejected' || !rows.some(row => row.operationId === prior.operationId && row.phase === 'remote-committed')) return;
 		this.manifest.recordUploadDiagnostic({ ...prior, at: undefined, clientSession: this.clientSession, phase,

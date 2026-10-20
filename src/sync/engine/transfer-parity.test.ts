@@ -2,12 +2,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import type { BatchUploadFile, FileEntry } from '../../protocol/sync-types';
 import { createPersistentEngineHarness } from './engine-persistence-test-harness';
-import { computeHash } from '../hasher';
 import { pendingChangeKey } from '../pending-change';
 import type { ApiHttpResponse, ApiHttpTransport } from '../worker-api/http';
 import { formatSyncProgress } from '../../ui/activity/progress-label';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import type { SyncResult } from '../types';
+import { sha256Hex } from '../../platform/sha256';
 
 beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal('window', { setTimeout, clearTimeout }); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -19,7 +19,7 @@ function response(value: unknown): ApiHttpResponse {
 
 it.each(['selected', 'full', 'incremental', 'automatic', 'force'] as const)('shares batched uploads, guarded deletes and progress in %s sync', async mode => {
 	const content = new TextEncoder().encode('local edit').buffer;
-	const base: FileEntry = { hash: await computeHash(new TextEncoder().encode('base').buffer), revision: 'original', size: 4, modified: new Date(1).toISOString() };
+	const base: FileEntry = { hash: await sha256Hex(new TextEncoder().encode('base').buffer), revision: 'original', size: 4, modified: new Date(1).toISOString() };
 	const uploads = Array.from({ length: 10 }, (_, i) => `edit-${i}.md`);
 	const deletes = Array.from({ length: 9 }, (_, i) => `old-${i}.md`);
 	const remote: Record<string, FileEntry> = Object.fromEntries([...uploads, ...deletes].map(path => [path, base]));

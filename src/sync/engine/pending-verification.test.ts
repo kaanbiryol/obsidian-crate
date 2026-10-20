@@ -1,10 +1,10 @@
 import { pendingChangeKey } from '../pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { computeHash } from '../hasher';
 import { arrayBufferToBase64 } from '../encoding';
 import { createHarness, createSyncResult, spyOnIncrementalSync, toArrayBuffer, type Harness } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { sha256Hex } from '../../platform/sha256';
 
 let h: Harness;
 const path = '.vault-config/app.json';
@@ -15,7 +15,7 @@ beforeEach(async () => {
 	vi.useFakeTimers();
 	h = createHarness({ automaticSync: false });
 	h.localManifest.setEntry(path, {
-		hash: await computeHash(original), size: original.byteLength,
+		hash: await sha256Hex(original), size: original.byteLength,
 		modified: new Date(1000).toISOString(), revision: 'remote-revision',
 	});
 	h.vault.adapter.stat.mockResolvedValue(stat);
@@ -26,7 +26,7 @@ beforeEach(async () => {
 afterEach(() => { h.engine.destroy(); vi.useRealTimers(); });
 
 async function pendingUpload(path: string) {
-	await h.localManifest.uploadJournal.prepare([{ path, hash: await computeHash(original), size: original.byteLength,
+	await h.localManifest.uploadJournal.prepare([{ path, hash: await sha256Hex(original), size: original.byteLength,
 		content: arrayBufferToBase64(original), contentType: 'application/json', expectedHash: null, intent: { kind: 'local' } }], Math.floor(Date.now() / 86_400_000));
 }
 
@@ -97,7 +97,7 @@ it('keeps a real edit pending even when size and timestamp match the checkpoint'
 
 it('hashes binary files without relying on a text preview', async () => {
 	const bytes = new Uint8Array([255, 0, 128]).buffer;
-	h.localManifest.setEntry('image.png', { hash: await computeHash(bytes), size: 3, modified: '' });
+	h.localManifest.setEntry('image.png', { hash: await sha256Hex(bytes), size: 3, modified: '' });
 	h.vault.adapter.stat.mockResolvedValue({ ...stat, size: 3 });
 	h.vault.adapter.readBinary.mockResolvedValue(bytes);
 	touch('image.png');

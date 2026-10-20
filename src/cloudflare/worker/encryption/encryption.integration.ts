@@ -24,13 +24,13 @@ import { parseEncryptedNotification } from '../../../encryption/notification-for
 import { handleEncryptionRoute } from '../routes/encryption';
 import { CONVERSION_SWEEP_PAGE_SIZE, handleEncryptionConversion } from './conversion';
 import { meterD1Usage } from '../d1-usage';
-import { sha256Hex } from '../auth/crypto';
 import { encryptJson } from '../../../encryption/envelope';
 import { openFile } from '../../../encryption/file-codec';
 import { readEncryptionState } from './state';
 import { handleCheckChanges } from '../sync/metadata-handlers';
 import worker from '../index';
 import { createManagedObjectKey } from '../../../protocol/storage-keys';
+import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });

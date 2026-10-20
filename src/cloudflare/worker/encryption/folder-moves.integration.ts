@@ -4,7 +4,6 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
-import { sha256Hex } from '../auth/crypto';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, moveEncryptionScopes, openRecoveryBundle } from '../../../encryption/key-bundle';
 import { convertEncryptedVault, readServerEncryption } from '../../../sync/encryption/conversion';
 import { WorkerApiHttpClient, type ApiHttpTransport } from '../../../sync/worker-api/http';
@@ -14,7 +13,6 @@ import { FileKeyAuthority } from '../../../encryption/file-authority';
 import { SyncWorkerApi } from '../../../sync/worker-api/sync';
 import { EncryptedFiles } from '../../../sync/encryption/encrypted-files';
 import { arrayBufferToBase64 } from '../../../sync/encoding';
-import { computeHash } from '../../../sync/hasher';
 import type { JournalUpload } from '../../../sync/upload-intent';
 import type { RestoreIntent } from '../../../sync/restore-intent';
 import { openFile, sealFile } from '../../../encryption/file-codec';
@@ -22,6 +20,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { createReminderProjection } from '../../../encryption/reminder-projection';
 import { EncryptedReadingApi } from '../../../pwa/reading/encrypted-api';
 import { createReadingNote } from '../../../reading/core/notes';
+import { sha256Hex } from '../../../platform/sha256';
 
 
 beforeEach(async () => {
@@ -125,7 +124,7 @@ it('settles accepted uploads and restores from their original receipts after a f
   const transport = new SyncWorkerApi(h.http); transport.setEncryption(oldEncryption);
   const pending = async (path: string): Promise<JournalUpload> => {
     const bytes = new TextEncoder().encode('Private queued content').buffer;
-    const file: JournalUpload = { path, content: arrayBufferToBase64(bytes), hash: await computeHash(bytes), size: bytes.byteLength,
+    const file: JournalUpload = { path, content: arrayBufferToBase64(bytes), hash: await sha256Hex(bytes), size: bytes.byteLength,
       contentType: 'text/markdown', expectedHash: null, intent: { kind: 'local' }, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)),
       origin: { clientSession: crypto.randomUUID(), at: new Date().toISOString() } };
     file.encryptedWire = await oldEncryption.prepare(file); return file;

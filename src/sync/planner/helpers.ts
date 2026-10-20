@@ -2,7 +2,7 @@ import { assertLocalSyncPath } from '../local-path-safety';
 import type { Stat, TAbstractFile, TFile } from "obsidian";
 import { isHiddenPath } from "../file-discovery";
 import type { Vault } from "obsidian";
-import { computeHash } from "../hasher";
+import { sha256Hex } from '../../platform/sha256';
 
 export function isVaultTFileLike(file: TAbstractFile | null): file is TFile {
   return typeof file === "object"
@@ -47,7 +47,7 @@ async function readDeleteSnapshot(context: LocalDeleteContext, path: string): Pr
   if ((!visibleFile || isHiddenPath(path)) && stat?.type !== 'file') throw changedTarget();
 
   try {
-    const hash = await computeHash(await context.vault.adapter.readBinary(path));
+    const hash = await sha256Hex(await context.vault.adapter.readBinary(path));
     return { hash, ...(visibleFile && !isHiddenPath(path) ? { visibleFile } : {}), ...(stat ? { stat } : {}) };
   } catch (error) {
     if (!await context.vault.adapter.exists(path)) {

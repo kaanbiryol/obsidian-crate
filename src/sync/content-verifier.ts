@@ -4,7 +4,7 @@ import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { UNVERIFIED_MODIFIED } from './applied-content';
 import type { VaultFile } from './file-discovery';
-import { computeHash } from './hasher';
+import { sha256Hex } from '../platform/sha256';
 
 export const VERIFICATION_FILE_BUDGET = 32;
 export const VERIFICATION_BYTE_BUDGET = 8 * 1024 * 1024;
@@ -101,7 +101,7 @@ export class LocalContentVerifier {
 				const entry = manifest.getEntry(file.path);
 				if (!entry || Date.parse(entry.modified) !== file.mtime || entry.size !== file.size) continue;
 				const content = await withSyncFileContext(file.path, () => vault.adapter.readBinary(file.path));
-				const hash = await computeHash(content);
+				const hash = await sha256Hex(content);
 				signal.throwIfAborted();
 				if (manifest.getEntry(file.path) !== entry) continue;
 				if (hash !== entry.hash) {

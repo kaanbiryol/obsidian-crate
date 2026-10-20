@@ -1,10 +1,10 @@
 import type { AuthPrincipal } from '../auth/authenticate';
-import { sha256Hex } from '../auth/crypto';
 import { changedRows } from '../db';
 import { limitNotificationAction } from '../rate-limit';
 import { ReadingError, readingResponse, type ReadingPolicy } from './common';
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
 import { isSha256Hex } from '@/platform/validation';
+import { sha256Hex } from '@/platform/sha256';
 
 const secret = () => `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, '');
 const invalidPairing = () => new ReadingError('This pairing code expired or was already used. Create a new code in Reading settings.', 410);

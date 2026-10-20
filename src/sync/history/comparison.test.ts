@@ -1,12 +1,12 @@
 import { expect, it, vi } from 'vitest';
 import { compareHistorySnapshots, type HistorySnapshot } from './comparison';
-import { computeHash } from '../hasher';
 import type { FileEntry } from '../../protocol/sync-types';
+import { sha256Hex } from '../../platform/sha256';
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 async function snapshot(values: Record<string, string>) {
     const read = vi.fn(async (path: string) => bytes(values[path]!));
     const files: Record<string, FileEntry> = Object.fromEntries(await Promise.all(Object.entries(values).map(async ([path, text]) => [path, {
-        hash: await computeHash(bytes(text)), size: bytes(text).byteLength, modified: '2026-09-20', revision: text,
+        hash: await sha256Hex(bytes(text)), size: bytes(text).byteLength, modified: '2026-09-20', revision: text,
     }] as const)));
     return { files, read } satisfies HistorySnapshot;
 }
@@ -36,7 +36,7 @@ it('preserves BOMs when comparing restore contents', async () => {
 });
 it.each([bytes('a\0b'), new Uint8Array([0xff]).buffer])('does not render binary or invalid UTF-8 restore contents', async content => {
     const saved = await snapshot({ 'note.md': 'placeholder' });
-    saved.files['note.md'] = { hash: await computeHash(content), size: content.byteLength, modified: '' };
+    saved.files['note.md'] = { hash: await sha256Hex(content), size: content.byteLength, modified: '' };
     saved.read.mockResolvedValue(content);
     expect(await compareHistorySnapshots(saved).preview('note.md')).toEqual({
         unavailable: 'This file is not valid UTF-8 text. You can still restore this point.',

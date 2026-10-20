@@ -2,15 +2,15 @@ import { expect, it, vi } from 'vitest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import type { FileEntry } from '../protocol/sync-types';
 import { LocalManifest } from './manifest';
-import { computeHash } from './hasher';
 import { createFullSyncPlan } from './planner/full';
 import { parseInitialConfigPull } from './initial-config-pull';
+import { sha256Hex } from '@/platform/sha256';
 
 const settingsPath = '.obsidian/appearance.json';
 const local = '{"cssTheme":""}';
 const remote = '{"cssTheme":"Minimal"}';
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
-const entry = async (text: string): Promise<FileEntry> => ({ hash: await computeHash(bytes(text)), size: bytes(text).byteLength, modified: '2026-10-01T00:00:00Z', revision: '1' });
+const entry = async (text: string): Promise<FileEntry> => ({ hash: await sha256Hex(bytes(text)), size: bytes(text).byteLength, modified: '2026-10-01T00:00:00Z', revision: '1' });
 
 async function fixture() {
 	const disk = new PersistentTestVault();
@@ -45,7 +45,7 @@ it('downloads existing server settings into an empty vault with BRAT and Crate i
 	// This is replacement intent, never a fabricated last-synced baseline.
 	expect(h.context.localManifest.getEntry(settingsPath)).toBeUndefined();
 	await h.reopen();
-	expect(h.context.localManifest.getInitialConfigPull()).toEqual({ configDir: '.obsidian', files: { [settingsPath]: await computeHash(bytes(local)) } });
+	expect(h.context.localManifest.getInitialConfigPull()).toEqual({ configDir: '.obsidian', files: { [settingsPath]: await sha256Hex(bytes(local)) } });
 });
 
 it.each(['note.md', '.other-settings.json'])('keeps normal conflicts when the new device already has %s', async path => {

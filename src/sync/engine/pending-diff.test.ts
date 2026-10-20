@@ -1,7 +1,7 @@
 import { pendingChangeKey } from '../pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createHarness, toArrayBuffer } from './engine-test-harness';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
@@ -9,7 +9,7 @@ afterEach(() => { vi.useRealTimers(); });
 async function setup(path = 'note.md') {
  const h = createHarness({ automaticSync: false });
  const base = toArrayBuffer('before');
- const hash = await computeHash(base);
+ const hash = await sha256Hex(base);
  const baseline = { hash, size: base.byteLength, modified: '' };
  h.localManifest.setEntry(path, baseline);
  const remote = { getFileMetadata: vi.fn(), listFileVersions: vi.fn(), previewFileVersion: vi.fn() };
@@ -88,7 +88,7 @@ it('rejects a preview if sync changes its baseline during a local read', async (
 it('discards a local deletion offline and preserves the last-synced revision', async () => {
  const h = createHarness({ automaticSync: false });
  const base = toArrayBuffer('last synced');
- const hash = await computeHash(base);
+ const hash = await sha256Hex(base);
  const baseline = { hash, size: base.byteLength, modified: '', revision: 'last-synced-revision' };
  h.localManifest.setEntry('note.md', baseline);
  h.engine.onFileDelete({ path: 'note.md' } as never);

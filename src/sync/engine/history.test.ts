@@ -1,12 +1,12 @@
 import { expect, it, vi } from 'vitest';
 import { createEngineHistory } from './history';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 async function harness(local: Record<string, string>, saved: Record<string, string>) {
     const files = new Map(Object.entries(local));
     const target = Object.fromEntries(await Promise.all(Object.entries(saved).map(async ([path, text]) => [path, {
-        hash: await computeHash(bytes(text)), size: bytes(text).byteLength, modified: '2026-09-20',
+        hash: await sha256Hex(bytes(text)), size: bytes(text).byteLength, modified: '2026-09-20',
     }] as const)));
     const adapter = {
         exists: vi.fn(async (path: string) => files.has(path)),

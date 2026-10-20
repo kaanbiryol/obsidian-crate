@@ -3,7 +3,6 @@ import { openFile, openFileMetadata, sealFile, type PrivateFileMetadata } from '
 import { ENCRYPTED_FILE_CONTENT_TYPE, validateFileDescriptor } from '../../encryption/file-format';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
-import { computeHash } from '../hasher';
 import type { EncryptedUploadWire, JournalUpload } from '../upload-intent';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
 import { parseFileMetadata } from '../worker-api/read-contracts';
@@ -13,6 +12,7 @@ import type { RestoreIntent } from '../restore-intent';
 import { parseFileVersions } from '../worker-api/version-contract';
 import type { UploadResult } from '../../protocol/sync-types';
 import { BATCH_DOWNLOAD_MAX_FILES, ENCRYPTION_METADATA_BATCH } from '../../protocol/sync-limits';
+import { sha256Hex } from '../../platform/sha256';
 
 interface WireMetadata { hash: string; size: number; revision?: string }
 const METADATA_CONCURRENCY = 4;
@@ -180,12 +180,12 @@ export class EncryptedFiles {
 		}
 		const authority = this.keys.forVaultMetadata();
 		const receipt = await decryptJson(saved.envelope, authority.key, { vaultId: authority.vaultId, scopeId: 'vault', objectId: operationId, purpose: 'reminder' }) as { kind: string; requestHash: string; response: UploadResult };
-		if (receipt.kind !== 'upload' || receipt.requestHash !== await computeHash(new TextEncoder().encode(JSON.stringify(payload)).buffer)) throw new Error('The encrypted legacy receipt does not match the saved operation');
+		if (receipt.kind !== 'upload' || receipt.requestHash !== await sha256Hex(new TextEncoder().encode(JSON.stringify(payload)).buffer)) throw new Error('The encrypted legacy receipt does not match the saved operation');
 		return receipt.response;
 	}
 
 	async download(path: string, bytes: ArrayBuffer, wire?: Pick<WireMetadata, 'hash' | 'size'>): Promise<{ content: ArrayBuffer; metadata: PrivateFileMetadata }> {
-		if (wire && (bytes.byteLength !== wire.size || await computeHash(bytes) !== wire.hash)) throw new Error('Encrypted transfer failed integrity validation');
+		if (wire && (bytes.byteLength !== wire.size || await sha256Hex(bytes) !== wire.hash)) throw new Error('Encrypted transfer failed integrity validation');
 		const opened = await openFile(new Uint8Array(bytes), path, this.keys.forPath(path));
 		return { content: opened.content.buffer, metadata: opened.metadata };
 	}

@@ -9,7 +9,7 @@ import { assertRenamePreserved } from '../sync/rename-dependencies';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../encryption/key-bundle';
 import { saveEncryptionKeys } from './encryption-storage';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from './encryption-folder-moves';
-import { computeHash } from '../sync/hasher';
+import { sha256Hex } from '@/platform/sha256';
 
 vi.mock('../sync/encryption/conversion', async original => ({ ...await original<object>(), convertEncryptedVault: vi.fn(async () => {}) }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), waitForStoppedReading: vi.fn(async () => {}) }));
@@ -35,7 +35,7 @@ it.each(['single', 'rapid', 'previous rename', 'paused rename'] as const)('prese
   const keys = addReminderScope(createVaultKeyBundle(), 'Reading', 'reading');
   saveEncryptionKeys(plugin.secretStorage, keys, await generateRecoveryCode());
   vi.spyOn(WorkerApiHttpClient.prototype, 'getServerInfo').mockResolvedValue({ capabilities: ['e2ee-folder-moves-v1'] } as never);
-  const entry = { hash: await computeHash(disk.read('Reading/note.md')), size: 12, modified: '2026-01-01T00:00:00Z', revision: 'source' };
+  const entry = { hash: await sha256Hex(disk.read('Reading/note.md')), size: 12, modified: '2026-01-01T00:00:00Z', revision: 'source' };
   const seed = new LocalManifest(plugin.app, plugin.manifest, h.settings.workerUrl);
   seed.setEntry('Reading/note.md', entry); await seed.save(); await seed.close();
   await h.runtime.initialize({ skipStartupSync: true });

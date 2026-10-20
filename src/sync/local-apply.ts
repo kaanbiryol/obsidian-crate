@@ -2,12 +2,12 @@ import type { TFile, Vault } from 'obsidian';
 import { LocalPathObstructionError, prepareLocalFilePath } from './local-path-topology';
 import { createConflictCopy } from './conflict/conflict';
 import { isHiddenPath } from './file-discovery';
-import { computeHash } from './hasher';
 import { IncomingFileReviewError, preserveIncomingForReview } from './incoming-file-review';
 import type { RecordConflictInput } from './conflict/store';
 import { isVaultTFileLike } from './planner/helpers';
 import type { DiffApplyOutcome } from './transfer/types';
 import { isCurrentVaultFile } from './vault-file-identity';
+import { sha256Hex } from '../platform/sha256';
 
 const MAX_CONFLICT_COPY_ATTEMPTS = 3;
 const textDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -74,7 +74,7 @@ export async function preserveLocalVersionsAndApplyRemote(
 		return applySnapshot(context, path, remoteContent, await readLocalSnapshot(context.vault, path));
 	}
 	let localContent = initialLocalContent;
-	let localHash = await computeHash(localContent);
+	let localHash = await sha256Hex(localContent);
 
 	for (let attempt = 0; attempt < MAX_CONFLICT_COPY_ATTEMPTS; attempt++) {
 		const conflictPath = await createConflictCopy(context.vault, path, localContent);
@@ -122,7 +122,7 @@ async function readLocalSnapshot(vault: Vault, path: string): Promise<LocalSnaps
 		return {
 			exists: true,
 			content,
-			hash: await computeHash(content),
+			hash: await sha256Hex(content),
 			...(visibleFile ? { visibleFile } : {}),
 		};
 	} catch (error) {

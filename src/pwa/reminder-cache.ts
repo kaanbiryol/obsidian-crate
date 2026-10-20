@@ -1,10 +1,10 @@
-import { stringDigest } from './string-digest';
 import { capturePwaSession } from './session-generation';
 import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue } from './types';
 import { AUTH_TOKEN_KEY } from './config';
 import { CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME, deleteCacheDatabase, openCacheDatabase, reminderCacheHealth, reportCacheProblem } from './reminder-cache-database';
 import { normalizeSnapshot } from './reminder-cache-validation';
 import { sealPrivateValue, openPrivateValue, privateStorageEnabled } from './private-storage';
+import { sha256Hex } from '../platform/sha256';
 
 let cacheGeneration = 0;
 
@@ -18,7 +18,7 @@ interface CacheFreshness {
 // logout deletion. No credential is stored in the snapshot.
 async function cacheSessionScope(): Promise<string> {
 	const token = typeof localStorage === 'undefined' ? '' : localStorage.getItem(AUTH_TOKEN_KEY) ?? '';
-	return stringDigest(token);
+	return sha256Hex(token);
 }
 
 /** Metadata for one folder's snapshot. It lists each note's random write

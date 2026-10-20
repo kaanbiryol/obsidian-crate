@@ -1,7 +1,7 @@
 import { trackStagedUpload } from './staged-uploads';
-import { sha256HexBytes } from '../auth/crypto';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../../encryption/file-format';
 import { createManagedObjectKey } from '../../../protocol/storage-keys';
+import { sha256Hex } from '../../../platform/sha256';
 
 export interface StagedMarkdownFile {
 	path: string;
@@ -25,7 +25,7 @@ export async function stageMarkdownFile(
 	if (bytes.byteLength > fileTransportLimit(contentType)) {
 		throw new Error('Reminder file exceeds 25MB limit');
 	}
-	const hash = await sha256HexBytes(bytes.buffer);
+	const hash = await sha256Hex(bytes.buffer);
 	const objectKey = createManagedObjectKey(hash);
 	await trackStagedUpload(db, objectKey, path, contentType === ENCRYPTED_FILE_CONTENT_TYPE);
 	await bucket.put(objectKey, bytes, {

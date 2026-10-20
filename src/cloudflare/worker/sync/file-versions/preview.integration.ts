@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../../schema.sql?raw';
 import { handleFileVersionPreview } from './preview';
-import { sha256Hex } from '../../auth/crypto';
+import { sha256Hex } from '../../../../platform/sha256';
 beforeEach(async () => {
  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
  const hash = await sha256Hex('saved');

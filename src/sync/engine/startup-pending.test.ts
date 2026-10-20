@@ -1,17 +1,17 @@
 import { pendingChangeKey } from '../pending-change';
 import type { TFile } from 'obsidian';
 import { describe, expect, it, vi } from 'vitest';
-import { computeHash } from '../hasher';
 import { createHarness, createSyncResult, runPeriodicCheck, spyOnConflictRecovery, spyOnIncrementalSync, toArrayBuffer } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import { normalizeCrateSettings } from '../../plugin/settings';
 import { VERIFICATION_FILE_BUDGET } from '../content-verifier';
 import { LOCAL_CONTENT_CHECK_INTERVAL_MS } from './constants';
+import { sha256Hex } from '../../platform/sha256';
 
 async function setup() {
 	const h = createHarness({ automaticSync: false, lastSync: '2026-09-19T10:00:00Z' });
 	const original = toArrayBuffer('original');
-	const hash = await computeHash(original);
+	const hash = await sha256Hex(original);
 	for (const path of ['edited.md', 'unchanged.md', 'deleted.md', 'old-name.md']) {
 		h.localManifest.setEntry(path, { hash, size: original.byteLength, modified: new Date(1000).toISOString() });
 	}
@@ -50,7 +50,7 @@ describe('pending changes after restart with automatic sync off', () => {
 	it('rebuilds separate entries for delete-prefixed files and neighboring deletions', async () => {
 		const h = await setup();
 		const original = toArrayBuffer('original');
-		h.localManifest.setEntry('note.md', { hash: await computeHash(original), size: original.byteLength, modified: new Date(1000).toISOString() });
+		h.localManifest.setEntry('note.md', { hash: await sha256Hex(original), size: original.byteLength, modified: new Date(1000).toISOString() });
 		const files = h.vault.getFiles() as TFile[];
 		h.vault.getFiles.mockReturnValue([...files, { path: 'delete:note.md', extension: 'md', stat: { size: original.byteLength, mtime: 1000 } }]);
 		try {
@@ -158,7 +158,7 @@ describe('startup pending scan cost', () => {
 	async function largeVault(count: number) {
 		const h = createHarness({ automaticSync: false, lastSync: '2026-09-19T10:00:00Z' });
 		const original = toArrayBuffer('original');
-		const hash = await computeHash(original);
+		const hash = await sha256Hex(original);
 		const paths = Array.from({ length: count }, (_, i) => `notes/${i.toString().padStart(4, '0')}.md`);
 		const disk = new Map(paths.map(path => [path, original]));
 		const mtimes = new Map(paths.map(path => [path, 1000]));

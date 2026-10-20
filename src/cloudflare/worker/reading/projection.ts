@@ -4,9 +4,9 @@ import { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
 import { readingUrlIdentity } from '@/reading/core/model';
 import { ReadingError, readSource, type ReadingPolicy } from './common';
-import { sha256Hex } from '../auth/crypto';
 import type { Env } from '../types';
 import { vaultChangeToken } from '../vault-change-token';
+import { sha256Hex } from '@/platform/sha256';
 
 export const READING_PROJECTION_KEY = 'reading_projection';
 

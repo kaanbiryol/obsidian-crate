@@ -3,8 +3,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { FileEntry } from '../../protocol/sync-types';
 import { TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
 import { createPersistentEngineHarness } from './engine-persistence-test-harness';
-import { computeHash } from '../hasher';
 import type { ApiHttpResponse, ApiHttpTransport } from '../worker-api/http';
+import { sha256Hex } from '../../platform/sha256';
 
 beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal('window', { setTimeout, clearTimeout }); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -18,7 +18,7 @@ function response(content: unknown): ApiHttpResponse {
 
 async function setup(saved = '{"theme":"saved"}', local: string | null = '{"theme":"local"}') {
     const base = toArrayBuffer(saved);
-    const baseline = { hash: await computeHash(base), size: base.byteLength, modified: '2026-09-30T10:00:00Z', revision: 'last-synced-revision' };
+    const baseline = { hash: await sha256Hex(base), size: base.byteLength, modified: '2026-09-30T10:00:00Z', revision: 'last-synced-revision' };
     const key = local === null ? pendingChangeKey('delete', path) : path;
     const version = { ...baseline, path, storage_key: 'retained', created_at: '2026-09-30T10:00:00Z', expires_at: 1, reason: 'replaced' as const };
     const remote = {

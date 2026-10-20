@@ -3,7 +3,7 @@ import { isRecord, isSha256Hex } from '../../platform/validation';
 import { parseSyncFiles } from '../../protocol/sync-validation';
 import { assertPortablePaths } from '../../protocol/portable-path';
 import type { FileEntry } from '../../protocol/sync-types';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 interface HistoryCheckpoint {
     version: 1;
@@ -28,7 +28,7 @@ export class HistoryCheckpoints {
         assertPortablePaths(Object.keys(files));
         const text = JSON.stringify({ version: 1, authority: this.authority, ignorePatterns,
             files: Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b))) });
-        const id = await computeHash(new TextEncoder().encode(text).buffer);
+        const id = await sha256Hex(new TextEncoder().encode(text).buffer);
         if (!await this.adapter.exists(this.root)) await this.adapter.mkdir(this.root);
         const path = `${this.root}/${id}.json`;
         await this.adapter.write(path, text);
@@ -41,7 +41,7 @@ export class HistoryCheckpoints {
         const path = `${this.root}/${id}.json`;
         if (!await this.adapter.exists(path)) throw new Error('This checkpoint is no longer available on this device.');
         const text = await this.adapter.read(path);
-        if (await computeHash(new TextEncoder().encode(text).buffer) !== id) throw new Error('The history checkpoint is damaged. No files were changed.');
+        if (await sha256Hex(new TextEncoder().encode(text).buffer) !== id) throw new Error('The history checkpoint is damaged. No files were changed.');
         const value: unknown = JSON.parse(text);
         if (!isRecord(value) || value.version !== 1 || value.authority !== this.authority) throw new Error('This checkpoint belongs to a different sync connection.');
         if (JSON.stringify(value.ignorePatterns) !== JSON.stringify(ignorePatterns)) throw new Error('Sync exclusions have changed since this checkpoint. Restore the previous exclusions before returning to this state.');

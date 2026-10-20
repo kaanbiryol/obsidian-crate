@@ -1,12 +1,13 @@
 import { limitNotificationAction } from '../rate-limit';
 import { parseFolderPath } from '../reminders-web/requests';
-import { createRandomHexToken, sha256Hex } from '../auth/crypto';
 import { corsResponse } from '../cors';
 import { getOrCreateVapidKeys } from './push';
 import { parseJsonObject, parseOptionalString } from '../utils';
 import { issueWebEnrollmentToken } from '../auth/web-enrollment';
 import { changedRows } from '../db';
 import { readEncryptionState } from '../encryption/state';
+import { sha256Hex } from '../../../platform/sha256';
+import { createRandomHexToken } from '../../../platform/random-hex';
 
 const REMINDERS_AUTH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 

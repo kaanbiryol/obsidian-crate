@@ -11,7 +11,6 @@ import type { UploadResult } from '@/protocol/sync-types';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import type { CommitEffects } from '../commit-effects';
 import { changedRows } from '../db';
-import { sha256HexBytes } from '../auth/crypto';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { assertFileNamespaceAvailable, FileNamespaceConflictError, fileNamespaceGuard } from './file-namespace';
 import { findFileDeletionReceipt, recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
@@ -23,6 +22,7 @@ import {
 	type ExpectedFileHash,
 	type FileStorageRow,
 } from './storage';
+import { sha256Hex } from '@/platform/sha256';
 
 interface UploadMutationInput {
 	path: string;
@@ -145,7 +145,7 @@ export async function commitStagedFile(
 		const current = await getStoredFileRow(db, params.path);
 		if (!params.effects && current?.hash === params.hash) {
 			const object = await bucket.get(current.storageKey);
-			if (!object || object.size !== current.size || await sha256HexBytes(await object.arrayBuffer()) !== current.hash) {
+			if (!object || object.size !== current.size || await sha256Hex(await object.arrayBuffer()) !== current.hash) {
 				throw new Error('Committed file content is unavailable; restore a verified version before retrying');
 			}
 			await deleteBucketObjectsOrQueue(bucket, db, [{ storageKey: params.objectKey, path: params.path }]);

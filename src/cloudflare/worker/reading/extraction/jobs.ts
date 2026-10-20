@@ -8,11 +8,11 @@ import { policy, readSource } from '../common';
 import { parseReadingNote } from '@/reading/core/notes';
 import { assembleReadingArticle, managedArticle } from '@/reading/core/article';
 import { invalidateReadingProjection, projectReading } from '../projection';
-import { sha256Hex } from '../../auth/crypto';
 import { commitStagedFile } from '../../sync/mutations';
 import { stageMarkdownFile } from '../../sync/markdown-file-staging';
 import type { extractDocument } from './document';
 import { coordinatorStub } from '@/cloudflare/worker/coordinator';
+import { sha256Hex } from '@/platform/sha256';
 
 interface Job { path: string; item_id: string; generation: string; source_revision: string; block_hash: string; url: string; attempts: number }
 export interface Publication { job: Job; result: ReturnType<typeof extractDocument> | null; resolvedUrl?: string }

@@ -4,13 +4,13 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import worker from './index';
-import { sha256HexBytes } from './auth/crypto';
+import { sha256Hex } from '../../platform/sha256';
 
 beforeEach(async () => {
 	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
 	for (const scope of ['vault', 'reminders']) {
 		await env.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope, folder_path, expires_at) VALUES (?, ?, ?, ?, ?)')
-			.bind(scope, await sha256HexBytes(new TextEncoder().encode(`${scope}-credential`)), scope, scope === 'reminders' ? 'Reminders' : null, Date.now() + 60000).run();
+			.bind(scope, await sha256Hex(new TextEncoder().encode(`${scope}-credential`)), scope, scope === 'reminders' ? 'Reminders' : null, Date.now() + 60000).run();
 	}
 });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });

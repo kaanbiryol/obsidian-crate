@@ -7,7 +7,6 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
-import { sha256Hex } from '../auth/crypto';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '@/encryption/key-bundle';
 import { createEncryptionState } from '@/encryption/server-state';
 import { FileKeyAuthority } from '@/encryption/file-authority';
@@ -21,6 +20,7 @@ import { handleReadingRoute } from './routes';
 import { encryptJson } from '@/encryption/envelope';
 import type { CapturedArticle } from '@/reading/extraction/types';
 import type { ReadingItem } from '@/reading/core/model';
+import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });

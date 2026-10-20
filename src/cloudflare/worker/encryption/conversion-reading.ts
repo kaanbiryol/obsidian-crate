@@ -2,11 +2,11 @@ import type { EncryptionServerState } from '../../../encryption/server-state';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { ENCRYPTION_FILE_PREFIX, validateEncryptedContent } from './state';
-import { sha256Hex } from '../auth/crypto';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../utils';
 import type { Env } from '../types';
 import { createManagedObjectKey } from '../../../protocol/storage-keys';
+import { sha256Hex } from '../../../platform/sha256';
 
 export const convertedCapturePath = (folder: string, id: string) => `${folder}/Article ${id}.md`;
 

@@ -2,10 +2,10 @@ import { ExpiredReminderChange, RejectedReminderChange, submitReminderChange } f
 import type { ReminderOutboxStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import type { ApiFetch } from './types';
-import { stringDigest } from './string-digest';
+import { sha256Hex } from '../platform/sha256';
 
 function requestFingerprint(change: PendingReminderChange): Promise<string> {
-	return stringDigest(JSON.stringify([change.method, change.path, change.body]));
+	return sha256Hex(JSON.stringify([change.method, change.path, change.body]));
 }
 
 /** Automatic wakeups share the saved deadline and budget; only user retries reset them. */

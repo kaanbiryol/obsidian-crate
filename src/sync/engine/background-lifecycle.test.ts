@@ -3,7 +3,7 @@ import { createPersistentEngineHarness } from './engine-persistence-test-harness
 import { createHarness, toArrayBuffer } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import { TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 const unexpectedRequest = vi.fn(async (): Promise<never> => { throw new Error('Unexpected network request'); });
 
@@ -105,7 +105,7 @@ it('drains an in-flight conflict discovery read without publishing its cancelled
 it('drains a cache seed write already dispatched during initialization', async () => {
 	const { engine, vault, localManifest } = createHarness();
 	const content = toArrayBuffer('unchanged markdown');
-	const hash = await computeHash(content);
+	const hash = await sha256Hex(content);
 	localManifest.load.mockResolvedValue();
 	localManifest.setEntry('note.md', { hash, size: content.byteLength, modified: new Date(0).toISOString() });
 	vault.adapter.readBinary.mockResolvedValue(content);

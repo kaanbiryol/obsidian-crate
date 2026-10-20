@@ -1,10 +1,10 @@
-import { computeHash } from './hasher';
 import type { FileEntry } from '../protocol/sync-types';
 import type { DataAdapter } from 'obsidian';
 import type { RemoteFileVersion } from '../protocol/sync-types';
 import type { SyncApiClient } from './api';
 import { assertLocalSyncPath } from './local-path-safety';
 import { decodePreviewText, isBinaryPreviewPath, MAX_PREVIEW_BYTES } from './preview-format';
+import { sha256Hex } from '../platform/sha256';
 
 export interface FileHistoryPreview {
 	saved?: string;
@@ -55,7 +55,7 @@ export async function loadCurrentSyncedPreview(
 	if (file.size > MAX_PREVIEW_BYTES) return { file, unavailable: 'This file is too large to preview (limit: 256 KB).' };
 	const downloaded = await api.downloadFile(path);
 	if (downloaded.hash !== file.hash || downloaded.revision !== file.revision || downloaded.content.byteLength !== file.size
-		|| await computeHash(downloaded.content) !== file.hash) {
+		|| await sha256Hex(downloaded.content) !== file.hash) {
 		throw new Error('The synced file changed while loading. Reload its preview to see the latest version.');
 	}
 	try { return { file, text: decodePreviewText(downloaded.content, { preserveBom: false }) }; }

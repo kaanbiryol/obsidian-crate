@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { computeHash } from '../hasher';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { createFullSyncPlan } from './planner';
+import { sha256Hex } from '../../platform/sha256';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({
 	getAllVaultFiles: vi.fn(),
@@ -107,7 +107,7 @@ describe('createFullSyncPlan', () => {
 
 	it('hashes every file during full reconciliation regardless of matching metadata', async () => {
 		const unchangedContent = new TextEncoder().encode('unchanged').buffer;
-		const unchangedHash = await computeHash(unchangedContent);
+		const unchangedHash = await sha256Hex(unchangedContent);
 		const newContent = new TextEncoder().encode('new-file').buffer;
 
 		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([
@@ -150,12 +150,12 @@ describe('createFullSyncPlan', () => {
 
 		expect(readBinary).toHaveBeenCalledTimes(4);
 		expect(readBinary).toHaveBeenCalledWith('notes/unchanged.md');
-		expect(plan.localFiles['notes/unchanged.md']?.hash).toBe(await computeHash(newContent));
+		expect(plan.localFiles['notes/unchanged.md']?.hash).toBe(await sha256Hex(newContent));
 	});
 
 	it('reuses baseline hashes for matching metadata only during automatic recovery', async () => {
 		const unchangedContent = new TextEncoder().encode('unchanged').buffer;
-		const unchangedHash = await computeHash(unchangedContent);
+		const unchangedHash = await sha256Hex(unchangedContent);
 		const newContent = new TextEncoder().encode('new-file').buffer;
 
 		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([

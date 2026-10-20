@@ -1,4 +1,5 @@
-import { createRandomHexToken, sha256Hex } from './crypto';
+import { sha256Hex } from '../../../platform/sha256';
+import { createRandomHexToken } from '../../../platform/random-hex';
 
 const WEB_ENROLLMENT_TOKEN_TTL_MS = 10 * 60 * 1000;
 

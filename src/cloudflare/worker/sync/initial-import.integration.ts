@@ -6,7 +6,6 @@ import schema from '../../schema.sql?raw';
 import { beginInitialImport, finishInitialImport } from './initial-import';
 import { uploadInitialFiles } from './initial-import-upload';
 import { pruneInitialImport } from './initial-import-prune';
-import { sha256Hex } from '../auth/crypto';
 import { importInventoryPages, INITIAL_IMPORT_MAX_FILES, INITIAL_IMPORT_VERIFY_PAGE } from '@/protocol/initial-import';
 import { meterD1Usage } from '../d1-usage';
 import { meterD1Writes } from '../test-support/d1-write-meter-test-harness';
@@ -17,6 +16,7 @@ import { drainNotificationProjections } from '../notifications/projection';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
+import { sha256Hex } from '@/platform/sha256';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {

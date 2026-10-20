@@ -6,8 +6,8 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schemaSql from '../../schema.sql?raw';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
 import type { FileManifest, FileMetadataResponse, UploadResult } from '../../../protocol/sync-types';
-import { sha256Hex } from '../auth/crypto';
 import worker from '../index';
+import { sha256Hex } from '@/platform/sha256';
 
 const paths = ['__proto__', 'constructor', 'toString'];
 const authToken = 'path-records-vault-token';

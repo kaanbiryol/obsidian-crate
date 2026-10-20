@@ -5,6 +5,7 @@ import { HttpError, WorkerApiHttpClient, TRANSFER_TIMEOUT_MS } from '../worker-a
 import { readServerEncryption } from './conversion';
 import { isSha256Hex } from '../../platform/validation';
 import { SECRET_KEYS } from '../../platform/secret-keys';
+import { createRandomHexToken } from '../../platform/random-hex';
 
 export interface EncryptionReset {
 	version: 1;
@@ -44,7 +45,7 @@ export function saveEncryptionReset(storage: SecretStorageService, reset: Encryp
 export function createEncryptionReset(workerUrl: string, oldToken: string, state: EncryptionServerState, automaticSync: boolean): EncryptionReset {
 	if (state.mode !== 'active') throw new Error('Finish encryption conversion before turning encryption off');
 	return { version: 1, id: crypto.randomUUID(), workerUrl, oldToken, vaultId: state.vaultId, generation: state.generation,
-		replacementToken: Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join(''),
+		replacementToken: createRandomHexToken(),
 		automaticSync, phase: 'remote', beginState: 'prepared' };
 }
 

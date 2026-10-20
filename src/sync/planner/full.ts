@@ -1,4 +1,3 @@
-import { computeHash } from "../hasher";
 import { skippedFileIssue, withSyncFileContext } from '../issues';
 import { classifyPaths } from "../reconciliation";
 import { getAllVaultFiles } from "../file-discovery";
@@ -7,6 +6,7 @@ import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 import { prepareInitialConfigPull } from '../initial-config-pull';
+import { sha256Hex } from '../../platform/sha256';
 
 /** `reuseUnchangedHashes` trusts the baseline hash when size and mtime match,
  * as incremental sync does. Only automatic recovery from an expired or failed
@@ -33,7 +33,7 @@ export async function createFullSyncPlan(
       }
       const content = await context.vault.adapter.readBinary(file.path);
       context.throwIfDestroyed();
-      const hash = await computeHash(content);
+      const hash = await sha256Hex(content);
       context.throwIfDestroyed();
       context.plannedContent?.remember(file.path, content, hash);
       return { path: file.path, hash, size: content.byteLength, mtime: file.mtime };

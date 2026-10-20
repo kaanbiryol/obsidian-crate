@@ -1,12 +1,12 @@
 import { readEncryptionState } from '../encryption/state';
 import { limitNotificationAction } from '../rate-limit';
 import { changedRows } from '../db';
-import { sha256Hex } from '../auth/crypto';
 import { validateReadingFolder } from '@/reading/settings';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { policy, authority, canPrepareReadingHandoff, ReadingError, readingResponse, type ReadingPolicy } from './common';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 import { isSha256Hex } from '@/platform/validation';
+import { sha256Hex } from '@/platform/sha256';
 
 export async function updatePolicy(db: D1Database, body: Record<string, unknown>) {
   const existing = await policy(db);

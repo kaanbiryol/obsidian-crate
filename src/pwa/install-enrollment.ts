@@ -1,6 +1,6 @@
 import { pwaStartSearchFromUrl } from './shell/pwa-params';
 import { isSha256Hex } from '../platform/validation';
-export { stringDigest as enrollmentFingerprint } from './string-digest';
+export { sha256Hex as enrollmentFingerprint } from '../platform/sha256';
 
 const INSTALL_COOKIE = 'crate-reminders-install';
 const REDEEMED_KEY = 'crate-reminders-redeemed-enrollment';

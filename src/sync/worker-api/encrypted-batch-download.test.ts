@@ -5,7 +5,7 @@ import { EncryptedFiles } from '../encryption/encrypted-files';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
 import { sealFile } from '../../encryption/file-codec';
 import { arrayBufferToBase64 } from '../encoding';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 it('decrypts a batch with bounded overlap and returns verified bytes in order', async () => {
 	const encryption = await EncryptedFiles.create({} as WorkerApiHttpClient, createVaultKeyBundle(), async () => null);
@@ -30,6 +30,6 @@ it('decrypts a batch with bounded overlap and returns verified bytes in order', 
 	for (const file of result.files) {
 		if (!('verifiedContent' in file)) throw new Error('Expected decrypted bytes');
 		expect(new TextDecoder().decode(file.verifiedContent)).toBe(`body ${file.path}`);
-		expect(file.hash).toBe(await computeHash(file.verifiedContent));
+		expect(file.hash).toBe(await sha256Hex(file.verifiedContent));
 	}
 });

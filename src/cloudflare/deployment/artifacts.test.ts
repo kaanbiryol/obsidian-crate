@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { decodeAndVerifyArtifacts, sha256Hex } from './artifacts';
+import { decodeAndVerifyArtifacts } from './artifacts';
+import { sha256Hex } from '../../platform/sha256';
 
 async function gzipBase64(content: string): Promise<string> {
 	const input = new Blob([content]).stream().pipeThrough(new CompressionStream('gzip'));

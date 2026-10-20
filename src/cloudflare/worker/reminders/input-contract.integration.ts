@@ -4,7 +4,6 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
-import { sha256Hex, sha256HexBytes } from '../auth/crypto';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { buildReminderMutationBody } from '@/pwa/reminder-mutation';
@@ -12,6 +11,7 @@ import { scanReminderMarkdownFile, toReminderPayload } from '../reminders-web/sc
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';
 import type { ReminderRecord } from '@/pwa/types';
+import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => {
 	vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -88,7 +88,7 @@ it.for([[255], [0xe2, 0x82], [0xff, 0xfe, 65, 0], [65, 0, 66, 0]])('preserves in
 	const row = (await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind(filePath).first<{ storage_key: string }>())!;
 	const original = new Uint8Array(await (await env.BUCKET.get(row.storage_key))!.arrayBuffer());
 	const bytes = new Uint8Array([...original, ...invalid]);
-	const hash = await sha256HexBytes(bytes);
+	const hash = await sha256Hex(bytes);
 	await env.BUCKET.put(row.storage_key, bytes);
 	await env.DB.prepare('UPDATE files SET hash = ?, size = ? WHERE path = ?').bind(hash, bytes.length, filePath).run();
 	const response = await update(before, { content: 'Changed' });
@@ -106,7 +106,7 @@ it('retains the UTF-8 BOM and unrelated Unicode text when editing a reminder', a
 	const text = '\ufeff' + original + '\nUnrelated footer: 漢字 🙂 \ufffd\n';
 	const bytes = new TextEncoder().encode(text);
 	await env.BUCKET.put(row.storage_key, bytes);
-	await env.DB.prepare('UPDATE files SET hash = ?, size = ? WHERE path = ?').bind(await sha256HexBytes(bytes), bytes.length, filePath).run();
+	await env.DB.prepare('UPDATE files SET hash = ?, size = ? WHERE path = ?').bind(await sha256Hex(bytes), bytes.length, filePath).run();
 	expect((await update(before, { content: 'Changed title' })).status).toBe(200);
 	const saved = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, filePath);
 	expect(saved!.content).toBe(text.replace('Original task', 'Changed title'));

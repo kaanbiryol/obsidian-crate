@@ -4,8 +4,8 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import worker from './reset-worker.js';
 import schema from '../../schema.sql?raw';
-import { sha256Hex } from '../../deployment/artifacts';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
+import { sha256Hex } from '../../../platform/sha256';
 
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 const token = 'b'.repeat(64), resetId = 'c'.repeat(32);

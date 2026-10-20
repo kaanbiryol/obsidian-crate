@@ -5,16 +5,16 @@ import { DurableUploads } from '../durable-uploads';
 import { EncryptedFiles } from './encrypted-files';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
 import { arrayBufferToBase64 } from '../encoding';
-import { computeHash } from '../hasher';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
 import type { JournalUpload } from '../upload-intent';
 import type { BatchUploadFile } from '../../protocol/sync-types';
+import { sha256Hex } from '@/platform/sha256';
 
 async function fixture() {
 	const disk = new PersistentTestVault();
 	const create = () => new LocalManifest({ vault: disk.vault } as never, { dir: TEST_PLUGIN_DIR } as never, 'https://server.test');
 	const content = new TextEncoder().encode('Private content').buffer;
-	const file = { path: 'note.md', content: arrayBufferToBase64(content), hash: await computeHash(content), size: content.byteLength,
+	const file = { path: 'note.md', content: arrayBufferToBase64(content), hash: await sha256Hex(content), size: content.byteLength,
 		contentType: 'text/markdown', expectedHash: null };
 	const encryption = await EncryptedFiles.create({} as WorkerApiHttpClient, createVaultKeyBundle(), async () => null);
 	return { disk, create, file, encryption };

@@ -8,10 +8,10 @@ import type { SyncApiClient } from '../api';
 import { getAllVaultFiles } from '../file-discovery';
 import { assertLocalSyncPath } from '../local-path-safety';
 import { readLocalFileEntry } from '../local-file-entry';
-import { computeHash } from '../hasher';
 import { deletePathLocallyIfUnchanged } from '../planner/helpers';
 import { applyRemoteContentIfUnchanged, TEXT_PATH } from '../local-apply';
 import { loadHistoryRestorePreview, type HistoryRestorePreview } from './restore-preview';
+import { sha256Hex } from '../../platform/sha256';
 
 type Files = Record<string, FileEntry>;
 interface HistoryRestoreItem { path: string; action: 'revert' | 'restore' | 'remove' }
@@ -130,7 +130,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
                         if (outcome.status === 'changed') throw new Error(`${item.path} changed. Its new contents were kept.`);
                     } else {
                         const content = await vault.adapter.readBinary(staged.get(item.path)!.target!);
-                        if (await computeHash(content) !== target[item.path]!.hash) throw new Error('The staged restore copy is damaged.');
+                        if (await sha256Hex(content) !== target[item.path]!.hash) throw new Error('The staged restore copy is damaged.');
                         const original = staged.get(item.path)!.original;
                         const text = TEXT_PATH.test(item.path) && isUtf8(content) && (!original || isUtf8(await vault.adapter.readBinary(original)));
                         let expected = originalHash;
@@ -171,9 +171,9 @@ function sameFiles(left: Files, right: Files, revisions = false): boolean {
 
 
 async function stage(vault: Vault, path: string, bytes: ArrayBuffer, hash: string): Promise<void> {
-    if (bytes.byteLength > MAX_FILE_SIZE_BYTES || await computeHash(bytes) !== hash) throw new Error('A file changed or its saved version is damaged. No files were changed.');
+    if (bytes.byteLength > MAX_FILE_SIZE_BYTES || await sha256Hex(bytes) !== hash) throw new Error('A file changed or its saved version is damaged. No files were changed.');
     await vault.adapter.writeBinary(path, bytes);
-    if (await computeHash(await vault.adapter.readBinary(path)) !== hash) throw new Error('Could not verify a recovery copy. No files were changed.');
+    if (await sha256Hex(await vault.adapter.readBinary(path)) !== hash) throw new Error('Could not verify a recovery copy. No files were changed.');
 }
 
 function isUtf8(bytes: ArrayBuffer): boolean {

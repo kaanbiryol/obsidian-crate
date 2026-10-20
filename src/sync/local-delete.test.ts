@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { deletePathLocallyIfUnchanged } from './planner/helpers';
-import { computeHash } from './hasher';
 import { TFile, TFolder } from 'obsidian';
 import { createTransferHarness, emptyResult } from './transfer/transfer-test-harness';
 import { processDiff } from './transfer/process';
+import { sha256Hex } from '../platform/sha256';
 
 	describe('recoverable local deletion', () => {
 	it.each(['note.md', 'drawing.canvas', 'image.png', '.hidden/settings.json'])('preserves an edit arriving after the hash check in local trash: %s', async path => {
@@ -27,7 +27,7 @@ import { processDiff } from './transfer/process';
 			} as never,
 			fileManager: { trashFile: vi.fn(async () => { live = null; }) },
 		};
-		expect(await deletePathLocallyIfUnchanged(context, path, await computeHash(original))).toEqual({ status: 'deleted' });
+		expect(await deletePathLocallyIfUnchanged(context, path, await sha256Hex(original))).toEqual({ status: 'deleted' });
 		expect(trashed).toEqual(newer);
 		expect(remove).not.toHaveBeenCalled();
 		expect(context.fileManager.trashFile).not.toHaveBeenCalled();
@@ -49,7 +49,7 @@ import { processDiff } from './transfer/process';
 			getAbstractFileByPath: () => !path.startsWith('.') && disk.has(path) ? file : null,
 			adapter: { stat: async () => ({ type: 'file', mtime: 1, ctime: 1, size: 8 }), exists: async (key: string) => disk.has(key), readBinary: async (key: string) => disk.get(key), trashLocal: trash },
 		} as never });
-		const expectedHash = await computeHash(original);
+		const expectedHash = await sha256Hex(original);
 		await expect(deletePathLocallyIfUnchanged(context(), path, expectedHash)).rejects.toThrow('Lost move acknowledgement');
 		expect(await deletePathLocallyIfUnchanged(context(), path, expectedHash)).toEqual({ status: 'missing' });
 		expect(disk.get(`.trash/${path}`)).toEqual(newer);
@@ -69,7 +69,7 @@ import { processDiff } from './transfer/process';
 			} as never,
 			fileManager: { trashFile: vi.fn() },
 		};
-		await expect(deletePathLocallyIfUnchanged(context, path, await computeHash(content))).rejects.toThrow('Trash unavailable');
+		await expect(deletePathLocallyIfUnchanged(context, path, await sha256Hex(content))).rejects.toThrow('Trash unavailable');
 		expect(remove).not.toHaveBeenCalled();
 		expect(context.fileManager.trashFile).not.toHaveBeenCalled();
 	});
@@ -87,7 +87,7 @@ describe('local deletion target replacement', () => {
 		h.vault.getAbstractFileByPath.mockReturnValue(file);
 		h.adapter.readBinary.mockImplementation(async () => { h.vault.getAbstractFileByPath.mockReturnValue(next); return bytes; });
 		const result = emptyResult();
-		const localFiles = { [path]: { hash: await computeHash(bytes), size: bytes.byteLength, modified: '2026-09-09T00:00:00.000Z' } };
+		const localFiles = { [path]: { hash: await sha256Hex(bytes), size: bytes.byteLength, modified: '2026-09-09T00:00:00.000Z' } };
 		await expect(processDiff(h.context, { path, action: 'delete-local', localHash: localFiles[path].hash, cause: 'remote-deleted' }, localFiles, result)).rejects.toThrow('target changed');
 		expect(h.vault.trash).not.toHaveBeenCalled();
 		expect(h.adapter.remove).not.toHaveBeenCalled();
@@ -106,7 +106,7 @@ describe('local deletion target replacement', () => {
 			exists: async () => true, readBinary: async () => bytes,
 			stat: vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second), trashLocal,
 		} };
-		await expect(deletePathLocallyIfUnchanged({ vault: vault as never }, path, await computeHash(bytes))).rejects.toThrow('target changed');
+		await expect(deletePathLocallyIfUnchanged({ vault: vault as never }, path, await sha256Hex(bytes))).rejects.toThrow('target changed');
 		expect(trashLocal).not.toHaveBeenCalled();
 	});
 

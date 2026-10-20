@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { computeHash } from '../hasher';
 import type { PreparedUpload, SyncResult } from '../types';
 import { runIncrementalSync } from './planner';
 import { createIncrementalHarness, createSettings } from './planner-test-harness';
+import { sha256Hex } from '../../platform/sha256';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({
 	getAllVaultFiles: vi.fn(),
@@ -26,7 +26,7 @@ describe('runIncrementalSync', () => {
   it.each(['put', 'delete'] as const)('uploads an edit discovered after the scan while reconciling a remote %s', async action => {
     const path = 'notes/late-edit.md';
     const content = new TextEncoder().encode('edited after scanning').buffer;
-    const hash = await computeHash(content);
+    const hash = await sha256Hex(content);
     const localChanges: Array<{ path: string; hash: string }> = [];
     Object.freeze(localChanges);
     const harness = createIncrementalHarness({
@@ -142,7 +142,7 @@ describe('runIncrementalSync', () => {
 
 	it('applies remote delete changes through local trash', async () => {
 		const content = new TextEncoder().encode('remote delete base').buffer;
-		const hash = await computeHash(content);
+		const hash = await sha256Hex(content);
 		const harness = createIncrementalHarness({
 			settings: { lastSeq: 4 },
 			changes: [
@@ -178,7 +178,7 @@ describe('runIncrementalSync', () => {
 
 	it('trashes hidden files for remote delete changes', async () => {
 		const content = new TextEncoder().encode('hidden base').buffer;
-		const hash = await computeHash(content);
+		const hash = await sha256Hex(content);
 		const harness = createIncrementalHarness({
 			settings: { lastSeq: 4 },
 			changes: [
@@ -220,8 +220,8 @@ describe('runIncrementalSync', () => {
 	])('preserves a newer local edit before applying a remote delete ($path)', async ({ path, hidden }) => {
 		const baseContent = new TextEncoder().encode('planned content').buffer;
 		const changedContent = new TextEncoder().encode('edited during sync').buffer;
-		const baseHash = await computeHash(baseContent);
-		const changedHash = await computeHash(changedContent);
+		const baseHash = await sha256Hex(baseContent);
+		const changedHash = await sha256Hex(changedContent);
 		const prepared: PreparedUpload = {
 			path,
 			content: changedContent,
@@ -269,7 +269,7 @@ describe('runIncrementalSync', () => {
 	it('retains the cursor and checkpoint when a file becomes a folder while applying a remote delete', async () => {
 		const path = 'notes/replaced.md';
 		const content = new TextEncoder().encode('original').buffer;
-		const hash = await computeHash(content);
+		const hash = await sha256Hex(content);
 		const h = createIncrementalHarness({ settings: { lastSeq: 4 }, lastSeq: 6,
 			changes: [{ seq: 6, path, action: 'delete', hash: '', size: 0, created_at: '2026-09-09T00:00:00.000Z' }],
 		});
@@ -316,7 +316,7 @@ describe('runIncrementalSync', () => {
 
 	it('skips download when remote put hash matches local content', async () => {
 		const content = new TextEncoder().encode('same').buffer;
-		const hash = await computeHash(content);
+		const hash = await sha256Hex(content);
 		const harness = createIncrementalHarness({
 			settings: { lastSeq: 2 },
 			changes: [

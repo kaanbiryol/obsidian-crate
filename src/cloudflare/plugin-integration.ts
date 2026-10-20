@@ -15,7 +15,7 @@ import { loadEmbeddedCloudflareArtifacts } from './deployment/embedded-artifacts
 import { obsidianHttpTransport } from './http';
 import { configureCloudflareAuthorizedDevice } from '../sync/plugin-integration';
 import { isSelfHostedConnectionPending } from '../sync/self-hosted-connection';
-import { generateSecureToken, hashToken } from '../sync/device-token';
+import { generateSecureToken, hashToken } from './device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
 import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../ui/cloudflare/deployment-modal';
 import { dismissCloudflareAuthorizationModal, openCloudflareAuthorizationModal } from '../ui/cloudflare/authorization-modal';

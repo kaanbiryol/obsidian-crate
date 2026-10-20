@@ -12,8 +12,8 @@ import { handleNotificationPolicy } from '../notifications/policy';
 import { handleBatchUpload } from './batch/upload';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
-import { sha256Hex } from '../auth/crypto';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
+import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => {
   for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();

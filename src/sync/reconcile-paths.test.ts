@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HttpError } from './api';
 import { RemoteVersionChangedError } from './transfer/download';
-import { computeHash } from './hasher';
 import { reconcileQueuePaths, type TargetedReconcileContext } from './reconcile-paths';
 import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import type { SyncResult } from './types';
 import { pendingChangeKey } from './pending-change';
+import { sha256Hex } from '../platform/sha256';
 
 function bytes(text: string): ArrayBuffer {
 	return new TextEncoder().encode(text).buffer;
@@ -193,7 +193,7 @@ describe('reconcileQueuePaths', () => {
 
 	it('classifies and reconciles only the queue path that lost the version race', async () => {
 		const localText = 'local edit';
-		const localHash = await computeHash(bytes(localText));
+		const localHash = await sha256Hex(bytes(localText));
 		const harness = await createHarness({
 			baseHash: 'base',
 			localText,

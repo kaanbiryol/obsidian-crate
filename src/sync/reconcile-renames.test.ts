@@ -3,17 +3,17 @@ import { pendingChangeKey } from './pending-change';
 import { describe, expect, it, vi } from 'vitest';
 import type { App, PluginManifest, Vault } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
-import { computeHash } from './hasher';
 import { LocalManifest } from './manifest';
 import { assertRenamePreserved } from './rename-dependencies';
 import { reconcileQueuePaths, type TargetedReconcileContext } from './reconcile-paths';
+import { sha256Hex } from '../platform/sha256';
 
 async function harness(destinationUploaded: boolean) {
 	const source = 'Dashboard.md';
 	const destination = 'Upcoming.md';
 	const content = new TextEncoder().encode('dashboard').buffer;
 	const entry: FileEntry = {
-		hash: await computeHash(content), size: content.byteLength,
+		hash: await sha256Hex(content), size: content.byteLength,
 		modified: new Date(1000).toISOString(), revision: 'v1',
 	};
 	const disk = new Map<string, string>();

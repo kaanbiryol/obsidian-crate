@@ -5,7 +5,6 @@ import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
 import { fetchWorkerRequest } from '../request-handler';
-import { sha256Hex } from '../auth/crypto';
 import { readEncryptionState } from './state';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { createVaultKeyBundle, generateRecoveryCode } from '../../../encryption/key-bundle';
@@ -13,6 +12,7 @@ import { convertEncryptedVault } from '../../../sync/encryption/conversion';
 import { WorkerApiHttpClient, type ApiHttpTransport } from '../../../sync/worker-api/http';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
+import { sha256Hex } from '../../../platform/sha256';
 
 const uploadKinds = ['single binary', 'single markdown', 'batch', 'bulk'] as const;
 type UploadKind = typeof uploadKinds[number];

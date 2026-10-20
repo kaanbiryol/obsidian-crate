@@ -19,7 +19,7 @@ test('source paths referenced by browser tests and scripts exist', () => {
 		for (const [, path] of text.matchAll(/['"`]\.\/((?:src|tests)\/[\w@/.-]+?)['"`;?]/g)) {
 			if (!exists(path)) missing.push(`${file}: ./${path}`);
 		}
-		// esbuild stdin modules resolve `./src/...` from the repository root, checked above.
+		// esbuild stdin modules resolve src/ and tests/ paths from the repository root, checked above.
 		for (const [, specifier] of text.matchAll(/^import\s[^;]*?\bfrom\s+['"](\.{1,2}\/(?!src\/|tests\/)[^'"]+)['"]/gm)) {
 			if (!exists(normalize(join(dirname(file), specifier.split('?')[0])))) missing.push(`${file}: ${specifier}`);
 		}

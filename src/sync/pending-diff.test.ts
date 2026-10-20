@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadPendingDiff } from './pending-diff';
 import { loadRemotePendingBase } from './pending-baseline';
 import type { FileEntry } from '../protocol/sync-types';
-import { computeHash } from './hasher';
+import { sha256Hex } from '../platform/sha256';
 
 vi.mock('obsidian', () => ({ Platform: { isWin: false } }));
 
@@ -20,7 +20,7 @@ function setup(local: string | null = 'new', remote: string | null = 'old', fixt
 describe('pending file previews', () => {
     it('recognizes unchanged files using the last-synced hash without reading the base cache', async () => {
         const h = setup('same', 'same');
-        const hash = await computeHash(new TextEncoder().encode('same').buffer);
+        const hash = await sha256Hex(new TextEncoder().encode('same').buffer);
         h.baseline!.hash = hash;
         expect(await h.load()).toMatchObject({ unchanged: true, before: 'same', after: 'same' });
         expect(h.readBase).not.toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe('pending file previews', () => {
 describe('remote pending comparison baselines', () => {
     async function remoteSetup() {
         const content = new TextEncoder().encode('{"theme":"old"}').buffer;
-        const baseline = { hash: await computeHash(content), size: content.byteLength, modified: '' };
+        const baseline = { hash: await sha256Hex(content), size: content.byteLength, modified: '' };
         const path = '.obsidian/plugins/obsidian-minimal-settings/data.json';
         const version = { ...baseline, path, storage_key: 'retained', created_at: '2026-09-30T10:00:00Z', expires_at: 1, reason: 'replaced' as const };
         const api = {

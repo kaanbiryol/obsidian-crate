@@ -1,5 +1,4 @@
 import { assertLocalSyncPath } from '../local-path-safety';
-import { computeHash } from "../hasher";
 import { recordAppliedContent, UNVERIFIED_MODIFIED } from '../applied-content';
 import { applyRemoteContentIfUnchanged, preserveLocalVersionsAndApplyRemote } from "../local-apply";
 import { isMarkdownPath } from "../markdown-base-cache";
@@ -13,6 +12,7 @@ import type { ConflictDiff, FileDiff, SyncResult } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { assertLocalFileAbsent, LocalFilePresentError } from '../local-absence';
+import { sha256Hex } from '../../platform/sha256';
 
 export async function processDiff(
   context: TransferContext,
@@ -210,7 +210,7 @@ async function tryAutoMergeMarkdownConflict(
   }
 
   const mergedContent = mergeResult.content;
-  const mergedHash = await computeHash(mergedContent);
+  const mergedHash = await sha256Hex(mergedContent);
   const uploadResult = await context.api.uploadFile(
     diff.path,
     mergedContent,
@@ -230,7 +230,7 @@ async function tryAutoMergeMarkdownConflict(
 
   // The remote compare-and-swap happens first. Revalidate the local file before
   // replacing it so an edit made while the request was in flight is retained.
-  const plannedLocalHash = await computeHash(localContent);
+  const plannedLocalHash = await sha256Hex(localContent);
   const localApplyOutcome = await applyRemoteContentIfUnchanged(
     context,
     diff.path,

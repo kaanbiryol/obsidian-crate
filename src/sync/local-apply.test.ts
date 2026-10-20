@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { applyRemoteContentIfUnchanged, preserveLocalVersionsAndApplyRemote } from './local-apply';
-import { computeHash } from './hasher';
+import { sha256Hex } from '../platform/sha256';
 
 const encode = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer;
 const decode = (content: ArrayBuffer): string => new TextDecoder('utf-8', { ignoreBOM: true }).decode(content);
@@ -49,7 +49,7 @@ describe('safe local application', () => {
 			h.files.set(target, late);
 			throw new Error('File exists');
 		});
-		await expect(applyRemoteContentIfUnchanged(h.context, path, new Uint8Array([255, 2]).buffer, await computeHash(original)))
+		await expect(applyRemoteContentIfUnchanged(h.context, path, new Uint8Array([255, 2]).buffer, await sha256Hex(original)))
 			.rejects.toThrow('File exists');
 		expect(h.files.get(path)).toEqual(original);
 		expect([...h.files.entries()].filter(([name]) => name !== path).map(([, bytes]) => bytes)).toEqual([late]);
@@ -62,7 +62,7 @@ describe('safe local application', () => {
 		const rename = () => { h.files.delete('note.md'); h.files.set('excluded/note.md', original); file.path = 'excluded/note.md'; };
 		if (stage === 'read') h.vault.adapter.readBinary.mockImplementationOnce(async () => { rename(); return original; });
 		else h.beforeProcess(rename);
-		expect((await applyRemoteContentIfUnchanged(h.context, 'note.md', encode('remote'), await computeHash(original))).status).toBe('deferred');
+		expect((await applyRemoteContentIfUnchanged(h.context, 'note.md', encode('remote'), await sha256Hex(original))).status).toBe('deferred');
 		expect(h.files.get('excluded/note.md')).toEqual(original);
 		expect(h.files.has('note.md')).toBe(false);
 	});
@@ -70,7 +70,7 @@ describe('safe local application', () => {
 	it('rejects a replacement TFile even if its text is identical', async () => {
 		const original = encode('original'), h = harness('note.md', original);
 		h.beforeProcess(() => h.vault.getAbstractFileByPath.mockReturnValue({ path: 'note.md', extension: 'md' }));
-		expect((await applyRemoteContentIfUnchanged(h.context, 'note.md', encode('remote'), await computeHash(original))).status).toBe('deferred');
+		expect((await applyRemoteContentIfUnchanged(h.context, 'note.md', encode('remote'), await sha256Hex(original))).status).toBe('deferred');
 		expect(h.files.get('note.md')).toEqual(original);
 	});
 
@@ -78,7 +78,7 @@ describe('safe local application', () => {
 		const original = encode('original');
 		const h = harness(path, original);
 		h.beforeProcess(() => h.files.set(path, encode('new local edit')));
-		const outcome = await applyRemoteContentIfUnchanged(h.context, path, encode('remote'), await computeHash(original));
+		const outcome = await applyRemoteContentIfUnchanged(h.context, path, encode('remote'), await sha256Hex(original));
 		expect(outcome.status).toBe('deferred');
 		expect(decode(h.files.get(path)!)).toBe('new local edit');
 		expect(h.vault.modifyBinary).not.toHaveBeenCalled();
@@ -89,7 +89,7 @@ describe('safe local application', () => {
 		const original = encode('\uFEFFOriginal café\r\n');
 		const remote = encode('\uFEFFUpdated café ☕\r\n');
 		const h = harness(path, original);
-		expect(await applyRemoteContentIfUnchanged(h.context, path, remote, await computeHash(original)))
+		expect(await applyRemoteContentIfUnchanged(h.context, path, remote, await sha256Hex(original)))
 			.toEqual({ status: 'applied' });
 		expect(h.files.get(path)).toEqual(remote);
 		expect(h.vault.adapter.process).toHaveBeenCalledTimes(1);
@@ -114,7 +114,7 @@ describe('safe local application', () => {
 		const original = encode('original');
 		const h = harness(path, original);
 		h.beforeProcess(() => { throw new Error('Disk full'); });
-		await expect(applyRemoteContentIfUnchanged(h.context, path, encode('remote'), await computeHash(original)))
+		await expect(applyRemoteContentIfUnchanged(h.context, path, encode('remote'), await sha256Hex(original)))
 			.rejects.toThrow('Disk full');
 		expect(h.files.get(path)).toEqual(original);
 	});
@@ -123,7 +123,7 @@ describe('safe local application', () => {
 		const original = new Uint8Array([255, 0, 254]).buffer;
 		const remote = new Uint8Array([254, 0, 255]).buffer;
 		const h = harness(path, original);
-		const hash = await computeHash(original);
+		const hash = await sha256Hex(original);
 		expect((await applyRemoteContentIfUnchanged(h.context, path, remote, hash)).status).toBe('deferred');
 		expect(h.files.get(path)).toEqual(original);
 		expect([...h.files.entries()].filter(([name]) => name !== path).map(([, bytes]) => bytes)).toEqual([remote]);
@@ -149,10 +149,10 @@ it('preserves edits to an earlier incoming binary copy when the transfer retries
   const original = new Uint8Array([255, 0, 254]).buffer;
   const remote = new Uint8Array([254, 0, 255]).buffer;
   const h = harness('image.png', original);
-  await applyRemoteContentIfUnchanged(h.context, 'image.png', remote, await computeHash(original));
+  await applyRemoteContentIfUnchanged(h.context, 'image.png', remote, await sha256Hex(original));
   const copy = [...h.files.keys()].find(path => path !== 'image.png')!;
   h.files.set(copy, encode('edited recovery copy'));
-  await applyRemoteContentIfUnchanged(h.context, 'image.png', remote, await computeHash(original));
+  await applyRemoteContentIfUnchanged(h.context, 'image.png', remote, await sha256Hex(original));
   expect(decode(h.files.get(copy)!)).toBe('edited recovery copy');
   expect([...h.files.values()]).toContainEqual(remote);
   expect(h.files.get('image.png')).toEqual(original);

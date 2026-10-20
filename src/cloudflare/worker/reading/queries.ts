@@ -4,8 +4,8 @@ import { ReadingError, sourceById, type ReadingPolicy } from './common';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { parseReadingNote } from '@/reading/core/notes';
 import { validateReadingMetadata } from '@/reading/core/model';
-import { sha256Hex } from '../auth/crypto';
 import { parseChangeEtags, vaultChangeToken } from '../vault-change-token';
+import { sha256Hex } from '@/platform/sha256';
 
 /** Called only after route authorization and a complete Reading projection. */
 export async function readingItem(env: Env, current: ReadingPolicy, id: string | null) {

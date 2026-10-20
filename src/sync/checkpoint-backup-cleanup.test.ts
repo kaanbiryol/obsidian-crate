@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest';
 import type { DataAdapter } from 'obsidian';
 import { pruneCheckpointBackups, registerCheckpointBackupCleanup } from './checkpoint-backup-cleanup';
-import { computeHash } from './hasher';
 import { arrayBufferToBase64 } from './encoding';
 import type { SyncState } from './types';
+import { sha256Hex } from '../platform/sha256';
 
 const dir = '.obsidian/plugins/crate';
 const id = 'e1_00020708_fa270a13-1cb3-4f6a-8529-7e06d75f806f';
@@ -11,7 +11,7 @@ const backup = `${dir}/upload-${id}.json.previous-a1f6ed79-839e-4d7a-aab1-ba18fb
 const day = 86400000;
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 async function fixture() {
-	const payload = { content: arrayBufferToBase64(bytes('saved note')), hash: await computeHash(bytes('saved note')), size: 10 };
+	const payload = { content: arrayBufferToBase64(bytes('saved note')), hash: await sha256Hex(bytes('saved note')), size: 10 };
 	const record = { version: 1, authority: 'https://old.example', sequence: 1, file: {
 		...payload, path: 'note.md', contentType: 'text/markdown', expectedHash: null,
 		operationId: id, origin: { clientSession: 'fa270a13-1cb3-4f6a-8529-7e06d75f806f', at: '2026-09-13T00:00:00.000Z' },
@@ -42,7 +42,7 @@ it.each(['different', 'missing', 'corrupt', 'unsupported', 'preimage', 'private'
 	if (kind === 'corrupt') f.record.file.content = 'AAAA';
 	if (kind === 'unsupported') f.record.version = 3;
 	if (kind === 'preimage') Object.assign(f.record.file, { intent: { kind: 'merge', preimage: {
-		content: arrayBufferToBase64(bytes('old')), hash: await computeHash(bytes('old')), size: 3,
+		content: arrayBufferToBase64(bytes('old')), hash: await sha256Hex(bytes('old')), size: 3,
 	} } });
 	if (kind === 'private') f.record.file.path = `${dir}/saved.md`;
 	if (kind === 'wrong-id') f.record.file.operationId = 'e1_00020709_fa270a13-1cb3-4f6a-8529-7e06d75f806f';

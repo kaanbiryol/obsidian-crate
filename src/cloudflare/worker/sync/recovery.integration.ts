@@ -4,11 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schemaSql from '../../schema.sql?raw';
-import { sha256HexBytes } from '../auth/crypto';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { handleRestoreFileVersion } from './file-versions/handlers';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from '../maintenance/object-cleanup';
 import type { Env } from '../types';
+import { sha256Hex } from '../../../platform/sha256';
 
 const { DB: db, BUCKET: bucket }: Env = env;
 
@@ -23,7 +23,7 @@ afterEach(async () => {
 });
 
 async function retain(path: string, content: Uint8Array<ArrayBuffer>) {
-	const hash = await sha256HexBytes(content);
+	const hash = await sha256Hex(content);
 	const key = `__crate__/files/${hash}/retained`;
 	await bucket.put(key, content, { httpMetadata: { contentType: 'application/octet-stream' }, customMetadata: { hash } });
 	await db.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, expires_at)

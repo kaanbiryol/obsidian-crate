@@ -1,5 +1,6 @@
 import type { CloudflareApiClient } from '../cloudflare-api';
 import { isSha256Hex } from '../../platform/validation';
+import { sha256Hex } from '../../platform/sha256';
 
 export interface BackupSource { account: string; database: string; bucket: string }
 interface BackupObject { key: string; sha256: string; size: number; contentType?: string }
@@ -10,10 +11,6 @@ export interface BackupRow { table: string; columns: string[]; values: Cell[] }
 export const PREFIX = /^__crate__\/backups\/schema-upgrade-[a-f0-9-]{36}$/;
 export const quote = (name: string) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('Unsupported backup identifier'); return `"${name}"`; };
 export const literal = (value: Cell): string => value === null ? 'NULL' : typeof value === 'number' ? String(value) : `'${value.replace(/'/g, "''")}'`;
-export async function hashBytes(bytes: Uint8Array): Promise<string> {
-  const hash = await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>);
-  return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
-}
 export async function readBackup(api: Pick<CloudflareApiClient, 'getRecoveryObject'>, source: BackupSource, prefix: string): Promise<BackupChoice> {
   if (!PREFIX.test(prefix)) throw new Error('Invalid backup location');
   const bytes = await api.getRecoveryObject(source.account, source.bucket, `${prefix}/archive.json`);
@@ -28,7 +25,7 @@ export async function readBackup(api: Pick<CloudflareApiClient, 'getRecoveryObje
       || !isSha256Hex(item.sha256) || !Number.isSafeInteger(item.size) || item.size < 0) throw new Error('Invalid backup inventory');
     keys.add(item.key);
   }
-  return { prefix, manifest: value, hash: await hashBytes(bytes) };
+  return { prefix, manifest: value, hash: await sha256Hex(bytes) };
 }
 
 /** Decode only the literal INSERTs emitted by our checkpoint writer. Never execute downloaded SQL. */

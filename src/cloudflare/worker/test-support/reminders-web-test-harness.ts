@@ -2,7 +2,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { scanReminderMarkdownFile } from '../reminders-web/scan';
 import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { vi } from 'vitest';
-import { sha256HexBytes } from '../auth/crypto';
+import { sha256Hex } from '@/platform/sha256';
 
 type StoredObject = {
 	body: ArrayBuffer;
@@ -267,7 +267,7 @@ export async function createEnv(input: {
 	}));
 	const hashEntries = await Promise.all(Object.entries(resolvedFiles).map(async ([path, objectKey]) => {
 		const body = store.get(objectKey)?.body;
-		return [path, body ? await sha256HexBytes(body) : ''] as const;
+		return [path, body ? await sha256Hex(body) : ''] as const;
 	}));
 	const fileHashes: Record<string, string> = Object.fromEntries(hashEntries);
 	const { db, files, hashes, reminderCache, scheduled, sizes } = createDb({
@@ -321,7 +321,7 @@ export async function createEnv(input: {
 			const body = new TextEncoder().encode(content).buffer;
 			store.set(storageKey, { body });
 			files.set(path, storageKey);
-			hashes.set(path, await sha256HexBytes(body));
+			hashes.set(path, await sha256Hex(body));
 			sizes.set(path, body.byteLength);
 		},
 		setCachedParserVersion(folderPath: string, filePath: string, parserVersion: number) {

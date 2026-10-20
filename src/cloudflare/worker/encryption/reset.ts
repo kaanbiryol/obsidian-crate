@@ -1,6 +1,5 @@
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
-import { sha256Hex } from '../auth/crypto';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../utils';
 import { ENCRYPTION_STATE_KEY, readEncryptionState } from './state';
@@ -9,6 +8,7 @@ import { isEncryptionId } from '../../../encryption/encoding';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { isSha256Hex } from '../../../platform/validation';
 import { notificationDispatcherStub } from '../coordinator';
+import { sha256Hex } from '../../../platform/sha256';
 
 const PREFIX = 'encryption-reset:';
 const READING_TABLES = ['reading_policy', 'reading_sources', 'reading_jobs', 'reading_operations',

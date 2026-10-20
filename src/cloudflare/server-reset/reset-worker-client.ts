@@ -1,7 +1,7 @@
 import { CloudflareApiError } from '../cloudflare-api-error';
-import { sha256Hex } from '../deployment/artifacts';
 import type { HttpTransport } from '../http';
 import { isSha256Hex } from '../../platform/validation';
+import { sha256Hex } from '../../platform/sha256';
 
 function cleanupUrl(origin: string, path: string): string {
 	const url = new URL(origin);

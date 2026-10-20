@@ -4,10 +4,10 @@ import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import type { BatchUploadFile, FileEntry } from '../../protocol/sync-types';
 import { TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
 import { createPersistentEngineHarness } from './engine-persistence-test-harness';
-import { computeHash } from '../hasher';
 import { arrayBufferToBase64 } from '../encoding';
 import type { ApiHttpResponse, ApiHttpTransport } from '../worker-api/http';
 import { formatSyncProgress } from '../../ui/activity/progress-label';
+import { sha256Hex } from '../../platform/sha256';
 
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
 afterEach(() => vi.unstubAllGlobals());
@@ -17,7 +17,7 @@ function response(value: unknown): ApiHttpResponse {
     return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
 }
 async function harness(paths = ['a.md', 'b.md']) {
-    const hash = await computeHash(bytes);
+    const hash = await sha256Hex(bytes);
     const entry = { hash, revision: 'v1', size: bytes.byteLength, modified: '2026-09-30T10:00:00Z' };
     const remote = {
         metadata: vi.fn(async (paths: string[]): Promise<{ files: Record<string, FileEntry> }> => ({ files: Object.fromEntries(paths.map(path => [path, entry])) })),

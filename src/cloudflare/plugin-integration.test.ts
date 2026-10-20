@@ -27,7 +27,7 @@ async function loadPluginIntegration() {
 	vi.doMock('./oauth/config', async () => ({ ...await vi.importActual<object>('./oauth/config'), isCloudflareOAuthConfigured: () => true }));
 	vi.doMock('obsidian', () => ({ Notice: vi.fn(), Platform: platform }));
 	vi.doMock('../sync/plugin-integration', () => ({ configureCloudflareAuthorizedDevice }));
-	vi.doMock('../sync/device-token', () => ({ generateSecureToken, hashToken }));
+	vi.doMock('./device-token', () => ({ generateSecureToken, hashToken }));
 	vi.doMock('../plugin/deviceInfo', () => ({
 		getCurrentDeviceName: vi.fn(() => 'Test device'),
 		getCurrentPlatformCode: vi.fn(() => 'desktop'),

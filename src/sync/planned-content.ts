@@ -1,4 +1,4 @@
-import { computeHash } from './hasher';
+import { sha256Hex } from '../platform/sha256';
 
 export class PlannedContent {
     private entries = new Map<string, { content: ArrayBuffer; hash: string }>();
@@ -27,7 +27,7 @@ export class PlannedContent {
                 if (equal) return prior.hash;
             }
         }
-        return computeHash(content);
+        return sha256Hex(content);
     }
 
     clear(): void { this.entries.clear(); this.bytes = 0; }

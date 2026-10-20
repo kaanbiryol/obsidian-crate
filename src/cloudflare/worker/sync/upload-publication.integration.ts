@@ -5,9 +5,9 @@ import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
-import { sha256Hex } from '../auth/crypto';
 import { fetchWorkerRequest } from '../request-handler';
 import type { Env } from '../types';
+import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => {
 	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();

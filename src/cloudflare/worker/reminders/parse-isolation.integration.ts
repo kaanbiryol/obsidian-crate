@@ -5,10 +5,10 @@ import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schema from '../../schema.sql?raw';
 import { fetchWorkerRequest } from '../request-handler';
+import { sha256Hex } from '@/platform/sha256';
 
 // These tests step projection manually to inspect its intermediate D1 state.
 const controlledCoordinator = { storage: { put: async () => {}, setAlarm: async () => {} } } as unknown as DurableObjectState;
-import { sha256Hex } from '../auth/crypto';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { drainNotificationProjections } from '../notifications/projection';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';

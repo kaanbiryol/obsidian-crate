@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { computeHash } from '../hasher';
 import { downloadAndSaveFile } from './download';
 import { parallelDownloadAndSaveFiles, processDiff } from './transfer';
 import { createNamedAbortError, createTransferHarness, emptyResult } from './transfer-test-harness';
+import { sha256Hex } from '../../platform/sha256';
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
@@ -23,7 +23,7 @@ describe('transfer download/process helpers', () => {
 		const content = new TextEncoder().encode('hello').buffer;
 
 		harness.vault.createBinary.mockImplementation(async () => { harness.adapter.readBinary.mockResolvedValue(content); });
-		const hash = await computeHash(content);
+		const hash = await sha256Hex(content);
 		harness.api.downloadFile.mockResolvedValue({ content, size: 5, hash, revision: 'revision-1' });
 		await downloadAndSaveFile(harness.context, { path: 'notes/a.md', expectedLocalHash: null, expectedRemoteHash: hash, remoteSize: 5 }, emptyResult());
 
@@ -52,7 +52,7 @@ describe('transfer download/process helpers', () => {
 
 		await processDiff(
 			harness.context,
-			{ path: 'notes/a.md', action: 'conflict', localHash: 'l', remoteHash: await computeHash(remote), cause: 'concurrent-edit' },
+			{ path: 'notes/a.md', action: 'conflict', localHash: 'l', remoteHash: await sha256Hex(remote), cause: 'concurrent-edit' },
 			localFiles,
 			result,
 		);
@@ -81,7 +81,7 @@ describe('transfer download/process helpers', () => {
 		harness.api.uploadFile.mockResolvedValue({
 			success: true,
 			path: 'notes/a.md',
-			hash: await computeHash(content),
+			hash: await sha256Hex(content),
 		});
 
 		const result = emptyResult();
@@ -119,7 +119,7 @@ describe('transfer download/process helpers', () => {
 		harness.api.uploadFile.mockResolvedValue({
 			success: true,
 			path: 'notes/a.md',
-			hash: await computeHash(content),
+			hash: await sha256Hex(content),
 		});
 		const result = emptyResult();
 
@@ -145,7 +145,7 @@ describe('transfer download/process helpers', () => {
 	it('moves a local file to trash when the remote delete wins', async () => {
 		const harness = createTransferHarness();
 		const content = new TextEncoder().encode('base').buffer;
-		const hash = await computeHash(content);
+		const hash = await sha256Hex(content);
 		const file = { path: 'notes/a.md', extension: 'md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(file);
 		harness.adapter.readBinary.mockResolvedValue(content);
@@ -171,8 +171,8 @@ describe('transfer download/process helpers', () => {
 		const harness = createTransferHarness();
 		const baseContent = new TextEncoder().encode('base').buffer;
 		const changedContent = new TextEncoder().encode('edited during sync').buffer;
-		const baseHash = await computeHash(baseContent);
-		const changedHash = await computeHash(changedContent);
+		const baseHash = await sha256Hex(baseContent);
+		const changedHash = await sha256Hex(changedContent);
 		const file = {
 			path: 'notes/a.md',
 			extension: 'md',
@@ -235,13 +235,13 @@ describe('transfer download/process helpers', () => {
 
 		harness.api.batchDownload.mockResolvedValue({
 			files: [
-				{ path: 'good.md', content: b64, hash: await computeHash(okContent.buffer), size: 2, contentType: 'text/plain' },
+				{ path: 'good.md', content: b64, hash: await sha256Hex(okContent.buffer), size: 2, contentType: 'text/plain' },
 				{ path: 'bad.md', content: '', hash: '', size: 0, contentType: '', error: 'File not found' },
 			],
 		});
 
 		const result = emptyResult();
-		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'good.md', expectedLocalHash: null, expectedRemoteHash: await computeHash(okContent.buffer), remoteSize: 2 }, { path: 'bad.md', expectedLocalHash: null, expectedRemoteHash: 'missing', remoteSize: 2 }], result, 5);
+		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'good.md', expectedLocalHash: null, expectedRemoteHash: await sha256Hex(okContent.buffer), remoteSize: 2 }, { path: 'bad.md', expectedLocalHash: null, expectedRemoteHash: 'missing', remoteSize: 2 }], result, 5);
 
 		expect(result.downloaded).toBe(1);
 		expect(result.errors).toContain('bad.md: File not found');
@@ -259,7 +259,7 @@ describe('transfer download/process helpers', () => {
 			files: [{
 				path,
 				content: btoa(String.fromCharCode(...new Uint8Array(remote))),
-				hash: await computeHash(remote),
+				hash: await sha256Hex(remote),
 				size: remote.byteLength,
 				contentType: 'text/markdown',
 			}],
@@ -268,8 +268,8 @@ describe('transfer download/process helpers', () => {
 		const result = emptyResult();
 		await parallelDownloadAndSaveFiles(harness.context, [{
 			path,
-			expectedLocalHash: await computeHash(plannedLocal),
-			expectedRemoteHash: await computeHash(remote),
+			expectedLocalHash: await sha256Hex(plannedLocal),
+			expectedRemoteHash: await sha256Hex(remote),
 			remoteSize: remote.byteLength,
 		}], result, 5);
 
@@ -292,7 +292,7 @@ describe('transfer download/process helpers', () => {
 		harness.api.downloadFile.mockResolvedValue({
 			content: remote,
 			contentType: 'text/markdown',
-			hash: await computeHash(remote),
+			hash: await sha256Hex(remote),
 			size: remote.byteLength,
 		});
 		const result = emptyResult();
@@ -302,7 +302,7 @@ describe('transfer download/process helpers', () => {
 			{
 				path,
 				action: 'download',
-				remoteHash: await computeHash(remote),
+				remoteHash: await sha256Hex(remote),
 				cause: 'local-deleted',
 			},
 			{},
@@ -329,7 +329,7 @@ describe('transfer download/process helpers', () => {
 		});
 
 		const result = emptyResult();
-		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'fallback.md', expectedLocalHash: null, expectedRemoteHash: await computeHash(new TextEncoder().encode('ok').buffer), remoteSize: 2 }], result, 5);
+		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'fallback.md', expectedLocalHash: null, expectedRemoteHash: await sha256Hex(new TextEncoder().encode('ok').buffer), remoteSize: 2 }], result, 5);
 
 		expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md');
 		expect(result.downloaded).toBe(1);
@@ -364,7 +364,7 @@ it('reports every file across concurrent download batches', async () => {
     const harness = createTransferHarness();
     harness.vault.getAbstractFileByPath.mockReturnValue(null);
     const content = new TextEncoder().encode('ok');
-    const hash = await computeHash(content.buffer);
+    const hash = await sha256Hex(content.buffer);
     const onProcessed = vi.fn();
     harness.api.batchDownload.mockImplementation(async (paths: string[]) => {
         return { files: paths.map(path => ({ path, content: btoa('ok'), hash, size: 2, contentType: 'text/plain' })) };

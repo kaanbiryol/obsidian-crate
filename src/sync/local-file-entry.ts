@@ -1,9 +1,9 @@
 import { assertLocalSyncPath } from './local-path-safety';
 import type { Vault } from 'obsidian';
-import { computeHash } from './hasher';
 import { isVaultTFileLike } from './planner/helpers';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
+import { sha256Hex } from '../platform/sha256';
 
 /** Read the current local metadata used by all reconciliation paths. */
 export async function readLocalFileEntry(
@@ -28,7 +28,7 @@ export async function readLocalFileEntry(
 			throw new Error('Skipped local file larger than 25MB');
 		}
 		return {
-			hash: await computeHash(content),
+			hash: await sha256Hex(content),
 			size: content.byteLength,
 			modified: new Date(stat?.mtime ?? Date.now()).toISOString(),
 		};

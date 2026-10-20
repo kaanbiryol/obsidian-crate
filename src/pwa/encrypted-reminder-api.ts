@@ -4,7 +4,6 @@ import { createReminderProjectionWithKeys } from '../encryption/reminder-project
 import { scanReminderMarkdownContent, getProjectFromPath } from '../reminders/core/markdownScan';
 import { decodeMarkdownBytes } from '../reminders/core/markdownEncoding';
 import { applyReminderFileCommand, reminderCommandPayload, ReminderCommandError } from '../reminders/core/reminderFileCommand';
-import { computeHash } from '../sync/hasher';
 import { reminderRequestHash } from '../encryption/reminder-receipt';
 import { MarkdownEncodingError } from '../reminders/core/markdownEncoding';
 import { ReminderInputError } from '../reminders/core/reminderMutationInput';
@@ -21,6 +20,7 @@ import { mapBounded } from '@/platform/map-bounded';
 import { isReminderOperationId } from '@/protocol/reminder-operation';
 import { isSyncPath } from '@/protocol/sync-validation';
 import { REMINDER_OUTBOX_LOCK } from '@/pwa/reminder-storage-keys';
+import { sha256Hex } from '@/platform/sha256';
 
 const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
 const NOTE_CONCURRENCY = 6;
@@ -105,7 +105,7 @@ export class EncryptedReminderApi {
 		const response = await this.fetch(`/reminders/encrypted-file?${query}`);
 		if (!response.ok) await json(response);
 		const bytes = await response.arrayBuffer();
-		if (bytes.byteLength !== file.size || await computeHash(bytes) !== file.hash) throw new Error('Encrypted reminder transfer failed integrity validation');
+		if (bytes.byteLength !== file.size || await sha256Hex(bytes) !== file.hash) throw new Error('Encrypted reminder transfer failed integrity validation');
 		const opened = await openFile(new Uint8Array(bytes), file.path, this.authority(file.path));
 		if (opened.content.byteLength > 1024 * 1024) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
 		const content = decodeMarkdownBytes(opened.content);
@@ -192,7 +192,7 @@ export class EncryptedReminderApi {
 		if (original.folderPath !== this.localFolder || !isReminderOperationId(original.operationId)) throw new ReminderCommandError('Invalid encrypted reminder operation', 400, 'invalid_reminder_input');
 		const body = { ...original, operationId: original.operationId };
 		const key = this.attemptKey(body.operationId);
-		const semanticHash = await computeHash(new TextEncoder().encode(JSON.stringify([action, source])).buffer);
+		const semanticHash = await sha256Hex(new TextEncoder().encode(JSON.stringify([action, source])).buffer);
 		let attempt = await loadEncryptedReminderAttempt(key);
 		if (attempt && attempt.semanticHash !== semanticHash && !attempt.rejected) throw new Error('The original encrypted save is still unresolved. Retry it before changing the request.');
 		const movedAttempt = attempt && attempt.generation !== this.keys.generation;

@@ -5,7 +5,6 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import worker from './index';
-import { sha256Hex } from './auth/crypto';
 import { handleSubscribe, handleUnsubscribe } from './notifications/subscription-handlers';
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { writeCommittedMarkdownFile } from './storage';
@@ -13,6 +12,7 @@ import { makeApiFetch } from '@/pwa/api';
 import { performPwaLogout } from '@/pwa/hooks/usePwaSessionLifecycle';
 import { invalidatePwaSession } from '@/pwa/session-generation';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
+import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });

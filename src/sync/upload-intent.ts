@@ -4,8 +4,8 @@ import { isUploadSession } from './upload-diagnostics';
 import { isSyncDate, isSyncPath, isSyncSequence } from '../protocol/sync-validation';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { arrayBufferToBase64, base64ToArrayBuffer } from './encoding';
-import { computeHash } from './hasher';
 import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES, parseEncryptedFile } from '../encryption/file-format';
+import { sha256Hex } from '../platform/sha256';
 
 interface UploadPreimage { content: string; hash: string; size: number }
 export type UploadIntent = { kind: 'local' } | { kind: 'merge'; preimage: UploadPreimage };
@@ -30,7 +30,7 @@ export function uploadWire(file: JournalUpload): BatchUploadFile {
 }
 
 export async function mergeUploadIntent(content: ArrayBuffer): Promise<UploadIntent> {
-	return { kind: 'merge', preimage: { content: arrayBufferToBase64(content), hash: await computeHash(content), size: content.byteLength } };
+	return { kind: 'merge', preimage: { content: arrayBufferToBase64(content), hash: await sha256Hex(content), size: content.byteLength } };
 }
 
 async function validateBytes(value: unknown, limit = MAX_FILE_SIZE_BYTES, verifyContent = true): Promise<void> {
@@ -39,7 +39,7 @@ async function validateBytes(value: unknown, limit = MAX_FILE_SIZE_BYTES, verify
 		|| value.content.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value.content)) throw new Error('Invalid upload journal bytes');
 	if (!verifyContent) return;
 	const content = base64ToArrayBuffer(value.content);
-	if (content.byteLength !== value.size || await computeHash(content) !== value.hash) throw new Error('Upload journal content failed integrity validation');
+	if (content.byteLength !== value.size || await sha256Hex(content) !== value.hash) throw new Error('Upload journal content failed integrity validation');
 }
 
 /** `sealedInMemory` skips rehashing bytes that encryption just produced and

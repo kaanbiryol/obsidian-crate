@@ -3,12 +3,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
-import { sha256Hex, sha256HexBytes } from '../auth/crypto';
 import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import type { RemoteFileVersion, RestoreFileRequest } from '../../../protocol/sync-types';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
+import { sha256Hex } from '../../../platform/sha256';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -25,7 +25,7 @@ async function request(path: string, body: unknown) {
 }
 async function retained(): Promise<RemoteFileVersion> {
 	const bytes = new TextEncoder().encode('retained content');
-	const hash = await sha256HexBytes(bytes); const key = `__crate__/files/${hash}/${crypto.randomUUID()}`;
+	const hash = await sha256Hex(bytes); const key = `__crate__/files/${hash}/${crypto.randomUUID()}`;
 	await env.BUCKET.put(key, bytes, { customMetadata: { hash } });
 	const version: RemoteFileVersion = { storage_key: key, path: 'note.md', hash, size: bytes.byteLength, reason: 'deleted', created_at: new Date().toISOString(), expires_at: Date.now() + 60_000 };
 	await env.DB.prepare("INSERT INTO file_versions (storage_key,path,hash,size,reason,expires_at) VALUES (?,?,?,?,'deleted',?)").bind(key,version.path,hash,version.size,version.expires_at).run();

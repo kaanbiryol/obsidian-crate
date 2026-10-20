@@ -7,7 +7,7 @@ import { handleListFileVersions } from './list';
 import { handleRestoreFileVersion } from './handlers';
 import { parseFileVersions } from '../../../../sync/worker-api/version-contract';
 import { createReminderOperationId } from '../../../../protocol/reminder-operation';
-import { sha256Hex } from '../../auth/crypto';
+import { sha256Hex } from '../../../../platform/sha256';
 
 beforeEach(async () => {
 	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();

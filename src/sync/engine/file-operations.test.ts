@@ -2,10 +2,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { SyncApiClient } from '../api';
-import { computeHash } from '../hasher';
 import { LocalManifest } from '../manifest';
 import { MarkdownBaseCache } from '../markdown-base-cache';
 import type { ApiHttpTransport } from '../worker-api/http';
+import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
 afterEach(() => vi.unstubAllGlobals());
@@ -17,7 +17,7 @@ async function fixture() {
 	const manifest = new LocalManifest(app, plugin, 'https://server.test');
 	const cache = new MarkdownBaseCache(app, plugin);
 	const content = new TextEncoder().encode('original').buffer;
-	const hash = await computeHash(content);
+	const hash = await sha256Hex(content);
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		if (!request.url.endsWith('/.well-known/crate')) throw new Error('Lost response');
 		const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL,

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FileEntry, RemoteFileVersion } from '../../protocol/sync-types';
 import { createHistoryRestore } from './restore';
 import { HistoryCheckpoints } from './checkpoint';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 vi.mock('../file-discovery', async importOriginal => ({
     ...await importOriginal<typeof import('../file-discovery')>(),
@@ -11,7 +11,7 @@ vi.mock('../file-discovery', async importOriginal => ({
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 async function metadata(source: Record<string, string>): Promise<Record<string, FileEntry>> {
     return Object.fromEntries(await Promise.all(Object.entries(source).map(async ([path, text]) => [path,
-        { hash: await computeHash(bytes(text)), revision: `revision-${text}`, size: bytes(text).byteLength, modified: '2026-09-20' }] as const)));
+        { hash: await sha256Hex(bytes(text)), revision: `revision-${text}`, size: bytes(text).byteLength, modified: '2026-09-20' }] as const)));
 }
 async function harness(initial: Record<string, string>, historical: Record<string, string>, server = initial) {
     const files = new Map(Object.entries(initial).map(([path, text]) => [path, bytes(text)]));

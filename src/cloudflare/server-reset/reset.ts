@@ -1,6 +1,5 @@
 import { ResetBlockedError } from './reset-errors';
 import { inspectResumableDeletion } from './delete-recovery';
-import { sha256Hex } from '../deployment/artifacts';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { assertDeploymentIsNotDowngrade } from '../deployment/update';
 import { deployedArtifact } from '../deployment/discovery';
@@ -8,6 +7,7 @@ import { randomHex } from '../oauth/pkce';
 import { assertWorkerTarget, assertUnsharedResources, assertOwnedNamespace, readCrateTables, type ResetApi } from './reset-ownership';
 import { createObjectOwnershipCheck, inspectBucketObjects, clearBucketObjects } from './reset-objects';
 import { fenceResetMutations, withDeploymentFence, type DeploymentFence } from '../deployment/fence';
+import { sha256Hex } from '../../platform/sha256';
 
 export async function resetCrateServer(input: {
 	api: ResetApi;

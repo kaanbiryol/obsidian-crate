@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sha256Hex } from './crypto';
 import { authenticateWorkerRequest } from './authenticate';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../../../protocol/web-session';
+import { sha256Hex } from '../../../platform/sha256';
 
 function createDb(tokenHash: string, row: { id: string; scope: string; folder_path?: string; device_name?: string; last_seen_stale?: number; feature_policy?: string } | null) {
 	return {

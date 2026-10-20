@@ -2,9 +2,9 @@ import type { DataAdapter, Plugin } from 'obsidian';
 import { createLogger } from './logger';
 import { isRecord } from '../platform/validation';
 import { validateUploadIntent, type JournalUpload } from './upload-intent';
-import { computeHash } from './hasher';
 import { UPLOAD_JOURNAL_VERSION } from './upload-journal';
 import type { SyncState } from './types';
+import { sha256Hex } from '../platform/sha256';
 
 const DAY = 24 * 60 * 60 * 1000;
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
@@ -37,7 +37,7 @@ export async function pruneCheckpointBackups(adapter: DataAdapter, directory: st
 			if (file.intent.kind === 'merge' && file.intent.preimage.hash !== file.hash) continue;
 			if (signal.aborted) break;
 			const bytes = await adapter.readBinary(file.path);
-			if (bytes.byteLength !== file.size || await computeHash(bytes) !== file.hash) continue;
+			if (bytes.byteLength !== file.size || await sha256Hex(bytes) !== file.hash) continue;
 			// Do not remove a backup replaced while its contents were being checked.
 			if (await adapter.read(path) !== original || signal.aborted) continue;
 			await adapter.remove(path);

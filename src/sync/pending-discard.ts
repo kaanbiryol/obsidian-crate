@@ -2,12 +2,12 @@ import { decodePendingChange } from './pending-change';
 import type { Vault } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
-import { computeHash } from './hasher';
 import { assertLocalSyncPath } from './local-path-safety';
 import { isHiddenPath } from './file-discovery';
 import { deletePathLocallyIfUnchanged } from './planner/helpers';
 import { applyRemoteContentIfUnchanged, TEXT_PATH } from './local-apply';
 import { replaceLocalFileWithRecovery } from './local-recovery-write';
+import { sha256Hex } from '../platform/sha256';
 
 interface DiscardItem {
     path: string;
@@ -67,7 +67,7 @@ async function readHash(vault: Vault, path: string): Promise<string | null> {
     if (stat.size > MAX_FILE_SIZE_BYTES) throw new Error(`${path}: file is too large to discard safely.`);
     const bytes = await vault.adapter.readBinary(path);
     if (bytes.byteLength > MAX_FILE_SIZE_BYTES) throw new Error(`${path}: file is too large to discard safely.`);
-    return computeHash(bytes);
+    return sha256Hex(bytes);
 }
 
 async function verifySnapshots(context: DiscardContext, snapshots: DiscardSnapshot[]): Promise<void> {
@@ -93,13 +93,13 @@ async function discardOne(context: DiscardContext, item: DiscardSnapshot): Promi
     let original: ArrayBuffer | undefined;
     if (item.localHash !== null) {
         original = await vault.adapter.readBinary(item.path);
-        if (await computeHash(original) !== item.localHash) throw new Error(`${item.path} changed. Reopen discard.`);
+        if (await sha256Hex(original) !== item.localHash) throw new Error(`${item.path} changed. Reopen discard.`);
         const folder = `${context.backupRoot}/${crypto.randomUUID()}`;
         if (!await vault.adapter.exists(context.backupRoot)) await vault.adapter.mkdir(context.backupRoot);
         await vault.adapter.mkdir(folder);
         await vault.adapter.writeBinary(`${folder}/original`, original);
         await vault.adapter.write(`${folder}/info.json`, JSON.stringify({ path: item.path, hash: item.localHash, action: item.action, savedAt: new Date().toISOString() }));
-        if (await computeHash(await vault.adapter.readBinary(`${folder}/original`)) !== item.localHash) throw new Error('Could not verify the recovery copy. The file was kept.');
+        if (await sha256Hex(await vault.adapter.readBinary(`${folder}/original`)) !== item.localHash) throw new Error('Could not verify the recovery copy. The file was kept.');
     }
     await verifySnapshots(context, [item]);
     if (!content) {
@@ -137,7 +137,7 @@ function isUtf8(bytes: ArrayBuffer): boolean {
 
 async function readBaseline(context: DiscardContext, path: string, baseline: Readonly<FileEntry>): Promise<ArrayBuffer> {
     const content = await context.readBase(path, baseline);
-    if (!content || content.byteLength > MAX_FILE_SIZE_BYTES || content.byteLength !== baseline.size || await computeHash(content) !== baseline.hash) {
+    if (!content || content.byteLength > MAX_FILE_SIZE_BYTES || content.byteLength !== baseline.size || await sha256Hex(content) !== baseline.hash) {
         throw new Error(`${path}: the last-synced copy is unavailable or could not be verified. Local changes were kept.`);
     }
     return content;

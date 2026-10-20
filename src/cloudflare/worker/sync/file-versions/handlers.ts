@@ -1,5 +1,4 @@
 import { trackStagedUpload } from '../staged-uploads';
-import { sha256HexBytes } from '../../auth/crypto';
 import { beginUploadOperation } from '../upload-operations';
 import { isSyncRevision } from '@/protocol/sync-validation';
 import { corsResponse } from '../../cors';
@@ -13,6 +12,7 @@ import {
 import { parseExpectedFileHash } from '../storage';
 import { parseJsonObject, parseOptionalString, sanitizePath } from '../../utils';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
+import { sha256Hex } from '@/platform/sha256';
 export { handleListFileVersions } from './list';
 
 interface FileVersionRow {
@@ -64,7 +64,7 @@ export async function handleRestoreFileVersion(
 		return corsResponse({ error: 'Stored file version content is unavailable' }, 503);
 	}
 	const content = await object.arrayBuffer();
-	if (content.byteLength !== version.size || await sha256HexBytes(content) !== version.hash) {
+	if (content.byteLength !== version.size || await sha256Hex(content) !== version.hash) {
 		return corsResponse({ error: 'Stored file version content failed integrity validation' }, 503);
 	}
 

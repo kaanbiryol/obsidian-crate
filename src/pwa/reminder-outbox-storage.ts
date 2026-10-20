@@ -1,4 +1,3 @@
-import { stringDigest } from './string-digest';
 import * as v from 'valibot';
 import { isStoredReminderChange, storedChangeSchema } from './reminder-outbox-validation';
 import type { PendingReminderChange } from './reminder-outbox-types';
@@ -6,6 +5,7 @@ import { privateStorage } from './private-storage';
 import { isSha256Hex } from '../platform/validation';
 import { isReminderOperationId } from '../protocol/reminder-operation';
 import { REMINDER_OUTBOX_PREFIX } from './reminder-storage-keys';
+import { sha256Hex } from '../platform/sha256';
 
 const STORAGE_ERROR = 'Could not access pending changes on this device. Free up storage and try again.';
 const CORRUPT_ERROR = 'Pending changes on this device could not be read. Keep this app open and try again.';
@@ -88,7 +88,7 @@ function quarantineStorage(storage: Storage, keys: () => string[], folderPath: s
 }
 
 async function outboxScope(authToken: string, folderPath: string): Promise<string> {
-	const tokenHash = await stringDigest(authToken);
+	const tokenHash = await sha256Hex(authToken);
 	return `${REMINDER_OUTBOX_PREFIX}v1:${tokenHash}:${encodeURIComponent(folderPath)}:`;
 }
 

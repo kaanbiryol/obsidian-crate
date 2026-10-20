@@ -4,7 +4,6 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import { writeCommittedMarkdownFile } from '../storage';
-import { sha256Hex } from '../auth/crypto';
 import { drainNotificationProjections } from '../notifications/projection';
 import { revalidateReminderSources } from './source-migration';
 import { handleNotificationPolicy } from '../notifications/policy';
@@ -13,6 +12,7 @@ import { sendToAllSubscriptions } from '../notifications/push';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
 import { runNotificationCoordinator } from '../notifications/coordinator';
 import { handleListReminders } from '../reminders-web/routes/list';
+import { sha256Hex } from '../../../platform/sha256';
 
 vi.mock('../notifications/push', () => ({ listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
 beforeEach(async () => {

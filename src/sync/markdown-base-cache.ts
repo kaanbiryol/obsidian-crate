@@ -2,7 +2,7 @@ import type { App, PluginManifest } from 'obsidian';
 import { createLogger, errorMessage } from './logger';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
-import { computeHash } from './hasher';
+import { sha256Hex } from '../platform/sha256';
 
 const logger = createLogger('MarkdownBaseCache');
 const CACHE_DIRNAME = 'markdown-base-cache';
@@ -57,7 +57,7 @@ export class MarkdownBaseCache {
 				return null;
 			}
 			const content = await this.app.vault.adapter.readBinary(cachePath);
-			if (content.byteLength > MAX_FILE_SIZE_BYTES || await computeHash(content) !== hash) {
+			if (content.byteLength > MAX_FILE_SIZE_BYTES || await sha256Hex(content) !== hash) {
 				this.invalidHashes.add(hash);
 				this.writtenHashes.delete(hash);
 				logger.warn(`Ignoring corrupt Markdown base cache for ${path}`);
@@ -132,7 +132,7 @@ export class MarkdownBaseCache {
 				if (content.byteLength > MAX_FILE_SIZE_BYTES) {
 					return;
 				}
-				const hash = await computeHash(content);
+				const hash = await sha256Hex(content);
 				if (hash === entry.hash) {
 					await this.putBase(path, entry.hash, content);
 				}

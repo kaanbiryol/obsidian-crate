@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { PlannedContent } from './planned-content';
-import { computeHash } from './hasher';
+import { sha256Hex } from '../platform/sha256';
 
 it('reuses only byte-identical snapshots and consumes them once', async () => {
     const cache = new PlannedContent();
@@ -11,7 +11,7 @@ it('reuses only byte-identical snapshots and consumes them once', async () => {
     expect(digest).not.toHaveBeenCalled();
     const edited = new Uint8Array([1, 3]).buffer;
     cache.remember('note.md', content, 'planned-hash');
-    expect(await cache.hash('note.md', edited)).toBe(await computeHash(edited));
+    expect(await cache.hash('note.md', edited)).toBe(await sha256Hex(edited));
     expect(digest).toHaveBeenCalled();
     digest.mockRestore();
 });
@@ -21,7 +21,7 @@ it('bounds retained bytes and clears snapshots', async () => {
     const content = new Uint8Array([1, 2]).buffer;
     cache.remember('first', content, 'first-hash');
     cache.remember('second', content, 'second-hash');
-    expect(await cache.hash('second', content)).toBe(await computeHash(content));
+    expect(await cache.hash('second', content)).toBe(await sha256Hex(content));
     cache.clear();
-    expect(await cache.hash('first', content)).toBe(await computeHash(content));
+    expect(await cache.hash('first', content)).toBe(await sha256Hex(content));
 });

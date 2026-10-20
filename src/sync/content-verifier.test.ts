@@ -2,16 +2,16 @@ import type { DataAdapter } from 'obsidian';
 import { describe, expect, it, vi } from 'vitest';
 import { LocalContentVerifier, VERIFICATION_FILE_BUDGET, VERIFICATION_BYTE_BUDGET } from './content-verifier';
 import { LocalManifest } from './manifest';
-import { computeHash } from './hasher';
 import { getLocalChanges } from './planner/local';
 import { createFullSyncPlan } from './planner/full';
 import { createHarness, toArrayBuffer } from './engine/engine-test-harness';
 import { createDeferred } from './runtime/runtime-test-harness';
 import type { VaultFile } from './file-discovery';
+import { sha256Hex } from '../platform/sha256';
 
 async function fixture(count = 1, size = 4) {
 	const original = toArrayBuffer('same');
-	const hash = await computeHash(original);
+	const hash = await sha256Hex(original);
 	const files: VaultFile[] = Array.from({ length: count }, (_, i) => ({ path: `notes/${i.toString().padStart(5, '0')}.md`, size, mtime: 1000, extension: 'md' }));
 	const disk = new Map<string, string>();
 	const adapter = {
@@ -50,7 +50,7 @@ describe('content verification independent of filesystem fingerprints', () => {
 		const restarted = new LocalManifest(h.app, h.plugin, 'https://server.example');
 		await restarted.load();
 		expect(restarted.getEntry('.hidden.md')?.modified).toBe('unverified');
-		expect((await getLocalChanges({ ...h.planner, localManifest: restarted }, 1)).changes).toEqual([{ path: '.hidden.md', hash: await computeHash(toArrayBuffer('edit')) }]);
+		expect((await getLocalChanges({ ...h.planner, localManifest: restarted }, 1)).changes).toEqual([{ path: '.hidden.md', hash: await sha256Hex(toArrayBuffer('edit')) }]);
 	});
 
 	it('full reconciliation detects a same-size, same-time offline edit immediately', async () => {
@@ -118,7 +118,7 @@ describe('content verification independent of filesystem fingerprints', () => {
 		h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
 		h.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('edit'));
 		h.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 42, hasMore: false });
-		h.localManifest.setEntry(path, { hash: await computeHash(toArrayBuffer('same')), size: 4, modified: new Date(1000).toISOString() });
+		h.localManifest.setEntry(path, { hash: await sha256Hex(toArrayBuffer('same')), size: 4, modified: new Date(1000).toISOString() });
 		expect(await h.engine.hasUnsyncedLocalChanges()).toBe(true);
 		const result = await h.engine.sync();
 		expect(result.success).toBe(true);

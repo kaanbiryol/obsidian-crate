@@ -6,12 +6,12 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
-import { sha256Hex } from '../auth/crypto';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { handleListReminders } from '../reminders-web/routes/list';
 import { handleReorderReminders } from '../reminders-web/routes/reorder';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';
+import { sha256Hex } from '@/platform/sha256';
 
 const path = 'Reminders/Inbox.md';
 const first = '- [ ] First 2099-09-09 <!-- crate-id:first -->';

@@ -1,12 +1,12 @@
 import { prepareRows } from './prepare-rows';
 import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
-import { sha256Hex } from '../deployment/artifacts';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { recoverDeployment } from '../deployment/recovery';
 import { completePublishedDeployment } from '../deployment/complete-published';
-import { hashBytes, literal, parseBackupRows, PREFIX, quote, readBackup, type BackupChoice, type BackupRow, type BackupSource } from './archive';
+import { literal, parseBackupRows, PREFIX, quote, readBackup, type BackupChoice, type BackupRow, type BackupSource } from './archive';
 import { validRestoreState, type ServerRestoreState } from './state';
+import { sha256Hex } from '../../platform/sha256';
 
 export async function listUpgradeBackups(api: CloudflareApiClient, source: BackupSource): Promise<BackupChoice[]> {
   const choices: BackupChoice[] = [], cursors = new Set<string>(); let cursor: string | undefined;
@@ -83,7 +83,7 @@ export async function restoreUpgradeBackup(input: {
     onProgress('Verifying the backup database and file inventory…');
     const databaseBytes = await api.getRecoveryObject(account, source.bucket, `${state.prefix}/database.sql`);
     if (databaseBytes.length > 128 * 1024 * 1024) throw new Error('Backup database is too large for in-app recovery. Use the recovery CLI.');
-    if (await hashBytes(databaseBytes) !== backup.manifest.databaseSha256) throw new Error('Backup database checksum does not match');
+    if (await sha256Hex(databaseBytes) !== backup.manifest.databaseSha256) throw new Error('Backup database checksum does not match');
     const rows = prepareRows(parseBackupRows(new TextDecoder().decode(databaseBytes)), backup.manifest, artifacts.d1Schema, state.restoredAt);
     const plan = await sha256Hex(JSON.stringify([state.archiveHash, state.fingerprint, state.restoredAt, rows]));
     const batches = rowBatches(rows, plan);
@@ -91,7 +91,7 @@ export async function restoreUpgradeBackup(input: {
     const backupKey = async (key: string) => `${state.prefix}/objects/${await sha256Hex(key)}`;
     for (const [index, item] of backup.manifest.objects.entries()) {
       const bytes = await api.getRecoveryObject(account, source.bucket, await backupKey(item.key));
-      if (bytes.length !== item.size || await hashBytes(bytes) !== item.sha256) throw new Error('A backup file failed verification');
+      if (bytes.length !== item.size || await sha256Hex(bytes) !== item.sha256) throw new Error('A backup file failed verification');
       onProgress(`Verifying backup: ${index + 1} of ${backup.manifest.objects.length} files and versions…`);
     }
     onProgress('Preparing separate restore storage…');
@@ -129,11 +129,11 @@ export async function restoreUpgradeBackup(input: {
       catch (error) {
         if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
         const original = await api.getRecoveryObject(account, source.bucket, await backupKey(item.key));
-        if (original.length !== item.size || await hashBytes(original) !== item.sha256) throw new Error('Backup file changed during restore');
+        if (original.length !== item.size || await sha256Hex(original) !== item.sha256) throw new Error('Backup file changed during restore');
         await api.putRestoredObject(account, source.bucket, target.r2BucketName, item.key, original);
         bytes = await api.getRecoveryObject(account, target.r2BucketName, item.key);
       }
-      if (bytes.length !== item.size || await hashBytes(bytes) !== item.sha256) throw new Error('Restore file differs from the backup; it was not overwritten');
+      if (bytes.length !== item.size || await sha256Hex(bytes) !== item.sha256) throw new Error('Restore file differs from the backup; it was not overwritten');
       onProgress(`Restoring files and history: ${index + 1} of ${backup.manifest.objects.length} verified…`);
     }
     for (let index = progress; index < batches.length; index++) {

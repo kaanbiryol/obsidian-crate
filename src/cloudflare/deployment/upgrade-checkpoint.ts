@@ -1,7 +1,7 @@
 import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
-import { sha256Hex } from './artifacts';
 import type { DeploymentFence } from './fence';
 import { UPGRADE_BACKUP_PREFIX, SHARED_SETTINGS_KEY } from '../../protocol/storage-keys';
+import { sha256Hex } from '../../platform/sha256';
 
 const CONTROL = new Set(['maintenance_state', 'crate_schema', 'crate_migrations', 'crate_release']);
 const quoteName = (name: string) => `"${name.replace(/"/g, '""')}"`;
@@ -42,7 +42,7 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
   const databaseSha256 = await sha256Hex(sql);
   await api.putRecoveryObject(accountId, bucketName, `${prefix}/database.sql`, new TextEncoder().encode(sql));
   const verifiedSql = await api.getRecoveryObject(accountId, bucketName, `${prefix}/database.sql`);
-  if (await hash(verifiedSql) !== databaseSha256) throw new Error('Database checkpoint verification failed');
+  if (await sha256Hex(verifiedSql) !== databaseSha256) throw new Error('Database checkpoint verification failed');
   const objects: Array<{ key: string; sha256: string; size: number; contentType: string }> = [];
   input.onProgress?.('Counting files and history for the backup…');
   const refs = await rows('SELECT storage_key, hash, size FROM files UNION SELECT storage_key, hash, size FROM file_versions;');
@@ -68,29 +68,25 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
   if (total) reportFiles(0);
   for (const [key, row] of uniqueRefs) {
     const bytes = await api.getRecoveryObject(accountId, bucketName, key);
-    if (bytes.byteLength !== row.size || await hash(bytes) !== row.hash) throw new Error('A server file could not be verified. Upgrade has not started.');
+    if (bytes.byteLength !== row.size || await sha256Hex(bytes) !== row.hash) throw new Error('A server file could not be verified. Upgrade has not started.');
     const backupKey = `${prefix}/objects/${await sha256Hex(key)}`;
     await api.putRecoveryObject(accountId, bucketName, backupKey, bytes);
-    if (await hash(await api.getRecoveryObject(accountId, bucketName, backupKey)) !== row.hash) throw new Error('File checkpoint verification failed');
+    if (await sha256Hex(await api.getRecoveryObject(accountId, bucketName, backupKey)) !== row.hash) throw new Error('File checkpoint verification failed');
     objects.push({ key, sha256: String(row.hash), size: bytes.byteLength, contentType: 'application/octet-stream' });
     reportFiles(objects.length);
   }
   input.onProgress?.('Finishing and verifying the backup archive…');
   try {
     const key = SHARED_SETTINGS_KEY, bytes = await api.getRecoveryObject(accountId, bucketName, key);
-    const sha = await hash(bytes), backupKey = `${prefix}/objects/${await sha256Hex(key)}`;
+    const sha = await sha256Hex(bytes), backupKey = `${prefix}/objects/${await sha256Hex(key)}`;
     await api.putRecoveryObject(accountId, bucketName, backupKey, bytes);
-    if (await hash(await api.getRecoveryObject(accountId, bucketName, backupKey)) !== sha) throw new Error('Settings checkpoint verification failed');
+    if (await sha256Hex(await api.getRecoveryObject(accountId, bucketName, backupKey)) !== sha) throw new Error('Settings checkpoint verification failed');
     objects.push({ key, sha256: sha, size: bytes.byteLength, contentType: 'application/json' });
   } catch (error) { if (!(error instanceof CloudflareApiError && error.status === 404)) throw error; }
   const manifest = JSON.stringify({ format: 1, complete: true, createdAt: new Date().toISOString(), source: { account: accountId, database: databaseId, bucket: bucketName }, bookmark: null, databaseSha256, objects });
   await api.putRecoveryObject(accountId, bucketName, `${prefix}/archive.json`, new TextEncoder().encode(manifest));
-  if (await hash(await api.getRecoveryObject(accountId, bucketName, `${prefix}/archive.json`)) !== await sha256Hex(manifest)) throw new Error('Checkpoint manifest verification failed');
+  if (await sha256Hex(await api.getRecoveryObject(accountId, bucketName, `${prefix}/archive.json`)) !== await sha256Hex(manifest)) throw new Error('Checkpoint manifest verification failed');
   await fence.mutate(() => api.queryD1(accountId, databaseId, "INSERT OR REPLACE INTO maintenance_state(key,value) VALUES ('crate_upgrade_checkpoint', ?);", [prefix]), 'verify-upgrade-checkpoint');
-}
-async function hash(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>);
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 export async function releaseUpgradeGuards(api: Pick<CloudflareApiClient, 'queryD1'>, account: string, database: string, fence: DeploymentFence) {
   const rows = (await api.queryD1(account, database, "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'crate_upgrade_%';")).flatMap(result => result.results ?? []);

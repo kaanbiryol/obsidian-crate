@@ -1,8 +1,8 @@
 import type { DataAdapter } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { assertLocalSyncPath } from './local-path-safety';
-import { computeHash } from './hasher';
 import { decodePreviewText, isBinaryPreviewPath, MAX_PREVIEW_BYTES } from './preview-format';
+import { sha256Hex } from '../platform/sha256';
 
 export interface PendingDiff {
     before?: string;
@@ -44,7 +44,7 @@ export async function loadPendingDiff(
         return { ...result, afterSize: afterBytes.byteLength, unavailable: 'This file is too large to preview (limit: 256 KB).' };
     }
     // A matching last-synced hash needs no cached contents, including for config files.
-    const unchanged = !deleted && !!baseline && await computeHash(afterBytes) === baseline.hash;
+    const unchanged = !deleted && !!baseline && await sha256Hex(afterBytes) === baseline.hash;
     let beforeBytes = new ArrayBuffer(0);
     if (unchanged) {
         beforeBytes = afterBytes;

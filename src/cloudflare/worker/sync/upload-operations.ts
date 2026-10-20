@@ -1,10 +1,10 @@
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
-import { sha256Hex } from '../auth/crypto';
 import { corsResponse } from '../cors';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { OPERATION_VALID } from '../operation-expiry';
 import { fileNamespaceGuard, namespacePredicate, FileNamespaceConflictError } from './file-namespace';
 import type { RestoreFileRequest, UploadResult } from '@/protocol/sync-types';
+import { sha256Hex } from '@/platform/sha256';
 
 export function decodeReceipt(json: string): UploadResult {
 	const result = JSON.parse(json) as UploadResult & { conflictingPath?: string | null };

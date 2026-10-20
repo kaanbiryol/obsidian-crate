@@ -2,7 +2,7 @@ import { pendingChangeKey } from '../pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createHarness, createSyncResult, spyOnIncrementalSync, toArrayBuffer, type Harness } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 let harness: Harness;
 const path = '.vault-config/plugins/example/data.json';
@@ -16,7 +16,7 @@ afterEach(() => harness.engine.destroy());
 
 async function trackedFile(candidate = path, bytes = toArrayBuffer('same bytes')) {
 	harness.localManifest.setEntry(candidate, {
-		hash: await computeHash(bytes), size: bytes.byteLength, modified: new Date(1).toISOString(),
+		hash: await sha256Hex(bytes), size: bytes.byteLength, modified: new Date(1).toISOString(),
 	});
 	harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: bytes.byteLength, mtime: 1 });
 	harness.vault.adapter.readBinary.mockResolvedValue(bytes);
@@ -85,7 +85,7 @@ it('never publishes touched configuration files when their contents match the la
 	vi.useFakeTimers();
 	try {
 		const bytes = toArrayBuffer('same bytes');
-		harness.localManifest.setEntry(path, { hash: await computeHash(bytes), size: bytes.byteLength, modified: new Date(0).toISOString() });
+		harness.localManifest.setEntry(path, { hash: await sha256Hex(bytes), size: bytes.byteLength, modified: new Date(0).toISOString() });
 		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: bytes.byteLength, mtime: 50 });
 		harness.vault.adapter.readBinary.mockResolvedValue(bytes);
 		const stateChanged = vi.fn();

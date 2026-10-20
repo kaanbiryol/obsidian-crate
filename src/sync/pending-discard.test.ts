@@ -2,7 +2,7 @@ import { pendingChangeKey } from './pending-change';
 import { describe, expect, it, vi } from 'vitest';
 import type { FileEntry } from '../protocol/sync-types';
 import { createPendingDiscard } from './pending-discard';
-import { computeHash } from './hasher';
+import { sha256Hex } from '../platform/sha256';
 
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 async function harness(initial: Record<string, ArrayBuffer>, server: Record<string, ArrayBuffer>) {
@@ -31,7 +31,7 @@ async function harness(initial: Record<string, ArrayBuffer>, server: Record<stri
         createBinary: vi.fn(async (path: string, content: ArrayBuffer) => { if (files.has(path)) throw new Error('File exists'); files.set(path, content); }),
         trash: (file: { path: string }) => trash(file.path),
     };
-    const entry = async (path: string): Promise<FileEntry> => ({ hash: await computeHash(remote.get(path)!), revision: 'v1', size: remote.get(path)!.byteLength, modified: '2026-09-16' });
+    const entry = async (path: string): Promise<FileEntry> => ({ hash: await sha256Hex(remote.get(path)!), revision: 'v1', size: remote.get(path)!.byteLength, modified: '2026-09-16' });
     const baselines = new Map(await Promise.all([...remote.keys()].map(async path => [path, await entry(path)] as const)));
     const readBase = vi.fn(async (path: string) => remote.get(path) ?? null);
     const applied = vi.fn(async () => {});
@@ -85,7 +85,7 @@ describe('pending discard', () => {
         await review.discard();
         expect(h.files.get(path)).toEqual(remote);
         expect([...h.files.entries()].find(([key]) => key.endsWith('/original'))?.[1]).toEqual(original);
-        expect(h.applied).toHaveBeenCalledWith(path, expect.objectContaining({ hash: await computeHash(remote) }), remote);
+        expect(h.applied).toHaveBeenCalledWith(path, expect.objectContaining({ hash: await sha256Hex(remote) }), remote);
         await expect(review.discard()).rejects.toThrow('Reopen discard');
     });
     it.each(['note.md', '.obsidian/app.json'])('restores a locally deleted file: %s', async path => {

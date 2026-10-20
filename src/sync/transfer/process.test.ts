@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { computeHash } from '../hasher';
 import { processDiff } from './process';
 import { createEmptySyncResult } from '../sync-result';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { TransferContext } from './types';
+import { sha256Hex } from '../../platform/sha256';
 
 function toArrayBuffer(text: string): ArrayBuffer {
 	return new TextEncoder().encode(text).buffer;
@@ -88,7 +88,7 @@ describe('processDiff conflict handling', () => {
 		const remote = reason === 'edit-budget' ? lines('remote') : 'line1\nline2\nREMOTE';
 		if (reason === 'edit-budget') {
 			const base = toArrayBuffer(lines('base'));
-			harness.localManifest.getEntry.mockReturnValue({ hash: await computeHash(base), size: base.byteLength, modified: '2026-02-14T00:00:00.000Z' });
+			harness.localManifest.getEntry.mockReturnValue({ hash: await sha256Hex(base), size: base.byteLength, modified: '2026-02-14T00:00:00.000Z' });
 			harness.markdownBaseCache.readBase.mockResolvedValue(base);
 		}
 		const localFile = { path, extension: 'md' };
@@ -105,7 +105,7 @@ describe('processDiff conflict handling', () => {
 
 		await processDiff(
 			harness.context,
-			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)), cause: 'concurrent-edit' },
+			{ path, action: 'conflict', localHash: 'l', remoteHash: await sha256Hex(toArrayBuffer(remote)), cause: 'concurrent-edit' },
 			localFiles,
 			result,
 		);
@@ -124,7 +124,7 @@ describe('processDiff conflict handling', () => {
 		expect(fromArrayBuffer(mergedWritten)).toBe(remote);
 		expect(localFiles[path]).toEqual(
 			expect.objectContaining({
-				hash: await computeHash(mergedWritten),
+				hash: await sha256Hex(mergedWritten),
 				size: mergedWritten.byteLength,
 			}),
 		);
@@ -141,7 +141,7 @@ describe('processDiff conflict handling', () => {
 		const local = 'title\nlocal edit\nbase remote\n';
 		const remote = 'title\nbase local\nremote edit\n';
 		const localFile = { path, extension: 'md' };
-		const baseHash = await computeHash(toArrayBuffer(base));
+		const baseHash = await sha256Hex(toArrayBuffer(base));
 		harness.localManifest.getEntry.mockReturnValue({
 			hash: baseHash,
 			size: base.length,
@@ -166,7 +166,7 @@ describe('processDiff conflict handling', () => {
 
 		await processDiff(
 			harness.context,
-			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)), cause: 'concurrent-edit' },
+			{ path, action: 'conflict', localHash: 'l', remoteHash: await sha256Hex(toArrayBuffer(remote)), cause: 'concurrent-edit' },
 			localFiles,
 			result,
 		);
@@ -182,13 +182,13 @@ describe('processDiff conflict handling', () => {
 		expect(fromArrayBuffer(mergedWritten)).toBe('title\nlocal edit\nremote edit\n');
 		expect(localFiles[path]).toEqual(
 			expect.objectContaining({
-				hash: await computeHash(mergedWritten),
+				hash: await sha256Hex(mergedWritten),
 				size: mergedWritten.byteLength,
 			}),
 		);
 		expect(harness.markdownBaseCache.putBase).toHaveBeenCalledWith(
 			path,
-			await computeHash(mergedWritten),
+			await sha256Hex(mergedWritten),
 			mergedWritten,
 		);
 	});
@@ -201,7 +201,7 @@ describe('processDiff conflict handling', () => {
 		const remote = 'title\nbase local\nremote edit\n';
 		const lateLocal = 'title\nlocal edit again\nbase remote\n';
 		const localFile = { path, extension: 'md' };
-		const baseHash = await computeHash(toArrayBuffer(base));
+		const baseHash = await sha256Hex(toArrayBuffer(base));
 		harness.localManifest.getEntry.mockReturnValue({
 			hash: baseHash,
 			size: base.length,
@@ -231,8 +231,8 @@ describe('processDiff conflict handling', () => {
 			{
 				path,
 				action: 'conflict',
-				localHash: await computeHash(toArrayBuffer(local)),
-				remoteHash: await computeHash(toArrayBuffer(remote)),
+				localHash: await sha256Hex(toArrayBuffer(local)),
+				remoteHash: await sha256Hex(toArrayBuffer(remote)),
 				cause: 'concurrent-edit',
 			},
 			localFiles,
@@ -247,13 +247,13 @@ describe('processDiff conflict handling', () => {
 		expect(result.resolvedRaces).toEqual([]);
 		expect(result.mergedPaths).toEqual([]);
 		expect(harness.localManifest.setEntry).toHaveBeenCalledWith(path, {
-			hash: await computeHash(toArrayBuffer(local)),
+			hash: await sha256Hex(toArrayBuffer(local)),
 			size: toArrayBuffer(local).byteLength,
 			modified: 'unverified',
 		});
 		expect(harness.markdownBaseCache.putBase).toHaveBeenCalledWith(
 			path,
-			await computeHash(toArrayBuffer(local)),
+			await sha256Hex(toArrayBuffer(local)),
 			toArrayBuffer(local),
 		);
 		expect(outcome).toEqual({
@@ -279,7 +279,7 @@ describe('processDiff conflict handling', () => {
 		harness.api.downloadFile.mockResolvedValue({
 			content: remote,
 			contentType: 'text/markdown',
-			hash: await computeHash(remote),
+			hash: await sha256Hex(remote),
 			size: remote.byteLength,
 		});
 
@@ -289,8 +289,8 @@ describe('processDiff conflict handling', () => {
 			{
 				path,
 				action: 'conflict',
-				localHash: await computeHash(firstLocal),
-				remoteHash: await computeHash(remote),
+				localHash: await sha256Hex(firstLocal),
+				remoteHash: await sha256Hex(remote),
 				cause: 'concurrent-edit',
 			},
 			{},
@@ -311,7 +311,7 @@ describe('processDiff conflict handling', () => {
 		const base = 'title\nbase local\nbase remote\n';
 		const local = 'title\nlocal edit\nbase remote\n';
 		const remote = 'title\nbase local\nremote edit\n';
-		const baseHash = await computeHash(toArrayBuffer(base));
+		const baseHash = await sha256Hex(toArrayBuffer(base));
 		harness.localManifest.getEntry.mockReturnValue({
 			hash: baseHash,
 			size: base.length,
@@ -332,8 +332,8 @@ describe('processDiff conflict handling', () => {
 			{
 				path,
 				action: 'conflict',
-				localHash: await computeHash(toArrayBuffer(local)),
-				remoteHash: await computeHash(toArrayBuffer(remote)),
+				localHash: await sha256Hex(toArrayBuffer(local)),
+				remoteHash: await sha256Hex(toArrayBuffer(remote)),
 				cause: 'concurrent-edit',
 			},
 			{},
@@ -367,7 +367,7 @@ describe('processDiff conflict handling', () => {
 
 		await processDiff(
 			harness.context,
-			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)), cause: 'concurrent-edit' },
+			{ path, action: 'conflict', localHash: 'l', remoteHash: await sha256Hex(toArrayBuffer(remote)), cause: 'concurrent-edit' },
 			localFiles,
 			result,
 		);
@@ -385,7 +385,7 @@ describe('processDiff conflict handling', () => {
 		expect(fromArrayBuffer(mainWritten)).toBe(remote);
 		expect(localFiles[path]).toEqual(
 			expect.objectContaining({
-				hash: await computeHash(mainWritten),
+				hash: await sha256Hex(mainWritten),
 				size: mainWritten.byteLength,
 			}),
 		);

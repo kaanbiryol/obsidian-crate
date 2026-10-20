@@ -4,8 +4,8 @@ import { CloudflareDeploymentService } from './service';
 import type { CloudflareWorkerSettings } from '../cloudflare-api';
 import type { HttpTransport } from '../http';
 import { createFenceQueryHarness } from './fence-test-harness';
-import { sha256Hex } from './artifacts';
 import { SERVER_RELEASE } from './database-upgrades';
+import { sha256Hex } from '../../platform/sha256';
 
 // Exercise the real service, API client and reset/delete implementation through
 // a local transport. Remote mutations happen before their response is released.

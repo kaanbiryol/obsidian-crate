@@ -1,8 +1,8 @@
 import type { FileEntry } from '../protocol/sync-types';
 import type { SyncApiClient } from './api';
 import { assertLocalSyncPath } from './local-path-safety';
-import { computeHash } from './hasher';
 import { findHistorySource } from './history/source';
+import { sha256Hex } from '../platform/sha256';
 
 /** Recover the exact last-synced bytes for review or discard, never a newer server version. */
 export async function loadRemotePendingBase(
@@ -19,7 +19,7 @@ export async function loadRemotePendingBase(
     }
     const read = await findHistorySource(api, path, baseline, current);
     const content = await read();
-    if (content.byteLength > maxBytes || content.byteLength !== baseline.size || await computeHash(content) !== baseline.hash) {
+    if (content.byteLength > maxBytes || content.byteLength !== baseline.size || await sha256Hex(content) !== baseline.hash) {
         throw new Error(`${path}: the last-synced copy changed or could not be verified. Review the file again.`);
     }
     return content;

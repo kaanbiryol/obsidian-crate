@@ -1,10 +1,10 @@
 import { parseSharedCheckpoint, parseSharedCheckpointList, parseSharedCheckpointDocument, type SharedCheckpoint } from '../../protocol/history-checkpoints';
 import { isRecord } from '../../platform/validation';
-import { computeHash } from '../hasher';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
 import type { EncryptedFiles } from '../encryption/encrypted-files';
+import { sha256Hex } from '../../platform/sha256';
 
 export class SharedHistoryApi {
     constructor(private http: WorkerApiHttpClient) {}
@@ -34,7 +34,7 @@ export class SharedHistoryApi {
     async download(id: string, path: string, file: FileEntry): Promise<ArrayBuffer> {
         let { body } = await this.http.requestBinary(`/sync/checkpoint-file?id=${encodeURIComponent(id)}&path=${encodeURIComponent(path)}&revision=${encodeURIComponent(file.revision ?? '')}`, {}, TRANSFER_TIMEOUT_MS);
         if (this.encryption) body = (await this.encryption.download(path, body)).content;
-        if (body.byteLength > MAX_FILE_SIZE_BYTES || body.byteLength !== file.size || await computeHash(body) !== file.hash) throw new Error(`${path}: checkpoint file failed integrity validation.`);
+        if (body.byteLength > MAX_FILE_SIZE_BYTES || body.byteLength !== file.size || await sha256Hex(body) !== file.hash) throw new Error(`${path}: checkpoint file failed integrity validation.`);
         return body;
     }
 }

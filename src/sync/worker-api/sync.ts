@@ -1,5 +1,4 @@
 import type { ConnectionTestResult } from '../types';
-import { computeHash } from '../hasher';
 import type { EncryptedFiles, UploadPreconditions } from '../encryption/encrypted-files';
 import type { JournalUpload } from '../upload-intent';
 import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryption/file-format';
@@ -42,6 +41,7 @@ import {
 	HttpError,
 	type WorkerApiHttpClient,
 } from './http';
+import { sha256Hex } from '@/platform/sha256';
 
 // Bounds decrypted plaintext held at once while overlapping batch decryption.
 const DECRYPT_CONCURRENCY = 4;
@@ -393,7 +393,7 @@ export class SyncWorkerApi {
 		const params = new URLSearchParams({ path: version.path, storageKey: version.storage_key });
 		let { body } = await this.http.requestBinary(`/sync/version-preview?${params}`, {}, TRANSFER_TIMEOUT_MS);
 		if (this.encryption) body = (await this.encryption.download(version.path, body)).content;
-		if (body.byteLength > 256_000 || body.byteLength !== version.size || await computeHash(body) !== version.hash) {
+		if (body.byteLength > 256_000 || body.byteLength !== version.size || await sha256Hex(body) !== version.hash) {
 			throw new Error('Saved version failed integrity validation.');
 		}
 		return body;

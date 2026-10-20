@@ -2,9 +2,9 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES } from '../../../
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { corsHeaders, corsResponse } from '../cors';
 import { ENCRYPTION_FILE_PREFIX, validateEncryptedContent } from './state';
-import { sha256HexBytes } from '../auth/crypto';
 import type { Env } from '../types';
 import { readLimitedRequestBody } from '../body-reader';
+import { sha256Hex } from '../../../platform/sha256';
 
 interface ConversionFile { path: string; revision: string; hash: string; size: number }
 export const CONVERSION_FILES = `SELECT path, storage_key AS revision, hash, size FROM files
@@ -32,7 +32,7 @@ export async function convertFile(request: Request, env: Env, state: EncryptionS
 		// Resume replacements made by earlier clients, but never mistake original
 		// plaintext (including a reserved MIME type) for converted content.
 		existingBytes = new Uint8Array(await object.arrayBuffer());
-		alreadyEncrypted = existingBytes.byteLength !== file.size || await sha256HexBytes(existingBytes) !== file.hash
+		alreadyEncrypted = existingBytes.byteLength !== file.size || await sha256Hex(existingBytes) !== file.hash
 			|| Boolean(await env.DB.prepare('SELECT 1 FROM maintenance_state WHERE key = ?').bind(ENCRYPTION_FILE_PREFIX + revision).first());
 	}
 	// Do not hold both complete versions of a large attachment in Worker memory.
@@ -48,7 +48,7 @@ export async function convertFile(request: Request, env: Env, state: EncryptionS
 	}
 	if (content.byteLength > MAX_ENCRYPTED_FILE_BYTES) return corsResponse({ error: 'Encrypted file is too large' }, 413);
 	const descriptor = validateEncryptedContent(state, file.path, content);
-	const hash = await sha256HexBytes(content);
+	const hash = await sha256Hex(content);
 	if (!alreadyEncrypted) await env.BUCKET.put(revision, content, {
 		httpMetadata: { contentType: ENCRYPTED_FILE_CONTENT_TYPE }, customMetadata: { hash, crateEncryptionVault: state.vaultId, crateEncryptionGeneration: String(state.generation) },
 	});

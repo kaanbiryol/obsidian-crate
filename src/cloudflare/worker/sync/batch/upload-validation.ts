@@ -1,7 +1,6 @@
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import { BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../../../protocol/sync-limits';
 import type { BatchUploadResponse } from '../../../../protocol/sync-types';
-import { sha256HexBytes } from '../../auth/crypto';
 import { corsResponse } from '../../cors';
 import { parseJsonObject, parseNonNegativeInteger, parseOptionalString, sanitizePath } from '../../utils';
 import {
@@ -11,6 +10,7 @@ import {
 import type { BatchFile } from './types';
 import { isSha256Hex } from '../../../../platform/validation';
 import { createManagedObjectKey } from '../../../../protocol/storage-keys';
+import { sha256Hex } from '../../../../platform/sha256';
 
 /** Validate and decode the complete request before receipts, staging or commits. */
 export async function prepareBatchUpload(request: Request, expectedEncryption?: EncryptionServerState | null) {
@@ -106,7 +106,7 @@ export async function prepareBatchUpload(request: Request, expectedEncryption?: 
 				continue;
 			}
 
-			const computedHash = await sha256HexBytes(bytes);
+			const computedHash = await sha256Hex(bytes);
 			if (providedHash && providedHash !== computedHash) {
 				results.push(validationFailure(safePath, 'Declared file hash does not match content'));
 				continue;

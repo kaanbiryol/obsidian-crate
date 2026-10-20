@@ -2,8 +2,8 @@ import { decodePendingChange } from './pending-change';
 import type { DataAdapter } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
-import { computeHash } from './hasher';
 import { assertLocalSyncPath } from './local-path-safety';
+import { sha256Hex } from '../platform/sha256';
 
 interface PendingVerificationContext {
 	adapter: Pick<DataAdapter, 'stat' | 'readBinary'>;
@@ -37,7 +37,7 @@ export async function verifyUnchangedPendingPaths(context: PendingVerificationCo
 			if (!before || before.type !== 'file' || before.size > MAX_FILE_SIZE_BYTES || !isCurrent(key)) continue;
 			const bytes = await adapter.readBinary(path);
 			if (bytes.byteLength > MAX_FILE_SIZE_BYTES || !isCurrent(key)) continue;
-			const hash = await computeHash(bytes);
+			const hash = await sha256Hex(bytes);
 			if (hash !== baseline.hash || !isCurrent(key)) continue;
 			const after = await adapter.stat(path);
 			if (!after || after.type !== 'file' || after.mtime !== before.mtime

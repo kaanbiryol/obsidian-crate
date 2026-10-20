@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest';
 import { ConflictStore } from './conflict/store';
 import { getIncomingConflictFileName } from './conflict/conflict';
-import { computeHash } from './hasher';
 import { downloadAndSaveFile, parallelDownloadAndSaveFiles } from './transfer/download';
 import { createTransferHarness, emptyResult } from './transfer/transfer-test-harness';
+import { sha256Hex } from '../platform/sha256';
 
 const encode = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer;
 
@@ -48,7 +48,7 @@ for (const mode of ['single', 'batch', 'fallback'] as const) {
             ['notes/.assets/icon.png', new Uint8Array([137, 80, 78, 71, 255, 0]).buffer],
         ]);
         const requests = await Promise.all([...remote].map(async ([path, content]) => ({
-            path, expectedLocalHash: null, expectedRemoteHash: await computeHash(content), remoteSize: content.byteLength,
+            path, expectedLocalHash: null, expectedRemoteHash: await sha256Hex(content), remoteSize: content.byteLength,
         })));
         await h.store.load();
         for (const request of requests) {
@@ -61,10 +61,10 @@ for (const mode of ['single', 'batch', 'fallback'] as const) {
             });
         }
         h.api.downloadFile.mockImplementation(async (path: string) => ({
-            content: remote.get(path)!, hash: await computeHash(remote.get(path)!), size: remote.get(path)!.byteLength, revision: '1',
+            content: remote.get(path)!, hash: await sha256Hex(remote.get(path)!), size: remote.get(path)!.byteLength, revision: '1',
         }));
         h.api.batchDownload.mockImplementation(async (paths: string[]) => ({ files: await Promise.all(paths.map(async path => ({
-            path, content: Buffer.from(remote.get(path)!).toString('base64'), hash: await computeHash(remote.get(path)!),
+            path, content: Buffer.from(remote.get(path)!).toString('base64'), hash: await sha256Hex(remote.get(path)!),
             size: remote.get(path)!.byteLength, revision: '1',
         }))) }));
         if (mode === 'fallback') h.api.batchDownload.mockRejectedValue(new Error('Batch unavailable'));
@@ -94,7 +94,7 @@ it.each(['edited-copy', 'changed-original', 'missing-copy', 'unreadable-copy', '
         const h = harness();
         const path = '.obsidian/plugins/omnisearch/data.json';
         const content = encode('remote');
-        const hash = await computeHash(content);
+        const hash = await sha256Hex(content);
         const copy = getIncomingConflictFileName(path, hash);
         h.files.set(path, scenario === 'changed-original' ? encode('local edit') : content);
         if (scenario !== 'missing-copy') h.files.set(copy, scenario === 'edited-copy' ? encode('edited recovery copy') : content);
@@ -114,7 +114,7 @@ it('keeps a previous review active when the host rejects creation during a retry
     const h = harness();
     const path = '.obsidian/plugins/omnisearch/data.json';
     const content = encode('remote');
-    const hash = await computeHash(content);
+    const hash = await sha256Hex(content);
     const copy = getIncomingConflictFileName(path, hash);
     h.files.set(copy, content);
     await h.store.record({ originalPath: path, conflictPath: copy, cause: 'incoming-review', copySide: 'remote', localHash: '', remoteHash: hash });

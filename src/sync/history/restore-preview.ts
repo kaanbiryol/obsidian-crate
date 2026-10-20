@@ -1,6 +1,6 @@
 import type { FileEntry } from '../../protocol/sync-types';
-import { computeHash } from '../hasher';
 import { decodePreviewText, isBinaryPreviewPath, MAX_PREVIEW_BYTES } from '../preview-format';
+import { sha256Hex } from '../../platform/sha256';
 
 export type HistoryRestorePreview = { current: string; saved: string } | { unavailable: string };
 
@@ -19,7 +19,7 @@ export async function loadHistoryRestorePreview(
     const read = async (entry: FileEntry | undefined, load: () => Promise<ArrayBuffer>) => {
         if (!entry) return new ArrayBuffer(0);
         const bytes = await load();
-        if (bytes.byteLength > MAX_PREVIEW_BYTES || await computeHash(bytes) !== entry.hash) {
+        if (bytes.byteLength > MAX_PREVIEW_BYTES || await sha256Hex(bytes) !== entry.hash) {
             throw new Error('The file changed or its saved version is unavailable. Review the restore again.');
         }
         return bytes;

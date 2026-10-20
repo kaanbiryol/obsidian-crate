@@ -4,21 +4,21 @@ import { openFile, sealFile } from '../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';
 import { decryptJson } from '../../encryption/envelope';
 import { addReminderScope, createVaultKeyBundle, moveEncryptionScopes } from '../../encryption/key-bundle';
-import { computeHash } from '../hasher';
 import { prepareConversionFile, prepareConversionReceipt, type ConversionFile } from './conversion-content';
+import { sha256Hex } from '../../platform/sha256';
 
 async function fixture(path = 'note.md') {
 	const bundle = addReminderScope(addReminderScope(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Other'), 'Reading', 'reading');
 	const keys = await FileKeyAuthority.fromVault(bundle);
 	const body = new TextEncoder().encode('Original private note.').buffer;
-	const file: ConversionFile = { path, revision: 'original', hash: await computeHash(body), size: body.byteLength };
+	const file: ConversionFile = { path, revision: 'original', hash: await sha256Hex(body), size: body.byteLength };
 	return { bundle, keys, body, file };
 }
 
 it.each(['plaintext', 'encrypted-looking'])('uses authoritative original bytes for %s files', async kind => {
 	const h = await fixture();
 	const body = kind === 'plaintext' ? h.body : (await sealFile({ path: h.file.path, content: new Uint8Array(h.body), contentType: 'text/markdown' }, h.keys.forPath(h.file.path))).bytes.buffer;
-	const file = { ...h.file, hash: await computeHash(body), size: body.byteLength };
+	const file = { ...h.file, hash: await sha256Hex(body), size: body.byteLength };
 	const prepared = await prepareConversionFile(file, body, null, h.bundle, h.keys);
 	const opened = await openFile(prepared.bytes, file.path, h.keys.forPath(file.path));
 	expect(opened.content).toEqual(new Uint8Array(body));

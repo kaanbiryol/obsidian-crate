@@ -1,11 +1,11 @@
 import { CloudflareApiError } from '../cloudflare-api';
-import { sha256Hex } from '../deployment/artifacts';
 import { randomHex } from '../oauth/pkce';
 import { DeploymentRecoveryRequiredError, withDeploymentFence, type DeploymentFence } from '../deployment/fence';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { clearBucketObjects } from './reset-objects';
 import { inspectTerminalDeletionFence } from './delete-fence';
 import { assertDeletionHelper, assertDeletionIdentity, deletionWorkerSettings, inspectDeletionResources, type DeleteApi } from './delete-ownership';
+import { sha256Hex } from '../../platform/sha256';
 
 /** Terminal deletion never migrates application data or rebuilds the selected server. */
 export async function deleteCrateServer(input: {

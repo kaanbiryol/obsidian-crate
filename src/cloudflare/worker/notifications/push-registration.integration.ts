@@ -5,8 +5,8 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
-import { sha256Hex } from '../auth/crypto';
 import { issueWebEnrollmentToken } from '../auth/web-enrollment';
+import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { await reset(); });

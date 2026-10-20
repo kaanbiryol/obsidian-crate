@@ -4,7 +4,6 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
-import { sha256Hex, sha256HexBytes } from '../auth/crypto';
 import { ENCRYPTION_STATE_KEY } from './state';
 import { trackStagedUploads } from '../sync/staged-uploads';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
@@ -14,6 +13,7 @@ import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
+import { sha256Hex } from '../../../platform/sha256';
 
 let state: EncryptionServerState;
 let keys: FileKeyAuthority;
@@ -106,7 +106,7 @@ it('accepts valid encrypted uploads and replays their exact receipt through the 
 	expect(await (await send()).json()).toEqual(receipt);
 	const objects = (await env.BUCKET.list()).objects;
 	expect(objects).toHaveLength(1);
-	expect(await sha256HexBytes(await (await env.BUCKET.get(objects[0]!.key))!.arrayBuffer())).toBe(file.hash);
+	expect(await sha256Hex(await (await env.BUCKET.get(objects[0]!.key))!.arrayBuffer())).toBe(file.hash);
 });
 
 it.each(['single', 'batch'] as const)('commits an encrypted %s Markdown upload without reading it back from R2', async kind => {

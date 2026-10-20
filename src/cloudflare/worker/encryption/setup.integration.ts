@@ -12,7 +12,7 @@ import { readEncryptionState } from './state';
 import { FileKeyAuthority } from '../../../encryption/file-authority';
 import { openFile } from '../../../encryption/file-codec';
 import { SyncWorkerApi } from '../../../sync/worker-api/sync';
-import { computeHash } from '../../../sync/hasher';
+import { sha256Hex } from '../../../platform/sha256';
 
 let device: SyncTestDevice;
 beforeEach(async () => {
@@ -114,7 +114,7 @@ it.each([false, true])('recovers a pending plaintext upload after conversion wit
     if (committed) await original.apply(this, args);
     throw new Error('Connection lost');
   });
-  await expect(device.files.uploadFile('pending.md', content, await computeHash(content), content.byteLength, 'text/markdown', null)).rejects.toThrow('Connection lost');
+  await expect(device.files.uploadFile('pending.md', content, await sha256Hex(content), content.byteLength, 'text/markdown', null)).rejects.toThrow('Connection lost');
   const f = await fixture();
   await f.convert();
   device.close(); await device.engine.waitForIdle(); await device.open();

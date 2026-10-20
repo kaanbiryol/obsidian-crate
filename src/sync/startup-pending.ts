@@ -4,7 +4,7 @@ import type { LocalManifestView } from './manifest';
 import { getPathEntry } from '../protocol/path-record';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { getAllVaultFiles, type VaultFile } from './file-discovery';
-import { computeHash } from './hasher';
+import { sha256Hex } from '../platform/sha256';
 
 /** Rebuild the volatile queue from local bytes without changing sync authority. */
 export async function findStartupPendingPaths(context: {
@@ -27,7 +27,7 @@ export async function findStartupPendingPaths(context: {
 		if (file.size > MAX_FILE_SIZE_BYTES) return null;
 		if (!entry) return pendingChangeKey('upload', file.path);
 		if (entry.size === file.size && Date.parse(entry.modified) === file.mtime) return null;
-		const hash = await computeHash(await context.vault.adapter.readBinary(file.path));
+		const hash = await sha256Hex(await context.vault.adapter.readBinary(file.path));
 		return hash === entry.hash ? null : pendingChangeKey('upload', file.path);
 	}), concurrency);
 	const present = new Set(files.map(file => file.path));

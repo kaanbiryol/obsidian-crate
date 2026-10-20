@@ -1,7 +1,6 @@
 import { FILE_FOLDER_MATCH, fileFolderArgs } from './sync/file-identity';
 import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import type { CommitEffects } from './commit-effects';
-import { sha256HexBytes } from './auth/crypto';
 import { queryRows } from './db';
 import { stageMarkdownFile } from './sync/markdown-file-staging';
 import { commitStagedFile } from './sync/mutations';
@@ -9,6 +8,7 @@ import {
 	getStoredFileRow,
 	MAX_FILE_BYTES,
 } from './sync/storage';
+import { sha256Hex } from '@/platform/sha256';
 
 export interface StoredTextFile {
 	path: string;
@@ -66,7 +66,7 @@ export async function readStoredMarkdownFiles(
 			if (!object || (row.size > 0 && object.size !== row.size)) return null;
 
 			const bytes = await object.arrayBuffer();
-			if (await sha256HexBytes(bytes) !== row.hash) return null;
+			if (await sha256Hex(bytes) !== row.hash) return null;
 			return {
 				path: row.path,
 				content: bytes,
@@ -95,7 +95,7 @@ export async function readCommittedMarkdownFileVersion(
 	}
 
 	const bytes = await object.arrayBuffer();
-	if (await sha256HexBytes(bytes) !== file.hash) {
+	if (await sha256Hex(bytes) !== file.hash) {
 		return null;
 	}
 

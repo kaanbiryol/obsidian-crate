@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CloudflareApiClient } from '../cloudflare-api';
-import { sha256Hex } from '../deployment/artifacts';
 import type { HttpTransport } from '../http';
+import { sha256Hex } from '../../platform/sha256';
 
 const origin = 'https://crate-0123456789abcdef.example.workers.dev';
 const resetId = 'a'.repeat(32), token = 'b'.repeat(64);

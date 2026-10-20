@@ -1,13 +1,13 @@
 import { recordSyncError } from '../issues';
 import { isAbortError } from "../abort";
 import { base64ToArrayBuffer } from "../encoding";
-import { computeHash } from "../hasher";
 import { applyRemoteContentIfUnchanged } from "../local-apply";
 import { recordAppliedContent } from '../applied-content';
 import type { DiffApplyOutcome, TransferContext } from "./types";
 import { createLogger, errorMessage } from "../logger";
 import type { SyncResult } from '../types';
 import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { sha256Hex } from '../../platform/sha256';
 
 const logger = createLogger("SyncTransfer");
 
@@ -37,7 +37,7 @@ export async function validateDownloadedContent(
   if (declaredSize !== content.byteLength) {
     throw new Error(`Download size mismatch (expected ${declaredSize}, got ${content.byteLength})`);
   }
-  const computedHash = verified ? declaredHash : await computeHash(content);
+  const computedHash = verified ? declaredHash : await sha256Hex(content);
   if (declaredHash && declaredHash !== computedHash) {
     throw new Error(`Download hash mismatch for ${path}`);
   }

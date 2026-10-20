@@ -1,6 +1,6 @@
-import { computeHash } from './hasher';
 import { expect, it, vi } from 'vitest';
 import { loadFileHistoryPreview, loadCurrentSyncedPreview } from './file-history-preview';
+import { sha256Hex } from '../platform/sha256';
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 const version = { path: 'note.md', storage_key: 'key', hash: 'a'.repeat(64), size: 5, reason: 'replaced' as const, created_at: '2026-09-19', expires_at: 1 };
 const api = () => ({ previewFileVersion: vi.fn().mockResolvedValue(bytes('saved')) });
@@ -30,7 +30,7 @@ it.each([bytes('a\0b'), new Uint8Array([0xff]).buffer])('rejects binary or inval
 });
 
 it.each(['', '\uFEFF'])('reads the current synced copy with optional BOM %j and verifies its bytes, hash and revision', async bom => {
- const content = bytes(`${bom}server`); const hash = await computeHash(content);
+ const content = bytes(`${bom}server`); const hash = await sha256Hex(content);
  const file = { hash, size: content.byteLength, revision: 'current', modified: '2026-09-19' };
  const client = { getFileMetadata: vi.fn().mockResolvedValue({ files: { 'note.md': file } }), downloadFile: vi.fn().mockResolvedValue({ content, hash, revision: 'current' }) };
  expect(await loadCurrentSyncedPreview(client, 'note.md')).toEqual({ file, text: 'server' });

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createHarness, toArrayBuffer } from './engine-test-harness';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 const configPaths = ['app', 'appearance', 'community-plugins', 'core-plugins']
 	.map(name => `.vault-config/${name}.json`);
@@ -48,7 +48,7 @@ async function setup(lastSeq = 0) {
 		await h.engine.onRawFileChange(path);
 	});
 	const content = toArrayBuffer(remoteText);
-	const entry = { hash: await computeHash(content), size: content.byteLength, modified: new Date(2000).toISOString(), revision: 'remote-v1' };
+	const entry = { hash: await sha256Hex(content), size: content.byteLength, modified: new Date(2000).toISOString(), revision: 'remote-v1' };
 	h.api.getManifest.mockResolvedValue({ version: 1, files: Object.fromEntries(configPaths.map(path => [path, entry])), lastSeq: 5 });
 	h.api.getChanges.mockResolvedValue({ changes: configPaths.map((path, i) => ({ path, action: 'upload', seq: i + 2, ...entry, created_at: entry.modified })), lastSeq: 5, hasMore: false });
 	h.api.downloadFile.mockResolvedValue({ content, ...entry });

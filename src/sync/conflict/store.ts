@@ -4,8 +4,8 @@ import type { ConflictRecord } from '../types';
 import { createLogger, errorMessage } from '../logger';
 import { getOriginalPathFromConflictFile, isConflictFile } from './conflict';
 import { getAllVaultFiles } from '../file-discovery';
-import { computeHash } from '../hasher';
 import { createAbortError } from '../abort';
+import { sha256Hex } from '../../platform/sha256';
 
 const logger = createLogger('ConflictStore');
 const STORE_FILENAME = 'conflicts.json';
@@ -212,8 +212,8 @@ export class ConflictStore {
 			let changed = false;
 			for (const conflict of candidates) {
 				try {
-					if (await computeHash(await adapter.readBinary(conflict.conflictPath)) !== hash
-						|| await computeHash(await adapter.readBinary(originalPath)) !== hash) continue;
+					if (await sha256Hex(await adapter.readBinary(conflict.conflictPath)) !== hash
+						|| await sha256Hex(await adapter.readBinary(originalPath)) !== hash) continue;
 				} catch {
 					// Missing or unreadable files are not evidence of resolution.
 					continue;

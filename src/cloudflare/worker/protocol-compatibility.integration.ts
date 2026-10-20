@@ -4,16 +4,16 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import worker from './index';
-import { sha256HexBytes } from './auth/crypto';
 import { writeCommittedMarkdownFile } from './storage';
 import { createReminderOperationId } from '../../protocol/reminder-operation';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol/server-info';
+import { sha256Hex } from '../../platform/sha256';
 
 const token = 'protocol-compatibility-test-credential';
 beforeEach(async () => {
 	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
 	await env.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope) VALUES (?, ?, ?)')
-		.bind('protocol-test', await sha256HexBytes(new TextEncoder().encode(token)), 'vault').run();
+		.bind('protocol-test', await sha256Hex(new TextEncoder().encode(token)), 'vault').run();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Note.md', 'Keep the original bytes', null);
 });
 afterEach(async () => { await reset(); });

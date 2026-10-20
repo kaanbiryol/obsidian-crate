@@ -1,7 +1,7 @@
-import { computeHash } from './hasher';
 import { isMarkdownPath } from './markdown-base-cache';
 import type { FileEntry } from '../protocol/sync-types';
 import type { TransferContext } from './transfer/types';
+import { sha256Hex } from '../platform/sha256';
 
 // A remote baseline can be valid even when its local metadata is not. The
 // planners deliberately hash entries whose modification time is not a date.
@@ -15,13 +15,13 @@ export async function recordAppliedContent(
   // Callers that already verified these bytes pass their hash to skip rehashing.
   knownHash?: string,
 ): Promise<FileEntry> {
-  const hash = knownHash ?? await computeHash(content);
+  const hash = knownHash ?? await sha256Hex(content);
   let modified = UNVERIFIED_MODIFIED;
   try {
     const before = await context.getModifiedIso(path);
     const current = await context.vault.adapter.readBinary(path);
     const after = await context.getModifiedIso(path);
-    if (before === after && current.byteLength === content.byteLength && await computeHash(current) === hash) {
+    if (before === after && current.byteLength === content.byteLength && await sha256Hex(current) === hash) {
       modified = before;
     }
   } catch {

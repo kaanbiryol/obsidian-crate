@@ -1,10 +1,10 @@
 import { corsResponse } from '../cors';
-import { sha256Hex } from './crypto';
 import { parseOptionalString } from '../utils';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../../../protocol/web-session';
 import { validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { FEATURE_POLICY_KEY } from '../feature-policy';
+import { sha256Hex } from '../../../platform/sha256';
 
 type AuthScope = 'vault' | 'reminders' | 'reading' | 'reading_capture';
 

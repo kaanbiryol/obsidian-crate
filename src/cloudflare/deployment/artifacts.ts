@@ -20,7 +20,6 @@ function decodeBase64(value: string): Uint8Array<ArrayBuffer> {
 	return decoded;
 }
 
-export { sha256Hex };
 
 export async function decodeAndVerifyArtifacts(input: {
 	development?: DevelopmentBuild;

@@ -3,10 +3,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
-import { sha256Hex } from '../auth/crypto';
 import { handleListReminders } from '../reminders-web/routes/list';
 import { scanReminderMarkdownFile } from '../reminders-web/scan';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache';
+import { sha256Hex } from '../../../platform/sha256';
 
 // A repeatable local workerd/D1/R2 measurement, not a hosted CPU or mobile claim.
 beforeEach(async () => {

@@ -4,7 +4,7 @@ import { assertLocalSyncPath } from '../local-path-safety';
 import { isCurrentVaultFile } from '../vault-file-identity';
 import { replaceLocalFileWithRecovery } from '../local-recovery-write';
 import { deletePathLocallyIfUnchanged } from '../planner/helpers';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 /** Hidden configuration files are not represented by Obsidian TFiles. */
 export async function conflictReviewFile(app: App, path: string) {
@@ -38,11 +38,11 @@ export async function conflictReviewFile(app: App, path: string) {
         },
         writeBinary: async (bytes: ArrayBuffer, expected: ArrayBuffer, assertCurrent: () => void) => {
             await check();
-            await replaceLocalFileWithRecovery(vault, path, bytes, await computeHash(expected), assertCurrent);
+            await replaceLocalFileWithRecovery(vault, path, bytes, await sha256Hex(expected), assertCurrent);
         },
         trash: async (expected: ArrayBuffer) => {
             await check();
-            const outcome = await deletePathLocallyIfUnchanged({ vault }, path, await computeHash(expected));
+            const outcome = await deletePathLocallyIfUnchanged({ vault }, path, await sha256Hex(expected));
             if (outcome.status !== 'deleted') throw unavailable();
         },
     };

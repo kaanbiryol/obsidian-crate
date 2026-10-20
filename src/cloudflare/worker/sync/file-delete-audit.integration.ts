@@ -6,12 +6,12 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schema from '../../schema.sql?raw';
 import { SERVER_RELEASE } from '../../deployment/database-upgrades';
 import worker from '../index';
-import { sha256Hex } from '../auth/crypto';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { pruneFileDeletionReceipts } from './file-delete-audit';
 import { BATCH_DELETE_MAX_FILES } from '../../../protocol/sync-limits';
 import { commitFileDelete } from './mutations';
 import { getStoredFileRow } from './storage';
+import { sha256Hex } from '@/platform/sha256';
 
 const secret = 'Private note content and Bearer credential';
 const path = 'Private folder/Confidential note.md';

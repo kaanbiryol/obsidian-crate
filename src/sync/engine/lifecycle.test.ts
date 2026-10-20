@@ -6,7 +6,7 @@ import {
 	toArrayBuffer,
 } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
-import { computeHash } from '../hasher';
+import { sha256Hex } from '../../platform/sha256';
 
 describe('SyncEngine initialization', () => {
 	it('defers conflict recovery until the workspace layout is ready', async () => {
@@ -52,7 +52,7 @@ describe('SyncEngine abort-on-destroy', () => {
 	it.each(['incremental', 'full'] as const)('preserves the baseline when %s hashing finishes after cancellation', async mode => {
 		const harness = createHarness({ automaticSync: false, lastSeq: 42 });
 		const content = toArrayBuffer('unchanged');
-		const baseline = { hash: await computeHash(content), size: content.byteLength, modified: new Date(1000).toISOString() };
+		const baseline = { hash: await sha256Hex(content), size: content.byteLength, modified: new Date(1000).toISOString() };
 		harness.localManifest.setEntry('note.md', baseline);
 		harness.localManifest.setEntry.mockClear();
 		harness.vault.getFiles.mockReturnValue([{ path: 'note.md', extension: 'md', stat: { size: content.byteLength, mtime: 2000 } }]);

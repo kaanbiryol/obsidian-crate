@@ -8,10 +8,10 @@ import schema from '../../schema.sql?raw';
 import { handleUpload, handleDelete } from './file-handlers';
 import { handleBatchUpload } from './batch/upload';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { sha256Hex } from '../auth/crypto';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { pruneOperationReceipts } from '../maintenance/operation-receipts';
 import type { UploadResult } from '@/protocol/sync-types';
+import { sha256Hex } from '@/platform/sha256';
 
 const devices: SyncTestDevice[] = [];
 beforeEach(async () => {

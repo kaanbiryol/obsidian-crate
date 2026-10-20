@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHarness, toArrayBuffer } from './engine-test-harness';
-import { computeHash } from '../hasher';
 import { arrayBufferToBase64 } from '../encoding';
 import { VERIFICATION_FILE_BUDGET } from '../content-verifier';
 import { MarkdownBaseCache } from '../markdown-base-cache';
+import { sha256Hex } from '../../platform/sha256';
 
 const path = 'note.md';
 const base = 'first\nsecond\nthird\n';
@@ -17,8 +17,8 @@ async function setup(lastSeq: number, initial = local) {
 	const file = { path, extension: 'md', stat: { size: toArrayBuffer(text).byteLength, mtime: 2000 } };
 	const baseBytes = toArrayBuffer(base);
 	const remoteBytes = toArrayBuffer(remote);
-	const remoteHash = await computeHash(remoteBytes);
-	h.localManifest.setEntry(path, { hash: await computeHash(baseBytes), size: baseBytes.byteLength, modified: new Date(1000).toISOString() });
+	const remoteHash = await sha256Hex(remoteBytes);
+	h.localManifest.setEntry(path, { hash: await sha256Hex(baseBytes), size: baseBytes.byteLength, modified: new Date(1000).toISOString() });
 	vi.spyOn(MarkdownBaseCache.prototype, 'readBase').mockResolvedValue(baseBytes);
 	vi.spyOn(MarkdownBaseCache.prototype, 'putBase').mockResolvedValue();
 	vi.spyOn(MarkdownBaseCache.prototype, 'pruneUnreferenced').mockResolvedValue();
@@ -114,7 +114,7 @@ describe('downloaded file verification cost', () => {
 		const h = createHarness({ lastSeq: 1, automaticSync: false });
 		const baseBytes = toArrayBuffer(base);
 		const remoteBytes = toArrayBuffer(remote);
-		const remoteHash = await computeHash(remoteBytes);
+		const remoteHash = await sha256Hex(remoteBytes);
 		vi.spyOn(MarkdownBaseCache.prototype, 'putBase').mockResolvedValue();
 		vi.spyOn(MarkdownBaseCache.prototype, 'pruneUnreferenced').mockResolvedValue();
 		type TestFile = { path: string; extension: string; text: string; stat: { size: number; mtime: number } };
@@ -123,7 +123,7 @@ describe('downloaded file verification cost', () => {
 			return [filePath, { path: filePath, extension: 'md', text: base, stat: { size: baseBytes.byteLength, mtime: 1000 } }];
 		}));
 		for (const file of files.values()) {
-			h.localManifest.setEntry(file.path, { hash: await computeHash(baseBytes), size: baseBytes.byteLength, modified: new Date(1000).toISOString() });
+			h.localManifest.setEntry(file.path, { hash: await sha256Hex(baseBytes), size: baseBytes.byteLength, modified: new Date(1000).toISOString() });
 		}
 		h.vault.getFiles.mockImplementation(() => [...files.values()]);
 		h.vault.getAbstractFileByPath.mockImplementation((candidate: string) => files.get(candidate) ?? null);

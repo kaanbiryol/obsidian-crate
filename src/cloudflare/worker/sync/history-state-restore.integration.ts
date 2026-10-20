@@ -10,7 +10,7 @@ import type { SyncHistoryEntry } from '../../../sync/types';
 import { CHECKPOINT_PAGE_SIZE, createSharedCheckpoint, getSharedCheckpoint, pruneSharedCheckpoints, storeEncryptedCheckpoint } from './history-checkpoints';
 import { parseSharedCheckpointDocument } from '../../../protocol/history-checkpoints';
 import worker from '../index';
-import { sha256Hex } from '../auth/crypto';
+import { sha256Hex } from '../../../platform/sha256';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {

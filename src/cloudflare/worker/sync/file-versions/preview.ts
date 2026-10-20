@@ -2,9 +2,9 @@ import { corsHeaders, corsResponse } from '../../cors';
 import { sanitizePath } from '../../utils';
 import { isSyncRevision } from '../../../../protocol/sync-validation';
 import { storedObjectMatchesMetadata } from '../storage';
-import { sha256HexBytes } from '../../auth/crypto';
 import type { RemoteFileVersion } from '../../../../protocol/sync-types';
 import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES } from '../../../../encryption/file-format';
+import { sha256Hex } from '../../../../platform/sha256';
 
 /** Read-only, bounded access to a retained object; never accepts arbitrary R2 keys. */
 export async function handleFileVersionPreview(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
@@ -23,7 +23,7 @@ export async function handleFileVersionPreview(request: Request, bucket: R2Bucke
 		return corsResponse({ error: 'Stored file version content is unavailable' }, 503);
 	}
 	const content = await object.arrayBuffer();
-	if (content.byteLength !== version.size || await sha256HexBytes(content) !== version.hash) {
+	if (content.byteLength !== version.size || await sha256Hex(content) !== version.hash) {
 		return corsResponse({ error: 'Stored file version content failed integrity validation' }, 503);
 	}
 	return new Response(content, { headers: { ...corsHeaders(), 'Content-Type': 'application/octet-stream',

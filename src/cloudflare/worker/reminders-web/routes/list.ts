@@ -1,4 +1,3 @@
-import { sha256Hex } from '../../auth/crypto';
 import { corsHeaders, corsResponse } from '../../cors';
 import { listStoredMarkdownFileMetadataByPrefix } from '../../storage';
 import type { Env } from '../../types';
@@ -9,6 +8,7 @@ import {
 } from '../reminder-cache';
 import { toReminderPayload } from '../scan';
 import { changedPathsSince, deltaBase, parseChangeEtags, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../../vault-change-token';
+import { sha256Hex } from '../../../../platform/sha256';
 
 export async function handleListReminders(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);

@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
-import { sha256Hex } from '../auth/crypto';
+import { sha256Hex } from '../../../platform/sha256';
 
 // Actual client, Worker, D1 and R2; only the host filesystem is an in-memory seam.
 // Wall times describe this local workerd run, not a hosted or physical-device SLA.

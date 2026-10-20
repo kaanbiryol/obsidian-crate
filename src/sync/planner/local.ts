@@ -1,9 +1,9 @@
 import { pendingChangeKey } from '../pending-change';
 import { withSyncFileContext } from '../issues';
-import { computeHash } from "../hasher";
 import { getAllVaultFiles } from "../file-discovery";
 import type { LocalChangeScan, LocalDiffPlannerContext } from "./types";
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { sha256Hex } from '../../platform/sha256';
 
 export async function getLocalDeletes(
   context: LocalDiffPlannerContext,
@@ -58,7 +58,7 @@ export async function getLocalChanges(
     context.throwIfDestroyed();
     const content = await withSyncFileContext(file.path, () => context.vault.adapter.readBinary(file.path));
     context.throwIfDestroyed();
-    const hash = await computeHash(content);
+    const hash = await sha256Hex(content);
     context.throwIfDestroyed();
       context.plannedContent?.remember(file.path, content, hash);
     const existing = context.localManifest.getEntry(file.path);

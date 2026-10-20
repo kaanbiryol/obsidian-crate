@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { computeHash } from '../hasher';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { getLocalChanges, getLocalDeletes } from './planner';
+import { sha256Hex } from '../../platform/sha256';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({
 	getAllVaultFiles: vi.fn(),
@@ -52,7 +52,7 @@ describe('planner local diff helpers', () => {
 	it('detects changed local files by hash and skips unchanged ones', async () => {
 		const unchangedContent = new TextEncoder().encode('same').buffer;
 		const changedContent = new TextEncoder().encode('changed').buffer;
-		const unchangedHash = await computeHash(unchangedContent);
+		const unchangedHash = await sha256Hex(unchangedContent);
 
 		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([
 			{ path: 'notes/changed.md', size: 7, mtime: 100, extension: 'md' },

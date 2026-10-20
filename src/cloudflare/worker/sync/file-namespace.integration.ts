@@ -5,11 +5,11 @@ import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
-import { sha256Hex } from '../auth/crypto';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { assertPortablePaths } from '../../../protocol/portable-path';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
 import { FileNamespaceConflictError } from './file-namespace';
+import { sha256Hex } from '@/platform/sha256';
 
 interface UploadedFile { path: string; hash: string; revision: string }
 
