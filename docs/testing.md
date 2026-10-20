@@ -434,7 +434,7 @@ It first runs the npm advisory audit (including development dependencies, failin
 
 Asset limits are defined once in `scripts/bundle-budgets.mjs`; the artifact checks and PWA smoke test use the same byte limits. Use the [local release preparation command](releases.md) to sign and upload the public shortcut, then dispatch verification. Verified plugin assets are attached to the same draft GitHub release. Publish the draft only after completing the physical-device and hosted acceptance record below.
 
-GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, Docker hosting on AMD64/ARM64, four editor shards (activity on the first, file/vault history on the second), and four PWA browser shards run on Linux. Linux browser jobs use a pinned Playwright image with preinstalled browsers and OS dependencies; update its version and digest alongside the Playwright lockfile version. Two balanced native PWA shards retain macOS for native menus, font geometry and WebKit rendering/focus checks. Two visual shards retain the reviewed macOS snapshot platform. The Reading browser job runs on macOS and checks the native shortcut parser before its browser suite. These five macOS jobs fit the hosted macOS concurrency limit. Capacity benchmarks remain in the gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
+GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, Docker hosting on AMD64/ARM64, four editor shards (activity on the first, file/vault history on the second, plugin dialogs on the third), and four PWA browser shards run on Linux. Linux browser jobs use a pinned Playwright image with preinstalled browsers and OS dependencies; update its version and digest alongside the Playwright lockfile version. Two balanced native PWA shards retain macOS for native menus, font geometry and WebKit rendering/focus checks. Two visual shards retain the reviewed macOS snapshot platform. The Reading browser job runs on macOS and checks the native shortcut parser before its browser suite. These five macOS jobs fit the hosted macOS concurrency limit. Capacity benchmarks remain in the gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
 
 Successful push builds upload candidate records and release assets for seven days.
 Release preparation can reuse only a successful repository push run for the exact
@@ -1055,7 +1055,7 @@ light/dark themes, desktop/phone/short screens, narrow dialog containers,
 clipboard actions, expanded disclosures and pending-delete dismissal. The encryption
 suite also checks stable loading/progress/completion geometry and recovery-key
 acknowledgment. Screenshots are saved under `.generated/plugin-dialog-review/` and
-`.generated/encryption-ui-review/`.
+`.generated/encryption-ui-review/`. CI runs it in the third editor shard.
 
 Set `CRATE_PLUGIN_CSS_PATH` to an isolated plugin build's stylesheet when another
 build is using `dist/`. `CRATE_OBSIDIAN_CSS_PATH` optionally overlays a locally

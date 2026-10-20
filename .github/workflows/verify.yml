@@ -234,6 +234,9 @@ jobs:
       - name: Check file and vault history browser behavior
         if: matrix.shard == 2
         run: npm run test:file-history-browser
+      - name: Check plugin dialog consistency
+        if: matrix.shard == 3
+        run: npm run test:plugin-dialogs
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -244,6 +247,8 @@ jobs:
             .generated/activity-diff/
             .generated/conflict-review/
             .generated/file-history/
+            .generated/plugin-dialog-review/
+            .generated/encryption-ui-review/
           include-hidden-files: true
           retention-days: 7
 
