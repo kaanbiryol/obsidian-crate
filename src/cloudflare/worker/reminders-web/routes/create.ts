@@ -1,4 +1,4 @@
-import { assertReminderMutationInput } from '@/reminders/core/reminderMutationInput';
+import { assertReminderMutationInput, parseReminderRecurrenceInput } from '@/reminders/core/reminderMutationInput';
 import { beginReminderOperation, reminderOperationEffects } from '../operations';
 import { buildCreateReminderArgs } from '@/reminders/core/reminderMutationPlan';
 import { corsResponse } from '../../cors';
@@ -13,8 +13,8 @@ import {
 import {
 	hasNonEmptyStringValue,
 	parseProjectPath,
-	parseRecurrenceMutationValue,
 	parseReminderMutationWorkspace,
+	recurrenceInputResponse,
 } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
@@ -45,9 +45,11 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 	if (!content) {
 		return corsResponse({ error: 'content required' }, 400);
 	}
-	const recurrenceResult = parseRecurrenceMutationValue(parsedBody.value.recurrence);
-	if (!recurrenceResult.ok) {
-		return recurrenceResult.response;
+	let recurrence;
+	try {
+		recurrence = parseReminderRecurrenceInput(parsedBody.value.recurrence);
+	} catch (error) {
+		return recurrenceInputResponse(error);
 	}
 
 	const priority = parsedBody.value.priority === 1 ? 1 : 4;
@@ -57,7 +59,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		description,
 		project,
 		priority,
-		recurrence: recurrenceResult.value ?? undefined,
+		recurrence: recurrence ?? undefined,
 		dueDate: parseOptionalString(parsedBody.value.dueDate, 64) || undefined,
 		dueDatetime: parseOptionalString(parsedBody.value.dueDatetime, 128) || undefined,
 		id: parseOptionalString(parsedBody.value.id, 128) || undefined,

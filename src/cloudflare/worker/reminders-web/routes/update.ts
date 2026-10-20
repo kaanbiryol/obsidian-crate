@@ -1,9 +1,6 @@
-import { assertReminderMutationInput } from '@/reminders/core/reminderMutationInput';
+import { parseReminderUpdateParams } from '@/reminders/core/reminderMutationInput';
 import { beginReminderOperation, reminderOperationEffects } from '../operations';
 import { buildReminderUpdate } from '@/reminders/core/reminderMutationPlan';
-import type { UpdateReminderParams } from '@/reminders/types/reminder';
-import { parseStoredReminderDate, reminderHasTime } from '@/reminders/core/dates/reminderDate';
-import { normalizeRecurrenceRule } from '@/reminders/core/recurrence/recurrenceRule';
 import { writeCommittedMarkdownFilePair } from '../../sync/atomic-markdown-write';
 import { corsResponse } from '../../cors';
 import {
@@ -13,63 +10,21 @@ import {
 import type { Env } from '../../types';
 import { parseJsonObject, parseOptionalString } from '../../request-validation';
 import {
-	createReminderInFileContent,
 	deleteReminderFromFileContent,
 	getInitialProjectFileContent,
 	getProjectFilePath,
+	moveReminderIntoFileContent,
 	updateReminderInFileContent,
 } from '../file-content';
 import {
-	hasNonEmptyStringValue,
-	parseProjectPath,
-	parseRecurrenceMutationValue,
 	parseReminderMutationWorkspace,
 	parseReminderSourceFilePath,
+	recurrenceInputResponse,
 } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
 import { loadReminderSource } from '../workspace';
 import { checkReminderRevision } from '../revision';
-
-function parseUpdateParams(body: Record<string, unknown>): UpdateReminderParams | Response {
-	assertReminderMutationInput(body, 'update');
-	const updateParams: UpdateReminderParams = {};
-	if (Object.prototype.hasOwnProperty.call(body, 'content')) {
-		updateParams.content = parseOptionalString(body.content, 1024) || undefined;
-	}
-	if (Object.prototype.hasOwnProperty.call(body, 'description')) {
-		updateParams.description = body.description === null
-			? ''
-			: typeof body.description === 'string' ? body.description.trim() || undefined : undefined;
-	}
-	if (Object.prototype.hasOwnProperty.call(body, 'priority')) {
-		if (body.priority !== 1 && body.priority !== 4) {
-			return corsResponse({ error: 'Invalid priority' }, 400);
-		}
-		updateParams.priority = body.priority;
-	}
-	if (Object.prototype.hasOwnProperty.call(body, 'project')) {
-		const parsedProject = parseProjectPath(body.project);
-		if (hasNonEmptyStringValue(body.project) && !parsedProject) {
-			return corsResponse({ error: 'Invalid project' }, 400);
-		}
-		updateParams.project = parsedProject || undefined;
-	}
-	if (Object.prototype.hasOwnProperty.call(body, 'dueDate')) {
-		updateParams.dueDate = parseOptionalString(body.dueDate, 64) || undefined;
-	}
-	if (Object.prototype.hasOwnProperty.call(body, 'dueDatetime')) {
-		updateParams.dueDatetime = parseOptionalString(body.dueDatetime, 128) || undefined;
-	}
-	if (Object.prototype.hasOwnProperty.call(body, 'recurrence')) {
-		const recurrenceResult = parseRecurrenceMutationValue(body.recurrence);
-		if (!recurrenceResult.ok) {
-			return recurrenceResult.response;
-		}
-		updateParams.recurrence = recurrenceResult.value ?? null;
-	}
-	return updateParams;
-}
 
 export async function handleUpdateReminder(request: Request, env: Env): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -102,9 +57,11 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 	const revisionError = await checkReminderRevision(parsedBody.value, reminder);
 	if (revisionError) return revisionError;
 
-	const updateParams = parseUpdateParams(parsedBody.value);
-	if (updateParams instanceof Response) {
-		return updateParams;
+	let updateParams;
+	try {
+		updateParams = parseReminderUpdateParams(parsedBody.value);
+	} catch (error) {
+		return recurrenceInputResponse(error);
 	}
 	const update = buildReminderUpdate(updateParams);
 
@@ -114,22 +71,7 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		const newFilePath = getProjectFilePath(workspaceResult.folderPath, nextProject);
 		const newFile = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, newFilePath);
 		const newFileContent = newFile?.content ?? getInitialProjectFileContent(nextProject);
-		const movedContent = createReminderInFileContent(newFileContent, {
-			content: update.updates.content ?? reminder.content,
-			description: 'description' in update.updates
-				? (update.updates.description?.trim() || undefined)
-				: reminder.description,
-			dueDate: 'dueDate' in update.updates ? update.updates.dueDate : parseStoredReminderDate(reminder),
-			priority: update.updates.priority ?? reminder.priority,
-			recurrence: Object.prototype.hasOwnProperty.call(update.updates, 'recurrence')
-				? normalizeRecurrenceRule(update.updates.recurrence ?? undefined)
-				: reminder.recurrence,
-			hasTime: Object.prototype.hasOwnProperty.call(update.updates, 'hasTime')
-				? update.updates.hasTime
-				: reminderHasTime(reminder),
-			completed: reminder.completed,
-			reminderId: reminder.id,
-		});
+		const movedContent = moveReminderIntoFileContent(newFileContent, reminder, update);
 		const oldContent = deleteReminderFromFileContent(oldFile.content, reminder);
 		const movedReminders = scanReminderMarkdownFile(newFilePath, movedContent, workspaceResult.folderPath);
 		updatedReminder = movedReminders.find(candidate => candidate.id === id);

@@ -1,14 +1,10 @@
 import { scanReminderMarkdownContent } from './markdownScan';
 import { reminderRevision } from './reminderRevision';
-import { assertReminderMutationInput } from './reminderMutationInput';
+import { assertReminderMutationInput, parseReminderRecurrenceInput, parseReminderUpdateParams } from './reminderMutationInput';
 import { getReminderProjectFilePath, normalizeReminderProjectPath } from './reminderProjectPath';
-import { validateRecurrence } from './recurrence/validateRecurrence';
 import { buildCreateReminderArgs, buildReminderUpdate } from './reminderMutationPlan';
-import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
+import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildMovedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderReminderBlocksInContent } from './markdownReminderFile';
-import { parseStoredReminderDate, reminderHasTime } from './dates/reminderDate';
-import { normalizeRecurrenceRule } from './recurrence/recurrenceRule';
-import type { UpdateReminderParams, RecurrenceRule } from '../types/reminder';
 import { DEFAULT_PROJECT } from './constants';
 
 export class ReminderCommandError extends Error {
@@ -20,12 +16,6 @@ export async function reminderCommandPayload(reminder: ScannedReminder) {
 	return { ...value, revision: await reminderRevision(reminder) };
 }
 
-function recurrence(value: unknown): RecurrenceRule | null | undefined {
-	if (value === undefined || value === null) return value;
-	const parsed = validateRecurrence(value);
-	if (!('rule' in parsed)) throw new ReminderCommandError(parsed.error, 400, 'invalid_reminder_input');
-	return parsed.rule;
-}
 const text = (value: unknown) => typeof value === 'string' ? value.trim() || undefined : undefined;
 function project(value: unknown): string {
 	if (value === undefined || value === null || value === '') return DEFAULT_PROJECT;
@@ -61,7 +51,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		const content = await load(path) ?? getInitialProjectFileContent(name);
 		if (scan(path, content).some(item => item.id === body.id)) throw new ReminderCommandError('This reminder already exists. Refresh its saved state.');
 		const args = buildCreateReminderArgs({ content: text(body.content)!, description: text(body.description), project: name,
-			priority: body.priority === 1 ? 1 : 4, recurrence: recurrence(body.recurrence) ?? undefined,
+			priority: body.priority === 1 ? 1 : 4, recurrence: parseReminderRecurrenceInput(body.recurrence) ?? undefined,
 			dueDate: text(body.dueDate), dueDatetime: text(body.dueDatetime), id: body.id });
 		const next = appendCreatedReminderBlock(content, buildCreatedReminderBlock({ ...args, content: text(body.content)!, description: text(body.description), reminderId: body.id }));
 		changes.set(path, next);
@@ -87,23 +77,12 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 			if (typeof body.completed !== 'boolean') throw new ReminderCommandError('Choose a completion state', 400, 'invalid_reminder_input');
 			changes.set(path, current.completed === body.completed ? content : setReminderCompletionInContent(content, current, body.completed).content);
 		} else if (action === 'update') {
-			assertReminderMutationInput(body, 'update');
-			const params: UpdateReminderParams = {};
-			for (const field of ['content', 'dueDate', 'dueDatetime'] as const) if (field in body) params[field] = text(body[field]);
-			if ('description' in body) params.description = body.description === null ? '' : text(body.description);
-			if ('priority' in body) params.priority = body.priority === 1 ? 1 : 4;
-			if ('project' in body && text(body.project)) params.project = project(body.project);
-			if ('recurrence' in body) params.recurrence = recurrence(body.recurrence) ?? null;
-			const update = buildReminderUpdate(params).updates;
+			const update = buildReminderUpdate(parseReminderUpdateParams(body)).updates;
 			if (update.project && update.project !== current.project) {
 				const destination = getReminderProjectFilePath(folderPath, update.project);
 				const before = await load(destination) ?? getInitialProjectFileContent(update.project);
 				if (scan(destination, before).some(item => item.id === current.id)) throw new ReminderCommandError('The destination already contains this reminder');
-				const next = appendCreatedReminderBlock(before, buildCreatedReminderBlock({ reminderId: current.id,
-					content: update.content ?? current.content, description: 'description' in update ? update.description?.trim() || undefined : current.description,
-					dueDate: 'dueDate' in update ? update.dueDate : parseStoredReminderDate(current), priority: update.priority ?? current.priority,
-					recurrence: 'recurrence' in update ? normalizeRecurrenceRule(update.recurrence ?? undefined) : current.recurrence,
-					hasTime: 'hasTime' in update ? update.hasTime : reminderHasTime(current), completed: current.completed }));
+				const next = appendCreatedReminderBlock(before, buildMovedReminderBlock(current, update));
 				changes.set(path, deleteReminderBlockFromContent(content, current).content);
 				changes.set(destination, next);
 				reminder = scan(destination, next).find(item => item.id === current.id);

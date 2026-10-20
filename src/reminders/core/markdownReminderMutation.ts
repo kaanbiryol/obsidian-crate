@@ -144,6 +144,25 @@ export function buildUpdatedReminderBlock(
 	};
 }
 
+/** A project move writes the edited reminder as a new block in the destination
+ * note, keeping its identity and completion state. */
+export function buildMovedReminderBlock(
+	reminder: MarkdownReminderRecord,
+	updates: MarkdownReminderUpdate,
+): ReminderBlockMutation {
+	const mutation = buildUpdatedReminderBlock(reminder, updates);
+	return buildCreatedReminderBlock({
+		content: mutation.content,
+		description: mutation.description,
+		dueDate: mutation.dueDate,
+		priority: mutation.priority,
+		recurrence: mutation.recurrence,
+		hasTime: mutation.hasTime,
+		completed: reminder.completed,
+		reminderId: reminder.id,
+	});
+}
+
 export function replaceUpdatedReminderBlock(
 	fileContent: string,
 	reminder: MarkdownReminderRecord,

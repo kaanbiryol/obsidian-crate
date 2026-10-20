@@ -5,6 +5,7 @@ import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath
 import {
 	appendCreatedReminderBlock,
 	buildCreatedReminderBlock,
+	buildMovedReminderBlock,
 	buildUpdatedReminderBlock,
 	replaceUpdatedReminderBlock,
 	setReminderCompletionInContent,
@@ -35,6 +36,14 @@ export function createReminderInFileContent(
 	},
 ): string {
 	return validateReminderFileContent(appendCreatedReminderBlock(fileContent, buildCreatedReminderBlock(params)));
+}
+
+export function moveReminderIntoFileContent(
+	fileContent: string,
+	reminder: RemoteReminderRecord,
+	update: ReturnType<typeof buildReminderUpdate>,
+): string {
+	return validateReminderFileContent(appendCreatedReminderBlock(fileContent, buildMovedReminderBlock(reminder, update.updates)));
 }
 
 export function deleteReminderFromFileContent(fileContent: string, reminder: RemoteReminderRecord): string {

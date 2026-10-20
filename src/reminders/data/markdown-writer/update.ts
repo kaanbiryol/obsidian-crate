@@ -7,7 +7,7 @@ import {
   findReminderLineNumber,
 } from "../../core/markdownReminderFile";
 import {
-  buildCreatedReminderBlock,
+  buildMovedReminderBlock,
   buildUpdatedReminderBlock,
   replaceUpdatedReminderBlock,
 } from "../../core/markdownReminderMutation";
@@ -56,20 +56,10 @@ export async function updateReminderInMarkdown(
     throw new Error(`Invalid reminder project: ${requestedProject}`);
   }
   const oldProject = reminder.project || DEFAULT_PROJECT;
-  const mutation = buildUpdatedReminderBlock(reminder, updates);
 
   if (newProject && newProject !== oldProject) {
     markdownWriterLog.info(`Moving reminder from ${oldProject} to ${newProject}`);
-    const movedMutation = buildCreatedReminderBlock({
-      content: mutation.content,
-      description: mutation.description,
-      dueDate: mutation.dueDate,
-      priority: mutation.priority,
-      recurrence: mutation.recurrence,
-      hasTime: mutation.hasTime,
-      completed: reminder.completed,
-      reminderId: reminder.id,
-    });
+    const movedMutation = buildMovedReminderBlock(reminder, updates);
 
     const oldFile = await context.getFile(reminder.filePath);
     if (!oldFile) {
@@ -159,6 +149,7 @@ export async function updateReminderInMarkdown(
     return;
   }
 
+  const mutation = buildUpdatedReminderBlock(reminder, updates);
   const file = await context.getFile(reminder.filePath);
   if (!file) {
     throw new Error(`File not found: ${reminder.filePath}`);

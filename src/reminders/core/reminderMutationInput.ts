@@ -1,4 +1,6 @@
 import { normalizeReminderProjectPath } from './reminderProjectPath';
+import { validateRecurrence } from './recurrence/validateRecurrence';
+import type { RecurrenceRule, UpdateReminderParams } from '../types/reminder';
 
 const REMINDER_TITLE_MAX_LENGTH = 1024;
 const REMINDER_DESCRIPTION_MAX_LENGTH = 4096;
@@ -55,4 +57,27 @@ export function assertReminderMutationInput(
 			invalid(field, field === 'dueDate' ? 'Choose a date without a time.' : 'Choose a valid reminder time and timezone.');
 		}
 	}
+}
+
+/** Validate a requested repeat: null removes it and undefined keeps it. */
+export function parseReminderRecurrenceInput(value: unknown): RecurrenceRule | null | undefined {
+	if (value === undefined || value === null) return value;
+	const parsed = validateRecurrence(value);
+	if (!('rule' in parsed)) invalid('recurrence', parsed.error);
+	return parsed.rule;
+}
+
+const optionalText = (value: unknown) => typeof value === 'string' ? value.trim() || undefined : undefined;
+
+/** Read an edit request body: omitted fields stay unchanged and null clears one. */
+export function parseReminderUpdateParams(body: Record<string, unknown>): UpdateReminderParams {
+	assertReminderMutationInput(body, 'update');
+	const params: UpdateReminderParams = {};
+	for (const field of ['content', 'dueDate', 'dueDatetime'] as const) if (field in body) params[field] = optionalText(body[field]);
+	if ('description' in body) params.description = body.description === null ? '' : optionalText(body.description);
+	if (body.priority === 1 || body.priority === 4) params.priority = body.priority;
+	const project = normalizeReminderProjectPath(body.project);
+	if (project) params.project = project;
+	if ('recurrence' in body) params.recurrence = parseReminderRecurrenceInput(body.recurrence) ?? null;
+	return params;
 }

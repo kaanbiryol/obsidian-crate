@@ -1,13 +1,8 @@
-import type { RecurrenceRule } from '@/reminders/types/reminder';
 import { normalizeReminderProjectPath } from '@/reminders/core/reminderProjectPath';
-import { validateRecurrence } from '@/reminders/core/recurrence/validateRecurrence';
+import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { corsResponse } from '../cors';
 import { parseOptionalString, sanitizePath } from '../request-validation';
 import type { ReminderMutationWorkspace } from './types';
-
-export type RecurrenceMutationResult =
-	| { ok: true; value: RecurrenceRule | null | undefined }
-	| { ok: false; response: Response };
 
 export function parseFolderPath(value: unknown): string | null {
 	const parsed = parseOptionalString(value, 512);
@@ -34,18 +29,10 @@ export function hasNonEmptyStringValue(value: unknown): boolean {
 	return typeof value === 'string' && value.trim().length > 0;
 }
 
-export function parseRecurrenceMutationValue(value: unknown): RecurrenceMutationResult {
-	if (value === undefined) {
-		return { ok: true, value: undefined };
-	}
-
-	if (value === null) {
-		return { ok: true, value: null };
-	}
-
-	const result = validateRecurrence(value);
-	return 'rule' in result ? { ok: true, value: result.rule }
-		: { ok: false, response: corsResponse({ error: result.error }, 400) };
+/** Plaintext routes answer an invalid repeat without an input field or code. */
+export function recurrenceInputResponse(error: unknown): Response {
+	if (error instanceof ReminderInputError && error.field === 'recurrence') return corsResponse({ error: error.message }, 400);
+	throw error;
 }
 
 export function parseReminderMutationWorkspace(
