@@ -53,6 +53,7 @@ export class EncryptedReminderApi {
 	private attemptKey(operationId: string) { return `${this.keys.vaultId}:${this.keys.scopeId}:${operationId}`; }
 
 	async handle(path: string, init: RequestInit = {}): Promise<Response | null> {
+		// Fetching a page title would reveal a URL from an encrypted reminder to the server.
 		if (path === '/links/title') return Response.json({ title: null });
 		const url = new URL(path, 'https://crate.invalid');
 		if (url.pathname === '/reminders/list') {

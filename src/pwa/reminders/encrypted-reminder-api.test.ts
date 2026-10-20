@@ -210,3 +210,10 @@ it('downloads cold notes with bounded concurrency while keeping note order and i
   expect(listed.reminders.map(reminder => reminder.id)).toEqual(Array.from({ length: 20 }, (_, index) => `t${index}`).filter(id => id !== 't3'));
   expect(listed.issues.map(issue => issue.path)).toEqual(['Reminders/N03.md']);
 });
+
+it('never sends an encrypted reminder link to the server for a page title', async () => {
+  const fetch = vi.fn();
+  const response = await new EncryptedReminderApi(keys, fetch).handle('/links/title', { method: 'POST', body: JSON.stringify({ url: 'https://private.example' }) });
+  await expect(response?.json()).resolves.toEqual({ title: null });
+  expect(fetch).not.toHaveBeenCalled();
+});
