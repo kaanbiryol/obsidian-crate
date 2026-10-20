@@ -1,7 +1,7 @@
-import { downloadJson } from '../download';
+import { downloadJson } from '../storage/download';
 import { PwaButton as BaseButton } from './PwaButton';
 import React, { useState } from 'react';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 
 export function ExpiredReminderChangeActions({ change, onDiscard }: {
 	change: PendingReminderChange;

@@ -341,7 +341,7 @@ is required.
 `pwa/reading/cache.ts` owns `commitReadingCache`, keeping uncertain-source
 preservation, article pruning, encrypted records and list persistence in one guarded
 transaction. `reading/database.ts` owns database lifetime and raw encrypted values;
-`pwa/single-store-database.ts` shares bounded opening, schema validation and late
+`pwa/storage/single-store-database.ts` shares bounded opening, schema validation and late
 request fencing with the encryption databases. Reading retains its cached
 connection, and each feature retains its own records and transactions.
 `reading/session.ts` owns session authority. The storage facade exposes specific
@@ -521,7 +521,7 @@ may import only an allowlist: `protocol/`, `encryption/`, `platform/`, the share
 reminder and Reading domain folders, release metadata and the PWA shell in
 `pwa/shell/`. `scripts/worker-import-boundary.mjs` enforces it through ESLint.
 
-`pwa/reminder-outbox.ts` owns automatic retry eligibility. Mount, foreground,
+`pwa/reminders/outbox/reminder-outbox.ts` owns automatic retry eligibility. Mount, foreground,
 connectivity and timer wakeups honor the stored deadline and attempt budget.
 Explicit retry and earlier-session recovery reset that budget while retaining the
 operation identity and request bytes.
@@ -529,7 +529,7 @@ operation identity and request bytes.
 and endpoint. Storage validation remains the boundary for persisted records; the
 type does not reconstruct saved commands or change their request bytes.
 
-`pwa/reminder-outbox-events.ts` groups browser wakeups and cross-tab confirmation
+`pwa/reminders/outbox/reminder-outbox-events.ts` groups browser wakeups and cross-tab confirmation
 listeners under one subscription lifetime. `useReminderOutbox` retains queue
 initialization, recovery and session ownership; delayed work from a disposed
 subscription cannot trigger a new refresh or error toast.
@@ -626,7 +626,7 @@ traversal independently of file counts. Reading and Reminders retain their own f
 limits, projections and sequence checks; each publishes its derived source cache
 only after a complete, confirmed load.
 
-`encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encryption/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `plugin/encryption-folder-move-journal.ts` owns the durable move contract, exact setting destinations and guarded journal-head updates. `encryption-folder-move-workflow.ts` applies one persisted job, keeping target persistence, conversion, both settings saves, capture recovery and journal advancement ordered together. `encryption-folder-moves.ts` retains task deduplication, queue draining and feature restarts through `SyncRuntime`'s existing configuration serialization.
+`encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encryption/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `plugin/encryption-folder-move-journal.ts` owns the durable move contract, exact setting destinations and guarded journal-head updates. `encryption-folder-move-workflow.ts` applies one persisted job, keeping target persistence, conversion, both settings saves, capture recovery and journal advancement ordered together. `encryption-folder-moves.ts` retains task deduplication, queue draining and feature restarts through `SyncRuntime`'s existing configuration serialization.
 
 `sync/encryption/conversion.ts` owns conversion sequencing, progress, server
 acknowledgments and activation. `encryption/conversion-content.ts` authenticates

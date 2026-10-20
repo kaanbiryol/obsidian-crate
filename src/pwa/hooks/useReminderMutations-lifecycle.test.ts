@@ -3,16 +3,16 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { useReminderMutations } from './useReminderMutations';
 import { useReminderOutbox } from './useReminderOutbox';
-import { newReminderOperationId } from '../reminder-operation-id';
+import { newReminderOperationId } from '../reminders/outbox/reminder-operation-id';
 import { createSettingsStore } from '../settings-store';
 import { SettingsContext, useFeatureSettings } from '../settings-context';
 import { pwaSyncState } from '../sync/state';
 import { invalidatePwaSession } from '../session-generation';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import type { ReminderRecord } from '../types';
 
 vi.mock('./useReminderOutbox', () => ({ useReminderOutbox: vi.fn() }));
-vi.mock('../reminder-operation-id', () => ({ newReminderOperationId: vi.fn() }));
+vi.mock('../reminders/outbox/reminder-operation-id', () => ({ newReminderOperationId: vi.fn() }));
 
 function deferred() {
 	let resolve!: (id: string) => void;

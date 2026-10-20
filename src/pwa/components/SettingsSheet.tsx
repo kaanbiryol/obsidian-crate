@@ -1,13 +1,13 @@
 import { pwaSyncState, refreshPwaSync, logoutPwaSync } from '../sync/state';
 import { EncryptionSettings } from './EncryptionSettings';
 import { ChevronRight } from 'lucide-react';
-import { encryptionSnapshot, subscribeEncryption } from '../encryption-session';
+import { encryptionSnapshot, subscribeEncryption } from '../encryption/encryption-session';
 
 import { TabSettings } from './TabSettings';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { PwaPushStack } from './PwaPushStack';
 import { ShortcutSettingsSheet } from './ShortcutSettingsSheet';
-import type { PushedScreenHistory } from '../pushed-screen-history';
+import type { PushedScreenHistory } from '../navigation/pushed-screen-history';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 import { PwaModalSheet } from './PwaModalSheet';
 import { Button } from '@/ui/shared/Button';

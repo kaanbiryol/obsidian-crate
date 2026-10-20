@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
-import { applyReminderDelta, fetchReadyReminderList, parseReminderDeltaResponse, parseReminderListResponse, type ReminderIndexingProgress } from '../reminder-api';
-import { isScopedReminderList } from '../reminder-storage-validation';
-import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
-import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
+import { applyReminderDelta, fetchReadyReminderList, parseReminderDeltaResponse, parseReminderListResponse, type ReminderIndexingProgress } from '../reminders/reminder-api';
+import { isScopedReminderList } from '../reminders/cache/reminder-storage-validation';
+import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminders/cache/reminder-cache';
+import { createReminderRequestCoordinator } from '../reminders/outbox/reminder-request-coordinator';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, ReminderSourceIssue, StoredConfig } from '../types';
 

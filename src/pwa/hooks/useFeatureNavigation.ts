@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPushedScreenHistory } from '../pushed-screen-history';
-import { cancelDetailHistoryOpen, installDetailHistory } from '../detail-history';
+import { createPushedScreenHistory } from '../navigation/pushed-screen-history';
+import { cancelDetailHistoryOpen, installDetailHistory } from '../navigation/detail-history';
 import { dockDestinationIndex } from '../dock-preferences';
 import type { CrateSection, DockDestination } from '../components/FeatureSwitcherButton';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
 import type { SharedFeatures } from '../shared-features';
 import { loadPwaPreferences } from '../preferences';
-import { resolvePwaOpeningDestination } from '../opening-destination';
+import { resolvePwaOpeningDestination } from '../navigation/opening-destination';
 import { useSettingsOpen, useSettingsStore } from '../settings-context';
 import { usePwaPreferences } from './usePwaPreferences';
 import { usePwaBackGesture } from './usePwaBackGesture';

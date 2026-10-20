@@ -33,7 +33,7 @@ preserves the confirmed cache, offline articles and pending commands in Chromium
 and WebKit.
 
 `encryption/file-inventory.test.ts`, `pwa/reading/encrypted-api.test.ts` and
-`pwa/encrypted-reminder-api.test.ts` cover encrypted page validation, advancing
+`pwa/reminders/encrypted-reminder-api.test.ts` cover encrypted page validation, advancing
 empty-page limits, duplicate paths, cursor/sequence changes and retention of the
 previous decrypted cache after rejected loads.
 
@@ -1029,7 +1029,7 @@ Worker `encryption/pairing.integration.ts` checks the actual authenticated relay
 with local D1, including Reading scope checks, concurrent claims, replay,
 cancellation, expiry, revocation, conversion/reset fences and attempt limits.
 `encryption/pairing/protocol.test.ts`, `plugin/web-app-pairing.test.ts`, and
-`pwa/web-app-unlock.test.ts` cover cryptographic binding, vault/session guards,
+`pwa/encryption/web-app-unlock.test.ts` cover cryptographic binding, vault/session guards,
 limited grants and storage validation. These tests write no hosted D1 rows.
 
 On a physical iPhone, install from Safari, open the Home Screen app, select

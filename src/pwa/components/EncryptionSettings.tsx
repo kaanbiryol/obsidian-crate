@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { encryptionSnapshot, subscribeEncryption } from '../encryption-session';
+import { encryptionSnapshot, subscribeEncryption } from '../encryption/encryption-session';
 import type { SettingsSnapshot } from '../settings-store';
 import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';

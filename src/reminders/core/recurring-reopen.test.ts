@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildCreatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { scanReminderMarkdownContent } from './markdownScan';
-import { predictReminderCompletion } from '@/pwa/reminder-optimistic-state';
+import { predictReminderCompletion } from '@/pwa/reminders/outbox/reminder-optimistic-state';
 
 const read = (content: string) => scanReminderMarkdownContent('Reminders/Inbox.md', content, 'Reminders').reminders[0]!;
 function source(timed: boolean, count = 3) {

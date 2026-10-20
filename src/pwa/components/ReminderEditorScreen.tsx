@@ -22,7 +22,7 @@ import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
 	formatModalDueSummary,
-} from '../reminder-state';
+} from '../reminders/editor/editor-draft';
 import type { ModalDraft, ModalPickerId, ModalState } from '../types';
 
 export interface ReminderEditorScreenHandle {

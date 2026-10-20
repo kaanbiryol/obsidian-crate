@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSyncFailureToast } from './useSyncFailureToast';
-import { createReminderOutbox, reminderRetryAt } from '../reminder-outbox';
-import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from '../reminder-outbox-storage';
+import { createReminderOutbox, reminderRetryAt } from '../reminders/outbox/reminder-outbox';
+import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from '../reminders/outbox/reminder-outbox-storage';
 import { capturePwaSession } from '../session-generation';
-import { mergeReminderRecord } from '../reminder-optimistic-state';
-import { mergeProject, reorderProjectReminders } from '../reminder-list-state';
-import { createReminderSettlementChannel } from '../reminder-settlement';
-import { subscribeReminderOutboxEvents } from '../reminder-outbox-events';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import { mergeReminderRecord } from '../reminders/outbox/reminder-optimistic-state';
+import { mergeProject, reorderProjectReminders } from '../reminders/outbox/reminder-list-state';
+import { createReminderSettlementChannel } from '../reminders/outbox/reminder-settlement';
+import { subscribeReminderOutboxEvents } from '../reminders/outbox/reminder-outbox-events';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import type { ApiFetch, LoadReminders, ReminderRecord, ShowToast } from '../types';
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
-import { REMINDER_OUTBOX_LOCK } from '../reminder-storage-keys';
+import { REMINDER_OUTBOX_LOCK } from '../reminders/outbox/reminder-storage-keys';
 
 export function useReminderOutbox(options: {
 	enabled?: boolean;

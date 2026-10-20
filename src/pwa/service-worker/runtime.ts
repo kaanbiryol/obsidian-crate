@@ -1,5 +1,5 @@
 import { receiveReadingShare } from '../shell/share-target';
-import { decryptPushDisplay } from '../encrypted-push';
+import { decryptPushDisplay } from '../encryption/encrypted-push';
 import type { ServiceWorkerConfig } from './config';
 
 interface NotificationData {

@@ -1,9 +1,9 @@
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Drawer } from '@base-ui/react/drawer';
-import { lockSheetDocumentScroll } from '../sheet-scroll-lock';
-import { measureSheetTravel } from '../sheet-geometry';
-import { trackSheetPresentation } from '../sheet-presentation';
+import { lockSheetDocumentScroll } from '../navigation/sheet-scroll-lock';
+import { measureSheetTravel } from '../navigation/sheet-geometry';
+import { trackSheetPresentation } from '../navigation/sheet-presentation';
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { PwaSheetSurface } from './PwaSheetSurface';
 

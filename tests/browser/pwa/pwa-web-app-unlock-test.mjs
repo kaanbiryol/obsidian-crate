@@ -6,8 +6,8 @@ import { chromium, webkit } from '@playwright/test';
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
 
-export * from './src/pwa/web-app-unlock';
-export * from './src/pwa/encryption-keys';
+export * from './src/pwa/encryption/web-app-unlock';
+export * from './src/pwa/encryption/encryption-keys';
 export { AUTH_TOKEN_KEY, saveConfig } from './src/pwa/config';
 export { READING_SESSION_KEY } from './src/pwa/reading/storage';
 `, resolveDir: process.cwd() }, bundle: true, format: 'iife', globalName: 'webKeys', write: false })).outputFiles[0].text;

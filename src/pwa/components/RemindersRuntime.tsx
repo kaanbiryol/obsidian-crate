@@ -3,9 +3,9 @@ import { createContext, lazy, useCallback, useContext, useEffect, useMemo, useSt
 import { isStandaloneApp } from '../config';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
 import { capturePwaSession } from '../session-generation';
-import { loadCachedReminderSnapshot } from '../reminder-cache';
-import { EncryptionKeyRequiredError } from '../encryption-onboarding';
-import { exportPendingChanges } from '../export-pending-changes';
+import { loadCachedReminderSnapshot } from '../reminders/cache/reminder-cache';
+import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
+import { exportPendingChanges } from '../reminders/outbox/export-pending-changes';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
@@ -18,11 +18,11 @@ import { useReminderSync } from '../hooks/useReminderSync';
 import { useSyncFeedback } from '../sync/SyncFeedback';
 import { isInitialPwaContentReady } from '../initial-content-readiness';
 import { useSharedFeatures } from '../shared-features';
-import { toSharedReminder } from '../reminder-list-state';
+import { toSharedReminder } from '../reminders/outbox/reminder-list-state';
 import { useFeatureSettings, useSettingsOpen } from '../settings-context';
 import { DeferredNotice } from './DeferredNotice';
 import { reminderSyncStatus } from '../sync/reminder-status';
-import { reminderRetryAt } from '../reminder-outbox';
+import { reminderRetryAt } from '../reminders/outbox/reminder-outbox';
 
 const ReminderRecoveryNotice = lazy(() => import('./ReminderRecoveryNotice')
 	.then(module => ({ default: module.ReminderRecoveryNotice })));

@@ -1,6 +1,6 @@
 import { SettingsAction } from './SettingsAction';
 import React, { useEffect, useState } from 'react';
-import { browserStorageStatus, type BrowserStorageStatus } from '../browser-storage';
+import { browserStorageStatus, type BrowserStorageStatus } from '../storage/browser-storage';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 

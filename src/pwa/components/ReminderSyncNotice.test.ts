@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import { ReminderSyncNotice } from './ReminderSyncNotice';
 
 type SaveChange = Extract<PendingReminderChange, { kind: 'save' }>;

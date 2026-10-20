@@ -235,7 +235,7 @@ Dock morphs use the shared collapsed height.
   completions, and runs an optional synchronous feature guard before copying.
   Shortcut setup retains pairing expiry and session validation; diagnostics
   retains its payload. Copy failure never changes or regenerates the value.
-- `src/pwa/download.ts` owns the JSON download and Blob URL lifecycle shared by
+- `src/pwa/storage/download.ts` owns the JSON download and Blob URL lifecycle shared by
   Reading and reminder recovery. Each caller retains its filename, payload
   format, and export snapshot. Starting a download does not prove it was saved.
 - `ReminderEditorFields` and `ReminderActionChips` are shared editor content.
@@ -731,7 +731,7 @@ scoped to the running document; reloads create a fresh library predecessor so Ba
 cannot restore an older page instance. Reduced-motion users switch sections
 immediately while spatial animations are disabled. Dismissing an article clears its forward-history
 destination, so a right-edge swipe cannot reopen a dismissed article.
-Projects and Reading share `src/pwa/detail-history.ts`. Every reopen revisits the
+Projects and Reading share `src/pwa/navigation/detail-history.ts`. Every reopen revisits the
 known same-document predecessor while leaving the current list rendered, then
 pushes a fresh detail entry before mounting it. Replacing a closed detail entry
 alone retains old native-preview pixels, even when the destination tab matches:

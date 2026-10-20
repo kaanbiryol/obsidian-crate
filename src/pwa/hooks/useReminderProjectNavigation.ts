@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ViewMode } from '@/reminders/ui/remindersViewModel';
 import type { NavigationMotion } from '../../ui/shared/navigation/NavigationScreen';
-import { dismissProjectHistory, hasProjectHistory, openProjectHistory } from '../project-history';
+import { dismissProjectHistory, hasProjectHistory, openProjectHistory } from '../navigation/project-history';
 
 /** Own project history, exit completion and focus restoration as one lifetime. */
 export function useReminderProjectNavigation({ initialTab, initialProject, reduceMotion }: {

@@ -1,9 +1,9 @@
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { capturePwaSession } from '../session-generation';
-import { newReminderOperationId } from '../reminder-operation-id';
-import { applyReminderChanges, predictReminderCompletion } from '../reminder-optimistic-state';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import { newReminderOperationId } from '../reminders/outbox/reminder-operation-id';
+import { applyReminderChanges, predictReminderCompletion } from '../reminders/outbox/reminder-optimistic-state';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import { useReminderOutbox } from './useReminderOutbox';
 import type { ApiFetch, LoadReminders, ModalState, ReminderRecord, ShowToast, StoredConfig } from '../types';
 
@@ -52,7 +52,7 @@ export function useReminderMutations(options: {
 		preparingRef.current = true;
 		const finishPreparation = beginPreparation();
 		try {
-			const { createSaveReminderChange } = await import('../save-reminder-command');
+			const { createSaveReminderChange } = await import('../reminders/outbox/save-reminder-command');
 			if (!sessionCurrent()) return false;
 			const previous = getSnapshot().reminders.find(item => item.id === modal.reminderId);
 			const change = await createSaveReminderChange(modal, config, projects, selectedProject, previous);

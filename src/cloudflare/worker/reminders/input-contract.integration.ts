@@ -6,7 +6,7 @@ import schema from '../../schema.sql?raw';
 import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { buildReminderMutationBody } from '@/pwa/reminder-mutation';
+import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { scanReminderMarkdownFile, toReminderPayload } from '../reminders-web/scan';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';

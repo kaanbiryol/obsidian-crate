@@ -2,11 +2,11 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { parseHTML } from 'linkedom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { encryptionSnapshot } from '../encryption-session';
+import { encryptionSnapshot } from '../encryption/encryption-session';
 import type { SettingsSnapshot } from '../settings-store';
 import { EncryptionSettings } from './EncryptionSettings';
 
-vi.mock('../encryption-session', () => ({ encryptionSnapshot: vi.fn(), subscribeEncryption: vi.fn() }));
+vi.mock('../encryption/encryption-session', () => ({ encryptionSnapshot: vi.fn(), subscribeEncryption: vi.fn() }));
 vi.mock('react', async importOriginal => ({
 	...await importOriginal<typeof import('react')>(),
 	useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),

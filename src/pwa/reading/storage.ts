@@ -1,7 +1,7 @@
 import { decodeReadingValue } from './private-storage';
 import type { PendingReading } from './outbox';
 import { isPendingReading, isReadingDraft } from './storage-validation';
-import { downloadJson } from '../download';
+import { downloadJson } from '../storage/download';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
 import { assertReadingSession, READING_SESSION_KEY, type ReadingSession } from './session';
 import { readingKeys, isPendingReadingKey } from './storage-keys';
@@ -96,7 +96,7 @@ export async function exportReadingData(): Promise<void> {
   // Export healthy records as readable recovery data and preserve opaque damaged
   // records alongside their wrapped local keys. Never silently omit queued work.
   let wrappedKeys: unknown[] = [];
-  try { wrappedKeys = await (await import('../encryption-keys')).exportWrappedLocalKeys(); } catch { unreadable.push('encryption-keys'); }
+  try { wrappedKeys = await (await import('../encryption/encryption-keys')).exportWrappedLocalKeys(); } catch { unreadable.push('encryption-keys'); }
   downloadJson('crate-reading-recovery.json', { format: 1, origin: location.origin, data, wrappedKeys, unreadable });
 }
 

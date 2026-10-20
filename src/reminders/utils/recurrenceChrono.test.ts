@@ -4,8 +4,8 @@ import * as chrono from 'chrono-node';
 import { parseReminderEditorContent } from './reminderEditorParsing';
 import { buildRichTextSegments } from './richTextRenderer';
 import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
-import { buildReminderMutationBody } from '@/pwa/reminder-mutation';
-import { buildModalDraft } from '@/pwa/reminder-modal-draft';
+import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
+import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
 import { calculateFirstOccurrence, calculateNextOccurrence } from './recurrenceCalculator';
 
 beforeEach(() => {

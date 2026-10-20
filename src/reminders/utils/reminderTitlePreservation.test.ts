@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as chrono from 'chrono-node';
 import { resetLocalTimeZone } from '@internationalized/date';
-import { buildModalDraft } from '@/pwa/reminder-modal-draft';
-import { buildReminderMutationBody } from '@/pwa/reminder-mutation';
+import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
+import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { buildCreatedReminderBlock, buildUpdatedReminderBlock } from '../core/markdownReminderMutation';
 import { scanReminderMarkdownContent } from '../core/markdownScan';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';

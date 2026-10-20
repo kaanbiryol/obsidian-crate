@@ -5,20 +5,20 @@ import { renderHook } from '../../test/react-hooks';
 import { usePwaSessionLifecycle } from '../hooks/usePwaSessionLifecycle';
 import { clearReadingData, READING_SESSION_KEY } from './storage';
 import { AUTH_TOKEN_KEY } from '../config';
-import { clearReminderDrafts } from '../reminder-drafts';
-import { clearReminderOutbox } from '../reminder-outbox-storage';
-import { clearCachedReminderSnapshots } from '../reminder-cache';
-import { clearPersistedEncryption, clearEncryptionSessionMarkers } from '../encryption-cleanup';
-import { resetPwaEncryption } from '../encryption-session';
+import { clearReminderDrafts } from '../reminders/editor/reminder-drafts';
+import { clearReminderOutbox } from '../reminders/outbox/reminder-outbox-storage';
+import { clearCachedReminderSnapshots } from '../reminders/cache/reminder-cache';
+import { clearPersistedEncryption, clearEncryptionSessionMarkers } from '../encryption/encryption-cleanup';
+import { resetPwaEncryption } from '../encryption/encryption-session';
 import { capturePwaSession } from '../session-generation';
 
-vi.mock('../encryption-cleanup', async importOriginal => ({ ...await importOriginal<typeof import('../encryption-cleanup')>(), clearPersistedEncryption: vi.fn(async () => {}), clearEncryptionSessionMarkers: vi.fn() }));
-vi.mock('../encryption-session', () => ({ resetPwaEncryption: vi.fn() }));
+vi.mock('../encryption/encryption-cleanup', async importOriginal => ({ ...await importOriginal<typeof import('../encryption/encryption-cleanup')>(), clearPersistedEncryption: vi.fn(async () => {}), clearEncryptionSessionMarkers: vi.fn() }));
+vi.mock('../encryption/encryption-session', () => ({ resetPwaEncryption: vi.fn() }));
 vi.mock('./storage', async importOriginal => ({ ...await importOriginal<typeof import('./storage')>(), clearReadingData: vi.fn(async () => {}) }));
 vi.mock('../config', async importOriginal => ({ ...await importOriginal<typeof import('../config')>(), finishEnrollment: vi.fn() }));
-vi.mock('../reminder-drafts', () => ({ clearReminderDrafts: vi.fn(() => true) }));
-vi.mock('../reminder-outbox-storage', () => ({ clearReminderOutbox: vi.fn() }));
-vi.mock('../reminder-cache', () => ({ clearCachedReminderSnapshots: vi.fn(async () => true) }));
+vi.mock('../reminders/editor/reminder-drafts', () => ({ clearReminderDrafts: vi.fn(() => true) }));
+vi.mock('../reminders/outbox/reminder-outbox-storage', () => ({ clearReminderOutbox: vi.fn() }));
+vi.mock('../reminders/cache/reminder-cache', () => ({ clearCachedReminderSnapshots: vi.fn(async () => true) }));
 
 beforeEach(() => {
   const values = new Map([[READING_SESSION_KEY, '{ damaged credentials'], [AUTH_TOKEN_KEY, 'valid-reminders-token']]);

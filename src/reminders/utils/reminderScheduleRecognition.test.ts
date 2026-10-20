@@ -3,7 +3,7 @@ import { parseReminderEditorContent } from './reminderEditorParsing';
 import { calculateFirstOccurrence, calculateNextOccurrence } from './recurrenceCalculator';
 import { buildRichTextSegments } from './richTextRenderer';
 import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
-import { buildReminderMutationBody } from '@/pwa/reminder-mutation';
+import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 
 beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 21, 13)); });
 afterEach(() => vi.useRealTimers());

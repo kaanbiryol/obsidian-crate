@@ -7,8 +7,8 @@ import { calculateFirstOccurrence, calculateNextOccurrence } from './recurrenceC
 import { parseRecurrenceFromContent } from './recurrenceParser';
 import { recurrenceToEditorText } from './rruleConverter';
 import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
-import { buildReminderMutationBody } from '@/pwa/reminder-mutation';
-import { buildModalDraft } from '@/pwa/reminder-modal-draft';
+import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
+import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
 import { canonicalReminderTimezone } from './reminderTimezone';
 
 beforeEach(() => {

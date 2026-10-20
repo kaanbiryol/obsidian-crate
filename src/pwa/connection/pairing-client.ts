@@ -1,6 +1,6 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol/server-info';
 import { PAIRING_PATH, PairingEndedError, type PairingTransport } from '../../encryption/pairing/protocol';
-import { parseScopedEncryptionState, type ScopedEncryptionState } from '../encryption-scope';
+import { parseScopedEncryptionState, type ScopedEncryptionState } from '../encryption/encryption-scope';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
 import { READING_SESSION_KEY, readingSession } from '../reading/storage';
 import { capturePwaSession } from '../session-generation';

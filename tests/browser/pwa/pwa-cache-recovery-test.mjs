@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { chromium, webkit } from '@playwright/test';
 
-const { outputFiles } = await build({ stdin: { contents: `export * from './src/pwa/reminder-cache'; export { reminderCacheHealth } from './src/pwa/reminder-cache-database';`, resolveDir: process.cwd() },
+const { outputFiles } = await build({ stdin: { contents: `export * from './src/pwa/reminders/cache/reminder-cache'; export { reminderCacheHealth } from './src/pwa/reminders/cache/reminder-cache-database';`, resolveDir: process.cwd() },
 	bundle: true, format: 'iife', globalName: 'reminderCache', write: false });
 
 for (const browserType of [chromium, webkit]) {

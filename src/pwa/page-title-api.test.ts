@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeApiFetch } from './api';
 import { invalidatePwaSession } from './session-generation';
 
-vi.mock('./encryption-session', () => ({ preparePwaEncryption: async () => null, encryptionSnapshot: () => ({ status: 'legacy' }) }));
+vi.mock('./encryption/encryption-session', () => ({ preparePwaEncryption: async () => null, encryptionSnapshot: () => ({ status: 'legacy' }) }));
 
 beforeEach(() => {
 	vi.stubGlobal('localStorage', { getItem: () => 'session' });

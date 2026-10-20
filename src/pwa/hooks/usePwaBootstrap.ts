@@ -1,7 +1,7 @@
 import { preserveIncomingShare } from '../connection/incoming-share';
 import { connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from '../connection/issues';
 import { capturePwaSession } from '../session-generation';
-import { EncryptionKeyRequiredError } from '../encryption-onboarding';
+import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
 import { useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import {

@@ -1,5 +1,5 @@
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
-import { createDetailHistory } from '../detail-history';
+import { createDetailHistory } from '../navigation/detail-history';
 
 const articles = createDetailHistory({
 	stackKey: 'readingStackId', detailKey: 'readingArticle',

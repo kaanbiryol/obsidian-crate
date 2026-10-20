@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import { PwaSyncStatusIndicator } from './PwaSyncStatusIndicator';
 import { reminderSyncStatus } from '../sync/reminder-status';
 

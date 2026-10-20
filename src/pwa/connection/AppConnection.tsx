@@ -5,7 +5,7 @@ import { onConnectionExpired } from './expiration';
 import type { ConnectionIssue } from './issues';
 import { READING_SESSION_KEY, readingSession } from '../reading/storage';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
-import { encryptionSnapshot, subscribeEncryption } from '../encryption-session';
+import { encryptionSnapshot, subscribeEncryption } from '../encryption/encryption-session';
 import { usePwaBootstrap } from '../hooks/usePwaBootstrap';
 import { usePwaSessionLifecycle } from '../hooks/usePwaSessionLifecycle';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';

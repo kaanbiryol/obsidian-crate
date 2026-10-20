@@ -1,6 +1,6 @@
 import { EncryptionTransitionError } from '../connection/encryption';
 import { ConnectionError, connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from '../connection/issues';
-import { EncryptionKeyRequiredError } from '../encryption-onboarding';
+import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
 import { resetReadingEncryption } from './encryption-lifecycle';
 import { prepareReadingEncryption } from './encryption-session';
 import { useCallback, useEffect, useRef, useState } from 'react';

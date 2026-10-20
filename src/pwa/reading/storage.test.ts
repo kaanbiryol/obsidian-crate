@@ -8,9 +8,9 @@ import { isPendingReading, isReadingCache, isReadingSession } from './storage-va
 
 const values = vi.hoisted(() => new Map<string, unknown>());
 const download = vi.hoisted(() => vi.fn());
-vi.mock('../download', () => ({ downloadJson: download }));
-vi.mock('../encryption-keys', () => ({ exportWrappedLocalKeys: async () => [] }));
-vi.mock('../single-store-database', () => ({ openSingleStoreDatabase: async () => ({
+vi.mock('../storage/download', () => ({ downloadJson: download }));
+vi.mock('../encryption/encryption-keys', () => ({ exportWrappedLocalKeys: async () => [] }));
+vi.mock('../storage/single-store-database', () => ({ openSingleStoreDatabase: async () => ({
   get: async (_store: string, key: string) => values.get(key),
   put: async (_store: string, value: unknown, key: string) => { values.set(key, value); },
   delete: async (_store: string, key: string) => { values.delete(key); },

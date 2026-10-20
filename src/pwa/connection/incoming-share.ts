@@ -1,4 +1,4 @@
-import { pendingReadingCapture, forgetReadingCapture } from '../encryption-fragments';
+import { pendingReadingCapture, forgetReadingCapture } from '../encryption/encryption-fragments';
 import { readingUrl } from '@/reading/core/model';
 
 /** Preserve a Shortcut's private URL before any enrollment can reset in-memory keys. */

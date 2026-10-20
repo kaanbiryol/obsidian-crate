@@ -10,7 +10,7 @@ import { READING_SESSION_KEY, assertReadingSession, commitReadingCache, readingS
 import { ReadingApiError } from './api-error';
 export { ReadingApiError } from './api-error';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './record-validation';
-import { EncryptionScopeChangedError, routeFolderPath } from '../encryption-folder-routing';
+import { EncryptionScopeChangedError, routeFolderPath } from '../encryption/encryption-folder-routing';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {

@@ -3,13 +3,13 @@ import { clearReadingData, readingSession, READING_SESSION_KEY } from '../readin
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { invalidatePwaSession } from '../session-generation';
-import { clearReminderDrafts } from '../reminder-drafts';
-import { clearReminderOutbox } from '../reminder-outbox-storage';
+import { clearReminderDrafts } from '../reminders/editor/reminder-drafts';
+import { clearReminderOutbox } from '../reminders/outbox/reminder-outbox-storage';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY, finishEnrollment, loadStoredConfig } from '../config';
-import { clearCachedReminderSnapshots } from '../reminder-cache';
+import { clearCachedReminderSnapshots } from '../reminders/cache/reminder-cache';
 import type { ApiFetch, ShowToast, StoredConfig } from '../types';
-import { captureEncryptionCleanupAuthority, clearEncryptionSessionMarkers, clearPersistedEncryption } from '../encryption-cleanup';
-import { resetPwaEncryption } from '../encryption-session';
+import { captureEncryptionCleanupAuthority, clearEncryptionSessionMarkers, clearPersistedEncryption } from '../encryption/encryption-cleanup';
+import { resetPwaEncryption } from '../encryption/encryption-session';
 import { resetReadingEncryption } from '../reading/encryption-lifecycle';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 

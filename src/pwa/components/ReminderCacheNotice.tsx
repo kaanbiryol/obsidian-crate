@@ -1,7 +1,7 @@
 import { PwaButton } from './PwaButton';
 import { PwaNotice } from './PwaNotice';
 import React, { useState, useSyncExternalStore } from 'react';
-import { reminderCacheHealth } from '../reminder-cache-database';
+import { reminderCacheHealth } from '../reminders/cache/reminder-cache-database';
 
 const explanations = {
 	blocked: 'Close other Crate tabs and retry. An open tab is preventing access to the offline copy.',

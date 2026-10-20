@@ -1,6 +1,6 @@
 import { SPINNER_SPOKES_HTML } from '../../ui/shared/spinner-spokes';
 import { createPwaOpeningDockHtml, openingIconSvg } from './opening-dock';
-import type { resolvePwaOpeningDestination } from '../opening-destination';
+import type { resolvePwaOpeningDestination } from '../navigation/opening-destination';
 
 // Match the shared React loading indicator before the app module is available.
 const loadingIndicator = (label: string) => `<div class="crate-content-loading" role="status" aria-label="${label}"><svg class="crate-content-loading__spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">${SPINNER_SPOKES_HTML}</svg></div>`;

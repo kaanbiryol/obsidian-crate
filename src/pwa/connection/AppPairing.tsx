@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PwaButton as Button } from '../components/PwaButton';
 import { pairingConnection } from './pairing-client';
 import { requestAppPairing } from '../../encryption/pairing/session';
-import { rememberPairingGrants } from '../web-app-unlock';
+import { rememberPairingGrants } from '../encryption/web-app-unlock';
 import { PairingEndedError } from '../../encryption/pairing/protocol';
 
 export function AppPairing({ feature }: { feature: 'reading' | 'reminders' }) {

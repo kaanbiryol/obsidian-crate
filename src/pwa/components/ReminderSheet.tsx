@@ -6,7 +6,7 @@ import {
 	getReminderSheetClosedOffset,
 	useReminderSheetNavigation,
 } from '../hooks/useReminderSheetNavigation';
-import { discardReminderDraft, inspectReminderDraft, restoreReminderDraft, saveReminderDraft } from '../reminder-drafts';
+import { discardReminderDraft, inspectReminderDraft, restoreReminderDraft, saveReminderDraft } from '../reminders/editor/reminder-drafts';
 import type { ModalDraft, ModalState } from '../types';
 import {
 	ReminderEditorScreen,

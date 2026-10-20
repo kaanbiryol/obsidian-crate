@@ -1,5 +1,5 @@
 import type { IDBPDatabase, DBSchema } from 'idb';
-import { openSingleStoreDatabase } from '../single-store-database';
+import { openSingleStoreDatabase } from '../storage/single-store-database';
 import { encodeReadingValue, decodeReadingValue } from './private-storage';
 import { assertReadingSession, type ReadingSession } from './session';
 

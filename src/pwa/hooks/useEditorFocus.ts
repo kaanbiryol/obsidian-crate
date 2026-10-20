@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react';
-import { captureTitleSelection, restoreTitleSelection, revealTitleCaret } from '../editor-selection';
+import { captureTitleSelection, restoreTitleSelection, revealTitleCaret } from '../reminders/editor/editor-selection';
 
 export function useEditorFocus({ titleRef, descriptionRef, editorRef, active, keyboardInset }: {
 	titleRef: RefObject<HTMLDivElement | null>;

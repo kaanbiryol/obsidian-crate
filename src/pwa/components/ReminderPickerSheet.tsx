@@ -2,7 +2,7 @@ import React, { useLayoutEffect } from 'react';
 import { ProjectPickerContent } from '@/reminders/ui/reminder-modal/ProjectPickerContent';
 import {
 	applyReminderTextUpdate,
-} from '../reminder-state';
+} from '../reminders/editor/editor-draft';
 import type { ModalDraft } from '../types';
 import { ReminderDatePicker } from './ReminderDatePicker';
 import { ReminderRecurrencePicker } from './ReminderRecurrencePicker';

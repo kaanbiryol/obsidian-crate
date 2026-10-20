@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { chromium, webkit } from '@playwright/test';
 
 const { outputFiles } = await build({
-	entryPoints: ['src/pwa/reminder-cache.ts'],
+	entryPoints: ['src/pwa/reminders/cache/reminder-cache.ts'],
 	bundle: true,
 	format: 'iife',
 	globalName: 'reminderCache',

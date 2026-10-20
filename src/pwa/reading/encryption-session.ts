@@ -1,10 +1,10 @@
-import { rememberEncryptionUnlock } from '../encryption-onboarding';
+import { rememberEncryptionUnlock } from '../encryption/encryption-onboarding';
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { loadEncryptionState, loadScopeKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../connection/encryption';
-import type { ScopedEncryptionState } from '../encryption-scope';
-import { unlockLocalState, type StoredReminderKeys } from '../encryption-keys';
-import { pendingReadingKey, forgetReadingKey, forgetReadingCapture } from '../encryption-fragments';
+import type { ScopedEncryptionState } from '../encryption/encryption-scope';
+import { unlockLocalState, type StoredReminderKeys } from '../encryption/encryption-keys';
+import { pendingReadingKey, forgetReadingKey, forgetReadingCapture } from '../encryption/encryption-fragments';
 import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from './private-storage';
 import { assertReadingSession, type ReadingSession } from './session';
 import { readingDatabase } from './database';
@@ -76,7 +76,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 export async function unlockReadingWithCode(code: string, session: ReadingSession): Promise<void> {
   if (!expected) throw new Error('Verify the Reading connection first.');
   const state = expected;
-  const { rememberRecoveryKey } = await import('../web-app-unlock');
+  const { rememberRecoveryKey } = await import('../encryption/web-app-unlock');
   await rememberRecoveryKey(code, state, session.folderPath, () => { try { assertReadingSession(session); return expected === state; } catch { return false; } });
   location.reload();
 }

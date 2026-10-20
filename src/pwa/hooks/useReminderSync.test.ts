@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { useReminderSync } from './useReminderSync';
 import { invalidatePwaSession } from '../session-generation';
-import { loadCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
+import { loadCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminders/cache/reminder-cache';
 import type { ApiFetch, ReminderRecord } from '../types';
 import { reminderSyncStatus } from '../sync/reminder-status';
 
-vi.mock('../reminder-cache', () => ({
+vi.mock('../reminders/cache/reminder-cache', () => ({
 	loadCachedReminderSnapshot: vi.fn(async () => null),
 	refreshCachedReminderSnapshot: vi.fn(async () => {}),
 	saveCachedReminderSnapshot: vi.fn(async () => {}),

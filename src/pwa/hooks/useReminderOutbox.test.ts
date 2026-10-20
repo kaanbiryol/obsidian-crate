@@ -2,12 +2,12 @@ import { act } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { invalidatePwaSession } from '../session-generation';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import type { ApiFetch, ReminderRecord } from '../types';
 import { useReminderOutbox } from './useReminderOutbox';
 
 const stored = vi.hoisted(() => ({ changes: [] as PendingReminderChange[], initializing: undefined as Promise<void> | undefined }));
-vi.mock('../reminder-outbox-storage', () => ({
+vi.mock('../reminders/outbox/reminder-outbox-storage', () => ({
 	createReminderOutboxStorage: async () => { await stored.initializing; return {
 		load: () => structuredClone(stored.changes),
 		get: (id: string) => structuredClone(stored.changes.find(item => item.operationId === id) ?? null),
@@ -19,7 +19,7 @@ vi.mock('../reminder-outbox-storage', () => ({
 	}; },
 	createReminderRecoveryStorage: async () => ({ load: () => [], quarantined: () => [], acceptsKey: () => false }),
 }));
-vi.mock('../reminder-settlement', () => ({ createReminderSettlementChannel: async () => ({ publish: vi.fn() }) }));
+vi.mock('../reminders/outbox/reminder-settlement', () => ({ createReminderSettlementChannel: async () => ({ publish: vi.fn() }) }));
 vi.mock('./useSyncFailureToast', () => ({ useSyncFailureToast: vi.fn() }));
 
 const reminder: ReminderRecord = { id: 'one', content: 'My reminder', completed: false, priority: 4,

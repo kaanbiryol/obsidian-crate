@@ -14,7 +14,7 @@ vi.mock('./storage-validation', async importOriginal => {
   const actual = await importOriginal<typeof import('./storage-validation')>();
   return { ...actual, isReadingCache: vi.fn(actual.isReadingCache) };
 });
-vi.mock('../single-store-database', () => ({ openSingleStoreDatabase: async () => ({
+vi.mock('../storage/single-store-database', () => ({ openSingleStoreDatabase: async () => ({
   transaction: () => ({
     store: {
       getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key),

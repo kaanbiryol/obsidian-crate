@@ -2,12 +2,12 @@ import { act } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { useReminderEditorActions } from './useReminderEditorActions';
-import { discardReminderDraft } from '../reminder-drafts';
-import { buildModalDraft } from '../reminder-modal-draft';
+import { discardReminderDraft } from '../reminders/editor/reminder-drafts';
+import { buildModalDraft } from '../reminders/editor/reminder-modal-draft';
 import { invalidatePwaSession } from '../session-generation';
 import type { ModalState } from '../types';
 
-vi.mock('../reminder-drafts', () => ({ discardReminderDraft: vi.fn() }));
+vi.mock('../reminders/editor/reminder-drafts', () => ({ discardReminderDraft: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
 
 const modal: ModalState = { mode: 'create', operationId: 'save-one',

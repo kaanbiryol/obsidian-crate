@@ -1,6 +1,6 @@
 import { PwaButton as BaseButton } from './PwaButton';
 import React from 'react';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import { ExpiredReminderChangeActions } from './ExpiredReminderChangeActions';
 import { PwaNotice } from './PwaNotice';
 

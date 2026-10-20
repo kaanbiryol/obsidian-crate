@@ -1,5 +1,5 @@
-import { consumeReadingKeyFragment } from './encryption-fragments';
-import { consumeEncryptionFragment } from './encryption-session';
+import { consumeReadingKeyFragment } from './encryption/encryption-fragments';
+import { consumeEncryptionFragment } from './encryption/encryption-session';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { FeatureShell } from './FeatureShell';

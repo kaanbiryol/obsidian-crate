@@ -4,10 +4,10 @@ import { rebuildCheckboxLine, parseCheckboxLine } from '../utils/checkboxParser'
 import { scanReminderMarkdownContent } from './markdownScan';
 import { buildCreatedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent } from './markdownReminderFile';
-import { buildModalDraft } from '@/pwa/reminder-modal-draft';
-import { deriveDraftPatchFromContent } from '@/pwa/reminder-state';
+import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
+import { deriveDraftPatchFromContent } from '@/pwa/reminders/editor/editor-draft';
 import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
-import { buildReminderMutationBody } from '@/pwa/reminder-mutation';
+import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 
 const originalTZ = process.env.TZ;
 afterEach(() => { process.env.TZ = originalTZ; resetLocalTimeZone(); });

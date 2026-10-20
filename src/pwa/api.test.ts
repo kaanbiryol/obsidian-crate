@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { getPwaPushManager, registerPwaServiceWorker } from './api';
-import * as encryptionSession from './encryption-session';
+import * as encryptionSession from './encryption/encryption-session';
 
 afterEach(() => vi.restoreAllMocks());
 

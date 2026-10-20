@@ -1,7 +1,7 @@
 import type { SyncIndicatorState } from '../../ui/shared/SyncIndicator';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import type { DataMode } from '../types';
-import type { ReminderIndexingProgress } from '../reminder-api';
+import type { ReminderIndexingProgress } from '../reminders/reminder-api';
 
 interface PwaSyncIndicatorProps {
 	changes: PendingReminderChange[];

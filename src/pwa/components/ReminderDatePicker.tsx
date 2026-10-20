@@ -1,6 +1,6 @@
 import { DatePickerContent } from '@/reminders/ui/reminder-modal/DatePickerContent';
 import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/utils/reminderDate';
-import { applyDateFieldsToDraft, applyDatePresetToDraft } from '../reminder-state';
+import { applyDateFieldsToDraft, applyDatePresetToDraft } from '../reminders/editor/editor-draft';
 import type { ModalDraft } from '../types';
 
 export function ReminderDatePicker({ draft, projectOptions, isDark, onPatch, onSelect, onClose }: {

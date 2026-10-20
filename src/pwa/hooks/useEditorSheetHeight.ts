@@ -1,5 +1,5 @@
 import { useLayoutEffect, type RefObject } from 'react';
-import { measureSheetTravel } from '../sheet-geometry';
+import { measureSheetTravel } from '../navigation/sheet-geometry';
 
 /** Fit the editor to its natural rows, including wrapped chips and resized text. */
 export function useEditorSheetHeight(ref: RefObject<HTMLDivElement | null>, active: boolean, confirmingDelete = false): void {

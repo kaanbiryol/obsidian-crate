@@ -5,8 +5,8 @@ import { useReminderMutations } from './useReminderMutations';
 import { useReminderEditorActions } from './useReminderEditorActions';
 import { useReminderOutbox } from './useReminderOutbox';
 import { invalidatePwaSession } from '../session-generation';
-import { restoreReminderDraft, saveReminderDraft } from '../reminder-drafts';
-import type { PendingReminderChange } from '../reminder-outbox-types';
+import { restoreReminderDraft, saveReminderDraft } from '../reminders/editor/reminder-drafts';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import type { ModalState, ReminderRecord } from '../types';
 
 vi.mock('../server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));

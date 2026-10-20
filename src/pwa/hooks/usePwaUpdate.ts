@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { startAutoPwaUpdate } from '../auto-update';
-import { applyPwaUpdate, preparePwaUpdate } from '../apply-update';
+import { startAutoPwaUpdate } from '../update/auto-update';
+import { applyPwaUpdate, preparePwaUpdate } from '../update/apply-update';
 import { advancePwaUpdateProgress, finishPwaUpdateTransition, preparePwaUpdateTransition, showPwaUpdateTransition } from '../shell/update-transition';
-import { whenUpdateLayoutSettles } from '../update-layout-readiness';
+import { whenUpdateLayoutSettles } from '../update/update-layout-readiness';
 import type { ShowToast } from '../types';
 
 const LAUNCH_UPDATE_BUDGET_MS = 2_500;

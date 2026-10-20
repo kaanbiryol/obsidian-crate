@@ -4,13 +4,13 @@ import { EncryptionUnlockCard } from '../components/EncryptionUnlockCard';
 import { EmptyAuthState, ErrorState } from '../components/AuthStates';
 import { PwaLaunchSplash } from '../components/PwaChrome';
 import { PwaButton as Button } from '../components/PwaButton';
-import { unlockWithRecoveryKey } from '../encryption-session';
+import { unlockWithRecoveryKey } from '../encryption/encryption-session';
 import { unlockReadingWithCode } from '../reading/encryption-session';
 import { exportReadingData } from '../reading/storage';
 import { useSharedFeatures } from '../shared-features';
 import { BrowserSetup, needsBrowserSetup } from './BrowserSetup';
 import { AppPairing } from './AppPairing';
-import { hasEncryptedSessionEvidence } from '../encryption-scope';
+import { hasEncryptedSessionEvidence } from '../encryption/encryption-scope';
 import { SESSION_RECOVERY_ISSUE } from './issues';
 
 /** One app-level setup/recovery surface, regardless of the initial destination. */

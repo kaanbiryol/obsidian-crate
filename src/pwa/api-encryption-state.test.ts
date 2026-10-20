@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { makeApiFetch } from './api';
-import { preparePwaEncryption } from './encryption-session';
+import { preparePwaEncryption } from './encryption/encryption-session';
 import { invalidatePwaSession } from './session-generation';
 import type { ApiFetch } from './types';
 
-vi.mock('./encryption-session', () => ({
+vi.mock('./encryption/encryption-session', () => ({
 	preparePwaEncryption: vi.fn(async (_token: string, rawFetch: ApiFetch) => { await rawFetch('/encryption'); return null; }),
 	encryptionSnapshot: () => ({ status: 'legacy' }),
 }));

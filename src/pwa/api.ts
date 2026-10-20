@@ -4,10 +4,10 @@ import { ConnectionError } from './connection/issues';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { detectWebSessionName } from './session-label';
-import { preparePwaEncryption, encryptionSnapshot } from './encryption-session';
-import type { EncryptedReminderApi } from './encrypted-reminder-api';
-import type { StoredReminderKeys } from './encryption-keys';
-import { EncryptionScopeChangedError, routeFolderRequest } from './encryption-folder-routing';
+import { preparePwaEncryption, encryptionSnapshot } from './encryption/encryption-session';
+import type { EncryptedReminderApi } from './reminders/encrypted-reminder-api';
+import type { StoredReminderKeys } from './encryption/encryption-keys';
+import { EncryptionScopeChangedError, routeFolderRequest } from './encryption/encryption-folder-routing';
 import { requestSharedFeaturesRefresh } from './shared-features';
 import { ENCRYPTION_STATE_HEADER } from '@/encryption/server-state';
 
@@ -84,7 +84,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		if (!refresh && encryptionOff && !keys) return Promise.resolve();
 		if (refresh) preparing = undefined;
 		return preparing ??= preparePwaEncryption(authToken, rawFetch, refresh).then(async value => {
-			const Constructor = value ? (await import('./encrypted-reminder-api')).EncryptedReminderApi : null;
+			const Constructor = value ? (await import('./reminders/encrypted-reminder-api')).EncryptedReminderApi : null;
 			if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed before unlocking');
 			keys = value;
 			encrypted = keys && Constructor ? new Constructor(keys, rawFetch) : null;

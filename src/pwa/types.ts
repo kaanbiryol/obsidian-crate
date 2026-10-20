@@ -1,6 +1,6 @@
 import type { SyncIndicatorState } from '@/ui/shared/SyncIndicator';
 import type { InferOutput } from 'valibot';
-import type { reminderDraftSchema, reminderRecordSchema } from './reminder-storage-validation';
+import type { reminderDraftSchema, reminderRecordSchema } from './reminders/cache/reminder-storage-validation';
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 
 export type ModalMode = 'create' | 'edit';
