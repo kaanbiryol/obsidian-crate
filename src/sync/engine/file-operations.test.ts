@@ -51,11 +51,3 @@ it('protects remote copies for both single and batch deletion while an upload is
 	expect(h.transport).not.toHaveBeenCalled();
 	await h.manifest.close();
 });
-
-it('allows token refresh but refuses to retarget a bound engine to another server', async () => {
-	const h = await fixture();
-	expect(() => h.api.updateCredentials('https://server.test/', 'new-token')).not.toThrow();
-	expect(() => h.api.updateCredentials('https://other.test', 'token')).toThrow('Stop this sync engine');
-	expect(h.api.getWorkerUrl()).toBe('https://server.test');
-	await h.manifest.close();
-});

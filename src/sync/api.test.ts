@@ -254,18 +254,6 @@ describe('SyncApiClient', () => {
 		expect(transport).toHaveBeenCalledTimes(3);
 	});
 
-	it('updates credentials used by subsequent requests', async () => {
-		const transport = mockTransport(new Response('{"status":"ok","timestamp":"now"}'));
-		const client = new SyncApiClient('https://old.example/', 'old-token', transport);
-		client.updateCredentials('https://new.example/', 'new-token');
-		await client.health();
-
-		const [request] = transport.mock.calls[0]!;
-		expect(request.url).toBe('https://new.example/health');
-		expect(request.headers?.Authorization).toBe('Bearer new-token');
-		expect(client.getWorkerUrl()).toBe('https://new.example');
-	});
-
 	it('refreshes the shared-settings version after a stale write', async () => {
 		const settings = {
 			ignorePatterns: [],

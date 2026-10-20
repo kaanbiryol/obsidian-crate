@@ -3,7 +3,6 @@ import type { ConnectionTestResult } from './types';
 import { SharedHistoryApi } from './worker-api/history-checkpoints';
 import type { RequestDiagnostics } from './diagnostics/request-diagnostics';
 import type { MarkdownBaseCache } from './merge/markdown-base-cache';
-import { normalizeWorkerUrl } from './connection/worker-url';
 import type { Vault } from 'obsidian';
 import type { LocalManifest } from './manifest/manifest';
 import type { NotificationPolicy } from '../protocol/notification-policy';
@@ -55,9 +54,7 @@ export class SyncApiClient {
 		this.encryption = encryption;
 	}
 	readonly initialImport: InitialImportApi;
-	private fileOperationAuthority?: string;
 	createFileOperations(manifest: LocalManifest, vault: Vault, cache: MarkdownBaseCache) {
-		this.fileOperationAuthority = this.getWorkerUrl();
 		return createEngineFileOperations(this.syncApi, manifest, vault, cache, this.http.getRequestDiagnostics().clientSession);
 	}
 	private readonly http: WorkerApiHttpClient;
@@ -83,12 +80,6 @@ export class SyncApiClient {
 
 	setAbortSignal(signal: AbortSignal): void {
 		this.http.setAbortSignal(signal);
-	}
-
-	updateCredentials(workerUrl: string, authToken: string): void {
-		if (this.encryption) throw new Error('Reinitialize encrypted sync before changing connection credentials');
-		if (this.fileOperationAuthority !== undefined && normalizeWorkerUrl(workerUrl) !== this.fileOperationAuthority) throw new Error('Stop this sync engine and preserve its pending uploads before connecting another server');
-		this.http.updateCredentials(workerUrl, authToken);
 	}
 
 	isConfigured(): boolean {
@@ -124,10 +115,6 @@ export class SyncApiClient {
 
 	async testConnection(): Promise<ConnectionTestResult> {
 		return this.syncApi.testConnection();
-	}
-
-	async retryPausedNotifications(): Promise<{ retried: number; more: boolean }> {
-		return this.notificationsApi.retryPausedNotifications();
 	}
 
 	async getDiagnostics(): Promise<BackendDiagnostics> {

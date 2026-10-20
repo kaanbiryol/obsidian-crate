@@ -22,10 +22,6 @@ export interface PushTestResponse {
 export class NotificationsWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
 
-	retryPausedNotifications(): Promise<{ retried: number; more: boolean }> {
-		return this.http.requestJson('/notifications/retry', { method: 'POST' });
-	}
-
 	ensureNotificationPolicy(policy: Omit<NotificationPolicy, 'revision'>): Promise<{ policy: NotificationPolicy }> {
 		return this.http.requestJson('/reminders/notification-policy', { method: 'POST', body: JSON.stringify(policy) });
 	}
