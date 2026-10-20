@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState, forwardRef, memo } from 'react';
-import { motion, Reorder, useDragControls, useIsPresent } from 'motion/react';
+import React, { useCallback, useRef, useState, forwardRef, memo } from 'react';
+import { motion, Reorder, useIsPresent } from 'motion/react';
 import type { Reminder } from '../../types/reminder';
 import { ReminderListPresence } from './ReminderListPresence';
 import { REMINDER_DRAG_SCALE, REMINDER_LIST_LAYOUT_TRANSITION, REMINDER_SECTION_TRANSITION } from './layoutConstants';
 import { reminderRowMotion } from './reminderRowMotion';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import { createReorderClickGuard } from './reorderClickGuard';
+import { useLongPressReorder } from './useLongPressReorder';
 import { mergeReorderedPage, ReminderPagination, useReminderPagination } from './reminder-pagination';
 
 interface ReorderableReminderListProps {
@@ -28,148 +28,20 @@ interface ReorderableItemProps {
   enableLayoutAnimations: boolean;
 }
 
-const LONG_PRESS_DELAY_MS = 380;
-const LONG_PRESS_MOVE_TOLERANCE = 9;
-const LONG_PRESS_INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, [contenteditable="true"], [role="checkbox"]';
-
 const LARGE_LIST_ANIMATION_LIMIT = 80;
 
 const ReorderableItem = memo(forwardRef<HTMLDivElement, ReorderableItemProps>(function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction, enableLayoutAnimations }: ReorderableItemProps, ref) {
   const isPresent = useIsPresent();
   const rowMotion = reminderRowMotion(enableLayoutAnimations);
-  const [isDragPressed, setIsDragPressed] = useState(false);
-  const clickGuardRef = useRef(createReorderClickGuard());
   const elementRef = useRef<HTMLDivElement | null>(null);
   const setElementRef = useCallback((element: HTMLDivElement | null) => {
     elementRef.current = element;
     if (typeof ref === 'function') ref(element);
     else if (ref) ref.current = element;
   }, [ref]);
-  const dragControls = useDragControls();
-  const longPressTimerRef = useRef<number | null>(null);
-  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
-  const touchDragActiveRef = useRef(false);
-  const [isLongPressArmed, setIsLongPressArmed] = useState(false);
-  const [isReordering, setIsReordering] = useState(false);
-
-  const cancelLongPress = useCallback(() => {
-    if (longPressTimerRef.current !== null) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    pressStartRef.current = null;
-    setIsLongPressArmed(false);
-    setIsDragPressed(false);
-  }, []);
-
-  useEffect(() => cancelLongPress, [cancelLongPress]);
-
-  useEffect(() => {
-    const element = elementRef.current;
-    if (!element) return;
-    // Let swipes scroll until the hold activates. Then retain the touch stream
-    // for Motion instead of letting native scrolling cancel its pointer events.
-    const handleTouchMove = (event: TouchEvent) => {
-      if (touchDragActiveRef.current && event.cancelable) event.preventDefault();
-    };
-    const endTouch = () => {
-      touchDragActiveRef.current = false;
-      cancelLongPress();
-    };
-    element.addEventListener('touchmove', handleTouchMove, { passive: false });
-    element.addEventListener('touchend', endTouch);
-    element.addEventListener('touchcancel', endTouch);
-    return () => {
-      element.removeEventListener('touchmove', handleTouchMove);
-      element.removeEventListener('touchend', endTouch);
-      element.removeEventListener('touchcancel', endTouch);
-    };
-  }, [cancelLongPress]);
-
-  useEffect(() => {
-    const element = elementRef.current;
-    if (!element) return;
-    const guard = clickGuardRef.current;
-    const handleClick = (event: MouseEvent) => {
-      if (!guard.shouldBlock(event)) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    // Cards use native capture listeners, so block at their native ancestor too.
-    element.addEventListener('click', handleClick, true);
-    element.addEventListener('pointerdown', guard.reset, true);
-    return () => {
-      element.removeEventListener('click', handleClick, true);
-      element.removeEventListener('pointerdown', guard.reset, true);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isDragPressed && !isLongPressArmed) return;
-    // A drag may be released outside the row, where its pointer-up won't bubble.
-    window.addEventListener('pointerup', cancelLongPress);
-    window.addEventListener('pointercancel', cancelLongPress);
-    return () => {
-      window.removeEventListener('pointerup', cancelLongPress);
-      window.removeEventListener('pointercancel', cancelLongPress);
-    };
-  }, [cancelLongPress, isDragPressed, isLongPressArmed]);
-
-  const handleDragStart = useCallback(() => {
-    cancelLongPress();
-    clickGuardRef.current.block();
-    setIsReordering(true);
-    onDragStart();
-  }, [cancelLongPress, onDragStart]);
-
-  const handleDragEnd = useCallback(() => {
-    touchDragActiveRef.current = false;
-    cancelLongPress();
-    setIsReordering(false);
-    onDragEnd();
-    // Keep suppression until the next pointerdown: touch clicks can arrive late.
-  }, [cancelLongPress, onDragEnd]);
-
-  const handleClickCapture = useCallback((e: React.MouseEvent) => {
-    if (clickGuardRef.current.shouldBlock(e)) {
-      e.stopPropagation();
-      e.preventDefault();
-    }
-  }, []);
-
-  const handleItemPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!event.isPrimary || event.button !== 0) return;
-    const target = event.target as Element;
-    if (target.closest(LONG_PRESS_INTERACTIVE_SELECTOR)) return;
-
-    cancelLongPress();
-    touchDragActiveRef.current = false;
-    if (interaction === 'drag' && event.pointerType === 'mouse') {
-      setIsDragPressed(true);
-      dragControls.start(event);
-      return;
-    }
-    pressStartRef.current = { x: event.clientX, y: event.clientY };
-    longPressTimerRef.current = window.setTimeout(() => {
-      longPressTimerRef.current = null;
-      pressStartRef.current = null;
-      setIsLongPressArmed(true);
-      touchDragActiveRef.current = event.pointerType === 'touch';
-      clickGuardRef.current.block();
-      dragControls.start(event);
-    }, LONG_PRESS_DELAY_MS);
-  }, [cancelLongPress, dragControls, interaction]);
-
-  const handleItemPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const start = pressStartRef.current;
-    if (!start) return;
-    if (
-      Math.abs(event.clientX - start.x) > LONG_PRESS_MOVE_TOLERANCE
-      || Math.abs(event.clientY - start.y) > LONG_PRESS_MOVE_TOLERANCE
-    ) {
-      cancelLongPress();
-    }
-  }, [cancelLongPress]);
+  const { dragControls, isDragPressed, isLongPressArmed, isReordering, handlers } = useLongPressReorder({
+    elementRef, interaction, onDragStart, onDragEnd,
+  });
 
   return (
     <Reorder.Item
@@ -184,17 +56,7 @@ const ReorderableItem = memo(forwardRef<HTMLDivElement, ReorderableItemProps>(fu
       value={reminder}
       dragListener={false}
       dragControls={dragControls}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onClickCapture={handleClickCapture}
-      onPointerDown={handleItemPointerDown}
-      onPointerMove={handleItemPointerMove}
-      onPointerUp={cancelLongPress}
-      onPointerCancel={cancelLongPress}
-      onContextMenu={(event) => {
-        // Android raises its long-press menu while a touch press is arming or dragging the row.
-        if (interaction === 'long-press' || longPressTimerRef.current !== null || touchDragActiveRef.current) event.preventDefault();
-      }}
+      {...handlers}
       layout="position"
       layoutDependency={index}
       data-reminder-scroll-anchor={isPresent ? 'true' : undefined}
