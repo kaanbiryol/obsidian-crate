@@ -4,7 +4,7 @@ import { admitLocally, authenticatedAdmissionKey } from './auth/admission-state'
 import { sha256Hex } from '../../platform/sha256';
 
 export interface NotificationRateLimiter { limit(input: { key: string }): Promise<{ success: boolean }> }
-const actions = new Map([
+export const rateLimitedActions: ReadonlyMap<string, number> = new Map([
   ['POST /reading/shortcut-pairing', 5], ['POST /reading/shortcut/v1/exchange', 10],
   ['POST /notifications/share/reading', 30],
   ['POST /reading/exchange', 10], ['POST /reading/handoff', 30],
@@ -27,7 +27,7 @@ export async function limitNotificationRequest(request: Request, db: D1Database,
 	if (kind === 'asset') return null;
 	if (kind === 'unknown') return corsResponse({ error: 'Not found' }, 404);
 	const action = `${request.method} ${url.pathname}`;
-	const authenticated = actions.has(action) ? undefined : await authenticatedAdmissionKey(request, db);
+	const authenticated = rateLimitedActions.has(action) ? undefined : await authenticatedAdmissionKey(request, db);
 	// Sync bootstrap needs thousands of requests. A recently verified credential
 	// gets a separate, bounded local budget; it still undergoes D1 authentication.
 	// Unrecognized credentials cannot obtain this budget by rotating bearers.
@@ -49,7 +49,7 @@ export async function limitNotificationRequest(request: Request, db: D1Database,
 export async function limitNotificationAction(request: Request, db: D1Database, actor: string): Promise<Response | null> {
 	const url = new URL(request.url);
 	const action = `${request.method} ${url.pathname}`;
-	const limit = actions.get(action);
+	const limit = rateLimitedActions.get(action);
 	if (!limit) return null;
 	const now = Date.now();
 	const midnight = (Math.floor(now / 86_400_000) + 1) * 86_400_000;
