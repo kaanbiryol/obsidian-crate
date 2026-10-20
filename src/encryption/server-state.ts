@@ -1,5 +1,5 @@
 import { isEncryptionId } from './encoding';
-import { isEncryptionFolderPath, type RecoveryEnvelope, type VaultKeyBundle } from './key-bundle';
+import { isEncryptionFolderPath, isRecoveryEnvelope, type RecoveryEnvelope, type VaultKeyBundle } from './key-bundle';
 
 export const ENCRYPTION_CAPABILITY = 'e2ee-v1';
 export const READING_ENCRYPTION_CAPABILITY = 'e2ee-reading-v1';
@@ -34,6 +34,15 @@ function exactFields(value: Record<string, unknown>, fields: string[]): void {
 	if (Object.keys(value).some(field => !fields.includes(field))) throw new Error('Unexpected encryption configuration field');
 }
 
+/** Checks one scope's own fields. Uniqueness and overlap need the whole configuration. */
+export function assertEncryptionScope(scope: unknown): asserts scope is EncryptionScope {
+	if (!record(scope)) throw new Error('Invalid encryption scope');
+	if (scope.accessId !== undefined && !isEncryptionId(scope.accessId)) throw new Error('Invalid folder access identity');
+	if (scope.binding !== undefined && (typeof scope.binding !== 'string' || scope.binding.length > 8192 || scope.binding.split('.').length !== 5)) throw new Error('Invalid encrypted folder binding');
+	if ((scope.purpose !== undefined && scope.purpose !== 'reading') || ![scope.id, scope.keyId, scope.notificationKeyId].every(isEncryptionId)
+		|| !isEncryptionFolderPath(scope.folderPath)) throw new Error('Invalid encryption scope');
+}
+
 export function validateEncryptionState(value: unknown): asserts value is EncryptionServerState {
 	if (!record(value)) throw new Error('Invalid encryption configuration');
 	exactFields(value, ['version', 'vaultId', 'generation', 'mode', 'keyId', 'scopes', 'recovery']);
@@ -46,11 +55,8 @@ export function validateEncryptionState(value: unknown): asserts value is Encryp
 	for (const scope of value.scopes) {
 		if (!record(scope)) throw new Error('Invalid encryption scope');
 		exactFields(scope, ['id', 'folderPath', 'purpose', 'accessId', 'binding', 'keyId', 'notificationKeyId']);
-		if (scope.accessId !== undefined && !isEncryptionId(scope.accessId)) throw new Error('Invalid folder access identity');
-		if (scope.binding !== undefined && (typeof scope.binding !== 'string' || scope.binding.length > 8192 || scope.binding.split('.').length !== 5)) throw new Error('Invalid encrypted folder binding');
-		if ((scope.purpose !== undefined && scope.purpose !== 'reading') || ![scope.id, scope.keyId, scope.notificationKeyId].every(isEncryptionId)
-			|| !isEncryptionFolderPath(scope.folderPath)
-			|| folders.has(scope.folderPath)) throw new Error('Invalid encryption scope');
+		assertEncryptionScope(scope);
+		if (folders.has(scope.folderPath)) throw new Error('Invalid encryption scope');
 		folders.add(scope.folderPath);
 		const folderPath = scope.folderPath;
 		if ([...folders].some(folder => folder !== folderPath && (folder.startsWith(folderPath + '/') || folderPath.startsWith(folder + '/')))) throw new Error('Encrypted reminders folders must not overlap');
@@ -61,8 +67,7 @@ export function validateEncryptionState(value: unknown): asserts value is Encryp
 	}
 	if (!record(value.recovery)) throw new Error('Missing encrypted recovery bundle');
 	exactFields(value.recovery, ['version', 'vaultId', 'envelope']);
-	if (value.recovery.version !== 1 || value.recovery.vaultId !== value.vaultId || typeof value.recovery.envelope !== 'string'
-		|| value.recovery.envelope.length > 256 * 1024 || value.recovery.envelope.split('.').length !== 5) throw new Error('Invalid encrypted recovery bundle');
+	if (!isRecoveryEnvelope(value.recovery, value.vaultId)) throw new Error('Invalid encrypted recovery bundle');
 }
 
 export function createEncryptionState(bundle: VaultKeyBundle, recovery: RecoveryEnvelope): EncryptionServerState {

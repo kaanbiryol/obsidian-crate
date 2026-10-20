@@ -1,6 +1,6 @@
 import { isEncryptionId } from '../../encryption/encoding';
-import { isEncryptionFolderPath, type ReminderKeyGrant, type RecoveryEnvelope } from '../../encryption/key-bundle';
-import type { EncryptionScope } from '../../encryption/server-state';
+import { isRecoveryEnvelope, type ReminderKeyGrant, type RecoveryEnvelope } from '../../encryption/key-bundle';
+import { assertEncryptionScope, type EncryptionScope } from '../../encryption/server-state';
 
 /** Shared validation for the two folder-scoped PWA enrollment flows. */
 export interface ScopedEncryptionState {
@@ -9,20 +9,18 @@ export interface ScopedEncryptionState {
   recovery: RecoveryEnvelope;
 }
 
+function isEncryptionScope(scope: unknown): scope is EncryptionScope {
+  try { assertEncryptionScope(scope); return true; } catch { return false; }
+}
+
 export function parseScopedEncryptionState(value: unknown, feature: 'reading' | 'reminders'): ScopedEncryptionState {
   const state = value as Partial<ScopedEncryptionState> | null;
   if (!state || state.version !== 1 || !isEncryptionId(state.vaultId) || !Number.isSafeInteger(state.generation) || state.generation! < 1
-    || !['active', 'converting', 'resetting'].includes(state.mode ?? '') || !state.scope
-    || !isEncryptionId(state.scope.id) || !isEncryptionId(state.scope.keyId) || !isEncryptionId(state.scope.notificationKeyId)
-    || !isEncryptionFolderPath(state.scope.folderPath) || state.scope.purpose !== (feature === 'reading' ? 'reading' : undefined)
-    || state.scope.accessId !== undefined && !isEncryptionId(state.scope.accessId)
-    || state.scope.binding !== undefined && (typeof state.scope.binding !== 'string' || state.scope.binding.length > 8192)) {
+    || !['active', 'converting', 'resetting'].includes(state.mode ?? '') || !isEncryptionScope(state.scope)
+    || state.scope.purpose !== (feature === 'reading' ? 'reading' : undefined)) {
     throw new Error('Invalid encrypted enrollment configuration');
   }
-  if ((!state.recovery || state.recovery.version !== 1 || state.recovery.vaultId !== state.vaultId
-    || typeof state.recovery.envelope !== 'string' || state.recovery.envelope.length > 256 * 1024 || state.recovery.envelope.split('.').length !== 5)) {
-    throw new Error('Invalid encrypted recovery bundle');
-  }
+  if (!isRecoveryEnvelope(state.recovery, state.vaultId)) throw new Error('Invalid encrypted recovery bundle');
   return state as ScopedEncryptionState;
 }
 

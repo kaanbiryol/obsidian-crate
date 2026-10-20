@@ -28,3 +28,12 @@ it.each(['reading', 'reminders'] as const)('validates the complete %s authority 
     expect(() => parseScopedEncryptionState({ ...state, scope: { ...state.scope, folderPath } }, feature)).toThrow();
   }
 });
+
+it('applies the shared folder binding rules to enrollment scopes', () => {
+  const { state } = fixture();
+  expect(parseScopedEncryptionState({ ...state, scope: { ...state.scope, binding: 'a.b.c.d.e' } }, 'reminders').scope.binding).toBe('a.b.c.d.e');
+  for (const binding of ['a.b.c.d', 'a.b.c.d.e.f', '', 5, `${'a'.repeat(8192)}.b.c.d.e`]) {
+    expect(() => parseScopedEncryptionState({ ...state, scope: { ...state.scope, binding } }, 'reminders')).toThrow('Invalid encrypted enrollment configuration');
+  }
+  expect(() => parseScopedEncryptionState({ ...state, recovery: { ...state.recovery, envelope: 'a.b.c' } }, 'reminders')).toThrow('Invalid encrypted recovery bundle');
+});

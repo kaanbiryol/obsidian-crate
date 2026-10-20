@@ -171,9 +171,14 @@ export async function sealRecoveryBundle(bundle: VaultKeyBundle, code: string): 
 		envelope: await encryptJson(bundle, await recoveryKey(code), recoveryContext(bundle.vaultId)) };
 }
 
+/** Shape checks only; the recovery key authenticates the envelope contents. */
+export function isRecoveryEnvelope(value: unknown, vaultId?: string): value is RecoveryEnvelope {
+	return record(value) && value.version === 1 && isEncryptionId(value.vaultId) && (vaultId === undefined || value.vaultId === vaultId)
+		&& typeof value.envelope === 'string' && value.envelope.length <= 256 * 1024 && value.envelope.split('.').length === 5;
+}
+
 export async function openRecoveryBundle(value: unknown, code: string): Promise<VaultKeyBundle> {
-	if (!record(value) || value.version !== 1 || !isEncryptionId(value.vaultId) || typeof value.envelope !== 'string'
-		|| value.envelope.length > 256 * 1024) throw new Error('Unsupported or damaged recovery bundle');
+	if (!isRecoveryEnvelope(value)) throw new Error('Unsupported or damaged recovery bundle');
 	const bundle = await decryptJson(value.envelope, await recoveryKey(code), recoveryContext(value.vaultId));
 	validateVaultKeyBundle(bundle);
 	if (bundle.vaultId !== value.vaultId) throw new Error('Recovery bundle belongs to another vault');
