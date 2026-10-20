@@ -43,11 +43,49 @@ jobs:
       - run: npm ci
       - name: Check dependencies and source security
         run: npm run security:check
-      - name: Check source, server revision and unit tests
-        if: inputs.reuse-run-id == ''
+      # These are the npm run check:source commands, one step each so an early
+      # failure does not hide the results of later checks.
+      - name: Build the Worker and PWA assets
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run build:worker
+      - name: Lint
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run lint
+      - name: Type-check the plugin
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run typecheck
+      - name: Type-check the Worker
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run typecheck:worker
+      - name: Type-check the service worker
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run typecheck:service-worker
+      - name: Check for dead code
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run deadcode
+      - name: Check third-party notices
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run notices:check
+      - name: Check contract documentation
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run check:contracts
+      - name: Run tooling and release tests
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run test:ci
+      - name: Test the server revision check
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run test:server-revision
+      - name: Check the server revision
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: npm run check:source
+        run: npm run check:server-revision
+      - name: Test recovery tooling
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run test:recovery
+      - name: Run unit tests
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm test
       - name: Recheck the completed push verification
         if: inputs.reuse-run-id != ''
         env:

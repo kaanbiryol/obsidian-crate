@@ -120,3 +120,14 @@ test('draft attachment depends on the complete verifier, with reproduction gated
 	assert.equal(build.permissions.contents, 'read');
 	assert.equal(build.jobs.verify.uses, './.github/workflows/verify.yml');
 });
+
+test('CI mirrors check:source step by step and the local release gate runs the packed server test', async () => {
+	const verify = parse(await readFile(new URL('../.github/workflows/verify.yml', import.meta.url), 'utf8'));
+	const { scripts } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+	const commands = scripts['check:source'].split(' && ');
+	const steps = verify.jobs.checks.steps.filter(step => commands.includes(step.run));
+	assert.deepEqual(steps.map(step => step.run), commands);
+	for (const step of steps) assert.equal(step.if, "${{ !cancelled() && inputs.reuse-run-id == '' }}", step.name);
+	assert.ok(verify.jobs.worker.steps.some(step => step.run === 'npm run test:server-package'));
+	assert.ok(scripts['release:check'].split(' && ').includes('npm run test:server-package'));
+});
