@@ -1,8 +1,8 @@
-> Historical design notes. The current baseline is schema 1 with no registered migrations; see [current contract](current-contract.md). Upgrade requirements below are historical design notes, not a supported upgrade path.
+> Historical design notes. The current baseline is schema 1 with no registered migrations; see [current contract](../current-contract.md). Upgrade requirements below are historical design notes, not a supported upgrade path.
 
 # Read it later
 
-Status: implemented for integrated testing on `codex/read-it-later`. See [current implementation and acceptance status](read-it-later-plan.md#implementation-status) and [testing instructions](read-it-later-testing.md). This is not a published release.
+Status: implemented for integrated testing on `codex/read-it-later`. See [current implementation and acceptance status](read-it-later-plan.md#implementation-status) and [testing instructions](../read-it-later-testing.md). This is not a published release.
 
 Revalidated on 2026-09-21 against `master` at `48b9a902`. See [the implementation plan](read-it-later-plan.md) for code integration points, delivery order, and release gates. The launch baseline is plugin 0.3.0, server revision 1, schema 1, and protocol 1 (oldest compatible protocol 1).
 
@@ -178,7 +178,7 @@ Normalize URLs conservatively: lowercase scheme/host, remove default ports, and 
 
 Deduplicate active server captures by deployment, Reading policy generation, and normalized URL. Concurrent requests must converge through an atomic reservation, not a check followed by an unguarded insert. Saving an existing item returns **Already saved** and does not unarchive it, change its saved date, or enqueue another extraction. A capture-only response does not disclose existing article contents or personal metadata.
 
-Request idempotency is separate from URL deduplication. Each dispatched mutation includes a versioned operation ID and immutable request bytes/hash. Matching receipts replay the result; reuse with different bytes fails. Follow the existing server-issued 180-date retry window, monotonic cleanup floor, and expired-operation review semantics in [reminder retention](reminder-retention.md), with Reading-owned records. A retained receipt for a deleted item never recreates it. A new intentional save after deletion may create a new identity.
+Request idempotency is separate from URL deduplication. Each dispatched mutation includes a versioned operation ID and immutable request bytes/hash. Matching receipts replay the result; reuse with different bytes fails. Follow the existing server-issued 180-date retry window, monotonic cleanup floor, and expired-operation review semantics in [reminder retention](../reminder-retention.md), with Reading-owned records. A retained receipt for a deleted item never recreates it. A new intentional save after deletion may create a new identity.
 
 An undispatched offline draft may receive a fresh server-issued operation ID on reconnect. Once dispatched, never silently replace its operation ID after timeout, expiry, re-enrollment, or reload.
 
@@ -254,7 +254,7 @@ Do not duplicate sync, auth, or deployment infrastructure. Keep extraction depen
 
 ## Upgrade and hosting requirements
 
-Follow [server upgrades](server-upgrades.md). The schema-1 baseline has no released migration entries yet. Register a checksummed schema migration and wire the provisioner's `beforeDatabaseUpgrade` hook to a verified paired checkpoint before distributing Reading to existing Cloudflare installations. The self-hosted launcher currently rejects schema-hash changes; add a tested stopped-storage migration/backup workflow for existing local and Docker data rather than editing its compatibility metadata. Both fresh installation and upgrade are required acceptance paths.
+Follow [server upgrades](../server-upgrades.md). The schema-1 baseline has no released migration entries yet. Register a checksummed schema migration and wire the provisioner's `beforeDatabaseUpgrade` hook to a verified paired checkpoint before distributing Reading to existing Cloudflare installations. The self-hosted launcher currently rejects schema-hash changes; add a tested stopped-storage migration/backup workflow for existing local and Docker data rather than editing its compatibility metadata. Both fresh installation and upgrade are required acceptance paths.
 
 Preserve file content hashes, storage keys, device credentials, reminder receipts/observations, pending commands, and the inactive `CloudSafety` compatibility export. Update server revision for distributable Worker/PWA/provisioning changes. Advertise a Reading capability; choose protocol changes according to actual wire invariants, and retain compatible existing sync/reminder clients. New UI on an old server offers an update and preserves local drafts. Do not rewrite the baseline schema in place or ship a migration with no supported backup/recovery route.
 
@@ -288,8 +288,8 @@ Desktop acceptance: use the default Clipper template to save an article into the
 
 ## References
 
-- [Crate architecture](architecture.md), [protocol](protocol.md), [Worker API](worker-api.md), and [retry/retention](reminder-retention.md).
-- [Implementation plan](read-it-later-plan.md), [server upgrades](server-upgrades.md), [self-hosting](self-hosting.md), [browser storage recovery](pwa-storage-recovery.md), and [shared UI](ui-styling.md).
+- [Crate architecture](../architecture.md), [protocol](../protocol.md), [Worker API](../worker-api.md), and [retry/retention](../reminder-retention.md).
+- [Implementation plan](read-it-later-plan.md), [server upgrades](../server-upgrades.md), [self-hosting](../self-hosting.md), [browser storage recovery](../pwa-storage-recovery.md), and [shared UI](../ui-styling.md).
 - [Shiori](https://www.shiori.sh/): product reference for capture, inbox, and reading experience; no integration dependency.
 - [Obsidian Web Clipper](https://github.com/obsidianmd/obsidian-clipper/tree/b522a4d44b4fda25b91262085715ad7368604f7f): extraction and integration reference reviewed on 2026-09-14.
 - Web Clipper [templates](https://obsidian.md/help/web-clipper/templates), [variables](https://obsidian.md/help/web-clipper/variables), and [capture flow](https://obsidian.md/help/web-clipper/capture): template import, destination selection, and saved content behavior reviewed on 2026-09-14.

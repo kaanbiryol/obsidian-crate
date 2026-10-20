@@ -16,7 +16,7 @@ Automated tests cover source-preserving Markdown updates, deterministic clip ado
 
 The total plugin bundle is approximately 3.16 MB raw / 1.67 MB gzip, including its compressed deployable Worker. The Worker is approximately 3.20 MB raw / 1.17 MB gzip, including Defuddle's full Markdown and math support. Reading is a deferred PWA chunk; startup assets remain within the existing budget. Measured limits include modest headroom and notices cover the new dependencies.
 
-Use [the test guide](read-it-later-testing.md) for the running sandbox, plugin installation, signed shortcut, and upgrade commands. Physical iPhone/Android, installed Obsidian/Web Clipper, and live Cloudflare acceptance remain explicit manual checks. Browser automation is not evidence that those device/deployment checks were performed.
+Use [the test guide](../read-it-later-testing.md) for the running sandbox, plugin installation, signed shortcut, and upgrade commands. Physical iPhone/Android, installed Obsidian/Web Clipper, and live Cloudflare acceptance remain explicit manual checks. Browser automation is not evidence that those device/deployment checks were performed.
 
 ## What we are building
 

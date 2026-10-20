@@ -80,7 +80,7 @@ Reading plaintext content/capture/retry/handoff routes and server extraction are
 
 Destructive reset clears Reading tables and grants at both boundaries so old capabilities cannot republish after the wipe. Shared logout clears keys and local private data with identity fences; partial cleanup failures are reported and cannot delete a newer enrollment. Unreadable/future-format records remain available for explicit recovery export.
 
-Paths, approximate sizes, revisions, change timing and session/feature metadata remain visible. Reminder IDs, completion and due times remain disclosed for scheduling. Existing Reading filenames are preserved; new encrypted captures use generic names. The PWA trusts JavaScript served by its origin. Local vault files, old device copies, external backups and provider snapshots are not retroactively encrypted or securely erased. Explicit recovery exports may contain readable data. See [implementation](e2ee-implementation.md) and [Reading details](reading-e2ee-assessment.md).
+Paths, approximate sizes, revisions, change timing and session/feature metadata remain visible. Reminder IDs, completion and due times remain disclosed for scheduling. Existing Reading filenames are preserved; new encrypted captures use generic names. The PWA trusts JavaScript served by its origin. Local vault files, old device copies, external backups and provider snapshots are not retroactively encrypted or securely erased. Explicit recovery exports may contain readable data. See [implementation](../e2ee-implementation.md) and [Reading details](../reading-e2ee-assessment.md).
 
 ## Verification
 
