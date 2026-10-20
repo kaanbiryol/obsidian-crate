@@ -2,7 +2,7 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from './routes';
 import { publishCapture, runCapture, type PendingCapture } from './captures';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
@@ -15,7 +15,7 @@ const operation = () => createReminderOperationId(Math.floor(Date.now() / 86400_
 const command = (action: string, body: Record<string, unknown>) => handleReadingRoute(new Request(`https://test/reading/${action}`, { method: 'POST', body: JSON.stringify(body) }), env, principal);
 const list = () => handleReadingRoute(new Request('https://test/reading/list'), env, principal);
 beforeEach(async () => {
-	await env.DB.batch(schema.split(';').map(s => s.trim()).filter(Boolean).map(s => env.DB.prepare(s)));
+	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash) VALUES ('vault','hash')").run();
 	expect((await command('policy', { enabled: true, folderPath: 'Reading', revision: null })).status).toBe(200);
 });

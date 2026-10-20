@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { createReminderOperationId, REMINDER_RETRY_DAYS } from '@/protocol/reminder-operation';
 import { beginReminderOperation } from '../reminders-web/operations';
 import { handleCreateReminder } from '../reminders-web/routes/create';
@@ -16,7 +16,7 @@ const { DB: db, BUCKET: bucket } = env;
 const path = 'Reminders/Inbox.md';
 let day: number;
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await db.prepare(sql).run();
+	await applySchema(db);
 	day = (await db.prepare("SELECT CAST(unixepoch('now') / 86400 AS INTEGER) AS day").first<{ day: number }>())!.day;
 });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });

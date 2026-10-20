@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { READY_PROJECTION_JOBS_SQL, NEXT_NOTIFICATION_WORK_SQL } from './queue';
 import { runNotificationCoordinator } from './coordinator';
 import { revalidateReminderSources } from '../reminders/source-migration';
@@ -11,7 +11,7 @@ import { writeCommittedMarkdownFile } from '../storage';
 import { ReminderAlarm } from '../coordinator/reminder-alarm';
 
 beforeEach(async () => {
-  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
   await env.DB.prepare("INSERT OR IGNORE INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
 });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });

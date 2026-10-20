@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleNotificationPolicy } from './policy';
 import { writeCommittedMarkdownFile } from '../storage';
 import { runNotificationCoordinator } from './coordinator';
@@ -12,7 +12,7 @@ import { dispatchNotificationJobs } from './outbox';
 vi.mock('./outbox', async original => ({ ...await original<typeof import('./outbox')>(), dispatchNotificationJobs: vi.fn() }));
 
 beforeEach(async () => {
-  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
   await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: '09:00' }) }), env.DB);
 });
 afterEach(async () => { vi.mocked(dispatchNotificationJobs).mockClear(); await reset(); });

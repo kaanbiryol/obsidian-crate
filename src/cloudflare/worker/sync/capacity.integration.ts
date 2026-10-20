@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { sha256Hex } from '../../../platform/sha256';
 
@@ -12,7 +13,7 @@ const devices: SyncTestDevice[] = [];
 beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
 	vi.spyOn(console, 'info').mockImplementation(() => {});
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	// Explicitly clear this benchmark's local bindings. The workerd reset helper
 	// alone left D1 rows after the 10,000-file run in this local runtime.
 	for (const [, table] of schema.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)) {

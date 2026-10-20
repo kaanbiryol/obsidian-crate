@@ -2,14 +2,14 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { pruneReminderOccurrences } from '../maintenance/reminder-history';
 import { writeCommittedMarkdownFile } from '../storage';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';
 
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 });
 afterEach(async () => { await reset(); });
 const old = Date.parse('2000-01-01T00:00:00Z');

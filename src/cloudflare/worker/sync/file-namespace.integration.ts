@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { assertPortablePaths } from '../../../protocol/portable-path';
@@ -14,7 +14,7 @@ import { sha256Hex } from '@/platform/sha256';
 interface UploadedFile { path: string; hash: string; revision: string }
 
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES ('device', ?, 'vault')")
 		.bind(await sha256Hex('namespace-token')).run();
 });

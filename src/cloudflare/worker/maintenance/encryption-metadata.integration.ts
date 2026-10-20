@@ -2,11 +2,11 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { DESCRIPTOR_CLEANUP_PAGE, pruneEncryptionMetadata } from './encryption-metadata';
 
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	await env.DB.prepare(`INSERT INTO maintenance_state(key, value) VALUES ('e2ee:state', '{"mode":"active"}')`).run();
 });
 afterEach(async () => { await reset(); });

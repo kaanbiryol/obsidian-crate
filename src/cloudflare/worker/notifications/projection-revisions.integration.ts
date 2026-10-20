@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../storage';
 import { handleDelete } from '../sync/file-handlers';
 import { drainNotificationProjections, notificationDatetime } from './projection';
@@ -12,7 +12,7 @@ import { drainNotificationJobs } from './outbox';
 import { runNotificationCoordinator } from './coordinator';
 import { getStoredFileRow } from '../sync/storage';
 
-beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 const policy = { folderPath: 'Reminders', timezone: 'America/New_York', allDayTime: '09:00', revision: 'policy1' };
 async function configure() {

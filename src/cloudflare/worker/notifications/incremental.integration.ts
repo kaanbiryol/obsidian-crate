@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleNotificationPolicy } from './policy';
 import { writeCommittedMarkdownFile } from '../storage';
 import { drainNotificationProjections } from './projection';
@@ -14,7 +14,7 @@ const path = 'Reminders/Inbox.md';
 const due = '2099-01-01T12:00:00.000Z';
 const note = (id: string, title = 'Task', date = due) => `- [ ] ${title}${date ? ` ${date}` : ''} <!-- crate-id:${id} -->`;
 beforeEach(async () => {
-  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
   await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({
     folderPath: 'Reminders', timezone: 'UTC', allDayTime: '09:00',
   }) }), env.DB);

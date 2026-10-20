@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import worker from './reset-worker.js';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { sha256Hex } from '../../../platform/sha256';
 
@@ -13,7 +13,7 @@ const object = (id: number) => `__crate__/files/${id.toString(16).padStart(64, '
 const url = 'https://crate-0123456789abcdef.example.workers.dev';
 
 async function harness(keys = [object(0)], overrides: Record<string, unknown> = {}) {
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	const record = { owner: '12345678-1234-1234-1234-123456789012', worker: 'crate-0123456789abcdef', kind: 'delete',
 		resetId, recoveryProtocol: 1, cleanupTokenHash: await sha256Hex(token), step: 'deleteR2Objects', stepState: 'started',
 		batchHash: await sha256Hex(JSON.stringify(keys)), ...overrides };

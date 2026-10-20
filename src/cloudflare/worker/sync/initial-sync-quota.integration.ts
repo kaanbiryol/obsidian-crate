@@ -5,6 +5,7 @@ import { afterEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleBatchUpload } from './batch/upload';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { meterD1Writes } from '../test-support/d1-write-meter-test-harness';
@@ -30,7 +31,7 @@ it.each([false, true])('bounds initial-upload writes and preserves retries with 
   await initialize(legacy);
   // Reapplying the schema must preserve an existing database's table layout.
   await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('existing', 'existing', 'existing-key')").run();
-  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
   expect(await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'existing'").first()).toEqual({ storage_key: 'existing-key' });
   const table = await env.DB.prepare("SELECT sql FROM sqlite_master WHERE name = 'files'").first<{ sql: string }>();
   expect(table!.sql.includes('WITHOUT ROWID')).toBe(!legacy);

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
 import { createEncryptionState } from '../../../encryption/server-state';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
@@ -13,7 +13,7 @@ import { handleEncryptionRoute } from '../routes/encryption';
 import { prepareEncryptedReceipt, readEncryptedReceipt, pruneEncryptedReceiptChunks, RECEIPT_CHUNK_PAGE } from './receipt-storage';
 import { beginReminderOperation, reminderOperationEffects } from '../reminders-web/operations';
 
-beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });
 const operationId = () => createReminderOperationId(Math.floor(Date.now() / 86400000));
 const envelope = (size = 1_100_000) => `header.key.iv.${'a'.repeat(size)}.tag`;

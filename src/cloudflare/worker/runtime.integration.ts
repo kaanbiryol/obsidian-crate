@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset, runDurableObjectAlarm } from 'cloudflare:test';
-import schemaSql from '../schema.sql?raw';
+import { applySchema } from './test-support/schema-test-harness';
 import { writeCommittedMarkdownFilePair } from './sync/atomic-markdown-write';
 import { MAINTENANCE_DELETE_LIMIT, pruneChangelog } from './db';
 import { drainNotificationJobs } from './notifications/outbox';
@@ -18,9 +18,7 @@ import {
 const runtimeEnv: Env = env;
 
 beforeEach(async () => {
-	for (const statement of schemaSql.split(';').map(value => value.trim()).filter(Boolean)) {
-		await runtimeEnv.DB.prepare(statement).run();
-	}
+	await applySchema(runtimeEnv.DB);
 });
 
 afterEach(async () => {

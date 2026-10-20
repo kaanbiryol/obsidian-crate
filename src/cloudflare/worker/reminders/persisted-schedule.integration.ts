@@ -3,7 +3,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../storage';
 import { handleListReminders } from '../reminders-web/routes/list';
 import { handleUpdateReminder } from '../reminders-web/routes/update';
@@ -17,7 +17,7 @@ import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/t
 import { calculateNextOccurrence } from '@/reminders/core/recurrence/recurrenceCalculator';
 import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
-beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.useRealTimers(); vi.restoreAllMocks(); await reset(); });
 const path = 'Reminders/Inbox.md';
 const text = '- [ ] Send invoice tomorrow <!-- crate-id:invoice -->';

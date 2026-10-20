@@ -3,12 +3,12 @@ import { meterD1Usage } from '../d1-usage';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { CHANGELOG_BOUNDS_SQL } from './storage';
 import { findReferencedStorageKeys } from '../storage-references';
 
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 });
 afterEach(async () => { await reset(); });
 

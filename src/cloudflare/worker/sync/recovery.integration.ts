@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schemaSql from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { handleRestoreFileVersion } from './file-versions/handlers';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from '../maintenance/object-cleanup';
@@ -13,9 +13,7 @@ import { sha256Hex } from '../../../platform/sha256';
 const { DB: db, BUCKET: bucket }: Env = env;
 
 beforeEach(async () => {
-	for (const statement of schemaSql.split(';').map(value => value.trim()).filter(Boolean)) {
-		await db.prepare(statement).run();
-	}
+	await applySchema(db);
 });
 afterEach(async () => {
 	vi.restoreAllMocks();

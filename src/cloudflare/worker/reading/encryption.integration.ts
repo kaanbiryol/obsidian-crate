@@ -5,7 +5,7 @@ import { handleEncryptionRoute } from '../routes/encryption';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '@/encryption/key-bundle';
 import { createEncryptionState } from '@/encryption/server-state';
@@ -22,7 +22,7 @@ import type { CapturedArticle } from '@/reading/extraction/types';
 import type { ReadingItem } from '@/reading/core/model';
 import { sha256Hex } from '@/platform/sha256';
 
-beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
 const operation = () => createReminderOperationId(Math.floor(Date.now() / 86400_000));
 async function setup(mode: 'active' | 'converting' = 'active', readingScope = true) {

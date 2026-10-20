@@ -2,7 +2,7 @@
 import { afterEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { loadStoredFileRows } from './storage';
 import { handleGetManifest, handleGetFileMetadata } from './metadata-handlers';
@@ -12,11 +12,10 @@ import { beginInitialImport } from './initial-import';
 import { trackStagedBatch } from './staged-upload-batches';
 import { cleanStagedBatches } from '../maintenance/staged-batch-cleanup';
 
-const statements = (sql: string) => sql.split(';').map(value => value.trim()).filter(Boolean).map(value => env.DB.prepare(value));
 afterEach(reset);
 
 it('pages by portable identity while returning original spelling and rejecting alias reads', async () => {
-  await env.DB.batch(statements(schema));
+  await applySchema(env.DB);
   const paths = ['Z.md', 'alpha.md', 'École/İstanbul.md', 'Cafe\u0301/Note.md'];
   for (const path of paths) await env.DB.prepare('INSERT INTO files(path, portable_path, storage_key) VALUES (?, ?, ?)').bind(path, portablePathKey(path), path).run();
   let after: string | undefined;
@@ -32,7 +31,7 @@ it('pages by portable identity while returning original spelling and rejecting a
 });
 
 it('cleans owned batches using primary lookups among 10,000 files and protects retained objects', async () => {
-  await env.DB.batch(statements(schema));
+  await applySchema(env.DB);
   await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 10000)
     INSERT INTO files(path, portable_path, storage_key) SELECT 'Note-' || x, 'note-' || x, 'key-' || x FROM n`).run();
   await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('retained', 'Note-1', 'hash', 1, 'replaced', 9999999999999)").run();
@@ -50,7 +49,7 @@ it('cleans owned batches using primary lookups among 10,000 files and protects r
 });
 
 it.each([false, true])('preserves initial-import eligibility and any saved progress (open=%s)', async open => {
-  await env.DB.batch(statements(schema));
+  await applySchema(env.DB);
   if (open) await env.DB.prepare("INSERT INTO initial_import(id, token, state, generation) VALUES (1, 'resume-token', 'importing', 7)").run();
   if (open) expect(await env.DB.prepare('SELECT token, state, generation, snapshot_seq FROM initial_import').first()).toEqual({ token: 'resume-token', state: 'importing', generation: 7, snapshot_seq: 0 });
   else expect(await env.DB.prepare('SELECT * FROM initial_import').first()).toBeNull();

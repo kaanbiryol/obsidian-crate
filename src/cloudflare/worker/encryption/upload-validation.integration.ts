@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { ENCRYPTION_STATE_KEY } from './state';
 import { trackStagedUploads } from '../sync/staged-uploads';
@@ -22,7 +22,7 @@ const headers = () => ({ Authorization: 'Bearer owner', 'X-Crate-Protocol': Stri
 	'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) });
 
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	const bundle = createVaultKeyBundle();
 	state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' };
 	keys = await FileKeyAuthority.fromVault(bundle);

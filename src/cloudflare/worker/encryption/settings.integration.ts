@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
 import { createEncryptionState } from '../../../encryption/server-state';
 import { decryptJson, encryptJson, importEncryptionSecret } from '../../../encryption/envelope';
@@ -12,7 +12,7 @@ import { handleEncryptedSettings } from './settings';
 import { readEncryptionState } from './state';
 import { handlePutSettings } from '../sync/metadata-handlers';
 
-beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });
 
 const preferences = () => ({ ignorePatterns: ['秘密/'], syncInterval: 30, pushEnabled: false });

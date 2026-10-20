@@ -2,12 +2,12 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { fetchWorkerRequest } from '../request-handler';
 import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => {
-	await env.DB.batch(schema.split(';').map(value => value.trim()).filter(Boolean).map(value => env.DB.prepare(value)));
+	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,0,'Reading','g','r')").run();
 });
 afterEach(reset);

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { SERVER_RELEASE } from '../../deployment/database-upgrades';
 import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
@@ -20,11 +20,8 @@ const operation = '22222222-2222-4222-8222-222222222222';
 interface File { path: string; hash: string; revision: string }
 interface Receipt { consumed_revision: string; revision: string; changelog_seq: number; path: string; consumed_hash: string; request_id: string; device_id: string; client_session: string | null; operation_id: string | null }
 
-async function applySchema(sql = schema) {
-	for (const statement of sql.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(statement).run();
-}
 beforeEach(async () => {
-	await applySchema();
+	await applySchema(env.DB);
 	for (const device of ['first', 'second']) await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES (?, ?, 'vault')")
 		.bind(`device-${device}`, await sha256Hex(`credential-${device}`)).run();
 });
@@ -180,7 +177,7 @@ it('reapplying the baseline schema preserves existing vault rows', async () => {
 	const file = await upload();
 	await env.DB.prepare('DROP TABLE file_deletion_receipts').run();
 	const before = await env.DB.prepare('SELECT * FROM files').all();
-	await applySchema(); await applySchema();
+	await applySchema(env.DB); await applySchema(env.DB);
 	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion });
 	expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(before.results);
 	expect((await remove(file)).status).toBe(200);

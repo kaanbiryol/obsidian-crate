@@ -4,7 +4,7 @@ import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleUpload, handleDelete } from './file-handlers';
 import { handleBatchUpload } from './batch/upload';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
@@ -17,7 +17,7 @@ const devices: SyncTestDevice[] = [];
 beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
 	vi.spyOn(console, 'info').mockImplementation(() => {});
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO initial_import(id, token, state) VALUES(1, 'established', 'complete')").run();
 });
 afterEach(async () => { for (const device of devices.splice(0)) device.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });

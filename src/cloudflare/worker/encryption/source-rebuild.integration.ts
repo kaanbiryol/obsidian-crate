@@ -4,7 +4,7 @@ import { commitNewFiles } from '../sync/bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
 import { createEncryptionState } from '../../../encryption/server-state';
 import { FileKeyAuthority } from '../../../encryption/file-authority';
@@ -21,7 +21,7 @@ import { drainNotificationProjections } from '../notifications/projection';
 import { drainNotificationJobs } from '../notifications/outbox';
 import { runNotificationCoordinator } from '../notifications/coordinator';
 
-beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 
 async function fixture(padding: number, count = 1) {

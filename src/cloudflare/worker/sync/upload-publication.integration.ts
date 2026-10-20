@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { fetchWorkerRequest } from '../request-handler';
@@ -10,7 +10,7 @@ import type { Env } from '../types';
 import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('owner', ?, 'vault')")
 		.bind(await sha256Hex('owner')).run();
 });

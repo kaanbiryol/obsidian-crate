@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
+import { applySchema } from './test-support/schema-test-harness';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { resetCrateServer } from '../server-reset/reset';
 import { CloudflareApiError, type CloudflareWorkerSettings } from '../cloudflare-api';
@@ -32,7 +33,7 @@ async function harness(empty = false) {
 		d1DatabaseName: 'crate-0123456789abcdef', d1DatabaseId: '01234567-89ab-cdef-0123-456789abcdef', r2BucketName: 'crate-0123456789abcdef',
 		workersSubdomain: 'test', lastDeployedVersion: null, lastDeployedFingerprint: null,
 	};
-	if (!empty) for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	if (!empty) await applySchema(env.DB);
 	const bindings = [{ type: 'd1', name: 'DB', id: metadata.d1DatabaseId! }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: metadata.r2BucketName },
 		{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm', namespace_id: 'c'.repeat(32) }];
 	const state: { worker: CloudflareWorkerSettings | null; database: boolean; bucket: boolean } = {

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { WorkerApiHttpClient } from '../../../sync/worker-api/http';
@@ -18,7 +18,7 @@ let device: SyncTestDevice;
 beforeEach(async () => {
   vi.stubGlobal('window', { setTimeout, clearTimeout });
   vi.spyOn(console, 'info').mockImplementation(() => {});
-  for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
   device = new SyncTestDevice('setup-device', env);
   device.settings.automaticSync = false;
   await device.authorize(3600_000); await device.open();

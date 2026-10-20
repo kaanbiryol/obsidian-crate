@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../schema.sql?raw';
+import { applySchema } from './test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from './storage';
 import { drainNotificationProjections } from './notifications/projection';
 import { handleNotificationPolicy } from './notifications/policy';
@@ -10,7 +10,7 @@ import { ReminderAlarm } from './coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from './notifications/push';
 import { handleDiagnostics } from './maintenance/diagnostics';
 vi.mock('./notifications/push', () => ({ listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
-beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.clearAllMocks(); await reset(); });
 const id = '11111111-1111-4111-8111-111111111111';
 interface Command { reminderId: string; content: string; dueDatetime: string; project?: string; jobToken: string }

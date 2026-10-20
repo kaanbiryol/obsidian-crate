@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from './routes';
 import { projectReading, READING_PROJECTION_KEY } from './projection';
 import { publishExtraction } from './extraction/jobs';
@@ -24,7 +24,7 @@ const principal = { tokenId: 'vault', scope: 'vault' as const };
 const command = (path: string, body: Record<string, unknown>) => handleReadingRoute(new Request(`https://test/reading/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, principal);
 const id = () => createReminderOperationId(Math.floor(Date.now() / 86400_000));
 beforeEach(async () => {
-  await env.DB.batch(schema.split(';').map(value => value.trim()).filter(Boolean).map(value => env.DB.prepare(value)));
+  await applySchema(env.DB);
   await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash) VALUES ('vault','test-hash')").run();
   expect((await command('policy', { enabled: true, folderPath: 'Reading', revision: null })).status).toBe(200);
 });

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
@@ -14,7 +14,7 @@ const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
 	vi.spyOn(console, 'info').mockImplementation(() => {});
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES ('restore-test', ?, 'vault')").bind(await sha256Hex('restore-test')).run();
 });
 afterEach(async () => { for (const client of clients.splice(0)) client.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });

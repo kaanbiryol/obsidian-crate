@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import schemaSql from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
 import type { FileManifest, FileMetadataResponse, UploadResult } from '../../../protocol/sync-types';
 import worker from '../index';
@@ -13,7 +13,7 @@ const paths = ['__proto__', 'constructor', 'toString'];
 const authToken = 'path-records-vault-token';
 
 beforeEach(async () => {
-	for (const sql of schemaSql.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	await env.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope, expires_at) VALUES (?, ?, ?, ?)')
 		.bind('path-records-device', await sha256Hex(authToken), 'vault', Date.now() + 60_000).run();
 });

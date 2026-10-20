@@ -4,7 +4,7 @@ import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { handleListReminders } from '../reminders-web/routes/list';
@@ -16,7 +16,7 @@ import { sha256Hex } from '@/platform/sha256';
 const path = 'Reminders/Inbox.md';
 const first = '- [ ] First 2099-09-09 <!-- crate-id:first -->';
 const second = '- [ ] Second <!-- crate-id:second -->';
-beforeEach(async () => { for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });
 
 it('excludes fenced examples from identities, list results and notification jobs', async () => {

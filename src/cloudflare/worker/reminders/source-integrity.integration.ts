@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../storage';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
 import { drainNotificationProjections } from '../notifications/projection';
@@ -20,7 +20,7 @@ vi.mock('../notifications/push', () => ({
   sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })),
 }));
 beforeEach(async () => {
-  for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
   await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: '09:00' }) }), env.DB);
 });
 afterEach(async () => { vi.restoreAllMocks(); vi.clearAllMocks(); await reset(); });

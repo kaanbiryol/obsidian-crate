@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../storage';
 import { getStoredFileRow } from './storage';
 import { trackStagedUpload } from './staged-uploads';
@@ -16,7 +16,7 @@ import { createManagedObjectKey } from '@/protocol/storage-keys';
 import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => {
-  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
 });
 afterEach(async () => { await reset(); });
 

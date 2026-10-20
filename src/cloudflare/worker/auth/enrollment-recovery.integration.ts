@@ -2,12 +2,12 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleExchangeRemindersEnrollmentToken } from '../notifications/enrollment-handlers';
 import { issueWebEnrollmentToken } from './web-enrollment';
 import { sha256Hex } from '../../../platform/sha256';
 
-beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });
 
 it.each(['expired', 'active', 'vault'])('replaces a %s browser credential without widening revocation authority', async kind => {

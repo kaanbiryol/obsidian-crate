@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../schema.sql?raw';
+import { applySchema } from './test-support/schema-test-harness';
 import { featurePolicy, handleFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
 import { createReadingNote } from '@/reading/core/notes';
@@ -21,7 +21,7 @@ import { authenticateWorkerRequest } from './auth/authenticate';
 import { sha256Hex } from '@/platform/sha256';
 vi.mock('./notifications/push', () => ({ listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
 beforeEach(async () => {
-  await env.DB.batch(schema.split(';').map(s => s.trim()).filter(Boolean).map(s => env.DB.prepare(s)));
+  await applySchema(env.DB);
   await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash) VALUES ('vault','hash')").run();
 });
 afterEach(async () => { vi.clearAllMocks(); await reset(); });

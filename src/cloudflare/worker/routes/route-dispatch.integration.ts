@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { apiRoutePolicy, apiRoutes } from './policy';
 import { PUBLIC_ASSET_PATHS } from './admission';
 import { handleAuthenticatedRoute, handlePublicRoute } from '../router';
@@ -17,7 +17,7 @@ import { createEncryptionState } from '@/encryption/server-state';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	// Reading handlers check their folder before matching the path.
 	await updatePolicy(env.DB, { enabled: false, folderPath: 'Reading', revision: null });
 });

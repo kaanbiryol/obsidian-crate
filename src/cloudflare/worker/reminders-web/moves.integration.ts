@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { reminderRevision } from '@/reminders/core/reminderRevision';
-import schemaSql from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleUpdateReminder } from './routes/update';
 import { scanReminderMarkdownFile } from './scan';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
@@ -14,7 +14,7 @@ const sourcePath = 'Reminders/Inbox.md';
 const destinationPath = 'Reminders/Personal.md';
 
 beforeEach(async () => {
-	for (const sql of schemaSql.split(';').map(value => value.trim()).filter(Boolean)) await db.prepare(sql).run();
+	await applySchema(db);
 });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 

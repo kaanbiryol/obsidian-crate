@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { TFile, type App } from 'obsidian';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { scanFile } from '../../../reminders/data/vaultScanner';
 
@@ -14,7 +14,7 @@ const after = new TextEncoder().encode('\n\n- [ ] Task\n');
 const original = new Uint8Array([...before, 0xe9, ...after]).buffer;
 beforeEach(async () => {
   vi.stubGlobal('window', { setTimeout, clearTimeout });
-  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
 });
 afterEach(async () => {
   for (const device of devices.splice(0)) { device.close(); await device.engine.waitForIdle(); }

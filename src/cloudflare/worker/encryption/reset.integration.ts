@@ -4,7 +4,7 @@ import { commitNewFiles } from '../sync/bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
 import { createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
@@ -22,7 +22,7 @@ import { sha256Hex } from '../../../platform/sha256';
 const id = 'reset-operation', nextToken = 'b'.repeat(64);
 let state: EncryptionServerState;
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	const bundle = createVaultKeyBundle();
 	state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' };
 	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('e2ee:state', ?)").bind(JSON.stringify(state)).run();

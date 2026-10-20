@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset, runDurableObjectAlarm } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { INITIAL_REMINDERS_PENDING, finishInitialReminderSetup } from './initial-import-readiness';
 import { runNotificationCoordinator } from '../notifications/coordinator';
 import { writeCommittedMarkdownFile } from '../storage';
@@ -18,7 +18,7 @@ const json = (body: unknown) => new Request('https://test', { method: 'POST', bo
 const note = (due: string, id = crypto.randomUUID()) => `- [ ] Task @${due} <!-- crate-id:${id} -->`;
 beforeEach(async () => {
   vi.stubGlobal('window', { setTimeout, clearTimeout });
-  for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
   await handleNotificationPolicy(json({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: null }), env.DB);
 });
 afterEach(async () => { for (const client of clients.splice(0)) client.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });

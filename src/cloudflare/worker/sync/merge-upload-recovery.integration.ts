@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 
 const devices: SyncTestDevice[] = [];
@@ -12,7 +12,7 @@ beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
 	mutationLogs = [];
 	vi.spyOn(console, 'info').mockImplementation((...args: unknown[]) => { mutationLogs.push(args); });
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 });
 afterEach(async () => {
 	for (const device of devices.splice(0)) { device.close(); await device.engine.waitForIdle(); }

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../../schema.sql?raw';
+import { applySchema } from '../../test-support/schema-test-harness';
 import { handleListFileVersions } from './list';
 import { handleRestoreFileVersion } from './handlers';
 import { parseFileVersions } from '../../../../sync/worker-api/version-contract';
@@ -10,7 +10,7 @@ import { createReminderOperationId } from '../../../../protocol/reminder-operati
 import { sha256Hex } from '../../../../platform/sha256';
 
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	const hash = await sha256Hex('retained bytes');
 	await env.DB.batch(Array.from({ length: 205 }, (_, i) => env.DB.prepare(`INSERT INTO file_versions
 		(storage_key, path, hash, size, reason, created_at, expires_at) VALUES (?, ?, ?, 14, 'deleted', '2026-09-09 12:00:00', ?)`)

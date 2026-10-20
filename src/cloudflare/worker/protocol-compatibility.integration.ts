@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../schema.sql?raw';
+import { applySchema } from './test-support/schema-test-harness';
 import worker from './index';
 import { writeCommittedMarkdownFile } from './storage';
 import { createReminderOperationId } from '../../protocol/reminder-operation';
@@ -11,7 +11,7 @@ import { sha256Hex } from '../../platform/sha256';
 
 const token = 'protocol-compatibility-test-credential';
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 	await env.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope) VALUES (?, ?, ?)')
 		.bind('protocol-test', await sha256Hex(new TextEncoder().encode(token)), 'vault').run();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Note.md', 'Keep the original bytes', null);

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import schemaSql from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleUpload, handleDownload } from './file-handlers';
 import { handleBatchUpload } from './batch/upload';
 import { writeCommittedMarkdownFile } from '../storage';
@@ -16,7 +16,7 @@ import { retainReplacedVersionStatement } from './file-publication-statements';
 
 const { DB: db, BUCKET: bucket } = env;
 beforeEach(async () => {
-	for (const sql of schemaSql.split(';').map(value => value.trim()).filter(Boolean)) await db.prepare(sql).run();
+	await applySchema(db);
 });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 

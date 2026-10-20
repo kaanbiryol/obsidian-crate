@@ -3,14 +3,14 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleReorderReminders } from '../reminders-web/routes/reorder';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { scanReminderMarkdownFile } from '../reminders-web/scan';
 
 const path = 'Reminders/Inbox.md';
 beforeEach(async () => {
-	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await applySchema(env.DB);
 });
 afterEach(async () => { await reset(); });
 

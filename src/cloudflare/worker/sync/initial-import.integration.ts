@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { beginInitialImport, finishInitialImport } from './initial-import';
 import { uploadInitialFiles } from './initial-import-upload';
 import { pruneInitialImport } from './initial-import-prune';
@@ -21,7 +21,7 @@ import { sha256Hex } from '@/platform/sha256';
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
   vi.stubGlobal('window', { setTimeout, clearTimeout });
-  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
 });
 afterEach(async () => { for (const client of clients.splice(0)) client.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });
 const jsonRequest = (value: unknown) => new Request('https://test', { method: 'POST', body: JSON.stringify(value) });

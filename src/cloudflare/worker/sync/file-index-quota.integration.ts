@@ -3,14 +3,14 @@ import { fileFolderArgs } from './file-identity';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { listStoredMarkdownFileMetadataByPrefix } from '../storage';
 import { beginInitialImport } from './initial-import';
 import { pruneInitialImport } from './initial-import-prune';
 import { meterD1Usage } from '../d1-usage';
 
 async function initialize() {
-  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await applySchema(env.DB);
 }
 beforeEach(initialize);
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });

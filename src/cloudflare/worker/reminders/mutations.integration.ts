@@ -3,7 +3,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schemaSql from '../../schema.sql?raw';
+import { applySchema } from '../test-support/schema-test-harness';
 import { handleCreateReminder } from '../reminders-web/routes/create';
 import { handleUpdateReminder } from '../reminders-web/routes/update';
 import { handleSetReminderCompleted } from '../reminders-web/routes/complete';
@@ -16,7 +16,7 @@ const path = 'Reminders/Inbox.md';
 const request = (body: Record<string, unknown>) => new Request('https://test/reminders', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', ...body }) });
 const createBody = () => { const id = newOperationId(); return { id, operationId: id, content: 'Task', project: 'Inbox' }; };
 const { DB: db, BUCKET: bucket } = env;
-beforeEach(async () => { for (const sql of schemaSql.split(';').map(sql => sql.trim()).filter(Boolean)) await db.prepare(sql).run(); });
+beforeEach(async () => { await applySchema(db); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 async function payload(response: Response) { expect(response.status, await response.clone().text()).toBe(200); return (await response.json()) as { reminder: ReminderRecord }; }
 async function records() { return scanReminderMarkdownFile(path, (await readCommittedMarkdownFileVersion(bucket, db, path))!.content, 'Reminders'); }

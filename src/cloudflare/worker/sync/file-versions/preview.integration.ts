@@ -2,11 +2,11 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../../../schema.sql?raw';
+import { applySchema } from '../../test-support/schema-test-harness';
 import { handleFileVersionPreview } from './preview';
 import { sha256Hex } from '../../../../platform/sha256';
 beforeEach(async () => {
- for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+ await applySchema(env.DB);
  const hash = await sha256Hex('saved');
  await env.DB.prepare("INSERT INTO file_versions (storage_key,path,hash,size,reason,expires_at) VALUES ('retained/key','note.md',?,5,'deleted',?)").bind(hash, Date.now() + 300_000).run();
  await env.BUCKET.put('retained/key', 'saved', { customMetadata: { hash } });
