@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { subscribeReminderBackend } from '@/reminders/runtime';
 
 /**
  * Hook that subscribes to ReminderIndex changes and triggers re-renders.
@@ -38,6 +39,9 @@ export function useIndexRefresh(): {
 	}
 	return undefined;
   }, [plugin.reminderIndex, triggerRefresh]);
+
+  // A folder change replaces the index; reload and subscribe to the new one.
+  useEffect(() => subscribeReminderBackend(plugin, triggerRefresh), [plugin, triggerRefresh]);
 
   return { refreshToken, triggerRefresh };
 }

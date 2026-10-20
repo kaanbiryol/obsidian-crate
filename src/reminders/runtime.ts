@@ -13,6 +13,15 @@ import { createReminderScanGate } from './scan-gate';
 const remindersLogger = createLogger('Reminders');
 const backends = new WeakMap<CratePlugin, AbortController>();
 const moveJournals = new WeakMap<CratePlugin, ReminderMoveJournal>();
+const backendListeners = new WeakMap<CratePlugin, Set<() => void>>();
+
+/** Open views read the plugin's index and repository, which a folder change replaces. */
+export function subscribeReminderBackend(plugin: CratePlugin, listener: () => void): () => void {
+	let listeners = backendListeners.get(plugin);
+	if (!listeners) { listeners = new Set(); backendListeners.set(plugin, listeners); }
+	listeners.add(listener);
+	return () => { listeners.delete(listener); };
+}
 
 function reportMoveRecoveryIssues(issues: string[]): void {
 	if (!issues.length) return;
@@ -104,5 +113,6 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 			});
 		});
 	}
+	backendListeners.get(plugin)?.forEach(listener => listener());
 	return true;
 }
