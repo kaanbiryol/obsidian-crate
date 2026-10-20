@@ -2,6 +2,8 @@
 
 Self-hosted Obsidian vault sync and reminders using Cloudflare R2, Workers, D1, and push notifications.
 
+![Crate in Obsidian on desktop, with the reminders web app on a phone](docs/images/crate-overview.png)
+
 Crate is an Obsidian plugin for people who want to own the infrastructure behind their vault sync. Deploy into your own Cloudflare account, or run the same Worker on your own computer with Miniflare and persistent local storage. Crate is not a hosted service and does not require a Crate account.
 
 ## Status
