@@ -1,5 +1,5 @@
-import { isRecord } from '../../platform/validation';
-import { isSyncDate, isSyncHash, isSyncPath, isSyncRevision, isSyncSequence } from '../../protocol/sync-validation';
+import { isRecord, isSha256Hex } from '../../platform/validation';
+import { isSyncDate, isSyncPath, isSyncRevision, isSyncSequence } from '../../protocol/sync-validation';
 import type { FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 
 export function parseFileVersions(value: unknown): FileVersionsPage {
@@ -9,7 +9,7 @@ export function parseFileVersions(value: unknown): FileVersionsPage {
 	if (value.hasMore && (!value.versions.length || typeof value.nextCursor !== 'string' || !value.nextCursor || value.nextCursor.length > 8192)
 		|| !value.hasMore && value.nextCursor !== undefined) throw new Error('Invalid retained-file page');
 	const versions: RemoteFileVersion[] = value.versions.map((row: unknown) => {
-		if (!isRecord(row) || !isSyncPath(row.path) || !isSyncRevision(row.storage_key) || !isSyncHash(row.hash)
+		if (!isRecord(row) || !isSyncPath(row.path) || !isSyncRevision(row.storage_key) || !isSha256Hex(row.hash)
 			|| !isSyncSequence(row.size) || !isSyncSequence(row.expires_at) || !isSyncDate(row.created_at)
 			|| row.reason !== 'replaced' && row.reason !== 'deleted') throw new Error('Invalid retained-file metadata');
 		return { path: row.path, storage_key: row.storage_key, hash: row.hash, size: row.size, expires_at: row.expires_at,

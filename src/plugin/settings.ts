@@ -1,4 +1,4 @@
-import { isRecord } from '../platform/validation';
+import { isRecord, isSha256Hex } from '../platform/validation';
 import { validRestoreState } from '../cloudflare/restore/state';
 import { normalizeCloudflareDeployment } from '../cloudflare/deployment/state';
 import { normalizeReadingSettings } from '../reading/settings';
@@ -93,7 +93,7 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 		} : {}),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
         ...(typeof value.sharedCheckpoint === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value.sharedCheckpoint) ? { sharedCheckpoint: value.sharedCheckpoint } : {}),
-		...(typeof value.historyCheckpoint === 'string' && /^[a-f0-9]{64}$/.test(value.historyCheckpoint)
+		...(isSha256Hex(value.historyCheckpoint)
 			? { historyCheckpoint: value.historyCheckpoint } : {}),
 		...(requestDiagnostics ? { requestDiagnostics } : {}),
 		...(timings ? { timings } : {}),

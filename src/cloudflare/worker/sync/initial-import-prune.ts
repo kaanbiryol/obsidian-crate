@@ -1,7 +1,8 @@
 import { portablePathKey } from '../../../protocol/portable-path';
 import { readInitialImport } from './initial-import';
 import { corsResponse } from '../cors';
-import { isSha256Hex, parseJsonObject, sanitizePath } from '../utils';
+import { parseJsonObject, sanitizePath } from '../utils';
+import { isSha256Hex } from '../../../platform/validation';
 
 /** Remove files deleted locally while an unpublished import was paused. */
 export async function pruneInitialImport(request: Request, db: D1Database): Promise<Response> {
@@ -13,7 +14,7 @@ export async function pruneInitialImport(request: Request, db: D1Database): Prom
   if (!Array.isArray(files) || files.length > 50 || files.some((value: unknown) => {
     if (!value || typeof value !== 'object') return true;
     const file = value as Record<string, unknown>;
-    return typeof file.path !== 'string' || !sanitizePath(file.path) || typeof file.hash !== 'string' || !isSha256Hex(file.hash);
+    return typeof file.path !== 'string' || !sanitizePath(file.path) || !isSha256Hex(file.hash);
   })) {
     return corsResponse({ error: 'Invalid import file list' }, 400);
   }

@@ -6,7 +6,7 @@ import { beginUploadOperation } from './upload-operations';
 import { sha256HexBytes } from '../auth/crypto';
 import { exactArrayBuffer, readLimitedRequestBody } from '../body-reader';
 import { corsHeaders, corsResponse } from '../cors';
-import { isSha256Hex, parseJsonObject, parseOptionalString, sanitizePath } from '../utils';
+import { parseJsonObject, parseOptionalString, sanitizePath } from '../utils';
 import { commitFileDelete } from './mutations';
 import type { UploadCommitters } from './upload-committers';
 import { FileNamespaceConflictError } from './file-namespace';
@@ -22,6 +22,7 @@ import {
 	storedObjectMatchesMetadata,
 	type FileStorageRow,
 } from './storage';
+import { isSha256Hex } from '../../../platform/validation';
 
 export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, committers: UploadCommitters, expectedEncryption?: EncryptionServerState | null, resetGeneration?: string | null): Promise<Response> {
 	const limit = fileTransportLimit(request.headers.get('Content-Type') ?? undefined);

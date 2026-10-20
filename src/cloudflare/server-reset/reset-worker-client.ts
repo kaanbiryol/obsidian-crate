@@ -1,6 +1,7 @@
 import { CloudflareApiError } from '../cloudflare-api-error';
 import { sha256Hex } from '../deployment/artifacts';
 import type { HttpTransport } from '../http';
+import { isSha256Hex } from '../../platform/validation';
 
 function cleanupUrl(origin: string, path: string): string {
 	const url = new URL(origin);
@@ -34,7 +35,7 @@ export async function verifyResetWorker(transport: HttpTransport, origin: string
 export async function deleteResetWorkerObjects(transport: HttpTransport, origin: string, resetId: string, token: string, keys: string[]): Promise<void> {
 	const url = cleanupUrl(origin, '/__crate__/reset/objects');
 	const terminal = new URL(origin).hostname.startsWith('crate-delete-');
-	if (!/^[a-f0-9]{64}$/.test(token) || !/^[a-f0-9]{32}$/.test(resetId) || !keys.length || keys.length > 1000
+	if (!isSha256Hex(token) || !/^[a-f0-9]{32}$/.test(resetId) || !keys.length || keys.length > 1000
 		|| new Set(keys).size !== keys.length || keys.some(key => !key || new TextEncoder().encode(key).length > 1024
 			|| !terminal && key.split('/').some(segment => segment === '.' || segment === '..'))) throw new Error('Invalid cleanup batch.');
 	const body = JSON.stringify(keys);

@@ -1,5 +1,5 @@
-import { isRecord } from '../../platform/validation';
-import { isSyncDate, isSyncHash, isSyncPath, isSyncRevision, isSyncSequence, parseSyncFiles } from '../../protocol/sync-validation';
+import { isRecord, isSha256Hex } from '../../platform/validation';
+import { isSyncDate, isSyncPath, isSyncRevision, isSyncSequence, parseSyncFiles } from '../../protocol/sync-validation';
 import type { ChangesResponse, CheckResponse, FileManifest, FileMetadataResponse } from '../../protocol/sync-types';
 
 const invalid = (): never => { throw new Error('Invalid or unsupported sync response. Sync stopped before applying remote state.'); };
@@ -34,7 +34,7 @@ export function parseChanges(value: unknown, since: number): ChangesResponse {
 		if (!isRecord(change) || !isSyncSequence(change.seq) || change.seq <= previous || change.seq > value.lastSeq
 			|| !isSyncPath(change.path) || !isSyncSequence(change.size) || !isSyncDate(change.created_at)
 			|| !['put', 'delete'].includes(String(change.action))
-			|| !(isSyncHash(change.hash) || change.action === 'delete' && change.hash === '')
+			|| !(isSha256Hex(change.hash) || change.action === 'delete' && change.hash === '')
 			|| (change.revision != null && !isSyncRevision(change.revision))) return invalid();
 		changes.push({ seq: change.seq, path: change.path, action: change.action as 'put' | 'delete', hash: change.hash,
 			size: change.size, created_at: change.created_at, ...(change.revision == null ? {} : { revision: change.revision }) });

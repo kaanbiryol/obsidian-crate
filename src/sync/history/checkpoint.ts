@@ -1,5 +1,5 @@
 import type { DataAdapter } from 'obsidian';
-import { isRecord } from '../../platform/validation';
+import { isRecord, isSha256Hex } from '../../platform/validation';
 import { parseSyncFiles } from '../../protocol/sync-validation';
 import { assertPortablePaths } from '../../protocol/portable-path';
 import type { FileEntry } from '../../protocol/sync-types';
@@ -37,7 +37,7 @@ export class HistoryCheckpoints {
     }
 
     async load(id: string, ignorePatterns: string[]): Promise<HistoryCheckpoint> {
-        if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('This entry has no complete vault checkpoint.');
+        if (!isSha256Hex(id)) throw new Error('This entry has no complete vault checkpoint.');
         const path = `${this.root}/${id}.json`;
         if (!await this.adapter.exists(path)) throw new Error('This checkpoint is no longer available on this device.');
         const text = await this.adapter.read(path);

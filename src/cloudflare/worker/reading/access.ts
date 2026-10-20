@@ -6,6 +6,7 @@ import { validateReadingFolder } from '@/reading/settings';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { policy, authority, canPrepareReadingHandoff, ReadingError, readingResponse, type ReadingPolicy } from './common';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
+import { isSha256Hex } from '@/platform/validation';
 
 export async function updatePolicy(db: D1Database, body: Record<string, unknown>) {
   const existing = await policy(db);
@@ -80,7 +81,7 @@ export async function prepareHandoff(db: D1Database, principal: AuthPrincipal, b
 }
 export async function handoffAuthority(db: D1Database, request: Request) {
   const token = request.headers.get('X-Crate-Capture') ?? '';
-  if (!/^[a-f0-9]{64}$/.test(token)) throw new ReadingError('This save link is missing. Share the article again.', 401);
+  if (!isSha256Hex(token)) throw new ReadingError('This save link is missing. Share the article again.', 401);
   const row = await db.prepare(`SELECT h.body, h.generation, a.id, a.scope, a.folder_path, a.reading_generation FROM reading_handoffs h
     JOIN auth_tokens a ON a.id=h.principal_id WHERE h.token_hash=? AND h.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)`)
     .bind(await sha256Hex(token), Date.now(), Date.now()).first<{ body: string; generation: string; id: string; scope: string; folder_path: string; reading_generation: string }>();

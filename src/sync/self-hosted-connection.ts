@@ -7,6 +7,7 @@ import { applySharedSettings } from './shared-settings';
 import { SECRET_KEYS } from '../plugin/settings-types';
 import { exchangeSelfHostedPairingCode } from './self-hosted-pairing';
 import { loadEncryptionKeys } from '../plugin/encryption-storage';
+import { isSha256Hex } from '../platform/validation';
 
 const connecting = new WeakSet<CratePlugin>();
 
@@ -66,7 +67,7 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 	if (reconnect && workerUrl !== requireNormalizedWorkerUrl(expected.workerUrl)) throw new ConnectionSetupError('address-update-required');
 	let authToken = token.trim();
 	const pairing = /^crate-pair-[a-f0-9]{64}$/.test(authToken);
-	if (!pairing && !/^[a-f0-9]{64}$/.test(authToken)) throw new ConnectionSetupError('invalid-token');
+	if (!pairing && !isSha256Hex(authToken)) throw new ConnectionSetupError('invalid-token');
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
 	connecting.add(plugin);

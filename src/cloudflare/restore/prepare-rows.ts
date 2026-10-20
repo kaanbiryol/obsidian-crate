@@ -1,6 +1,7 @@
 import { SERVER_RELEASE, validateMigrationHistory } from '../deployment/database-upgrades';
 import type { BackupRow, Cell, UpgradeBackup } from './archive';
 import policy from './restore-policy.json';
+import { isSha256Hex } from '../../platform/validation';
 
 function discardMaintenanceKey(key: string): boolean {
   return policy.resetMaintenanceKeys.includes(key) || policy.resetMaintenancePrefixes.some(prefix => key.startsWith(prefix));
@@ -22,7 +23,7 @@ export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentS
   const refs = new Map<string, { hash: Cell; size: Cell }>();
   for (const row of rows.filter(row => row.table === 'files' || row.table === 'file_versions')) {
     const value = record(row), previous = refs.get(String(value.storage_key));
-    if (typeof value.storage_key !== 'string' || typeof value.hash !== 'string' || !/^[a-f0-9]{64}$/.test(value.hash) || typeof value.size !== 'number' || !Number.isSafeInteger(value.size) || value.size < 0 || previous && (previous.hash !== value.hash || previous.size !== value.size)) throw new Error('Conflicting backup file references');
+    if (typeof value.storage_key !== 'string' || !isSha256Hex(value.hash) || typeof value.size !== 'number' || !Number.isSafeInteger(value.size) || value.size < 0 || previous && (previous.hash !== value.hash || previous.size !== value.size)) throw new Error('Conflicting backup file references');
     refs.set(value.storage_key, { hash: value.hash, size: value.size });
   }
   for (const item of manifest.objects) {

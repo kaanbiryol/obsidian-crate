@@ -3,7 +3,7 @@ import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES, isReceiptEnvelope } from '../../.
 import { ENCRYPTED_INVENTORY_PAGE } from '../../../encryption/file-inventory';
 import { fileFolderArgs } from '../sync/file-identity';
 import { corsHeaders, corsResponse } from '../cors';
-import { parseJsonObject, sanitizePath, isSha256Hex } from '../utils';
+import { parseJsonObject, sanitizePath } from '../utils';
 import { readEncryptionState, prepareEncryptedFileCommit, EncryptionStateError } from '../encryption/state';
 import { encryptionScopeForPath, type EncryptionServerState } from '../../../encryption/server-state';
 import { getStoredFileRow, storedObjectMatchesMetadata } from '../sync/storage';
@@ -15,6 +15,7 @@ import { beginReminderOperation, reminderOperationEffects } from '../reminders-w
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { portablePathKey } from '../../../protocol/portable-path';
 import type { Env } from '../types';
+import { isSha256Hex } from '../../../platform/validation';
 
 const MAX_WEB_FILE_BYTES = 4 * 1024 * 1024;
 interface EncryptedWebFile { path: string; content: string; expectedHash: string | null; expectedRevision?: string }

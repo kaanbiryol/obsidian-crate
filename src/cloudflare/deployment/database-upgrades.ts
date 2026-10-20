@@ -1,5 +1,6 @@
 import release from '../server-release.json';
 import { sha256Hex } from './artifacts';
+import { isSha256Hex } from '../../platform/validation';
 
 export interface DatabaseMigration {
   id: string;
@@ -33,7 +34,7 @@ export function planDatabaseUpgrade(version: number | null, target: DatabaseRele
   for (const migration of target.migrations) {
     if (!/^[a-z0-9-]+$/.test(migration.id) || ids.has(migration.id)
       || migration.from !== next || migration.to !== next + 1
-      || migration.file !== `${migration.id}.sql` || !/^[a-f0-9]{64}$/.test(migration.checksum)) {
+      || migration.file !== `${migration.id}.sql` || !isSha256Hex(migration.checksum)) {
       throw new Error('Invalid database migration chain');
     }
     next = migration.to;

@@ -3,13 +3,14 @@ import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { BATCH_UPLOAD_MAX_BYTES, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { corsResponse } from '../cors';
-import { isSha256Hex, parseJsonObject, sanitizePath } from '../utils';
+import { parseJsonObject, sanitizePath } from '../utils';
 import { sha256HexBytes } from '../auth/crypto';
 import { readInitialImport } from './initial-import';
 import { createManagedObjectKey, loadStoredFileRows, parseExpectedFileHash } from './storage';
 import { trackStagedBatch, finishStagedBatches } from './staged-upload-batches';
 import { uploadMutation } from './mutations';
 import { readLimitedRequestBody } from '../body-reader';
+import { isSha256Hex } from '@/platform/validation';
 
 interface ImportFile {
   path: string; hash: string; size: number; content: ArrayBuffer;
@@ -45,7 +46,7 @@ export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db:
   for (const value of input) {
     const path = typeof value.path === 'string' ? sanitizePath(value.path) : null;
     const expectedHash = parseExpectedFileHash(value.expectedHash);
-    if (!path || paths.has(path) || expectedHash === undefined || typeof value.hash !== 'string' || !isSha256Hex(value.hash)) {
+    if (!path || paths.has(path) || expectedHash === undefined || !isSha256Hex(value.hash)) {
       return corsResponse({ error: 'Invalid import metadata' }, 400);
     }
     paths.add(path);

@@ -5,6 +5,7 @@ import { normalizeSyncTimings } from './timings';
 import { MAX_SYNC_HISTORY, type CrateSettings } from '../plugin/settings-types';
 import type { SyncState } from './types';
 import { normalizeRequestDiagnostics, type RequestDiagnostics } from './request-diagnostics';
+import { isSha256Hex } from '../platform/validation';
 
 const count = (value: unknown): number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
 function timestamp(value: unknown): string | null {
@@ -20,7 +21,7 @@ export function buildDiagnosticExport(settings: CrateSettings, state: SyncState,
 		bundledServerRevision: serverRelease.revision,
 		serverWebAppBuild: typeof server?.pwaAssetVersion === 'string' && /^[a-zA-Z0-9._-]{1,128}$/.test(server.pwaAssetVersion) ? server.pwaAssetVersion : null,
 		serverRevision: count(server?.serverRevision) || null,
-		serverFingerprint: typeof server?.deploymentFingerprint === 'string' && /^[a-f0-9]{64}$/.test(server.deploymentFingerprint) ? server.deploymentFingerprint : null,
+		serverFingerprint: typeof server?.deploymentFingerprint === 'string' && isSha256Hex(server.deploymentFingerprint) ? server.deploymentFingerprint : null,
 		configured: Boolean(settings.workerUrl),
 		status: ['idle', 'syncing', 'offline', 'error'].includes(state.status) ? state.status : 'unknown',
 		lastSync: timestamp(state.lastSync), lastSeq: count(settings.lastSeq),

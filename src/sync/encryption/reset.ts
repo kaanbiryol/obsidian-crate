@@ -4,6 +4,7 @@ import { isEncryptionId } from '../../encryption/encoding';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { HttpError, WorkerApiHttpClient, TRANSFER_TIMEOUT_MS } from '../worker-api/http';
 import { readServerEncryption } from './conversion';
+import { isSha256Hex } from '../../platform/validation';
 
 export interface EncryptionReset {
 	version: 1;
@@ -26,7 +27,7 @@ export function loadEncryptionReset(storage: SecretStorageService): EncryptionRe
 	if (value.version !== 1 || !isEncryptionId(value.id) || !isEncryptionId(value.vaultId)
 		|| !Number.isSafeInteger(value.generation) || value.generation! < 1 || typeof value.workerUrl !== 'string'
 		|| !value.workerUrl || typeof value.oldToken !== 'string' || !value.oldToken
-		|| typeof value.replacementToken !== 'string' || !/^[a-f0-9]{64}$/.test(value.replacementToken)
+		|| !isSha256Hex(value.replacementToken)
 		|| typeof value.automaticSync !== 'boolean' || !['remote', 'local', 'upload'].includes(value.phase ?? '')
 		|| (value.beginState !== undefined && !['prepared', 'attempted', 'rejected'].includes(value.beginState))) {
 		throw new Error('The saved encryption reset is invalid. Sync remains paused; preserve this device’s data.');

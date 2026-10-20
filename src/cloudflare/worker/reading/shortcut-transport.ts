@@ -3,6 +3,7 @@ import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import release from '../../server-release.json';
 import { PWA_ASSET_VERSION } from '../pwa/version';
 import { ReadingError } from './common';
+import { isSha256Hex } from '@/platform/validation';
 
 export interface ShortcutTransport { kind: 'prepare' | 'exchange'; version: number; revision: number }
 const revision = (value: string | null) => value && /^[1-9]\d{0,5}$/.test(value) ? Number(value) : 1;
@@ -37,7 +38,7 @@ export async function shortcutLaunchResponse(request: Request, response: Respons
   if (!response.ok) {
     const diagnostic = { stage: transport.kind === 'exchange' ? 'pair' : 'prepare', status: response.status,
       code: typeof data.code === 'string' && /^[a-z_]{1,64}$/.test(data.code) ? data.code : 'request_failed', requestId,
-      serverRevision: release.revision, serverFingerprint: serverFingerprint && /^[a-f0-9]{64}$/.test(serverFingerprint) ? serverFingerprint : null,
+      serverRevision: release.revision, serverFingerprint: serverFingerprint && isSha256Hex(serverFingerprint) ? serverFingerprint : null,
       pwaVersion: PWA_ASSET_VERSION, wireProtocol: CRATE_PLUGIN_PROTOCOL.current,
       shortcutContract: transport.version, shortcutRevision: transport.revision };
     data.launchUrl = `${new URL(request.url).origin}/notifications/save-reading#error=${encodeURIComponent(JSON.stringify(diagnostic))}`;

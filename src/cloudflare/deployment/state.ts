@@ -1,4 +1,4 @@
-import { isRecord } from '../../platform/validation';
+import { isRecord, isSha256Hex } from '../../platform/validation';
 import { normalizeVaultName } from '../vault-name';
 import type { CloudflareDeploymentMetadata } from './types';
 
@@ -36,7 +36,7 @@ export function normalizeCloudflareDeployment(value: unknown): CloudflareDeploym
 	const d1DatabaseId = normalizeNullableString(value.d1DatabaseId);
 	const workersSubdomain = normalizeNullableString(value.workersSubdomain);
 	const normalizedFingerprint = normalizeNullableString(value.lastDeployedFingerprint)?.toLowerCase() ?? null;
-	const lastDeployedFingerprint = normalizedFingerprint && /^[a-f0-9]{64}$/.test(normalizedFingerprint)
+	const lastDeployedFingerprint = normalizedFingerprint && isSha256Hex(normalizedFingerprint)
 		? normalizedFingerprint
 		: null;
 	if (accountId !== null && !/^[a-f0-9]{32}$/i.test(accountId)) {

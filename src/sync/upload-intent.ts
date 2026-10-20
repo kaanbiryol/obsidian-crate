@@ -1,7 +1,7 @@
 import type { BatchUploadFile } from '../protocol/sync-types';
-import { isRecord } from '../platform/validation';
+import { isRecord, isSha256Hex } from '../platform/validation';
 import { isUploadSession } from './upload-diagnostics';
-import { isSyncDate, isSyncHash, isSyncPath, isSyncSequence } from '../protocol/sync-validation';
+import { isSyncDate, isSyncPath, isSyncSequence } from '../protocol/sync-validation';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { arrayBufferToBase64, base64ToArrayBuffer } from './encoding';
 import { computeHash } from './hasher';
@@ -34,7 +34,7 @@ export async function mergeUploadIntent(content: ArrayBuffer): Promise<UploadInt
 }
 
 async function validateBytes(value: unknown, limit = MAX_FILE_SIZE_BYTES, verifyContent = true): Promise<void> {
-	if (!isRecord(value) || !isSyncHash(value.hash) || !isSyncSequence(value.size) || value.size > limit
+	if (!isRecord(value) || !isSha256Hex(value.hash) || !isSyncSequence(value.size) || value.size > limit
 		|| typeof value.content !== 'string' || value.content.length > Math.ceil(limit / 3) * 4
 		|| value.content.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value.content)) throw new Error('Invalid upload journal bytes');
 	if (!verifyContent) return;
@@ -46,14 +46,14 @@ async function validateBytes(value: unknown, limit = MAX_FILE_SIZE_BYTES, verify
  * checked in this process; entries read from disk must omit it. */
 export async function validateUploadIntent(value: unknown, sealedInMemory = false): Promise<void> {
 	if (!isRecord(value) || !isSyncPath(value.path) || typeof value.contentType !== 'string'
-		|| !(value.expectedHash === null || isSyncHash(value.expectedHash)) || !isRecord(value.intent)) throw new Error('Invalid upload journal intent');
+		|| !(value.expectedHash === null || isSha256Hex(value.expectedHash)) || !isRecord(value.intent)) throw new Error('Invalid upload journal intent');
 	if (!isRecord(value.origin) || !isUploadSession(value.origin.clientSession) || !isSyncDate(value.origin.at)) throw new Error('Invalid upload journal origin');
 	await validateBytes(value, MAX_FILE_SIZE_BYTES, !sealedInMemory);
 	if (value.encryptedWire !== undefined) {
 		const wire = value.encryptedWire;
 		if (!isRecord(wire) || wire.format !== 'crate-e2ee-v1' || wire.contentType !== ENCRYPTED_FILE_CONTENT_TYPE
 			|| typeof wire.generation !== 'number' || !Number.isSafeInteger(wire.generation) || wire.generation < 1
-			|| !(wire.expectedHash === null || isSyncHash(wire.expectedHash))) throw new Error('Invalid encrypted upload journal');
+			|| !(wire.expectedHash === null || isSha256Hex(wire.expectedHash))) throw new Error('Invalid encrypted upload journal');
 		await validateBytes(wire, MAX_ENCRYPTED_FILE_BYTES, !sealedInMemory);
 		if (!sealedInMemory) parseEncryptedFile(new Uint8Array(base64ToArrayBuffer(wire.content as string)));
 	}

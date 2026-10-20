@@ -2,8 +2,6 @@ import { corsResponse } from './cors';
 import { getSyncPathIssue } from '../../protocol/portable-path';
 import { readLimitedRequestBody } from './body-reader';
 
-const SHA256_HEX_REGEX = /^[a-f0-9]{64}$/i;
-
 function containsControlCharacters(value: string): boolean {
 	for (const character of value) {
 		const codePoint = character.codePointAt(0);
@@ -76,8 +74,4 @@ export function parseNonNegativeInteger(value: unknown): number | null {
 		return null;
 	}
 	return value;
-}
-
-export function isSha256Hex(value: string): boolean {
-	return SHA256_HEX_REGEX.test(value);
 }

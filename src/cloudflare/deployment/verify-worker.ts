@@ -2,6 +2,7 @@ import { parseDevelopmentBuild, type DevelopmentBuild } from '../server-build';
 import { CRATE_SERVICE_ID } from '../../protocol/server-info';
 import release from '../server-release.json';
 import type { HttpTransport } from '../http';
+import { isSha256Hex } from '../../platform/validation';
 
 /** Wait for the public route to serve the uploaded build, without repeating mutations. */
 export async function verifyWorkerDeployment(transport: HttpTransport, origin: string, fingerprint: string, published = false): Promise<{ revision: number; schemaVersion: number; developmentBuild?: DevelopmentBuild }> {
@@ -25,7 +26,7 @@ export async function verifyWorkerDeployment(transport: HttpTransport, origin: s
 		// Report only bounded deployment identity, never response bodies or credentials.
 		const revision = Number.isSafeInteger(info?.serverRevision) ? String(info?.serverRevision) : 'missing';
 		const schema = Number.isSafeInteger(info?.schemaVersion) ? String(info?.schemaVersion) : 'missing';
-		const liveFingerprint = typeof info?.deploymentFingerprint === 'string' && /^[a-f0-9]{64}$/.test(info.deploymentFingerprint)
+		const liveFingerprint = typeof info?.deploymentFingerprint === 'string' && isSha256Hex(info.deploymentFingerprint)
 			? info.deploymentFingerprint : 'missing or invalid';
 		observed = `HTTP ${response.status}; Crate identity ${info?.service === CRATE_SERVICE_ID ? 'matched' : 'missing or different'}; revision ${revision}; schema ${schema}; fingerprint ${liveFingerprint}`;
 		if (attempt < 7) await new Promise(resolve => window.setTimeout(resolve, 2000));

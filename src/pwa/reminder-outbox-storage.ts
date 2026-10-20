@@ -3,6 +3,7 @@ import * as v from 'valibot';
 import { isStoredReminderChange, OPERATION_ID, storedChangeSchema } from './reminder-outbox-validation';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import { privateStorage } from './private-storage';
+import { isSha256Hex } from '../platform/validation';
 
 const PREFIX = 'crate-reminder-outbox:';
 const STORAGE_ERROR = 'Could not access pending changes on this device. Free up storage and try again.';
@@ -141,7 +142,7 @@ export async function createReminderRecoveryStorage(authToken: string, folderPat
 		if (key === null) return true;
 		const parts = key.split(':');
 		return parts.length === 5 && `${parts[0]}:` === PREFIX && parts[1] === 'v1'
-			&& /^[a-f0-9]{64}$/.test(parts[2] ?? '') && parts[3] === encodeURIComponent(folderPath);
+			&& isSha256Hex(parts[2]) && parts[3] === encodeURIComponent(folderPath);
 	};
 	const keys = () => storageKeys(storage).filter(key => acceptsKey(key) && !key.startsWith(scope));
 	const entries = () => recoverableEntries(storage, keys(), folderPath).valid;

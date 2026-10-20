@@ -1,6 +1,6 @@
-import { isRecord } from '../platform/validation';
+import { isRecord, isSha256Hex } from '../platform/validation';
 import { reminderOperationDay } from '../protocol/reminder-operation';
-import { isSyncDate, isSyncHash, isSyncSequence } from '../protocol/sync-validation';
+import { isSyncDate, isSyncSequence } from '../protocol/sync-validation';
 
 export const MAX_UPLOAD_DIAGNOSTICS = 50;
 export type UploadApplyPhase = 'local-applied' | 'local-deferred' | 'local-apply-failed';
@@ -28,10 +28,10 @@ export function normalizeUploadDiagnostics(value: unknown): UploadDiagnostic[] {
 		if (!isRecord(row) || !isSyncDate(row.at) || !isUploadSession(row.clientSession)
 			|| typeof row.operationId !== 'string' || reminderOperationDay(row.operationId) === null
 			|| row.kind !== 'local' && row.kind !== 'merge' || typeof row.phase !== 'string' || !phases.has(row.phase)
-			|| !isSyncSequence(row.generation) || !isSyncHash(row.pathHash) || !isSyncHash(row.uploadHash) || !isSyncHash(row.baseHash)) continue;
+			|| !isSyncSequence(row.generation) || !isSha256Hex(row.pathHash) || !isSha256Hex(row.uploadHash) || !isSha256Hex(row.baseHash)) continue;
 		result.push({ at: row.at, clientSession: row.clientSession, operationId: row.operationId, kind: row.kind,
 			phase: row.phase as UploadPhase, generation: row.generation, pathHash: row.pathHash, uploadHash: row.uploadHash, baseHash: row.baseHash,
-			...(isSyncHash(row.appliedHash) ? { appliedHash: row.appliedHash } : {}) });
+			...(isSha256Hex(row.appliedHash) ? { appliedHash: row.appliedHash } : {}) });
 	}
 	return result;
 }

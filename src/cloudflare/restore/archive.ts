@@ -1,4 +1,5 @@
 import type { CloudflareApiClient } from '../cloudflare-api';
+import { isSha256Hex } from '../../platform/validation';
 
 export interface BackupSource { account: string; database: string; bucket: string }
 interface BackupObject { key: string; sha256: string; size: number; contentType?: string }
@@ -20,11 +21,11 @@ export async function readBackup(api: Pick<CloudflareApiClient, 'getRecoveryObje
   const value = JSON.parse(new TextDecoder().decode(bytes)) as UpgradeBackup;
   if (!value || value.format !== 1 || value.complete !== true || !Number.isFinite(Date.parse(value.createdAt))
     || !value.source || Object.keys(source).some(key => source[key as keyof BackupSource] !== value.source[key as keyof BackupSource])
-    || !/^[a-f0-9]{64}$/.test(value.databaseSha256) || !Array.isArray(value.objects)) throw new Error('Backup is incomplete or belongs to a different server');
+    || !isSha256Hex(value.databaseSha256) || !Array.isArray(value.objects)) throw new Error('Backup is incomplete or belongs to a different server');
   const keys = new Set<string>();
   for (const item of value.objects) {
     if (!item || typeof item.key !== 'string' || !item.key || item.key.length > 1024 || keys.has(item.key)
-      || !/^[a-f0-9]{64}$/.test(item.sha256) || !Number.isSafeInteger(item.size) || item.size < 0) throw new Error('Invalid backup inventory');
+      || !isSha256Hex(item.sha256) || !Number.isSafeInteger(item.size) || item.size < 0) throw new Error('Invalid backup inventory');
     keys.add(item.key);
   }
   return { prefix, manifest: value, hash: await hashBytes(bytes) };

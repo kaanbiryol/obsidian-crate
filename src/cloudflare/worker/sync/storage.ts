@@ -1,6 +1,7 @@
 import { portablePathKey } from '../../../protocol/portable-path';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { queryRows } from '../db';
+import { isSha256Hex } from '../../../platform/validation';
 export {
 	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
 	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,
@@ -25,7 +26,7 @@ export function parseExpectedFileHash(value: unknown): ExpectedFileHash | undefi
 	if (value === null || value === 'absent') return null;
 	if (typeof value !== 'string') return undefined;
 	const normalized = value.trim().toLowerCase();
-	return /^[a-f0-9]{64}$/.test(normalized) ? normalized : undefined;
+	return isSha256Hex(normalized) ? normalized : undefined;
 }
 
 export function parseDeclaredSize(headerValue: string | null): number | null {

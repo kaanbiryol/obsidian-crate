@@ -1,5 +1,6 @@
 import { CloudflareApiError, type CloudflareApiClient, type CloudflareWorkerSettings } from '../cloudflare-api';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
+import { isSha256Hex } from '../../platform/validation';
 
 export type DeleteApi = Pick<CloudflareApiClient,
 	'getWorkerSettings' | 'listWorkers' | 'listDurableObjectNamespaces' | 'deleteWorker'
@@ -41,7 +42,7 @@ export function assertDeletionHelper(settings: CloudflareWorkerSettings, metadat
 		|| !bindings.some(binding => binding.type === 'plain_text' && binding.name === 'CRATE_DELETE_UPLOAD_TAG'
 			&& /^crate-[a-f0-9-]{36}$/.test(binding.text ?? '') && binding.text === settings.annotations?.['workers/tag'])
 		|| !bindings.some(binding => binding.type === 'plain_text' && binding.name === 'CRATE_DELETE_TOKEN_HASH'
-			&& /^[a-f0-9]{64}$/.test(binding.text ?? '') && (!tokenHash || binding.text === tokenHash))) {
+			&& isSha256Hex(binding.text) && (!tokenHash || binding.text === tokenHash))) {
 		throw new Error('Deletion paused: the temporary cleanup Worker changed.');
 	}
 }

@@ -1,5 +1,6 @@
 import { HttpError, WorkerApiHttpClient } from './worker-api/http';
 import { ConnectionSetupError } from './connection-errors';
+import { isSha256Hex } from '../platform/validation';
 
 export async function exchangeSelfHostedPairingCode(address: string, code: string, signal: AbortSignal): Promise<string> {
 	const http = new WorkerApiHttpClient(address, '');
@@ -15,7 +16,7 @@ export async function exchangeSelfHostedPairingCode(address: string, code: strin
 		}
 		throw error;
 	}
-	if (typeof result.authToken !== 'string' || !/^[a-f0-9]{64}$/.test(result.authToken)) {
+	if (!isSha256Hex(result.authToken)) {
 		throw new ConnectionSetupError('invalid-pairing-response');
 	}
 	return result.authToken;

@@ -6,6 +6,7 @@ import type { CloudflareDeploymentMetadata } from './types';
 import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild } from './database';
 import { SERVER_RELEASE } from './database-upgrades';
 import { type DeploymentFenceRecord, DeploymentRecoveryRequiredError, isPendingAddressActivation, withDeploymentFence } from './fence';
+import { isSha256Hex } from '../../platform/validation';
 
 /** Verify an already-published update and its address. Never upload a replacement build. */
 export async function completePublishedDeployment(
@@ -20,7 +21,7 @@ export async function completePublishedDeployment(
 		&& ['acquire-deployment', 'record-release', 'verify-deployment'].includes(record.step ?? '');
 	if (!target.accountId || !target.d1DatabaseId || target.reset || record.kind !== 'update'
 		|| record.worker !== target.workerName || record.recoveryProtocol !== 1 || record.verificationPending !== true
-		|| !record.fingerprint || !/^[a-f0-9]{64}$/.test(record.fingerprint) || !/^\d+\.\d+\.\d+$/.test(record.version)
+		|| !record.fingerprint || !isSha256Hex(record.fingerprint) || !/^\d+\.\d+\.\d+$/.test(record.version)
 		|| !(finalStep || retry || isPendingAddressActivation(record))) throw new Error('This update is not ready for publication verification.');
 	const accountId = target.accountId;
 	const databaseId = target.d1DatabaseId;

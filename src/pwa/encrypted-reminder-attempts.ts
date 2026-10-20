@@ -3,6 +3,7 @@ import { reminderOperationDay, REMINDER_RETRY_DAYS } from '../protocol/reminder-
 import { sealPrivateValue, openPrivateValue } from './private-storage';
 import { clearSessionStore } from './clear-session-store';
 import { openEncryptedDatabase } from './encrypted-storage-database';
+import { isSha256Hex } from '../platform/validation';
 
 export interface EncryptedReminderAttempt { semanticHash: string; body: string; generation: number; rejected?: boolean; acknowledgment?: string }
 interface AttemptDatabase extends DBSchema { attempts: { key: string; value: string } }
@@ -10,7 +11,7 @@ const openAttempts = () => openEncryptedDatabase<AttemptDatabase>('crate-encrypt
 
 function decodeAttempt(raw: string, key: string): EncryptedReminderAttempt {
 	const attempt = JSON.parse(openPrivateValue(raw, `attempt:${key}`)) as EncryptedReminderAttempt;
-	if (!attempt || !/^[a-f0-9]{64}$/.test(attempt.semanticHash) || typeof attempt.body !== 'string'
+	if (!attempt || !isSha256Hex(attempt.semanticHash) || typeof attempt.body !== 'string'
 		|| !Number.isSafeInteger(attempt.generation) || attempt.generation < 1
 		|| (attempt.rejected !== undefined && typeof attempt.rejected !== 'boolean') || (attempt.acknowledgment !== undefined && typeof attempt.acknowledgment !== 'string')) throw new Error('The saved encrypted attempt is damaged. Preserve pending changes before recovering.');
 	return attempt;

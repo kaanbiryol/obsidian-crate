@@ -1,6 +1,7 @@
 import { decryptBytes, decryptJson, encryptBytes, encryptJson, type EncryptionContext, type EncryptionKey } from './envelope';
 import { encodeEncryptedFile, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
 import { sha256Hex } from '../platform/sha256';
+import { isSha256Hex } from '../platform/validation';
 
 export interface PrivateFileMetadata {
 	version: 1;
@@ -35,10 +36,10 @@ function validateAuthority(descriptor: EncryptedFileDescriptor, authority: FileE
 function validateMetadata(value: unknown, expectedPath: string): asserts value is PrivateFileMetadata {
 	if (!value || typeof value !== 'object') throw new Error('Invalid encrypted file metadata');
 	const item = value as Partial<PrivateFileMetadata>;
-	if (item.version !== 1 || item.path !== expectedPath || typeof item.hash !== 'string' || !/^[a-f0-9]{64}$/.test(item.hash)
+	if (item.version !== 1 || item.path !== expectedPath || !isSha256Hex(item.hash)
 		|| typeof item.size !== 'number' || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > 25 * 1024 * 1024
 		|| typeof item.contentType !== 'string' || item.contentType.length > 256
-		|| typeof item.publicDataHash !== 'string' || !/^[a-f0-9]{64}$/.test(item.publicDataHash)) {
+		|| !isSha256Hex(item.publicDataHash)) {
 		throw new Error('Encrypted file metadata does not match the requested file');
 	}
 }

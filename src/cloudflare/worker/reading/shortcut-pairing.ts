@@ -4,6 +4,7 @@ import { changedRows } from '../db';
 import { limitNotificationAction } from '../rate-limit';
 import { ReadingError, readingResponse, type ReadingPolicy } from './common';
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
+import { isSha256Hex } from '@/platform/validation';
 
 const secret = () => `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, '');
 const invalidPairing = () => new ReadingError('This pairing code expired or was already used. Create a new code in Reading settings.', 410);
@@ -26,7 +27,7 @@ export async function issueShortcutPairing(db: D1Database, principal: AuthPrinci
 // The one-time secret travels in the POST body. Neither a browser session nor a
 // long-lived capture credential is included in the distributed Shortcut or URL.
 export async function exchangeShortcutPairing(db: D1Database, body: Record<string, unknown>, request: Request) {
-  if (typeof body.token !== 'string' || !/^[a-f0-9]{64}$/.test(body.token)) throw invalidPairing();
+  if (!isSha256Hex(body.token)) throw invalidPairing();
   const hash = await sha256Hex(body.token);
   const grantSql = `FROM reading_enrollments e
     JOIN auth_tokens a ON e.scope='reading_capture:' || a.id

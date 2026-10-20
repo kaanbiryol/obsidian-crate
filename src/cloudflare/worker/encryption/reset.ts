@@ -7,6 +7,7 @@ import { ENCRYPTION_STATE_KEY, readEncryptionState } from './state';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
+import { isSha256Hex } from '../../../platform/validation';
 
 const PREFIX = 'encryption-reset:';
 const READING_TABLES = ['reading_policy', 'reading_sources', 'reading_jobs', 'reading_operations',
@@ -38,7 +39,7 @@ export async function handleEncryptionReset(request: Request, env: Env, path: st
 	const parsed = await parseJsonObject(request, 2048);
 	if (!parsed.ok) return parsed.response;
 	const { replacementToken, confirmation } = parsed.value;
-	if (confirmation !== 'delete-remote-data' || typeof replacementToken !== 'string' || !/^[a-f0-9]{64}$/.test(replacementToken)) {
+	if (confirmation !== 'delete-remote-data' || !isSha256Hex(replacementToken)) {
 		return corsResponse({ error: 'Explicit data-loss confirmation and a new device credential are required' }, 400);
 	}
 	const next: ResetReceipt = { id, vaultId: state.vaultId, generation: state.generation, complete: false };

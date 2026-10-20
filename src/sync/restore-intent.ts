@@ -1,6 +1,6 @@
-import { isRecord } from '../platform/validation';
+import { isRecord, isSha256Hex } from '../platform/validation';
 import { reminderOperationDay } from '../protocol/reminder-operation';
-import { isSyncHash, isSyncRevision } from '../protocol/sync-validation';
+import { isSyncRevision } from '../protocol/sync-validation';
 import type { RemoteFileVersion, RestoreFileRequest } from '../protocol/sync-types';
 import { parseFileVersions } from './worker-api/version-contract';
 
@@ -22,14 +22,14 @@ export function parseRestoreIntents(value: unknown): RestoreIntent[] {
 		const version = parseFileVersions({ versions: [entry.version], hasMore: false }).versions[0]!;
 		if (typeof request.operationId !== 'string' || reminderOperationDay(request.operationId) === null
 			|| request.path !== version.path || request.storageKey !== version.storage_key
-			|| (request.expectedHash !== null && !isSyncHash(request.expectedHash))
+			|| (request.expectedHash !== null && !isSha256Hex(request.expectedHash))
 			|| (request.expectedHash === null ? request.expectedRevision !== null : !isSyncRevision(request.expectedRevision))
 			|| ids.has(request.operationId) || keys.has(version.storage_key)) throw new Error('Invalid saved restore precondition');
 		ids.add(request.operationId); keys.add(version.storage_key);
 		const wire = entry.encryptedWire;
 		if (wire !== undefined && (!isRecord(wire) || typeof wire.vaultId !== 'string' || !wire.vaultId
 			|| typeof wire.generation !== 'number' || !Number.isSafeInteger(wire.generation) || wire.generation < 1
-			|| !isSyncHash(wire.restoredHash) || (wire.expectedHash !== null && !isSyncHash(wire.expectedHash))
+			|| !isSha256Hex(wire.restoredHash) || (wire.expectedHash !== null && !isSha256Hex(wire.expectedHash))
 			|| (wire.expectedHash === null) !== (request.expectedHash === null))) throw new Error('Invalid encrypted restore journal');
 		return { version, phase: entry.phase, request: {
 			operationId: request.operationId, path: version.path, storageKey: version.storage_key,

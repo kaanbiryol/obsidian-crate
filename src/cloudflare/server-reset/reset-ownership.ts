@@ -3,6 +3,7 @@ import { normalizeVaultName, VAULT_NAME_BINDING } from '../vault-name';
 import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from '../notification-rate-binding';
 import type { CloudflareApiClient, CloudflareWorkerSettings } from '../cloudflare-api';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
+import { isSha256Hex } from '../../platform/validation';
 
 // Current and prerelease Crate tables. Unknown tables block deletion, including
 // when somebody has repurposed a database which still has a Crate resource name.
@@ -31,7 +32,7 @@ export function assertWorkerTarget(settings: CloudflareWorkerSettings, metadata:
 		if (binding.type !== 'plain_text') return true;
 		if (!retired && binding.name === VAULT_NAME_BINDING && normalizeVaultName(binding.text)) return false;
 		if (!retired && binding.name === 'CRATE_PUBLIC_ORIGIN') return false;
-		if (!retired && binding.name === 'CRATE_DEPLOYMENT_FINGERPRINT' && /^[a-f0-9]{64}$/.test(binding.text ?? '')) return false;
+		if (!retired && binding.name === 'CRATE_DEPLOYMENT_FINGERPRINT' && isSha256Hex(binding.text)) return false;
 		if (retired && binding.name === 'CRATE_RESET_ID' && binding.text === metadata.reset?.id) return false;
 		return true;
 	});

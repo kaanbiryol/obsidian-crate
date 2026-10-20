@@ -4,6 +4,7 @@ import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
 import release from '../../server-release.json';
 import { PWA_ASSET_VERSION } from '../pwa/version';
 import { runReadingSavePage, type ReadingSaveConfig } from './save-client';
+import { isSha256Hex } from '@/platform/validation';
 
 const pageHeaders = (type: string) => ({ 'Content-Type': type, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',
   'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://crate.kaanbiryol.com; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
@@ -23,7 +24,7 @@ export function readingSavePage({ supportOnly = false, scriptUrl = '/notificatio
 export function readingSaveScript({ supportOnly = false, serverFingerprint }: PageOptions = {}): Response {
   const config: ReadingSaveConfig = { wireProtocol: supportOnly ? null : CRATE_PLUGIN_PROTOCOL.current,
     serverRevision: supportOnly ? null : release.revision,
-    serverFingerprint: !supportOnly && serverFingerprint && /^[a-f0-9]{64}$/.test(serverFingerprint) ? serverFingerprint : null,
+    serverFingerprint: !supportOnly && serverFingerprint && isSha256Hex(serverFingerprint) ? serverFingerprint : null,
     pwaVersion: supportOnly ? null : PWA_ASSET_VERSION,
     shortcutContract: contract.version, shortcutRevision: contract.revision, downloadUrl: contract.downloadUrl, issuesUrl: contract.issuesUrl, supportOnly };
   return new Response(`(${runReadingSavePage.toString()})(${JSON.stringify(config)});`, { headers: pageHeaders('application/javascript') });

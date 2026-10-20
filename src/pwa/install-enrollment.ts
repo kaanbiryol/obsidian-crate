@@ -1,4 +1,5 @@
 import { pwaStartSearchFromUrl } from '../cloudflare/worker/pwa/pwa-params';
+import { isSha256Hex } from '../platform/validation';
 export { stringDigest as enrollmentFingerprint } from './string-digest';
 
 const INSTALL_COOKIE = 'crate-reminders-install';
@@ -65,7 +66,7 @@ function redeemedEnrollments(): string[] {
 	try {
 		const parsed: unknown = JSON.parse(raw);
 		return Array.isArray(parsed)
-			? parsed.filter((value): value is string => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)).slice(0, MAX_REDEEMED_ENROLLMENTS)
+			? parsed.filter((value): value is string => isSha256Hex(value)).slice(0, MAX_REDEEMED_ENROLLMENTS)
 			: [];
 	} catch {
 		return [];

@@ -1,4 +1,5 @@
 import { parseDevelopmentBuild, type DevelopmentBuild } from '../cloudflare/server-build';
+import { isSha256Hex } from '../platform/validation';
 export const CRATE_SERVICE_ID = 'crate';
 
 export interface CrateProtocolRange {
@@ -76,7 +77,7 @@ export function parseCrateServerInfo(value: unknown): CrateServerInfo | null {
 		...(typeof info.pwaAssetVersion === 'string' && /^[a-zA-Z0-9._-]{1,128}$/.test(info.pwaAssetVersion) ? { pwaAssetVersion: info.pwaAssetVersion } : {}),
 		...(parseDevelopmentBuild(info.developmentBuild) ? { developmentBuild: parseDevelopmentBuild(info.developmentBuild) } : {}),
 		...(isPositiveInteger(info.serverRevision) ? { serverRevision: info.serverRevision } : {}),
-		...(typeof info.deploymentFingerprint === 'string' && /^[a-f0-9]{64}$/.test(info.deploymentFingerprint) ? { deploymentFingerprint: info.deploymentFingerprint } : {}),
+		...(isSha256Hex(info.deploymentFingerprint) ? { deploymentFingerprint: info.deploymentFingerprint } : {}),
 		...(isPositiveInteger(info.reminderOperationDay) ? { reminderOperationDay: info.reminderOperationDay } : {}),
 	};
 }

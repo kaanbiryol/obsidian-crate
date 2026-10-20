@@ -1,9 +1,10 @@
 import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { corsResponse } from '../cors';
 import type { RemoteReminderRecord } from './types';
+import { isSha256Hex } from '@/platform/validation';
 
 export async function checkReminderRevision(body: Record<string, unknown>, reminder: RemoteReminderRecord): Promise<Response | null> {
-	if (typeof body.expectedRevision !== 'string' || !/^[a-f0-9]{64}$/.test(body.expectedRevision)) {
+	if (!isSha256Hex(body.expectedRevision)) {
 		return corsResponse({ error: 'Reload the reminder before saving', code: 'revision_required' }, 428);
 	}
 	if (body.expectedRevision !== await reminderRevision(reminder)) {
