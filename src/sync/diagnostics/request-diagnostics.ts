@@ -1,6 +1,6 @@
 import { BULK_NEW_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 export const MAX_REQUEST_DIAGNOSTICS = 50;
-import { normalizeUploadDiagnostics, type UploadDiagnostic } from './upload-diagnostics';
+import { isDiagnosticTimestamp, isUploadSession as opaqueId, normalizeUploadDiagnostics, type UploadDiagnostic } from './upload-diagnostics';
 import { reminderOperationDay } from '../../protocol/reminder-operation';
 const routes = new Set([
 	'/sync/import', '/sync/import/upload', '/sync/import/prune', '/sync/import/complete', '/.well-known/crate', '/health', '/settings', '/diagnostics',
@@ -9,7 +9,6 @@ const routes = new Set([
 	'/reminders/notification-policy', '/notifications/subscribe', '/notifications/unsubscribe', '/notifications/subscriptions', '/notifications/test',
 ]);
 const methods = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD']);
-const opaqueId = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value);
 
 export interface RequestDiagnostic {
 	at: string;
@@ -41,7 +40,7 @@ export function normalizeRequestDiagnostics(value: unknown): RequestDiagnostics 
 	for (const raw of value.requests.slice(-MAX_REQUEST_DIAGNOSTICS)) {
 		if (!raw || typeof raw !== 'object') continue;
 		const item = raw as Record<string, unknown>;
-		if (typeof item.at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(item.at) || !Number.isFinite(Date.parse(item.at))
+		if (!isDiagnosticTimestamp(item.at)
 			|| !opaqueId(item.operationId) || typeof item.method !== 'string' || !methods.has(item.method)
 			|| !['response', 'failed', 'aborted'].includes(String(item.outcome))) continue;
 		requests.push({ at: item.at, operationId: item.operationId, method: item.method,

@@ -4,13 +4,12 @@ import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { normalizeSyncTimings } from './timings';
 import type { SyncState } from '../types';
 import { normalizeRequestDiagnostics, type RequestDiagnostics } from './request-diagnostics';
+import { isDiagnosticTimestamp } from './upload-diagnostics';
 import { isSha256Hex } from '../../platform/validation';
 import { MAX_SYNC_HISTORY, type SyncSettings } from '../settings';
 
 const count = (value: unknown): number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
-function timestamp(value: unknown): string | null {
-	return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) ? value : null;
-}
+const timestamp = (value: unknown): string | null => isDiagnosticTimestamp(value) ? value : null;
 
 /** Explicitly select safe fields; raw settings, filenames and errors stay local. */
 export function buildDiagnosticExport(settings: SyncSettings, state: SyncState, version: string, requests?: RequestDiagnostics, server?: CrateServerInfo): string {

@@ -18,7 +18,12 @@ export interface UploadDiagnostic {
 	appliedHash?: string;
 }
 const phases = new Set(['prepared', 'replaying', 'remote-committed', 'rejected', 'checkpointed', 'local-applied', 'local-deferred', 'local-apply-failed']);
+/** Client sessions and request operation ids share the UUID format. */
 export const isUploadSession = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value);
+
+/** Millisecond UTC timestamps written by Date.toISOString. */
+export const isDiagnosticTimestamp = (value: unknown): value is string => typeof value === 'string'
+	&& /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value));
 
 /** Diagnostic corruption never gains authority or bypasses export redaction. */
 export function normalizeUploadDiagnostics(value: unknown): UploadDiagnostic[] {
