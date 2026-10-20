@@ -96,6 +96,7 @@ export class EncryptedReminderApi {
 	private async readNote(file: RemoteFile, cache: typeof this.cached): Promise<{ content: string; issue?: string }> {
 		const cached = cache.get(file.revision);
 		if (cached && cached.file.path === file.path && cached.file.hash === file.hash && cached.file.size === file.size) return cached;
+		// Coarse ciphertext bound before download; the 1 MiB plaintext limit is checked after opening.
 		if (file.size > 4 * 1024 * 1024) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
 		const query = new URLSearchParams({ folderPath: this.keys.folderPath, path: file.path, revision: file.revision });
 		const response = await this.fetch(`/reminders/encrypted-file?${query}`);

@@ -69,9 +69,9 @@ export class EncryptedReadingApi {
     const folder = encodeURIComponent(this.options.folderPath);
     let source = sources.get(file.path);
     if (!source || !sameFile(source.file, file)) {
+      if (file.size > 4 * 1024 * 1024) throw new Error('This Reading note is too large.');
       const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`);
       if (!response.ok) throw new Error('Article changed or is unavailable. Refresh to retry.');
-      if (file.size > 4 * 1024 * 1024) throw new Error('This Reading note is too large.');
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (bytes.length !== file.size || await sha256Hex(bytes) !== file.hash) throw new Error('Encrypted article failed integrity verification.');
       const opened = await openFile(bytes, file.path, this.options.authority);

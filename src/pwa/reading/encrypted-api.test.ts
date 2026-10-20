@@ -210,3 +210,10 @@ it('keeps other decrypted notes after committing an edit', async () => {
 	// Only the committed note is downloaded again; the open note stays decrypted.
 	expect(request.mock.calls.filter(([path]) => path.startsWith('/reading/encrypted-file?')).map(([path]) => new URL(path, 'https://crate.invalid').searchParams.get('path'))).toEqual([saved[1]!.file.path]);
 });
+
+it('rejects an oversized encrypted note before downloading it', async () => {
+	const { api, request } = harness(), saved = await article('Saved');
+	request.mockImplementation(async () => Response.json(page([{ ...saved.file, size: 4 * 1024 * 1024 + 1 }])));
+	await expect(api.request('/reading/list')).resolves.toMatchObject({ issues: [{ path: saved.file.path, message: 'This Reading note is too large.' }] });
+	expect(request.mock.calls.some(([path]) => path.startsWith('/reading/encrypted-file?'))).toBe(false);
+});
