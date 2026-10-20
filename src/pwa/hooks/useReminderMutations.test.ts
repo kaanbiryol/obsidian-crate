@@ -42,7 +42,7 @@ function harness() {
 	const commitReminderState = vi.fn();
 	const refreshPresentation = vi.fn();
 	const options: Parameters<typeof useReminderMutations>[0] = {
-		apiFetch, authToken: 'token', bootstrapped: true, beginLocalMutation: () => () => {}, ensureCanMutate,
+		apiFetch, authToken: 'token', bootstrapped: true, beginLocalMutation: () => () => {}, invalidateReads: () => {}, ensureCanMutate,
 		commitReminderState, refreshPresentation, getSnapshot: () => ({ reminders: remindersRef.current, projects: ['Inbox'] }), reminders: remindersRef.current,
 		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 },
 		projects: ['Inbox'], selectedProject: null, showToast, loadReminders: vi.fn(),

@@ -18,6 +18,7 @@ export function useReminderOutbox(options: {
 	folderPath: string;
 	apiFetch: ApiFetch;
 	beginLocalMutation: () => () => void;
+	invalidateReads: () => void;
 	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => void | Promise<void>;
 	getSnapshot: () => ConfirmedReminderSnapshot;
 	loadReminders: LoadReminders;

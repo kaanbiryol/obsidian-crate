@@ -13,6 +13,7 @@ export function useReminderMutations(options: {
 	authToken: string | null;
 	bootstrapped: boolean;
 	beginLocalMutation: () => () => void;
+	invalidateReads: () => void;
 	commitReminderState: (reminders: ReminderRecord[], projects?: string[]) => void | Promise<void>;
 	config: StoredConfig;
 	ensureCanMutate: () => boolean;

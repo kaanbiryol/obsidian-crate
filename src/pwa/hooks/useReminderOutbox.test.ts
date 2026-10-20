@@ -43,7 +43,7 @@ it('does not replace a new folder outbox when the old initialization finishes', 
 	stored.initializing = old.promise;
 	const options = {
 		authToken: 'token', folderPath: 'Reminders', bootstrapped: true, apiFetch: vi.fn<ApiFetch>(), showToast: vi.fn(),
-		beginLocalMutation: () => () => {}, commitReminderState: async () => {},
+		beginLocalMutation: () => () => {}, invalidateReads: () => {}, commitReminderState: async () => {},
 		getSnapshot: () => ({ reminders: [], projects: [] }), loadReminders: vi.fn(),
 	};
 	const rendered = renderHook(() => useReminderOutbox(options));
@@ -68,7 +68,7 @@ async function harness(path: Extract<PendingReminderChange, { kind: 'save' }>['p
 	const commitReminderState = vi.fn(async () => {});
 	const rendered = renderHook(() => useReminderOutbox({
 		authToken: 'token', folderPath: 'Reminders', bootstrapped: true, apiFetch, showToast,
-		beginLocalMutation: () => () => {}, commitReminderState,
+		beginLocalMutation: () => () => {}, invalidateReads: () => {}, commitReminderState,
 		getSnapshot: () => ({ reminders: [], projects: ['Inbox'] }), loadReminders: vi.fn(),
 	}));
 	await act(async () => {});
@@ -147,7 +147,7 @@ it.each([1, 3])('preserves a saved retry deadline and %i attempts across mountin
 	const apiFetch = vi.fn<ApiFetch>(async () => new Response('Unavailable', { status: 503 }));
 	const mount = () => renderHook(() => useReminderOutbox({
 		authToken: 'token', folderPath: 'Reminders', bootstrapped: true, apiFetch, showToast: vi.fn(),
-		beginLocalMutation: () => () => {}, commitReminderState: async () => {},
+		beginLocalMutation: () => () => {}, invalidateReads: () => {}, commitReminderState: async () => {},
 		getSnapshot: () => ({ reminders: [], projects: ['Inbox'] }), loadReminders: vi.fn(),
 	}));
 	const first = mount();

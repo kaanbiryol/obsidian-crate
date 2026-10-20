@@ -45,7 +45,7 @@ function harness() {
 	const hook = renderHook(() => {
 		const mutations = useReminderMutations({ authToken: 'token', bootstrapped: true, config, reminders: [reminder], projects: ['Inbox'],
 			getSnapshot: () => ({ reminders: [reminder], projects: ['Inbox'] }), selectedProject: null,
-			apiFetch: vi.fn(), beginLocalMutation: () => () => {}, commitReminderState: vi.fn(),
+			apiFetch: vi.fn(), beginLocalMutation: () => () => {}, invalidateReads: () => {}, commitReminderState: vi.fn(),
 			ensureCanMutate: () => true, refreshPresentation: vi.fn(), showToast, loadReminders: vi.fn() });
 		useFeatureSettings('reminders', { ...feature, config, push: { phase: 'unsupported', status: null },
 			onEnablePush: vi.fn(async () => {}), recovery: null, unsynced: changes.length > 0,

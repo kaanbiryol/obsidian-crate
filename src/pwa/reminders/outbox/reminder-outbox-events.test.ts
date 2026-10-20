@@ -14,7 +14,7 @@ function harness() {
 	let active = true;
 	const finish = vi.fn(), loadReminders = vi.fn(async () => {}), showToast = vi.fn();
 	const commitReminderState = vi.fn(async (_reminders: ReminderRecord[]) => {});
-	const beginLocalMutation = vi.fn(() => finish);
+	const beginLocalMutation = vi.fn(() => finish), invalidateReads = vi.fn();
 	const outbox = { refresh: vi.fn(() => []), drain: vi.fn(async () => {}) };
 	const resume = vi.fn(), setRecoveryChanges = vi.fn();
 	const dispose = subscribeReminderOutboxEvents({
@@ -23,13 +23,13 @@ function harness() {
 		recovery: { acceptsKey: key => key === 'pending' || key === 'recovery', load: () => [] },
 		settlement: { key: 'settled', read: () => ({ version: 1, operationId: 'operation', kind: 'save',
 			recordId: 'one', previousRevision: 'before', reminder: after }) },
-		current: () => ({ beginLocalMutation, getSnapshot: () => ({ reminders: [before], projects: ['Inbox'] }),
+		current: () => ({ beginLocalMutation, invalidateReads, getSnapshot: () => ({ reminders: [before], projects: ['Inbox'] }),
 			commitReminderState, loadReminders, showToast }),
 	});
 	cleanups.push(dispose);
 	const storage = (key: string, newValue: string | null, oldValue: string | null = null) =>
 		browser.dispatchEvent(Object.assign(new Event('storage'), { key, newValue, oldValue }));
-	return { browser, page, storage, dispose, logout: () => { active = false; }, finish, beginLocalMutation,
+	return { browser, page, storage, dispose, logout: () => { active = false; }, finish, beginLocalMutation, invalidateReads,
 		loadReminders, showToast, commitReminderState, outbox, resume, setRecoveryChanges };
 }
 
@@ -54,10 +54,10 @@ it.each(['logout', 'dispose'] as const)('settles an already dispatched commit wi
 it('invalidates reads when a peer removes a command without a confirmation', async () => {
 	const h = harness();
 	h.storage('unrelated', null, 'value');
-	expect(h.beginLocalMutation).not.toHaveBeenCalled();
+	expect(h.invalidateReads).not.toHaveBeenCalled();
 	h.storage('pending', null, 'command');
-	expect(h.beginLocalMutation).toHaveBeenCalledOnce();
-	expect(h.finish).toHaveBeenCalledOnce();
+	expect(h.invalidateReads).toHaveBeenCalledOnce();
+	expect(h.beginLocalMutation).not.toHaveBeenCalled();
 	await vi.waitFor(() => expect(h.outbox.drain).toHaveBeenCalledOnce());
 	expect(h.setRecoveryChanges).not.toHaveBeenCalled();
 	await vi.waitFor(() => expect(h.loadReminders).toHaveBeenCalledWith({ silent: true }));
@@ -108,7 +108,8 @@ it('applies a peer confirmation while hidden and reads the list once it is shown
 	h.page.visibilityState = 'hidden';
 	h.storage('settled', 'receipt');
 	h.storage('pending', null, 'command');
-	await vi.waitFor(() => expect(h.finish).toHaveBeenCalledTimes(2));
+	expect(h.invalidateReads).toHaveBeenCalledOnce();
+	await vi.waitFor(() => expect(h.finish).toHaveBeenCalledOnce());
 	expect(h.commitReminderState).toHaveBeenCalledWith([after], ['Inbox'], { persist: false });
 	expect(h.loadReminders).not.toHaveBeenCalled();
 	h.page.visibilityState = 'visible';
@@ -122,7 +123,8 @@ it('reads the list once for a peer save that confirms and removes its command', 
 	const h = harness();
 	h.storage('pending', null, 'command');
 	h.storage('settled', 'receipt');
-	await vi.waitFor(() => expect(h.finish).toHaveBeenCalledTimes(2));
+	expect(h.invalidateReads).toHaveBeenCalledOnce();
+	await vi.waitFor(() => expect(h.finish).toHaveBeenCalledOnce());
 	await new Promise(resolve => setTimeout(resolve, 150));
 	// Before: one read per storage event.
 	expect(h.loadReminders).toHaveBeenCalledExactlyOnceWith({ silent: true });

@@ -30,6 +30,8 @@ export interface ReminderSyncState {
 	loadReminders: LoadReminders;
 	rebuildOfflineCache: () => Promise<void>;
 	beginLocalMutation: () => () => void;
+	/** Drops in-flight reads without starting a write, e.g. after another tab's command settles. */
+	invalidateReads: () => void;
 	/** Peers applying another tab's persisted confirmation pass persist: false. */
 	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => Promise<void>;
 	resetReminderState: () => void;
@@ -249,6 +251,12 @@ export function useReminderSync({
 		await loadReminders({ silent: true });
 	}, [config.folderPath, loadReminders]);
 
+	const invalidateReads = useCallback(() => {
+		requestCoordinatorRef.current.invalidateReads();
+		activeReadRef.current = null;
+		setIndexingProgress(null);
+	}, []);
+
 	const beginLocalMutation = useCallback(() => {
 		const coordinator = requestCoordinatorRef.current;
 		const finish = coordinator.beginMutation();
@@ -308,6 +316,7 @@ export function useReminderSync({
 		rebuildOfflineCache,
 		loadReminders,
 		beginLocalMutation,
+		invalidateReads,
 		commitReminderState,
 		resetReminderState,
 		refreshPresentation,

@@ -18,6 +18,7 @@ export function subscribeReminderOutboxEvents(options: {
 	current: () => {
 		hasSnapshot?: boolean;
 		beginLocalMutation: () => () => void;
+		invalidateReads: () => void;
 		getSnapshot: () => Pick<CachedReminderSnapshot, 'reminders' | 'projects'>;
 		commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => void | Promise<void>;
 		loadReminders: LoadReminders;
@@ -85,8 +86,7 @@ export function subscribeReminderOutboxEvents(options: {
 		if (!recovery.acceptsKey(event.key)) return;
 		// A missed confirmation still invalidates stale reads when its command disappears.
 		if (storage.acceptsKey(event.key) && event.oldValue && event.newValue === null) {
-			const finish = options.current().beginLocalMutation();
-			finish();
+			options.current().invalidateReads();
 			refreshList();
 		}
 		if (event.key === null || !storage.acceptsKey(event.key)) recoveryChanged = true;
