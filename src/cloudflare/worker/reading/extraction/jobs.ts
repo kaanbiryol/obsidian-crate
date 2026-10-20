@@ -12,7 +12,7 @@ import { invalidateReadingProjection, projectReading } from '../projection';
 import { commitStagedFile } from '../../sync/mutations';
 import { stageMarkdownFile } from '../../sync/markdown-file-staging';
 import type { extractDocument } from './document';
-import { coordinatorStub } from '@/cloudflare/worker/coordinator/coordinator';
+import { publishReading, wakeProjection, wakeReading } from '@/cloudflare/worker/coordinator/coordinator';
 import { sha256Hex } from '@/platform/sha256';
 import { DEPLOYMENT_FENCE_KEY } from '@/protocol/deployment-fence';
 
@@ -72,15 +72,12 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
       } else {
         try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; }
         catch { if (job.attempts < 2) return; }
-        const stub = coordinatorStub(env);
-        const response = await stub.fetch('https://do/reading-publish', { method: 'POST', body: JSON.stringify({ job, result, resolvedUrl }) });
-        if (!response.ok) throw new Error('Reading publication unavailable');
+        if (!await publishReading(env, { job, result, resolvedUrl } satisfies Publication)) throw new Error('Reading publication unavailable');
       }
     } catch { /* Keep the bounded lease and exact source for recovery. No article or URL logging. */ }
   }
   // Wake the serialized projector after a stale source or publication; no future browser visit is required.
-  const wake = await coordinatorStub(env).fetch('https://do/project', { method: 'POST' });
-  if (!wake.ok) throw new Error('Reading projection wake failed');
+  if (!await wakeProjection(env)) throw new Error('Reading projection wake failed');
   const next = await env.DB.prepare('SELECT MIN(available_at) AS at FROM (SELECT available_at FROM reading_captures UNION ALL SELECT available_at FROM reading_jobs WHERE ?=1)').bind(current.enabled).first<{ at: number | null }>();
   if (next?.at != null) await state.storage.setAlarm(Math.max(Date.now() + 1000, next.at));
 }
@@ -93,8 +90,7 @@ export async function scheduleReading(env: Env, loaded?: { encryption: Encryptio
   if (!current) return null;
   const projection = await projectReading(env, current);
   if (await env.DB.prepare('SELECT 1 FROM reading_captures UNION ALL SELECT 1 FROM reading_jobs WHERE ?=1 LIMIT 1').bind(current.enabled).first()) {
-    const response = await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/reading')).fetch('https://do/reading-wake', { method: 'POST' });
-    if (!response.ok) throw new Error('Could not schedule Reading');
+    if (!await wakeReading(env)) throw new Error('Could not schedule Reading');
   }
   return projection === 'complete' ? null : Date.now() + (projection === 'unavailable' ? 30_000 : 1);
 }

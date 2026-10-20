@@ -8,7 +8,7 @@ import { isReminderPath } from '../reminders/scope';
 import { getNotificationPolicy } from '../notifications/policy';
 import { readEncryptionState } from '../encryption/state';
 import type { UploadCommitInput, UploadCommitters } from './upload-committers';
-import { coordinatorStub } from '../coordinator/coordinator';
+import { commitCoordinatorUpload } from '../coordinator/coordinator';
 
 type UploadParams = UploadCommitInput;
 type CommitUpload = UploadCommitters['commitUpload'];
@@ -63,10 +63,9 @@ export function coordinatedUpload(env: Env): CommitUpload {
       previousFile: params.previousFile, encryptionState: params.encryptionState,
       resetGeneration: params.resetGeneration, operation: params.operation,
     };
-    const stub = coordinatorStub(env);
-    const response = await stub.fetch('https://do/commit-upload', params.encryptionState || hasFramedMarkdown(params)
-      ? { method: 'POST', body: frameUpload(metadata, [params.content]), headers: { [FRAMED_CONTENT_HEADER]: '1' } }
-      : { method: 'POST', body: JSON.stringify(metadata) });
+    const response = await commitCoordinatorUpload(env, params.encryptionState || hasFramedMarkdown(params)
+      ? { body: frameUpload(metadata, [params.content]), headers: { [FRAMED_CONTENT_HEADER]: '1' } }
+      : { body: JSON.stringify(metadata) });
     if (!response.ok) {
       const failure = await response.json() as { code?: string; path?: string; conflictingPath?: string };
       if (failure.code === 'namespace_conflict') throw new FileNamespaceConflictError(failure.path!, failure.conflictingPath!);

@@ -25,7 +25,7 @@ import { pruneInitialImport } from '../sync/initial-import-prune';
 import { forwardTransferRequest } from '../sync/transfer-dispatch';
 import { finishInitialReminderSetup } from '../sync/initial-import-readiness';
 import type { UploadCommitters } from '../sync/upload-committers';
-import { coordinatorStub } from '../coordinator/coordinator';
+import { wakeProjection } from '../coordinator/coordinator';
 
 export async function handleSyncRoute(
 	request: Request,
@@ -44,9 +44,7 @@ export async function handleSyncRoute(
     if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, '/history-checkpoint');
     if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, '/history-checkpoint-file');
   if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, async () => {
-    const coordinator = coordinatorStub(env);
-    const response = await coordinator.fetch('https://do/project', { method: 'POST' });
-    if (!response.ok) throw new Error('Unable to resume reminder setup');
+    if (!await wakeProjection(env)) throw new Error('Unable to resume reminder setup');
   });
   if (path === '/sync/import/complete' && method === 'POST') return finishInitialImport(request, db);
   if (path === '/sync/import/readiness' && method === 'POST') return finishInitialReminderSetup(request, db);

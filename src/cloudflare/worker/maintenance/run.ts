@@ -11,7 +11,7 @@ import { pruneReminderOccurrences } from './reminder-history';
 import { pruneOperationReceipts } from './operation-receipts';
 import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
 import { pruneEncryptionMetadata } from './encryption-metadata';
-import { coordinatorStub } from '../coordinator/coordinator';
+import { wakeProjection } from '../coordinator/coordinator';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 
 export interface MaintenanceResult { removedObjects: number; backlog: boolean }
@@ -27,8 +27,7 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
 	const tasks: Array<[string, () => Promise<unknown>]> = [
     ['recover Reading work', async () => {
       if (await env.DB.prepare('SELECT 1 FROM reading_policy WHERE enabled=1').first()) {
-        const result = await coordinatorStub(env).fetch('https://do/project', { method: 'POST' });
-        if (!result.ok) throw new Error('Reading coordinator unavailable');
+        if (!await wakeProjection(env)) throw new Error('Reading coordinator unavailable');
       }
     }],
         ['prune shared checkpoints', () => pruneSharedCheckpoints(env.BUCKET, env.DB)],

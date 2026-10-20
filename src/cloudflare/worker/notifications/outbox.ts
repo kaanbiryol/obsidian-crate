@@ -1,7 +1,7 @@
 import { featureEnabled } from '../feature-policy';
 import { queryRows } from '../db';
 import type { Env } from '../types';
-import { notificationDispatcherStub } from '../coordinator/coordinator';
+import { cancelReminderDelivery, dispatchNotifications, scheduleReminderDelivery } from '../coordinator/coordinator';
 
 interface SchedulePayload {
 	reminderId: string;
@@ -20,17 +20,20 @@ interface NotificationJobRow {
 }
 
 const OUTBOX_BATCH_SIZE = 10;
-/** Set by a coordinator pass that has just loaded the feature policy. */
-export const REMINDERS_ENABLED_HEADER = 'X-Crate-Reminders-Enabled';
 const OUTBOX_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 
 /** The existing class supplies a separate request budget; no extra persistent state. */
 export async function dispatchNotificationJobs(env: Env, remindersEnabled?: boolean): Promise<void> {
-	const dispatcher = notificationDispatcherStub(env);
-	const response = await dispatcher.fetch('https://do/dispatch-jobs', {
-		method: 'POST', headers: remindersEnabled ? { [REMINDERS_ENABLED_HEADER]: '1' } : undefined,
-	});
-	if (!response.ok) throw new Error('Unable to process reminder schedules');
+	if (!await dispatchNotifications(env, remindersEnabled)) throw new Error('Unable to process reminder schedules');
+}
+
+/** Makes queued cancellations due and drains a bounded batch of them. A lost reply
+ * is harmless: cancellation is token-checked and removes its private DO state.
+ * Returns whether any job or installed schedule remains. */
+export async function drainNotificationCancellations(env: Env): Promise<boolean> {
+	await env.DB.prepare("UPDATE notification_jobs SET available_at = 0 WHERE operation = 'cancel'").run();
+	await dispatchNotificationJobs(env);
+	return Boolean(await env.DB.prepare('SELECT 1 FROM notification_jobs UNION SELECT 1 FROM scheduled_reminders LIMIT 1').first());
 }
 
 function retryDelayMs(attempt: number): number {
@@ -38,18 +41,15 @@ function retryDelayMs(attempt: number): number {
 }
 
 async function runJob(env: Env, job: NotificationJobRow): Promise<void> {
-	const alarm = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName(job.reminder_id));
 	if (job.operation === 'cancel') {
-		const response = await alarm.fetch(`https://do/cancel?reminderId=${encodeURIComponent(job.reminder_id)}&jobToken=${encodeURIComponent(job.job_token)}`, { method: 'DELETE' });
+		const response = await cancelReminderDelivery(env, job.reminder_id, job.job_token);
 		if (!response.ok) throw new Error('Failed to cancel alarm');
 		return;
 	}
 	if (!job.payload_json) throw new Error('Notification schedule payload is missing');
 	const payload = JSON.parse(job.payload_json) as SchedulePayload;
 	if (payload.reminderId !== job.reminder_id || !Number.isFinite(Date.parse(payload.dueDatetime))) throw new Error('Notification schedule payload is invalid');
-	const response = await alarm.fetch('https://do/schedule', {
-		method: 'PUT', body: JSON.stringify({ ...payload, jobToken: job.job_token }),
-	});
+	const response = await scheduleReminderDelivery(env, job.reminder_id, { ...payload, jobToken: job.job_token });
 	if (!response.ok) throw new Error('Failed to schedule alarm');
 }
 

@@ -5,7 +5,8 @@ import type { Env } from '../types';
 
 import { publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
-import { drainNotificationJobs, REMINDERS_ENABLED_HEADER } from '../notifications/outbox';
+import { drainNotificationJobs } from '../notifications/outbox';
+import { COORDINATOR_PATHS, REMINDERS_ENABLED_HEADER } from './coordinator';
 import { uploadInitialFiles } from '../sync/initial-import-upload';
 import { handleBatchDownload } from '../sync/batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/bulk-upload-dispatch';
@@ -26,37 +27,37 @@ export async function handleCoordinatorRequest(
     target.pathname = path === '/sync-upload' ? '/sync/upload' : '/sync/batch-upload';
     return withStateLock(() => fetchWorkerRequest(new Request(target, request), env, { kind: 'transfer' }));
   }
-  if (path === '/commit-new-files' && request.method === 'POST') {
+  if (path === COORDINATOR_PATHS.commitNewFiles && request.method === 'POST') {
     const prepared = await prepareCoordinatedNewFiles(request, env);
     return withStateLock(() => commitCoordinatedNewFiles(prepared, state, env));
   }
-  if (path === '/commit-upload' && request.method === 'POST') {
+  if (path === COORDINATOR_PATHS.commitUpload && request.method === 'POST') {
     const prepared = await prepareCoordinatedUpload(request, env);
     if (prepared instanceof Response) return prepared;
     return withStateLock(() => commitCoordinatedUpload(prepared, state, env));
   }
   // Every poll ensures the projection coordinator. Once armed for this parser
   // version, answer without queuing behind mutations or notification passes.
-  if (path === '/ensure' && request.method === 'POST'
+  if (path === COORDINATOR_PATHS.ensure && request.method === 'POST'
     && await state.storage.get<number>('projectionParserVersion') === REMINDER_CACHE_PARSER_VERSION) return new Response(null, { status: 204 });
   // An already scheduled maintenance episode needs no state change; a running
   // pass holds this object's lock, and mutations must not wait for it.
-  if (path === '/maintain' && request.method === 'POST' && await state.storage.get<boolean>('maintenanceCoordinator')
+  if (path === COORDINATOR_PATHS.maintain && request.method === 'POST' && await state.storage.get<boolean>('maintenanceCoordinator')
     && await state.storage.getAlarm() !== null) return new Response(null, { status: 204 });
   // Schedule cleanup before queuing, so a running maintenance pass delays only
   // this request rather than every coordinated mutation behind it.
   if (request.headers.get('X-Crate-Internal-Mutation') === '1') await scheduleMaintenance(env, state);
   return withStateLock(async () => {
-    if (path === '/reading-wake' && request.method === 'POST') {
+    if (path === COORDINATOR_PATHS.readingWake && request.method === 'POST') {
       await state.storage.put('readingCoordinator', true);
       if (await state.storage.getAlarm() === null) await state.storage.setAlarm(Date.now() + 100);
       return new Response(null, { status: 204 });
     }
-    if (path === '/reading-publish' && request.method === 'POST') {
+    if (path === COORDINATOR_PATHS.readingPublish && request.method === 'POST') {
       await publishExtraction(env, await request.json() as Publication);
       return new Response(null, { status: 204 });
     }
-    if (path === '/dispatch-jobs' && request.method === 'POST') {
+    if (path === COORDINATOR_PATHS.dispatchJobs && request.method === 'POST') {
       await drainNotificationJobs(env, undefined, request.headers.get(REMINDERS_ENABLED_HEADER) === '1' || undefined);
       return new Response(null, { status: 204 });
     }
@@ -79,7 +80,7 @@ async function handleLockedCoordinatorRequest(request: Request, state: DurableOb
 		original.headers.delete('X-Crate-Internal-Mutation');
 		return fetchWorkerRequest(original, env, { kind: 'coordinator', state });
 	}
-	if (new URL(request.url).pathname === '/maintain' && request.method === 'POST') {
+	if (new URL(request.url).pathname === COORDINATOR_PATHS.maintain && request.method === 'POST') {
 		await state.storage.put('maintenanceCoordinator', true);
 		if (await state.storage.getAlarm() === null) {
       await state.storage.put('maintenancePass', 0);
@@ -87,7 +88,7 @@ async function handleLockedCoordinatorRequest(request: Request, state: DurableOb
     }
 		return new Response(null, { status: 204 });
 	}
-	if (new URL(request.url).pathname === '/ensure' && request.method === 'POST') {
+	if (new URL(request.url).pathname === COORDINATOR_PATHS.ensure && request.method === 'POST') {
 		if (await state.storage.get<number>('projectionParserVersion') !== REMINDER_CACHE_PARSER_VERSION) {
 			await armNotificationCoordinator(state);
 			await state.storage.put('projectionParserVersion', REMINDER_CACHE_PARSER_VERSION);
@@ -95,7 +96,7 @@ async function handleLockedCoordinatorRequest(request: Request, state: DurableOb
 		return new Response(null, { status: 204 });
 	}
 
-	if (new URL(request.url).pathname === '/project' && request.method === 'POST') {
+	if (new URL(request.url).pathname === COORDINATOR_PATHS.project && request.method === 'POST') {
 		await armNotificationCoordinator(state);
 		return new Response(JSON.stringify({ success: true }));
 	}

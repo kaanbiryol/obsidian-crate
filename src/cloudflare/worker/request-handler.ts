@@ -28,7 +28,7 @@ import { scheduleMaintenance } from './maintenance/schedule';
 import { commitStagedFile } from './sync/mutations';
 import { commitNewFiles } from './sync/bulk-new-file-commit';
 import type { UploadCommitters } from './sync/upload-committers';
-import { coordinatorStub } from '@/cloudflare/worker/coordinator/coordinator';
+import { coordinatorStub, ensureProjection } from '@/cloudflare/worker/coordinator/coordinator';
 
 function withRequestId(response: Response, requestId: string, started: number, encryptionState?: 'on' | 'off'): Response {
 	const headers = new Headers(response.headers);
@@ -123,9 +123,7 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 			return withRequestId(forwardedResponse, forwardedResponse.headers.get('X-Crate-Request-Id') ?? requestId, started, encryptionState);
 		}
 		if (!mutation && execution.kind !== 'coordinator' && routePolicy?.initializeProjection && !ensuredProjections.has(projectionBinding)) {
-			const stub = coordinatorStub(env);
-			const ensured = await stub.fetch('https://do/ensure', { method: 'POST' });
-			if (!ensured.ok) throw new Error('Unable to initialize notification processing');
+			if (!await ensureProjection(env)) throw new Error('Unable to initialize notification processing');
 			ensuredProjections.add(projectionBinding);
 		}
 		if (routeExecution?.kind === 'coordinator' && routeExecution.wake && execution.kind === 'coordinator') await armNotificationCoordinator(execution.state);

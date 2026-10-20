@@ -545,8 +545,11 @@ metadata and lifecycle/connection guards before dispatch and after responses.
 Reading adds its own capability requirements; shared feature settings require
 only their own capability.
 
-`ReminderAlarm` retains the Durable Object class, storage identities, and mutation
-lock. `coordinator-requests.ts` dispatches coordinator endpoints with that lock,
+`worker/coordinator/` holds the Durable Object. `ReminderAlarm` retains the class,
+storage identities, and mutation lock. `coordinator.ts` names every role instance
+(coordinator, notification dispatcher, maintenance, Reading, transfer pools and
+one instance per reminder) and owns the internal endpoint paths behind typed
+helpers. `coordinator-requests.ts` dispatches those endpoints with that lock,
 keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
 maintenance, and projection roles; reminder delivery stays in `ReminderAlarm`.
 
