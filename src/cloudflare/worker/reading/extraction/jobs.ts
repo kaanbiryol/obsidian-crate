@@ -14,6 +14,7 @@ import { stageMarkdownFile } from '../../sync/markdown-file-staging';
 import type { extractDocument } from './document';
 import { coordinatorStub } from '@/cloudflare/worker/coordinator';
 import { sha256Hex } from '@/platform/sha256';
+import { DEPLOYMENT_FENCE_KEY } from '@/protocol/deployment-fence';
 
 interface Job { path: string; item_id: string; generation: string; source_revision: string; block_hash: string; url: string; attempts: number }
 export interface Publication { job: Job; result: ReturnType<typeof extractDocument> | null; resolvedUrl?: string }
@@ -50,7 +51,7 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
 export async function runReadingExtraction(state: DurableObjectState, env: Env): Promise<void> {
   if (await readEncryptionState(env.DB)) return ;
   // A persisted maintenance fence stops new network work during backup/upgrade.
-  if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) { await state.storage.setAlarm(Date.now() + 60_000); return; }
+  if (await env.DB.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first()) { await state.storage.setAlarm(Date.now() + 60_000); return; }
   if (!await featureEnabled(env.DB, 'reading')) return;
   const current = await policy(env.DB);
   if (!current) return;

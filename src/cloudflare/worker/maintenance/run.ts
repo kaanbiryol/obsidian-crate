@@ -12,13 +12,14 @@ import { pruneOperationReceipts } from './operation-receipts';
 import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
 import { pruneEncryptionMetadata } from './encryption-metadata';
 import { coordinatorStub } from '../coordinator';
+import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 
 export interface MaintenanceResult { removedObjects: number; backlog: boolean }
 
 /** `backlog` reports a bounded pruning task that filled its batch. `firstPass`
  * is false for the follow-up passes of one maintenance episode. */
 export async function runScheduledMaintenance(env: Env, { firstPass = true }: { firstPass?: boolean } = {}): Promise<MaintenanceResult> {
-  if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) return { removedObjects: 0, backlog: false };
+  if (await env.DB.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first()) return { removedObjects: 0, backlog: false };
 	if (['converting', 'resetting'].includes((await readEncryptionState(env.DB))?.mode ?? '')) return { removedObjects: 0, backlog: false };
 	const errors: string[] = [];
   let removedObjects = 0, backlog = false;

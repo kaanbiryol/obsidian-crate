@@ -1,7 +1,7 @@
 import { portablePathKey } from '../../../protocol/portable-path';
 import type { ObjectReference } from '../storage-references';
 import { STAGED_UPLOAD_TTL_MS } from './staged-uploads';
-import { EncryptionStateError } from '../encryption/state';
+import { EncryptionStateError, encryptionWriteGuard } from '../encryption/state';
 import { changedRows } from '../db';
 import { syncResetGenerationGuard } from './reset-generation';
 
@@ -9,10 +9,11 @@ import { syncResetGenerationGuard } from './reset-generation';
 export async function trackStagedBatch(db: D1Database, storageKeys: ObjectReference[], resetGeneration?: string | null): Promise<string | undefined> {
   if (!storageKeys.length) return undefined;
   const id = crypto.randomUUID();
+  const plaintext = encryptionWriteGuard(null);
   const resetGuard = syncResetGenerationGuard(resetGeneration);
   const result = await db.prepare(`INSERT INTO staged_upload_batches(id, storage_keys, expires_at)
-    SELECT ?, ?, unixepoch('now') * 1000 + ? WHERE NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = 'e2ee:state') AND ${resetGuard.sql}`)
-    .bind(id, JSON.stringify(storageKeys), STAGED_UPLOAD_TTL_MS, ...resetGuard.args).run();
+    SELECT ?, ?, unixepoch('now') * 1000 + ? WHERE ${plaintext.sql} AND ${resetGuard.sql}`)
+    .bind(id, JSON.stringify(storageKeys), STAGED_UPLOAD_TTL_MS, ...plaintext.args, ...resetGuard.args).run();
   if (changedRows(result) !== 1) throw new EncryptionStateError('Encryption changed before this upload. Reconnect before syncing.', 428);
   return id;
 }

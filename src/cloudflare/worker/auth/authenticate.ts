@@ -4,6 +4,7 @@ import { CRATE_WEB_SESSION_NAME_HEADER } from '../../../protocol/web-session';
 import { validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { FEATURE_POLICY_KEY } from '../feature-policy';
+import { ENCRYPTION_STATE_KEY } from '../encryption/state';
 import { sha256Hex } from '../../../platform/sha256';
 
 type AuthScope = 'vault' | 'reminders' | 'reading' | 'reading_capture';
@@ -48,7 +49,7 @@ export async function authenticateWorkerRequest(
 		const tokenHash = await sha256Hex(token);
 		const row = await db.prepare(`SELECT id, scope, folder_path, reading_generation, expires_at, device_name,
 			(last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours')) AS last_seen_stale,
-			(SELECT value FROM maintenance_state WHERE key = 'e2ee:state') AS encryption_state,
+			(SELECT value FROM maintenance_state WHERE key = '${ENCRYPTION_STATE_KEY}') AS encryption_state,
 			(SELECT value FROM maintenance_state WHERE key = '${FEATURE_POLICY_KEY}') AS feature_policy,
 			(SELECT value FROM maintenance_state WHERE key = '${SYNC_RESET_GENERATION_KEY}') AS reset_generation FROM auth_tokens
 			WHERE token_hash = ? AND (expires_at IS NULL OR expires_at > ?)`)
