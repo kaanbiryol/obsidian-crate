@@ -581,12 +581,15 @@ The Worker is a separate build product. The production plugin includes gzip-comp
 
 | State | Icon | Text |
 |---|---|---|
-| Synced | ✓ | "Synced" |
-| Pending | ◐ | "{N} pending" |
-| Never synced | ○ | "Not synced" |
-| Syncing | ↻ | "Syncing {current}/{total}" |
-| Error | ⚠ | "Sync error" |
-| Offline | ○ | "Offline" |
+| Synced | ✓ | "Synced just now", "Synced {N}m ago" |
+| Pending | ◐ | "{N} changes pending" |
+| Never synced | ○ | "Not synced yet" |
+| Syncing | ↻ | Current phase, such as "Uploading {current} of {total} files" |
+| Error | ⚠ | "Last sync had errors" |
+| Offline | ○ | "Server unavailable" |
+
+The status bar shows only the indicator; the text is its accessible label and tooltip.
+Sync activity uses the same phrases from `describeSyncStatus` in `ui/activity/activity-status.ts`.
 
 Styling driven by `data-status` attribute on the status bar element, which CSS selectors use for spin animation and color changes.
 

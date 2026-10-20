@@ -1,16 +1,31 @@
 import type { SyncActivityProgress, SyncState } from '../../sync/types';
 
-function lastSyncLabel(state: SyncState, progress: SyncActivityProgress | null, now: number): string {
-	if (state.status === 'syncing' || progress) return 'Syncing…';
-	if (state.status === 'error') return 'Last sync had errors';
-	if (state.status === 'offline') return 'Server unavailable';
-	if (state.initializing) return 'Checking local files…';
-	if (!state.lastSync) return 'Not synced yet';
-	const minutes = Math.floor((now - new Date(state.lastSync).getTime()) / 60_000);
+type SyncStatusKind = 'syncing' | 'error' | 'offline' | 'checking' | 'pending' | 'synced' | 'never';
+
+function syncedAgo(lastSync: string, now: number): string {
+	const minutes = Math.floor((now - new Date(lastSync).getTime()) / 60_000);
 	if (minutes < 1) return 'Synced just now';
 	if (minutes < 60) return `Synced ${minutes}m ago`;
 	const hours = Math.floor(minutes / 60);
 	return hours < 24 ? `Synced ${hours}h ago` : `Synced ${Math.floor(hours / 24)}d ago`;
+}
+
+function lastSyncStatus(state: SyncState, syncing: boolean, now: number): { kind: SyncStatusKind; text: string } {
+	if (syncing) return { kind: 'syncing', text: 'Syncing…' };
+	if (state.status === 'error') return { kind: 'error', text: 'Last sync had errors' };
+	if (state.status === 'offline') return { kind: 'offline', text: 'Server unavailable' };
+	if (state.initializing) return { kind: 'checking', text: 'Checking local files…' };
+	if (!state.lastSync) return { kind: 'never', text: 'Not synced yet' };
+	return { kind: 'synced', text: syncedAgo(state.lastSync, now) };
+}
+
+/** One phrase per sync state, shared by Sync activity and the status bar. */
+export function describeSyncStatus(state: SyncState, pending: number, syncing = state.status === 'syncing', now = Date.now()) {
+	const lastSync = lastSyncStatus(state, syncing, now);
+	const status = pending > 0 && (lastSync.kind === 'synced' || lastSync.kind === 'never')
+		? { kind: 'pending' as const, text: `${pending} ${pending === 1 ? 'change' : 'changes'} pending` }
+		: lastSync;
+	return { ...status, lastSyncLabel: lastSync.text };
 }
 
 export function describeActivityStatus(
@@ -21,18 +36,16 @@ export function describeActivityStatus(
 	stopping: boolean,
 	now = Date.now(),
 ) {
-	const label = lastSyncLabel(state, progress, now);
 	const syncing = state.status === 'syncing' || !!progress;
+	const status = describeSyncStatus(state, pending, syncing, now);
 	const needsAttention = state.status === 'error' || state.status === 'offline';
 	const checking = !!state.initializing && !syncing && !needsAttention;
-	const text = syncing ? 'Syncing…' : needsAttention ? label
-		: checking ? label : pending > 0 ? `${pending} ${pending === 1 ? 'change' : 'changes'} pending` : label;
 	const canStop = syncing && canStopSync;
 	const buttonLabel = stopping ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : checking ? 'Checking…' : 'Sync vault';
 	return {
-		lastSyncLabel: label,
-		text,
-		subtitleState: syncing || checking ? 'syncing' : needsAttention ? 'attention' : pending > 0 ? 'pending' : label.startsWith('Synced') ? 'synced' : 'idle',
+		lastSyncLabel: status.lastSyncLabel,
+		text: status.text,
+		subtitleState: syncing || checking ? 'syncing' : needsAttention ? 'attention' : status.kind === 'pending' ? 'pending' : status.kind === 'synced' ? 'synced' : 'idle',
 		indicatorState: syncing ? { ...state, status: 'syncing' as const } : state,
 		checkingConflicts: checking || syncing && !['saving', 'reminders'].includes(state.work?.phase ?? ''),
 		button: {

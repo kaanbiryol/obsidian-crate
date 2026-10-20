@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { FakeElement } from '../test/fakes/obsidian-ui';
 import type { SyncState } from '../sync/types';
 import { StatusBarManager } from './status';
+import { describeActivityStatus } from './activity/activity-status';
 
 const { render } = vi.hoisted(() => ({ render: vi.fn<(element: { props: { state: SyncState } }) => void>() }));
 vi.mock('react-dom/client', () => ({ createRoot: () => ({ render, unmount: vi.fn() }) }));
@@ -55,4 +56,20 @@ it('does not retain listeners for status bar items it destroyed', () => {
 	});
 	items.at(-1)!.dispatchEvent({ type: 'click' } as Event);
 	expect(onClick).toHaveBeenCalledOnce();
+});
+
+const idle: SyncState = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
+
+it.each<[string, Partial<SyncState>, string]>([
+	['errors', { status: 'error' }, 'Last sync had errors'],
+	['one pending change', { pendingChanges: 1 }, '1 change pending'],
+	['pending changes after a sync', { pendingChanges: 2, lastSync: '2026-10-01T00:00:00Z' }, '2 changes pending'],
+	['a recent sync', { lastSync: new Date().toISOString() }, 'Synced just now'],
+	['no completed sync', {}, 'Not synced yet'],
+])('labels %s with the Sync activity phrase', (_, patch, text) => {
+	const { plugin, items } = createPlugin();
+	const state = { ...idle, ...patch };
+	new StatusBarManager(plugin as never, true, vi.fn()).update(state);
+	expect(describeActivityStatus(state, null, state.pendingChanges, true, false).text).toBe(text);
+	expect(items[0]!.getAttribute('aria-label')).toContain(`Open sync activity. ${text}.`);
 });

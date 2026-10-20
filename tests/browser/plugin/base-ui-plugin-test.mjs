@@ -173,7 +173,7 @@ for (const browserType of [chromium, webkit]) {
   });
   await expect(indicator).toHaveAttribute('data-visual-state','error');
   await expect(status).toHaveText('');
-  await expect(status).toHaveAttribute('aria-label', /Sync error/);
+  await expect(status).toHaveAttribute('aria-label', /Last sync had errors/);
   await status.click();
   await expect(page.getByRole('dialog',{name:'Sync activity',exact:true})).toBeVisible();
   await page.keyboard.press('Escape');

@@ -1,4 +1,5 @@
 import { formatSyncProgress } from './activity/progress-label';
+import { describeSyncStatus } from './activity/activity-status';
 /**
  * Status bar component for sync status display
  */
@@ -116,83 +117,51 @@ export class StatusBarManager {
 	 * Get display information for state
 	 */
 	private getDisplayInfo(state: SyncState): { text: string; tooltip: string | null } {
-		switch (state.status) {
+		if (state.status === 'idle' && state.conflictCount > 0) {
+			return {
+				text: state.conflictCount === 1 ? '1 conflict' : `${state.conflictCount} conflicts`,
+				tooltip: 'Local-only conflict copies need review. Open Sync activity → Conflicts.',
+			};
+		}
+
+		const status = describeSyncStatus(state, state.pendingChanges);
+		switch (status.kind) {
 			case 'syncing':
 				return {
-					text: this.work?.phase === 'applying' ? 'Syncing…' : formatSyncProgress(!this.work && this.syncProgress ? { type: 'sync', ...this.syncProgress } : null, this.work),
+					// The status bar has no progress panel, so it names the current phase.
+					text: this.work?.phase === 'applying' ? status.text : formatSyncProgress(!this.work && this.syncProgress ? { type: 'sync', ...this.syncProgress } : null, this.work),
 					tooltip: 'Comparing and syncing changes. Unchanged files are skipped. Open sync activity for details.',
-				};
-
-			case 'error':
-				return {
-					text: 'Sync error',
-					tooltip: null,
 				};
 
 			case 'offline':
 				return {
-					text: 'Server unavailable',
+					text: status.text,
 					tooltip: state.lastError || 'Cannot connect to sync server',
 				};
 
-			case 'idle':
-			default:
-				if (state.conflictCount > 0) {
-					return {
-						text: state.conflictCount === 1 ? '1 conflict' : `${state.conflictCount} conflicts`,
-						tooltip: 'Local-only conflict copies need review. Open Sync activity → Conflicts.',
-					};
-				}
-
-				if (state.initializing) {
-					return {
-						text: 'Checking local files…',
-						tooltip: 'Loading sync state and checking local files before reporting sync status.',
-					};
-				}
-
-				if (state.pendingChanges > 0) {
-					return {
-						text: `${state.pendingChanges} change${state.pendingChanges === 1 ? '' : 's'} queued`,
-						tooltip: `${state.pendingChanges} local file changes waiting to sync, including deletions. This is not the total number of files in your vault.`,
-					};
-				}
-
-				if (state.lastSync) {
-					const lastSyncDate = new Date(state.lastSync);
-					const ago = this.formatTimeAgo(lastSyncDate);
-					return {
-						text: 'Synced',
-						tooltip: `Last sync: ${ago}`,
-					};
-				}
-
+			case 'checking':
 				return {
-					text: 'Not synced',
+					text: status.text,
+					tooltip: 'Loading sync state and checking local files before reporting sync status.',
+				};
+
+			case 'pending':
+				return {
+					text: status.text,
+					tooltip: `${state.pendingChanges} local file changes waiting to sync, including deletions. This is not the total number of files in your vault.`,
+				};
+
+			case 'never':
+				return {
+					text: status.text,
 					tooltip: 'No sync has been performed yet',
 				};
-		}
-	}
 
-	/**
-	 * Format relative time
-	 */
-	private formatTimeAgo(date: Date): string {
-		const now = new Date();
-		const diffMs = now.getTime() - date.getTime();
-		const diffSeconds = Math.floor(diffMs / 1000);
-		const diffMinutes = Math.floor(diffSeconds / 60);
-		const diffHours = Math.floor(diffMinutes / 60);
-		const diffDays = Math.floor(diffHours / 24);
-
-		if (diffSeconds < 60) {
-			return 'just now';
-		} else if (diffMinutes < 60) {
-			return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
-		} else if (diffHours < 24) {
-			return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-		} else {
-			return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+			default:
+				return {
+					text: status.text,
+					tooltip: null,
+				};
 		}
 	}
 
