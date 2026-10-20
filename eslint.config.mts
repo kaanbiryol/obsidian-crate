@@ -6,7 +6,7 @@ import { globalIgnores } from "eslint/config";
 import workerImportBoundary from './scripts/worker-import-boundary.mjs';
 
 const pluginAdapterImports = {
-	regex: '^(?:@/ui/plugin|(?:\\.\\./)+(?:ui/)?plugin)(?:/|$)',
+	regex: '^(?:@/ui/plugin|(?:\\.\\./)+(?:ui/)?plugin|(?:@/|(?:\\.\\./)+)reminders/ui/plugin)(?:/|$)',
 	message: 'Obsidian adapters belong to the plugin host; use portable components from ui/shared.',
 };
 
@@ -154,7 +154,7 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['src/ui/shared/**/*.{ts,tsx}', 'src/reminders/ui/shared/**/*.{ts,tsx}', 'src/reading/ui/**/*.{ts,tsx}'],
+		files: ['src/ui/shared/**/*.{ts,tsx}', 'src/reminders/ui/{shared,reminder-modal,views,editor,format}/**/*.{ts,tsx}', 'src/reading/ui/**/*.{ts,tsx}'],
 		ignores: ['src/reading/ui/plugin/**'],
 		rules: {
 			'@typescript-eslint/no-restricted-imports': ['error', {
