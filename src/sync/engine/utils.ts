@@ -1,6 +1,6 @@
-import { HttpError, SyncTransportError } from '../api';
 import { createLogger } from '../logger';
 import { createAbortError, isAbortError } from '../abort';
+import { HttpError, SyncTransportError } from '../worker-api/http';
 
 const logger = createLogger('SyncEngine');
 const MAX_SERVER_RETRY_DELAY_MS = 60_000;

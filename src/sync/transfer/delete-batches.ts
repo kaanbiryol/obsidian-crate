@@ -1,10 +1,10 @@
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
 import { isAbortError } from '../abort';
-import { HttpError } from '../api';
 import { errorMessage } from '../logger';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { LocalFilePresentError } from '../local/local-absence';
 import { BATCH_DELETE_CONCURRENCY } from '../engine/constants';
+import { HttpError } from '../worker-api/http';
 
 export interface ConditionalDeleteCandidate {
 	path: string;

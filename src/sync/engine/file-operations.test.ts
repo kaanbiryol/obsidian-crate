@@ -31,7 +31,7 @@ async function fixture() {
 
 it('keeps raw endpoint calls independent of engine journals after binding file operations', async () => {
 	const h = await fixture();
-	await expect(h.api.uploadFile('raw.md', h.content, h.hash, h.content.byteLength, 'text/markdown', null)).rejects.toThrow('Lost response');
+	await expect(h.api.unjournaled.uploadFile('raw.md', h.content, h.hash, h.content.byteLength, 'text/markdown', null)).rejects.toThrow('Lost response');
 	expect(h.manifest.uploadJournal.pending()).toEqual([]);
 	await expect(h.files.uploadFile('owned.md', h.content, h.hash, h.content.byteLength, 'text/markdown', null)).rejects.toThrow('Lost response');
 	await h.manifest.close();

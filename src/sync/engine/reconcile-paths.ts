@@ -2,7 +2,6 @@ import { decodePendingChange, pendingChangeKey } from '../pending/pending-change
 import { isAbortError } from '../abort';
 import { recordSyncError } from '../issues';
 import type { Vault } from 'obsidian';
-import { HttpError } from '../api';
 import { readLocalFileEntry } from '../local/local-file-entry';
 import { classifyPath } from '../planner/reconciliation';
 import { isQueueVersionConflict } from '../queue/failure';
@@ -15,6 +14,7 @@ import type { DiffApplyOutcome } from '../transfer/types';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 import type { DeleteRemoteFiles } from '../transfer/delete';
 import type { ConditionalDeleteCandidate } from '../transfer/delete-batches';
+import { HttpError } from '../worker-api/http';
 
 const MAX_RECONCILE_ATTEMPTS = 3;
 

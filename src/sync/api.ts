@@ -12,9 +12,6 @@ import type { NotificationPolicy } from '../protocol/notification-policy';
  */
 
 import type {
-	BatchDeleteResponse,
-	BatchUploadFile,
-	BatchUploadResponse,
 	BackendDiagnostics,
 	ChangesResponse,
 	CheckResponse,
@@ -24,7 +21,6 @@ import type {
 	RegisteredDevice,
 	FileVersionQuery,
 	FileVersionsPage,
-	UploadResult,
 	RemoteFileVersion,
 } from '../protocol/sync-types';
 import type { SharedSettings } from '../protocol/shared-settings';
@@ -66,6 +62,9 @@ export class SyncApiClient {
 	}
 	private readonly http: WorkerApiHttpClient;
 	private readonly syncApi: SyncWorkerApi;
+	/** Raw writes that bypass the durable upload journal and rename guards. Sync uses
+	 * the engine's file operations; these serve tests and tools acting as another device. */
+	readonly unjournaled: Pick<SyncWorkerApi, 'uploadFile' | 'deleteFile' | 'batchUpload' | 'batchDelete'>;
     readonly sharedHistory: SharedHistoryApi;
 	private readonly authApi: AuthWorkerApi;
 	private readonly sharedSettingsApi: SharedSettingsWorkerApi;
@@ -75,6 +74,7 @@ export class SyncApiClient {
 		this.http = new WorkerApiHttpClient(workerUrl, authToken, transport);
     this.initialImport = new InitialImportApi(this.http);
 		this.syncApi = new SyncWorkerApi(this.http);
+		this.unjournaled = this.syncApi;
         this.sharedHistory = new SharedHistoryApi(this.http);
 		this.authApi = new AuthWorkerApi(this.http);
 		this.sharedSettingsApi = new SharedSettingsWorkerApi(this.http);
@@ -126,9 +126,9 @@ export class SyncApiClient {
 		return this.syncApi.testConnection();
 	}
 
-  async retryPausedNotifications(): Promise<{ retried: number; more: boolean }> {
-    return this.http.requestJson('/notifications/retry', { method: 'POST' });
-  }
+	async retryPausedNotifications(): Promise<{ retried: number; more: boolean }> {
+		return this.notificationsApi.retryPausedNotifications();
+	}
 
 	async getDiagnostics(): Promise<BackendDiagnostics> {
 		return this.syncApi.getDiagnostics();
@@ -142,24 +142,8 @@ export class SyncApiClient {
 		return this.syncApi.getFileMetadata(paths);
 	}
 
-	async uploadFile(
-		path: string,
-		content: ArrayBuffer,
-		hash: string,
-		size: number,
-		contentType: string,
-		expectedHash: string | null,
-		operationId?: string,
-	): Promise<UploadResult> {
-		return this.syncApi.uploadFile(path, content, hash, size, contentType, expectedHash, operationId);
-	}
-
 	async downloadFile(path: string): Promise<DownloadedFile> {
 		return this.syncApi.downloadFile(path);
-	}
-
-	async deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }> {
-		return this.syncApi.deleteFile(path, expectedHash, expectedRevision);
 	}
 
 	async checkForChanges(since: number): Promise<CheckResponse> {
@@ -170,20 +154,8 @@ export class SyncApiClient {
 		return this.syncApi.getChanges(since);
 	}
 
-	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
-		return this.syncApi.batchUpload(files);
-	}
-
 	async batchDownload(paths: string[]): Promise<DownloadedBatch> {
 		return this.syncApi.batchDownload(paths);
-	}
-
-	async batchDelete(
-		paths: string[],
-		expectedHashes?: Record<string, string>,
-		expectedRevisions?: Record<string, string>,
-	): Promise<BatchDeleteResponse> {
-		return this.syncApi.batchDelete(paths, expectedHashes, expectedRevisions);
 	}
 
 	async previewFileVersion(version: RemoteFileVersion): Promise<ArrayBuffer> {
@@ -215,21 +187,20 @@ export class SyncApiClient {
 	}
 
 	async ensureNotificationPolicy(policy: Omit<NotificationPolicy, 'revision'>): Promise<{ policy: NotificationPolicy }> {
-		return this.http.requestJson('/reminders/notification-policy', { method: 'POST', body: JSON.stringify(policy) });
+		return this.notificationsApi.ensureNotificationPolicy(policy);
 	}
+
 	async getNotificationPolicy(): Promise<{ policy: NotificationPolicy | null }> {
-		return this.http.requestJson('/reminders/notification-policy');
+		return this.notificationsApi.getNotificationPolicy();
 	}
+
 	async updateNotificationPolicy(policy: NotificationPolicy): Promise<{ policy: NotificationPolicy }> {
-		return this.http.requestJson('/reminders/notification-policy', { method: 'PUT', body: JSON.stringify({ ...policy, expectedRevision: policy.revision }) });
+		return this.notificationsApi.updateNotificationPolicy(policy);
 	}
-
-
 
 	async getPushSubscriptions(): Promise<PushSubscriptionsResponse> {
 		return this.notificationsApi.getPushSubscriptions();
 	}
-
 
 	async createRemindersEnrollmentToken(folderPath: string): Promise<{ token: string; browserToken: string; expiresAt: string }> {
 		return this.notificationsApi.createRemindersEnrollmentToken(folderPath);

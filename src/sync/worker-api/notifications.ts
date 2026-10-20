@@ -1,4 +1,5 @@
 import type { WorkerApiHttpClient } from './http';
+import type { NotificationPolicy } from '../../protocol/notification-policy';
 
 export interface PushSubscriptionsResponse {
 	subscriptions: Array<{
@@ -21,8 +22,21 @@ export interface PushTestResponse {
 export class NotificationsWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
 
+	retryPausedNotifications(): Promise<{ retried: number; more: boolean }> {
+		return this.http.requestJson('/notifications/retry', { method: 'POST' });
+	}
 
+	ensureNotificationPolicy(policy: Omit<NotificationPolicy, 'revision'>): Promise<{ policy: NotificationPolicy }> {
+		return this.http.requestJson('/reminders/notification-policy', { method: 'POST', body: JSON.stringify(policy) });
+	}
 
+	getNotificationPolicy(): Promise<{ policy: NotificationPolicy | null }> {
+		return this.http.requestJson('/reminders/notification-policy');
+	}
+
+	updateNotificationPolicy(policy: NotificationPolicy): Promise<{ policy: NotificationPolicy }> {
+		return this.http.requestJson('/reminders/notification-policy', { method: 'PUT', body: JSON.stringify({ ...policy, expectedRevision: policy.revision }) });
+	}
 
 	async getPushSubscriptions(): Promise<PushSubscriptionsResponse> {
 		return this.http.requestJson<PushSubscriptionsResponse>('/notifications/subscriptions');

@@ -49,7 +49,7 @@ async function setup() {
   const upload = async (path: string, text: string, previous: string | null = null) => {
     const bytes = new TextEncoder().encode(text);
     const sealed = await sealFile({ path, content: bytes, contentType: 'text/markdown', publicData: await createReminderProjection(keys, path, bytes.buffer) }, authority.forPath(path));
-    await api.uploadFile(path, sealed.bytes.buffer, sealed.hash, sealed.bytes.byteLength, ENCRYPTED_FILE_CONTENT_TYPE, previous, createReminderOperationId(Math.floor(Date.now() / 86400_000)));
+    await api.unjournaled.uploadFile(path, sealed.bytes.buffer, sealed.hash, sealed.bytes.byteLength, ENCRYPTED_FILE_CONTENT_TYPE, previous, createReminderOperationId(Math.floor(Date.now() / 86400_000)));
     return sealed.hash;
   };
   return { http, api, keys, recovery, transport, upload, loseReply: () => { lost = true; } };
@@ -183,9 +183,9 @@ it.each(['before', 'after'] as const)('recovers a Reading edit interrupted %s co
   await h.api.configureEncryption(next);
   const previous = await h.api.downloadFile(old), authority = await FileKeyAuthority.fromVault(next);
   const sealed = await sealFile({ path: destination, content: new Uint8Array(previous.content), contentType: 'text/markdown', publicData: null }, authority.forPath(destination));
-  await h.api.uploadFile(destination, sealed.bytes.buffer, sealed.hash, sealed.bytes.length, ENCRYPTED_FILE_CONTENT_TYPE, null, createReminderOperationId(Math.floor(Date.now() / 86400_000)));
+  await h.api.unjournaled.uploadFile(destination, sealed.bytes.buffer, sealed.hash, sealed.bytes.length, ENCRYPTED_FILE_CONTENT_TYPE, null, createReminderOperationId(Math.floor(Date.now() / 86400_000)));
   const metadata = (await h.api.getFileMetadata([old])).files[old]!;
-  await h.api.deleteFile(old, metadata.hash, metadata.revision);
+  await h.api.unjournaled.deleteFile(old, metadata.hash, metadata.revision);
   expect(await (await client(next, 'Articles')).request('/reading/update', body)).toEqual({ saved: true, id });
   expect(commits).toBe(1);
   expect(new TextDecoder().decode((await h.api.downloadFile(destination)).content)).toContain('favorite: true');

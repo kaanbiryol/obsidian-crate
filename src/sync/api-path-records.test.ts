@@ -65,14 +65,14 @@ describe('literal path names in sync API records', () => {
 
 	it.each(paths)('requires explicit delete preconditions for %s', async path => {
 		const { client, transport } = clientWithResponses();
-		await expect(client.batchDelete([path])).rejects.toThrow('Missing expected remote hash');
-		await expect(client.batchDelete([path], { [path]: entry.hash })).rejects.toThrow('Missing remote revision');
+		await expect(client.unjournaled.batchDelete([path])).rejects.toThrow('Missing expected remote hash');
+		await expect(client.unjournaled.batchDelete([path], { [path]: entry.hash })).rejects.toThrow('Missing remote revision');
 		expect(transport).not.toHaveBeenCalled();
 	});
 
 	it('sends literal delete preconditions for supported filenames', async () => {
 		const { client, transport } = clientWithResponses(Response.json({ success: true, deleted: paths }));
-		await client.batchDelete(
+		await client.unjournaled.batchDelete(
 			paths,
 			Object.fromEntries(paths.map(path => [path, entry.hash])),
 			Object.fromEntries(paths.map(path => [path, entry.revision!])),

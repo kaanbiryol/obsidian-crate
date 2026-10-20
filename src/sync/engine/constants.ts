@@ -1,5 +1,5 @@
 import { Platform } from 'obsidian';
-import { HttpError } from '../api';
+import { HttpError } from '../worker-api/http';
 
 export const AUTH_ERROR_MESSAGE = 'This device’s sync access is no longer valid. In Crate settings → Account and devices, select “Reconnect”.';
 export const UPLOAD_CONCURRENCY = 2;

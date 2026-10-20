@@ -76,7 +76,7 @@ describe('SyncApiClient', () => {
 		const controller = new AbortController();
 		client.setAbortSignal(controller.signal);
 		let accepted = false;
-		const upload = client.uploadFile('note.md', new ArrayBuffer(1), hash, 1, 'text/markdown', null);
+		const upload = client.unjournaled.uploadFile('note.md', new ArrayBuffer(1), hash, 1, 'text/markdown', null);
 		void upload.then(() => { accepted = true; }, () => {});
 		const assertion = expect(upload).rejects.toThrow(reason === 'abort' ? 'Sync request aborted' : 'Request timed out');
 		await vi.waitFor(() => expect(commit).toBeTypeOf('function'));
@@ -138,7 +138,7 @@ describe('SyncApiClient', () => {
 		}), { status: 409 }));
 		const client = new SyncApiClient('https://worker.example', 'token', transport);
 
-		await expect(client.deleteFile('notes/a.md', 'base-hash', 'base-revision')).rejects.toMatchObject({
+		await expect(client.unjournaled.deleteFile('notes/a.md', 'base-hash', 'base-revision')).rejects.toMatchObject({
 			status: 409,
 			code: 'version_conflict',
 			currentHash: 'remote-hash',
@@ -414,7 +414,7 @@ it.each([true, 'bulk'] as const)('negotiates larger asset uploads with server su
     return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
   };
   const client = new SyncApiClient('https://worker.example', 'token', transport);
-  const response = await client.batchUpload(Array.from({ length: 8 }, (_, index) => ({
+  const response = await client.unjournaled.batchUpload(Array.from({ length: 8 }, (_, index) => ({
     path: `${index}.svg`, content: btoa('x'), size: 1, hash: 'h', contentType: 'image/svg+xml', expectedHash: null,
   })));
   expect(response.results).toHaveLength(8);

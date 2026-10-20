@@ -8,11 +8,11 @@ import { deletePendingFiles } from './delete';
 import type { QueueFlushContext } from './flush-types';
 import { uploadPendingFiles } from './upload';
 import { isQueueTerminalFailure, isQueueVersionConflict } from './failure';
-import { HttpError } from '../api';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import type { SyncResult } from '../types';
 import { recordSyncError, syncErrorIssues, formatSyncIssue, SkippedFileError, withSyncFileContext } from '../issues';
 import type { SyncIssue } from '../types';
+import { HttpError } from '../worker-api/http';
 
 export type { QueueFlushContext } from './flush-types';
 

@@ -9,9 +9,9 @@ import type { PreparedUpload, SyncResult } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import type { VaultFile } from "../local/file-discovery";
-import { HttpError } from '../api';
 import { isQueueVersionConflict } from '../queue/failure';
 import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from '../engine/constants';
+import { HttpError } from '../worker-api/http';
 
 const logger = createLogger("SyncTransfer");
 
