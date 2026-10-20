@@ -2,7 +2,7 @@ import { wrap, type DBSchema, type IDBPDatabase, type StoreNames } from 'idb';
 
 const OPEN_TIMEOUT_MS = 3_000;
 
-export type DatabaseOpenFailure = 'blocked' | 'unsupported' | 'unavailable';
+type DatabaseOpenFailure = 'blocked' | 'unsupported' | 'unavailable';
 
 interface StoreSpec {
 	name: string;

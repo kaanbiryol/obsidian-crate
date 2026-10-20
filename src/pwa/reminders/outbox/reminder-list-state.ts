@@ -43,12 +43,12 @@ export function reorderProjectReminders(reminders: ReminderRecord[], project: st
 	});
 }
 
-export function mergeProject(projects: string[], project: string): string[] {
+function mergeProject(projects: string[], project: string): string[] {
 	const normalized = project.trim() || 'Inbox';
 	return projects.includes(normalized) ? projects : [...projects, normalized].sort((a, b) => a.localeCompare(b));
 }
 
-export function mergeReminderRecord(reminders: ReminderRecord[], record: ReminderRecord): ReminderRecord[] {
+function mergeReminderRecord(reminders: ReminderRecord[], record: ReminderRecord): ReminderRecord[] {
 	return reminders.some(item => item.id === record.id)
 		? reminders.map(item => item.id === record.id ? record : item)
 		: [...reminders, record];
