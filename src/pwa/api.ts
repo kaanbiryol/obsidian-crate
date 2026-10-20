@@ -10,6 +10,7 @@ import type { StoredReminderKeys } from './encryption/encryption-keys';
 import { EncryptionScopeChangedError, routeFolderRequest } from './encryption/encryption-folder-routing';
 import { requestSharedFeaturesRefresh } from './shared-features';
 import { ENCRYPTION_STATE_HEADER } from '@/encryption/server-state';
+import { requireCompatibleServer as fetchCompatibleServer } from './server-compatibility';
 
 export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
 	const protocol = await requireCompatibleServer();
@@ -158,7 +159,8 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuf
 	return outputArray;
 }
 
+/** Fetched per mutation: operation ids take the server's current day from this response. */
 async function requireCompatibleServer(): Promise<number> {
-  const info = await (await import('./server-compatibility')).requireCompatibleServer();
-  return Math.min(CRATE_PLUGIN_PROTOCOL.current, info.protocol.current);
+	const info = await fetchCompatibleServer();
+	return Math.min(CRATE_PLUGIN_PROTOCOL.current, info.protocol.current);
 }
