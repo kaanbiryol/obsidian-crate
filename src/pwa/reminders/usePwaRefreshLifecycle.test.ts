@@ -14,6 +14,8 @@ it('refreshes immediately on reconnection, throttles page resumes, and removes l
 	expect(loadReminders).toHaveBeenCalledExactlyOnceWith({ silent: true, maxAgeMs: 0 });
 	await act(() => window.dispatchEvent(new window.Event('pageshow')));
 	expect(loadReminders).toHaveBeenLastCalledWith({ silent: true, maxAgeMs: 30_000 });
+	// Launch and reconnection confirm registration; a resume moments later does not.
+	expect(refreshPushState).toHaveBeenCalledTimes(2);
 	rendered.unmount();
 	loadReminders.mockClear();
 	window.dispatchEvent(new window.Event('online'));

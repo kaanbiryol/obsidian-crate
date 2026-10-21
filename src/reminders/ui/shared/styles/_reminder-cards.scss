@@ -60,7 +60,11 @@
         -webkit-user-select: none;
         user-select: none;
         transform-origin: center;
-        will-change: transform;
+
+        // Promote only the held row. A layer per row costs iOS memory and compositing.
+        &:is(.is-long-press-armed, .is-reordering) {
+            will-change: transform;
+        }
 
         &.is-long-press-armed {
             z-index: 45;

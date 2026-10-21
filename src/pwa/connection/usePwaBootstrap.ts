@@ -24,6 +24,7 @@ export function usePwaBootstrap({
 	suspendLocalSession,
 	setAuthToken,
 	setBootstrapped,
+	setEnrolled,
 	setConfig,
 	reportError,
 	setLaunchReminderId,
@@ -35,6 +36,7 @@ export function usePwaBootstrap({
 	suspendLocalSession: () => Promise<void>;
 	setAuthToken: Dispatch<SetStateAction<string | null>>;
 	setBootstrapped: Dispatch<SetStateAction<boolean>>;
+	setEnrolled: Dispatch<SetStateAction<boolean>>;
 	setConfig: Dispatch<SetStateAction<StoredConfig>>;
 	reportError: (issue: ConnectionIssue | null) => void;
 	setLaunchReminderId: Dispatch<SetStateAction<string | null>>;
@@ -45,14 +47,14 @@ export function usePwaBootstrap({
 	// Bootstrap owns a single mount-time session, even if callers rerender during enrollment.
 	const initialOptionsRef = useRef({
 		authToken, suspendLocalSession,
-		setAuthToken, setBootstrapped, setConfig, reportError, setLaunchReminderId,
+		setAuthToken, setBootstrapped, setEnrolled, setConfig, reportError, setLaunchReminderId,
 		setSelectedProject, setStartTab, showToast,
 	});
 
 	useEffect(() => {
 		const {
 			authToken: initialAuthToken, suspendLocalSession,
-			setAuthToken, setBootstrapped, setConfig, reportError, setLaunchReminderId,
+			setAuthToken, setBootstrapped, setEnrolled, setConfig, reportError, setLaunchReminderId,
 			setSelectedProject, setStartTab, showToast,
 		} = initialOptionsRef.current;
 		let cancelled = false;
@@ -125,6 +127,9 @@ export function usePwaBootstrap({
 					setLaunchReminderId(applied.reminderId);
 				}
 				if (!enrollmentFailed) finishEnrollment();
+				// Reading needs only the enrolled credential, so its encryption
+				// check can run alongside the Reminders one below.
+				setEnrolled(true);
 
 				if (!nextToken) return;
 				await makeApiFetch(nextToken, () => { void suspendLocalSession(); reportError(SESSION_RECOVERY_ISSUE); }).ready();
@@ -147,6 +152,7 @@ export function usePwaBootstrap({
 				// Storage events adopt a replacement or logout from another tab.
 				// Finishing bootstrap lets that session load instead of hanging.
 				if (!cancelled) {
+					setEnrolled(true);
 					setBootstrapped(true);
 				}
 			}

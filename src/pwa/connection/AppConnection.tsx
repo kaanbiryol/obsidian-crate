@@ -23,6 +23,7 @@ function useConnection() {
     setAuthority(current => ({ token: typeof next === 'function' ? next(current.token) : next }));
   }, []);
   const [bootstrapped, setBootstrapped] = useState(false);
+  const [enrolled, setEnrolled] = useState(false);
   const [config, setConfig] = useState(loadStoredConfig);
   const [error, reportError] = useState<ConnectionIssue | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -45,10 +46,10 @@ function useConnection() {
   const lifecycle = usePwaSessionLifecycle({ apiFetch, resetView, disablePushNotifications, handleUnauthorizedRef,
     setAuthToken, setConfig, reportError, setSettingsOpen, showToast });
   usePwaBootstrap({ authToken: authority.token, suspendLocalSession: lifecycle.suspendLocalSession,
-    setAuthToken, setBootstrapped, setConfig, reportError, setLaunchReminderId, setSelectedProject, setStartTab, showToast });
+    setAuthToken, setBootstrapped, setEnrolled, setConfig, reportError, setLaunchReminderId, setSelectedProject, setStartTab, showToast });
   const encryption = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot);
   // Finish app enrollment before Reading uses its credential or a direct setup link.
-  const reading = useReadingConnection(useSharedFeatures().reading, bootstrapped, authority);
+  const reading = useReadingConnection(useSharedFeatures().reading, enrolled, authority);
 
   const expireReading = reading.expire;
   useEffect(() => onConnectionExpired(token => {

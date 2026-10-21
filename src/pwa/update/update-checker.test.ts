@@ -29,9 +29,22 @@ describe('app-wide update checks', () => {
 		expect(check).toHaveBeenCalledTimes(1);
 		for (const [target, event] of [[documentEvents, 'visibilitychange'], [windowEvents, 'pageshow'], [windowEvents, 'online']] as const) {
 			target.dispatchEvent(new Event(event));
-			await vi.advanceTimersByTimeAsync(0);
+			await vi.advanceTimersByTimeAsync(30_000);
 		}
 		expect(check).toHaveBeenCalledTimes(4);
+	});
+	it('checks once when one resume fires both pageshow and visibilitychange', async () => {
+		const check = vi.fn(async () => {});
+		stop = startUpdateChecks(check);
+		await vi.advanceTimersByTimeAsync(AN_HOUR);
+		windowEvents.dispatchEvent(new Event('pageshow'));
+		await vi.advanceTimersByTimeAsync(0);
+		documentEvents.dispatchEvent(new Event('visibilitychange'));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(check).toHaveBeenCalledTimes(2);
+		windowEvents.dispatchEvent(new Event('online'));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(check).toHaveBeenCalledTimes(3);
 	});
 	it('skips hidden/offline checks and removes listeners on cleanup', async () => {
 		visible = false;

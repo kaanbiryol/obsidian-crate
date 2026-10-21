@@ -71,6 +71,11 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 					update({ phase: 'off', status: null });
 					return;
 				}
+				// A granted subscription shows no list prompt, so reveal cached
+				// reminders now instead of after the server confirms registration.
+				if (subscription && permission === 'granted' && isCurrent()) {
+					setState(previous => previous.authToken === authToken ? { ...previous, initialCheckComplete: true } : previous);
+				}
 				if (!subscription || permission !== 'granted') {
 					const response = await fetch('/notifications/vapid-public-key', { signal: AbortSignal.timeout(30_000) });
 					if (!response.ok) throw new Error('Could not load notification settings. Try again.');

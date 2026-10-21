@@ -5,7 +5,8 @@ import { readingSource, readingTitle } from '../core/reading-presentation';
 import { ReadingSourceIcon } from './ReadingSourceIcon';
 import { ReadingVideoThumbnail } from './ReadingVideo';
 
-export function ReadingItemContent({ item }: { item: ReadingItem }) {
+// Rows re-render on every search keystroke; unchanged items skip this work.
+export const ReadingItemContent = React.memo(function ReadingItemContent({ item }: { item: ReadingItem }) {
 	const videoId = youtubeVideoId(item.source_url);
 	return <>
 		<ReadingSourceIcon item={item} />
@@ -14,4 +15,4 @@ export function ReadingItemContent({ item }: { item: ReadingItem }) {
 		</span>
 		{videoId && <ReadingVideoThumbnail key={videoId} id={videoId} />}
 	</>;
-}
+});

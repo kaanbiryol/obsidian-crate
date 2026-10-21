@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import { motion } from "motion/react";
 import {
   BrowseView,
@@ -79,6 +79,9 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
     },
   };
 
+  // Views are memoized; a fresh object here would re-render each one.
+  const animationConfig = useMemo(() => ({ enabled: animationsEnabled }), [animationsEnabled]);
+
   if (!isInitialLoadComplete) return null;
 
   switch (viewMode) {
@@ -94,14 +97,14 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
             onReorderDragActiveChange={onReorderDragActiveChange}
             colorScheme={colorScheme}
             reorderInteraction={reorderInteraction}
-            animationConfig={{ enabled: animationsEnabled }}
+            animationConfig={animationConfig}
           />
         </motion.div>
       );
     case "today":
       return (
         <motion.div key="today" className="reminders-view-panel" {...pageTransition}>
-          <TodayView reminders={reminders} renderCard={renderCard} hasFab={showFab} colorScheme={colorScheme} animationConfig={{ enabled: animationsEnabled }} />
+          <TodayView reminders={reminders} renderCard={renderCard} hasFab={showFab} colorScheme={colorScheme} animationConfig={animationConfig} />
         </motion.div>
       );
     case "upcoming":
@@ -113,7 +116,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
             days={upcomingDays}
             hasFab={showFab}
             colorScheme={colorScheme}
-            animationConfig={{ enabled: animationsEnabled }}
+            animationConfig={animationConfig}
           />
         </motion.div>
       );
@@ -126,7 +129,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
               reminders={reminders}
               onProjectSelect={onProjectSelect}
               colorScheme={colorScheme}
-              animationConfig={{ enabled: animationsEnabled }}
+              animationConfig={animationConfig}
             />
           </motion.div>
         );
@@ -143,7 +146,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
             belowHeaderContent={projectBelowHeaderContent}
             reminders={reminders}
             onBack={onBackToProjects}
-            animationConfig={{ enabled: animationsEnabled }}
+            animationConfig={animationConfig}
             renderCard={renderCard}
             hasFab={showFab}
             onReorder={onReorder}

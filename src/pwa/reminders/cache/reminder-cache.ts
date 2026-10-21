@@ -123,10 +123,12 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 			for (const note of notes) {
 				if (note.sessionScope !== sessionScope || typeof note.version !== 'string' || typeof note.path !== 'string') return null;
 				if (privateStorageEnabled() !== Boolean(note.encrypted)) return null;
-				const value: unknown = note.encrypted ? JSON.parse(openPrivateValue(note.encrypted, noteKey(sessionScope, folderPath, note.path))) : note.reminders;
+				// The decrypted text is the JSON the write path compares, so reuse it.
+				const openedJson = note.encrypted ? openPrivateValue(note.encrypted, noteKey(sessionScope, folderPath, note.path)) : undefined;
+				const value: unknown = openedJson !== undefined ? JSON.parse(openedJson) : note.reminders;
 				if (!Array.isArray(value) || !value.length || value.some(reminder => !reminder || typeof reminder !== 'object' || (reminder as ReminderRecord).filePath !== note.path)) return null;
 				reminders.push(...value as ReminderRecord[]);
-				read.set(note.path, { version: note.version, json: JSON.stringify(value), reminders: value as ReminderRecord[] });
+				read.set(note.path, { version: note.version, json: openedJson ?? JSON.stringify(value), reminders: value as ReminderRecord[] });
 			}
 			const snapshot = normalizeSnapshot({ folderPath, reminders, projects: metadata.projects, savedAt: metadata.savedAt, etag: metadata.etag,
 				deltaBase: metadata.deltaBase, issues: metadata.issues }, folderPath);

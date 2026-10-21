@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { discardReminderDraft } from './reminder-drafts';
 import { capturePwaSession } from '../../session-generation';
 import type { ShowToast } from '../../types';
@@ -36,12 +36,17 @@ export function useReminderEditorActions({ editor, mutations, selectedProject, f
 		if (draft) openEditor(draft);
 	}, [ensureCanMutate, ready, prepareEdit, openEditor]);
 
-	const editReminder = useCallback((id: string) => {
+	const editReminderNow = useCallback((id: string) => {
 		const failedSave = changes.find(change => change.kind === 'save' && change.status === 'failed'
 			&& (change.recordId === id || change.optimistic?.id === id));
 		if (failedSave) editFailedChange(failedSave.operationId);
 		else openModal('edit', id);
 	}, [changes, editFailedChange, openModal]);
+	// Every card receives this handler. A stable identity keeps memoized rows
+	// from re-rendering on each sync; the ref always runs the latest closure.
+	const latestEdit = useRef(editReminderNow);
+	useLayoutEffect(() => { latestEdit.current = editReminderNow; });
+	const editReminder = useCallback((id: string) => latestEdit.current(id), []);
 
 	const saveReminder = async (modal: ModalState): Promise<boolean> => {
 		if (!ensureCanMutate() || saving.current) return false;
