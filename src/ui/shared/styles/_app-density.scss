@@ -2,7 +2,7 @@
 // Host adapters retain colors, safe-area ownership and viewport/container rules.
 @mixin typography {
   --crate-view-title-size: 24px;
-  --crate-view-title-weight: 600;
+  --crate-view-title-weight: 700;
   --crate-view-title-spacing: -.025em;
   --crate-view-title-leading: 1.2;
 }
@@ -18,7 +18,7 @@
 	:is(.reminders-view.is-primary, .reminders-list-container) .premium-reminder-title,
 	.crate-reading .crate-reading__open strong,
 	.reminders-browse-view .premium-project-name,
-	.crate-highlight-group__header .crate-highlight-group__copy strong { font-weight: 400; }
+	.crate-highlight-group__header .crate-highlight-group__copy strong { font-weight: var(--reminder-font-weight-medium); }
 	.crate-reading .crate-reading__source-icon { width: 20px; height: 20px; flex-basis: 20px; border-radius: 5px; }
 	.crate-reading .crate-reading__search {
 		--crate-field-height: 44px;

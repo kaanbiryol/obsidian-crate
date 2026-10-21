@@ -14,7 +14,7 @@ export function registerPluginNavigationTests() {
         await expect(row.locator('.premium-checkbox')).toHaveCSS('height', '44px');
         const titleSize = '16px';
         await expect(row.locator('.premium-reminder-title')).toHaveCSS('font-size', titleSize);
-        await expect(row.locator('.premium-reminder-title')).toHaveCSS('font-weight', '400');
+        await expect(row.locator('.premium-reminder-title')).toHaveCSS('font-weight', '500');
         await expect(row.locator('.premium-checkbox-visual')).toHaveCSS('width', '18px');
         const headingSize = await active.locator('.view-header-title').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
         expect(headingSize).toBeCloseTo(parseFloat(titleSize) * 1.5, 1);
