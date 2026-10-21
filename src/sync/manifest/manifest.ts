@@ -16,6 +16,7 @@ import type { FileManifest, FileEntry } from '../../protocol/sync-types';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 
 import { syncStoragePaths } from './storage-paths';
+import { RenameDependencies } from './rename-dependencies';
 
 const logger = createLogger('Manifest');
 
@@ -30,10 +31,7 @@ export type LocalManifestView = Readonly<Omit<FileManifest, 'files'>> & {
 
 export class LocalManifest {
 	readonly uploadJournal: UploadJournal;
-	private renameDependencies = new Map<string, string>();
-	/** Current path -> baseline paths that now live there, so one file's rename
-	 * updates only its own dependencies instead of scanning all of them. */
-	private renameTargets = new Map<string, Set<string>>();
+	private renames = new RenameDependencies();
 	private appliedRename?: string;
 	private app: App;
 	private manifestPath: string;
@@ -125,8 +123,7 @@ export class LocalManifest {
 			this.uploadDiagnostics = selected.uploadDiagnostics;
 			this.restoreIntents = selected.restoreIntents;
 			this.initialConfigPull = selected.initialConfigPull;
-			this.renameDependencies = selected.renames;
-			this.indexRenameTargets();
+			this.renames = new RenameDependencies(selected.renames);
 			this.appliedRename = selected.appliedRename;
 			this.persistedState = encodeLogState(selected);
 			await this.uploadJournal.load(selected.settledUploads ?? []);
@@ -180,7 +177,7 @@ export class LocalManifest {
 			generation: this.generation,
 			authority: this.authority,
 			settledUploads: this.uploadJournal.completedSnapshot(),
-			renames: this.renameDependencies,
+			renames: this.renames.entries,
 			appliedRename: this.appliedRename,
 			uploadDiagnostics: this.uploadDiagnostics,
 			restoreIntents: this.restoreIntents,
@@ -251,7 +248,7 @@ export class LocalManifest {
 	private recoveryState() {
 		return {
 			settledUploads: this.uploadJournal.completedSnapshot(),
-			renames: this.renameDependencies,
+			renames: this.renames.entries,
 			appliedRename: this.appliedRename,
 			uploadDiagnostics: this.uploadDiagnostics,
 			restoreIntents: this.restoreIntents,
@@ -271,23 +268,26 @@ export class LocalManifest {
 		const previous = this.getEntry(path);
 		this.manifest.files[path] = { ...entry, revision: entry.revision ?? (previous?.hash === entry.hash ? previous.revision : undefined) };
 		this.changedPaths.add(path);
-		this.revision++;
-		this.dirty = true;
+		this.markChanged();
 	}
 
 	/**
 	 * Remove file entry
 	 */
 	removeEntry(path: string): void {
-		this.deleteRenameDependency(path);
+		this.renames.delete(path);
 		delete this.manifest.files[path];
 		this.changedPaths.add(path);
-		this.revision++;
-		this.dirty = true;
+		this.markChanged();
 	}
 
 	completeUpload(id: string): void {
 		this.uploadJournal.complete(id);
+		this.markChanged();
+	}
+
+	/** Every mutation advances the revision, so a save in progress writes it next. */
+	private markChanged(): void {
 		this.revision++;
 		this.dirty = true;
 	}
@@ -298,17 +298,17 @@ export class LocalManifest {
 
 	setInitialConfigPull(state: InitialConfigPull | undefined): void {
 		this.initialConfigPull = parseInitialConfigPull(state);
-		this.revision++; this.dirty = true;
+		this.markChanged();
 	}
 
 	setRestoreIntent(intent: RestoreIntent): void {
 		this.restoreIntents = parseRestoreIntents([...this.restoreIntents.filter(item => item.request.storageKey !== intent.request.storageKey), intent]);
-		this.revision++; this.dirty = true;
+		this.markChanged();
 	}
 
 	removeRestoreIntent(storageKey: string): void {
 		this.restoreIntents = this.restoreIntents.filter(item => item.request.storageKey !== storageKey);
-		this.revision++; this.dirty = true;
+		this.markChanged();
 	}
 
 	getUploadDiagnostics(): UploadDiagnostic[] { return this.uploadDiagnostics.map(row => ({ ...row })); }
@@ -318,22 +318,21 @@ export class LocalManifest {
 		if (!row) return;
 		this.uploadDiagnostics.push(row);
 		this.uploadDiagnostics = this.uploadDiagnostics.slice(-MAX_UPLOAD_DIAGNOSTICS);
-		this.revision++;
-		this.dirty = true;
+		this.markChanged();
 	}
 
-	renameDestination(path: string): string | undefined { return this.renameDependencies.get(path); }
-	getRenameDependencies(): Record<string, string> { return Object.fromEntries(this.renameDependencies); }
+	renameDestination(path: string): string | undefined { return this.renames.destination(path); }
+	getRenameDependencies(): Record<string, string> { return this.renames.toRecord(); }
 
 	/** The journal keeps ordered IDs until checkpoint publication succeeds. The
 	 * last receipt is enough to resume a prefix without applying nested moves twice. */
 	applyJournalRenames(moves: Array<{ id: string; from: string; to: string; rename?: boolean; priorRenames?: Record<string, string> }>): void {
 		const start = moves.findIndex(move => move.id === this.appliedRename) + 1;
 		for (const move of moves.slice(start)) {
-			for (const [source, target] of Object.entries(move.priorRenames ?? {})) this.setRenameDependency(source, target);
+			for (const [source, target] of Object.entries(move.priorRenames ?? {})) this.renames.set(source, target);
 			if (move.rename !== false) this.recordRename(move.from, move.to);
 			this.appliedRename = move.id;
-			this.revision++; this.dirty = true;
+			this.markChanged();
 		}
 	}
 
@@ -343,56 +342,10 @@ export class LocalManifest {
 	 * tell, for an untracked source) scan every path below the source.
 	 */
 	recordRename(source: string, destination: string, kind?: 'file' | 'folder'): void {
-		const move = (path: string) => path === source ? destination : path.startsWith(`${source}/`) ? destination + path.slice(source.length) : path;
 		const tracked = Boolean(getPathEntry(this.manifest.files, source));
 		const folder = kind ? kind === 'folder' : !tracked;
-		const affected = folder
-			? [...this.renameDependencies].filter(([, target]) => move(target) !== target).map(([old]) => old)
-			: [...this.renameTargets.get(source) ?? []];
-		for (const old of affected) {
-			const next = move(this.renameDependencies.get(old)!);
-			if (old === next) this.deleteRenameDependency(old);
-			else this.setRenameDependency(old, next);
-		}
-		const sources = folder ? this.getAllPaths() : tracked ? [source] : [];
-		for (const path of sources) {
-			const target = move(path);
-			if (target !== path && !this.renameDependencies.has(path)) this.setRenameDependency(path, target);
-		}
-		this.revision++;
-		this.dirty = true;
-	}
-
-	private setRenameDependency(old: string, target: string): void {
-		// Updating in place keeps checkpoint key order unchanged.
-		const previous = this.renameDependencies.get(old);
-		if (previous !== undefined) {
-			const olds = this.renameTargets.get(previous);
-			olds?.delete(old);
-			if (olds?.size === 0) this.renameTargets.delete(previous);
-		}
-		this.renameDependencies.set(old, target);
-		const olds = this.renameTargets.get(target) ?? new Set<string>();
-		olds.add(old);
-		this.renameTargets.set(target, olds);
-	}
-
-	private deleteRenameDependency(old: string): void {
-		const target = this.renameDependencies.get(old);
-		if (target === undefined) return;
-		this.renameDependencies.delete(old);
-		const olds = this.renameTargets.get(target);
-		olds?.delete(old);
-		if (olds?.size === 0) this.renameTargets.delete(target);
-	}
-
-	private indexRenameTargets(): void {
-		this.renameTargets = new Map();
-		for (const [old, target] of this.renameDependencies) {
-			const olds = this.renameTargets.get(target) ?? new Set<string>();
-			olds.add(old);
-			this.renameTargets.set(target, olds);
-		}
+		this.renames.recordRename(source, destination, folder, folder ? this.getAllPaths() : tracked ? [source] : []);
+		this.markChanged();
 	}
 
 	/**
@@ -413,8 +366,7 @@ export class LocalManifest {
 	replaceManifest(manifest: LocalManifestView): void {
 		this.manifest = parseLocalManifest(manifest);
 		this.logActive = false;
-		this.revision++;
-		this.dirty = true;
+		this.markChanged();
 	}
 
 	/**
@@ -445,7 +397,6 @@ export class LocalManifest {
 	clear(): void {
 		this.manifest = { version: 1, files: createPathRecord() };
 		this.logActive = false;
-		this.revision++;
-		this.dirty = true;
+		this.markChanged();
 	}
 }

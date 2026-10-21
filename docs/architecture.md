@@ -114,7 +114,8 @@ CratePlugin (src/plugin/CratePlugin.ts)
 Sync history checkpoint and restore policy lives in `sync/engine/history.ts`.
 `sync/manifest/manifest-checkpoint.ts` owns checkpoint parsing, encoding and recovery
 equivalence. `LocalManifest` retains generation selection, file I/O and ordered
-saves. Its baseline readers expose readonly views with stable entry identities;
+saves. `RenameDependencies` in `sync/manifest/rename-dependencies.ts` indexes renamed
+baseline paths by their current location and applies file and folder moves. Its baseline readers expose readonly views with stable entry identities;
 mutations replace entries through the manifest so revision tracking and checks
 across asynchronous reads agree. Diagnostics remain outside recovery equivalence.
 Pending previews, discard preparation and post-sync baseline verification live in

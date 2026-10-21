@@ -15,7 +15,7 @@ export interface ManifestCheckpoint {
 	generation: number;
 	authority: string | undefined;
 	settledUploads: string[];
-	renames: Map<string, string>;
+	renames: ReadonlyMap<string, string>;
 	appliedRename: string | undefined;
 	uploadDiagnostics: UploadDiagnostic[];
 	restoreIntents: RestoreIntent[];
