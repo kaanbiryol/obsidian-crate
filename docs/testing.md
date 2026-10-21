@@ -46,7 +46,7 @@ Pushes to any branch and pull requests run `lint.yml` ("Node.js build"), and the
 | `reading` | macOS | `scripts/reading-shortcut.test.mjs` (the native shortcut parser), then `test:reading-browser`. |
 | `reproducible` | Linux | Only when a release tag is supplied: a clean-install `npm run build` compared with the checked artifacts. |
 
-`release:check` covers the same suites except `test:docker`, `test:plugin-dialogs` and the `reproducible` rebuild, which run only in CI. A release run that reuses a successful push build skips the test jobs; see [Release verification](#release-verification).
+`release:check` covers the same suites except `test:docker` and the `reproducible` rebuild, which run only in CI. A release run that reuses a successful push build skips the test jobs; see [Release verification](#release-verification).
 
 Other workflows: `security.yml` runs the secret scan on every push and pull request. `pages.yml` runs `check:docs`, the shortcut and site-deployment tests and the site build for documentation, site and shortcut changes; it deploys only for a published release or a manual run. `visual.yml` is manual, for baseline review and generation.
 
@@ -82,7 +82,7 @@ covers the library, consent, optimistic changes, highlights, and shortcut browse
 flows, one browser script at a time to avoid competing selection and focus tests.
 Both groups require Chromium/WebKit and a built Worker. `test:reading` builds the
 Worker and runs both groups.
-File/vault history browser checks also run in `release:check`.
+File/vault history and plugin dialog browser checks also run in `release:check`.
 
 `useReminderSync.test.ts` and `useReminderEditor.test.ts` render real React hooks
 with LinkeDOM to check rerenders, effect cleanup, stale reads, and editor lifetime.
