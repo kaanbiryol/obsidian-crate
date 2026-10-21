@@ -14,12 +14,6 @@ export class ReminderCommandError extends Error {
 	constructor(message: string, readonly status = 409, readonly code = 'version_conflict', readonly reason?: ReminderCommandFailure) { super(message); }
 }
 
-/** Released plaintext Worker routes keep an acceptance rule of their own. */
-export interface ReminderFileCommandOptions {
-	/** Size-check only notes that receive a written reminder block, so deletes and
-	 * reorders still apply to larger notes. */
-	limitWrittenNotesOnly?: boolean;
-}
 /** The wire record answered by the Worker routes and encrypted web apps. Fields
  * are listed explicitly so new scanner fields stay private until chosen. */
 export async function reminderCommandPayload(reminder: ScannedReminderRecord) {
@@ -50,6 +44,9 @@ function project(value: unknown): string {
 function unreadableTitle(): ReminderInputError {
 	return new ReminderInputError('content', 'This title cannot be saved as a reminder. Remove date, repeat or priority text from it.');
 }
+/** Applies to every note an edit reads or writes, deletes and reorders included.
+ * Reminder lists skip notes over the 1 MiB index limit, so an edit there could
+ * only come from a stale list, and its parsed result would bypass that limit. */
 function checkSize(content: string): void {
 	if (new TextEncoder().encode(content).length > 1024 * 1024) throw new ReminderCommandError('Split reminder notes larger than 1 MiB before editing them in the web app.', 413, 'file_too_large');
 }
@@ -57,7 +54,7 @@ function checkSize(content: string): void {
 /** Shared Markdown rules run on the enrolled client; the server receives only
  * complete encrypted replacements with immutable file preconditions. */
 export async function applyReminderFileCommand(action: string, body: Record<string, unknown>, folderPath: string,
-	read: (path: string) => Promise<string | null>, options: ReminderFileCommandOptions = {}) {
+	read: (path: string) => Promise<string | null>) {
 	const originals = new Map<string, string | null>();
 	const changes = new Map<string, string>();
 	const scanned = new Map<string, ScannedReminderRecord[]>();
@@ -66,15 +63,10 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 			|| !path.toLowerCase().endsWith('.md')) throw new ReminderCommandError('File is outside this enrollment', 403, 'scope_mismatch');
 		if (!originals.has(path)) originals.set(path, await read(path));
 		const content = originals.get(path)!;
-		if (content !== null && !options.limitWrittenNotesOnly) checkSize(content);
+		if (content !== null) checkSize(content);
 		return content;
 	};
 	const scan = (path: string, content: string) => scanReminderMarkdownContent(path, content, folderPath).reminders;
-	// A note that receives a new or rewritten reminder block.
-	const write = (path: string, content: string) => {
-		if (options.limitWrittenNotesOnly) checkSize(content);
-		changes.set(path, content);
-	};
 	const scanChange = (path: string) => {
 		let reminders: ScannedReminderRecord[];
 		// Each note was scanned before this edit, so only the written line can fail here.
@@ -95,7 +87,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 			priority: body.priority === 1 ? 1 : 4, recurrence: parseReminderRecurrenceInput(body.recurrence) ?? undefined,
 			dueDate: text(body.dueDate), dueDatetime: text(body.dueDatetime), id: body.id });
 		const next = appendCreatedReminderBlock(content, buildCreatedReminderBlock({ ...args, content: text(body.content)!, description: text(body.description), reminderId: body.id }));
-		write(path, next);
+		changes.set(path, next);
 		reminder = scanChange(path).find(item => item.id === body.id);
 		createdId = body.id;
 	} else if (action === 'reorder') {
@@ -116,8 +108,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		if (action === 'delete') changes.set(path, deleteReminderBlockFromContent(content, current).content);
 		else if (action === 'set-completed') {
 			if (typeof body.completed !== 'boolean') throw new ReminderCommandError('Choose a completion state', 400, 'invalid_reminder_input');
-			if (current.completed === body.completed) changes.set(path, content);
-			else write(path, setReminderCompletionInContent(content, current, body.completed).content);
+			changes.set(path, current.completed === body.completed ? content : setReminderCompletionInContent(content, current, body.completed).content);
 		} else if (action === 'update') {
 			const update = buildReminderUpdate(parseReminderUpdateParams(body)).updates;
 			if (update.project && update.project !== current.project) {
@@ -126,13 +117,13 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 				if (scan(destination, before).some(item => item.id === current.id)) throw new ReminderCommandError('The destination already contains this reminder', 409, 'version_conflict', 'duplicate');
 				const next = appendCreatedReminderBlock(before, buildMovedReminderBlock(current, update));
 				changes.set(path, deleteReminderBlockFromContent(content, current).content);
-				write(destination, next);
+				changes.set(destination, next);
 				reminder = scanChange(destination).find(item => item.id === current.id);
-			} else write(path, replaceUpdatedReminderBlock(content, current, buildUpdatedReminderBlock(current, update)).content);
+			} else changes.set(path, replaceUpdatedReminderBlock(content, current, buildUpdatedReminderBlock(current, update)).content);
 		} else throw new ReminderCommandError('Unsupported reminder operation', 400, 'invalid_reminder_input');
 		if (action !== 'delete' && !reminder) reminder = scanChange(path).find(item => item.id === current.id);
 	}
-	if (!options.limitWrittenNotesOnly) for (const content of changes.values()) checkSize(content);
+	for (const content of changes.values()) checkSize(content);
 	if (!['delete', 'reorder'].includes(action) && !reminder) throw unreadableTitle();
 	// `reminders` is present when the command already scanned the changed note.
 	return { files: [...changes].map(([path, content]) => ({ path, content, original: originals.get(path)!, reminders: scanned.get(path) })), createdId,

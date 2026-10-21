@@ -11,6 +11,7 @@ import { handleListReminders } from './routes/list';
 import { handleReorderReminders } from './routes/reorder';
 import { handleUpdateReminder } from './routes/update';
 import { scanReminderMarkdownFile } from './scan';
+import { ReminderFileSizeError } from './limits';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 
 const { DB: db, BUCKET: bucket } = env;
@@ -144,5 +145,20 @@ describe('reminder route mutations with D1 and R2', () => {
 
 		expect(response.status).toBe(200);
 		expect(await read('Reminders/Inbox.md')).toContain('- [ ] Second <!-- crate-id:r2 -->\n- [ ] First <!-- crate-id:r1 -->\n- [x] Done <!-- crate-id:r3 -->');
+	});
+
+	it('refuses deletes and reorders in a note the list reports as too large', async () => {
+		const path = 'Reminders/Inbox.md';
+		const content = `# Inbox\n\n${'x'.repeat(1024 * 1024)}\n\n- [ ] First <!-- crate-id:r-big-1 -->\n- [ ] Second <!-- crate-id:r-big-2 -->\n`;
+		await seed({ [path]: content });
+		const listed = async () => await (await list()).json() as { reminders: unknown[]; issues: Array<{ path: string }> };
+		const before = await listed();
+		expect(before).toMatchObject({ reminders: [], issues: [{ path }] });
+
+		await expect(handleDeleteReminder(await request('delete', { id: 'r-big-1', filePath: path }, 'DELETE'), env)).rejects.toBeInstanceOf(ReminderFileSizeError);
+		await expect(handleReorderReminders(await request('reorder', { project: 'Inbox', orderedIds: ['r-big-2', 'r-big-1'] }), env)).rejects.toBeInstanceOf(ReminderFileSizeError);
+
+		expect(await read(path)).toBe(content);
+		expect(await listed()).toEqual(before);
 	});
 });

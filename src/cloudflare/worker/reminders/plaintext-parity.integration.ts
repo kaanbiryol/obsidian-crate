@@ -6,20 +6,18 @@ import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { applyReminderFileCommand, reminderCommandPayload, ReminderCommandError, type ReminderFileCommandOptions } from '@/reminders/core/reminderFileCommand';
+import { applyReminderFileCommand, reminderCommandPayload, ReminderCommandError } from '@/reminders/core/reminderFileCommand';
 import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { ReminderMarkdownContextError } from '@/reminders/core/markdownTaskContext';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { buildCreatedReminderBlock } from '@/reminders/core/markdownReminderMutation';
 import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
-import { PLAINTEXT_COMMAND_OPTIONS } from './command';
 import { sha256Hex } from '@/platform/sha256';
 
 // The plaintext Worker routes apply the shared command used by encrypted web
-// apps with their released options, so their Markdown agrees. Their responses
-// keep the released wire format; differences from the web app's answers are
-// recorded per case.
+// apps, so their Markdown agrees. Their responses keep the released wire
+// format; differences from the web app's answers are recorded per case.
 const folderPath = 'Reminders';
 const inbox = 'Reminders/Inbox.md', work = 'Reminders/Work.md', home = 'Reminders/Home.md';
 const paths = [inbox, work, home];
@@ -33,7 +31,7 @@ const routes = {
 type Action = keyof typeof routes;
 type Files = Record<string, string>;
 interface Outcome { status: number; body: unknown; files: Record<string, string | null> }
-type Expected = { worker: Omit<Outcome, 'files'> & Partial<Outcome>; core: Omit<Outcome, 'files'> };
+type Expected = { worker: Omit<Outcome, 'files'>; core: Omit<Outcome, 'files'> };
 
 const timed = buildCreatedReminderBlock({ content: 'Call Sam', description: 'Ask about\nthe weekend', reminderId: 'r-timed', priority: 1,
 	dueDate: new Date('2099-01-05T09:30:00.000Z'), hasTime: true });
@@ -84,10 +82,10 @@ async function runWorker(action: Action, body: Record<string, unknown>, files: F
 }
 
 /** Mirrors how EncryptedReminderApi answers the web app from the shared command. */
-async function runCore(action: Action, body: Record<string, unknown>, files: Files, options?: ReminderFileCommandOptions): Promise<Outcome> {
+async function runCore(action: Action, body: Record<string, unknown>, files: Files): Promise<Outcome> {
 	const before = Object.fromEntries(paths.map(path => [path, files[path] ?? null]));
 	try {
-		const result = await applyReminderFileCommand(action, body, folderPath, async path => files[path] ?? null, options);
+		const result = await applyReminderFileCommand(action, body, folderPath, async path => files[path] ?? null);
 		const after = { ...before, ...Object.fromEntries(result.files.map(file => [file.path, file.content])) };
 		return { status: 200, body: JSON.parse(JSON.stringify(result.response)) as unknown, files: after };
 	} catch (error) {
@@ -100,10 +98,9 @@ async function runCore(action: Action, body: Record<string, unknown>, files: Fil
 
 async function compare(action: Action, files: Files, body: Record<string, unknown>) {
 	const core = await runCore(action, body, files);
-	const plaintext = await runCore(action, body, files, PLAINTEXT_COMMAND_OPTIONS);
 	const workerOutcome = await runWorker(action, body, files);
-	expect(workerOutcome.files).toEqual(plaintext.files);
-	if (workerOutcome.status === 200) expect(workerOutcome.body).toEqual(plaintext.body);
+	expect(workerOutcome.files).toEqual(core.files);
+	if (workerOutcome.status === 200) expect(workerOutcome.body).toEqual(core.body);
 	return { core, worker: workerOutcome };
 }
 
@@ -164,12 +161,12 @@ describe('plaintext Worker routes and the shared reminder command', () => {
 			worker: { status: 413, body: { error: sizeError } },
 			core: { status: 413, body: { error: sizeError, code: 'file_too_large' } },
 		}],
-		['deletes from an oversized note only on the Worker', 'delete', { [inbox]: oversizedNote }, files => edit(files, 'r-big-1'), {
-			worker: { status: 200, body: { success: true, id: 'r-big-1' }, files: { [inbox]: oversized('- [ ] Second <!-- crate-id:r-big-2 -->'), [work]: null, [home]: null } },
+		['refuses to delete from an oversized note', 'delete', { [inbox]: oversizedNote }, files => edit(files, 'r-big-1'), {
+			worker: { status: 413, body: { error: sizeError } },
 			core: { status: 413, body: { error: sizeError, code: 'file_too_large' } },
 		}],
-		['reorders an oversized note only on the Worker', 'reorder', { [inbox]: oversizedNote }, files => reorder(files, inbox, ['r-big-2', 'r-big-1']), {
-			worker: { status: 200, body: { success: true }, files: { [inbox]: oversized('- [ ] Second <!-- crate-id:r-big-2 -->\n- [ ] First <!-- crate-id:r-big-1 -->'), [work]: null, [home]: null } },
+		['refuses to reorder an oversized note', 'reorder', { [inbox]: oversizedNote }, files => reorder(files, inbox, ['r-big-2', 'r-big-1']), {
+			worker: { status: 413, body: { error: sizeError } },
 			core: { status: 413, body: { error: sizeError, code: 'file_too_large' } },
 		}],
 		['rejects a stale revision', 'update', seeded, async files => ({ ...await edit(files, 'r-plain', { content: 'Stale' }), expectedRevision: 'a'.repeat(64) }), {
@@ -231,10 +228,8 @@ describe('plaintext Worker routes and the shared reminder command', () => {
 		}],
 	])('%s with known wire differences', async (_name, action, files, body, expected) => {
 		const { core, worker: workerOutcome } = await compare(action, files, await body(files));
-		expect({ status: workerOutcome.status, body: workerOutcome.body }).toEqual({ status: expected.worker.status, body: expected.worker.body });
-		if (expected.worker.files) expect(workerOutcome.files).toEqual(expected.worker.files);
+		expect({ status: workerOutcome.status, body: workerOutcome.body }).toEqual(expected.worker);
 		expect({ status: core.status, body: core.body }).toEqual(expected.core);
 		if (core.status !== 200) expect(core.files).toEqual(Object.fromEntries(paths.map(path => [path, files[path] ?? null])));
-		if (workerOutcome.status !== 200) expect(workerOutcome.files).toEqual(core.files);
 	});
 });

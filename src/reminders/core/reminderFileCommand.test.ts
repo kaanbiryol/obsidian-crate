@@ -90,14 +90,16 @@ it('answers only the listed wire fields of a scanned reminder', async () => {
 	expect(payload).not.toHaveProperty('rawLine');
 });
 
-it('limits only written notes when the plaintext Worker asks', async () => {
+it('refuses every edit in a note over 1 MiB, deletes and reorders included, and growth past it', async () => {
 	const large = `${note}${'x'.repeat(1024 * 1024)}\n`;
 	const body = await request(large);
-	await expect(applyReminderFileCommand('delete', body, folder, async () => large)).rejects.toMatchObject({ status: 413, code: 'file_too_large' });
-	const deleted = await applyReminderFileCommand('delete', body, folder, async () => large, { limitWrittenNotesOnly: true });
-	expect(deleted.files[0]!.content).not.toContain('crate-id:r1');
-	await expect(applyReminderFileCommand('update', { ...body, content: 'Renamed' }, folder, async () => large, { limitWrittenNotesOnly: true }))
-		.rejects.toMatchObject({ status: 413, code: 'file_too_large' });
+	const tooLarge = { status: 413, code: 'file_too_large' };
+	await expect(applyReminderFileCommand('delete', body, folder, async () => large)).rejects.toMatchObject(tooLarge);
+	await expect(applyReminderFileCommand('reorder', { expectedOrder: ['r1'], orderedIds: ['r1'], project: 'Inbox' }, folder, async () => large)).rejects.toMatchObject(tooLarge);
+	await expect(applyReminderFileCommand('update', { ...body, content: 'Renamed' }, folder, async () => large)).rejects.toMatchObject(tooLarge);
+	const full = `${note}${'x'.repeat(1024 * 1024 - note.length - 1)}\n`;
+	await expect(applyReminderFileCommand('update', { ...await request(full), content: 'A longer title' }, folder, async () => full)).rejects.toMatchObject(tooLarge);
+	expect((await applyReminderFileCommand('delete', await request(full), folder, async () => full)).files[0]!.content).not.toContain('crate-id:r1');
 });
 
 it.each([

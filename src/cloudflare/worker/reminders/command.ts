@@ -1,4 +1,4 @@
-import { applyReminderFileCommand, ReminderCommandError, type ReminderFileCommandOptions } from '@/reminders/core/reminderFileCommand';
+import { applyReminderFileCommand, ReminderCommandError } from '@/reminders/core/reminderFileCommand';
 import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { ReminderReorderConflictError } from '@/reminders/core/markdownReminderFile';
 import { isSha256Hex } from '@/platform/validation';
@@ -19,7 +19,6 @@ type ReminderAction = 'create' | 'update' | 'set-completed' | 'delete' | 'reorde
 // order. The shared JSON reader also bounds the entire request to 1 MiB.
 export const MAX_REORDER_REMINDERS = 10_000;
 const REMINDER_EXISTS = 'This reminder already exists. Reload to see its committed state.';
-export const PLAINTEXT_COMMAND_OPTIONS: ReminderFileCommandOptions = { limitWrittenNotesOnly: true };
 
 /** Plaintext routes keep the failure responses released before they shared the
  * Markdown command. `request` is the body as received. */
@@ -61,7 +60,7 @@ export async function commitReminderCommand(env: Env, operation: ReminderOperati
 			const file = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path);
 			versions.set(path, file);
 			return file?.content ?? null;
-		}, PLAINTEXT_COMMAND_OPTIONS);
+		});
 	} catch (error) {
 		return plaintextFailureResponse(error, request);
 	}
