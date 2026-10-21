@@ -32,7 +32,7 @@ import type {
 	PushTestResponse,
 } from './worker-api/notifications';
 import { NotificationsWorkerApi } from './worker-api/notifications';
-import { SharedSettingsWorkerApi } from './worker-api/shared-settings';
+import { SharedSettingsWorkerApi, type VersionedSharedSettings } from './worker-api/shared-settings';
 import { SyncWorkerApi, type DownloadedBatch, type DownloadedFile } from './worker-api/sync';
 import { InitialImportApi } from './worker-api/initial-import';
 import { EncryptedFiles } from './encryption/encrypted-files';
@@ -167,6 +167,11 @@ export class SyncApiClient {
 
 	async getSharedSettings(): Promise<{ settings: SharedSettings | null; settingsVersion: string | null }> {
 		return this.sharedSettingsApi.getSharedSettings();
+	}
+
+	/** The server's shared settings as this client last read or wrote them, read first when unknown. */
+	async getKnownSharedSettings(): Promise<VersionedSharedSettings> {
+		return this.sharedSettingsApi.getKnownSharedSettings();
 	}
 
 	async putSharedSettings(settings: SharedSettings): Promise<{ success: boolean; settingsVersion: string }> {

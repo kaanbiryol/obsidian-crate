@@ -45,3 +45,20 @@ it('still reads populated encrypted shared settings', async () => {
 	const { api } = await fixture(settings);
 	await expect(api.getSharedSettings()).resolves.toEqual({ settings, settingsVersion: 'converted' });
 });
+
+it('writes encrypted changes against the version it last read or wrote', async () => {
+	const { api, encryption, requestJson, initial } = await fixture(null);
+	requestJson.mockResolvedValueOnce(initial)
+		.mockResolvedValueOnce({ success: true, settingsVersion: 'saved' })
+		.mockResolvedValueOnce({ success: true, settingsVersion: 'saved-again' });
+	await expect(api.getKnownSharedSettings()).resolves.toEqual({ settings: null, settingsVersion: 'converted' });
+	await api.putSharedSettings(settings);
+	await expect(api.getKnownSharedSettings()).resolves.toEqual({ settings, settingsVersion: 'saved' });
+	const changed = { ...settings, syncInterval: 60 };
+	await api.putSharedSettings(changed);
+
+	const writes = requestJson.mock.calls.flatMap(([, request]) => request ? [JSON.parse(request.body) as { settings: unknown; expectedVersion: string }] : []);
+	expect(requestJson).toHaveBeenCalledTimes(3);
+	expect(writes.map(write => write.expectedVersion)).toEqual(['converted', 'saved']);
+	await expect(encryption.openSettings(writes[1]!.settings)).resolves.toEqual(changed);
+});

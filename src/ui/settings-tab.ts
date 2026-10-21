@@ -25,16 +25,17 @@ import { createSharedSettingsPush } from './settings/shared-settings-push';
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
 	private cleanupFns: (() => void)[] = [];
-	private readonly pushSharedSettingsIfChanged: () => void;
+	private readonly sharedSettings: ReturnType<typeof createSharedSettingsPush>;
 
 	constructor(app: App, plugin: CratePlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
-		this.pushSharedSettingsIfChanged = createSharedSettingsPush(plugin);
+		this.sharedSettings = createSharedSettingsPush(plugin);
 	}
 
 	display(): void {
 		this.cleanup();
+		this.sharedSettings.observe();
 
 		const { containerEl } = this;
 		const viewState = captureSettingsView(containerEl);
@@ -150,7 +151,7 @@ export class CrateSettingTab extends PluginSettingTab {
 	}
 
 	hide(): void {
-		this.pushSharedSettingsIfChanged();
+		void this.sharedSettings.push();
 		this.cleanup();
 	}
 

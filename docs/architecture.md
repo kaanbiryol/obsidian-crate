@@ -531,7 +531,8 @@ focus restoration together; `PwaRemindersAppShell` renders that navigation state
 `protocol/feature-policy.ts` and `protocol/reading-policy.ts` do the same for the
 `/features` and `/reading/policy` contracts; `reading/server.ts` wraps the plugin's
 Reading policy requests.
-`sync/connection/shared-settings.ts` applies them to plugin settings. Production Worker modules
+`sync/connection/shared-settings.ts` applies them to plugin settings and rebases this device's
+changes onto the server's version before a conditional write. Production Worker modules
 may import only an allowlist: `protocol/`, `encryption/`, `platform/`, the shared
 reminder and Reading domain folders, release metadata and the PWA shell in
 `pwa/shell/`. `scripts/worker-import-boundary.mjs` enforces it through ESLint.
