@@ -21,7 +21,7 @@ export async function fetchReadingCapture(source: string, fetchPublic: (request:
     return { article: await withYoutubeTranscript(youtubeMetadata(resource.html), videoId, fetchPublic), url };
   }
   // Failed downloads and video metadata need no DOM parser.
-  const { extractDocument } = await import('./document');
+  const { extractDocument } = await import('@/reading/extraction/document');
   return { article: extractDocument(resource.html, resource.url), url: resource.url };
 }
 

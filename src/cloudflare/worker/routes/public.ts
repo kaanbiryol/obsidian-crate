@@ -23,13 +23,12 @@ import {
 } from '../pwa/asset-handlers';
 import { handleServerInfo } from '../server-info';
 import type { Env } from '../types';
-import type { RouteMethod } from './shared';
 
 export async function handlePublicRoute(
 	request: Request,
 	env: Env,
 	path: string,
-	method: RouteMethod,
+	method: Request['method'],
 ): Promise<Response | null> {
 	const db = env.DB;
  if (path === '/notifications/share/reading' && method === 'POST') return db && await readEncryptionState(db) ? new Response('Encrypted Reading requires the updated shortcut or saving a link inside Crate. Remove and reinstall older share targets.', { status: 428, headers: { 'Cache-Control': 'no-store' } }) : readingShareFallback(request);

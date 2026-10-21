@@ -18,7 +18,6 @@ import { handleListFileVersions, handleRestoreFileVersion } from '../sync/file-v
 import { handleEncryptedSettings } from '../encryption/settings';
 import { readEncryptionState } from '../encryption/state';
 import type { Env } from '../types';
-import type { RouteMethod } from './shared';
 import type { MutationAuditContext } from '../request-diagnostics';
 import { beginInitialImport, finishInitialImport } from '../sync/initial-import';
 import { pruneInitialImport } from '../sync/initial-import-prune';
@@ -32,7 +31,7 @@ export async function handleSyncRoute(
 	env: Env,
 	uploadCommitters: UploadCommitters,
 	path: string,
-	method: RouteMethod,
+	method: Request['method'],
 	resetGeneration: string | null,
 	audit?: MutationAuditContext,
 	encryption?: EncryptionServerState | null,

@@ -9,13 +9,12 @@ import {
 	handleUnsubscribe,
 } from '../notifications/subscription-handlers';
 import { retryPausedNotifications } from '../notifications/retry-handler';
-import type { RouteMethod } from './shared';
 
 export async function handleNotificationsRoute(
 	request: Request,
 	db: D1Database,
 	path: string,
-	method: RouteMethod,
+	method: Request['method'],
 	principal: AuthPrincipal,
 ): Promise<Response | null> {
 	if (path === '/notifications/subscribe' && method === 'POST') {

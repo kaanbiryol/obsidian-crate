@@ -9,7 +9,6 @@ import { handlePublicRoute } from './routes/public';
 import { handleRemindersRoute } from './routes/reminders';
 import { handleServerRoute } from './routes/server';
 import { handleSyncRoute } from './routes/sync';
-import type { RouteMethod } from './routes/shared';
 import type { Env } from './types';
 import type { AuthPrincipal } from './auth/index';
 import { corsResponse } from './cors';
@@ -29,7 +28,7 @@ export { handlePublicRoute };
 export function isAuthenticatedRouteAllowed(
 	principal: AuthPrincipal,
 	path: string,
-	method: RouteMethod,
+	method: Request['method'],
 ): boolean {
 	const policy = apiRoutePolicy(path, method);
 	// Admission rejects unknown routes before authentication. Vault credentials
@@ -40,7 +39,7 @@ export function isAuthenticatedRouteAllowed(
 interface AuthenticatedRouteContext {
 	uploadCommitters: UploadCommitters;
 	path: string;
-	method: RouteMethod;
+	method: Request['method'];
 	principal: AuthPrincipal;
 	resetGeneration: string | null;
 	requestId?: string;

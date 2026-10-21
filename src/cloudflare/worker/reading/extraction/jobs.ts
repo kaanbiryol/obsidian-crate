@@ -11,7 +11,7 @@ import { assembleReadingArticle, managedArticle } from '@/reading/core/article';
 import { invalidateReadingProjection, projectReading } from '../projection';
 import { commitStagedFile } from '../../sync/mutations';
 import { stageMarkdownFile } from '../../sync/markdown-file-staging';
-import type { extractDocument } from './document';
+import type { extractDocument } from '@/reading/extraction/document';
 import { publishReading, wakeProjection, wakeReading } from '@/cloudflare/worker/coordinator/coordinator';
 import { sha256Hex } from '@/platform/sha256';
 import { DEPLOYMENT_FENCE_KEY } from '@/protocol/deployment-fence';
