@@ -3,12 +3,12 @@ import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
 import { ReminderListLayout } from './ReminderListLayout';
 
-import type { AnimationConfig } from '../../types/componentAdapter';
+import type { AnimationConfig } from '../../../ui/shared/component-adapter';
 import type { Reminder } from '../../types/reminder';
 import { formatDateHeader } from '../format/dateFormatting';
 import { ReminderListPresence } from '../shared/ReminderListPresence';
 import { ReminderCard } from '../shared/ReminderCard';
-import { EmptyState } from '../shared/EmptyState';
+import { EmptyState } from '../../../ui/shared/EmptyState';
 import { buildUpcomingViewModel } from './viewModels';
 import { ReminderMotionRow } from '../shared/ReminderMotionRow';
 import type { ProjectColorScheme } from '../format/projectColors';

@@ -4,13 +4,11 @@ import { AnimatePresence, motion } from 'motion/react';
 
 import { ReminderMotionRow } from '../shared/ReminderMotionRow';
 import { ReminderListPresence } from '../shared/ReminderListPresence';
-import type { AnimationConfig } from '../../types/componentAdapter';
+import type { AnimationConfig } from '../../../ui/shared/component-adapter';
 import type { Reminder } from '../../types/reminder';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
-import {
-  REMINDER_LIST_FADE_TRANSITION,
-  REMINDER_SECTION_TRANSITION,
-} from '../shared/layoutConstants';
+import { REMINDER_SECTION_TRANSITION } from '../shared/layoutConstants';
+import { LIST_FADE_TRANSITION } from '../../../ui/shared/navigation/motion';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { ReminderPagination, useReminderPagination } from '../shared/reminder-pagination';
 
@@ -54,7 +52,7 @@ export const CompletedReminderSection = memo(function CompletedReminderSection({
         initial={animationsEnabled ? { height: 0, opacity: 0, overflow: 'hidden' } : false}
         animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }}
         exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
-        transition={animationsEnabled ? { height: REMINDER_SECTION_TRANSITION, opacity: REMINDER_LIST_FADE_TRANSITION } : { duration: 0 }}
+        transition={animationsEnabled ? { height: REMINDER_SECTION_TRANSITION, opacity: LIST_FADE_TRANSITION } : { duration: 0 }}
         style={{ display: 'flow-root' }}
       >
         <Collapsible.Root open={showCompleted} onOpenChange={onToggle}

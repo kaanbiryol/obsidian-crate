@@ -1,5 +1,6 @@
 import type { MotionProps } from 'motion/react';
-import { REMINDER_LIST_FADE_TRANSITION, REMINDER_SECTION_TRANSITION } from './layoutConstants';
+import { REMINDER_SECTION_TRANSITION } from './layoutConstants';
+import { LIST_FADE_TRANSITION } from '../../../ui/shared/navigation/motion';
 
 /** Animate occupied space, so fading cards never overlap their neighbors. */
 export function reminderRowMotion(enabled: boolean): MotionProps {
@@ -13,7 +14,7 @@ export function reminderRowMotion(enabled: boolean): MotionProps {
     transition: enabled ? {
       height: REMINDER_SECTION_TRANSITION,
       marginBottom: REMINDER_SECTION_TRANSITION,
-      opacity: REMINDER_LIST_FADE_TRANSITION,
+      opacity: LIST_FADE_TRANSITION,
     } : { duration: 0 },
     style: { display: 'flow-root' },
   };

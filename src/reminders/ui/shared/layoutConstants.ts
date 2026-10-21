@@ -29,7 +29,6 @@ export const REMINDER_LIST_LAYOUT_TRANSITION = {
   restSpeed: 10,
 } as const;
 
-export const REMINDER_LIST_FADE_TRANSITION = { duration: 0.12, ease: 'easeOut' } as const;
 export const REMINDER_SECTION_TRANSITION = { duration: 0.2, ease: EASE_STANDARD } as const;
 export const REMINDER_DRAG_SCALE = 1.02;
 

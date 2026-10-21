@@ -24,7 +24,7 @@ import { shouldShowReminderFab } from '@/reminders/ui/shared/remindersViewModel'
 import { useRemindersShellModel } from '@/reminders/ui/shared/useRemindersShellModel';
 import { PwaThemeIcon } from '../components/PwaThemeIcon';
 import { ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
-import { EmptyStateMessageContext } from '@/reminders/ui/shared/EmptyState';
+import { EmptyStateMessageContext } from '@/ui/shared/EmptyState';
 import { useReminderProjectNavigation } from './useReminderProjectNavigation';
 
 const LOADING_EMPTY_MESSAGE = { title: 'Loading reminders…', description: 'Checking for the latest reminders.' };

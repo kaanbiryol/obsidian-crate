@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { Drawer } from '@base-ui/react/drawer';
-import type { AnimationConfig, ModalVariant } from '../../reminders/types/componentAdapter';
+import type { AnimationConfig, ModalVariant } from './component-adapter';
 import { useObsidianOverlayActive } from './useObsidianOverlayActive';
 import { useReducedMotion } from './useReducedMotion';
 

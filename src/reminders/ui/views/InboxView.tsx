@@ -2,11 +2,11 @@ import React, { useMemo, memo } from 'react';
 
 import { ReminderListLayout } from './ReminderListLayout';
 
-import type { AnimationConfig } from '../../types/componentAdapter';
+import type { AnimationConfig } from '../../../ui/shared/component-adapter';
 import type { Reminder } from '../../types/reminder';
 import { ReminderCard } from '../shared/ReminderCard';
 import { ReorderableReminderList } from '../shared/ReorderableReminderList';
-import { EmptyState } from '../shared/EmptyState';
+import { EmptyState } from '../../../ui/shared/EmptyState';
 import { buildInboxViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../format/projectColors';
 import { useReminderOrder } from '../shared/hooks/useReminderOrder';

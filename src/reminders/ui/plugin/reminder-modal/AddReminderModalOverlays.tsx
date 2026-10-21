@@ -1,5 +1,5 @@
 import React from "react";
-import type { AnimationConfig } from "@/reminders/ui/plugin/animations";
+import type { AnimationConfig } from "@/ui/shared/component-adapter";
 import type { ReminderDraft } from "./useReminderDraft";
 import { DeleteConfirmationModal } from "../DeleteConfirmationModal";
 import { DatePickerModal } from "./DatePickerModal";

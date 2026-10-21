@@ -1,8 +1,8 @@
 import React, { memo, useMemo } from 'react';
 
-import type { AnimationConfig } from '../../types/componentAdapter';
+import type { AnimationConfig } from '../../../ui/shared/component-adapter';
 import type { Reminder } from '../../types/reminder';
-import { EmptyState } from '../shared/EmptyState';
+import { EmptyState } from '../../../ui/shared/EmptyState';
 import { buildProjectTree, ProjectTree } from './ProjectTree';
 import { buildBrowseProjectCardsViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../format/projectColors';

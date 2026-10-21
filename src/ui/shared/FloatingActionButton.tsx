@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { ShadowDOMNativeMotionButton } from './ShadowDOMNativeMotionButton';
-import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
-import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
+import { ThemeIcon } from './ThemeIcon';
+import { useReducedMotion } from './useReducedMotion';
 
 interface FloatingActionButtonProps {
   onClick: () => void;

@@ -302,8 +302,8 @@ Dock morphs use the shared collapsed height.
   flow in its current position, keeping the incoming scroller’s parent and geometry
   intact. Incoming reminders accept input immediately; departing content is inert.
   Empty-state copy and icons fade as one unit without a separate icon delay.
-  Reading library, filter results, and setup guidance reuse the reminders
-  `EmptyState` component and shared `empty-state` Sass. Center these messages in
+  Reading library, filter results, and setup guidance reuse the shared
+  `EmptyState` component and `empty-state` Sass from `src/ui/shared/`. Center these messages in
   the space below the search and filters, clear of navigation; short screens
   scroll from the top so their text and actions remain reachable.
   `PwaSheetSurface` owns keyboard padding and motion for reminder stages,

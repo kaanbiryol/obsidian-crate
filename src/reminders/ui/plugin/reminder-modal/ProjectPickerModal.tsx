@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import { BaseModal } from '../../../../ui/shared/BaseModal';
 import { ThemeIconProvider } from '../../../../ui/shared/ThemeIcon';
 import { ObsidianIcon } from '../../../../ui/obsidian-icon';
-import type { AnimationConfig } from '../animations';
+import type { AnimationConfig } from '../../../../ui/shared/component-adapter';
 import { getPickerModalProps } from '../glassStyles';
 import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
 import { ProjectPickerContent } from '../../reminder-editor/ProjectPickerContent';

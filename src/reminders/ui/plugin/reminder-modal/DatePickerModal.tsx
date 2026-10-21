@@ -4,7 +4,7 @@ import { ObsidianIcon } from '../../../../ui/obsidian-icon';
 import React, { useCallback } from 'react';
 
 import { BaseModal } from '../../../../ui/shared/BaseModal';
-import type { AnimationConfig } from '../animations';
+import type { AnimationConfig } from '../../../../ui/shared/component-adapter';
 import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
 import { getPickerModalProps } from '../glassStyles';
 import { parseLocalDateKey, parseReminderDateValue } from '../../../core/dates/reminderDate';

@@ -1,9 +1,9 @@
 import React, { forwardRef, useCallback, useId, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useIsPresent, type HTMLMotionProps } from 'motion/react';
 import type { Reminder } from '../../types/reminder';
-import type { AnimationConfig } from '../../types/componentAdapter';
+import type { AnimationConfig } from '../../../ui/shared/component-adapter';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import { REMINDER_LIST_FADE_TRANSITION } from '../shared/layoutConstants';
+import { LIST_FADE_TRANSITION } from '../../../ui/shared/navigation/motion';
 import { useStableReminderScroll } from '../shared/hooks/useStableReminderScroll';
 import { CompletedReminderSection, type CompletedSectionToggleProps } from './CompletedReminderSection';
 
@@ -44,7 +44,7 @@ export function ReminderListLayout({
   animationConfig,
 }: ReminderListLayoutProps) {
   const reduceMotion = useReducedMotion();
-  const transition = animationConfig.enabled && !reduceMotion ? REMINDER_LIST_FADE_TRANSITION : { duration: 0 };
+  const transition = animationConfig.enabled && !reduceMotion ? LIST_FADE_TRANSITION : { duration: 0 };
   const layoutGroupId = useId();
   const scrollRef = useStableReminderScroll(isDragging);
   const [showCompleted, setShowCompleted] = useState(false);

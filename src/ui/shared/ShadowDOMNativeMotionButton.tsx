@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react';
 import { motion } from 'motion/react';
-import { Button } from '../../../ui/shared/Button';
+import { Button } from './Button';
 
 const MotionButton = motion.create(Button);
 

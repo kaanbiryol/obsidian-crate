@@ -22,6 +22,9 @@ export const PWA_CONTROL_SPRING = {
 export const PWA_PICKER_EXIT = { duration: 0.18, ease: [0.4, 0, 1, 1] } as const;
 export const PWA_PICKER_RETURN = { ...PWA_PICKER_EXIT, duration: 0.08 } as const;
 
+/** Empty states and the list rows they replace dissolve together; durations are seconds. */
+export const LIST_FADE_TRANSITION = { duration: 0.12, ease: 'easeOut' } as const;
+
 export const SPRING_CONFIG = {
   stiffness: 500,
   damping: 40,

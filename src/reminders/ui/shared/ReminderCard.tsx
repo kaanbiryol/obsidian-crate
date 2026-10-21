@@ -9,7 +9,7 @@ import { formatDueDate } from '../format/dateFormatting';
 import { isReminderOverdue } from '../../core/dates/reminderDate';
 import { parseMarkdownLinks, isSafeUrl } from '../../core/grammar/markdownLinks';
 import { readableWikiLinks } from '../format/readableWikiLinks';
-import type { AnimationConfig } from '../../types/componentAdapter';
+import type { AnimationConfig } from '../../../ui/shared/component-adapter';
 import type { RecurrenceRule } from '../../types/reminder';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { useReminderClock } from './useReminderClock';

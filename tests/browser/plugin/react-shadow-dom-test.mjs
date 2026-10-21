@@ -10,7 +10,7 @@ const { outputFiles } = await build({
 			import { createRoot } from 'react-dom/client';
 			import { createPortal, flushSync } from 'react-dom';
 			import { Button } from './src/ui/shared/Button';
-			import { ShadowDOMNativeMotionButton } from './src/reminders/ui/shared/ShadowDOMNativeMotionButton';
+			import { ShadowDOMNativeMotionButton } from './src/ui/shared/ShadowDOMNativeMotionButton';
 			import { RichTextInput } from './src/reminders/ui/shared/RichTextInput';
 			const shadow = document.getElementById('host').attachShadow({ mode: 'open' });
 			const mountPoint = document.createElement('div');

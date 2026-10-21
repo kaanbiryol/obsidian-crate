@@ -8,7 +8,7 @@ import { ReadingReader } from '@/reading/ui/Reader';
 import { ReadingDialog, ReadingDialogHost } from '@/reading/ui/ReadingDialog';
 import { ReadingLibraryPanel } from '@/reading/ui/ReadingLibrary';
 import { SaveLinkForm } from '@/reading/ui/SaveLinkForm';
-import { EmptyState } from '@/reminders/ui/shared/EmptyState';
+import { EmptyState } from '@/ui/shared/EmptyState';
 import { Button } from '@/ui/shared/Button';
 import { useContext, useId, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
