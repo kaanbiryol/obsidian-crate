@@ -58,7 +58,6 @@ it('keeps the Reading library accessible when article fetching is disabled', asy
   const saved = await env.DB.prepare("SELECT path FROM files WHERE path LIKE 'Reading/%'").first<{ path: string }>();
   expect(saved).toBeNull();
   expect(await env.DB.prepare('SELECT url_identity FROM reading_captures').first()).toEqual({ url_identity: 'https://example.invalid/shared-pwa' });
-  expect((await worker.fetch(request('/reading/access', 'browser', { kind: 'reading' }), env)).status).toBe(403);
   expect((await worker.fetch(request('/reading/policy', 'browser', { enabled: false, folderPath: 'Reading' }), env)).status).toBe(403);
   const policy = await env.DB.prepare('SELECT revision FROM reading_policy').first<{ revision: string }>();
   expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: false, folderPath: 'Reading', revision: policy!.revision }), env)).status).toBe(200);
@@ -71,14 +70,9 @@ it('keeps the Reading library accessible when article fetching is disabled', asy
   const library = await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env);
   const bookmarks = await library.json() as { items: { source_url: string; extraction_status: string }[] };
   expect(bookmarks.items.find(item => item.source_url === 'https://example.invalid/bookmark')?.extraction_status).toBe('unavailable');
-  const permission = await worker.fetch(request('/reading/fetching', 'browser', undefined, 'GET'), env);
-  expect(permission.status).toBe(200);
-  const state = await permission.json() as { enabled: boolean; revision: string };
-  expect(state.enabled).toBe(false);
-  await token('capture-only', 'reading_capture', 'Reading');
-  expect((await worker.fetch(request('/reading/fetching', 'capture-only', { enabled: true, revision: state.revision }), env)).status).toBe(403);
-  expect((await worker.fetch(request('/reading/fetching', 'browser', { enabled: true, revision: 'stale' }), env)).status).toBe(409);
-  expect((await worker.fetch(request('/reading/fetching', 'browser', { enabled: true, revision: state.revision }), env)).status).toBe(200);
+  const state = await env.DB.prepare('SELECT enabled, revision FROM reading_policy').first<{ enabled: number; revision: string }>();
+  expect(state?.enabled).toBe(0);
+  expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: true, folderPath: 'Reading', revision: state!.revision }), env)).status).toBe(200);
   const explicitBookmark = await worker.fetch(request('/reading/capture', 'browser', {
     url: 'https://example.invalid/offline-bookmark', fetchArticle: false,
     operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),

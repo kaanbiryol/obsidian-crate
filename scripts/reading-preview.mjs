@@ -19,8 +19,8 @@ const server = createServer(async (request, response) => {
   try {
     if (request.headers.host !== `localhost:${port}`) { response.writeHead(403); response.end(); return; }
     if (request.url === '/preview/start' && request.method === 'GET') {
-      const enrollment = await api('/reading/access', { kind: 'reading' });
-      response.writeHead(303, { Location: enrollment.url, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }); response.end(); return;
+      const { browserToken } = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
+      response.writeHead(303, { Location: `${origin}/notifications?section=reading&browserToken=${browserToken}`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }); response.end(); return;
     }
     const chunks=[]; let size=0;
     for await (const chunk of request) { size+=chunk.length; if(size>32768) { response.writeHead(413);response.end();return; } chunks.push(chunk); }

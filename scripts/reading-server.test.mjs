@@ -57,16 +57,18 @@ test('built server captures, replays, isolates scopes and confirms browser hando
     };
     let result = await request('/reading/policy', vault.token, { enabled: true, folderPath: 'Reading', revision: null });
     assert.equal(result.status, 200, JSON.stringify(result));
-    const enrollment = await request('/reading/access', vault.token, { kind: 'reading' });
-    const grant = new URL(enrollment.body.url).hash.slice('#reading='.length);
-    const browser = await request('/reading/exchange', '', { token: grant });
-    assert.equal(browser.status, 200, JSON.stringify(browser));
-    const installed = await request('/reading/exchange', '', { token: browser.body.installToken });
-    assert.equal(installed.status, 200); assert.equal(installed.body.installToken, undefined);
-    assert.equal((await request('/reading/install', browser.body.token, {})).status, 404);
-    assert.equal((await request('/reading/access', browser.body.token, {kind:'reading'})).status, 403);
-    assert.equal((await request('/reading/exchange', '', { token: grant })).status, 401);
-    const capture = await request('/reading/access', vault.token, { kind: 'capture' });
+    // The web app signs in through Reminders enrollment; the Shortcut pairs over HTTPS.
+    const enrollment = await request('/notifications/reminders-enrollment-token', vault.token, { folderPath: 'Reminders' });
+    const exchanged = await request('/notifications/reminders-exchange', '', { token: enrollment.body.browserToken });
+    assert.equal(exchanged.status, 200, JSON.stringify(exchanged));
+    const browser = { body: { token: exchanged.body.authToken } };
+    assert.equal((await request('/reading/access', vault.token, { kind: 'reading' })).status, 404);
+    assert.equal((await request('/reading/exchange', '', { token: enrollment.body.token })).status, 404);
+    const shortcut = async (path, token, body) => (await runtime.mf.dispatchFetch(`https://localhost:8787${path}`, { method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json', [contract.revisionHeader]: String(contract.revision) }, body: JSON.stringify(body) })).json();
+    const pairing = await shortcut('/reading/shortcut-pairing', vault.token, {});
+    const { authorization } = await shortcut(contract.exchangePath, '', { token: new URL(pairing.pairingCode).hash.slice(1) });
+    const capture = { body: { token: authorization.slice('Bearer '.length) } };
     assert.equal((await request('/reading/list', capture.body.token)).status, 403);
     assert.equal((await request('/sync/manifest', browser.body.token)).status, 403);
     const body = { url: 'https://example.invalid/article?secret=never-log-me', fetchArticle: false, operationId: operation() };
@@ -90,7 +92,7 @@ test('built server captures, replays, isolates scopes and confirms browser hando
     const handoff = await request('/reading/handoff', '', {}, { 'X-Crate-Capture': launch.hash.slice(1) });
     assert.equal(handoff.status, 200, JSON.stringify(handoff)); assert.ok(handoff.body.saved);
     assert.deepEqual(await request('/reading/handoff', '', {}, { 'X-Crate-Capture': launch.hash.slice(1) }), handoff);
-    await runtime.db.prepare('DELETE FROM auth_tokens WHERE id=?').bind(capture.body.id).run();
+    await runtime.db.prepare("DELETE FROM auth_tokens WHERE scope='reading_capture'").run();
     assert.equal((await request('/reading/handoff', '', {}, { 'X-Crate-Capture': launch.hash.slice(1) })).status, 410);
     const page = await runtime.mf.dispatchFetch('http://localhost:8787/notifications/save-reading');
     assert.equal(page.headers.get('Cache-Control'), 'no-store'); assert.match(await page.text(), /<title>Save to Crate<\/title>/);

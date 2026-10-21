@@ -3,7 +3,6 @@ import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
 import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
-import { verifyReadingEnrollmentAuthority } from './pwa-reading-session-checks.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'auth-recovery-regression' });
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
@@ -247,7 +246,6 @@ try {
   for (const browserType of [chromium, webkit]) {
     const browser = await browserType.launch();
     try {
-      await verifyReadingEnrollmentAuthority(browser, origin);
       for (const kind of ['create', 'update']) {
         for (const failure of ['before', 'after']) await verifyRecovery(browser, kind, failure);
       }

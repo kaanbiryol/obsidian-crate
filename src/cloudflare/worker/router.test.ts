@@ -32,7 +32,6 @@ describe('authenticated route scopes', () => {
 		expect(isAuthenticatedRouteAllowed(principal, '/auth/tokens', 'GET')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/notifications/test', 'POST')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/notifications/reminders-enrollment-token', 'POST')).toBe(false);
-		expect(isAuthenticatedRouteAllowed(principal, '/reading/access', 'POST')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/reading/policy', 'POST')).toBe(false);
 	});
 });

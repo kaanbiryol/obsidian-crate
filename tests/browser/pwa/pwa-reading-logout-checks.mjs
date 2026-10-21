@@ -4,12 +4,14 @@ export async function checkReadingLogoutCorruption(browser, origin) {
   const page = await browser.newPage({ serviceWorkers: 'block' });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   try {
-    await page.route('**/reading/exchange', route => route.fulfill({ json: {
-      id: 'logout-reading', token: 'reading-test-token', folderPath: 'Reading', generation: 'logout-generation', expiresAt: Date.now() + 86400000,
-    } }));
+    await page.addInitScript(session => {
+      if (sessionStorage.getItem('reading-logout-seeded')) return;
+      sessionStorage.setItem('reading-logout-seeded', 'yes');
+      localStorage.setItem('crate-reading-session-v1', JSON.stringify(session));
+    }, { id: 'logout-reading', token: 'reading-test-token', folderPath: 'Reading', generation: 'logout-generation', expiresAt: Date.now() + 86400000 });
     await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
     await page.route('**/auth/session', route => route.fulfill({ status: 204 }));
-    await page.goto(`${origin}/notifications?section=reading#reading=logout-test-grant`);
+    await page.goto(`${origin}/notifications?section=reading`);
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reading-session-v1') ?? '{}').id)).toBe('logout-reading');
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
     await page.evaluate(async () => {

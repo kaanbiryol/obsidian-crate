@@ -3,10 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { useReadingConnection } from './useReadingConnection';
 import { useReadingSession } from './useReadingSession';
-import { AUTH_TOKEN_KEY, PWA_LOGOUT_KEY } from '../config';
+import { AUTH_TOKEN_KEY } from '../config';
 import { READING_SESSION_KEY, readReadingCache, readReadingDraft, saveReadingDraft, type ReadingSession } from './storage';
 import { connectReadingFromReminders } from './api';
-import { invalidatePwaSession } from '../session-generation';
 import { prepareReadingEncryption } from './encryption-session';
 
 vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
@@ -31,29 +30,32 @@ function deferred<T>() {
   return { promise, resolve };
 }
 beforeEach(() => {
-  values.clear(); vi.clearAllMocks(); network.mockReset();
+  values.clear(); vi.clearAllMocks(); network.mockReset().mockImplementation(async () => new Response(null, { status: 204 }));
   vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) });
   vi.stubGlobal('navigator', { onLine: true });
-  vi.stubGlobal('location', { hash: '#reading=grant', href: 'https://example.test/notifications?section=reading#reading=grant' });
-  vi.stubGlobal('history', { replaceState: vi.fn() });
+  vi.stubGlobal('location', { hash: '', href: 'https://example.test/notifications?section=reading' });
   vi.stubGlobal('fetch', network);
 });
 function renderSession() {
   return renderHook(() => useReadingSession(useReadingConnection(true, true)), () => {
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: false }) });
-    document.cookie = '';
   });
 }
 function start() {
-  const exchange = deferred<Response>();
-  network.mockImplementationOnce(() => exchange.promise).mockResolvedValue(new Response(null, { status: 204 }));
-  return { rendered: renderSession(), release: exchange.resolve };
+  const connected = deferred<ReadingSession>();
+  localStorage.setItem(AUTH_TOKEN_KEY, 'reminders');
+  vi.mocked(connectReadingFromReminders).mockImplementationOnce(async () => {
+    const next = await connected.promise;
+    localStorage.setItem(READING_SESSION_KEY, JSON.stringify(next));
+    return next;
+  });
+  return { rendered: renderSession(), release: connected.resolve };
 }
 
-describe('Reading enrollment authority', () => {
+describe('Reading session authority', () => {
   it.each(['replacement', 'reset', 'unmount'] as const)('rejects stale state publications after %s', async change => {
     const h = start();
-    await act(async () => { h.release(new Response(JSON.stringify(session))); });
+    await act(async () => { h.release(session); });
     const publisher = h.rendered.current;
     expect(publisher.isCurrentSession(session)).toBe(true);
     await act(async () => {
@@ -71,54 +73,21 @@ describe('Reading enrollment authority', () => {
     expect(h.rendered.current).toMatchObject({ cache: before.cache, pending: before.pending, error: before.error, url: before.url });
   });
 
-  it('persists enrollment, hydrates a saved draft, and saves edits after rerender', async () => {
+  it('connects from Reminders, hydrates a saved draft, and saves edits after rerender', async () => {
     vi.mocked(readReadingDraft).mockResolvedValueOnce({ url: 'https://saved.example/article' });
     const h = start();
-    await act(async () => { h.release(new Response(JSON.stringify({ ...session, installToken: 'install-token' }))); });
-    expect(JSON.parse(localStorage.getItem(READING_SESSION_KEY)!)).toEqual(session);
+    await act(async () => { h.release(session); });
     expect(h.rendered.current).toMatchObject({ ready: true, session, adding: true, url: 'https://saved.example/article' });
-    expect(document.cookie).toContain('crate-reading-install=install-token');
-    expect(network).toHaveBeenCalledOnce();
+    expect(connectReadingFromReminders).toHaveBeenCalledOnce();
     await act(async () => h.rendered.current.setUrl('https://edited.example/article'));
     expect(saveReadingDraft).toHaveBeenLastCalledWith(session, { url: 'https://edited.example/article' });
-  });
-
-  it.each(['peer logout', 'local logout', 'replacement reading session', 'replacement reminders session', 'reset', 'unmount'] as const)(
-    'discards a delayed grant after %s', async change => {
-      const h = start();
-      await act(async () => {
-        if (change === 'peer logout') localStorage.setItem(PWA_LOGOUT_KEY, 'logout');
-        if (change === 'local logout') invalidatePwaSession();
-        if (change === 'replacement reading session') localStorage.setItem(READING_SESSION_KEY, JSON.stringify(replacement));
-        if (change === 'replacement reminders session') localStorage.setItem(AUTH_TOKEN_KEY, 'replacement-reminders');
-        if (change === 'reset') h.rendered.current.resetSession();
-      });
-      if (change === 'unmount') h.rendered.unmount();
-      await act(async () => { h.release(new Response(JSON.stringify({ ...session, installToken: 'obsolete-install-token' }))); });
-      const revocation = network.mock.calls.find(([path]) => path === '/auth/session')![1]!;
-      expect(revocation.method).toBe('DELETE');
-      expect(new Headers(revocation.headers).get('Authorization')).toBe(`Bearer ${session.token}`);
-      if (change !== 'unmount') expect(h.rendered.current.ready).toBe(true);
-      expect(localStorage.getItem(READING_SESSION_KEY)).toBe(change === 'replacement reading session' ? JSON.stringify(replacement) : null);
-      expect(readReadingCache).not.toHaveBeenCalled();
-      expect(h.rendered.current.session).toBeNull();
-      expect(document.cookie).not.toContain('obsolete-install-token');
-    },
-  );
-
-  it('ignores a late enrollment failure after logout', async () => {
-    const h = start();
-    localStorage.setItem(PWA_LOGOUT_KEY, 'logout');
-    await act(async () => { h.release(new Response(JSON.stringify({ error: 'Expired grant' }), { status: 401 })); });
-    expect(h.rendered.current).toMatchObject({ ready: true, session: null, error: null });
-    expect(localStorage.getItem(READING_SESSION_KEY)).toBeNull();
   });
 
   it('fences delayed hydration after reset and preserves an unreadable draft', async () => {
     const cache = deferred<undefined>();
     vi.mocked(readReadingCache).mockReturnValueOnce(cache.promise);
     const h = start();
-    await act(async () => { h.release(new Response(JSON.stringify(session))); });
+    await act(async () => { h.release(session); });
     await act(async () => h.rendered.current.resetSession());
     await act(async () => { cache.resolve(undefined); });
     expect(h.rendered.current.session).toBeNull();
@@ -127,7 +96,7 @@ describe('Reading enrollment authority', () => {
 
     vi.mocked(readReadingDraft).mockRejectedValueOnce(new Error('Saved draft needs recovery'));
     const damaged = start();
-    await act(async () => { damaged.release(new Response(JSON.stringify(session))); });
+    await act(async () => { damaged.release(session); });
     expect(damaged.rendered.current).toMatchObject({ session, recovery: true, error: 'Saved draft needs recovery' });
     expect(saveReadingDraft).not.toHaveBeenCalled();
   });
@@ -136,7 +105,7 @@ describe('Reading enrollment authority', () => {
     const encryption = deferred<null>();
     vi.mocked(prepareReadingEncryption).mockReturnValueOnce(encryption.promise);
     const h = start();
-    await act(async () => { h.release(new Response(JSON.stringify(session))); });
+    await act(async () => { h.release(session); });
     await act(async () => h.rendered.current.resetSession());
     await act(async () => encryption.resolve(null));
     expect(h.rendered.current.session).toBeNull();
@@ -144,7 +113,6 @@ describe('Reading enrollment authority', () => {
   });
 
   it('removes connection listeners after enrollment and on unmount', async () => {
-    vi.stubGlobal('location', { hash: '', href: 'https://example.test/notifications?section=reading' });
     localStorage.setItem(AUTH_TOKEN_KEY, 'reminders');
     const rendered = renderSession();
     await act(async () => {});

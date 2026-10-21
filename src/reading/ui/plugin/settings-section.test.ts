@@ -13,7 +13,7 @@ beforeEach(() => {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isDesktopApp: true } }));
 	vi.doMock('../../../plugin/server-request', async () => ({ ...await vi.importActual<typeof import('../../../plugin/server-request')>('../../../plugin/server-request'), serverRequest: request }));
 	vi.doMock('../../runtime', () => ({ restartReading: vi.fn(), validateReadingConfiguration: validate }));
-	request.mockImplementation(async (_plugin, path) => path === '/reading/fetching' ? { enabled: true, revision: 'r' } : { policy });
+	request.mockImplementation(async () => ({ policy }));
 });
 afterEach(() => {
 	resetObsidianUiMocks();

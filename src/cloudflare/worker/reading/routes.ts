@@ -10,7 +10,7 @@ import type { AuthPrincipal } from '../auth/authenticate';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { parseJsonObject } from '../request-validation';
 import { policy, authority, readingResponse, ReadingError } from './common';
-import { issueReadingAccess, prepareHandoff, updatePolicy, exchangeReadingAccess, handoffAuthority } from './access';
+import { prepareHandoff, updatePolicy, handoffAuthority } from './access';
 import { mutateReading } from './mutations';
 import { projectReading } from './projection';
 import { readingItem, readingList, readingListEtag } from './queries';
@@ -44,7 +44,6 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     const body = parsed.value;
     if (shortcut) validateShortcutBody(body, shortcut.kind);
     if (shortcut?.kind === 'exchange') return await exchangeShortcutPairing(env.DB, body, request);
-    if (path === '/reading/exchange' && request.method === 'POST') return await exchangeReadingAccess(env.DB, body, request);
     if (path === '/reading/handoff' && request.method === 'POST') {
       const handoff = await handoffAuthority(env.DB, request);
       const limited = await limitNotificationAction(request, env.DB, handoff.principal.tokenId); if (limited) return limited;
@@ -59,17 +58,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
       if (request.method === 'POST') return await updatePolicy(env.DB, body);
     }
     const current = await authority(env.DB, principal);
-    if (path === '/reading/fetching' && principal.scope !== 'reading_capture') {
-      if (request.method === 'GET') return readingResponse({ enabled: Boolean(current.enabled), revision: current.revision });
-      if (request.method === 'POST') {
-        if (typeof body.enabled !== 'boolean') throw new ReadingError('Choose whether to fetch articles.');
-        await updatePolicy(env.DB, { enabled: body.enabled, folderPath: current.folder_path, revision: body.revision });
-        const updated = await policy(env.DB);
-        return readingResponse({ enabled: Boolean(updated?.enabled), revision: updated?.revision });
-      }
-    }
     if (path === '/reading/shortcut-pairing' && request.method === 'POST') return await issueShortcutPairing(env.DB, principal, current, url.origin);
-    if (path === '/reading/access' && request.method === 'POST' && principal.scope === 'vault') return await issueReadingAccess(env.DB, current, body, url.origin);
     if (shortcut?.kind === 'prepare' && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);
     if (path === '/reading/capture' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'capture');
     if (principal.scope === 'reading_capture') throw new ReadingError('This credential can only save links.', 403);

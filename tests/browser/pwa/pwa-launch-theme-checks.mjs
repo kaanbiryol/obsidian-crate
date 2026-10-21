@@ -47,11 +47,14 @@ export async function checkReadingOpening(browser, origin) {
    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148' });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.addInitScript(() => Object.defineProperty(navigator, 'standalone', { value: true }));
+  await page.addInitScript(() => {
+   Object.defineProperty(navigator, 'standalone', { value: true });
+   localStorage.setItem('crate-reminders-auth-token', 'slow-opening');
+  });
   await page.route('**/notifications/app.js*', async route => { await app.promise; await route.continue(); });
-  await page.route('**/reading/exchange', async route => { await session.promise; await route.abort(); });
+  await page.route('**/reading/session', async route => { await session.promise; await route.abort(); });
   try {
-   await page.goto(`${origin}/notifications?section=reading#reading=slow-opening`, { waitUntil: 'commit' });
+   await page.goto(`${origin}/notifications?section=reading`, { waitUntil: 'commit' });
    await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'default');
    await expect(page.locator('html')).toHaveAttribute('data-pwa-ios27-standalone', 'true');
    await expect(page.locator('.pwa-launch-splash .view-header-title')).toHaveText('Reading');

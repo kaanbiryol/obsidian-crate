@@ -32,8 +32,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       assert.equal(response.status, 200, await response.clone().text()); return response.json();
     };
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
-    const enrollment = await api('/reading/access', { kind: 'reading' });
-    const setup = new URL(enrollment.url); setup.searchParams.set('setup', 'shortcut');
+    const { browserToken } = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
+    const setup = new URL(`${origin}/notifications?section=reading&setup=shortcut`); setup.searchParams.set('browserToken', browserToken);
     browser = await engine.launch({ headless: true });
     const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
@@ -130,10 +130,15 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     unavailable = false;
     await dialog.getByRole('button', { name: 'Create pairing code', exact: true }).click();
     await expect(input).toHaveValue(/shortcut-exchange#/);
+    // Another tab logs out: it clears both credentials, then announces logout.
     await page.evaluate(() => {
-      const key = 'crate-reading-session-v1', oldValue = localStorage.getItem(key);
-      localStorage.removeItem(key);
-      window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue: null, storageArea: localStorage }));
+      const keys = ['crate-reminders-auth-token', 'crate-reading-session-v1'];
+      const previous = keys.map(key => localStorage.getItem(key)), logout = crypto.randomUUID();
+      keys.forEach(key => localStorage.removeItem(key));
+      localStorage.setItem('crate-reminders-logout', logout);
+      const notify = (key, oldValue, newValue) => window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue, storageArea: localStorage }));
+      notify('crate-reminders-logout', null, logout);
+      keys.forEach((key, index) => notify(key, previous[index], null));
     });
     await expect(page.getByRole('heading', { name: 'Connect to Crate', exact: true })).toBeVisible();
     await expect(input).toHaveCount(0);
@@ -168,8 +173,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const post = async (path, body, authorization = `Bearer ${vault.token}`) => runtime.mf.dispatchFetch(`${origin}${path}`, { method: 'POST',
       headers: { Authorization: authorization, 'Content-Type': 'application/json', 'X-Crate-Protocol': '1', [contract.revisionHeader]: String(contract.revision) }, body: JSON.stringify(body) });
     assert.equal((await post('/reading/policy', { enabled: false, folderPath: 'Reading', revision: null })).status, 200);
-    const access = await (await post('/reading/access', { kind: 'capture' })).json();
-    const authorization = `Bearer ${access.token}`;
+    const pairing = await (await post('/reading/shortcut-pairing', {})).json();
+    const { authorization } = await (await post(contract.exchangePath, { token: new URL(pairing.pairingCode).hash.slice(1) }, '')).json();
     const articleUrl = 'https://example.invalid/private-article-name';
     const prepare = async () => {
       const response = await post(contract.preparePath, { url: articleUrl }, authorization);
@@ -209,7 +214,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const issue = new URL(await page.getByRole('link', { name: 'Report on GitHub', exact: true }).getAttribute('href'));
     assert.equal(issue.origin + issue.pathname, contract.issuesUrl);
     assert.ok(issue.searchParams.get('body').includes(JSON.stringify(report, null, 2)));
-    for (const secret of [articleUrl, authorization, access.token, 'private-expired-credential']) {
+    for (const secret of [articleUrl, authorization, authorization.slice('Bearer '.length), 'private-expired-credential']) {
       assert.ok(!JSON.stringify(report).includes(secret)); assert.ok(!issue.searchParams.get('body').includes(secret));
     }
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Denied'); } } }));

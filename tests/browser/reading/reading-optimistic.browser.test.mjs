@@ -47,7 +47,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         return response;
       },
     });
-    const { runtime, vault, origin, api } = fixture;
+    const { runtime, vault, origin, api, readingAppUrl } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const saved = await api('/reading/capture', { url: 'https://example.invalid/article', title: 'Optimistic article', fetchArticle: false, operationId: operationId() });
     const path = `Reading/Optimistic article - ${saved.id.slice(0, 8)}.md`;
@@ -60,12 +60,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       'X-Crate-Expected-Hash': download.headers.get('X-File-Hash'), 'X-Crate-Upload-Operation': operationId(),
     }, body: content });
     assert.equal(uploaded.status, 200, await uploaded.text());
-    const enrollment = await api('/reading/access', { kind: 'reading' });
+    const readingUrl = await readingAppUrl();
     browser = await engine.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(enrollment.url);
+    await page.goto(readingUrl);
     const sync = page.locator('.pwa-reading-root .pwa-tab-panel:not([data-leaving]) .pwa-sync-indicator');
     const toast = page.locator('.toast');
     await expect(sync).toHaveAttribute('data-sync-state', 'synced');
@@ -246,7 +246,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     let refreshed = listResponses;
     await page.evaluate(() => {
       window.dispatchEvent(new Event('online'));
-      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'crate-test-unrelated' }));
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await expect.poll(() => listResponses).toBeGreaterThan(refreshed);

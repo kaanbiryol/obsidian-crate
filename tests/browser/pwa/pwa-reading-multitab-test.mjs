@@ -54,9 +54,9 @@ async function saveOffline(page, url) {
 	await expect(page.locator('.toast')).toHaveText('Link saved on this device');
 }
 
-async function verifySharedQueue(browser, { api, origin, runtime }) {
+async function verifySharedQueue(browser, { api, origin, runtime, readingAppUrl }) {
 	await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
-	const enrollment = await api('/reading/access', { kind: 'reading' });
+	const readingUrl = await readingAppUrl();
 	const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
 	const errors = [];
 	const held = Promise.withResolvers(), release = Promise.withResolvers();
@@ -79,7 +79,7 @@ async function verifySharedQueue(browser, { api, origin, runtime }) {
 			page.setDefaultTimeout(15_000);
 			page.on('pageerror', error => errors.push(error.message));
 		}
-		await pages[0].goto(enrollment.url);
+		await pages[0].goto(readingUrl);
 		await ready(pages[0]);
 		await pages[1].goto(`${origin}/notifications?section=reading`);
 		await ready(pages[1]);

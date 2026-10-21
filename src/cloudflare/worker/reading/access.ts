@@ -1,11 +1,8 @@
 import { readEncryptionState } from '../encryption/state';
-import { limitNotificationAction } from '../rate-limit';
-import { changedRows } from '../db';
 import { validateReadingFolder } from '@/reading/settings';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { policy, authority, canPrepareReadingHandoff, ReadingError, readingResponse } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
-import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 import { isSha256Hex } from '@/platform/validation';
 import { sha256Hex } from '@/platform/sha256';
 import { createRandomHexToken } from '@/platform/random-hex';
@@ -29,41 +26,6 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
     ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled, folder_path=excluded.folder_path, generation=excluded.generation, revision=excluded.revision`)
     .bind(current.enabled, folder, current.generation, current.revision).run();
   return readingResponse({ policy: current });
-}
-export async function issueReadingAccess(db: D1Database, current: ReadingPolicy, body: Record<string, unknown>, origin: string) {
-  const token = createRandomHexToken();
-  if (body.kind === 'capture') {
-    const id = crypto.randomUUID(), expiresAt = Date.now() + 90 * 86400_000;
-    await db.prepare(`INSERT INTO auth_tokens(id, token_hash, device_name, platform, scope, folder_path, reading_generation, expires_at)
-      VALUES (?, ?, 'Save to Crate shortcut', 'shortcut', 'reading_capture', ?, ?, ?)`)
-      .bind(id, await sha256Hex(token), current.folder_path, current.generation, expiresAt).run();
-    return readingResponse({ token, id, expiresAt, endpoint: `${origin}${shortcut.preparePath}` });
-  }
-  if (body.kind !== 'reading') throw new ReadingError('Choose Reading or capture access.');
-  await db.prepare(`INSERT INTO reading_enrollments(token_hash, generation, scope, expires_at) VALUES (?, ?, 'reading', ?)`)
-    .bind(await sha256Hex(token), current.generation, Date.now() + 10 * 60_000).run();
-  return readingResponse({ token, url: `${origin}/notifications?section=reading#reading=${token}` });
-}
-export async function exchangeReadingAccess(db: D1Database, body: Record<string, unknown>, request: Request) {
-  if (typeof body.token !== 'string' || body.token.length > 256) throw new ReadingError('Open a fresh Reading setup link.', 401);
-  const hash = await sha256Hex(body.token), current = await policy(db);
-  if (!current) throw new ReadingError('Choose a Reading folder in Obsidian first.', 403);
-  const enrollment = await db.prepare('SELECT scope FROM reading_enrollments WHERE token_hash=? AND expires_at>? AND generation=?')
-    .bind(hash, Date.now(), current.generation).first<{ scope: string }>();
-  if (!enrollment || !['reading', 'reading_install'].includes(enrollment.scope)) throw new ReadingError('This setup link expired or was already used. Open a fresh one from Crate settings.', 401);
-  const limited = await limitNotificationAction(request, db, hash); if (limited) return limited;
-  const id = crypto.randomUUID(), token = createRandomHexToken(), expiresAt = Date.now() + 90 * 86400_000;
-  const installToken = enrollment.scope === 'reading' ? createRandomHexToken() : undefined;
-  const results = await db.batch([
-    db.prepare(`INSERT INTO auth_tokens(id, token_hash, device_name, platform, scope, folder_path, reading_generation, expires_at)
-      SELECT ?, ?, 'Reading web app', 'web', 'reading', ?, ?, ? WHERE EXISTS (SELECT 1 FROM reading_enrollments WHERE token_hash=? AND expires_at>?)`)
-      .bind(id, await sha256Hex(token), current.folder_path, current.generation, expiresAt, hash, Date.now()),
-    ...(installToken ? [db.prepare(`INSERT INTO reading_enrollments(token_hash,generation,scope,expires_at)
-      SELECT ?, ?, 'reading_install', ? WHERE changes()=1`).bind(await sha256Hex(installToken), current.generation, Date.now()+10*60_000)] : []),
-    db.prepare('DELETE FROM reading_enrollments WHERE token_hash=?').bind(hash),
-  ]);
-  if (changedRows(results[0]) !== 1) throw new ReadingError('This setup link was already used.', 401);
-  return readingResponse({ token, id, expiresAt, ...(installToken ? { installToken } : {}), folderPath: current.folder_path, generation: current.generation });
 }
 export async function prepareHandoff(db: D1Database, principal: AuthPrincipal, body: Record<string, unknown>, origin: string) {
   if (!canPrepareReadingHandoff(principal.scope)) throw new ReadingError('Reading access is required.', 403);

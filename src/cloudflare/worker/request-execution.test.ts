@@ -73,7 +73,7 @@ it('reauthenticates inside the transfer queue before a revoked upload can be dis
 	expect(handleAuthenticatedRoute).not.toHaveBeenCalled();
 });
 
-it.each([['POST', '/reading/exchange'], ['PUT', '/settings']])('returns the coordinator request ID for a forwarded %s %s', async (method, path) => {
+it.each([['POST', '/reading/handoff'], ['PUT', '/settings']])('returns the coordinator request ID for a forwarded %s %s', async (method, path) => {
 	const forwarded: Request[] = [];
 	const coordinatorEnv = { DB: {}, REMINDER_ALARMS: {
 		idFromName: (name: string) => name,

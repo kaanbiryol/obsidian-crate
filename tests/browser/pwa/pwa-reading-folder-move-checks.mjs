@@ -16,11 +16,11 @@ export async function verifyReadingFolderMove({ t, page, origin, owner, bundle, 
     const http = new t.WorkerApiHttpClient(origin, owner.token, transport);
     http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
     const enroll = async () => {
-      const { token } = await http.requestJson('/reading/access', { method: 'POST', body: JSON.stringify({ kind: 'reading' }) });
+      const { browserToken } = await http.requestJson('/notifications/reminders-enrollment-token', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders' }) });
       // Open the setup link as a new document, as Obsidian does. Navigating an
       // already-open /notifications page to only a new hash does not reload it.
       await page.goto(origin + '/health');
-      await page.goto(`${origin}/notifications?section=reading#reading=${token}&crateReadingKey=${encodeURIComponent(recovery)}`);
+      await page.goto(`${origin}/notifications?section=reading&browserToken=${browserToken}#crateReadingKey=${encodeURIComponent(recovery)}`);
       await expect(page.getByText('Encrypted Reading article', { exact: true })).toBeVisible({ timeout: 30000 });
     };
     await enroll();

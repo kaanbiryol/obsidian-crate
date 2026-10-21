@@ -11,7 +11,7 @@ import { createRandomHexToken } from '@/platform/random-hex';
 const invalidPairing = () => new ReadingError('This pairing code expired or was already used. Create a new code in Reading settings.', 410);
 
 // Enrollment scopes name the issuer so revoking it also invalidates unredeemed
-// codes. Existing library/install exchanges explicitly reject these scopes.
+// codes.
 export async function issueShortcutPairing(db: D1Database, principal: AuthPrincipal, current: ReadingPolicy, origin: string) {
   if (principal.scope !== 'reading' && principal.scope !== 'reminders' && principal.scope !== 'vault') throw new ReadingError('Reading access is required.', 403);
   if (!origin.startsWith('https://')) throw new ReadingError('Open Crate over HTTPS to connect an iPhone shortcut.');

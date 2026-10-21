@@ -14,7 +14,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   let articleMarkdown = 'A useful **article excerpt**.\n\nAnother paragraph to read.\n\n```swift\n' + codeExample + '```\n\n```unknown-language\nunchanged <example>\n```';
   try {
     fixture = await openWorkerBrowserFixture({ deviceName: 'Highlight test' });
-    const { runtime, vault, origin, api } = fixture;
+    const { runtime, vault, origin, api, readingAppUrl } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const operationId = `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
     const saved = await api('/reading/capture', { url: 'https://example.invalid/article', title: 'Highlight article', fetchArticle: false, operationId });
@@ -33,11 +33,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       assert.equal(response.status, 200, await response.text());
     };
     await replaceArticle(articleMarkdown);
-    const enrollment = await api('/reading/access', { kind: 'reading' });
+    const readingUrl = await readingAppUrl();
     browser = await engine.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     page = await context.newPage();
-    await page.goto(enrollment.url);
+    await page.goto(readingUrl);
     const open = async () => {
       await page.getByRole('button', { name: /example.invalid Highlight article/ }).click();
       await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');

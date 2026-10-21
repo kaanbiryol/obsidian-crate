@@ -357,8 +357,7 @@ async function openReadingBrowserFixture(t, name, engine, contextOptions = {}) {
   const seedArticle = () => fixture.api('/reading/capture', { url: readerUrl, fetchArticle: false,
     operationId: `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}` });
   const enroll = async () => {
-    const enrollment = await fixture.api('/reading/access', { kind: 'reading' });
-    await page.goto(enrollment.url);
+    await page.goto(await fixture.readingAppUrl());
     await page.getByRole('searchbox', { name: 'Search reading' }).waitFor();
     await expect(readingSync).toHaveAttribute('data-sync-state', 'synced');
   };
@@ -367,13 +366,13 @@ async function openReadingBrowserFixture(t, name, engine, contextOptions = {}) {
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: opening shell, settings and input geometry`, { timeout: 90000 }, async t => {
   const fixture = await openReadingBrowserFixture(t, name, engine);
-  const { page, readingSync, api } = fixture;
-  const enrollment = await api('/reading/access', { kind: 'reading' });
+  const { page, readingSync } = fixture;
+  const readingUrl = await fixture.readingAppUrl();
   const listResponse = fixture.holdResponse('list');
-  const exchangeReleased = Promise.withResolvers();
-  fixture.releases.push(exchangeReleased.resolve);
-  await page.route('**/reading/exchange', async route => { await exchangeReleased.promise; await route.continue(); });
-  await page.goto(enrollment.url);
+  const sessionReleased = Promise.withResolvers();
+  fixture.releases.push(sessionReleased.resolve);
+  await page.route('**/reading/session', async route => { await sessionReleased.promise; await route.continue(); });
+  await page.goto(readingUrl);
   await expect(page.locator('.pwa-reading-opening__header')).toBeVisible();
   await expect(page.locator('.pwa-reading-opening__header [data-icon="settings"]')).toBeVisible();
   const headerGeometry = () => page.locator('.crate-reading__header:visible').evaluate(header => {
@@ -386,7 +385,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await expect.poll(async () => { openingHeader = await headerGeometry(); return openingHeader.height; }).toBeGreaterThan(0);
   await expect(page.locator('.pwa-dock .pwa-mode-opening__shape')).toHaveCount(0);
   const openingDock = await dockAppearance(page);
-  exchangeReleased.resolve();
+  sessionReleased.resolve();
   await page.getByRole('searchbox',{name:'Search reading'}).waitFor();
   assert.deepEqual(await headerGeometry(), openingHeader, 'Reading header stays fixed when the session loads');
   assert.deepEqual(await dockAppearance(page), openingDock, 'Reading dock is already complete while the session loads');
@@ -413,7 +412,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   assert.equal(await page.locator('.crate-feature-nav').count(), 0);
   await page.getByRole('searchbox',{name:'Search reading'}).fill('kept while switching');
   await switchFeature(page, 'Reminders');
-  await page.getByRole('heading',{name:'Connect to Crate',exact:true}).waitFor();
+  await expect(page.locator('.crate-feature-panel[data-active="true"]')).toHaveAttribute('data-crate-section', 'reminders');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(featureNavigationTarget(page)).toBeFocused();
   await switchFeature(page, 'Reading');
@@ -888,12 +887,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   let fixture, browser;
   try {
     fixture = await openWorkerBrowserFixture({ deviceName: 'Layout test' });
-    const { api } = fixture;
+    const { api, readingAppUrl } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
-    const enrollment = await api('/reading/access', { kind: 'reading' });
+    const readingUrl = await readingAppUrl();
     browser = await engine.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 1280, height: 844 } });
-    await page.goto(enrollment.url);
+    await page.goto(readingUrl);
     await expect(page.getByRole('heading', { name: 'Save something worth your time' })).toBeVisible();
     for (const width of [1280, 900, 390]) {
       await page.setViewportSize({ width, height: 844 });

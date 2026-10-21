@@ -11,7 +11,7 @@ const CHOICE_KEY = 'crate-browser-setup-choice';
 export function needsBrowserSetup(): boolean {
   if (isStandaloneApp() || (!isIosOrIpados() && !/Android/i.test(navigator.userAgent))) return false;
   const params = new URLSearchParams(location.search);
-  const incoming = Boolean(params.get('token') || params.get('browserToken') || new URLSearchParams(location.hash.slice(1)).get('reading'));
+  const incoming = Boolean(params.get('token') || params.get('browserToken'));
   try {
     const choice = localStorage.getItem(CHOICE_KEY);
     if (choice === 'web') return false;

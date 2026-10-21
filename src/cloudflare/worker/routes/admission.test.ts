@@ -89,7 +89,7 @@ it.each([
 	expect(apiRoutePolicy(path, method)?.initializeProjection ?? false).toBe(initialize);
 });
 
-it.each(['/reading/exchange', '/reading/handoff'])('redeems %s under coordinator authority before ordinary authentication', path => {
+it.each(['/reading/handoff', shortcut.exchangePath])('redeems %s under coordinator authority before ordinary authentication', path => {
 	expect(apiRoutePolicy(path, 'POST')?.execution).toEqual({ kind: 'reading-grant' });
 });
 

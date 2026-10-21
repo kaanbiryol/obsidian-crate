@@ -8,7 +8,7 @@ App mutations require `X-Crate-Protocol: 1`; check `/.well-known/crate` before w
 
 All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have `vault`, `reminders`, `reading`, or `reading_capture` scope, and may have an expiry. Reading grants are also bound to the active Reading policy generation. The Worker hashes the bearer token with SHA-256 and looks up the hash in the `auth_tokens` D1 table. Authentication fails closed with `503` when D1 is unavailable.
 
-Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. Once a Reading folder is configured, the same token can use Reading library, save, update, and shortcut-pairing routes. It cannot issue Reading setup links or change the Reading folder, and it cannot call sync, settings, device-management or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
+Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. Once a Reading folder is configured, the same token can use Reading library, save, update, and shortcut-pairing routes. It cannot change the Reading folder, and it cannot call sync, settings, device-management or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
 Self-hosted installations additionally have a Node gateway, outside the Worker:
 `GET /__crate/ready` returns a per-process readiness identifier, and
@@ -509,11 +509,6 @@ plugin initializes extraction when Reading is enabled. A library capture with
 `fetchArticle: true` also enables extraction as part of that explicit save.
 Capture-only credentials cannot enable it. The plugin does not expose a separate
 fetching switch.
-
-`GET /reading/fetching` returns `{ enabled, revision }`. `POST /reading/fetching`
-accepts `{ enabled: boolean, revision }` and returns the updated state. Vault, Reading,
-and reminders sessions can explicitly change this permission; capture-only credentials
-cannot. Stale revisions receive 409. This endpoint cannot change the Reading folder.
 
 With fetching off, new URL captures become bookmarks (`extraction_status: unavailable`),
 existing articles remain readable and editable, and retries are rejected. Capture

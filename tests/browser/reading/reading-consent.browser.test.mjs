@@ -9,12 +9,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
     let fixture, browser;
     try {
       fixture = await openWorkerBrowserFixture({ deviceName: 'Consent test' });
-      const { api } = fixture;
+      const { api, readingAppUrl } = fixture;
       await api('/reading/policy', { enabled: false, folderPath: 'Reading', revision: null });
-      const enrollment = await api('/reading/access', { kind: 'reading' });
+      const readingUrl = await readingAppUrl();
       browser = await engine.launch({ headless: true });
       const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: 'reduce', serviceWorkers: 'block' });
-      await page.goto(enrollment.url);
+      await page.goto(readingUrl);
       await expect(page.getByRole('button', { name: 'Save a link', exact: true })).toBeVisible();
       await page.getByRole('button', { name: 'Save a link', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: 'Save a link', exact: true });
@@ -30,15 +30,15 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       await expect(dialog).toHaveCount(0);
       await expect.poll(async () => (await api('/reading/list')).items.length).toBe(1);
       assert.equal((await api('/reading/list')).items[0].capture_method, 'url');
-      assert.equal((await api('/reading/fetching')).enabled, true);
+      assert.equal((await api('/reading/policy')).policy.enabled, 1);
       await page.getByRole('button', { name: 'Save a link', exact: true }).click();
       await dialog.getByLabel('Link', { exact: true }).fill('https://example.invalid/article');
       await dialog.getByRole('button', { name: 'Save link', exact: true }).click();
       await expect(dialog).toHaveCount(0);
       await expect.poll(async () => (await api('/reading/list')).items.length).toBe(2);
-      assert.equal((await api('/reading/fetching')).enabled, true);
-      const permission = await api('/reading/fetching');
-      await api('/reading/fetching', { enabled: false, revision: permission.revision });
+      const { policy } = await api('/reading/policy');
+      assert.equal(policy.enabled, 1);
+      await api('/reading/policy', { enabled: false, folderPath: 'Reading', revision: policy.revision });
       await page.reload();
       await expect(page.getByRole('button', { name: 'Save a link', exact: true })).toBeVisible();
       assert.equal((await api('/reading/list')).items.length, 2);

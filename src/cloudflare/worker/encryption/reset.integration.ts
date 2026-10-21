@@ -88,7 +88,6 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	expect(await env.DB.prepare('SELECT 1 FROM web_enrollment_tokens UNION SELECT 1 FROM push_subscriptions').first()).toBeNull();
 	await finish();
 	for (const table of readingTables) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
-	expect((await request('/reading/exchange', nextToken, 'POST', { token: 'old-reading-grant' })).status).not.toBe(200);
 	expect(await readEncryptionState(env.DB)).toBeNull();
 	expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(SYNC_RESET_GENERATION_KEY).first()).toEqual({ value: id });
 	expect((await env.BUCKET.list()).objects).toHaveLength(0);

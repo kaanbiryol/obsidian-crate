@@ -11,8 +11,8 @@ export async function verifyReadingPlaintextTransition({ t, browser, origin, own
       const response = await fetch(request.url, { method: request.method, body: request.body, headers: { ...request.headers, 'Content-Type': request.contentType ?? 'application/json' } });
       const bytes = await response.arrayBuffer(); return { status: response.status, headers: Object.fromEntries(response.headers), arrayBuffer: bytes, text: new TextDecoder().decode(bytes) };
     });
-    const { token } = await http.requestJson('/reading/access', { method: 'POST', body: JSON.stringify({ kind: 'reading' }) });
-    await page.goto(`${origin}/notifications?section=reading#reading=${token}`);
+    const { browserToken } = await http.requestJson('/notifications/reminders-enrollment-token', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders' }) });
+    await page.goto(`${origin}/notifications?section=reading&browserToken=${browserToken}`);
     await page.getByRole('button', { name: 'Save a link', exact: true }).click();
     await page.getByLabel('Link', { exact: true }).fill(privateUrl);
     // Keep this plaintext tab and its draft open while an Obsidian client

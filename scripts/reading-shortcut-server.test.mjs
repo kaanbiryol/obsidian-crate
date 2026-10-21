@@ -93,9 +93,13 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
       const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       return { status: response.status, body: await response.json(), cache: response.headers.get('Cache-Control') };
     };
+    // Web app sessions come from Reminders enrollment, as the plugin links them.
     const browser = async () => {
-      const access = await request('/reading/access', vault.token, { kind: 'reading' });
-      return (await request('/reading/exchange', '', { token: access.body.token })).body;
+      const enrollment = await request('/notifications/reminders-enrollment-token', vault.token, { folderPath: 'Reminders' });
+      const { authToken, expiresAt } = (await request('/notifications/reminders-exchange', '', { token: enrollment.body.browserToken })).body;
+      const { id } = await runtime.db.prepare('SELECT id FROM auth_tokens WHERE token_hash=?').bind(hash(authToken)).first();
+      const { generation } = await runtime.db.prepare('SELECT generation FROM reading_policy').first();
+      return { token: authToken, id, generation, expiresAt: Date.parse(expiresAt) };
     };
     await request('/reading/policy', vault.token, { enabled: true, folderPath: 'Reading', revision: null });
     const session = await browser();
@@ -122,8 +126,8 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     const grant = await pair();
     const saved = await runtime.db.prepare('SELECT * FROM reading_enrollments WHERE token_hash=?').bind(hash(grant.token)).first();
     assert.ok(saved); assert.ok(!JSON.stringify(saved).includes(grant.token));
-    assert.equal((await request('/reading/exchange', '', grant)).status, 401);
-    assert.equal((await request('/reading/access', session.token, { kind: 'reading' })).status, 403);
+    assert.equal((await request('/reading/exchange', '', grant)).status, 404);
+    assert.equal((await request('/reading/access', session.token, { kind: 'reading' })).status, 404);
     const exchanges = await Promise.all([request(contract.exchangePath, '', grant), request(contract.exchangePath, '', grant)]);
     assert.deepEqual(exchanges.map(result => result.status).sort(), [200, 410]);
     const capture = exchanges.find(result => result.status === 200);
@@ -134,7 +138,7 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     assert.equal(credential.scope, 'reading_capture'); assert.equal(credential.folder_path, 'Reading'); assert.equal(credential.reading_generation, session.generation);
     assert.ok(credential.expires_at <= session.expiresAt);
     assert.equal((await request('/reading/shortcut-pairing', token)).status, 403);
-    assert.equal((await request('/reading/access', token, { kind: 'reading' })).status, 403);
+    assert.equal((await request('/reading/access', token, { kind: 'reading' })).status, 404);
     assert.equal((await request(contract.preparePath, token, { url: 'https://example.invalid/test' })).status, 200);
     const replaced = await pair(), current = await pair();
     assert.equal((await request(contract.exchangePath, '', replaced)).status, 410);
@@ -155,7 +159,8 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     const changed = await pair(second);
     await runtime.db.prepare("UPDATE reading_policy SET generation='changed'").run();
     assert.equal((await request(contract.exchangePath, '', changed)).status, 410);
-    assert.equal((await request('/reading/shortcut-pairing', second.token)).status, 401);
+    // Reminders sessions follow the Reading folder, so they can pair again for the new generation.
+    assert.equal((await request('/reading/shortcut-pairing', second.token)).status, 200);
     assert.equal((await request(contract.exchangePath, '', { token: 'bad' })).status, 410);
     // Pairing does not save files or leak into an article handoff.
     assert.equal((await request('/reading/handoff', grant.token)).status, 401);

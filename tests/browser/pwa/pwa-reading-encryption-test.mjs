@@ -54,9 +54,12 @@ try {
   const sealed = await t.sealFile({ path, content: new TextEncoder().encode(note), contentType: 'text/markdown', publicData: null }, keys.forPath(path));
   const upload = await fetch(`${origin}/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: sealed.bytes, headers: { ...headers, 'Content-Type': 'application/vnd.crate.encrypted-file', 'X-File-Hash': sealed.hash, 'X-File-Size': String(sealed.bytes.length), 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${crypto.randomUUID()}` } });
   assert.equal(upload.status, 200, await upload.text());
-  const enrollment = await fetch(origin + '/reading/access', { method: 'POST', headers, body: JSON.stringify({ kind: 'reading' }) });
-  assert.equal(enrollment.status, 200, await enrollment.clone().text());
-  const { token } = await enrollment.json();
+  const enroll = async () => {
+    const enrollment = await fetch(origin + '/notifications/reminders-enrollment-token', { method: 'POST', headers, body: JSON.stringify({ folderPath: 'Reminders' }) });
+    assert.equal(enrollment.status, 200, await enrollment.clone().text());
+    return (await enrollment.json()).browserToken;
+  };
+  const token = await enroll();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   // Headless WebKit's native getSubscription() freezes even on an empty page
   // on this host. Keep real SW/storage, but leave native push to device checks.
@@ -75,7 +78,7 @@ try {
   injectShell = true;
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => { if ((request.url() + (request.postData() ?? '')).includes(recovery)) recoverySent = true; if (request.method() !== 'GET') requests.push({ path: new URL(request.url()).pathname, body: request.postData() ?? '' }); });
-  await page.goto(`${origin}/notifications?section=reading#reading=${token}&crateReadingKey=${encodeURIComponent(recovery)}`);
+  await page.goto(`${origin}/notifications?section=reading&browserToken=${token}#crateReadingKey=${encodeURIComponent(recovery)}`);
   try { await expect(page.getByText('Encrypted Reading article', { exact: true })).toBeVisible({ timeout: 30000 }); }
   catch (error) { console.log('Reading bootstrap:', await page.locator('body').innerText({ timeout: 2000 }).catch(() => 'unavailable'), errors); throw error; }
   assert.ok(!page.url().includes('crateReadingKey'));
@@ -149,7 +152,6 @@ try {
   assert.ok(!commits.some(body => body.includes('article-private') || body.includes('Private browser extraction')));
   await page.getByRole('button', { name: 'Open settings', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Encryption', exact: true }).locator('.settings-row').filter({ has: page.getByText('Reading', { exact: true }) }).getByText('Unlocked', { exact: true })).toBeVisible();
-  await expect(page.getByText('Connect Reminders to check this device.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
   await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
   await expect.poll(() => page.evaluate(() => localStorage.getItem('crate-reading-session-v1'))).toBeNull();
@@ -160,12 +162,15 @@ try {
   assert.equal(await page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('crate-encryption-session:'))), false);
   // A fresh Safari/PWA partition must keep an incoming Shortcut URL through
   // folder-key recovery, without placing that URL in any server request.
-  const fresh = await fetch(origin + '/reading/access', { method: 'POST', headers, body: JSON.stringify({ kind: 'reading' }) });
-  assert.equal(fresh.status, 200); const freshGrant = await fresh.json();
+  const freshToken = await enroll();
   const lockedContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  // This context signs in through Reminders, which checks push subscriptions.
+  if (type === webkit) await lockedContext.addInitScript(() => {
+    Object.defineProperty(ServiceWorkerRegistration.prototype, 'pushManager', { get: () => undefined });
+  });
   const locked = await lockedContext.newPage(), privateUrl = 'https://example.invalid/private-shortcut-draft';
   const wire = []; locked.on('request', request => wire.push(request.url() + (request.postData() ?? '')));
-  await locked.goto(`${origin}/notifications?section=reading#reading=${freshGrant.token}&readingCapture=${encodeURIComponent(privateUrl)}`);
+  await locked.goto(`${origin}/notifications?section=reading&browserToken=${freshToken}#readingCapture=${encodeURIComponent(privateUrl)}`);
   await expect(locked.getByRole('heading', { name: 'Unlock Crate', exact: true })).toBeVisible();
   assert.ok(!locked.url().includes('readingCapture'));
   await locked.getByRole('button', { name: 'Use recovery key instead', exact: true }).click();

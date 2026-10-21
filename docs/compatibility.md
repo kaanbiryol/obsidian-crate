@@ -90,7 +90,7 @@ One-off and repeating editor schedules accept timezone suffixes, for example `to
 
 The baseline includes `reading-shortcut-pairing-v1`. Enrolled Reading sessions may mint one-use capture grants, but cannot renew or mint library sessions. Capture access is bounded by the issuer’s expiry. Manually configured shortcuts also work. Deploy the signed v1 shortcut through the Pages workflow before distributing a server revision; downloaded templates contain no account data.
 
-An enrolled Reminders PWA can use the same browser credential for Reading after server Reading is enabled. The Reading library stays gated by the active server policy; Reminders credentials still cannot create Reading setup links, change Reading policy, or access vault sync. The web app keeps Reading-only setup links for browsers without a Reminders connection.
+An enrolled Reminders PWA can use the same browser credential for Reading after server Reading is enabled. The Reading library stays gated by the active server policy; Reminders credentials still cannot change Reading policy or access vault sync. Browsers open Reading through this Reminders sign-in; there are no Reading-only setup links. Reading-only sessions saved by older versions keep working until they expire.
 
 Reading-folder imports do not require a Clipper marker. Imported notes without a web source use `source_url: ""` with
 `capture_method: web-clipper`; URL captures still require a valid HTTP(S) URL.

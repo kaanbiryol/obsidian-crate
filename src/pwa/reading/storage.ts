@@ -74,7 +74,6 @@ export async function readingDrainLock<T>(action: () => Promise<T>): Promise<T> 
 export async function clearReadingData(isCurrent: () => boolean = () => true): Promise<void> {
   if (!isCurrent()) return;
   localStorage.removeItem(READING_SESSION_KEY);
-  document.cookie = 'crate-reading-install=; Max-Age=0; Path=/notifications; SameSite=Strict; Secure';
   window.dispatchEvent(new Event('crate-reading-change'));
   // Serialize with in-flight cache writes. Credential checks stop later completions.
   const db = await readingDatabase();

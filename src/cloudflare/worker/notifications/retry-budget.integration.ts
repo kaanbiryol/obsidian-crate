@@ -6,7 +6,6 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../storage';
 import { revalidateReminderSources } from '../reminders/source-migration';
 import { drainNotificationJobs } from './outbox';
-import { retryPausedNotifications } from './retry-handler';
 import { handleDiagnostics } from '../maintenance/diagnostics';
 import { READY_PROJECTION_JOBS_SQL, NEXT_NOTIFICATION_WORK_SQL } from './queue';
 
@@ -16,7 +15,7 @@ beforeEach(async () => {
 });
 afterEach(async () => { await reset(); });
 
-it('pauses an invalid file immediately despite unrelated edits, then supports explicit retry and repair', async () => {
+it('pauses an invalid file immediately despite unrelated edits, then recovers after repair', async () => {
   const path = 'Reminders/Broken.md';
   const content = '- [ ] Broken @2099-01-01 <!-- crate-id:11111111-1111-4111-8111-111111111111 -->\n<!-- crate-desc:v1:%invalid -->';
   const original = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
@@ -26,9 +25,6 @@ it('pauses an invalid file immediately despite unrelated edits, then supports ex
   for (let i = 0; i < 3; i++) await revalidateReminderSources(env, 2);
   expect(await failure()).toEqual({ attempts: 1, available_at: -1 });
   expect(await (await handleDiagnostics(env.DB)).json()).toMatchObject({ pausedNotificationFiles: [{ path, attempts: 1 }] });
-  expect(await (await retryPausedNotifications(env.DB)).json()).toEqual({ retried: 1, more: false });
-  await revalidateReminderSources(env, 2);
-  expect(await failure()).toMatchObject({ attempts: 1 });
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, 'Repaired', original.hash);
   expect(await failure()).toBeNull();
 });
@@ -46,9 +42,6 @@ it('stops dispatching a broken alarm job after eight failures', async () => {
   for (let i = 0; i < 3; i++) await drainNotificationJobs(failing);
   expect(requests).toBe(8);
   expect(await env.DB.prepare('SELECT attempts, available_at FROM notification_jobs').first()).toEqual({ attempts: 8, available_at: -1 });
-  await retryPausedNotifications(env.DB);
-  await drainNotificationJobs(failing);
-  expect(requests).toBe(9);
 });
 
 it.each([null, -1])('does not scan ten thousand paused files looking for runnable work (deadline=%s)', async deadline => {

@@ -51,7 +51,12 @@ export async function openWorkerBrowserFixture({ deviceName = 'Browser test', ha
       assert.equal(response.status, 200, await response.clone().text());
       return response.json();
     };
-    return { runtime, vault, origin, api, close };
+    // Reading opens through the Reminders web app sign-in, as the plugin links it.
+    const readingAppUrl = async (folderPath = 'Reminders') => {
+      const { browserToken } = await api('/notifications/reminders-enrollment-token', { folderPath });
+      return `${origin}/notifications?section=reading&browserToken=${browserToken}`;
+    };
+    return { runtime, vault, origin, api, readingAppUrl, close };
   } catch (error) {
     await close();
     throw error;

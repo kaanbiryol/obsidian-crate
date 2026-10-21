@@ -48,7 +48,7 @@ function useConnection() {
   usePwaBootstrap({ authToken: authority.token, suspendLocalSession: lifecycle.suspendLocalSession,
     setAuthToken, setBootstrapped, setEnrolled, setConfig, reportError, setLaunchReminderId, setSelectedProject, setStartTab, showToast });
   const encryption = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot);
-  // Finish app enrollment before Reading uses its credential or a direct setup link.
+  // Finish app enrollment before Reading uses its credential.
   const reading = useReadingConnection(useSharedFeatures().reading, enrolled, authority);
 
   const expireReading = reading.expire;

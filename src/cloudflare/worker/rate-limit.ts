@@ -7,16 +7,15 @@ export interface NotificationRateLimiter { limit(input: { key: string }): Promis
 export const rateLimitedActions: ReadonlyMap<string, number> = new Map([
   ['POST /reading/shortcut-pairing', 5], ['POST /reading/shortcut/v1/exchange', 10],
   ['POST /notifications/share/reading', 30],
-  ['POST /reading/exchange', 10], ['POST /reading/handoff', 30],
+  ['POST /reading/handoff', 30],
   ['POST /reading/shortcut/v1/prepare', 30], ['POST /reading/capture', 30],
   ['POST /reading/update', 60], ['POST /reading/retry', 10],
-  ['POST /reading/access', 10], ['POST /reading/policy', 10], ['POST /features', 10], ['POST /reading/fetching', 10],
+  ['POST /reading/policy', 10], ['POST /features', 10],
 	['POST /notifications/reminders-exchange', 10],
 	['POST /notifications/reminders-enrollment-token', 10],
 	['POST /notifications/subscribe', 30],
 	['DELETE /notifications/subscribe', 30],
 	['POST /notifications/test', 3],
-	['POST /notifications/retry', 10],
 ]);
 const denied = () => corsResponse({ error: 'Too many requests. Try again in a minute.' }, 429, { 'Retry-After': '60' });
 

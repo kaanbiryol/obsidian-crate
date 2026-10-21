@@ -27,7 +27,7 @@ export async function authority(db: D1Database, principal: AuthPrincipal): Promi
   const current = await policy(db);
   if (!current) throw new ReadingError('Choose a Reading folder in Obsidian’s Crate settings first.', 403, 'reading_not_configured');
   if (principal.scope !== 'vault' && principal.scope !== 'reminders' && (principal.folderPath !== current.folder_path || principal.readingGeneration !== current.generation)) {
-    throw new ReadingError('Open a fresh Reading setup link from Crate settings.', 401);
+    throw new ReadingError('Reconnect this web app from Crate settings in Obsidian.', 401);
   }
   return current;
 }
