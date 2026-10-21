@@ -12,7 +12,7 @@ import type { SyncResult } from '../types';
 import { syncErrorIssues, formatSyncIssue, SkippedFileError, skippedFileIssue, withSyncFileContext } from '../issues';
 import type { SyncIssue } from '../types';
 import { HttpError } from '../worker-api/http';
-import { completeWorkflowResult, handleWorkflowError, publishAuthFailure } from '../engine/workflow-shared';
+import { completeTransferResult, completeWorkflowResult, handleWorkflowError } from '../engine/workflow-shared';
 
 export type { QueueFlushContext } from './flush-types';
 
@@ -141,13 +141,10 @@ export async function processPendingChanges(
 			const issues = [...failures.map(failure => ({ path: failure.path, message: failure.error })), ...skipped];
 			batch.release();
 			const failed = { ...buildQueueSyncResult(uploads, deletes, completedQueueKeys, errors), issues };
-			const pendingChanges = context.getPendingPathCount();
-			// Transfers record a rejected request per file; one revoked token fails them all.
-			if (failures.some(failure => failure.status === 401)) {
-				publishAuthFailure(context, failed, { failureLogPrefix: FLUSH_FAILURE, logger, pendingChanges });
-			} else {
-				completeWorkflowResult(context, failed, { errorFallback: FLUSH_FAILURE, errorSummary: errors.join('; '), pendingChanges });
-			}
+			completeTransferResult(context, failed, failures, {
+				errorFallback: FLUSH_FAILURE, errorSummary: errors.join('; '), failureLogPrefix: FLUSH_FAILURE, logger,
+				pendingChanges: context.getPendingPathCount(),
+			});
 			await reportFlushResult(context, failed);
 			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
 			return;

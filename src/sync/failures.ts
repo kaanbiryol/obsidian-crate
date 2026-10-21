@@ -4,8 +4,13 @@ import { HttpError, SyncTransportError } from './worker-api/http';
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const VERSION_CONFLICT_HTTP_STATUSES = new Set([409, 412]);
 
+/** Revoked or invalid credentials, whether a request throws or one file's result reports it. */
+export function isAuthFailure(status: number | undefined): boolean {
+	return status === 401;
+}
+
 export function isAuthError(error: unknown): boolean {
-	return error instanceof HttpError && error.status === 401;
+	return error instanceof HttpError && isAuthFailure(error.status);
 }
 
 /** Request retries and queue requeues: anything but a non-retryable server status may succeed later. */

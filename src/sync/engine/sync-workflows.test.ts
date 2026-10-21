@@ -4,6 +4,8 @@ import {
 	createHarness,
 	toArrayBuffer,
 } from './engine-test-harness';
+import { Notice } from '../../test/mocks/obsidian';
+import { AUTH_ERROR_MESSAGE } from './constants';
 
 afterEach(() => { vi.useRealTimers(); });
 
@@ -87,6 +89,29 @@ describe('SyncEngine full sync safeguards', () => {
 		expect(harness.settings.lastSeq).toBe(5);
 	});
 
+	it('reports a batch upload result rejected for revoked access with the reconnect message', async () => {
+		Notice.reset();
+		const harness = createHarness({ lastSeq: 0 });
+		const file = { path: 'notes/a.md', extension: 'md', stat: { size: 1, mtime: 1700000000000 } };
+		harness.api.getManifest.mockResolvedValue({ version: 1, files: {}, lastSeq: 3 });
+		harness.vault.getFiles.mockReturnValue([file]);
+		harness.vault.getAbstractFileByPath.mockReturnValue(file);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+		harness.api.batchUpload.mockResolvedValue({
+			success: false,
+			results: [{ path: 'notes/a.md', success: false, status: 401, error: 'Unauthorized' }],
+		});
+
+		const result = await harness.engine.sync();
+
+		expect(harness.api.batchUpload).toHaveBeenCalledOnce();
+		expect(result).toMatchObject({ success: false, errors: ['notes/a.md: Unauthorized', AUTH_ERROR_MESSAGE] });
+		expect(harness.engine.getState()).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
+		expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
+		expect(harness.settings).toMatchObject({ lastSync: null, lastSeq: 0 });
+		harness.engine.destroy();
+	});
 });
 
 describe('SyncEngine slice 5 safeguards', () => {

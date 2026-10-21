@@ -13,12 +13,13 @@ import {
 import { uploadFullSyncPlan, type FullSyncUploadContext } from './full-sync-upload';
 import { createLogger, errorMessage } from '../logger';
 import type { FileDiff, SyncResult, SyncState } from '../types';
-import type { FileEntry } from '../../protocol/sync-types';
+import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { getPathEntry } from '../../protocol/path-record';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { FullSyncPlan } from '../planner/types';
 import {
+	completeTransferResult,
 	completeWorkflowResult,
 	getStartFailureResult,
 	handleWorkflowError,
@@ -136,13 +137,14 @@ export async function runSyncWorkflow(
 		const total = diffs.length;
 		let current = 0;
 		progressCallback?.(current, total);
+		const failures: MutationFailure[] = [];
 
 		if (uploadDiffs.length > 0) {
 			context.updateState({ work: { phase: 'preparing' } });
-			await uploadFullSyncPlan(context, uploadDiffs, localFiles, result, () => {
+			failures.push(...await uploadFullSyncPlan(context, uploadDiffs, localFiles, result, () => {
 				current++;
 				progressCallback?.(current, total);
-			});
+			}));
 		}
 
 		context.throwIfDestroyed();
@@ -211,12 +213,12 @@ export async function runSyncWorkflow(
 			progressCallback?.(current, total);
 		}
 
-		await context.deleteRemoteFiles(remoteDeletes.flatMap(diff => {
+		failures.push(...await context.deleteRemoteFiles(remoteDeletes.flatMap(diff => {
 			if (!diff.remoteHash) { recordSyncError(result, 'Missing remote version for delete', diff.path); return []; }
 			return [{ path: diff.path, expectedHash: diff.remoteHash, expectedRevision: diff.remoteRevision }];
 		}), result, {
 			onProcessed: count => { current += count; progressCallback?.(current, total); },
-		});
+		}));
 		for (const path of result.deletedPaths) delete localFiles[path];
 
 		if (result.errors.length === 0) {
@@ -235,8 +237,10 @@ export async function runSyncWorkflow(
 			context.setLastSeq(remoteManifest.lastSeq);
 		}
 		if (!result.errors.length) await context.finishInitialSetup();
-		completeWorkflowResult(context, result, {
+		completeTransferResult(context, result, failures, {
 			errorFallback: 'Full sync completed with errors',
+			failureLogPrefix: 'Full sync failed',
+			logger,
 		});
 
 		logger.info(

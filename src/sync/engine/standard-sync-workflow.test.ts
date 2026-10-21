@@ -1,8 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileDiff, SyncResult } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { runSyncWorkflow, type SyncWorkflowContext } from './standard-sync-workflow';
 import { ReconnectNotice } from './workflow-shared';
+import { recordSyncError } from '../issues';
+import { Notice } from '../../test/mocks/obsidian';
+import { AUTH_ERROR_MESSAGE } from './constants';
 
 function createContext(options: {
 	prepareFullSyncUpload?: SyncWorkflowContext['prepareFullSyncUpload'];
@@ -185,5 +188,41 @@ describe('runSyncWorkflow', () => {
 		expect(result.conflicts).toEqual([]);
 		expect(result.resolvedRaces).toContainEqual({ path, resolution: 'kept-remote-edit' });
 		expect(result.downloadedPaths).toContain(path);
+	});
+	describe('per-file authorization failures in a full sync', () => {
+		beforeEach(() => Notice.reset());
+
+		function expectReconnect(result: SyncResult, spies: ReturnType<typeof createContext>['spies']) {
+			expect(result).toMatchObject({ outcome: 'failed', success: false });
+			expect(result.errors).toContain(AUTH_ERROR_MESSAGE);
+			expect(spies.updateState).toHaveBeenLastCalledWith({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
+			expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
+			expect(spies.setLastSync).not.toHaveBeenCalled();
+			expect(spies.setLastSeq).not.toHaveBeenCalled();
+		}
+
+		it('reports a rejected upload with the reconnect message', async () => {
+			const { context, spies } = createContext();
+			spies.uploadPreparedFiles.mockImplementation(async (prepared, result, options) => {
+				for (const upload of prepared) {
+					recordSyncError(result, 'Unauthorized', upload.path);
+					options.onFailure?.({ path: upload.path, error: 'Unauthorized', status: 401 });
+				}
+			});
+			expectReconnect(await runSyncWorkflow(context), spies);
+		});
+
+		it('reports a rejected remote deletion with the reconnect message', async () => {
+			const { context, spies } = createContext();
+			const deleteDiff: FileDiff = { path: 'notes/old.md', action: 'delete', remoteHash: 'remote-hash', cause: 'local-deleted' };
+			context.createFullSyncPlan = vi.fn(async () => ({
+				localFiles: {}, diffs: [deleteDiff], uploadDiffs: [], downloadDiffs: [], remainingDiffs: [deleteDiff], errors: [],
+			}));
+			spies.deleteRemoteFiles.mockImplementation(async (files, result) => files.map(file => {
+				recordSyncError(result, 'Unauthorized', file.path);
+				return { path: file.path, error: 'Unauthorized', status: 401 };
+			}));
+			expectReconnect(await runSyncWorkflow(context), spies);
+		});
 	});
 });

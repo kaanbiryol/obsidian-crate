@@ -4,7 +4,7 @@ import { errorMessage, type Logger } from '../logger';
 import type { SyncResult, SyncState } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { AUTH_ERROR_MESSAGE } from './constants';
-import { isAuthError } from '../failures';
+import { isAuthError, isAuthFailure } from '../failures';
 import {
 	cancelSyncResult,
 	createSyncFailureResult,
@@ -110,11 +110,23 @@ interface AuthFailureOptions extends Pick<OutcomeOptions, 'pendingChanges'> {
 }
 
 /** Revoked access reads the same on every path: the reconnect message and a notice. */
-export function publishAuthFailure(context: WorkflowErrorContext, result: SyncResult, options: AuthFailureOptions): void {
+function publishAuthFailure(context: WorkflowErrorContext, result: SyncResult, options: AuthFailureOptions): void {
 	result.errors.push(AUTH_ERROR_MESSAGE);
 	options.logger.error(`${options.failureLogPrefix}: auth error (401)`);
 	context.reconnectNotice.show();
 	context.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE, ...pendingUpdate(options) });
+}
+
+/** Publishes a result whose transfers report failures per file. A revoked token rejects
+ * every file, so any per-file 401 publishes the reconnect failure, as a thrown one does. */
+export function completeTransferResult(
+	context: WorkflowCompletionContext & WorkflowErrorContext,
+	result: SyncResult,
+	failures: ReadonlyArray<{ status?: number }>,
+	options: OutcomeOptions & AuthFailureOptions & { errorFallback: string },
+): void {
+	if (failures.some(failure => isAuthFailure(failure.status))) publishAuthFailure(context, result, options);
+	else completeWorkflowResult(context, result, options);
 }
 
 export function handleWorkflowError(

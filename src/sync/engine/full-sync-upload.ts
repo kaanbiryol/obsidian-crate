@@ -1,6 +1,6 @@
 import { recordSyncError } from '../issues';
 import { errorMessage } from '../logger';
-import type { FileEntry } from '../../protocol/sync-types';
+import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { pipelineUploadChunks } from '../transfer/budget';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { UploadDiff, PreparedUpload, SyncResult } from '../types';
@@ -16,9 +16,11 @@ export interface FullSyncUploadContext {
 	throwIfDestroyed(): void;
 }
 
-/** Bound retained bytes while using the same CAS/receipt validation as initial sync. */
-export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: UploadDiff[], localFiles: Record<string, FileEntry>, result: SyncResult, onCompleted: () => void): Promise<void> {
+/** Bound retained bytes while using the same CAS/receipt validation as initial sync.
+ * Returns the upload failures, which carry their HTTP status. */
+export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: UploadDiff[], localFiles: Record<string, FileEntry>, result: SyncResult, onCompleted: () => void): Promise<MutationFailure[]> {
 	let processed = 0;
+	const failures: MutationFailure[] = [];
 	const chunks = pipelineUploadChunks(diffs, async diff => {
 		context.throwIfDestroyed();
 		try {
@@ -53,6 +55,7 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 				context.reportWork?.('uploading', processed, diffs.length);
 				for (let index = 0; index < count; index++) onCompleted();
 			},
+			onFailure: failure => { failures.push(failure); },
 			retry: false,
 		});
 		for (let index = reported; index < chunk.length; index++) { processed++; onCompleted(); }
@@ -65,4 +68,5 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 		if (entry) localFiles[diff.path] = entry;
 		if (diff.cause === 'remote-deleted') recordResolvedRace(result, diff.path, 'kept-local-edit');
 	}
+	return failures;
 }
