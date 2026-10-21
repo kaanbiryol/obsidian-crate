@@ -1,4 +1,4 @@
-import { readEncryptedReceipt } from '../encryption/receipt-storage';
+import { readConvertedScopeEnvelope } from '../encryption/receipts';
 import { readEncryptionState } from '../encryption/state';
 import { handleEncryptedFolderFiles } from '../encryption/encrypted-folder-files';
 import { issueShortcutPairing, exchangeShortcutPairing } from './shortcut-pairing';
@@ -28,12 +28,9 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
       const limited = await limitNotificationAction(request, env.DB, principal.tokenId); if (limited) return limited;
       if (path === '/reading/encrypted-receipt' && request.method === 'GET') {
         const id = url.searchParams.get('operationId') ?? '';
-        const wire = url.searchParams.get('wire') === '1';
-        const row = await (wire ? env.DB.prepare('SELECT response_json FROM reminder_operations WHERE operation_id=?').bind(id)
-          : env.DB.prepare('SELECT response_json FROM reading_operations WHERE operation_id=? AND generation=?').bind(id, current.generation)).first<{ response_json: string }>();
-        const converted = row ? (await readEncryptedReceipt(env.DB, wire ? 'reminder' : 'reading', id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
+        const receipt = url.searchParams.get('wire') === '1' ? { kind: 'reminder' as const } : { kind: 'reading' as const, generation: current.generation };
         const scope = encryption?.scopes.find(scope => scope.folderPath === current.folder_path);
-        return readingResponse({ envelope: converted?.scopes.find(item => item.id === scope?.id)?.envelope ?? null });
+        return readingResponse({ envelope: await readConvertedScopeEnvelope(env.DB, receipt, id, scope?.id) });
       }
       return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path) ?? readingResponse({ error: 'Not found' }, 404);
     }

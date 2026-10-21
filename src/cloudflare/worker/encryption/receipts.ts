@@ -29,7 +29,16 @@ export async function handleReminderReceipt(request: Request, db: D1Database): P
 	const state = await readEncryptionState(db);
 	const scope = state?.scopes.find(scope => scope.folderPath === folder);
 	if (!id || !scope) return corsResponse({ error: 'Invalid receipt scope' }, 400);
-	const row = await db.prepare('SELECT response_json FROM reminder_operations WHERE operation_id = ?').bind(id).first<{ response_json: string }>();
-	const converted = row ? (await readEncryptedReceipt(db, 'reminder', id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
-	return corsResponse({ envelope: converted?.scopes.find(item => item.id === scope.id)?.envelope ?? null });
+	return corsResponse({ envelope: await readConvertedScopeEnvelope(db, { kind: 'reminder' }, id, scope.id) });
+}
+
+/** One encryption scope's envelope from a converted pre-encryption reminder or
+ * Reading receipt. Reading receipts are read only for the given policy generation. */
+export async function readConvertedScopeEnvelope(db: D1Database, receipt: { kind: 'reminder' } | { kind: 'reading'; generation: string },
+	id: string, scopeId: string | undefined): Promise<string | null> {
+	const row = await (receipt.kind === 'reminder'
+		? db.prepare('SELECT response_json FROM reminder_operations WHERE operation_id = ?').bind(id)
+		: db.prepare('SELECT response_json FROM reading_operations WHERE operation_id = ? AND generation = ?').bind(id, receipt.generation)).first<{ response_json: string }>();
+	const converted = row ? (await readEncryptedReceipt(db, receipt.kind, id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
+	return converted?.scopes.find(item => item.id === scopeId)?.envelope ?? null;
 }
