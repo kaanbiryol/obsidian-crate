@@ -278,6 +278,18 @@ Response: `{ success: true, settingsVersion }`. A stale version returns `409` in
 
 Reminder handlers live in `src/cloudflare/worker/reminders/routes/`. Mutations apply the shared Markdown command described in the [architecture](architecture.md).
 
+Create, update and set-completed respond with the saved reminder as `{ success: true, reminder }`. `reminder` has the fields of a listed reminder: `revision`, `id`, `content`, optional `description`, `dueDate` and `dueDatetime`, `priority`, `completed`, `project`, optional `recurrence`, `filePath` and `lineNumber`. A retried operation returns its original response.
+
+Mutation failures respond with `{ error }` and, where listed, a stable `code`. Nothing is written on any failure.
+
+- `400` `invalid_reminder_input`, with the rejected `field`: invalid reminder fields. This includes a title containing Crate's `<!-- crate-id:` or `<!-- crate-rule:` comments, and a title that would not read back as the saved reminder, such as an undated title consisting only of a date or priority marker. Clients should treat it as a definite rejection that needs a corrected request, not a retry.
+- `400` without a code: route checks such as a missing `folderPath`, `id` or `filePath`, an invalid project on create, an invalid repeat, or unreadable `orderedIds` or `expectedOrder`.
+- `404`: the reminder or project note no longer exists.
+- `409` `version_conflict` for a stale `expectedRevision`; `reminder_markdown_context` for duplicate identities or Markdown that cannot be edited safely; `reminder_order_conflict` for a reorder the note cannot apply safely, such as one that includes completed or nested reminders; `duplicate_reminder_identity` when the identity occurs more than once in the reminders folder; `operation_mismatch` when an operation ID is reused for different changes. A create whose identity already exists, a changed project order and a concurrent note write return `409` without a code.
+- `410` `operation_expired`: the operation ID is outside the retry window. See [retention](reminder-retention.md).
+- `413`: a note the edit reads or writes is larger than 1 MiB. This applies to deletes and reorders too, because lists report such notes as issues instead of returning their reminders.
+- `428`: a missing `operationId` or `expectedOrder`, or `revision_required` for a missing or malformed `expectedRevision`.
+
 ### GET /reminders/list
 
 Query: `?folderPath=<reminders-folder>`
@@ -296,7 +308,7 @@ Creates a reminder in the selected project Markdown file, creating that file if 
 
 Request includes a versioned `operationId`, `folderPath`, `content`, optional `project`, `description`, `priority`, `dueDate`, `dueDatetime`, `recurrence`, and required `id` equal to `operationId`. Recurrence time fields include optional `second` (0–59) and `millisecond` (0–999), alongside `hour` and `minute`. Obtain the UTC operation day from server metadata and encode it as specified in the [retry policy](reminder-retention.md).
 
-Response: `{ success: true, notificationWarning? }`
+Response: `{ success: true, reminder }`
 
 ### POST /reminders/update
 
@@ -304,19 +316,19 @@ Updates an existing reminder by `id`. The request requires a versioned `operatio
 
 If `project` changes, the worker commits the source and destination Markdown files atomically with hash-based compare-and-swap checks.
 
-Response: `{ success: true, notificationWarning? }`
+Response: `{ success: true, reminder }`. After a move, `reminder.filePath` and `reminder.project` name the destination.
 
 ### POST /reminders/set-completed
 
 Request: `{ operationId, expectedRevision, folderPath, filePath, id, completed }`
 
-Response: `{ success: true, notificationWarning? }`
+Response: `{ success: true, reminder }`. Completing a repeating reminder with later occurrences returns the next one, still open.
 
 ### DELETE /reminders/delete
 
 Request: `{ operationId, expectedRevision, folderPath, filePath, id }`
 
-Response: `{ success: true, notificationWarning? }`
+Response: `{ success: true, id }`
 
 ### POST /reminders/reorder
 
