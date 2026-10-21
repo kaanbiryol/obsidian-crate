@@ -10,7 +10,7 @@ import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import type { VaultFile } from "../local/file-discovery";
 import { isVersionConflict } from '../failures';
-import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from '../engine/constants';
+import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from './constants';
 import { HttpError } from '../worker-api/http';
 
 const logger = createLogger("SyncTransfer");

@@ -223,12 +223,12 @@ Release and transfer values are also checked against source in [current contract
 | `BATCH_DOWNLOAD_MAX_FILES` | 50 | `protocol/sync-limits.ts` |
 | `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
 | `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
-| `UPLOAD_CONCURRENCY` | 2 | `engine/constants.ts` |
+| `UPLOAD_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `DOWNLOAD_CONCURRENCY` | 2 | `engine/constants.ts` |
 | `PREPARE_CONCURRENCY` | 2 | `engine/constants.ts` |
 | Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer/budget.ts` |
-| `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `engine/constants.ts` |
-| `BATCH_DELETE_CONCURRENCY` | 2 | `engine/constants.ts` |
+| `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
+| `BATCH_DELETE_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `MAX_RETRIES` | 3 | `engine/constants.ts` |
 | `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine/constants.ts` |
 
