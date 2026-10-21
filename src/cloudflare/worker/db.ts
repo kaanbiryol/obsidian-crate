@@ -25,6 +25,12 @@ export async function pruneChangelog(db: D1Database): Promise<boolean> {
 	return changedRows(result) === MAINTENANCE_DELETE_LIMIT;
 }
 
+/** Sets a `maintenance_state` value. Conflicts keep the row's `updated_at`; the
+ * statement can run alone or in a batch. */
+export function putMaintenanceValue(db: D1Database, key: string, value: string): D1PreparedStatement {
+	return db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(key, value);
+}
+
 export async function queryRows<T = Record<string, unknown>>(statement: D1PreparedStatement): Promise<T[]> {
 	const result = await statement.all();
 	return (Array.isArray(result?.results) ? result.results : []) as T[];

@@ -17,6 +17,7 @@ import { MAX_ENCRYPTED_CHECKPOINT_BYTES } from '../../../protocol/history-checkp
 import { readLimitedRequestBody } from '../body-reader';
 import { HISTORY_CHECKPOINT_PREFIX, SHARED_SETTINGS_KEY, MANAGED_FILES_PREFIX } from '../../../protocol/storage-keys';
 import { drainNotificationCancellations } from '../notifications/outbox';
+import { putMaintenanceValue } from '../db';
 
 const CONVERSION_PAGE_SIZE = 25;
 const CONVERSION_INDEX = 'files_conversion_storage_key_idx';
@@ -38,7 +39,7 @@ function parseConversionCursor(value: string | null): ConversionCursor | null {
 	}
 }
 
-const putValue = (env: Env, key: string, value: unknown) => env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(key, JSON.stringify(value));
+const putValue = (env: Env, key: string, value: unknown) => putMaintenanceValue(env.DB, key, JSON.stringify(value));
 
 
 /** All conversion writes run under the projection coordinator's mutation lock.

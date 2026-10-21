@@ -9,13 +9,13 @@ import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { isSha256Hex } from '../../../platform/validation';
 import { drainNotificationCancellations } from '../notifications/outbox';
 import { sha256Hex } from '../../../platform/sha256';
+import { putMaintenanceValue } from '../db';
 
 const PREFIX = 'encryption-reset:';
 const READING_TABLES = ['reading_policy', 'reading_sources', 'reading_jobs', 'reading_operations',
 	'reading_enrollments', 'reading_handoffs', 'reading_captures'] as const;
 interface ResetReceipt { id: string; vaultId: string; generation: number; complete: boolean }
-const save = (db: D1Database, key: string, value: unknown) => db.prepare(`INSERT INTO maintenance_state(key, value) VALUES (?, ?)
-	ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(key, JSON.stringify(value));
+const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValue(db, key, JSON.stringify(value));
 
 /** Runs under the projection coordinator lock. The replacement credential and
  * reset receipt commit together, so a lost begin reply is safe to retry. */
@@ -46,8 +46,7 @@ export async function handleEncryptionReset(request: Request, env: Env, path: st
 	await env.DB.batch([
 		save(env.DB, PREFIX + id, next),
 		save(env.DB, ENCRYPTION_STATE_KEY, { ...state, mode: 'resetting' }),
-		env.DB.prepare(`INSERT INTO maintenance_state(key, value) VALUES (?, ?)
-			ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(SYNC_RESET_GENERATION_KEY, id),
+		putMaintenanceValue(env.DB, SYNC_RESET_GENERATION_KEY, id),
 		env.DB.prepare(`INSERT INTO auth_tokens(id, token_hash, device_id, device_name, platform, scope)
 			SELECT ?, ?, device_id, device_name, platform, 'vault' FROM auth_tokens WHERE id = ?`)
 			.bind(id, await sha256Hex(replacementToken), principal.tokenId),

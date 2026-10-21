@@ -8,6 +8,7 @@ import { storedObjectMatchesMetadata } from './storage';
 import { sanitizePath } from '../request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
+import { putMaintenanceValue } from '../db';
 
 const PREFIX = HISTORY_CHECKPOINT_PREFIX;
 // Ten pages cover the largest checkpoint within the Free plan's query budget.
@@ -156,6 +157,6 @@ export async function pruneSharedCheckpoints(bucket: R2Bucket, db: D1Database): 
     const retained = new Set(index.checkpoints.filter(entry => entry.expiresAt > Date.now()).map(entry => keyFor(entry.id)));
     const garbage = listing.objects.filter(object => object.uploaded.getTime() < Date.now() - 86_400_000 && !retained.has(object.key));
     if (garbage.length) await bucket.delete(garbage.map(object => object.key));
-    if (listing.truncated) await db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(cursorKey, listing.cursor).run();
+    if (listing.truncated) await putMaintenanceValue(db, cursorKey, listing.cursor!).run();
     else await db.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(cursorKey).run();
 }

@@ -8,6 +8,7 @@ import type { ReadingPolicy } from '@/protocol/reading-policy';
 import type { Env } from '../types';
 import { vaultChangeToken } from '../vault-change-token';
 import { sha256Hex } from '@/platform/sha256';
+import { putMaintenanceValue } from '../db';
 
 export const READING_PROJECTION_KEY = 'reading_projection';
 
@@ -73,7 +74,7 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
   // Pending extractions are queued only while fewer than 1,000 jobs exist, so a
   // full queue must be revisited once it drains.
   if (complete && !unavailable && ((await db.prepare('SELECT count(*) AS jobs FROM reading_jobs').first<{ jobs: number }>())?.jobs ?? 0) < 1000) {
-    await db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(READING_PROJECTION_KEY, token).run();
+    await putMaintenanceValue(db, READING_PROJECTION_KEY, token).run();
   }
   return unavailable ? 'unavailable' : complete ? 'complete' : 'pending';
 }

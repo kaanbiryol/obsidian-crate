@@ -1,4 +1,5 @@
 import { MAX_ENCRYPTED_REMINDER_ACK } from '../../../encryption/receipt-format';
+import { putMaintenanceValue } from '../db';
 
 const CHUNK_SIZE = 512 * 1024;
 const MAX_CHUNKS = Math.ceil((MAX_ENCRYPTED_REMINDER_ACK + 4096) / CHUNK_SIZE);
@@ -61,7 +62,7 @@ export async function pruneEncryptedReceiptChunks(db: D1Database): Promise<void>
 				AND NOT EXISTS (SELECT 1 FROM reading_operations WHERE c.kind = 'reading' AND operation_id = c.id))`)
 			.bind(JSON.stringify(candidates)),
 		page.results.length === RECEIPT_CHUNK_PAGE
-			? db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(cursorKey, page.results.at(-1)!.key)
+			? putMaintenanceValue(db, cursorKey, page.results.at(-1)!.key)
 			: db.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(cursorKey),
 	]);
 }
