@@ -60,7 +60,7 @@
 .pwa-update-screen__title{color:var(--text);font-size:21px;font-weight:600;line-height:1.3;letter-spacing:-.035em}
 .pwa-update-screen__detail{margin-top:8px;color:var(--text-muted);font-size:14px;line-height:1.5}
 .pwa-update-screen__activity{width:128px;height:3px;margin-top:28px;overflow:hidden;border-radius:999px;background:rgba(var(--accent-rgb),.12)}
-.pwa-update-screen__activity span{display:block;width:100%;height:100%;border-radius:inherit;background:var(--accent);transform-origin:left center;transform:scaleX(var(--pwa-update-progress,.32));transition:transform .18s ease-out}
+.pwa-update-screen__activity span{display:block;width:100%;height:100%;border-radius:inherit;background:var(--accent);transform-origin:left center;transform:scaleX(var(--pwa-update-progress,.32));transition:transform .45s cubic-bezier(.22,.61,.36,1)}
 .pwa-update-screen__activity span.is-resetting{transition:none}
 @media (orientation:landscape){.pwa-update-screen{top:50%}}
 :root[data-pwa-updating] #pwa-update-transition{visibility:visible;opacity:1;pointer-events:auto;transition-delay:0s}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { startAutoPwaUpdate } from './auto-update';
 import { applyPwaUpdate, preparePwaUpdate } from './apply-update';
-import { advancePwaUpdateProgress, finishPwaUpdateTransition, preparePwaUpdateTransition, showPwaUpdateTransition } from './update-transition';
+import { PWA_UPDATE_PROGRESS_SETTLE_MS, advancePwaUpdateProgress, finishPwaUpdateTransition, preparePwaUpdateTransition, showPwaUpdateTransition } from './update-transition';
 import { whenUpdateLayoutSettles } from './update-layout-readiness';
 import type { ShowToast } from '../types';
 
@@ -30,7 +30,9 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: 
 	}, []);
 	useEffect(() => {
 		if (!launchPending) return;
-		const timer = window.setTimeout(finishLaunch, Math.max(0, launchDeadline.current - Date.now()));
+		// An update that already started applying finishes or defers on its own.
+		const timer = window.setTimeout(() => { if (!inFlight.current) finishLaunch(); },
+			Math.max(0, launchDeadline.current - Date.now()));
 		const defer = () => {
 			if (document.visibilityState !== 'visible' || !navigator.onLine) finishLaunch();
 		};
@@ -50,15 +52,20 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: 
 		document.getElementById('app')?.setAttribute('inert', '');
 		if (!contentReady) return;
 		// Data readiness can precede safe-area, viewport and notice layout updates.
-		return whenUpdateLayoutSettles(() => {
+		let reveal: number | undefined;
+		const cancel = whenUpdateLayoutSettles(() => {
 			advancePwaUpdateProgress('ready');
-			finishPwaUpdateTransition({ fade: true });
+			// Let the bar visibly complete before the curtain fades.
+			reveal = window.setTimeout(() => finishPwaUpdateTransition({ fade: true }), PWA_UPDATE_PROGRESS_SETTLE_MS);
 		});
+		return () => { cancel(); window.clearTimeout(reveal); };
 	}, [contentReady]);
 
 	const apply = useCallback(async (options: Parameters<typeof applyPwaUpdate>[1] = {}, showImmediately = false) => {
 		if (inFlight.current) return false;
 		inFlight.current = true;
+		// Start the launch screen's bar from empty so each stage glides forward.
+		if (!showImmediately) advancePwaUpdateProgress('checking');
 		setUpdating(true);
 		let reloading = false;
 		try {
@@ -95,7 +102,8 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: 
 		}
 		preparedVersion.current = auto.version;
 		return startAutoPwaUpdate(auto.version,
-			() => launchOpen.current && Date.now() < launchDeadline.current && canAutoApply.current(),
+			// The deadline only gates starting; an applying update is not cut off midway.
+			() => launchOpen.current && (inFlight.current || Date.now() < launchDeadline.current) && canAutoApply.current(),
 			(version, canApply, beforeNavigation) => apply({ version, canApply, beforeNavigation }),
 			finishLaunch);
 	}, [auto.version, apply, launchPending, finishLaunch]);

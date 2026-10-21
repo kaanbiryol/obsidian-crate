@@ -2,6 +2,8 @@ export const PWA_UPDATE_TRANSITION_KEY = 'crate-pwa-update-transition';
 export const PWA_UPDATE_TRANSITION_POSITION_KEY = 'crate-pwa-update-position';
 export const PWA_UPDATE_TRANSITION_MAX_AGE_MS = 60_000;
 export const PWA_UPDATE_OPENING_PROGRESS = 0.9;
+/** Matches the progress bar's CSS transition in theme.css. */
+export const PWA_UPDATE_PROGRESS_SETTLE_MS = 450;
 // Recover if the browser suspends or cancels transition completion.
 const UPDATE_REVEAL_FALLBACK_MS = 1000;
 let revealTimer: number | undefined;
@@ -55,10 +57,10 @@ export function showPwaUpdateTransition(): void {
 export async function preparePwaUpdateTransition(): Promise<void> {
 	showPwaUpdateTransition();
 	advancePwaUpdateProgress('opening');
-	// Let the curtain paint fully before replacing the document. Match the CSS
-	// fade duration, including a frame for the initial style change.
+	// Let the curtain paint and the bar reach its opening milestone before
+	// replacing the document, so the reloaded curtain continues from there.
 	const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-	await new Promise(resolve => window.setTimeout(resolve, reduceMotion ? 32 : 220));
+	await new Promise(resolve => window.setTimeout(resolve, reduceMotion ? 32 : PWA_UPDATE_PROGRESS_SETTLE_MS + 32));
 	try {
 		const labelTop = parseFloat(document.documentElement.style.getPropertyValue('--pwa-update-label-top'));
 		sessionStorage.setItem(PWA_UPDATE_TRANSITION_POSITION_KEY, String(labelTop));
