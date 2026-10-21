@@ -5,14 +5,9 @@ import { errorMessage } from '../../sync/logger';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import type { SyncApiClient } from '../../sync/worker-api/client';
+import type { SettingsSectionContext } from './section-helpers';
 
-export interface NotificationsSectionContext {
-	containerEl: HTMLElement;
-	plugin: CratePlugin;
-	rerender: () => void;
-}
-
-export function renderNotificationsSection(context: NotificationsSectionContext): () => void {
+export function renderNotificationsSection(context: SettingsSectionContext): () => void {
 	const { containerEl, plugin } = context;
 	let active = true;
 	const isActive = () => active;

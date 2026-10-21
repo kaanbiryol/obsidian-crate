@@ -1,11 +1,11 @@
 import { Notice, Setting, type TextComponent } from 'obsidian';
 import { connectSelfHostedServer, updateSelfHostedServerAddress } from '../../../plugin/self-hosted-connection';
-import type { ConfigSectionContext } from './config-types';
+import type { SettingsSectionContext } from '../section-helpers';
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { selfHostedConnectionMessage } from './self-hosted-errors';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 
-export function renderSelfHostedAddressSetting({ containerEl, plugin, rerender }: ConfigSectionContext): void {
+export function renderSelfHostedAddressSetting({ containerEl, plugin, rerender }: SettingsSectionContext): void {
 	if (!plugin.syncRuntime.isConfigured() || plugin.settings.cloudflareDeployment) return;
 	let address = plugin.settings.workerUrl;
 	let errorEl: HTMLElement;
@@ -31,7 +31,7 @@ export function renderSelfHostedAddressSetting({ containerEl, plugin, rerender }
 	errorEl.hidden = true;
 }
 
-export function renderSelfHostedSetting({ containerEl, plugin, rerender }: ConfigSectionContext, reconnect = false): void {
+export function renderSelfHostedSetting({ containerEl, plugin, rerender }: SettingsSectionContext, reconnect = false): void {
 	if ((!reconnect && plugin.syncRuntime.isConfigured()) || plugin.settings.cloudflareDeployment) return;
 	const container = createSettingsDisclosure(containerEl, reconnect ? 'Reconnect' : 'Connect to your server', {
 		summary: reconnect ? undefined : 'Connect to a self-hosted Crate server.',

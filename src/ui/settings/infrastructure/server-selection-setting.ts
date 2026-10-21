@@ -1,8 +1,8 @@
 import { Notice, Setting } from 'obsidian';
 import { openConfirmationModal } from '../../confirmation-modal';
-import type { ConfigSectionContext } from './config-types';
+import type { SettingsSectionContext } from '../section-helpers';
 
-export function renderForgetServerSetting({ containerEl, plugin, rerender }: ConfigSectionContext): void {
+export function renderForgetServerSetting({ containerEl, plugin, rerender }: SettingsSectionContext): void {
 	const saved = plugin.settings.cloudflareDeployment;
 	if (plugin.syncRuntime.isConfigured() || !saved || saved.reset || saved.deletion) return;
 	new Setting(containerEl)

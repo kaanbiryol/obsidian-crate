@@ -1,8 +1,5 @@
-import type CratePlugin from '../../../plugin/CratePlugin';
+import type { SettingsSectionContext } from '../section-helpers';
 
-export interface InfrastructureSectionContext {
-	containerEl: HTMLElement;
-	plugin: CratePlugin;
+export interface InfrastructureSectionContext extends SettingsSectionContext {
 	isConfigured: boolean;
-	rerender: () => void;
 }

@@ -1,4 +1,12 @@
 import { Setting } from 'obsidian';
+import type CratePlugin from '../../plugin/CratePlugin';
+
+/** Where a settings section renders and how it asks the settings tab to render again. */
+export interface SettingsSectionContext {
+	containerEl: HTMLElement;
+	plugin: CratePlugin;
+	rerender: () => void;
+}
 
 export function createSettingsSectionHeading(containerEl: HTMLElement, title: string): Setting {
 	return new Setting(containerEl)

@@ -1,19 +1,14 @@
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import type { CachedDevicesState } from './settings-ui-state';
-import type CratePlugin from '../../plugin/CratePlugin';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { openConfirmationModal } from '../confirmation-modal';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import { createLogger, errorMessage } from '../../sync/logger';
+import type { SettingsSectionContext } from './section-helpers';
 
 const log = createLogger('DeviceSettings');
 
-export interface DevicesSectionContext {
-	containerEl: HTMLElement;
-	plugin: CratePlugin;
-}
-
-export function renderDevicesSection(context: DevicesSectionContext): () => void {
+export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rerender'>): () => void {
 	const { containerEl, plugin } = context;
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (!apiClient) return () => {};

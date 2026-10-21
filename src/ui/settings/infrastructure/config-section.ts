@@ -5,13 +5,12 @@ import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../../cloudflare/deployment/emb
 import { isCloudflareServerUpdateAvailable } from '../../../cloudflare/deployment/update';
 import { startCloudflareDeployment } from '../../../cloudflare/plugin-integration';
 import { openConfirmationModal } from '../../confirmation-modal';
-import type { ConfigSectionContext } from './config-types';
-import { createSettingsSectionHeading } from '../section-helpers';
+import { createSettingsSectionHeading, type SettingsSectionContext } from '../section-helpers';
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
 import { openExternalBrowserModal } from '../../external-browser-modal';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 
-export function renderConfigSection(context: ConfigSectionContext, showHeading = true): void {
+export function renderConfigSection(context: SettingsSectionContext, showHeading = true): void {
 	const { containerEl, plugin } = context;
 	const isConfigured = plugin.syncRuntime.isConfigured();
 
@@ -38,7 +37,7 @@ export function renderConfigSection(context: ConfigSectionContext, showHeading =
 	}
 }
 
-export function renderServerUpdateNotice(context: ConfigSectionContext): void {
+export function renderServerUpdateNotice(context: SettingsSectionContext): void {
     const { containerEl, plugin } = context;
     const deployment = plugin.settings.cloudflareDeployment;
     if (!plugin.syncRuntime.isConfigured() || !deployment
@@ -72,7 +71,7 @@ export function renderServerUpdateNotice(context: ConfigSectionContext): void {
     });
 }
 
-export function renderServerSection(context: ConfigSectionContext): void {
+export function renderServerSection(context: SettingsSectionContext): void {
     const { containerEl, plugin } = context;
     const deployment = plugin.settings.cloudflareDeployment;
     renderVersionSettings(containerEl, plugin);
@@ -119,7 +118,7 @@ export function renderServerSection(context: ConfigSectionContext): void {
 		}));
 }
 
-export function renderAccountSection(context: ConfigSectionContext): void {
+export function renderAccountSection(context: SettingsSectionContext): void {
 	const { containerEl, plugin, rerender } = context;
 	const isConfigured = plugin.syncRuntime.isConfigured();
 	if (isConfigured) {
@@ -179,9 +178,8 @@ export function renderAccountSection(context: ConfigSectionContext): void {
 				}));
 	}
 }
-export type { ConfigSectionContext } from './config-types';
 
-function renderServerBackupSetting({ containerEl, plugin }: ConfigSectionContext): void {
+function renderServerBackupSetting({ containerEl, plugin }: SettingsSectionContext): void {
     const deployment = plugin.settings.cloudflareDeployment;
     if (deployment?.accountId && deployment.d1DatabaseId && !deployment.reset && !deployment.deletion) {
         const restore = plugin.settings.cloudflareRestore;

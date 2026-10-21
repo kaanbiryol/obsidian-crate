@@ -1,5 +1,4 @@
 import { Notice, Setting } from 'obsidian';
-import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../sync/logger';
 import type { CrateSettings } from '../../plugin/settings-types';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
@@ -7,14 +6,9 @@ import { renderSyncInterval } from './sync-interval';
 import { renderEncryptionSection } from './encryption/encryption-section';
 import { renderExclusionsSetting } from './exclusions-setting';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
+import type { SettingsSectionContext } from './section-helpers';
 
-export interface SyncSectionContext {
-	containerEl: HTMLElement;
-	plugin: CratePlugin;
-	rerender: () => void;
-}
-
-export function renderSyncSection(context: SyncSectionContext): () => void {
+export function renderSyncSection(context: SettingsSectionContext): () => void {
 	const { containerEl, plugin, rerender } = context;
 	const cleanup = renderEncryptionSection(containerEl, plugin);
 	const persistSettings = async (update: Partial<CrateSettings>): Promise<boolean> => {

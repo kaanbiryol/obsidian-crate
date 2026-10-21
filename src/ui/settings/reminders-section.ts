@@ -1,7 +1,6 @@
 import { setSharedFeature } from '../../plugin/feature-settings';
 import { Notice, Setting } from 'obsidian';
 import { changeReminderFolder } from '../../reminders/notification-policy-sync';
-import type CratePlugin from '../../plugin/CratePlugin';
 import {
 	normalizeRemindersFolderPath,
 	type DueDateDefaultSetting,
@@ -12,14 +11,9 @@ import { errorMessage } from '../../sync/logger';
 import { FolderSuggest } from './folder-suggest';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
+import type { SettingsSectionContext } from './section-helpers';
 
-export interface RemindersSectionContext {
-	containerEl: HTMLElement;
-	plugin: CratePlugin;
-	rerender: () => void;
-}
-
-export function renderRemindersSection(context: RemindersSectionContext): () => void {
+export function renderRemindersSection(context: SettingsSectionContext): () => void {
 	const { containerEl, plugin, rerender } = context;
 	const settings = plugin.remindersSettings;
 	const persistSettings = async (update: Partial<RemindersSettings>): Promise<void> => {
