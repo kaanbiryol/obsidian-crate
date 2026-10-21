@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { endPluginLifecycle } from '../../plugin/lifecycle-state';
-import { DEFAULT_SETTINGS } from '../../plugin/settings';
-import { SyncApiClient } from '../worker-api/client';
+import { endPluginLifecycle } from './lifecycle-state';
+import { DEFAULT_SETTINGS } from './settings';
+import { SyncApiClient } from '../sync/worker-api/client';
 import { configureCloudflareAuthorizedDevice } from './cloudflare-connection';
 
 const remote = { ignorePatterns: ['remote-pattern'], syncInterval: 60, pushEnabled: true };

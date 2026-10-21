@@ -26,7 +26,7 @@ async function loadPluginIntegration() {
 	vi.doMock('../sync/worker-api/client', () => ({ HttpError, SyncApiClient: class { constructor() { return reconnectApi; } } }));
 	vi.doMock('./oauth/config', async () => ({ ...await vi.importActual<object>('./oauth/config'), isCloudflareOAuthConfigured: () => true }));
 	vi.doMock('obsidian', () => ({ Notice: vi.fn(), Platform: platform }));
-	vi.doMock('../sync/connection/cloudflare-connection', () => ({ configureCloudflareAuthorizedDevice }));
+	vi.doMock('../plugin/cloudflare-connection', () => ({ configureCloudflareAuthorizedDevice }));
 	vi.doMock('./device-token', () => ({ generateSecureToken, hashToken }));
 	vi.doMock('../plugin/deviceInfo', () => ({
 		getCurrentDeviceName: vi.fn(() => 'Test device'),

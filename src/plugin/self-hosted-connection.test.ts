@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type CratePlugin from '../../plugin/CratePlugin';
-import { endPluginLifecycle } from '../../plugin/lifecycle-state';
+import type CratePlugin from './CratePlugin';
+import { endPluginLifecycle } from './lifecycle-state';
 import { connectSelfHostedServer, updateSelfHostedServerAddress } from './self-hosted-connection';
-import { createVaultKeyBundle } from '../../encryption/key-bundle';
-import { ConnectionSetupError } from './connection-errors';
-import { SECRET_KEYS } from '../../platform/secret-keys';
+import { createVaultKeyBundle } from '../encryption/key-bundle';
+import { ConnectionSetupError } from '../sync/connection/connection-errors';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 const api = vi.hoisted(() => ({
 	setAbortSignal: vi.fn(), testConnection: vi.fn(), listTokens: vi.fn(), getSharedSettings: vi.fn(), getEncryptionState: vi.fn(),
 }));
 const exchange = vi.hoisted(() => vi.fn());
-vi.mock('./self-hosted-pairing', () => ({ exchangeSelfHostedPairingCode: exchange }));
-vi.mock('../worker-api/client', () => ({ SyncApiClient: class { constructor() { return api; } } }));
+vi.mock('../sync/connection/self-hosted-pairing', () => ({ exchangeSelfHostedPairingCode: exchange }));
+vi.mock('../sync/worker-api/client', () => ({ SyncApiClient: class { constructor() { return api; } } }));
 
 function plugin() {
 	return {

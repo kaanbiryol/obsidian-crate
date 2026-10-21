@@ -1,10 +1,10 @@
-import type { ConnectionTestResult } from '../types';
-import type CratePlugin from '../../plugin/CratePlugin';
-import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
-import { SyncApiClient } from '../worker-api/client';
-import { applySharedSettings, buildSharedSettings } from './shared-settings';
-import type { SharedSettings } from '../../protocol/shared-settings';
-import { createLogger, errorMessage } from '../logger';
+import type { ConnectionTestResult } from '../sync/types';
+import type CratePlugin from './CratePlugin';
+import { getPluginLifecycleSignal } from './lifecycle-state';
+import { SyncApiClient } from '../sync/worker-api/client';
+import { applySharedSettings, buildSharedSettings } from '../sync/connection/shared-settings';
+import type { SharedSettings } from '../protocol/shared-settings';
+import { createLogger, errorMessage } from '../sync/logger';
 
 const logger = createLogger('CloudflareConnection');
 

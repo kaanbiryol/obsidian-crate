@@ -251,6 +251,9 @@ policy. The service owns authorization, cancellation, target verification and th
 ordered provisioning workflow. `cloudflare/plugin-integration.ts` coordinates
 the operation and device connection; `ui/cloudflare/operation-presentation.ts`
 owns modal copy and recovery actions supplied by that coordinator.
+`plugin/cloudflare-connection.ts` and `plugin/self-hosted-connection.ts` connect a
+device across the plugin's runtime, settings and deployment state; `sync/connection/`
+retains pairing, address, reachability and shared-settings rules.
 
 `sync/runtime/connection-workflow.ts` owns connecting and disconnecting, including
 validation, credential revocation, local state cleanup and settings persistence.

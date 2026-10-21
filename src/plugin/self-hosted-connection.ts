@@ -1,13 +1,13 @@
-import { ConnectionSetupError } from './connection-errors';
-import type CratePlugin from '../../plugin/CratePlugin';
-import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
-import { SyncApiClient } from '../worker-api/client';
-import { requireNormalizedWorkerUrl } from './worker-url';
-import { applySharedSettings } from './shared-settings';
-import { exchangeSelfHostedPairingCode } from './self-hosted-pairing';
-import { loadEncryptionKeys } from '../encryption/key-storage';
-import { isSha256Hex } from '../../platform/validation';
-import { SECRET_KEYS } from '../../platform/secret-keys';
+import { ConnectionSetupError } from '../sync/connection/connection-errors';
+import type CratePlugin from './CratePlugin';
+import { getPluginLifecycleSignal } from './lifecycle-state';
+import { SyncApiClient } from '../sync/worker-api/client';
+import { requireNormalizedWorkerUrl } from '../sync/connection/worker-url';
+import { applySharedSettings } from '../sync/connection/shared-settings';
+import { exchangeSelfHostedPairingCode } from '../sync/connection/self-hosted-pairing';
+import { loadEncryptionKeys } from '../sync/encryption/key-storage';
+import { isSha256Hex } from '../platform/validation';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 const connecting = new WeakSet<CratePlugin>();
 
