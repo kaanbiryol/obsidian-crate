@@ -241,6 +241,11 @@ are prepared in byte-bounded chunks and split at `BATCH_FILE_SIZE_LIMIT` (1 MB):
 - **< 1 MB:** batched into JSON payloads with base64-encoded content. Edited Markdown batches contain up to 3 files; assets allow 4, and eligible new-file imports allow 8 when the server supports them. Each request respects `BATCH_MAX_BYTES` (10 MB). Sent via `POST /sync/batch-upload`, with up to 4 requests in flight on desktop or 2 on mobile. Per-path failures retain their code and status for targeted reconciliation or terminal failure handling. The smaller mutation limits keep worst-case conditional-write cleanup below Workers Free D1 query limits.
 - **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload`, with up to 2 requests in flight. Each mode retains its retry policy.
 
+`protocol/sync-limits.ts:maxUploadBatchFiles()` defines the per-request file limit.
+Chunk planning assumes new files are eligible for a new-file import; the request
+client applies the rule again with the server capability and encryption state, and
+splits a chunk the server cannot accept in one request.
+
 Remote deletes in manual, selected-file, incremental, forced and automatic sync
 use `transfer/delete.ts:deleteRemoteFiles()`. It waits for preceding uploads and
 reconciliation to succeed, rechecks local absence, and uses `delete-batches.ts`

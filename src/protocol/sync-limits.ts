@@ -19,6 +19,17 @@ export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 export const BULK_NEW_UPLOAD_MAX_FILES = 8;
 export const BULK_NEW_UPLOAD_CAPABILITY = 'bulk-new-file-uploads-v1';
 
+/** Most files one batch upload request may carry. Only files with an absent
+ * precondition qualify for a new-file import, and only when `bulkNewEligible`:
+ * the vault is unencrypted and the server has `BULK_NEW_UPLOAD_CAPABILITY`. */
+export function maxUploadBatchFiles(
+	files: ReadonlyArray<{ path: string; expectedHash?: string | null }>,
+	bulkNewEligible: boolean,
+): number {
+	if (bulkNewEligible && files.every(file => file.expectedHash === null)) return BULK_NEW_UPLOAD_MAX_FILES;
+	return files.some(file => file.path.toLowerCase().endsWith('.md')) ? BATCH_UPLOAD_MAX_FILES : BATCH_ASSET_UPLOAD_MAX_FILES;
+}
+
 /** Largest plaintext file, in bytes, that history, restore and pending-change previews show. */
 export const MAX_PREVIEW_BYTES = 256_000;
 

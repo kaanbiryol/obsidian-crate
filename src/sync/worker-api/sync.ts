@@ -5,7 +5,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryptio
 import { base64ToArrayBuffer } from '../encoding';
 import type { RestoreIntent } from '../durability/restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, BULK_NEW_UPLOAD_CAPABILITY, MAX_PREVIEW_BYTES, maxUploadBatchFiles } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
@@ -308,16 +308,15 @@ export class SyncWorkerApi {
 			}
 			return { success: results.every(result => result.success), results };
 		}
+		const info = await this.getServerInfo();
 		if (files.some(file => !file.operationId)) {
-			const day = (await this.getServerInfo()).reminderOperationDay;
+			const day = info.reminderOperationDay;
 			if (day === undefined) throw new Error('Update the Crate server before uploading');
 			files = files.map(file => ({ ...file, operationId: file.operationId ?? createReminderOperationId(day) }));
 		}
-		const info = await this.getServerInfo();
-		const bulkNew = !this.encryption && files.every(file => file.expectedHash === null) && info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY);
-		const maxFiles = bulkNew ? BULK_NEW_UPLOAD_MAX_FILES
-			: files.every(file => !file.path.toLowerCase().endsWith('.md'))
-				? BATCH_ASSET_UPLOAD_MAX_FILES : BATCH_UPLOAD_MAX_FILES;
+		const bulkNewEligible = !this.encryption && info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY);
+		const bulkNew = bulkNewEligible && files.every(file => file.expectedHash === null);
+		const maxFiles = maxUploadBatchFiles(files, bulkNewEligible);
 		if (files.length > maxFiles) {
 			const results: BatchUploadResponse['results'] = [];
 			for (let offset = 0; offset < files.length; offset += maxFiles) {

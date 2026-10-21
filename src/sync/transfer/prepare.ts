@@ -5,10 +5,8 @@ import type { VaultFile } from "../local/file-discovery";
 import type { PreparedUpload } from '../types';
 import {
 	BATCH_UPLOAD_MAX_BYTES as BATCH_MAX_BYTES,
-	BATCH_UPLOAD_MAX_FILES as BATCH_MAX_FILES,
-	BATCH_ASSET_UPLOAD_MAX_FILES,
-	BULK_NEW_UPLOAD_MAX_FILES,
 	MAX_FILE_SIZE_BYTES,
+	maxUploadBatchFiles,
 } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import type { TransferContext } from "./types";
@@ -106,6 +104,10 @@ export async function prepareUploadFromPath(
   }, options);
 }
 
+/** Chunks are planned before the transport resolves the server's capabilities or
+ * the vault's encryption, so new files are treated as bulk eligible here.
+ * `SyncWorkerApi.batchUpload` applies the same rule with the actual eligibility and
+ * splits a chunk the server cannot accept in one request. */
 export function createBatchUploadChunks(prepared: PreparedUpload[]): PreparedUpload[][] {
   const chunks: PreparedUpload[][] = [];
   let currentChunk: PreparedUpload[] = [];
@@ -113,9 +115,7 @@ export function createBatchUploadChunks(prepared: PreparedUpload[]): PreparedUpl
 
   for (const upload of prepared) {
     if (
-      currentChunk.length >= (upload.expectedHash === null && currentChunk.every(file => file.expectedHash === null) ? BULK_NEW_UPLOAD_MAX_FILES
-        : upload.path.toLowerCase().endsWith('.md') || currentChunk.some(file => file.path.toLowerCase().endsWith('.md'))
-        ? BATCH_MAX_FILES : BATCH_ASSET_UPLOAD_MAX_FILES)
+      currentChunk.length >= maxUploadBatchFiles([...currentChunk, upload], true)
       || (currentChunk.length > 0 && currentBytes + upload.size > BATCH_MAX_BYTES)
     ) {
       chunks.push(currentChunk);
