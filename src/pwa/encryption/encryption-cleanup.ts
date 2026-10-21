@@ -14,7 +14,7 @@ export function captureEncryptionCleanupAuthority(): () => boolean {
 }
 
 export function clearEncryptionSessionMarkers(isCurrent: () => boolean): void {
-  if (isCurrent()) resetReadingEncryption();
+  if (isCurrent()) resetReadingEncryption(true);
 	if (!isCurrent()) return;
 	for (const key of Object.keys(localStorage)) {
 		if (key.startsWith('crate-encryption-session:') || key.startsWith('crate-encryption-unlocked:')) localStorage.removeItem(key);

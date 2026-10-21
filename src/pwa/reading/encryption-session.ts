@@ -17,7 +17,11 @@ let pending: { identity: string; promise: Promise<StoredReminderKeys | null> } |
 let currentKeys: StoredReminderKeys | null = null;
 let expected: ReadingEncryptionState | null = null;
 let verifiedIdentity: string | undefined;
-onReadingEncryptionReset(() => { pending = undefined; currentKeys = null; expected = null; verifiedIdentity = undefined; forgetReadingKey(); forgetReadingCapture(); lockReadingStorage(); });
+onReadingEncryptionReset(discardKeys => {
+  pending = undefined; currentKeys = null; expected = null; verifiedIdentity = undefined;
+  if (discardKeys) { forgetReadingKey(); forgetReadingCapture(); }
+  lockReadingStorage();
+});
 export function readingEncryptionHeaders(): Record<string, string> {
   return expected ? { [ENCRYPTION_VAULT_HEADER]: expected.vaultId, [ENCRYPTION_GENERATION_HEADER]: String(expected.generation) } : {};
 }

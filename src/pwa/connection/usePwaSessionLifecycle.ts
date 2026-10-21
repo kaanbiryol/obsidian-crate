@@ -87,7 +87,7 @@ export function usePwaSessionLifecycle({
 		invalidatePwaSession();
 		resetReminderEncryption(discardPrivateData);
 		setAuthToken(nextToken);
-		resetReadingEncryption();
+		resetReadingEncryption(discardPrivateData);
 		resetView();
 		if (closeSettings) setSettingsOpen(false);
 		// A derived Reading credential belongs to the same app connection. Remove
