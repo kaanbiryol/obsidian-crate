@@ -15,7 +15,7 @@ export function extractDocument(html: string, url: string): CapturedArticle {
   // Defuddle's own Markdown converter in articleMarkdown.
   // Retain JSON-LD until Defuddle reads metadata; its parser removes scripts.
   const result = post ?? new Defuddle(document, {
-    url, useAsync: false, markdown: false, debug: false, includeReplies: false,
+    url,
     // These heuristic passes delete short article lists and repeated project
     // headings. Keep structural cleanup, but preserve those authored sections.
     removeLowScoring: false, removeContentPatterns: false,
