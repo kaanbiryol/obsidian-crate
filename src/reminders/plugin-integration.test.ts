@@ -7,12 +7,6 @@ type RemindersSettingsStub = {
 	autoOpenView: 'sidebar' | 'none';
 };
 
-type FileWrittenCallback = (file: unknown) => Promise<void>;
-type MockWriter = {
-	setOnFileWritten: ReturnType<typeof vi.fn<(callback: FileWrittenCallback) => void>>;
-	onFileWritten?: FileWrittenCallback;
-};
-
 type MockPlugin = {
 	manifest: { dir: string };
 	app: {
@@ -67,7 +61,7 @@ const moveJournal = { recover: recoverMoves, hasPending: pendingMoves, isPending
 const createMoveJournal = vi.fn(() => moveJournal);
 const activateOrRevealRemindersLeaf = vi.fn(async (..._args: unknown[]) => {});
 
-let latestWriter: MockWriter;
+const latestWriter = {};
 let latestWatcher: {
 	register: ReturnType<typeof vi.fn>;
 	unregister: ReturnType<typeof vi.fn>;
@@ -197,11 +191,6 @@ beforeEach(() => {
 	createRemindersBlockExtension.mockReset();
 	registerReminderCommands.mockReset();
 
-	latestWriter = {
-		setOnFileWritten: vi.fn((callback: FileWrittenCallback) => {
-			latestWriter.onFileWritten = callback;
-		}),
-	};
 	latestWatcher = {
 		register: vi.fn(),
 		unregister: vi.fn(),
@@ -271,9 +260,6 @@ describe('initializeReminders', () => {
 		layoutReadyHandler?.();
 		await flushMicrotasks();
 		expect(activateOrRevealRemindersLeaf).toHaveBeenCalledExactlyOnceWith(plugin.app.workspace, 'reminders-view', undefined, expect.any(AbortSignal));
-
-		await latestWriter.onFileWritten?.({ path: 'Reminders/Work.md' });
-		expect(reminderIndexRescanFile).toHaveBeenCalledWith({ path: 'Reminders/Work.md' });
 	});
 
 	it('does not duplicate UI registration when reminders are initialized twice for the same plugin', async () => {

@@ -11,6 +11,7 @@ function createMockIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex 
     applyOptimisticUpdate: vi.fn(),
     applyOptimisticDelete: vi.fn(),
     clearOptimistic: vi.fn(),
+    rescanFile: vi.fn(async () => undefined),
     ...overrides,
   } as unknown as ReminderIndex;
 }
@@ -462,10 +463,9 @@ describe('markdownWriter', () => {
     const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
-    const index = createMockIndex();
+    const rescanFile = vi.fn(async () => undefined);
+    const index = createMockIndex({ rescanFile });
     const writer = createMarkdownWriter(app, index);
-    const onFileWritten = vi.fn(async () => undefined);
-    writer.setOnFileWritten(onFileWritten);
 
     await writer.reorderReminders('Reminders/Work.md', ['r2', 'r1']);
 
@@ -481,8 +481,8 @@ describe('markdownWriter', () => {
     expect(descIndex).toBe(firstIndex + 1);
     expect(doneIndex).toBeGreaterThan(descIndex);
     expect(footerIndex).toBeGreaterThan(doneIndex);
-    expect(onFileWritten).toHaveBeenCalledTimes(1);
-    expect(onFileWritten).toHaveBeenCalledWith(expect.objectContaining({ path: 'Reminders/Work.md' }));
+    expect(rescanFile).toHaveBeenCalledTimes(1);
+    expect(rescanFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'Reminders/Work.md' }));
   });
 
   it('removes recurrence when update explicitly clears it', async () => {

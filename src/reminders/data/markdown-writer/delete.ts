@@ -2,10 +2,7 @@ import { processVaultMarkdown } from '../vault-markdown';
 import { deleteReminderBlockFromContent } from "../../core/markdownReminderFile";
 import type { IndexedReminder } from "../reminder-index";
 import type { MarkdownWriterContext } from "./types";
-import {
-  markdownWriterLog,
-  notifyFileWritten,
-} from "./operation-shared";
+import { markdownWriterLog } from "./operation-shared";
 
 export async function deleteReminderInMarkdown(
   context: MarkdownWriterContext,
@@ -34,7 +31,7 @@ export async function deleteReminderInMarkdown(
     }
 
     markdownWriterLog.info(`Deleted reminder from ${reminder.filePath} at line ${deletedLineNumber}`);
-    await notifyFileWritten(context, file);
+    await context.index.rescanFile(file);
   } catch (error) {
     context.index.clearOptimistic(reminder.id);
     throw error;

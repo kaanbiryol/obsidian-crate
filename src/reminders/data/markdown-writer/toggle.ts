@@ -7,10 +7,7 @@ import {
 } from '../../core/markdownReminderMutation';
 import type { IndexedReminder } from '../reminder-index';
 import type { MarkdownWriterContext } from './types';
-import {
-	markdownWriterLog,
-	notifyFileWritten,
-} from './operation-shared';
+import { markdownWriterLog } from './operation-shared';
 
 export async function toggleReminderCompletionInMarkdown(
 	context: MarkdownWriterContext,
@@ -50,7 +47,7 @@ export async function toggleReminderCompletionInMarkdown(
 			markdownWriterLog.info('Recurring reminder: no more occurrences, marking complete');
 		}
 
-		await notifyFileWritten(context, file);
+		await context.index.rescanFile(file);
 		markdownWriterLog.info(
 			`Toggled completion for reminder in ${reminder.filePath} at line ${result.lineNumber}`,
 		);

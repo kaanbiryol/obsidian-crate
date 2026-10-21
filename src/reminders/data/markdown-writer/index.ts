@@ -24,7 +24,6 @@ import { updateReminderInMarkdown } from "./update";
 import type {
   MarkdownWriter,
   MarkdownWriterContext,
-  OnFileWrittenCallback,
 } from "./types";
 
 export type {
@@ -36,7 +35,6 @@ export function createMarkdownWriter(
   index: ReminderIndex,
   moveJournal?: ReminderMoveJournal,
 ): MarkdownWriter {
-  let onFileWritten: OnFileWrittenCallback | undefined;
   let mutationQueue: Promise<void> = Promise.resolve();
 
   const enqueueMutation = <T>(mutation: () => Promise<T>, paths: string[] | (() => string[])): Promise<T> => {
@@ -61,7 +59,6 @@ export function createMarkdownWriter(
     moveJournal,
     getFile: (filePath: string) => getFile(app, filePath),
     getOrCreateProjectFile: (project: string) => getOrCreateProjectFile(app, index, project),
-    getOnFileWritten: () => onFileWritten,
   };
 
   return {
@@ -76,8 +73,5 @@ export function createMarkdownWriter(
       enqueueMutation(() => toggleReminderCompletionInMarkdown(context, reminder), [reminder.filePath]),
     reorderReminders: (filePath, orderedIds) =>
       enqueueMutation(() => reorderRemindersInMarkdown(context, filePath, orderedIds), [filePath]),
-    setOnFileWritten(callback: OnFileWrittenCallback): void {
-      onFileWritten = callback;
-    },
   };
 }

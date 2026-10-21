@@ -38,7 +38,6 @@ async function workspace(sourceTask = task) {
 			if (file instanceof TFile) await index.rescanFile(file);
 		}
 		const writer = createMarkdownWriter(app, index, journal);
-		writer.setOnFileWritten(written => index.rescanFile(written));
 		return { journal, index, writer, lifetime, issues };
 	}
 	return { files, vault, adapter, session, first: await session(), records: () => [...files.keys()].filter(path => path.startsWith(directory) && path.endsWith('.json')) };

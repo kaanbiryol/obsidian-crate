@@ -15,10 +15,7 @@ import { normalizeReminderProjectPath } from "../../core/reminderProjectPath";
 import type {
   MarkdownWriterContext,
 } from "./types";
-import {
-  markdownWriterLog,
-  notifyFileWritten,
-} from "./operation-shared";
+import { markdownWriterLog } from "./operation-shared";
 import { DEFAULT_PROJECT } from '../../core/constants';
 
 function errorMessage(error: unknown): string {
@@ -138,8 +135,8 @@ export async function updateReminderInMarkdown(
 
     try {
       await Promise.all([
-        notifyFileWritten(context, newFile),
-        notifyFileWritten(context, oldFile),
+        context.index.rescanFile(newFile),
+        context.index.rescanFile(oldFile),
       ]);
 
     } catch (error) {
@@ -173,7 +170,7 @@ export async function updateReminderInMarkdown(
       return replacement.content;
     });
     markdownWriterLog.info(`Updated reminder in ${reminder.filePath} at line ${replacementLineNumber}`);
-    await notifyFileWritten(context, file);
+    await context.index.rescanFile(file);
 
   } catch (error) {
     context.index.clearOptimistic(reminder.id);

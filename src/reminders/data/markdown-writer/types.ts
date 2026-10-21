@@ -7,15 +7,12 @@ import type {
 import type { IndexedReminder, ReminderIndex } from "../reminder-index";
 import type { ReminderMoveJournal } from '../reminder-move-journal';
 
-export type OnFileWrittenCallback = (file: TFile) => Promise<void>;
-
 export interface MarkdownWriterContext {
   app: App;
   index: ReminderIndex;
   moveJournal?: ReminderMoveJournal;
   getFile(filePath: string): Promise<TFile | null>;
   getOrCreateProjectFile(project: string): Promise<TFile>;
-  getOnFileWritten(): OnFileWrittenCallback | undefined;
 }
 
 export interface CreateReminderInput {
@@ -42,6 +39,4 @@ export interface MarkdownWriter {
   toggleComplete(reminder: IndexedReminder): Promise<void>;
 
   reorderReminders(filePath: string, orderedIds: string[]): Promise<void>;
-
-  setOnFileWritten(callback: OnFileWrittenCallback): void;
 }

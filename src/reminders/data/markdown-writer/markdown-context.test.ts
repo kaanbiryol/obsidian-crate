@@ -15,7 +15,6 @@ async function workspace(content: string) {
 	const index = createReminderIndex(app, 'Reminders');
 	await index.rescanFile(file);
 	const writer = createMarkdownWriter(app, index);
-	writer.setOnFileWritten(written => index.rescanFile(written));
 	return { files, index, writer, repository: createReminderRepository(index, writer) };
 }
 

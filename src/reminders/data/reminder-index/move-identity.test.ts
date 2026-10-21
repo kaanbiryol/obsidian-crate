@@ -27,7 +27,6 @@ async function workspace(source = 'A', destination = 'Z') {
 	await index.rescanFile(file(sourcePath));
 	await index.rescanFile(file(destinationPath));
 	const writer = createMarkdownWriter(app, index);
-	writer.setOnFileWritten(written => index.rescanFile(written));
 	return { app, files, vault, index, writer, file, sourcePath, destinationPath, lifetime, setStatus: (next: string) => { status = next; } };
 }
 

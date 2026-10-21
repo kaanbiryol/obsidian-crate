@@ -7,10 +7,7 @@ import {
 } from "../../core/markdownReminderMutation";
 import { requireReminderProjectPath } from "../../core/reminderProjectPath";
 import type { CreateReminderInput, MarkdownWriterContext } from "./types";
-import {
-  markdownWriterLog,
-  notifyFileWritten,
-} from "./operation-shared";
+import { markdownWriterLog } from "./operation-shared";
 
 export async function createReminderInMarkdown(
   context: MarkdownWriterContext,
@@ -57,7 +54,7 @@ export async function createReminderInMarkdown(
       return appendCreatedReminderBlock(fileContent, mutation);
     });
     markdownWriterLog.info(`Created reminder in ${file.path}`);
-    await notifyFileWritten(context, file);
+    await context.index.rescanFile(file);
 
   } catch (error) {
     context.index.clearOptimistic(stableReminderId);
