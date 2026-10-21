@@ -17,7 +17,7 @@ import { sha256Hex } from '@/platform/sha256';
 import { DEPLOYMENT_FENCE_KEY } from '@/protocol/deployment-fence';
 
 interface Job { path: string; item_id: string; generation: string; source_revision: string; block_hash: string; url: string; attempts: number }
-export interface Publication { job: Job; result: ReturnType<typeof extractDocument> | null; resolvedUrl?: string }
+export interface Publication { job: Job; result: Awaited<ReturnType<typeof extractDocument>> | null; resolvedUrl?: string }
 
 /** Called under the file coordinator's lock. Never recreate a missing or changed source. */
 export async function publishExtraction(env: Env, publication: Publication | CapturePublication): Promise<void> {
@@ -63,7 +63,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
     // Lease before network access: a crash or restart repeats safely after one minute.
     await env.DB.prepare('UPDATE reading_jobs SET available_at=?, attempts=attempts+1 WHERE path=?').bind(Date.now() + 60_000, job.path).run();
     await state.storage.setAlarm(Date.now() + 60_000);
-    let result: ReturnType<typeof extractDocument> | null = null, resolvedUrl: string | undefined;
+    let result: Awaited<ReturnType<typeof extractDocument>> | null = null, resolvedUrl: string | undefined;
     try {
       const source = await readSource(env, job.path);
       if (source.file.storageKey !== job.source_revision) {

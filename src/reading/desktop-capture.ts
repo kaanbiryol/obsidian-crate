@@ -50,7 +50,15 @@ export async function captureDesktopArticle(source: string, signal: AbortSignal)
     const html = new TextDecoder(charset).decode(response.arrayBuffer);
     const { extractDocument } = await import('./extraction/document');
     signal.throwIfAborted();
-    return extractDocument(html, url);
+    // requestUrl follows redirects itself, so only the first hop is allowlisted here.
+    return await extractDocument(html, url, async request => {
+      signal.throwIfAborted();
+      const result = await requestUrl({ url: request.url, method: request.method, headers: Object.fromEntries(request.headers),
+        ...(request.method === 'POST' ? { body: await request.text() } : {}), throw: false });
+      signal.throwIfAborted();
+      if (result.arrayBuffer.byteLength > MAX_BYTES) throw new Error('Extractor response too large');
+      return new Response(result.arrayBuffer, { status: result.status, headers: result.headers });
+    });
   } finally {
     window.clearTimeout(timeout);
     if (onAbort) signal.removeEventListener('abort', onAbort);

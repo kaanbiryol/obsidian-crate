@@ -85,7 +85,7 @@ Article bodies suppress remote images and active HTML. Library favicons can cont
 
 The YouTube player loads when you select the play icon or interact with a timed transcript passage. It contacts YouTube and may use its cookies and receive your app's origin as a referrer. It does not receive your Crate credentials or note contents.
 
-Your hosting resources handle server-side article downloads; Crate does not use a separate extraction service. Reading notes have a 1 MiB limit, even though larger files can still qualify for ordinary vault sync.
+Your hosting resources handle server-side article downloads. When a page is a login shell or needs more data, links from X, Reddit, Bilibili and C2 wiki may also contact a fixed list of public APIs: X's oEmbed endpoint and the third-party FxTwitter API for X posts, Reddit's own pages and feeds, and Bilibili and C2 wiki APIs. These requests send the saved link, not your cookies or Crate credentials; the API also sees the downloading device's or server's IP address, and Cloudflare adds the Worker's hostname to server requests. Reading notes have a 1 MiB limit, even though larger files can still qualify for ordinary vault sync.
 
 ## Pause or resume Reading
 

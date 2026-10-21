@@ -52,11 +52,16 @@ test('Defuddle extracts documents in the deployed workerd runtime without networ
 		import { articleMarkdown } from './src/reading/extraction/markdown';
 		import { parseHTML } from 'linkedom';
 		import { createMarkdownContent } from 'defuddle/full';
+		const seen = [];
 		export default { async fetch(request) {
+			if (new URL(request.url).pathname === '/seen') return Response.json(seen.splice(0));
 			try {
 				const params = new URL(request.url).searchParams, html = await request.text(), source = params.get('source') || 'https://example.com/story';
 				if (params.get('convert') === 'upstream') return Response.json({ markdown: createMarkdownContent(html, source) });
-				return Response.json(params.has('convert') ? { markdown: articleMarkdown(parseHTML('<html><body>' + html + '</body></html>').document.body, source) } : await extractReadingDocument(html, source));
+				return Response.json(params.has('convert') ? { markdown: articleMarkdown(parseHTML('<html><body>' + html + '</body></html>').document.body, source) } : await extractReadingDocument(html, source, params.has('oembed') ? async request => {
+					seen.push(request.url);
+					return new URL(request.url).hostname === 'publish.twitter.com' ? new Response(params.get('oembed'), { headers: { 'Content-Type': 'application/json' } }) : new Response('Not found', { status: 404 });
+				} : undefined));
 			}
 			catch (error) { return Response.json({ error: error.message }, {status:422}); }
 		} };`, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'neutral',
@@ -91,6 +96,16 @@ test('Defuddle extracts documents in the deployed workerd runtime without networ
 		t.diagnostic(`First extraction including runtime initialization: ${(performance.now() - started).toFixed(0)} ms wall time; this is not a Cloudflare CPU measurement.`);
 		const empty = await extract('<html><head></head><body></body></html>', 'https://x.com/person/status/123');
 		assert.equal(empty.status, 422);
+		// Defuddle's async X extractor recovers a login shell only through the allowlisted transport.
+		const oembed = JSON.stringify({ author_name: 'Writer', author_url: 'https://x.com/writer',
+			html: '<blockquote class="twitter-tweet"><p lang="en" dir="ltr">A post fetched through the allowlisted oEmbed endpoint with enough words.</p>&mdash; Writer (@writer) <a href="https://x.com/writer/status/123">Oct 1, 2026</a></blockquote>' });
+		const recovered = await runtime.dispatchFetch(`https://probe.invalid/?source=${encodeURIComponent('https://x.com/writer/status/123')}&oembed=${encodeURIComponent(oembed)}`,
+			{ method: 'POST', body: '<html><head><title>X</title></head><body><nav>Log in to X</nav></body></html>' });
+		const post = await recovered.json();
+		assert.equal(recovered.status, 200, JSON.stringify(post));
+		assert.match(post.markdown, /allowlisted oEmbed endpoint/);
+		const seen = await (await runtime.dispatchFetch('https://probe.invalid/seen')).json();
+		assert.ok(seen.length && seen.every(url => ['publish.twitter.com', 'api.fxtwitter.com'].includes(new URL(url).hostname)), JSON.stringify(seen));
 		const malformed = await extract('<html><head><title>Broken</title></head><body><article><h1>Broken</h1><p>A readable paragraph despite missing closing tags.<p>Another paragraph.');
 		assert.equal(malformed.status, 200);
 		assert.ok(malformed.result.markdown.includes('readable paragraph'));

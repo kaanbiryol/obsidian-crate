@@ -22,7 +22,7 @@ export async function fetchReadingCapture(source: string, fetchPublic: (request:
   }
   // Failed downloads and video metadata need no DOM parser.
   const { extractDocument } = await import('@/reading/extraction/document');
-  return { article: extractDocument(resource.html, resource.url), url: resource.url };
+  return { article: await extractDocument(resource.html, resource.url, fetchPublic), url: resource.url };
 }
 
 async function fetchResource(source: string, fetchPublic: (request: Request) => Promise<Response>, ownOrigin?: string, json = false): Promise<{ html: string; url: string }> {
