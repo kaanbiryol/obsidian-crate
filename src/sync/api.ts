@@ -173,6 +173,10 @@ export class SyncApiClient {
 		return this.sharedSettingsApi.putSharedSettings(settings);
 	}
 
+	async createSharedSettings(settings: SharedSettings): Promise<{ success: boolean; settingsVersion: string }> {
+		return this.sharedSettingsApi.createSharedSettings(settings);
+	}
+
 	async ensureNotificationPolicy(policy: Omit<NotificationPolicy, 'revision'>): Promise<{ policy: NotificationPolicy }> {
 		return this.notificationsApi.ensureNotificationPolicy(policy);
 	}

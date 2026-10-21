@@ -2,12 +2,17 @@ import type { ConnectionTestResult } from '../types';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
 import { SyncApiClient } from '../api';
-import { applySharedSettings } from './shared-settings';
+import { applySharedSettings, buildSharedSettings } from './shared-settings';
 import type { SharedSettings } from '../../protocol/shared-settings';
+import { createLogger, errorMessage } from '../logger';
+
+const logger = createLogger('CloudflareConnection');
 
 /** Like the self-hosted flow, read the new server's shared settings first but apply
  * them only after the connection is saved. The running engine reads these settings
- * live, so a failed switch must not leave another server's settings on it. */
+ * live, so a failed switch must not leave another server's settings on it. This
+ * device's settings only seed a server read as having none; a failed or skipped
+ * read leaves the server's settings untouched. */
 export async function configureCloudflareAuthorizedDevice(
 	plugin: CratePlugin,
 	workerUrl: string,
@@ -17,7 +22,8 @@ export async function configureCloudflareAuthorizedDevice(
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
 	const api = new SyncApiClient(workerUrl, authToken);
-	let shared: SharedSettings | null = null;
+	// Undefined when unknown: the read failed, or was skipped for an encrypted vault.
+	let shared: SharedSettings | null | undefined;
 	try {
 		// An encrypted vault's settings need keys this device may not have yet.
 		if (!await api.getEncryptionState()) shared = (await api.getSharedSettings()).settings;
@@ -35,8 +41,18 @@ export async function configureCloudflareAuthorizedDevice(
 		applySharedSettings(plugin.settings, shared);
 		await plugin.saveSettings();
 		plugin.syncRuntime.updateSyncSettings();
+	} else if (shared === null) {
+		await seedSharedSettings(api, plugin.settings);
 	}
 
-	void plugin.syncRuntime.pushSharedSettingsBestEffort();
 	return await plugin.syncRuntime.testConnection();
+}
+
+/** Create-only, so a device that seeded the fresh deployment first keeps its settings. */
+async function seedSharedSettings(api: SyncApiClient, settings: CratePlugin['settings']): Promise<void> {
+	try {
+		await api.createSharedSettings(buildSharedSettings(settings));
+	} catch (error) {
+		logger.warn('Did not seed shared settings:', errorMessage(error));
+	}
 }

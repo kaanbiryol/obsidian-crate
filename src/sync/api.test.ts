@@ -282,6 +282,20 @@ describe('SyncApiClient', () => {
 		expect(JSON.parse(lastPut.body) as unknown).toMatchObject({ expectedVersion: 'version-2' });
 	});
 
+	it('creates shared settings only when the server has none', async () => {
+		const settings = { ignorePatterns: [], syncInterval: 30, pushEnabled: false };
+		const transport = mockTransport(new Response(JSON.stringify({ error: 'Shared settings changed on another device' }), { status: 409 }));
+		const client = new SyncApiClient('https://worker.example', 'token', transport);
+
+		await expect(client.createSharedSettings(settings)).rejects.toMatchObject({ status: 409 });
+
+		const requests = transport.mock.calls.map(call => call[0]).filter(request => request.url.endsWith('/settings'));
+		expect(requests.map(request => request.method)).toEqual(['PUT']);
+		const put = requests[0];
+		if (typeof put?.body !== 'string') throw new Error('Expected a JSON request body');
+		expect(JSON.parse(put.body) as unknown).toEqual({ settings, expectedVersion: null });
+	});
+
 	it('rejects in-flight requests with an AbortError when the sync signal aborts', async () => {
 		const transport = vi.fn<ApiHttpTransport>(() => new Promise<ApiHttpResponse>(() => {}));
 		const controller = new AbortController();

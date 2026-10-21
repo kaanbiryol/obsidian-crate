@@ -27,10 +27,19 @@ export class SharedSettingsWorkerApi {
 
 	async putSharedSettings(settings: SharedSettings): Promise<{ success: boolean; settingsVersion: string }> {
 		if (this.settingsVersion === undefined) await this.getSharedSettings();
+		return this.writeSharedSettings(settings, this.settingsVersion ?? null);
+	}
+
+	/** Stores settings only while the server has none, so it never replaces another device's. */
+	async createSharedSettings(settings: SharedSettings): Promise<{ success: boolean; settingsVersion: string }> {
+		return this.writeSharedSettings(settings, null);
+	}
+
+	private async writeSharedSettings(settings: SharedSettings, expectedVersion: string | null): Promise<{ success: boolean; settingsVersion: string }> {
 		try {
 			const result = await this.http.requestJson<{ success: boolean; settingsVersion: string }>('/settings', {
 				method: 'PUT',
-				body: JSON.stringify({ settings: this.encryption ? await this.encryption.sealSettings(settings) : settings, expectedVersion: this.settingsVersion ?? null }),
+				body: JSON.stringify({ settings: this.encryption ? await this.encryption.sealSettings(settings) : settings, expectedVersion }),
 			});
 			this.settingsVersion = result.settingsVersion;
 			return result;

@@ -23,6 +23,7 @@ function spyOnServer() {
 	return {
 		encryption: vi.spyOn(SyncApiClient.prototype, 'getEncryptionState').mockResolvedValue(null),
 		sharedSettings: vi.spyOn(SyncApiClient.prototype, 'getSharedSettings').mockResolvedValue({ settings: remote, settingsVersion: 'version' }),
+		createSettings: vi.spyOn(SyncApiClient.prototype, 'createSharedSettings').mockResolvedValue({ success: true, settingsVersion: 'seeded' }),
 	};
 }
 let server: ReturnType<typeof spyOnServer>;
@@ -53,7 +54,54 @@ it('applies remote shared settings only after the connection is saved', async ()
 	expect(owner.saveSettings).toHaveBeenCalledOnce();
 	expect(owner.syncRuntime.updateSyncSettings).toHaveBeenCalledOnce();
 	expect(owner.syncRuntime.applyInfrastructureConfig.mock.invocationCallOrder[0]).toBeLessThan(owner.saveSettings.mock.invocationCallOrder[0]!);
-	expect(owner.saveSettings.mock.invocationCallOrder[0]).toBeLessThan(owner.syncRuntime.pushSharedSettingsBestEffort.mock.invocationCallOrder[0]!);
+});
+
+function expectNoSettingsWrite(owner: ReturnType<typeof plugin>) {
+	expect(server.createSettings).not.toHaveBeenCalled();
+	expect(owner.syncRuntime.pushSharedSettingsBestEffort).not.toHaveBeenCalled();
+}
+
+it('does not push over shared settings the server already has', async () => {
+	const owner = plugin();
+	await configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token');
+	expect(owner.settings).toMatchObject(remote);
+	expectNoSettingsWrite(owner);
+});
+
+it('does not push this device\'s settings when the shared settings read fails', async () => {
+	const owner = plugin();
+	server.sharedSettings.mockRejectedValue(new Error('Server unavailable'));
+	await expect(configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token')).resolves.toEqual({ success: true });
+	expect(owner.syncRuntime.applyInfrastructureConfig).toHaveBeenCalledOnce();
+	expect(owner.settings.ignorePatterns).toEqual(DEFAULT_SETTINGS.ignorePatterns);
+	expectNoSettingsWrite(owner);
+});
+
+it('does not push settings to an encrypted server it could not read', async () => {
+	const owner = plugin();
+	server.encryption.mockResolvedValue({ mode: 'active' } as never);
+	await configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token');
+	expectNoSettingsWrite(owner);
+});
+
+it('seeds a fresh deployment with this device\'s shared settings after connecting', async () => {
+	const owner = plugin();
+	server.sharedSettings.mockResolvedValue({ settings: null, settingsVersion: null });
+	await expect(configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token')).resolves.toEqual({ success: true });
+	expect(server.createSettings).toHaveBeenCalledExactlyOnceWith({
+		ignorePatterns: DEFAULT_SETTINGS.ignorePatterns, syncInterval: DEFAULT_SETTINGS.syncInterval, pushEnabled: DEFAULT_SETTINGS.pushEnabled,
+	});
+	expect(owner.syncRuntime.applyInfrastructureConfig.mock.invocationCallOrder[0]).toBeLessThan(server.createSettings.mock.invocationCallOrder[0]!);
+	expect(owner.syncRuntime.pushSharedSettingsBestEffort).not.toHaveBeenCalled();
+	expect(owner.saveSettings).not.toHaveBeenCalled();
+});
+
+it('keeps the connection when seeding loses to another device', async () => {
+	const owner = plugin();
+	server.sharedSettings.mockResolvedValue({ settings: null, settingsVersion: null });
+	server.createSettings.mockRejectedValue(new Error('Shared settings changed on another device'));
+	await expect(configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token')).resolves.toEqual({ success: true });
+	expect(owner.syncRuntime.pushSharedSettingsBestEffort).not.toHaveBeenCalled();
 });
 
 it('keeps the current connection settings when switching servers fails', async () => {

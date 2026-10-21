@@ -274,6 +274,8 @@ Request: `{ settings: { ignorePatterns: [...], syncInterval: 300, pushEnabled: f
 
 Response: `{ success: true, settingsVersion }`. A stale version returns `409` instead of overwriting another device's edit.
 
+`expectedVersion: null` stores settings only when none exist. Connecting a Cloudflare device uses it to seed a fresh deployment with that device's preferences. A connecting device applies settings it reads and never writes over settings it could not read, including an encrypted vault's.
+
 Reminder handlers live in `src/cloudflare/worker/reminders/routes/`. Mutations apply the shared Markdown command described in the [architecture](architecture.md).
 
 ### GET /reminders/list
