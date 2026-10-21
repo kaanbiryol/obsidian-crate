@@ -239,6 +239,8 @@ export default tseslint.config(
 		"site/docs/**",
 		"test-vault",
 		"test-vault/**",
+		// Agent worktrees are full repository copies with their own node_modules.
+		".claude/**",
 		"test-results/**",
 		"playwright-report/**",
 		"esbuild.config.mjs",
