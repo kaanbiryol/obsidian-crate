@@ -1,6 +1,6 @@
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { isEncryptionId } from '../../encryption/encoding';
-import type { EncryptionServerState } from '../../encryption/server-state';
+import type { EncryptionServerState, ResetReceipt } from '../../encryption/server-state';
 import { HttpError, WorkerApiHttpClient, TRANSFER_TIMEOUT_MS } from '../worker-api/http';
 import { readServerEncryption } from './conversion';
 import { isSha256Hex } from '../../platform/validation';
@@ -53,7 +53,6 @@ export class EncryptionResetRejectedError extends Error {
 	constructor() { super('The server rejected the reset before it started. Reopen Manage encryption or reconnect this device.'); }
 }
 
-interface ResetReceipt { id: string; vaultId: string; generation: number; complete: boolean }
 function checkReceipt(reset: EncryptionReset, receipt: ResetReceipt): ResetReceipt {
 	if (!receipt || receipt.id !== reset.id || receipt.vaultId !== reset.vaultId || receipt.generation !== reset.generation || typeof receipt.complete !== 'boolean') {
 		throw new Error('The server did not confirm this device’s reset');

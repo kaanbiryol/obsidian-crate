@@ -21,6 +21,9 @@ export interface EncryptionScope {
 	notificationKeyId: string;
 }
 
+/** The server's record of an encryption reset, answered to the device that started it. */
+export interface ResetReceipt { id: string; vaultId: string; generation: number; complete: boolean }
+
 /** Public routing metadata and a recovery envelope. No unwrapped secrets. */
 export interface EncryptionServerState {
 	version: 1;

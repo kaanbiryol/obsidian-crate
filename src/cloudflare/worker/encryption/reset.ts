@@ -5,6 +5,7 @@ import { parseJsonObject } from '../request-validation';
 import { ENCRYPTION_STATE_KEY, hasEncryptionAuthority, readEncryptionState } from './state';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
+import type { ResetReceipt } from '../../../encryption/server-state';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { isSha256Hex } from '../../../platform/validation';
 import { drainNotificationCancellations } from '../notifications/outbox';
@@ -14,7 +15,6 @@ import { putMaintenanceValue } from '../db';
 const PREFIX = 'encryption-reset:';
 const READING_TABLES = ['reading_policy', 'reading_sources', 'reading_jobs', 'reading_operations',
 	'reading_enrollments', 'reading_handoffs', 'reading_captures'] as const;
-interface ResetReceipt { id: string; vaultId: string; generation: number; complete: boolean }
 const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValue(db, key, JSON.stringify(value));
 
 /** Runs under the projection coordinator lock. The replacement credential and
