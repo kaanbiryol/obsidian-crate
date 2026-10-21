@@ -169,7 +169,7 @@ try {
 			expect(await sheet.locator('.settings-main').evaluate(element => element.scrollTop)).toBe(retainedScroll);
 			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeFocused();
 			await page.emulateMedia({ reducedMotion: 'reduce' });
-			await expect(sheet.getByText('Device storage', { exact: true })).toBeVisible();
+			await expect(sheet.getByRole('region', { name: 'About', exact: true })).toBeVisible();
 			// Hold refresh open so unrelated controls are checked during real pending work.
 			let releaseRefresh;
 			const refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
