@@ -185,3 +185,40 @@ it('adds a Reading scope to an already encrypted vault and resumes a lost conver
   await expect(openFile(converted, path, h.keys.forPath(path))).rejects.toThrow();
   expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:prior-file:%'").first()).toBeNull();
 });
+
+async function convertReceipts(h: Awaited<ReturnType<typeof setup>>, kind: 'reminder' | 'reading', receipts: Array<{ id: string; scopes: Array<{ id: string; envelope: string }> }>) {
+  for (const { id, scopes } of receipts) {
+    const converted = await handleEncryptionConversion(new Request('https://test/encryption/conversion/receipt', { method: 'PUT', headers: h.headers,
+      body: JSON.stringify({ kind, operationId: id, vault: 'vault.key.iv.cipher.tag', scopes }) }), env, '/encryption/conversion/receipt');
+    expect(converted?.status, await converted?.clone().text()).toBe(200);
+  }
+  await env.DB.prepare("UPDATE maintenance_state SET value=? WHERE key='e2ee:state'").bind(JSON.stringify({ ...h.state, mode: 'active' })).run();
+}
+async function receiptEnvelope(h: Awaited<ReturnType<typeof setup>>, query: string) {
+  const response = await h.request(`/reading/encrypted-receipt?${query}`);
+  expect(response.status).toBe(200);
+  return (await response.json() as { envelope: string | null }).envelope;
+}
+
+it('recovers a lost encrypted wire attempt from the reminder operation ledger with only the Reading scope envelope', async () => {
+  const h = await setup('converting'), id = operation();
+  const reading = h.bundle.scopes.find(scope => scope.purpose === 'reading')!, reminders = h.bundle.scopes.find(scope => scope.folderPath === 'Reminders')!;
+  await env.DB.prepare('INSERT INTO reminder_operations(operation_id, request_hash, response_json) VALUES (?, ?, ?)').bind(id, 'old-hash', '{"encrypted":"old"}').run();
+  await convertReceipts(h, 'reminder', [{ id, scopes: [{ id: reminders.id, envelope: 'reminders.key.iv.cipher.tag' }, { id: reading.id, envelope: 'reading.key.iv.cipher.tag' }] }]);
+  expect(await receiptEnvelope(h, `operationId=${id}&wire=1`)).toBe('reading.key.iv.cipher.tag');
+  // Without `wire=1` the route reads only Reading semantic receipts.
+  expect(await receiptEnvelope(h, `operationId=${id}`)).toBeNull();
+  expect(await receiptEnvelope(h, `operationId=${operation()}&wire=1`)).toBeNull();
+});
+
+it('returns a converted Reading receipt only for the current Reading policy generation', async () => {
+  const h = await setup('converting'), current = operation(), previous = operation();
+  const reading = h.bundle.scopes.find(scope => scope.purpose === 'reading')!, day = Math.floor(Date.now() / 86400_000);
+  await env.DB.batch([current, previous].map(id => env.DB.prepare('INSERT INTO reading_operations VALUES (?,?,?,?,?,?)')
+    .bind(id, 'reader', id === current ? 'policy' : 'previous-policy', 'hash', JSON.stringify({ saved: true }), day)));
+  await convertReceipts(h, 'reading', [current, previous].map(id => ({ id, scopes: [{ id: reading.id, envelope: `${id}.key.iv.cipher.tag` }] })));
+  expect(await receiptEnvelope(h, `operationId=${current}`)).toBe(`${current}.key.iv.cipher.tag`);
+  expect(await receiptEnvelope(h, `operationId=${previous}`)).toBeNull();
+  // Reading semantic receipts are not in the shared wire ledger.
+  expect(await receiptEnvelope(h, `operationId=${current}&wire=1`)).toBeNull();
+});
