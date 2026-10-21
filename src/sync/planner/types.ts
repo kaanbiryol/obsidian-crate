@@ -6,7 +6,7 @@ import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { VaultFile } from '../local/file-discovery';
-import type { InitialConfigPull } from '../engine/initial-config-pull';
+import type { InitialConfigPull } from './initial-config-pull';
 import type { LocalManifestView } from '../manifest/manifest';
 import type { SyncSettings } from '../settings';
 

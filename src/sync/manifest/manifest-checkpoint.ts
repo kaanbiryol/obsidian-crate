@@ -5,7 +5,7 @@ import type { FileManifest } from '../../protocol/sync-types';
 import { parseRenameDependencies } from './rename-dependencies';
 import { normalizeUploadDiagnostics, type UploadDiagnostic } from '../diagnostics/upload-diagnostics';
 import { parseRestoreIntents, type RestoreIntent } from '../durability/restore-intent';
-import { parseInitialConfigPull, type InitialConfigPull } from '../engine/initial-config-pull';
+import { parseInitialConfigPull, type InitialConfigPull } from '../planner/initial-config-pull';
 
 export const CHECKPOINT_VERSION = 1;
 

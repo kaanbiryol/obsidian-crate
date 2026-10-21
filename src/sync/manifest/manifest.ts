@@ -2,7 +2,7 @@ import { encodeCheckpoint, parseCheckpoint, parseLocalManifest, sameCheckpointRe
 import { encodeLogHeader, encodeLogRecord, encodeLogState, replayManifestLog, type EncodedLogState } from './manifest-log';
 import { UploadJournal } from '../durability/upload-journal';
 import { parseRestoreIntents, type RestoreIntent } from '../durability/restore-intent';
-import { parseInitialConfigPull, type InitialConfigPull } from '../engine/initial-config-pull';
+import { parseInitialConfigPull, type InitialConfigPull } from '../planner/initial-config-pull';
 import { MAX_UPLOAD_DIAGNOSTICS, normalizeUploadDiagnostics, type UploadDiagnostic } from '../diagnostics/upload-diagnostics';
 /**
  * Local manifest management for tracking file state.

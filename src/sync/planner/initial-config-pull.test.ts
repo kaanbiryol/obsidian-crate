@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import type { FileEntry } from '../../protocol/sync-types';
 import { LocalManifest } from '../manifest/manifest';
-import { createFullSyncPlan } from '../planner/full';
+import { createFullSyncPlan } from './full';
 import { parseInitialConfigPull } from './initial-config-pull';
 import { sha256Hex } from '@/platform/sha256';
 

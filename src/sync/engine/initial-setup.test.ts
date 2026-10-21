@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { finishInitialSetup } from './initial-setup';
-import type { InitialConfigPull } from './initial-config-pull';
+import type { InitialConfigPull } from '../planner/initial-config-pull';
 import type { InitialImportApi } from '../worker-api/initial-import';
 
 function setup() {

@@ -27,7 +27,7 @@ import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState, SyncW
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
-import type { InitialConfigPull } from './initial-config-pull';
+import type { InitialConfigPull } from '../planner/initial-config-pull';
 import { updateSyncProgress, type SyncSettings } from '../settings';
 import type { ReconnectNotice } from './workflow-shared';
 
