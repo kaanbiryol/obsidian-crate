@@ -29,6 +29,7 @@ export interface SyncQueueControllerContext {
 	shouldIgnore(path: string): boolean;
 	updateState(updates: Partial<SyncState>): void;
 	setLastSync: QueueFlushContext['setLastSync'];
+	reconnectNotice: QueueFlushContext['reconnectNotice'];
 	isDestroyed(): boolean;
 	currentStatus(): SyncState['status'];
 	verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean): Promise<string[]>;
@@ -170,6 +171,7 @@ export class SyncQueueController {
 			localManifest: this.context.getLocalManifest(),
 			updateState: (updates: Partial<SyncState>) => this.context.updateState(updates),
 			setLastSync: (value: string) => this.context.setLastSync(value),
+			reconnectNotice: this.context.reconnectNotice,
 			isDestroyed: () => this.context.isDestroyed(),
 			currentStatus: () => this.context.currentStatus(),
 			prepareUploadFromPath: (path: string) => this.context.prepareUploadFromPath(path),

@@ -34,9 +34,27 @@ export function getStartFailureResult(context: {
 	return null;
 }
 
+/** Shows the reconnect notice once per authorization failure episode, so background
+ * flushes that keep failing do not repeat it. A successful sync ends the episode; new
+ * credentials replace the engine and with it this gate. */
+export class ReconnectNotice {
+	private shown = false;
+
+	show(): void {
+		if (this.shown) return;
+		this.shown = true;
+		new Notice(AUTH_ERROR_MESSAGE);
+	}
+
+	reset(): void {
+		this.shown = false;
+	}
+}
+
 export interface WorkflowCompletionContext {
 	updateState(updates: Partial<SyncState>): void;
 	setLastSync(value: string): void;
+	reconnectNotice: ReconnectNotice;
 }
 
 interface OutcomeOptions {
@@ -65,6 +83,7 @@ export function completeWorkflowResult(
 			...pending,
 		});
 		context.setLastSync(lastSync);
+		context.reconnectNotice.reset();
 		return;
 	}
 
@@ -82,6 +101,7 @@ export function completeWorkflowResult(
 
 export interface WorkflowErrorContext {
 	updateState(updates: Partial<SyncState>): void;
+	reconnectNotice: ReconnectNotice;
 }
 
 interface AuthFailureOptions extends Pick<OutcomeOptions, 'pendingChanges'> {
@@ -93,7 +113,7 @@ interface AuthFailureOptions extends Pick<OutcomeOptions, 'pendingChanges'> {
 export function publishAuthFailure(context: WorkflowErrorContext, result: SyncResult, options: AuthFailureOptions): void {
 	result.errors.push(AUTH_ERROR_MESSAGE);
 	options.logger.error(`${options.failureLogPrefix}: auth error (401)`);
-	new Notice(AUTH_ERROR_MESSAGE);
+	context.reconnectNotice.show();
 	context.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE, ...pendingUpdate(options) });
 }
 

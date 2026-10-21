@@ -29,6 +29,7 @@ import { runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
 import type { InitialConfigPull } from './initial-config-pull';
 import { updateSyncProgress, type SyncSettings } from '../settings';
+import type { ReconnectNotice } from './workflow-shared';
 
 interface SyncEngineContextDependencies {
 	prepareReminderScope?: () => Promise<void>;
@@ -49,6 +50,7 @@ interface SyncEngineContextDependencies {
 	verifyContent: (files: VaultFile[]) => Promise<boolean>;
 	reconcileVersionConflicts: (paths: string[], result: SyncResult) => Promise<void>;
 	updateState: (updates: Partial<SyncState>) => void;
+	reconnectNotice: ReconnectNotice;
 	throwIfDestroyed: () => void;
 }
 
@@ -210,6 +212,7 @@ export class SyncEngineContexts {
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			saveLocalManifest: () => dependencies.localManifest.save(),
 			setLastSync: this.setLastSync,
+			reconnectNotice: dependencies.reconnectNotice,
 		};
 	}
 

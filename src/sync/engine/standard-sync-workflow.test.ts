@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FileDiff, SyncResult } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { runSyncWorkflow, type SyncWorkflowContext } from './standard-sync-workflow';
+import { ReconnectNotice } from './workflow-shared';
 
 function createContext(options: {
 	prepareFullSyncUpload?: SyncWorkflowContext['prepareFullSyncUpload'];
@@ -69,6 +70,7 @@ function createContext(options: {
 		saveLocalManifest: spies.saveLocalManifest,
 		setLastSync: spies.setLastSync,
 		setLastSeq: spies.setLastSeq,
+		reconnectNotice: new ReconnectNotice(),
 	};
 
 	return { context, localFiles, spies, uploadDiff };

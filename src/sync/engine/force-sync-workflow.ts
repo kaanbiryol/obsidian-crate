@@ -14,6 +14,7 @@ import {
 	completeWorkflowResult,
 	getStartFailureResult,
 	handleWorkflowError,
+	type ReconnectNotice,
 	type RemoteManifest,
 	type SyncStatus,
 } from './workflow-shared';
@@ -46,6 +47,7 @@ export interface ForceSyncWorkflowContext {
 	deleteRemoteFiles: DeleteRemoteFiles;
 	saveLocalManifest(): Promise<void>;
 	setLastSync(value: string): void;
+	reconnectNotice: ReconnectNotice;
 }
 
 export async function runForceFullSyncWorkflow(

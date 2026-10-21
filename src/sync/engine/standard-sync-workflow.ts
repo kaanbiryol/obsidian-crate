@@ -22,6 +22,7 @@ import {
 	completeWorkflowResult,
 	getStartFailureResult,
 	handleWorkflowError,
+	type ReconnectNotice,
 	type RemoteManifest,
 	type SyncStatus,
 } from './workflow-shared';
@@ -60,6 +61,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 	saveLocalManifest(): Promise<void>;
 	setLastSync(value: string): void;
 	setLastSeq(value: number): void;
+	reconnectNotice: ReconnectNotice;
 }
 
 export async function runSyncWorkflow(

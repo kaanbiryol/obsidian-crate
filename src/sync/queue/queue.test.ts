@@ -22,6 +22,7 @@ import { LocalFilePresentError } from '../local/local-absence';
 import { createEmptySyncResult } from '../sync-result';
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
 import { AUTH_ERROR_MESSAGE } from '../engine/constants';
+import { ReconnectNotice } from '../engine/workflow-shared';
 
 type QueueState = SyncState;
 type UploadArgs = {
@@ -176,6 +177,7 @@ function createFlushHarness(overrides: Partial<{
 			},
 			updateState,
 			setLastSync,
+			reconnectNotice: new ReconnectNotice(),
 			isDestroyed: () => false,
 			currentStatus: () => state.status,
 			prepareUploadFromPath,

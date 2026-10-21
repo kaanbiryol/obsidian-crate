@@ -4,6 +4,9 @@ import { pendingChangeKey } from '../pending/pending-change';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDeferred } from '../runtime/runtime-test-harness';
+import { HttpError } from '../api';
+import { Notice } from '../../test/mocks/obsidian';
+import { AUTH_ERROR_MESSAGE } from './constants';
 import {
 	createHarness,
 	createSyncResult,
@@ -154,6 +157,63 @@ describe('SyncEngine event queue behavior', () => {
 		const { lastSync } = harness.engine.getState();
 		expect(lastSync).not.toBeNull();
 		expect(settingsAtReport).toEqual([lastSync]);
+	});
+
+	describe('reconnect notice', () => {
+		const unauthorized = () => new HttpError('Unauthorized', 401);
+		async function flushEdit(target: Harness = harness) {
+			target.engine.onFileChange({ path: 'notes/a.md' } as never);
+			await vi.advanceTimersByTimeAsync(5000);
+			await target.engine.waitForIdle();
+		}
+		function editableFile(target: Harness) {
+			target.vault.getAbstractFileByPath.mockReturnValue({ path: 'notes/a.md', extension: 'md', stat: { size: 1, mtime: 1700000000000 } });
+			target.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+		}
+
+		beforeEach(() => {
+			Notice.reset();
+			editableFile(harness);
+		});
+
+		it('appears once while revoked access keeps failing flushes and syncs', async () => {
+			harness.api.uploadFile.mockRejectedValue(unauthorized());
+			await flushEdit();
+			await flushEdit();
+			harness.api.getManifest.mockRejectedValue(unauthorized());
+			await harness.engine.sync();
+			await flushEdit();
+
+			expect(harness.engine.getState()).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
+			expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
+		});
+
+		it('appears again after a sync succeeds', async () => {
+			harness.api.uploadFile.mockRejectedValue(unauthorized());
+			await flushEdit();
+			harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
+			await flushEdit();
+			expect(harness.engine.getState()).toMatchObject({ status: 'idle', lastError: null });
+
+			harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('B'));
+			harness.api.uploadFile.mockRejectedValue(unauthorized());
+			await flushEdit();
+			expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE, AUTH_ERROR_MESSAGE]);
+		});
+
+		it('appears again for a new connection', async () => {
+			harness.api.uploadFile.mockRejectedValue(unauthorized());
+			await flushEdit();
+			const reconnected = createHarness();
+			reconnected.api.batchUpload.mockRejectedValue(unauthorized());
+			editableFile(reconnected);
+			try {
+				await flushEdit(reconnected);
+			} finally {
+				reconnected.engine.destroy();
+			}
+			expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE, AUTH_ERROR_MESSAGE]);
+		});
 	});
 
 	it('keeps new paths queued when they arrive during pending flush', async () => {

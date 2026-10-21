@@ -36,7 +36,7 @@ import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';
 import { runSyncWorkflow } from './standard-sync-workflow';
-import { completeWorkflowResult, handleWorkflowError } from './workflow-shared';
+import { completeWorkflowResult, handleWorkflowError, ReconnectNotice } from './workflow-shared';
 import { SyncEngineContexts } from './contexts';
 import { SyncEngineLifecycle } from './lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
@@ -77,6 +77,8 @@ export class SyncEngine {
 	private ignore: IgnoreMatcherContext;
 	private syncActivityRevision = 0;
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+	/** Per engine, so new credentials (a new engine) can show the notice again. */
+	private readonly reconnectNotice = new ReconnectNotice();
 
 	constructor(
 		plugin: Plugin,
@@ -160,6 +162,7 @@ export class SyncEngine {
 			shouldIgnore: this.shouldIgnore.bind(this),
 			updateState: this.updateState.bind(this),
 			setLastSync: value => this.contexts.setLastSync(value),
+			reconnectNotice: this.reconnectNotice,
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			currentStatus: () => this.state.status,
 			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
@@ -188,6 +191,7 @@ export class SyncEngine {
 			verifyContent: files => this.verifyContent(files),
 			reconcileVersionConflicts: (paths, result) => this.reconcileVersionConflicts(paths, result),
 			updateState: this.updateState.bind(this),
+			reconnectNotice: this.reconnectNotice,
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
 		});
 	}
@@ -640,7 +644,7 @@ export class SyncEngine {
 		if (this.state.status === 'syncing') return createSyncFailureResult('Sync already in progress');
 		return this.trackWork(async () => {
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
-			const outcome = { updateState: this.updateState.bind(this), setLastSync: this.contexts.setLastSync };
+			const outcome = { updateState: this.updateState.bind(this), setLastSync: this.contexts.setLastSync, reconnectNotice: this.reconnectNotice };
 			this.updateState({ status: 'syncing' });
 			let result = createEmptySyncResult();
 			try {
