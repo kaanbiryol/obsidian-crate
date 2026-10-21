@@ -46,8 +46,10 @@ this running instance. It keeps retrying while DNS or the tunnel is unavailable.
 
 Use backup --output PATH while stopped to create a checksum-verified backup.
 Use restore --backup PATH --data-dir EMPTY_PATH to validate and restore it, and
-check-upgrade to check compatibility without changing stored data. Runtime or
-schema changes require a tested migration; they are rejected until supported.
+check-upgrade to check compatibility without changing stored data. If it reports
+a database migration, run upgrade --output NEW_BACKUP_PATH while stopped; it
+creates a verified backup before migrating. Runtime changes, and schema changes
+without a registered migration, are rejected.
 
 Running the command opts into remote access through Cloudflare. Cloudflare
 terminates public HTTPS and handles traffic through the tunnel. Files, database,

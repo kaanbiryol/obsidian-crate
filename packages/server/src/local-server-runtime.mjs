@@ -1,4 +1,4 @@
-import { migrateLocalDatabase } from './local-server-migrations.mjs';
+import { assertLocalMigrationPath, migrateLocalDatabase } from './local-server-migrations.mjs';
 import { packaged, runtimeVersion, serverAssetPath, workerPath } from './assets.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
@@ -22,12 +22,13 @@ export function localNetworkOptions() {
 }
 
 export async function localBuildInfo() {
-	const [schema, release] = await Promise.all([
+	const [schema, releaseText] = await Promise.all([
 		readFile(serverAssetPath('schema.sql'), 'utf8'),
 		readFile(serverAssetPath('server-release.json'), 'utf8'),
 	]);
+	const release = JSON.parse(releaseText);
 	return { runtimeVersion,
-		schemaHash: digest(schema), serverRevision: JSON.parse(release).revision, previousSchemas: JSON.parse(release).previousSchemas ?? [] };
+		schemaHash: digest(schema), serverRevision: release.revision, release };
 }
 
 export function assertCompatibleLocalMetadata(previous, expected) {
@@ -102,7 +103,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
     if (previousText !== null) {
       if (!upgradeBackup) assertCompatibleLocalMetadata(previous, expected);
       else {
-        if (previous.schemaHash !== expected.schemaHash && !release.previousSchemas?.some(item => item.sha256 === previous.schemaHash)) throw new Error('No tested migration exists for this data directory.');
+        if (previous.schemaHash !== expected.schemaHash) assertLocalMigrationPath(previous.schemaVersion, release);
         assertCompatibleLocalMetadata({ ...previous, schemaHash: expected.schemaHash }, expected);
         const { backupLocalServer } = await import('./local-server-backup.mjs');
         await backupLocalServer(dataDir, upgradeBackup, true);
@@ -113,7 +114,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 			throw new Error('This directory contains data without server.json. Restore a complete backup or choose a new empty directory.');
 		}
 		const metadata = { format: 1, instanceId: previous?.instanceId ?? randomUUID(),
-			schemaHash: digest(schema), runtimeVersion, serverRevision: release.revision };
+			schemaHash: digest(schema), schemaVersion: release.schemaVersion, runtimeVersion, serverRevision: release.revision };
 		const options = {
 			name: 'crate-local', modules: true, script: worker,
 			compatibilityDate: '2026-08-18',

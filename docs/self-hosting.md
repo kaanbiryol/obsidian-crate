@@ -184,8 +184,12 @@ docker compose up -d
 Only start the new image if the check succeeds. If it rejects the upgrade,
 retag `crate-server:before-update` as `crate-server:local` and resume the previous
 image. The check has not changed the data. Updates with the same storage runtime
-and schema can advance the server revision. A changed runtime or schema requires
-an explicitly tested migration and is currently rejected. After a successful
+and schema can advance the server revision. If the check reports that the
+database needs a migration, run
+`docker compose run --rm crate upgrade --output /data/backups/before-migration`
+before starting. It creates a verified backup, then applies the registered
+migrations. A changed runtime, or a schema change without a registered migration
+from the data's schema version, is rejected. After a successful
 upgrade has written newer data, rollback requires the previous image and its
 pre-upgrade backup; do not bypass version checks.
 
@@ -480,9 +484,12 @@ recovery scripts manage Cloudflare resources; use a cold directory backup here.
 
 To update, stop the server, make a complete backup, update the source, run
 `npm ci` and `npm run build:worker`, then run `npm run server -- check-upgrade --data-dir /path/to/crate-data`. Start with the same directory and origin only if that check succeeds.
-The launcher rejects older server revisions, different schema hashes and
-different Miniflare versions. Runtime/schema changes need an explicit tested
-migration before opening existing data. Do not edit `server.json` to bypass
+If the check reports that the database needs a migration, first run
+`npm run server -- upgrade --data-dir /path/to/crate-data --output /path/to/new-backup`.
+It creates a verified backup, then applies the registered migrations in order.
+The launcher rejects older server revisions and different Miniflare versions.
+Normal startup rejects a different schema hash; only **upgrade** accepts one, and
+only with a registered migration from the data's recorded schema version. Do not edit `server.json` to bypass
 checks. Restore the matching installation when an upgrade is rejected. Stale
 generated Worker bundles are also rejected; rebuilding does not reset data.
 Missing database files or missing/corrupt `server.json` stop startup instead of

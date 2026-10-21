@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { copyFile, lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { assertLocalMigrationPath } from './local-server-migrations.mjs';
 import { assertCompatibleLocalMetadata, localBuildInfo, lockLocalData, openLocalRuntime } from './local-server-runtime.mjs';
 
 const ephemeral = new Set(['server.lock', 'control.json', 'status.json', '.DS_Store']);
@@ -33,7 +34,8 @@ async function copyInventory(source, target, files) {
 export async function checkLocalUpgrade(dataDir) {
 	const current = JSON.parse(await readFile(join(dataDir, 'server.json'), 'utf8'));
 	const next = await localBuildInfo();
-	const migration = next.previousSchemas.some(item => item.sha256 === current.schemaHash);
+	const migration = current?.schemaHash !== next.schemaHash;
+	if (migration) assertLocalMigrationPath(current?.schemaVersion, next.release);
   assertCompatibleLocalMetadata(migration ? { ...current, schemaHash: next.schemaHash } : current, next);
 	return { from: current.serverRevision, to: next.serverRevision, runtime: next.runtimeVersion, requiresMigration: migration };
 }

@@ -11,3 +11,6 @@ const runtimePackage = packaged ? metadata : JSON.parse(await readFile(join(runt
 export const runtimeVersion = runtimePackage.crateServerRuntime ?? runtimePackage.devDependencies.miniflare;
 export const serverAssetPath = name => join(runtimeRoot, packaged ? 'assets' : 'src/cloudflare', name);
 export const workerPath = packaged ? serverAssetPath('worker.mjs') : join(runtimeRoot, '.generated/cloudflare/worker.mjs');
+// Source runs the provisioner's upgrade rules through Node type stripping; the package ships them transpiled.
+export const upgradeRulesPath = packaged ? serverAssetPath('database-upgrade-rules.mjs')
+	: join(runtimeRoot, 'src/cloudflare/deployment/database-upgrade-rules.ts');

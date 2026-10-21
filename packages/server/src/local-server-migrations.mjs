@@ -1,30 +1,36 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { serverAssetPath } from './assets.mjs';
-export async function migrateLocalDatabase(db, release) {
-  const marker = await db.prepare('SELECT version, created_version FROM crate_schema WHERE id=1').first();
-  if (!marker || !Number.isSafeInteger(marker.version) || marker.version < release.minimumSchemaVersion || marker.version > release.schemaVersion) throw new Error('Unsupported local schema. Restore using the matching server build.');
+import { pathToFileURL } from 'node:url';
+import { serverAssetPath, upgradeRulesPath } from './assets.mjs';
+
+// The Cloudflare provisioner's manifest, history and transaction rules.
+const { migrationTransactionSql, planDatabaseUpgrade, validateMigrationHistory } = await import(pathToFileURL(upgradeRulesPath).href);
+const readMigration = file => readFile(serverAssetPath(`migrations/${file}`), 'utf8');
+
+// server.json records the schema version beside its hash, like crate_release on
+// Cloudflare. A changed schema needs an older version with a registered path.
+export function assertLocalMigrationPath(schemaVersion, release) {
+  if (!Number.isSafeInteger(schemaVersion) || schemaVersion >= release.schemaVersion) throw new Error('No tested migration exists for this data directory.');
+  planDatabaseUpgrade(schemaVersion, release);
+}
+
+export async function migrateLocalDatabase(db, release, readSql = readMigration) {
   const verify = async () => {
-    const current = await db.prepare('SELECT version, created_version FROM crate_schema WHERE id=1').first();
-    if (!Number.isSafeInteger(current.created_version) || current.created_version < (release.migrations[0]?.from ?? release.minimumSchemaVersion) || current.created_version > current.version) throw new Error('Unsupported local schema baseline.');
-    const receipts = (await db.prepare('SELECT id, checksum FROM crate_migrations').all()).results;
-    const expected = release.migrations.filter(step => step.from >= current.created_version && step.to <= current.version);
-    if (receipts.length !== expected.length || expected.some(step => !receipts.some(row => row.id === step.id && row.checksum === step.checksum))) throw new Error('Local migration history does not match this build.');
+    const marker = await db.prepare('SELECT version, created_version FROM crate_schema WHERE id=1').first();
+    if (!Number.isSafeInteger(marker?.version)) throw new Error('Unsupported local schema. Restore using the matching server build.');
+    validateMigrationHistory(marker.version, marker.created_version, (await db.prepare('SELECT id, checksum FROM crate_migrations').all()).results, release);
+    return marker.version;
   };
-  await verify();
-  const before = await db.prepare('SELECT (SELECT count(*) FROM auth_tokens) AS tokens, (SELECT count(*) FROM files) AS files, (SELECT count(*) FROM file_versions) AS versions').first();
-  for (const step of release.migrations.filter(step => step.from >= marker.version)) {
-    if (step.to !== step.from + 1 || step.file !== `${step.id}.sql` || !/^[a-z0-9-]+$/.test(step.id)) throw new Error('Invalid local migration manifest');
-    const sql = await readFile(serverAssetPath(`migrations/${step.file}`), 'utf8');
-    if (createHash('sha256').update(sql).digest('hex') !== step.checksum) throw new Error('Local migration checksum failed');
-    await db.batch([
-      db.prepare('INSERT INTO crate_schema(id,version,created_version) SELECT 2,0,1 WHERE NOT EXISTS (SELECT 1 FROM crate_schema WHERE id=1 AND version=?)').bind(step.from),
-      ...sql.split(';').map(value => value.trim()).filter(Boolean).map(value => db.prepare(value)),
-      db.prepare('INSERT INTO crate_migrations(id,checksum) VALUES (?,?)').bind(step.id, step.checksum),
-      db.prepare('UPDATE crate_schema SET version=? WHERE id=1').bind(step.to),
-    ]);
+  const counts = () => db.prepare('SELECT (SELECT count(*) FROM auth_tokens) AS tokens, (SELECT count(*) FROM files) AS files, (SELECT count(*) FROM file_versions) AS versions').first();
+  const version = await verify();
+  const before = await counts();
+  for (const migration of planDatabaseUpgrade(version, release)) {
+    const sql = await readSql(migration.file);
+    if (createHash('sha256').update(sql).digest('hex') !== migration.checksum) throw new Error('Database migration failed its integrity check');
+    // One prepared query runs the whole script in one D1 transaction, like the
+    // Cloudflare query API, so triggers and quoted semicolons stay intact.
+    await db.prepare(migrationTransactionSql(migration, sql)).run();
   }
   await verify();
-  const after = await db.prepare('SELECT (SELECT count(*) FROM auth_tokens) AS tokens, (SELECT count(*) FROM files) AS files, (SELECT count(*) FROM file_versions) AS versions').first();
-  if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('Upgrade verification failed. Keep the stopped server and its backup.');
+  if (JSON.stringify(before) !== JSON.stringify(await counts())) throw new Error('Upgrade verification failed. Keep the stopped server and its backup.');
 }

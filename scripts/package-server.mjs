@@ -1,4 +1,5 @@
 import { readBuiltIdentity } from './development-build.mjs';
+import { build } from 'esbuild';
 import { chmod, copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
@@ -42,4 +43,7 @@ await copyFile(join(root, '.generated/cloudflare/worker.mjs'), join(destination,
 await copyFile(join(root, 'src/cloudflare/schema.sql'), join(destination, 'assets/schema.sql'));
 await copyFile(join(root, 'src/cloudflare/server-release.json'), join(destination, 'assets/server-release.json'));
 await cp(join(root, 'src/cloudflare/migrations'), join(destination, 'assets/migrations'), { recursive: true });
+// Installed packages cannot strip TypeScript, so ship the shared upgrade rules as JavaScript.
+await build({ absWorkingDir: root, entryPoints: ['src/cloudflare/deployment/database-upgrade-rules.ts'], outfile: join(destination, 'assets/database-upgrade-rules.mjs'),
+	bundle: true, format: 'esm', platform: 'node', logLevel: 'warning' });
 console.log(`Standalone server package prepared in ${destination}`);

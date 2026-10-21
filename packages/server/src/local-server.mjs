@@ -99,7 +99,7 @@ try {
 			console.log(`Backup restored and database verified: ${dataDir}. Start Crate to resume.`);
 		} else if (command === 'check-upgrade') {
 			const checked = await checkLocalUpgrade(dataDir);
-			console.log(`Compatible: server revision ${checked.from} → ${checked.to}, runtime ${checked.runtime}. Back up before updating; no data was changed by this check.`);
+			console.log(`Compatible: server revision ${checked.from} → ${checked.to}, runtime ${checked.runtime}.${checked.requiresMigration ? ' The database needs a migration: run upgrade with a new --output backup directory before starting.' : ''} Back up before updating; no data was changed by this check.`);
 		} else if (command === 'pair') {
 			const pairing = await requestLocalPairing(dataDir, values.name);
 			console.log(`Server address to paste into Obsidian: ${pairing.origin}`);
