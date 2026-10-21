@@ -1,11 +1,14 @@
 /** Keep background depth tied to the painted sheet, including interrupted drags. */
-export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true): () => void {
+export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true, coveredPopup?: HTMLElement | null): () => void {
 	// Focus must stay synchronous with the opening tap to activate iOS's keyboard.
 	// Suppress only caret painting until its transformed ancestors have settled.
 	popup.setAttribute('data-sheet-moving', '');
 	const sheet = popup.closest<HTMLElement>('.pwa-modal-sheet');
 	const backdrop = sheet?.querySelector<HTMLElement>('.pwa-modal-sheet__backdrop');
 	const canvas = recedeCanvas ? sheet?.closest('.crate-feature-shell')?.querySelector<HTMLElement>('.crate-modal-canvas') : null;
+	// A nested sheet pushes the sheet it covers back, like a stacked iOS page sheet.
+	coveredPopup?.setAttribute('data-sheet-covered', '');
+	const coveredSheet = coveredPopup?.closest<HTMLElement>('.pwa-modal-sheet');
 	const depth = matchMedia('(max-width: 759px) and (prefers-reduced-motion: no-preference)');
 	let frame = 0;
 	let height = popup.offsetHeight;
@@ -36,6 +39,7 @@ export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true):
 		const progress = String(position(style.transform, travel));
 		canvas?.style.setProperty('--pwa-sheet-position', progress);
 		backdrop?.style.setProperty('--pwa-sheet-position', progress);
+		coveredSheet?.style.setProperty('--pwa-covering-sheet-position', progress);
 		const transition = popup.getAnimations().find(animation =>
 			'transitionProperty' in animation && animation.transitionProperty === 'transform' && animation.playState === 'running');
 		popup.toggleAttribute('data-sheet-moving', Boolean(transition)
@@ -55,6 +59,10 @@ export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true):
 			const p = position(String(keyframe.transform), travel);
 			return { offset: keyframe.offset, easing: keyframe.easing,
 				transform: `translateY(${8 * (1 - p)}px) scale(${.94 + .06 * p})`, borderRadius: `${24 * (1 - p)}px` };
+		}), timing));
+		if (depth.matches && coveredPopup) mirrors.push(coveredPopup.animate(keyframes.map(keyframe => {
+			const p = position(String(keyframe.transform), travel);
+			return { offset: keyframe.offset, easing: keyframe.easing, translate: `0 ${-10 * (1 - p)}px`, scale: String(.94 + .06 * p) };
 		}), timing));
 		if (backdrop) mirrors.push(backdrop.animate(keyframes.map(keyframe => ({
 			offset: keyframe.offset, easing: keyframe.easing, opacity: 1 - position(String(keyframe.transform), travel),
@@ -87,5 +95,7 @@ export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true):
 		popup.removeAttribute('data-sheet-moving');
 		canvas?.style.removeProperty('--pwa-sheet-position');
 		backdrop?.style.removeProperty('--pwa-sheet-position');
+		coveredPopup?.removeAttribute('data-sheet-covered');
+		coveredSheet?.style.removeProperty('--pwa-covering-sheet-position');
 	};
 }

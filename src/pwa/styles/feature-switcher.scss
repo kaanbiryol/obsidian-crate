@@ -68,6 +68,13 @@
 		transform: translateY(calc(8px * (1 - var(--pwa-sheet-position, 1)))) scale(calc(.94 + .06 * var(--pwa-sheet-position, 1)));
 		border-radius: calc(24px * (1 - var(--pwa-sheet-position, 1)));
 	}
+	// A covered sheet recedes and lifts so its top edge peeks above the nested one.
+	// Individual transforms compose with the drawer's own transform.
+	.pwa-modal-sheet__container[data-sheet-covered] {
+		transform-origin: center top;
+		translate: 0 calc(-10px * (1 - var(--pwa-covering-sheet-position, 1)));
+		scale: calc(.94 + .06 * var(--pwa-covering-sheet-position, 1));
+	}
 }
 
 // A long article uses native document scrolling; leave its frozen canvas in place.

@@ -46,7 +46,7 @@ export function PwaModalSheet({
 		stopPresentation.current = undefined;
 		popupRef.current = popup;
 		measureSheetTravel(popup);
-		if (popup) stopPresentation.current = trackSheetPresentation(popup, recedeCanvas);
+		if (popup) stopPresentation.current = trackSheetPresentation(popup, recedeCanvas, anchorRef.current?.closest<HTMLElement>('.pwa-modal-sheet__container'));
 		// The portal can attach after the parent layout effect. Focus in its
 		// mount ref so a synchronous opening tap still activates the keyboard.
 		popup?.querySelector<HTMLElement>('[data-initial-focus]:not(:disabled)')?.focus({ preventScroll: true });
