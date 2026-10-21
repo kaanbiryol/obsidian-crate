@@ -122,6 +122,12 @@ export class SyncEngineContexts {
 
 	setLastSync = (value: string): void => updateSyncProgress(this.dependencies.getSettings(), { lastSync: value });
 
+	/** Replays interrupted uploads before any path is planned, reporting recovery progress. */
+	recoverUploads(): Promise<void> {
+		const dependencies = this.dependencies;
+		return dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } }));
+	}
+
 	deleteRemoteFiles: DeleteRemoteFiles = (files, result, options) => deleteRemoteFiles({
 		api: this.dependencies.files,
 		vault: this.dependencies.vault,
@@ -208,7 +214,7 @@ export class SyncEngineContexts {
 			finishInitialSetup: () => this.finishInitialSetup(),
 			apiConfigured: () => dependencies.api.isConfigured(),
 			reportWork: (phase: SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
-			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
+			recoverUploads: () => this.recoverUploads(),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			throwIfDestroyed: dependencies.throwIfDestroyed,

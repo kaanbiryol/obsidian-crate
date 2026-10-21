@@ -152,7 +152,7 @@ export class SyncEngine {
 			automaticSyncEnabled: () => this.settings.automaticSync,
 			recoverUploads: async () => {
 				void this.retryReminderScope();
-				await this.files.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
+				await this.contexts.recoverUploads();
 				this.updateState({ work: { phase: 'applying' } });
 			},
 			api: {
@@ -409,6 +409,18 @@ export class SyncEngine {
 		});
 	}
 
+	/**
+	 * Publishes state, and treats `syncing` as the engine's busy state. Entering it
+	 * starts a new sync activity: pending verifications, startup scans and content
+	 * checks begun earlier no longer apply their results, and phase and request
+	 * timings restart. Leaving it stops the timings and resumes pending checks that
+	 * waited for the engine to be idle.
+	 *
+	 * `runExclusiveOperation` reuses `syncing` for conflict resolution, discards,
+	 * history restores and exclusion cleanup, so they have these effects too. Those
+	 * operations write local state, so earlier reads cannot settle pending paths
+	 * afterwards; each sync restarts the timings before it records them.
+	 */
 	private updateState(updates: Partial<SyncState>): void {
 		if (this.lifecycle?.isDestroyed) return;
 		if (updates.status === 'syncing' && this.state.status !== 'syncing') {
@@ -676,7 +688,7 @@ export class SyncEngine {
 	}
 
 	private async reconcilePaths(queueKeys: string[], recover = true, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> {
-		if (recover) await this.files.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
+		if (recover) await this.contexts.recoverUploads();
 		this.lifecycle.throwIfDestroyed();
 		return reconcileQueuePaths({
 			reportWork: work => this.updateState({ work }),
