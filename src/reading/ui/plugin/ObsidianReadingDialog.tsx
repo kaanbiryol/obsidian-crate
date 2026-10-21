@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BaseModal } from '../../../ui/shared/BaseModal';
 import { ModalHeader } from '../../../ui/shared/ModalHeader';
-import { useObsidianKeyboardHeight } from '../../../reminders/ui/hooks/useObsidianKeyboardHeight';
+import { useObsidianKeyboardHeight } from '../../../ui/plugin/hooks/useObsidianKeyboardHeight';
 import type { ReadingDialogProps } from '../ReadingDialog';
 
 /** Base UI keeps plugin portals inside the same document and Obsidian shadow root. */

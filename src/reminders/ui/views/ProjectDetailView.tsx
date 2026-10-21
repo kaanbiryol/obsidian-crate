@@ -11,7 +11,7 @@ import { EmptyState } from '../shared/EmptyState';
 import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../format/projectColors';
-import { useReminderOrder } from '../hooks/useReminderOrder';
+import { useReminderOrder } from '../shared/hooks/useReminderOrder';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 
 

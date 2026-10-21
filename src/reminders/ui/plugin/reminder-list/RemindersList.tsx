@@ -6,12 +6,12 @@ import { ReminderMotionRow } from "@/reminders/ui/shared/ReminderMotionRow";
 
 import type { Reminder } from "@/reminders/types/reminder";
 import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
-import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
-import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
+import { useIndexRefresh } from "@/reminders/ui/plugin/hooks/useIndexRefresh";
+import { useObsidianDarkMode } from "@/reminders/ui/plugin/hooks/useObsidianDarkMode";
 import { useReducedMotion } from "@/ui/shared/useReducedMotion";
 import { ReminderCardWrapper } from "@/reminders/ui/plugin/ReminderCardWrapper";
 import { ReminderListPresence } from "@/reminders/ui/shared/ReminderListPresence";
-import { useReminderOrder } from "@/reminders/ui/hooks/useReminderOrder";
+import { useReminderOrder } from "@/reminders/ui/shared/hooks/useReminderOrder";
 import { ReorderableReminderList } from "@/reminders/ui/shared/ReorderableReminderList";
 import { ShadowDOMButton } from "@/reminders/ui/plugin/ShadowDOMButton";
 import { ObsidianIcon } from "@/ui/obsidian-icon";

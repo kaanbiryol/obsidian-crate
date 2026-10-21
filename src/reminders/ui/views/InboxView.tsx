@@ -9,7 +9,7 @@ import { ReorderableReminderList } from '../shared/ReorderableReminderList';
 import { EmptyState } from '../shared/EmptyState';
 import { buildInboxViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../format/projectColors';
-import { useReminderOrder } from '../hooks/useReminderOrder';
+import { useReminderOrder } from '../shared/hooks/useReminderOrder';
 import type { CompletedSectionToggleProps } from './CompletedReminderSection';
 
 export interface InboxViewProps {

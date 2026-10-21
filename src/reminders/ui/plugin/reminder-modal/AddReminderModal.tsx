@@ -9,7 +9,7 @@ import { useReminderModalActions } from './useReminderModalActions';
 import type { NewReminder } from './reminderMutation';
 import { useReminderDraft } from './useReminderDraft';
 import { useReminderModalPresentation } from './useReminderModalPresentation';
-import { useObsidianDarkMode } from '../../hooks/useObsidianDarkMode';
+import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
 import { AnimationConfig } from '../animations';
 import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
 import { Reminder } from '../../../types';

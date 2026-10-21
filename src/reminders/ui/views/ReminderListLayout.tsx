@@ -4,7 +4,7 @@ import type { Reminder } from '../../types/reminder';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { REMINDER_LIST_FADE_TRANSITION } from '../shared/layoutConstants';
-import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
+import { useStableReminderScroll } from '../shared/hooks/useStableReminderScroll';
 import { CompletedReminderSection, type CompletedSectionToggleProps } from './CompletedReminderSection';
 
 // Pop the departing state out of flow without changing the scroller's parent.

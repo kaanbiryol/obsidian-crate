@@ -8,7 +8,7 @@ import type CratePlugin from '@/main';
 vi.mock('@/reminders/ui/plugin/ReminderCardWrapper', () => ({
   ReminderCardWrapper: ({ reminder }: { reminder: Reminder }) => React.createElement('div', { className: 'card' }, reminder.content),
 }));
-vi.mock('@/reminders/ui/hooks/useObsidianDarkMode', () => ({ useObsidianDarkMode: () => false }));
+vi.mock('@/reminders/ui/plugin/hooks/useObsidianDarkMode', () => ({ useObsidianDarkMode: () => false }));
 vi.mock('@/ui/shared/useReducedMotion', () => ({ useReducedMotion: () => true }));
 vi.mock('@/ui/obsidian-icon', () => ({ ObsidianIcon: () => null }));
 vi.mock('./styles.scss', () => ({}));

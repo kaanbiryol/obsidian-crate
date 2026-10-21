@@ -11,7 +11,7 @@ import { ObsidianIcon } from '@/ui/obsidian-icon';
 import { normalizeDockTabs, type DockTab } from '../shared/navigation/dock-destinations';
 import { PluginWorkspaceNavigation } from './PluginWorkspaceNavigation';
 import type { TabId } from '@/reminders/ui/shared/layoutConstants';
-import { useObsidianStatusBarInset } from '@/reminders/ui/hooks/useObsidianStatusBarInset';
+import { useObsidianStatusBarInset } from './hooks/useObsidianStatusBarInset';
 import './plugin-navigation.scss';
 
 const DOCK_KEY = 'crate-navigation-tabs';

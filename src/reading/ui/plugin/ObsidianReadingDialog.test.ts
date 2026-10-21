@@ -5,7 +5,7 @@ import { renderHook } from '../../../test/react-hooks';
 
 vi.mock('../../../ui/shared/BaseModal', () => ({ BaseModal: ({ children }: { children: React.ReactNode }) => React.createElement('div', { role: 'dialog' }, children) }));
 vi.mock('../../../ui/shared/ModalHeader', () => ({ ModalHeader: () => null }));
-vi.mock('../../../reminders/ui/hooks/useObsidianKeyboardHeight', () => ({ useObsidianKeyboardHeight: () => 0 }));
+vi.mock('../../../ui/plugin/hooks/useObsidianKeyboardHeight', () => ({ useObsidianKeyboardHeight: () => 0 }));
 import { ObsidianReadingDialog } from './ObsidianReadingDialog';
 
 it('portals to the owning pane outside its tab layer and removes the overlay on unmount', () => {

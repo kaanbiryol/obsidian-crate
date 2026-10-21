@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Reminder } from '../../types/reminder';
+import type { Reminder } from '../../../types/reminder';
 import { reconcileReminderOrder } from './useReminderOrder';
 
 const reminder = (id: string, content = id): Reminder => ({
