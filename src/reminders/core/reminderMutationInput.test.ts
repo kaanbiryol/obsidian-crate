@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { parseReminderRecurrenceInput, parseReminderUpdateParams, ReminderInputError } from './reminderMutationInput';
+import { assertReminderMutationInput, parseReminderRecurrenceInput, parseReminderUpdateParams, ReminderInputError } from './reminderMutationInput';
 
 it('keeps omitted fields and clears explicit nulls in an edit body', () => {
 	expect(parseReminderUpdateParams({ id: 'r1', content: ' Renamed ' })).toEqual({ content: 'Renamed' });
@@ -20,4 +20,12 @@ it('distinguishes a kept, removed and replaced repeat', () => {
 	expect(parseReminderRecurrenceInput(undefined)).toBeUndefined();
 	expect(parseReminderRecurrenceInput(null)).toBeNull();
 	expect(parseReminderRecurrenceInput({ frequency: 'weekly', daysOfWeek: [3, 1, 3] })).toMatchObject({ frequency: 'weekly', daysOfWeek: [1, 3] });
+});
+
+it('rejects a title holding the comments Crate writes on a reminder line', () => {
+	for (const content of ['<!-- crate-id:x -->', 'Task <!--crate-id:x -->', 'Task <!-- crate-rule:%7B%7D -->']) {
+		expect(() => assertReminderMutationInput({ content }, 'create')).toThrow(expect.objectContaining({ field: 'content' }));
+		expect(() => parseReminderUpdateParams({ content })).toThrow(expect.objectContaining({ field: 'content' }));
+	}
+	expect(() => assertReminderMutationInput({ content: 'Read <!-- a note --> about crate-id: values' }, 'create')).not.toThrow();
 });

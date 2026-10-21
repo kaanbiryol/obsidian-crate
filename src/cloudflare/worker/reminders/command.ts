@@ -19,7 +19,7 @@ type ReminderAction = 'create' | 'update' | 'set-completed' | 'delete' | 'reorde
 // order. The shared JSON reader also bounds the entire request to 1 MiB.
 export const MAX_REORDER_REMINDERS = 10_000;
 const REMINDER_EXISTS = 'This reminder already exists. Reload to see its committed state.';
-export const PLAINTEXT_COMMAND_OPTIONS: ReminderFileCommandOptions = { limitWrittenNotesOnly: true, allowUnverifiedResult: true };
+export const PLAINTEXT_COMMAND_OPTIONS: ReminderFileCommandOptions = { limitWrittenNotesOnly: true };
 
 /** Plaintext routes keep the failure responses released before they shared the
  * Markdown command. `request` is the body as received. */

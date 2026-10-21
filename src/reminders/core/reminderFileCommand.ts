@@ -1,11 +1,12 @@
 import { scanReminderMarkdownContent, type ScannedReminderRecord } from './markdownScan';
 import { reminderRevision } from './reminderRevision';
-import { assertReminderMutationInput, parseReminderRecurrenceInput, parseReminderUpdateParams } from './reminderMutationInput';
+import { assertReminderMutationInput, parseReminderRecurrenceInput, parseReminderUpdateParams, ReminderInputError } from './reminderMutationInput';
 import { getReminderProjectFilePath, normalizeReminderProjectPath } from './reminderProjectPath';
 import { buildCreateReminderArgs, buildReminderUpdate } from './reminderMutationPlan';
 import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildMovedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderReminderBlocksInContent } from './markdownReminderFile';
 import { DEFAULT_PROJECT } from './constants';
+import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
 
 /** Distinguishes conflicts that share a status and code, for hosts that answer them differently. */
 export type ReminderCommandFailure = 'exists' | 'missing' | 'duplicate' | 'stale' | 'order';
@@ -13,13 +14,11 @@ export class ReminderCommandError extends Error {
 	constructor(message: string, readonly status = 409, readonly code = 'version_conflict', readonly reason?: ReminderCommandFailure) { super(message); }
 }
 
-/** Released plaintext Worker routes keep two acceptance rules of their own. */
+/** Released plaintext Worker routes keep an acceptance rule of their own. */
 export interface ReminderFileCommandOptions {
 	/** Size-check only notes that receive a written reminder block, so deletes and
 	 * reorders still apply to larger notes. */
 	limitWrittenNotesOnly?: boolean;
-	/** Save an edit whose line no longer reads as that reminder, answering without it. */
-	allowUnverifiedResult?: boolean;
 }
 /** The wire record answered by the Worker routes and encrypted web apps. Fields
  * are listed explicitly so new scanner fields stay private until chosen. */
@@ -47,6 +46,10 @@ function project(value: unknown): string {
 	if (!normalized) throw new ReminderCommandError('Invalid reminder project', 400, 'invalid_reminder_input');
 	return normalized;
 }
+/** A written line that no longer reads as its reminder would hide it in the note. */
+function unreadableTitle(): ReminderInputError {
+	return new ReminderInputError('content', 'This title cannot be saved as a reminder. Remove date, repeat or priority text from it.');
+}
 function checkSize(content: string): void {
 	if (new TextEncoder().encode(content).length > 1024 * 1024) throw new ReminderCommandError('Split reminder notes larger than 1 MiB before editing them in the web app.', 413, 'file_too_large');
 }
@@ -73,7 +76,10 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		changes.set(path, content);
 	};
 	const scanChange = (path: string) => {
-		const reminders = scan(path, changes.get(path)!);
+		let reminders: ScannedReminderRecord[];
+		// Each note was scanned before this edit, so only the written line can fail here.
+		try { reminders = scan(path, changes.get(path)!); }
+		catch (error) { throw error instanceof UnresolvedReminderScheduleError ? unreadableTitle() : error; }
 		scanned.set(path, reminders);
 		return reminders;
 	};
@@ -127,7 +133,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		if (action !== 'delete' && !reminder) reminder = scanChange(path).find(item => item.id === current.id);
 	}
 	if (!options.limitWrittenNotesOnly) for (const content of changes.values()) checkSize(content);
-	if (!['delete', 'reorder'].includes(action) && !reminder && !options.allowUnverifiedResult) throw new Error('The edited reminder could not be verified');
+	if (!['delete', 'reorder'].includes(action) && !reminder) throw unreadableTitle();
 	// `reminders` is present when the command already scanned the changed note.
 	return { files: [...changes].map(([path, content]) => ({ path, content, original: originals.get(path)!, reminders: scanned.get(path) })), createdId,
 		response: { success: true, ...(reminder ? { reminder: await reminderCommandPayload(reminder) } : action === 'delete' ? { id: body.id } : {}) } };

@@ -90,7 +90,7 @@ it('answers only the listed wire fields of a scanned reminder', async () => {
 	expect(payload).not.toHaveProperty('rawLine');
 });
 
-it('limits only written notes and allows unverifiable results when the plaintext Worker asks', async () => {
+it('limits only written notes when the plaintext Worker asks', async () => {
 	const large = `${note}${'x'.repeat(1024 * 1024)}\n`;
 	const body = await request(large);
 	await expect(applyReminderFileCommand('delete', body, folder, async () => large)).rejects.toMatchObject({ status: 413, code: 'file_too_large' });
@@ -98,10 +98,25 @@ it('limits only written notes and allows unverifiable results when the plaintext
 	expect(deleted.files[0]!.content).not.toContain('crate-id:r1');
 	await expect(applyReminderFileCommand('update', { ...body, content: 'Renamed' }, folder, async () => large, { limitWrittenNotesOnly: true }))
 		.rejects.toMatchObject({ status: 413, code: 'file_too_large' });
+});
+
+it.each([
+	['a Crate comment', { content: '<!-- crate-id:x -->' }],
+	['only a priority marker', { content: '!' }],
+	['only a date', { content: 'Jan 5, 2099' }],
+	['a relative date', { content: 'Call tomorrow' }],
+])('rejects an undated title holding %s as invalid input instead of hiding the reminder', async (_name, fields) => {
 	const id = op();
-	const hidden = { folderPath: folder, operationId: id, id, content: '<!-- crate-id:x -->' };
-	await expect(applyReminderFileCommand('create', hidden, folder, async () => null)).rejects.toThrow('could not be verified');
-	expect((await applyReminderFileCommand('create', hidden, folder, async () => null, { allowUnverifiedResult: true })).response).toEqual({ success: true });
+	await expect(applyReminderFileCommand('create', { folderPath: folder, operationId: id, id, ...fields }, folder, async () => note))
+		.rejects.toThrow(expect.objectContaining({ name: 'ReminderInputError', field: 'content' }));
+	await expect(applyReminderFileCommand('update', { ...await request(), ...fields, dueDate: null }, folder, async () => note))
+		.rejects.toThrow(expect.objectContaining({ name: 'ReminderInputError', field: 'content' }));
+});
+
+it('rejects an edit that leaves an existing title unreadable', async () => {
+	const content = '# Notes\n\n- [ ] Call tomorrow Jan 5, 2099 <!-- crate-id:r1 -->\n';
+	await expect(applyReminderFileCommand('update', { ...await request(content), dueDate: null }, folder, async () => content))
+		.rejects.toThrow(expect.objectContaining({ name: 'ReminderInputError', field: 'content' }));
 });
 
 it('distinguishes conflicts that share a status and code', async () => {

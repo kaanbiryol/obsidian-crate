@@ -235,6 +235,16 @@ it('rejects encrypted changes for another folder or with an invalid operation id
   expect(fetch).not.toHaveBeenCalled();
 });
 
+it('rejects a title that would hide the reminder as invalid input without saving an attempt', async () => {
+  const fetch = vi.fn(async (path: string) => path.startsWith('/reminders/encrypted-receipt?') ? Response.json({ envelope: null }) : Response.json(page(1)));
+  const response = await new EncryptedReminderApi(keys, fetch).handle('/reminders/create', { method: 'POST',
+    body: JSON.stringify({ folderPath: 'Reminders', operationId, id: operationId, content: '!', project: 'Inbox' }) });
+  expect(response?.status).toBe(400);
+  expect(await response?.json()).toMatchObject({ code: 'invalid_reminder_input' });
+  expect(attempts.size).toBe(0);
+  expect(fetch.mock.calls.some(([path]) => path === '/reminders/encrypted-commit')).toBe(false);
+});
+
 it('keeps an unresolved encrypted save from being replaced by different content', async () => {
   attempts.set(`${keys.vaultId}:${keys.scopeId}:${operationId}`, { semanticHash: 'different', generation: keys.generation, body: '{}' });
   const fetch = vi.fn();

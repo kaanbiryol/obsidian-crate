@@ -136,7 +136,9 @@ describe('plaintext Worker routes and the shared reminder command', () => {
 	const revisionError = 'Reminder changed on another device. Reload it and review your draft before saving';
 	const reorderError = 'Reminder order changed. Refresh the project before reordering; nothing was changed.';
 	const duplicateError = 'Duplicate reminder identifiers. Refresh the note before editing; nothing was changed.';
-	const existingId = operationId(), hiddenId = operationId();
+	const markerError = 'Remove the Crate metadata comment from the reminder title.';
+	const unreadableError = 'This title cannot be saved as a reminder. Remove date, repeat or priority text from it.';
+	const existingId = operationId();
 	it.each<[string, Action, Files, (files: Files) => Promise<Record<string, unknown>> | Record<string, unknown>, Expected]>([
 		['rejects an invalid priority on create', 'create', seeded, () => create({ content: 'Task', priority: 2 }), {
 			worker: { status: 400, body: { error: 'Choose a valid reminder priority.', field: 'priority', code: 'invalid_reminder_input' } },
@@ -215,9 +217,17 @@ describe('plaintext Worker routes and the shared reminder command', () => {
 			worker: { status: 409, body: { error: duplicateError, code: 'reminder_markdown_context' } },
 			core: { status: 409, body: { error: 'The destination already contains this reminder', code: 'version_conflict' } },
 		}],
-		['saves a title that hides the reminder only on the Worker', 'create', { [inbox]: '# Inbox\n' }, () => create({ content: '<!-- crate-id:x -->' }, hiddenId), {
-			worker: { status: 200, body: { success: true }, files: { [inbox]: `# Inbox\n\n- [ ] <!-- crate-id:${hiddenId} -->\n`, [work]: null, [home]: null } },
-			core: { status: 0, body: { thrown: 'The edited reminder could not be verified' } },
+		['rejects a title holding a Crate comment', 'create', { [inbox]: '# Inbox\n' }, () => create({ content: '<!-- crate-id:x -->' }), {
+			worker: { status: 400, body: { error: markerError, field: 'content', code: 'invalid_reminder_input' } },
+			core: { status: 400, body: { error: markerError, code: 'invalid_reminder_input' } },
+		}],
+		['rejects a title that would hide the reminder', 'create', { [inbox]: '# Inbox\n' }, () => create({ content: '!' }), {
+			worker: { status: 400, body: { error: unreadableError, field: 'content', code: 'invalid_reminder_input' } },
+			core: { status: 400, body: { error: unreadableError, code: 'invalid_reminder_input' } },
+		}],
+		['rejects an edit that leaves the title unreadable', 'update', seeded, files => edit(files, 'r-plain', { content: 'Call tomorrow', dueDate: null }), {
+			worker: { status: 400, body: { error: unreadableError, field: 'content', code: 'invalid_reminder_input' } },
+			core: { status: 400, body: { error: unreadableError, code: 'invalid_reminder_input' } },
 		}],
 	])('%s with known wire differences', async (_name, action, files, body, expected) => {
 		const { core, worker: workerOutcome } = await compare(action, files, await body(files));

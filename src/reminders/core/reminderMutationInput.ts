@@ -4,6 +4,9 @@ import type { RecurrenceRule, UpdateReminderParams } from '../types/reminder';
 
 const REMINDER_TITLE_MAX_LENGTH = 1024;
 const REMINDER_DESCRIPTION_MAX_LENGTH = 4096;
+// The identity and repeat comments Crate writes on a reminder line. In a title
+// they are read back as metadata, which can hide the reminder.
+const CRATE_LINE_MARKER = /<!--\s*crate-(?:id|rule):/;
 
 export class ReminderInputError extends Error {
 	constructor(readonly field: string, message: string) {
@@ -38,6 +41,7 @@ export function assertReminderMutationInput(
 		if (typeof input.content !== 'string' || !input.content.trim()) invalid('content', 'Enter a reminder title.');
 		if (input.content.trim().length > REMINDER_TITLE_MAX_LENGTH) invalid('content', `Keep the reminder title within ${REMINDER_TITLE_MAX_LENGTH} characters.`);
 		if (containsControl(input.content)) invalid('content', 'Keep the reminder title on one line without control characters.');
+		if (CRATE_LINE_MARKER.test(input.content)) invalid('content', 'Remove the Crate metadata comment from the reminder title.');
 	}
 	if (input.description !== undefined && input.description !== null) {
 		if (typeof input.description !== 'string') invalid('description', 'Enter a text description or clear it.');

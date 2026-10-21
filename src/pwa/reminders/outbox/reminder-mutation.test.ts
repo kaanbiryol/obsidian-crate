@@ -37,6 +37,13 @@ describe('buildReminderMutationBody', () => {
         },
     );
 
+    it('rejects a title holding a Crate metadata comment before queuing it', () => {
+        for (const mode of ['create', 'edit'] as const) {
+            expect(() => buildReminderMutationBody({ config, mode, projects: ['Inbox'], selectedProject: null,
+                draft: createDraft({ content: '<!-- crate-id:x -->' }) })).toThrow('Remove the Crate metadata comment from the reminder title.');
+        }
+    });
+
     it('retains the API date fields for parsed times and timed picker values', () => {
         const common = { config, mode: 'create' as const, projects: ['Inbox'], selectedProject: null };
         const parsed = buildReminderMutationBody({ ...common, draft: createDraft({ content: 'Task 2026-04-03 14:30' }) });
