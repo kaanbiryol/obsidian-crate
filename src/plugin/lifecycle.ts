@@ -68,7 +68,7 @@ export function shutdownPlugin(plugin: CratePlugin): void {
   stopReading(plugin);
   plugin.syncRuntime?.destroy();
   plugin.cloudflareDeploymentService?.destroy();
-  plugin.remindersVaultWatcher?.unregister();
+  plugin.reminders?.watcher.unregister();
 }
 
 async function initializePluginCore(plugin: CratePlugin, signal: AbortSignal): Promise<boolean> {
@@ -132,11 +132,11 @@ async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin, signa
     if (signal.aborted) return;
     const startupSyncRan = await plugin.syncRuntime.waitForStartupSync();
     if (signal.aborted) return;
-    if (!plugin.remindersSettings.enabled || !plugin.reminderIndex) return;
+    if (!plugin.remindersSettings.enabled || !plugin.reminders) return;
     // Sync writes visible notes through the vault, so the watcher saw each
     // change; scans deferred while syncing are flushed instead of a full reload.
     if (startupSyncRan) {
-      await plugin.reminderIndex.flushDeferredScans();
+      await plugin.reminders.index.flushDeferredScans();
     }
     if (signal.aborted) return;
     await ensureReminderNotificationPolicy(plugin);

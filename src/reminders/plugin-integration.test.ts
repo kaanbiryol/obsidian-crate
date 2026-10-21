@@ -33,12 +33,13 @@ type MockPlugin = {
 	registerView: ReturnType<typeof vi.fn>;
 	addRibbonIcon: ReturnType<typeof vi.fn>;
 	addCommand: ReturnType<typeof vi.fn>;
-	reminderIndex?: unknown;
-	markdownWriter?: unknown;
-	reminderRepository?: unknown;
-	remindersVaultWatcher?: {
-		register?: ReturnType<typeof vi.fn>;
-		unregister: ReturnType<typeof vi.fn>;
+	reminders?: {
+		index?: unknown;
+		repository?: unknown;
+		watcher: {
+			register?: ReturnType<typeof vi.fn>;
+			unregister: ReturnType<typeof vi.fn>;
+		};
 	};
 	getLayoutReadyHandler: () => (() => void) | undefined;
 };
@@ -235,8 +236,10 @@ describe('initializeReminders', () => {
 
 		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders', gatedIndexOptions);
 		expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
-		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex, moveJournal);
-		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
+		expect(plugin.reminders?.repository).toBe(createReminderRepository.mock.results[0]?.value);
+		expect(plugin.reminders?.watcher.register).toBe(latestWatcher.register);
+		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminders?.index, moveJournal);
+		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminders?.index, latestWriter);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(3);
 		for (const [language, processor] of plugin.registerMarkdownCodeBlockProcessor.mock.calls as Array<[string, (source: string, el: unknown, ctx: unknown) => void]>) {
@@ -298,7 +301,7 @@ describe('reinitializeReminders', () => {
 		const { reinitializeReminders } = await loadPluginIntegrationModule();
 		const oldWatcher = { unregister: vi.fn() };
 		const plugin = createPlugin({
-			remindersVaultWatcher: oldWatcher,
+			reminders: { watcher: oldWatcher },
 		});
 
 		await reinitializeReminders(plugin as never, ' Reminders/Work/ ');
@@ -319,7 +322,7 @@ it('does not publish a reminder backend or register UI after shutdown during ind
   endPluginLifecycle(plugin as never);
   finish();
   await starting;
-  expect(plugin.reminderIndex).toBeUndefined();
+  expect(plugin.reminders).toBeUndefined();
   expect(latestWatcher.register).not.toHaveBeenCalled();
   expect(createMarkdownWriter).not.toHaveBeenCalled();
   expect(plugin.registerView).not.toHaveBeenCalled();
@@ -335,10 +338,10 @@ it('keeps the newer folder backend when an older scan finishes last', async () =
   const first = initializeReminders(plugin as never);
   await loading;
   await reinitializeReminders(plugin as never, 'NewFolder');
-  const current = plugin.reminderIndex;
+  const current = plugin.reminders;
   finish();
   await first;
-  expect(plugin.reminderIndex).toBe(current);
+  expect(plugin.reminders).toBe(current);
   expect(latestWatcher.register).toHaveBeenCalledOnce();
   expect(plugin.registerView).toHaveBeenCalledOnce();
   expect(registerReminderCommands).toHaveBeenCalledOnce();
@@ -444,7 +447,7 @@ it('does not start normalization when unloaded during journal recovery', async (
 	await starting;
 	expect(reminderIndexFactory).not.toHaveBeenCalled();
 	expect(createMarkdownWriter).not.toHaveBeenCalled();
-	expect(plugin.reminderIndex).toBeUndefined();
+	expect(plugin.reminders).toBeUndefined();
 });
 
  it('defers scanning the vault until Obsidian has loaded its file list', async () => {
@@ -485,16 +488,18 @@ it('stops the backend signal and watcher when reminders are disabled', async () 
   stopReminderBackend(plugin as never);
   expect(signal.aborted).toBe(true);
   expect(latestWatcher.unregister).toHaveBeenCalledOnce();
+  expect(plugin.reminders).toBeUndefined();
 });
 
 describe('setRemindersEnabled', () => {
 	it('stops local reminders without deleting notes when disabled and restarts them when enabled', async () => {
 		const { setRemindersEnabled } = await loadPluginIntegrationModule();
 		const watcher = { unregister: vi.fn() };
-		const plugin = createPlugin({ remindersVaultWatcher: watcher });
+		const plugin = createPlugin({ reminders: { watcher } });
 		await setRemindersEnabled(plugin as never, false);
 		expect(plugin.remindersSettings.enabled).toBe(false);
 		expect(watcher.unregister).toHaveBeenCalledOnce();
+		expect(plugin.reminders).toBeUndefined();
 		expect(plugin.app.workspace.detachLeavesOfType).toHaveBeenCalledWith('reminders-view');
 		expect(reminderIndexFactory).not.toHaveBeenCalled();
 		await setRemindersEnabled(plugin as never, true);

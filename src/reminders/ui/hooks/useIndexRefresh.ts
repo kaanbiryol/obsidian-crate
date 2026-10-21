@@ -30,15 +30,15 @@ export function useIndexRefresh(): {
 
   useEffect(() => {
     // Subscribe to index changes
-    if (plugin.reminderIndex) {
-      const unsubscribe = plugin.reminderIndex.onIndexChange(() => {
+    if (plugin.reminders?.index) {
+      const unsubscribe = plugin.reminders.index.onIndexChange(() => {
         triggerRefresh();
       });
 
 		return unsubscribe;
 	}
 	return undefined;
-  }, [plugin.reminderIndex, triggerRefresh]);
+  }, [plugin.reminders?.index, triggerRefresh]);
 
   // A folder change replaces the index; reload and subscribe to the new one.
   useEffect(() => subscribeReminderBackend(plugin, triggerRefresh), [plugin, triggerRefresh]);

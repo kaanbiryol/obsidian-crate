@@ -5,15 +5,12 @@
 import { Plugin } from 'obsidian';
 import type { CloudflareUsageConnection } from '../cloudflare/usage/connection';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment/service';
-import { type ReminderIndex } from '../reminders/data/reminder-index';
-import { type MarkdownWriter } from '../reminders/data/markdown-writer';
-import { type ReminderRepository } from '../reminders/data/reminder-repository';
 import {
 	type RemindersSettings,
 	normalizeRemindersSettings,
 	useRemindersSettingsStore,
 } from '../reminders/settings';
-import { type VaultWatcher } from '../reminders/data/vault-watcher';
+import { type ReminderBackend } from '../reminders/runtime';
 import { configureLogger as configureRemindersLogger } from '../reminders/logger';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import type { CrateSettingTab } from '../ui/settings-tab';
@@ -45,11 +42,8 @@ export default class CratePlugin extends Plugin {
 	private settingTab?: CrateSettingTab;
 	private settingsWriteQueue: Promise<void> = Promise.resolve();
 
-	// Reminders
-	reminderIndex!: ReminderIndex;
-	markdownWriter!: MarkdownWriter;
-	reminderRepository!: ReminderRepository;
-	remindersVaultWatcher?: VaultWatcher;
+	// Reminders: set while the reminders backend is loaded
+	reminders?: ReminderBackend;
 
 	get remindersSettings(): RemindersSettings {
 		return useRemindersSettingsStore.getState();

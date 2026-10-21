@@ -15,6 +15,7 @@ const log = createLogger('ReminderCardWrapper');
 import type { Reminder } from '@/reminders/types/reminder';
 import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 import { openReminderEditModal } from '@/reminders/ui/plugin/reminderEditorModals';
+import { requireReminderBackend } from '@/reminders/runtime';
 import type { ProjectColorScheme } from '@/reminders/ui/format/projectColors';
 import { useRemindersSettingsStore } from '@/reminders/settings';
 
@@ -57,9 +58,9 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
 
     try {
       if (reminder.completed) {
-        await plugin.reminderRepository.uncomplete(reminder.id);
+        await requireReminderBackend(plugin).repository.uncomplete(reminder.id);
       } else {
-        await plugin.reminderRepository.complete(reminder.id);
+        await requireReminderBackend(plugin).repository.complete(reminder.id);
       }
     } catch (error) {
       setCompletionPreview(undefined);

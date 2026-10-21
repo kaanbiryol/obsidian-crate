@@ -1,18 +1,26 @@
 import type CratePlugin from '../plugin/CratePlugin';
-import { createReminderIndex } from './data/reminder-index';
+import { createReminderIndex, type ReminderIndex } from './data/reminder-index';
 import { createMarkdownWriter } from './data/markdown-writer';
-import { createReminderRepository } from './data/reminder-repository';
+import { createReminderRepository, type ReminderRepository } from './data/reminder-repository';
 import { VaultWatcher } from './data/vault-watcher';
 import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { Notice } from 'obsidian';
 import { validateReadingFolder } from '../reading/settings';
-import { createReminderMoveJournal, type ReminderMoveJournal } from './data/reminder-move-journal';
+import { createReminderMoveJournal } from './data/reminder-move-journal';
 import { createReminderScanGate } from './scan-gate';
 
+/** The loaded reminders folder. A folder change replaces it; disabling reminders clears it. */
+export interface ReminderBackend {
+	index: ReminderIndex;
+	repository: ReminderRepository;
+	watcher: VaultWatcher;
+}
+
 const remindersLogger = createLogger('Reminders');
+// The newest setup's lifetime, including a setup that has not published its backend yet.
 const backends = new WeakMap<CratePlugin, AbortController>();
-const moveJournals = new WeakMap<CratePlugin, ReminderMoveJournal>();
+// Views subscribe once and follow every backend that replaces the current one.
 const backendListeners = new WeakMap<CratePlugin, Set<() => void>>();
 
 /** Open views read the plugin's index and repository, which a folder change replaces. */
@@ -21,6 +29,12 @@ export function subscribeReminderBackend(plugin: CratePlugin, listener: () => vo
 	if (!listeners) { listeners = new Set(); backendListeners.set(plugin, listeners); }
 	listeners.add(listener);
 	return () => { listeners.delete(listener); };
+}
+
+/** User actions report a stopped or still-loading backend instead of failing on a missing field. */
+export function requireReminderBackend(plugin: CratePlugin): ReminderBackend {
+	if (!plugin.reminders) throw new Error('Reminders are not loaded. Try again, or check your folder in Crate settings.');
+	return plugin.reminders;
 }
 
 function reportMoveRecoveryIssues(issues: string[]): void {
@@ -32,33 +46,31 @@ function reportMoveRecoveryIssues(issues: string[]): void {
 export function stopReminderBackend(plugin: CratePlugin): void {
 	backends.get(plugin)?.abort();
 	backends.delete(plugin);
-	plugin.remindersVaultWatcher?.unregister();
-	plugin.remindersVaultWatcher = undefined;
+	plugin.reminders?.watcher.unregister();
+	plugin.reminders = undefined;
 }
 
-export async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Promise<boolean> {
+export async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Promise<ReminderBackend | undefined> {
 	if (plugin.settings.reading?.enabled) validateReadingFolder(plugin.settings.reading.folderPath, folderPath, plugin.app.vault.configDir);
 	const lifetime = getPluginLifecycleSignal(plugin);
-	if (lifetime.aborted) return false;
+	if (lifetime.aborted) return undefined;
 	backends.get(plugin)?.abort();
 	const controller = new AbortController();
 	backends.set(plugin, controller);
 	const abort = () => controller.abort();
 	lifetime.addEventListener('abort', abort, { once: true });
 	controller.signal.addEventListener('abort', () => lifetime.removeEventListener('abort', abort), { once: true });
-	plugin.remindersVaultWatcher?.unregister();
+	plugin.reminders?.watcher.unregister();
 	const journal = createReminderMoveJournal(plugin.app, `${plugin.manifest.dir}/reminder-moves`, folderPath, controller.signal);
-	moveJournals.set(plugin, journal);
-	controller.signal.addEventListener('abort', () => { if (moveJournals.get(plugin) === journal) moveJournals.delete(plugin); }, { once: true });
 	try {
 		if (plugin.syncRuntime.getState().status !== 'syncing') reportMoveRecoveryIssues(await journal.recover());
 	} catch (error) {
 		const cancelled = controller.signal.aborted;
 		controller.abort();
-		if (cancelled) return false;
+		if (cancelled) return undefined;
 		throw error;
 	}
-	if (controller.signal.aborted) return false;
+	if (controller.signal.aborted) return undefined;
 
 	const gate = createReminderScanGate({ workspace: plugin.app.workspace, syncRuntime: plugin.syncRuntime, journal });
 	const index = createReminderIndex(plugin.app, folderPath, {
@@ -86,19 +98,17 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	} catch (error) {
 		const cancelled = controller.signal.aborted;
 		controller.abort();
-		if (cancelled) return false;
+		if (cancelled) return undefined;
 		throw error;
 	}
-	if (controller.signal.aborted) return false;
-	plugin.reminderIndex = index;
-	plugin.markdownWriter = createMarkdownWriter(plugin.app, index, journal);
-	plugin.reminderRepository = createReminderRepository(index, plugin.markdownWriter);
-
-	plugin.remindersVaultWatcher = new VaultWatcher(
-		plugin,
-		plugin.reminderIndex,
-	);
-	plugin.remindersVaultWatcher.register();
+	if (controller.signal.aborted) return undefined;
+	const backend: ReminderBackend = {
+		index,
+		repository: createReminderRepository(index, createMarkdownWriter(plugin.app, index, journal)),
+		watcher: new VaultWatcher(plugin, index),
+	};
+	plugin.reminders = backend;
+	backend.watcher.register();
 	// During application startup the vault's in-memory file list is still empty.
 	// Do not interpret that as an empty reminders folder or block plugin loading
 	// by awaiting layout readiness; resume the deferred scan once files are ready.
@@ -111,5 +121,5 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 		});
 	}
 	backendListeners.get(plugin)?.forEach(listener => listener());
-	return true;
+	return backend;
 }

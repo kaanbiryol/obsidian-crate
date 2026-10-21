@@ -30,7 +30,7 @@ const reminders: Reminder[] = Array.from({ length: 450 }, (_, i) => ({
 
 function mount(props: React.ComponentProps<typeof RemindersList>) {
   const repository = { getActive: vi.fn(() => reminders), getAll: vi.fn(() => reminders), getTodayReminders: vi.fn(() => reminders) };
-  const plugin = { reminderRepository: repository, reminderIndex: { isInitialLoadComplete: true }, remindersSettings: {} } as unknown as CratePlugin;
+  const plugin = { reminders: { repository, index: { isInitialLoadComplete: true } }, remindersSettings: {} } as unknown as CratePlugin;
   renderHook(() => null, () => {
     for (const name of ['Node', 'Element', 'HTMLElement', 'HTMLButtonElement']) vi.stubGlobal(name, (window as unknown as Record<string, unknown>)[name]);
     Object.assign(window, { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout });

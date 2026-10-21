@@ -15,8 +15,9 @@ const remindersLogger = createLogger('Reminders');
 export async function initializeReminders(plugin: CratePlugin): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	remindersLogger.info(`Initializing reminders for folder: ${plugin.remindersSettings.remindersFolderPath}`);
-	if (!await setupReminderBackend(plugin, plugin.remindersSettings.remindersFolderPath) || signal.aborted) return;
-	remindersLogger.info(`Index loaded: ${plugin.reminderIndex.getAll().length} reminders`);
+	const backend = await setupReminderBackend(plugin, plugin.remindersSettings.remindersFolderPath);
+	if (!backend || signal.aborted) return;
+	remindersLogger.info(`Index loaded: ${backend.index.getAll().length} reminders`);
 
 	await registerReminderIntegrations(plugin, () => activateRemindersView(plugin));
 }

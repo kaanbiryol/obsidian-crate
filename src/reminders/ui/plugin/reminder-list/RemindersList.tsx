@@ -18,6 +18,7 @@ import { ObsidianIcon } from "@/ui/obsidian-icon";
 import { ThemeIconProvider } from "@/ui/shared/ThemeIcon";
 import { openReminderCreationModal } from "@/reminders/ui/plugin/reminderEditorModals";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
+import { requireReminderBackend } from "@/reminders/runtime";
 import {
   buildRemindersListPresentation,
   loadRemindersListData,
@@ -73,9 +74,10 @@ const ActiveRemindersList: React.FC<Props> = ({
   useEffect(() => {
     let active = true;
     const loadReminders = async () => {
-      const ready = plugin.reminderIndex.isInitialLoadComplete;
+      if (!plugin.reminders) return;
+      const ready = plugin.reminders.index.isInitialLoadComplete;
       const loaded = await loadRemindersListData({
-        repository: plugin.reminderRepository,
+        repository: plugin.reminders.repository,
         showToday,
         showUpcoming,
         showCompleted: showCompletedState,
@@ -102,15 +104,15 @@ const ActiveRemindersList: React.FC<Props> = ({
   }, [showCompleted]);
 
   const handleReorderCommit = useCallback(async (orderedIds: string[]) => {
-    await persistReminderOrder(plugin.reminderRepository, presentation.effectiveProject, orderedIds, triggerRefresh);
+    await persistReminderOrder(requireReminderBackend(plugin).repository, presentation.effectiveProject, orderedIds, triggerRefresh);
     const loaded = await loadRemindersListData({
-      repository: plugin.reminderRepository,
+      repository: requireReminderBackend(plugin).repository,
       showToday,
       showUpcoming,
       showCompleted: showCompletedState,
       effectiveDays,
     });
-    setLoadedReminders({ rawReminders: loaded, isInitialLoadComplete: plugin.reminderIndex.isInitialLoadComplete });
+    setLoadedReminders({ rawReminders: loaded, isInitialLoadComplete: requireReminderBackend(plugin).index.isInitialLoadComplete });
   }, [plugin, presentation.effectiveProject, triggerRefresh, showToday, showUpcoming, showCompletedState, effectiveDays]);
   const order = useReminderOrder(presentation.activeReminders, handleReorderCommit);
   const pagination = useReminderPagination(presentation.reminders);

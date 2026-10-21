@@ -13,7 +13,7 @@ class ProjectSuggestModal extends FuzzySuggestModal<string> {
   }
 
   getItems(): string[] {
-    return this.plugin.reminderRepository.getProjects();
+    return this.plugin.reminders?.repository.getProjects() ?? [];
   }
 
   getItemText(item: string): string {
@@ -40,7 +40,7 @@ export function registerReminderCommands(plugin: CratePlugin) {
     name: "Open reminder project",
     callback: () => {
       if (!plugin.remindersSettings.enabled) { new Notice("Enable reminders in Crate settings first."); return; }
-      const projects = plugin.reminderRepository.getProjects();
+      const projects = plugin.reminders?.repository.getProjects() ?? [];
       if (projects.length === 0) {
         new Notice("No projects found. Create a reminder first.");
         return;

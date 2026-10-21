@@ -11,6 +11,7 @@ const log = createLogger('ReminderModal');
 import { today } from "@/reminders/core/dates/time";
 import { type DueDateDefaultSetting, useRemindersSettingsStore } from "@/reminders/settings";
 import { ModalContext, PluginContext } from "@/reminders/ui/plugin/reminders-context";
+import { requireReminderBackend } from "@/reminders/runtime";
 import type { Reminder } from "@/reminders/types/reminder";
 import { useObsidianKeyboardHeight } from "@/reminders/ui/hooks/useObsidianKeyboardHeight";
 
@@ -48,7 +49,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
   const keyboardHeight = useObsidianKeyboardHeight(isMobile);
 
   // Get projects and active reminders from index (sync, fast)
-  const projects = plugin.reminderRepository.getProjects();
+  const projects = plugin.reminders?.repository.getProjects() ?? [];
   const projectsList = projectOptionsWithDefault(projects);
 
   // Calculate default due date
@@ -59,7 +60,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
   const handleAdd = async (newReminder: NewReminder) => {
     try {
-      await plugin.reminderRepository.create({ id: createId.current, ...newReminder });
+      await requireReminderBackend(plugin).repository.create({ id: createId.current, ...newReminder });
 
       new Notice("Reminder created!");
       if (onSave) onSave(null); // Trigger refresh
@@ -72,7 +73,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
   const handleSave = async (updatedReminder: Reminder) => {
     try {
-      const saved = await plugin.reminderRepository.update(updatedReminder.id, {
+      const saved = await requireReminderBackend(plugin).repository.update(updatedReminder.id, {
         expectedRevision: reminder ? await reminderRevision(reminder) : undefined,
         content: updatedReminder.content,
         description: updatedReminder.description,
@@ -100,7 +101,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     log.info(" Deleting reminder:", reminderToDelete?.id);
 
     try {
-      const deleted = await plugin.reminderRepository.delete(reminderToDelete.id, await reminderRevision(reminderToDelete));
+      const deleted = await requireReminderBackend(plugin).repository.delete(reminderToDelete.id, await reminderRevision(reminderToDelete));
       if (!deleted) {
         new Notice("Reminder not found");
         log.warn(" Reminder not found:", reminderToDelete.id);

@@ -54,7 +54,7 @@ const cards = () => Array.from(document.querySelectorAll('.card'), card => card.
 
 it('shows the new folder after the reminders folder changes while the list is open', async () => {
   const { plugin, h } = await createPlugin();
-  expect(await setupReminderBackend(plugin, 'Reminders')).toBe(true);
+  expect(await setupReminderBackend(plugin, 'Reminders')).toBe(plugin.reminders);
   renderHook(() => null, () => {
     for (const name of ['Node', 'Element', 'HTMLElement', 'HTMLButtonElement']) vi.stubGlobal(name, (window as unknown as Record<string, unknown>)[name]);
     Object.assign(window, { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout });
@@ -67,6 +67,6 @@ it('shows the new folder after the reminders folder changes while the list is op
 
   // The list follows edits in the new folder, not the replaced index.
   const file = await h.put('Tasks/Inbox.md', '- [ ] Edited in the new folder <!-- crate-id:new -->\n');
-  await act(async () => { await plugin.reminderIndex.rescanFile(file); });
+  await act(async () => { await plugin.reminders?.index.rescanFile(file); });
   expect(cards()).toEqual(['Edited in the new folder']);
 });

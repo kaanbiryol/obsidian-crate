@@ -13,6 +13,7 @@ import {
     type PluginReminderCardRenderer,
 } from "@/reminders/ui/plugin/PluginRemindersAppShell";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
+import { requireReminderBackend } from "@/reminders/runtime";
 import { PluginReminderSourceNotice } from './PluginReminderSourceNotice';
 import { RemindersLoading } from "./RemindersLoading";
 import "../reminders-view.scss";
@@ -40,8 +41,8 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     // Startup sync can defer the index scan even after the view is registered.
     // Publish readiness with its reminders so no render sees a stale empty list.
     const readSnapshot = useCallback(() => ({
-        reminders: plugin.reminderRepository.getAll(),
-        isInitialLoadComplete: plugin.reminderIndex.isInitialLoadComplete,
+        reminders: plugin.reminders?.repository.getAll() ?? [],
+        isInitialLoadComplete: plugin.reminders?.index.isInitialLoadComplete ?? false,
     }), [plugin]);
     const [{ reminders, isInitialLoadComplete }, setSnapshot] = useState(readSnapshot);
 
@@ -75,7 +76,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
 
     const handleReorder = useCallback(async (project: string, orderedIds: string[]) => {
         await persistReminderOrder(
-            plugin.reminderRepository,
+            requireReminderBackend(plugin).repository,
             project,
             orderedIds,
             updateReminders,
@@ -106,8 +107,8 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             onAdd={handleAdd}
             onReorder={handleReorder}
             belowHeaderContent={<PluginReminderSourceNotice
-                issues={plugin.reminderIndex.sourceIssues}
-                onRefresh={() => plugin.reminderIndex.load()}
+                issues={plugin.reminders?.index.sourceIssues ?? []}
+                onRefresh={() => requireReminderBackend(plugin).index.load()}
                 onOpenNote={async path => {
                     const file = plugin.app.vault.getAbstractFileByPath(path);
                     if (!(file instanceof TFile)) throw new Error('This note is no longer available. Retry the scan to update the list.');

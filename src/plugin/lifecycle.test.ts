@@ -129,9 +129,9 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
 	noticeMessages.length = 0;
 	initializeReminders.mockReset().mockImplementation(async (target: {
-		reminderIndex?: { load: () => Promise<void> };
+		reminders?: { index: { load: () => Promise<void> }; watcher: { unregister: () => void } };
 	}) => {
-		target.reminderIndex ??= { load: vi.fn(async () => undefined) };
+		target.reminders ??= { index: { load: vi.fn(async () => undefined) }, watcher: { unregister: vi.fn() } };
 	});
 	ensureReminderNotificationPolicy.mockReset();
 	initializeSyncManagers.mockReset();
@@ -272,7 +272,7 @@ describe('bootstrapPlugin', () => {
 		});
 		const reminderIndexLoad = vi.fn(async () => undefined);
 		const plugin = createPlugin({
-			reminderIndex: { flushDeferredScans: reminderIndexLoad },
+			reminders: { index: { flushDeferredScans: reminderIndexLoad } },
 		});
 
 		initializeSyncManagers.mockImplementation((target) => {
@@ -307,7 +307,7 @@ describe('bootstrapPlugin', () => {
 		const reminderIndexLoad = vi.fn(async () => undefined);
 		const syncDestroy = vi.fn();
 		const plugin = createPlugin({
-			reminderIndex: { load: reminderIndexLoad },
+			reminders: { index: { load: reminderIndexLoad }, watcher: { unregister: vi.fn() } },
 		});
 
 		initializeSyncManagers.mockImplementation((target) => {
@@ -400,7 +400,7 @@ describe('shutdownPlugin', () => {
 		shutdownPlugin({
 			syncRuntime: { destroy },
 			cloudflareDeploymentService: { destroy: cloudflareDeploymentDestroy },
-			remindersVaultWatcher: { unregister },
+			reminders: { watcher: { unregister } },
 		} as never);
 
 		expect(destroy).toHaveBeenCalledTimes(1);
@@ -480,7 +480,7 @@ it('does not reactivate after shutdown during settings load', async () => {
 it('finishes loading before sync initializes and starts sync once the layout is ready', async () => {
   const { bootstrapPlugin } = await loadLifecycleModule();
   let layoutReady!: () => void;
-  const plugin = createPlugin({ reminderIndex: { flushDeferredScans: vi.fn(async () => undefined) } });
+  const plugin = createPlugin({ reminders: { index: { flushDeferredScans: vi.fn(async () => undefined) } } });
   plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
   let finishInitialize!: () => void;
   const initialize = vi.fn(() => new Promise<void>(resolve => { finishInitialize = resolve; }));
