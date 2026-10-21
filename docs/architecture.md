@@ -288,6 +288,8 @@ are required context dependencies, including in test fixtures.
 that applies its result.
 
 `ui/activity/activity-modal.ts` owns the Activity view's subscriptions and rendering.
+`ui/activity/activity-header.ts` renders its sync status, sync/stop control and sync
+error notice; the modal keeps the sync and stop actions.
 `ui/activity/shared-history-loader.ts` owns request coalescing and disposal for each
 open view, keeping available history on failure and ignoring late responses after
 close. `ui/activity/activity-status.ts` derives labels, indicators and button state

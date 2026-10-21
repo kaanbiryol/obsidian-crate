@@ -10,12 +10,12 @@ import { PendingDiscardModal } from './pending-discard-modal';
 import { formatSyncProgress } from './progress-label';
 import type { ConflictReview } from '../../sync/conflict/review';
 import { ConflictReviewModal } from './conflict-review-modal';
-import { Notice, Platform, setIcon, type App } from 'obsidian';
+import { Notice, Platform, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ActivitySheet } from './ActivitySheet';
 import { ActivityTabs } from './ActivityTabs';
-import { StatusBarIndicator } from '../StatusBarIndicator';
+import { ActivityHeader } from './activity-header';
 import { hideNativeModalCloseButton } from '../plugin/modalShell';
 import type { CrateSettings } from '../../plugin/settings-types';
 import type { ConflictRecord, SyncState, SyncActivityProgress } from '../../sync/types';
@@ -27,7 +27,6 @@ import type { SyncHistoryEntry } from '../../sync/types';
 import { renderConflictsPanel, renderPendingPanel } from './panels';
 import { renderLoadingState } from './rendering';
 import type { PendingDiffLoader, PendingBrowserState } from './pending-browser';
-import { renderSyncIssues } from './sync-issues';
 
 export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
     loadHistoryComparison?(entry: SyncHistoryEntry): Promise<HistoryComparison>;
@@ -60,15 +59,7 @@ export class ActivityModal extends BaseUiModal {
 	private currentTabIndex = 0;
     private activityHistory?: ActivityHistory;
     private sharedHistory?: SharedHistoryLoader;
-	private subtitleEl!: HTMLSpanElement;
-	private subtitleLabelEl!: HTMLSpanElement;
-	private subtitleIndicatorRoot: Root | undefined;
-	private errorNoticeEl!: HTMLDivElement;
-	private errorIssuesEl!: HTMLDivElement;
-	private errorSignature = '';
-	private errorTitleEl!: HTMLSpanElement;
-	private syncBtn!: HTMLButtonElement;
-	private syncBtnLabel!: HTMLSpanElement;
+	private header!: ActivityHeader;
 	private stoppingSync = false;
 	private pendingCount!: HTMLSpanElement;
 	private conflictsCount!: HTMLSpanElement;
@@ -108,8 +99,8 @@ export class ActivityModal extends BaseUiModal {
 			return;
 		}
 		const status = this.getActivityStatus();
-		this.updateSyncBtn(status);
-		this.updateSyncStatusText(status);
+		this.header.updateSyncBtn(status);
+		this.header.updateSyncStatusText(status);
         // The empty conflicts panel only changes with its checking state.
         if (this.deps.getActiveConflicts().length === 0 && status.checkingConflicts !== this.renderedCheckingConflicts) this.renderConflicts(status);
 		this.renderPending();
@@ -132,7 +123,7 @@ export class ActivityModal extends BaseUiModal {
         const browserSignature = showsBrowser ? paths.join('\0') : undefined;
         if (browserSignature !== undefined && browserSignature === this.renderedBrowserSignature
             && this.pendingPanel.querySelector('.crate-pending-browser')) {
-            this.updateSyncBtn();
+            this.header.updateSyncBtn();
             return;
         }
         this.renderedBrowserSignature = browserSignature;
@@ -151,7 +142,7 @@ export class ActivityModal extends BaseUiModal {
                 fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
                 discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard!(keys.filter(this.pendingPathFilter())), () => this.refresh()).open(),
             } : undefined);
-        this.updateSyncBtn();
+        this.header.updateSyncBtn();
 	}
 	private applyStateChange(): void {
 		const state = this.deps.getState();
@@ -190,42 +181,7 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	private renderActivity(contentEl: HTMLDivElement, headerEl: HTMLDivElement): void {
-
-		const header = headerEl.querySelector<HTMLElement>('.reminder-modal-header-side.is-right')!;
-
-		this.subtitleEl = header.createSpan({ cls: 'crate-activity-subtitle', attr: { role: 'status' } });
-		this.subtitleIndicatorRoot = createRoot(this.subtitleEl.createSpan({ cls: 'crate-activity-subtitle-indicator' }));
-		this.subtitleLabelEl = this.subtitleEl.createSpan({ cls: 'crate-activity-subtitle-label' });
-		this.syncBtn = header.createEl('button', {
-			cls: 'crate-sync-now-btn crate-sync-primary-action reminder-modal-header-action',
-			attr: { type: 'button', 'aria-label': 'Sync vault', title: 'Sync all local and remote changes, including unchecked files.' },
-		});
-		this.syncBtnLabel = this.syncBtn.createSpan({ cls: 'reminder-modal-header-action-label' });
-		this.syncBtn.addEventListener('click', () => {
-			if (this.deps.stopSync && (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress?.())) {
-				this.stoppingSync = true;
-				this.updateSyncBtn();
-				void this.deps.stopSync()
-					.then(() => { new Notice('Sync stopped. Automatic sync is off on this device.'); })
-					.catch(error => { new Notice(error instanceof Error ? error.message : 'Could not stop sync.'); })
-					.finally(() => { this.stoppingSync = false; this.updateSyncBtn(); });
-			} else {
-				void this.deps.sync().catch(error => { new Notice(error instanceof Error ? error.message : 'Could not sync.'); });
-			}
-		});
-		this.updateSyncBtn();
-
-		this.errorNoticeEl = contentEl.createDiv({
-			cls: 'crate-sync-error-notice',
-			attr: { role: 'status', 'aria-live': 'polite' },
-		});
-		const errorIconEl = this.errorNoticeEl.createDiv({ cls: 'crate-sync-error-icon' });
-		setIcon(errorIconEl, 'alert-triangle');
-		const errorCopyEl = this.errorNoticeEl.createDiv({ cls: 'crate-sync-error-copy' });
-		this.errorTitleEl = errorCopyEl.createSpan({ text: 'Sync error', cls: 'crate-sync-error-title' });
-		this.errorIssuesEl = errorCopyEl.createDiv({ cls: 'crate-sync-error-message' });
-		this.updateSyncErrorNotice();
-
+		this.header = this.createHeader(headerEl.querySelector<HTMLElement>('.reminder-modal-header-side.is-right')!, contentEl);
 
         const tabsHost = contentEl.createDiv({ cls: 'crate-activity-tabs-host' });
         this.tabsRoot = createRoot(tabsHost);
@@ -246,13 +202,36 @@ export class ActivityModal extends BaseUiModal {
         }));
     }
 
+	private createHeader(header: HTMLElement, contentEl: HTMLElement): ActivityHeader {
+		return new ActivityHeader(header, contentEl, {
+			getStatus: () => this.getActivityStatus(),
+			getState: () => this.deps.getState(),
+			getServerUrl: () => this.settings.workerUrl,
+			fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
+			onSync: () => this.toggleSync(),
+		});
+	}
+
+	private toggleSync(): void {
+		if (this.deps.stopSync && (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress?.())) {
+			this.stoppingSync = true;
+			this.header.updateSyncBtn();
+			void this.deps.stopSync()
+				.then(() => { new Notice('Sync stopped. Automatic sync is off on this device.'); })
+				.catch(error => { new Notice(error instanceof Error ? error.message : 'Could not stop sync.'); })
+				.finally(() => { this.stoppingSync = false; this.header.updateSyncBtn(); });
+		} else {
+			void this.deps.sync().catch(error => { new Notice(error instanceof Error ? error.message : 'Could not sync.'); });
+		}
+	}
+
 	private switchTab(index: number): void {
 		if (index === 0) this.pendingBrowserState.startChecks?.();
 		else this.pendingBrowserState.pauseChecks?.();
 		this.currentTabIndex = index;
         if (index === 2) { this.renderHistory(); void this.sharedHistory?.refresh(); }
-        this.updateSyncBtn();
-        this.updateSyncStatusText();
+        this.header.updateSyncBtn();
+        this.header.updateSyncStatusText();
 	}
 
     private pendingPathFilter(): (key: string) => boolean {
@@ -270,14 +249,6 @@ export class ActivityModal extends BaseUiModal {
             this.pendingChangeCount(), !!this.deps.stopSync, this.stoppingSync);
     }
 
-    private updateSyncStatusText(status = this.getActivityStatus()): void {
-        if (this.subtitleLabelEl.textContent !== status.text) this.subtitleLabelEl.setText(status.text);
-        this.subtitleIndicatorRoot?.render(createElement(StatusBarIndicator, { state: status.indicatorState }));
-        this.subtitleEl.setAttribute('title', status.text);
-        this.subtitleEl.setAttribute('data-state', status.subtitleState);
-    }
-
-
 	private updateTabCounts(): void {
 		const pendingLen = this.pendingChangeCount();
 		const conflictLen = this.deps.getActiveConflicts().length;
@@ -292,42 +263,10 @@ export class ActivityModal extends BaseUiModal {
 		}
 	}
 
-	private updateSyncBtn(status = this.getActivityStatus()): void {
-		const button = status.button;
-		this.syncBtn.disabled = button.disabled;
-		this.syncBtn.hidden = false;
-		this.syncBtn.setAttribute('aria-label', button.label);
-		this.syncBtn.setAttribute('title', button.title);
-		this.syncBtnLabel.setText(button.label);
-		this.syncBtn.toggleClass('is-enabled', !button.disabled);
-	}
-
-	private updateSyncErrorNotice(): void {
-		const state = this.deps.getState();
-		if (state.status !== 'error' && state.status !== 'offline') {
-			this.errorNoticeEl.hide();
-			return;
-		}
-
-		const issues = state.lastIssues?.length ? state.lastIssues : [{ message: state.lastError || 'Cannot reach the sync server.' }];
-		const signature = JSON.stringify([state.status, issues, this.settings.workerUrl]);
-		if (signature !== this.errorSignature) {
-			this.errorSignature = signature;
-			this.errorTitleEl.setText(state.status === 'offline' ? 'Server unavailable'
-				: issues.every(issue => issue.scope === 'reminders') ? 'Files synced; reminders need attention' : 'Sync needs attention');
-			this.errorIssuesEl.empty();
-			renderSyncIssues(this.errorIssuesEl, issues, {
-				serverUrl: this.settings.workerUrl,
-				fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
-			});
-		}
-		this.errorNoticeEl.show();
-	}
-
 	private refresh(): void {
-		this.updateSyncBtn();
-		this.updateSyncErrorNotice();
-		this.updateSyncStatusText();
+		this.header.updateSyncBtn();
+		this.header.updateSyncErrorNotice();
+		this.header.updateSyncStatusText();
 		this.updateTabCounts();
 		this.renderPending();
         this.renderConflicts();
@@ -379,8 +318,7 @@ export class ActivityModal extends BaseUiModal {
 		this.pendingBrowserState.dispose?.();
 		this.deps.removeStateChangeListener(this.onStateChange);
 		this.deps.removeProgressListener?.(this.onProgress);
-		this.subtitleIndicatorRoot?.unmount();
-		this.subtitleIndicatorRoot = undefined;
+		this.header?.dispose();
 		this.tabsRoot?.unmount();
 		this.tabsRoot = undefined;
 		this.root?.unmount();

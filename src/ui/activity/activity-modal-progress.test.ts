@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createObsidianUiModule, FakeElement } from '../../test/fakes/obsidian-ui';
 import { ActivityModal } from './activity-modal';
+import type { ActivityHeader } from './activity-header';
 import { recordSyncHistory } from '../../sync/runtime/sync-activity';
 import { createEmptySyncResult } from '../../sync/sync-result';
 import { DEFAULT_SETTINGS } from '../../plugin/settings-types';
@@ -8,6 +9,7 @@ import type { SyncState } from '../../sync/types';
 
 vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('./ActivitySheet', () => ({ ActivitySheet: vi.fn() }));
+vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }) }));
 vi.mock('./conflict-review-modal', () => ({ ConflictReviewModal: vi.fn() }));
 vi.mock('./pending-browser', () => ({
     renderPendingBrowser: (container: FakeElement) => { container.createDiv({ cls: 'crate-pending-browser' }); },
@@ -54,16 +56,11 @@ it('shows the reachability warning without treating it as a failed sync', () => 
         getState: () => state, getPendingPaths: () => [], getActiveConflicts: () => [],
         sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
     });
-    const internal = modal as unknown as {
-        errorNoticeEl: HTMLElement; errorTitleEl: HTMLElement; errorIssuesEl: HTMLElement;
-        updateSyncErrorNotice(): void;
-    };
-    internal.errorNoticeEl = new FakeElement('div') as unknown as HTMLElement;
-    internal.errorTitleEl = new FakeElement('span') as unknown as HTMLElement;
-    internal.errorIssuesEl = new FakeElement('span') as unknown as HTMLElement;
-    internal.updateSyncErrorNotice();
-    expect(internal.errorTitleEl.textContent).toBe('Server unavailable');
-    expect((internal.errorIssuesEl as unknown as FakeElement).collectText()).toContain('temporary tunnel address');
+    const internal = modal as unknown as { createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader };
+    const content = new FakeElement('div');
+    internal.createHeader(new FakeElement('div'), content).updateSyncErrorNotice();
+    expect(content.querySelector('.crate-sync-error-title')?.textContent).toBe('Server unavailable');
+    expect(content.querySelector('.crate-sync-error-message')?.collectText()).toContain('temporary tunnel address');
 });
 
 it('updates progress without copying the pending list or rebuilding the empty conflicts panel', async () => {
@@ -75,12 +72,14 @@ it('updates progress without copying the pending list or rebuilding the empty co
         getActiveConflicts: () => [], sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
     });
     const internal = modal as unknown as {
-        pendingPanel: FakeElement; conflictsPanel: FakeElement; syncBtn: FakeElement; syncBtnLabel: FakeElement;
-        subtitleEl: FakeElement; subtitleLabelEl: FakeElement; onProgress(): void; renderConflicts(): void;
+        pendingPanel: FakeElement; conflictsPanel: FakeElement; header: ActivityHeader; onProgress(): void; renderConflicts(): void;
+        createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
     };
     internal.pendingPanel = new FakeElement('div');
     internal.pendingPanel.createSpan({ cls: 'crate-activity-loading-label' });
-    for (const key of ['conflictsPanel', 'syncBtn', 'syncBtnLabel', 'subtitleEl', 'subtitleLabelEl'] as const) internal[key] = new FakeElement('div');
+    internal.conflictsPanel = new FakeElement('div');
+    const header = new FakeElement('div');
+    internal.header = internal.createHeader(header, new FakeElement('div'));
     const renderConflicts = vi.spyOn(internal, 'renderConflicts');
 
     for (let tick = 0; tick < 100; tick++) { internal.onProgress(); await Promise.resolve(); }
@@ -88,7 +87,7 @@ it('updates progress without copying the pending list or rebuilding the empty co
     // Before: about 4 full copies per tick and a conflicts rebuild on every tick.
     expect(getPendingPaths).not.toHaveBeenCalled();
     expect(renderConflicts).toHaveBeenCalledOnce();
-    expect(internal.subtitleLabelEl.textContent).toBe('Syncing…');
+    expect(header.querySelector('.crate-activity-subtitle-label')?.textContent).toBe('Syncing…');
 });
 
 it('applies a state change and progress tick from the same event once', async () => {
@@ -117,10 +116,12 @@ it('keeps the pending file browser and its comparisons while the pending set is 
         loadPendingDiff, sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
     });
     const internal = modal as unknown as {
-        pendingPanel: FakeElement; syncBtn: FakeElement; syncBtnLabel: FakeElement; renderPending(): void;
+        pendingPanel: FakeElement; header: ActivityHeader; renderPending(): void;
         pendingBrowserState: { dispose?: () => void };
+        createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
     };
-    for (const key of ['pendingPanel', 'syncBtn', 'syncBtnLabel'] as const) internal[key] = new FakeElement('div');
+    internal.pendingPanel = new FakeElement('div');
+    internal.header = internal.createHeader(new FakeElement('div'), new FakeElement('div'));
     internal.renderPending();
     const browser = internal.pendingPanel.querySelector('.crate-pending-browser');
     expect(browser).toBeTruthy();
