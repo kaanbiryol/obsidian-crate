@@ -1,6 +1,6 @@
 import { uploadPreparedFiles } from '../transfer/upload';
 import { deleteRemoteFiles } from '../transfer/delete';
-import { runConcurrentTasks } from '../engine/utils';
+import { runConcurrentTasks } from '../concurrency';
 import type { QueueFlushContext } from './flush-types';
 import { base64ToArrayBuffer } from '../encoding';
 import { pendingChangeKey } from '../pending/pending-change';

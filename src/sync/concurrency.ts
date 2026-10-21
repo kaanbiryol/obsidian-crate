@@ -1,7 +1,7 @@
-import { createLogger } from '../logger';
-import { createAbortError, isAbortError } from '../abort';
-import { HttpError } from '../worker-api/http';
-import { isRetryableSyncError } from '../failures';
+import { createLogger } from './logger';
+import { createAbortError, isAbortError } from './abort';
+import { HttpError } from './worker-api/http';
+import { isRetryableSyncError } from './failures';
 
 const logger = createLogger('SyncEngine');
 const MAX_SERVER_RETRY_DELAY_MS = 60_000;

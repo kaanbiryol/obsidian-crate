@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HttpError } from '../api';
-import { retryWithBackoff, runConcurrentTasks } from './utils';
+import { HttpError } from './api';
+import { retryWithBackoff, runConcurrentTasks } from './concurrency';
 
 describe('runConcurrentTasks', () => {
 	it('drains started workers before rejecting and launches no further work after failure', async () => {
