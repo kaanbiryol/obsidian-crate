@@ -6,7 +6,9 @@
   font: inherit;
 }
 
-.rich-text-input-editor[data-placeholder]:not([data-placeholder=""])::before {
+// The editor omits the attribute when no placeholder should show. Sass 1.106
+// cannot serialize an empty attribute value such as [data-placeholder=""].
+.rich-text-input-editor[data-placeholder]::before {
   position: absolute;
   content: attr(data-placeholder);
   color: var(--text-faint);

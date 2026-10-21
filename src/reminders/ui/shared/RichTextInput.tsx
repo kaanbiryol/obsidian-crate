@@ -169,6 +169,6 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     }}
     onFocus={props.onFocus} onBlur={props.onBlur} onPointerDown={props.onPointerDown}
     className={`rich-text-input-editor${props.className ? ` ${props.className}` : ''}`}
-    data-placeholder={!props.value ? props.placeholder : ''} data-editor="lexical"
+    data-placeholder={(!props.value && props.placeholder) || undefined} data-editor="lexical"
     suppressContentEditableWarning style={props.style} /></div>;
 });
