@@ -12,6 +12,8 @@ const [before, after] = await Promise.all([
   buildPwaPreviewAssets({ assetVersion: beforeVersion }),
   buildPwaPreviewAssets({ assetVersion: afterVersion }),
 ]);
+// Request update checks with a reconnect: foreground checks within 30 seconds
+// of the launch check are skipped, while reconnection always checks.
 const cardName = 'Check this article. Press Enter to edit reminder.';
 const authKey = 'crate-reminders-auth-token';
 const transitionKey = 'crate-pwa-update-transition';
@@ -106,7 +108,7 @@ async function testUpdate(browser, launchMode) {
     // This is an actual deployment and Update-button activation, not reload()
     // with service workers blocked. The new worker precaches generic HTML.
     assets = delayedAfter;
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
     const update = page.getByRole('button', { name: 'Update available', exact: true });
     await update.waitFor();
     failNextVersionCheck = true;
@@ -309,7 +311,7 @@ async function testDeferredUpdate(browser) {
     let navigations = 0;
     page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
     assets = after;
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await page.waitForFunction(async () => Boolean((await navigator.serviceWorker.getRegistration())?.waiting));
     await page.waitForTimeout(2_500);
     expect(navigations).toBe(0);
@@ -377,7 +379,7 @@ async function testPreparingCommandUpdate(browser) {
     await reminder.waitFor();
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
     assets = after;
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
     const update = page.getByRole('button', { name: 'Update available', exact: true });
     await expect(update).toBeEnabled();
     let navigations = 0;
@@ -433,7 +435,7 @@ async function testPreparingReadingUpdate(browser) {
     await expect(article).toBeVisible();
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
     assets = after;
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
     const update = page.getByRole('button', { name: 'Update available', exact: true });
     await expect(update).toBeEnabled();
     await article.click();

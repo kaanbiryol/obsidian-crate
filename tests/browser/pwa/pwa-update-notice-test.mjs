@@ -6,7 +6,11 @@ import { switchFeature } from './pwa-feature-navigation.mjs';
 
 const version = 'notice-before';
 // Update checks run on launch, foreground and reconnect, not on a timer.
-const returnToForeground = page => page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+// Foreground checks within 30 seconds of the last one are skipped.
+const returnToForeground = async page => {
+  await page.clock.fastForward(30_000);
+  await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+};
 const assets = await buildPwaPreviewAssets({ assetVersion: version });
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 await mkdir('test-results/update-notice', { recursive: true });
