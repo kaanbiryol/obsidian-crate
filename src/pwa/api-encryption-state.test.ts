@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { makeApiFetch } from './api';
-import { preparePwaEncryption } from './encryption/encryption-session';
+import { prepareReminderEncryption } from './reminders/encryption-session';
 import { invalidatePwaSession } from './session-generation';
 import type { ApiFetch } from './types';
 
-vi.mock('./encryption/encryption-session', () => ({
-	preparePwaEncryption: vi.fn(async (_token: string, rawFetch: ApiFetch) => { await rawFetch('/encryption'); return null; }),
-	encryptionSnapshot: () => ({ status: 'unencrypted' }),
+vi.mock('./reminders/encryption-session', () => ({
+	prepareReminderEncryption: vi.fn(async (_token: string, rawFetch: ApiFetch) => { await rawFetch('/encryption'); return null; }),
+	reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }),
 }));
 
 beforeEach(() => {
@@ -14,7 +14,7 @@ beforeEach(() => {
 	vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
 	vi.stubGlobal('navigator', { userAgent: 'Test Browser', maxTouchPoints: 0 });
 });
-afterEach(() => { invalidatePwaSession(); vi.unstubAllGlobals(); vi.mocked(preparePwaEncryption).mockClear(); });
+afterEach(() => { invalidatePwaSession(); vi.unstubAllGlobals(); vi.mocked(prepareReminderEncryption).mockClear(); });
 
 it('probes encryption once while server responses confirm the vault is unencrypted', async () => {
 	let enabled = false;
@@ -25,9 +25,9 @@ it('probes encryption once while server responses confirm the vault is unencrypt
 	const api = makeApiFetch('session', vi.fn());
 	for (let read = 0; read < 3; read++) expect((await api('/reminders/list?folderPath=Reminders')).status).toBe(200);
 	// Before: one /encryption probe per request in an unencrypted vault.
-	expect(preparePwaEncryption).toHaveBeenCalledOnce();
+	expect(prepareReminderEncryption).toHaveBeenCalledOnce();
 	enabled = true;
 	await expect(api('/reminders/list?folderPath=Reminders')).rejects.toThrow('encrypted folder changed');
 	// The 428 retried once after a fresh probe instead of trusting the cached state.
-	expect(preparePwaEncryption).toHaveBeenCalledTimes(2);
+	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
 });

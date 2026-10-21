@@ -7,7 +7,7 @@ import { clearReminderDrafts } from '../reminders/editor/reminder-drafts';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY, finishEnrollment, loadStoredConfig } from '../config';
 import type { ApiFetch, ShowToast, StoredConfig } from '../types';
 import { captureEncryptionCleanupAuthority } from '../encryption/encryption-cleanup';
-import { resetPwaEncryption } from '../encryption/encryption-session';
+import { resetReminderEncryption } from '../reminders/encryption-session';
 import { resetReadingEncryption } from '../reading/encryption-lifecycle';
 import { clearLocalData } from './local-data-cleanup';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
@@ -85,7 +85,7 @@ export function usePwaSessionLifecycle({
 		let closeSettings = discardPrivateData;
 		try { closeSettings ||= localStorage.getItem(AUTH_TOKEN_KEY) !== null; } catch { closeSettings = true; }
 		invalidatePwaSession();
-		resetPwaEncryption(discardPrivateData);
+		resetReminderEncryption(discardPrivateData);
 		setAuthToken(nextToken);
 		resetReadingEncryption();
 		resetView();

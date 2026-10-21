@@ -9,11 +9,11 @@ import { clearReminderDrafts } from '../reminders/editor/reminder-drafts';
 import { clearReminderOutbox } from '../reminders/outbox/reminder-outbox-storage';
 import { clearCachedReminderSnapshots } from '../reminders/cache/reminder-cache';
 import { clearPersistedEncryption, clearEncryptionSessionMarkers } from '../encryption/encryption-cleanup';
-import { resetPwaEncryption } from '../encryption/encryption-session';
+import { resetReminderEncryption } from '../reminders/encryption-session';
 import { capturePwaSession } from '../session-generation';
 
 vi.mock('../encryption/encryption-cleanup', async importOriginal => ({ ...await importOriginal<typeof import('../encryption/encryption-cleanup')>(), clearPersistedEncryption: vi.fn(async () => {}), clearEncryptionSessionMarkers: vi.fn() }));
-vi.mock('../encryption/encryption-session', () => ({ resetPwaEncryption: vi.fn() }));
+vi.mock('../reminders/encryption-session', () => ({ resetReminderEncryption: vi.fn() }));
 vi.mock('./storage', async importOriginal => ({ ...await importOriginal<typeof import('./storage')>(), clearReadingData: vi.fn(async () => {}) }));
 vi.mock('../config', async importOriginal => ({ ...await importOriginal<typeof import('../config')>(), finishEnrollment: vi.fn() }));
 vi.mock('../reminders/editor/reminder-drafts', () => ({ clearReminderDrafts: vi.fn(() => true) }));
@@ -51,7 +51,7 @@ it.each(['malformed credentials', 'unavailable credential reads'])('app logout c
   await act(async () => { await test.hook.current.logOut(); });
   expect(current()).toBe(false);
   expect(clearReadingData).toHaveBeenCalledOnce();
-  expect(resetPwaEncryption).toHaveBeenCalledWith(true);
+  expect(resetReminderEncryption).toHaveBeenCalledWith(true);
   expect(clearEncryptionSessionMarkers).toHaveBeenCalledOnce();
   expect(clearPersistedEncryption).toHaveBeenCalledOnce();
   expect(clearReminderDrafts).toHaveBeenCalledOnce();

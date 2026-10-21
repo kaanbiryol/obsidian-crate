@@ -1,12 +1,12 @@
-import { EncryptionKeyRequiredError, rememberEncryptionUnlock } from './encryption-onboarding';
+import { EncryptionKeyRequiredError, rememberEncryptionUnlock } from '../encryption/encryption-onboarding';
 import { loadEncryptionState, loadScopeKeys, assertEncryptionActive } from '../connection/encryption';
-import type { ScopedEncryptionState } from './encryption-scope';
-import type { StoredReminderKeys } from './encryption-keys';
-import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from '../reminders/private-storage';
+import type { ScopedEncryptionState } from '../encryption/encryption-scope';
+import type { StoredReminderKeys } from '../encryption/encryption-keys';
+import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from './private-storage';
 import { capturePwaSession } from '../session-generation';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
 import type { ApiFetch } from '../types';
-import { takeFragmentValues } from './encryption-fragments';
+import { takeFragmentValues } from '../encryption/encryption-fragments';
 
 type ScopeState = ScopedEncryptionState;
 type EncryptionView = { status: 'checking' | 'unencrypted' } | { status: 'ready'; folderPath: string }
@@ -17,23 +17,23 @@ let pending: { token: string; promise: Promise<StoredReminderKeys | null> } | un
 let state: ScopeState | undefined;
 let fragmentCode: string | undefined;
 
-export const subscribeEncryption = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
-export const encryptionSnapshot = () => view;
+export const subscribeReminderEncryption = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
+export const reminderEncryptionSnapshot = () => view;
 function publish(next: EncryptionView) { view = next; for (const listener of listeners) listener(); }
 
-export function consumeEncryptionFragment(): void {
+export function consumeReminderEncryptionFragment(): void {
 	const { crateKey } = takeFragmentValues(['crateKey']);
 	if (crateKey) fragmentCode = crateKey;
 }
 
-export function resetPwaEncryption(discardKeys = false): void {
+export function resetReminderEncryption(discardKeys = false): void {
 	pending = undefined; state = undefined;
 	if (discardKeys) fragmentCode = undefined;
 	lockPrivateStorage();
 	publish({ status: 'checking' });
 }
 
-export function preparePwaEncryption(token: string, rawFetch: ApiFetch, refresh = false): Promise<StoredReminderKeys | null> {
+export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, refresh = false): Promise<StoredReminderKeys | null> {
 	if (refresh) pending = undefined;
 	if (pending?.token === token) return pending.promise;
 	const sessionCurrent = capturePwaSession();
@@ -53,7 +53,7 @@ export function preparePwaEncryption(token: string, rawFetch: ApiFetch, refresh 
 		if (view.status !== 'ready') requirePrivateStorageUnlock();
 		assertEncryptionActive(expected);
 		const localFolder = loadStoredConfig().folderPath;
-		const { unlockLocalState } = await import('./encryption-keys');
+		const { unlockLocalState } = await import('../encryption/encryption-keys');
 		const keys = await loadScopeKeys(expected, localFolder, current, fragmentCode);
 		fragmentCode = undefined;
 		const local = await unlockLocalState(keys);
@@ -71,13 +71,13 @@ export function preparePwaEncryption(token: string, rawFetch: ApiFetch, refresh 
 	return work;
 }
 
-export async function unlockWithRecoveryKey(code: string): Promise<void> {
+export async function unlockRemindersWithCode(code: string): Promise<void> {
 	const sessionCurrent = capturePwaSession();
 	const token = localStorage.getItem(AUTH_TOKEN_KEY);
 	if (!token || !state) throw new Error('Open a fresh enrollment link from Crate first');
 	const expected = state;
 	const current = () => sessionCurrent() && state === expected;
-	const { rememberRecoveryKey } = await import('./web-app-unlock');
+	const { rememberRecoveryKey } = await import('../encryption/web-app-unlock');
 	await rememberRecoveryKey(code, expected, loadStoredConfig().folderPath, current);
 	if (!current()) throw new Error('Session changed before unlocking');
 	// Reload into the same durable outbox and drafts after keys are committed.

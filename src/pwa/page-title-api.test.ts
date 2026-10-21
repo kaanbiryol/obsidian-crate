@@ -3,7 +3,7 @@ import { makeApiFetch } from './api';
 import { fetchPageTitle } from './reminders/reminder-api';
 import { invalidatePwaSession } from './session-generation';
 
-vi.mock('./encryption/encryption-session', () => ({ preparePwaEncryption: async () => null, encryptionSnapshot: () => ({ status: 'unencrypted' }) }));
+vi.mock('./reminders/encryption-session', () => ({ prepareReminderEncryption: async () => null, reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }) }));
 
 beforeEach(() => {
 	vi.stubGlobal('localStorage', { getItem: () => 'session' });

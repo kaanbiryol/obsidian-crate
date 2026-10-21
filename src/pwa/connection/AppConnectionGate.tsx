@@ -4,7 +4,7 @@ import { EncryptionUnlockCard } from '../components/EncryptionUnlockCard';
 import { EmptyAuthState, ErrorState } from '../components/AuthStates';
 import { PwaLaunchSplash } from '../components/PwaChrome';
 import { PwaButton as Button } from '../components/PwaButton';
-import { unlockWithRecoveryKey } from '../encryption/encryption-session';
+import { unlockRemindersWithCode } from '../reminders/encryption-session';
 import { unlockReadingWithCode } from '../reading/encryption-session';
 import { exportReadingData } from '../reading/storage';
 import { useSharedFeatures } from '../shared-features';
@@ -37,7 +37,7 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
     converting: reading.converting,
     unlock: (code: string) => unlockReadingWithCode(code, readingLocked),
   } : section === 'reminders' && remindersLocked ? {
-    ...remindersLocked, unlock: unlockWithRecoveryKey,
+    ...remindersLocked, unlock: unlockRemindersWithCode,
   } : null;
   const other = section === 'reading' ? 'reminders' : 'reading';
   const otherReady = features[other] && (other === 'reminders'

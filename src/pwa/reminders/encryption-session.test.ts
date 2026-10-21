@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { consumeEncryptionFragment, encryptionSnapshot, preparePwaEncryption, resetPwaEncryption } from './encryption-session';
+import { consumeReminderEncryptionFragment, reminderEncryptionSnapshot, prepareReminderEncryption, resetReminderEncryption } from './encryption-session';
 import { invalidatePwaSession } from '../session-generation';
 import { AUTH_TOKEN_KEY } from '../config';
 import { LocalStateCipher } from '../../encryption/local-state';
-import { unlockPrivateStorage, privateStorageEnabled, sealPrivateValue, openPrivateValue } from '../reminders/private-storage';
-import { createReminderOutboxStorage } from '../reminders/outbox/reminder-outbox-storage';
+import { unlockPrivateStorage, privateStorageEnabled, sealPrivateValue, openPrivateValue } from './private-storage';
+import { createReminderOutboxStorage } from './outbox/reminder-outbox-storage';
 import { getPwaPushManager } from '../service-worker-registration';
 
 function storage(): Storage {
@@ -29,18 +29,18 @@ beforeEach(() => {
 	vi.stubGlobal('sessionStorage', storage());
 	vi.stubGlobal('navigator', { onLine: true });
 	localStorage.setItem(AUTH_TOKEN_KEY, 'session');
-	resetPwaEncryption(true);
+	resetReminderEncryption(true);
 });
-afterEach(() => { invalidatePwaSession(); resetPwaEncryption(true); vi.unstubAllGlobals(); });
+afterEach(() => { invalidatePwaSession(); resetReminderEncryption(true); vi.unstubAllGlobals(); });
 
 it('keeps the confirmed push provider during a same-session encryption recheck', async () => {
-	expect(encryptionSnapshot().status).toBe('checking');
-	await preparePwaEncryption('session', async () => Response.json({ encryption: null }));
+	expect(reminderEncryptionSnapshot().status).toBe('checking');
+	await prepareReminderEncryption('session', async () => Response.json({ encryption: null }));
 	let finish!: (response: Response) => void;
 	const fetch = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
-	const refreshing = preparePwaEncryption('session', fetch);
+	const refreshing = prepareReminderEncryption('session', fetch);
 	await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
-	expect(encryptionSnapshot().status).toBe('unencrypted');
+	expect(reminderEncryptionSnapshot().status).toBe('unencrypted');
 	const windowPushManager = {} as PushManager;
 	const registerServiceWorker = vi.fn(async () => null);
 	await expect(getPwaPushManager({ windowPushManager, registerServiceWorker })).resolves.toBe(windowPushManager);
@@ -52,12 +52,12 @@ it('clears the status on session reset and ignores an older response', async () 
 	unlockPreviousSession();
 	let finish!: (response: Response) => void;
 	const fetch = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
-	const pending = preparePwaEncryption('session', fetch);
+	const pending = prepareReminderEncryption('session', fetch);
 	await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
-	invalidatePwaSession(); resetPwaEncryption();
+	invalidatePwaSession(); resetReminderEncryption();
 	finish(Response.json({ encryption: null }));
 	await expect(pending).rejects.toThrow('Connection changed');
-	expect(encryptionSnapshot().status).toBe('checking');
+	expect(reminderEncryptionSnapshot().status).toBe('checking');
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 });
 
@@ -66,13 +66,13 @@ it('restores durable writes when an open encrypted tab adopts a verified unencry
 	const retainedKey = 'retained-ciphertext';
 	const retained = sealPrivateValue('preserve for recovery', retainedKey);
 	// The peer's logout clears shared state; this tab locks its in-memory key.
-	localStorage.clear(); invalidatePwaSession(); resetPwaEncryption(true);
+	localStorage.clear(); invalidatePwaSession(); resetReminderEncryption(true);
 	localStorage.setItem(AUTH_TOKEN_KEY, 'new-session');
-	invalidatePwaSession(); resetPwaEncryption();
+	invalidatePwaSession(); resetReminderEncryption();
 	localStorage.setItem(retainedKey, retained);
 	expect(() => sealPrivateValue('before confirmation', 'test')).toThrow('Unlock');
-	await preparePwaEncryption('new-session', async () => Response.json({ encryption: null }));
-	expect(encryptionSnapshot().status).toBe('unencrypted');
+	await prepareReminderEncryption('new-session', async () => Response.json({ encryption: null }));
+	expect(reminderEncryptionSnapshot().status).toBe('unencrypted');
 	expect(privateStorageEnabled()).toBe(false);
 	const outbox = await createReminderOutboxStorage('new-session', 'Reminders');
 	const operationId = crypto.randomUUID();
@@ -87,25 +87,25 @@ it('restores durable writes when an open encrypted tab adopts a verified unencry
 });
 
 it.each([[200, 'no longer reports'], [404, 'Could not verify encryption']] as const)('keeps a previous encrypted enrollment locked when a %s response omits encryption', async (status, message) => {
-	unlockPreviousSession(); resetPwaEncryption();
+	unlockPreviousSession(); resetReminderEncryption();
 	localStorage.setItem('crate-encryption-session:previous-session', 'encrypted enrollment');
-	await expect(preparePwaEncryption('session', async () => Response.json({ encryption: null }, { status })))
+	await expect(prepareReminderEncryption('session', async () => Response.json({ encryption: null }, { status })))
 		.rejects.toThrow(message);
-	expect(encryptionSnapshot().status).toBe('locked');
+	expect(reminderEncryptionSnapshot().status).toBe('locked');
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 });
 
 it.each([200, 404])('rejects plaintext mode for a fresh encrypted setup link when the server returns %s', async status => {
   vi.stubGlobal('window', { location: { hash: '#crateKey=private-setup-key', pathname: '/notifications', search: '' }, history: { state: null, replaceState: vi.fn() } });
-  consumeEncryptionFragment();
-  await expect(preparePwaEncryption('session', async () => Response.json({ encryption: null }, { status }))).rejects.toThrow();
-  expect(encryptionSnapshot().status).toBe('locked');
+  consumeReminderEncryptionFragment();
+  await expect(prepareReminderEncryption('session', async () => Response.json({ encryption: null }, { status }))).rejects.toThrow();
+  expect(reminderEncryptionSnapshot().status).toBe('locked');
   expect(() => sealPrivateValue('private draft', 'test')).toThrow('Unlock');
 });
 
 it('keeps storage locked after an unavailable check and permits writes after a successful plaintext retry', async () => {
-	await expect(preparePwaEncryption('session', async () => Response.json({}, { status: 503 }))).rejects.toThrow('Could not verify encryption');
+	await expect(prepareReminderEncryption('session', async () => Response.json({}, { status: 503 }))).rejects.toThrow('Could not verify encryption');
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
-	await preparePwaEncryption('session', async () => Response.json({ encryption: null }));
+	await prepareReminderEncryption('session', async () => Response.json({ encryption: null }));
 	expect(sealPrivateValue('new draft', 'draft')).toBe('new draft');
 });

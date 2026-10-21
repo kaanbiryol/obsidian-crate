@@ -53,13 +53,13 @@ export async function verifyBlockedEncryptionStorage(page) {
 						rejectBlocked(t.loadEncryptedReminderAttempt(attemptKey)),
 						rejectBlocked(t.saveEncryptedReminderAttempt(attemptKey, { ...attempt, body: 'Must not commit late' }, attempt, () => true)),
 						rejectBlocked(t.clearEncryptedReminderAttempts(() => true)),
-						rejectBlocked(t.preparePwaEncryption('blocked-session', async () => Response.json({ encryption: scoped }))),
+						rejectBlocked(t.prepareReminderEncryption('blocked-session', async () => Response.json({ encryption: scoped }))),
 						t.decryptPushDisplay(notice).then(display => { if (display !== null) throw new Error('Blocked push did not use the generic fallback'); }),
 					]),
 					new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Blocked encrypted storage did not settle')), 6000); }),
 				]);
 			} finally { clearTimeout(timer); }
-			if (t.encryptionSnapshot().status !== 'locked') throw new Error('Bootstrap did not leave checking with a recoverable error');
+			if (t.reminderEncryptionSnapshot().status !== 'locked') throw new Error('Bootstrap did not leave checking with a recoverable error');
 			if ((await read(blockers[0], 'keys', key)).localState !== keys.localState || await read(blockers[1], 'attempts', attemptKey) !== originalAttempt) throw new Error('Failed storage operation changed private bytes');
 			if (sessionStorage.getItem('crate-reminder-draft:Reminders:blocked') !== draft) throw new Error('Failed startup erased the draft');
 		} finally { blockers.forEach(db => db.close()); }
@@ -74,7 +74,7 @@ export async function verifyBlockedEncryptionStorage(page) {
 		}
 		await t.rememberReminderKeys(grant);
 		if ((await t.decryptPushDisplay(notice))?.title !== 'Private push') throw new Error('Push decryption did not recover after unblocking');
-		t.resetPwaEncryption(true);
+		t.resetReminderEncryption(true);
 		// A newer database must survive attempts to read, enroll, or erase it.
 		for (const [name, store] of databases) {
 			const db = await open(name, 2, db => db.createObjectStore('future'));

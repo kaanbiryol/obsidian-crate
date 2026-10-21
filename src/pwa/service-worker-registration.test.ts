@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
-import * as encryptionSession from './encryption/encryption-session';
+import * as encryptionSession from './reminders/encryption-session';
 import { getPwaPushManager, registerPwaServiceWorker } from './service-worker-registration';
 
 afterEach(() => vi.restoreAllMocks());
@@ -34,7 +34,7 @@ describe('service worker startup registration', () => {
 
 describe('getPwaPushManager', () => {
 	it('uses the window-level manager exposed by declarative Web Push', async () => {
-		vi.spyOn(encryptionSession, 'encryptionSnapshot').mockReturnValue({ status: 'unencrypted' });
+		vi.spyOn(encryptionSession, 'reminderEncryptionSnapshot').mockReturnValue({ status: 'unencrypted' });
 		const windowPushManager = {} as PushManager;
 		const registerServiceWorker = vi.fn<() => Promise<ServiceWorkerRegistration | null>>();
 
@@ -43,7 +43,7 @@ describe('getPwaPushManager', () => {
 		expect(registerServiceWorker).not.toHaveBeenCalled();
 	});
 	it.each(['checking', 'ready', 'locked'] as const)('keeps push on the decrypting service worker while encryption is %s', async status => {
-		vi.spyOn(encryptionSession, 'encryptionSnapshot').mockReturnValue(status === 'ready' ? { status, folderPath: 'Reminders' }
+		vi.spyOn(encryptionSession, 'reminderEncryptionSnapshot').mockReturnValue(status === 'ready' ? { status, folderPath: 'Reminders' }
 			: status === 'locked' ? { status, message: 'Unlock keys', converting: false, setupRequired: false } : { status });
 		const pushManager = {} as PushManager;
 		await expect(getPwaPushManager({ windowPushManager: {} as PushManager,

@@ -1,11 +1,11 @@
 import { useSyncExternalStore } from 'react';
-import { encryptionSnapshot, subscribeEncryption } from '../encryption/encryption-session';
+import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../reminders/encryption-session';
 import type { SettingsSnapshot } from '../settings-store';
 import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';
 
 export function EncryptionSettings({ reading, remindersConnected }: { reading: SettingsSnapshot['reading']; remindersConnected: boolean }) {
-	const encryption = useSyncExternalStore(subscribeEncryption, encryptionSnapshot);
+	const encryption = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot);
 	const reminderStatus = encryption.status === 'ready' ? 'Unlocked' : encryption.status === 'unencrypted' ? 'Not enabled'
 		: encryption.status === 'locked' ? encryption.converting ? 'Converting' : 'Locked' : remindersConnected ? 'Checking…' : 'Not connected';
 	const readingStatus = reading?.encryption?.status === 'ready' ? 'Unlocked' : reading?.encryption?.status === 'unencrypted' ? 'Not enabled'
@@ -34,7 +34,7 @@ export function EncryptionSettings({ reading, remindersConnected }: { reading: S
 
 /** Encryption is off for at least one connected feature: point to where it is set up. */
 export function EncryptionSetupHint({ reading }: { reading: SettingsSnapshot['reading'] }) {
-	const encryption = useSyncExternalStore(subscribeEncryption, encryptionSnapshot);
+	const encryption = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot);
 	if (encryption.status !== 'unencrypted' && reading?.encryption?.status !== 'unencrypted') return null;
 	return <p className="settings-help">Encryption is off. Set it up in Obsidian under <strong>Crate settings → Sync → Manage encryption</strong>.</p>;
 }

@@ -5,7 +5,7 @@ import { onConnectionExpired } from './expiration';
 import type { ConnectionIssue } from './issues';
 import { READING_SESSION_KEY, readingSession } from '../reading/storage';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
-import { encryptionSnapshot, subscribeEncryption } from '../encryption/encryption-session';
+import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../reminders/encryption-session';
 import { usePwaBootstrap } from './usePwaBootstrap';
 import { usePwaSessionLifecycle } from './usePwaSessionLifecycle';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
@@ -46,7 +46,7 @@ function useConnection() {
     setAuthToken, setConfig, reportError, setSettingsOpen, showToast });
   usePwaBootstrap({ authToken: authority.token, suspendLocalSession: lifecycle.suspendLocalSession,
     setAuthToken, setBootstrapped, setConfig, reportError, setLaunchReminderId, setSelectedProject, setStartTab, showToast });
-  const encryption = useSyncExternalStore(subscribeEncryption, encryptionSnapshot);
+  const encryption = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot);
   // Finish app enrollment before Reading uses its credential or a direct setup link.
   const reading = useReadingConnection(useSharedFeatures().reading, bootstrapped, authority);
 

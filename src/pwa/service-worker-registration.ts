@@ -1,5 +1,5 @@
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
-import { encryptionSnapshot } from './encryption/encryption-session';
+import { reminderEncryptionSnapshot } from './reminders/encryption-session';
 
 export async function registerPwaServiceWorker(): Promise<ServiceWorkerRegistration | null> {
 	if (!('serviceWorker' in navigator)) return null;
@@ -30,7 +30,7 @@ export async function getPwaPushManager({
 	windowPushManager = getWindowPushManager(),
 	registerServiceWorker = registerPwaServiceWorker,
 }: PwaPushManagerOptions = {}): Promise<PushManager | null> {
-	if (windowPushManager && encryptionSnapshot().status === 'unencrypted') return windowPushManager;
+	if (windowPushManager && reminderEncryptionSnapshot().status === 'unencrypted') return windowPushManager;
 	const registration = await registerServiceWorker();
 	return registration?.pushManager ?? null;
 }

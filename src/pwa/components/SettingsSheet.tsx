@@ -1,7 +1,7 @@
 import { pwaSyncState, refreshPwaSync, logoutPwaSync } from '../sync/state';
 import { EncryptionSettings, EncryptionSetupHint } from './EncryptionSettings';
 import { ChevronRight, Download, LogOut, RefreshCw } from 'lucide-react';
-import { encryptionSnapshot, subscribeEncryption } from '../encryption/encryption-session';
+import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../reminders/encryption-session';
 
 import { TabSettings } from './TabSettings';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
@@ -37,7 +37,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 	const { reminders, reading } = snapshot;
 	const { preferences, updatePreferences } = usePwaPreferences();
 	const homeScreen = useHomeScreenInstall();
-	const encryption = useSyncExternalStore(subscribeEncryption, encryptionSnapshot);
+	const encryption = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot);
 	const finish = useCallback(() => store.setOpen(false), [store]);
 	const transition = useSheetTransition(finish);
 	const { page: detailPage, entryId, immediate, closing } = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot);

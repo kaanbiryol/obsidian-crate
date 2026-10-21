@@ -2,11 +2,11 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { parseHTML } from 'linkedom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { encryptionSnapshot } from '../encryption/encryption-session';
+import { reminderEncryptionSnapshot } from '../reminders/encryption-session';
 import type { SettingsSnapshot } from '../settings-store';
 import { EncryptionSettings, EncryptionSetupHint } from './EncryptionSettings';
 
-vi.mock('../encryption/encryption-session', () => ({ encryptionSnapshot: vi.fn(), subscribeEncryption: vi.fn() }));
+vi.mock('../reminders/encryption-session', () => ({ reminderEncryptionSnapshot: vi.fn(), subscribeReminderEncryption: vi.fn() }));
 vi.mock('react', async importOriginal => ({
 	...await importOriginal<typeof import('react')>(),
 	useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
@@ -25,7 +25,7 @@ function render(readingState: SettingsSnapshot['reading'] = reading('unencrypted
 }
 const statusRows = (document: Document) => [...document.querySelectorAll('.settings-group > .settings-row')].map(row => row.textContent);
 
-beforeEach(() => vi.mocked(encryptionSnapshot).mockReturnValue({ status: 'unencrypted' }));
+beforeEach(() => vi.mocked(reminderEncryptionSnapshot).mockReturnValue({ status: 'unencrypted' }));
 
 describe('settings encryption status', () => {
 	it('replaces the status section with one setup hint while nothing is encrypted', () => {
@@ -35,14 +35,14 @@ describe('settings encryption status', () => {
 		expect(document.querySelector('details')).toBeNull();
 	});
 	it.each([[reading(undefined, false), true], [reading(), false]])('does not report unknown or disconnected encryption as disabled', (readingState, remindersConnected) => {
-		vi.mocked(encryptionSnapshot).mockReturnValue({ status: 'checking' });
+		vi.mocked(reminderEncryptionSnapshot).mockReturnValue({ status: 'checking' });
 		const document = render(readingState, remindersConnected);
 		expect(statusRows(document)).toEqual([]);
 		expect(document.body.textContent).not.toContain('Not enabled');
 		expect(document.body.textContent).not.toContain('Encryption is off');
 	});
 	it.each([false, true])('keeps lock and conversion problems visible without expanding details (converting=%s)', converting => {
-		vi.mocked(encryptionSnapshot).mockReturnValue({ status: 'locked', message: 'Finish encryption in Obsidian.', converting, setupRequired: false });
+		vi.mocked(reminderEncryptionSnapshot).mockReturnValue({ status: 'locked', message: 'Finish encryption in Obsidian.', converting, setupRequired: false });
 		const document = render(reading('locked'));
 		expect(statusRows(document)[0]).toContain(converting ? 'Converting' : 'Locked');
 		expect(document.body.textContent).toContain('Finish encryption in Obsidian.');
@@ -50,7 +50,7 @@ describe('settings encryption status', () => {
 		expect(document.querySelector('details')).toBeNull();
 	});
 	it('retains folder, notification and privacy information behind the unlocked details', () => {
-		vi.mocked(encryptionSnapshot).mockReturnValue({ status: 'ready', folderPath: 'Private reminders' });
+		vi.mocked(reminderEncryptionSnapshot).mockReturnValue({ status: 'ready', folderPath: 'Private reminders' });
 		const document = render(reading('ready'));
 		expect(statusRows(document)).toEqual(['RemindersUnlocked', 'ReadingUnlocked']);
 		expect(document.body.textContent).not.toContain('Encryption is off');

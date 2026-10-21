@@ -40,9 +40,9 @@ export async function verifyFolderKeyFollowing(page) {
     // The production bootstrap follows the verified mapping without a pasted key.
     localStorage.setItem(t.AUTH_TOKEN_KEY, 'same-browser-session');
     localStorage.setItem('crate-reminders-config', JSON.stringify({ folderPath: 'Reminders', upcomingDays: 7 }));
-    t.resetPwaEncryption(true);
-    const ready = await t.preparePwaEncryption('same-browser-session', async () => Response.json({ encryption: state }));
-    if (ready.folderPath !== 'Personal/Tasks' || ready.localFolderPath !== 'Reminders' || t.encryptionSnapshot().status !== 'ready') throw new Error('Bootstrap did not follow the folder');
+    t.resetReminderEncryption(true);
+    const ready = await t.prepareReminderEncryption('same-browser-session', async () => Response.json({ encryption: state }));
+    if (ready.folderPath !== 'Personal/Tasks' || ready.localFolderPath !== 'Reminders' || t.reminderEncryptionSnapshot().status !== 'ready') throw new Error('Bootstrap did not follow the folder');
     // Pasting the current grant after a move restores keys without losing the
     // old durable namespace or the secret protecting pending drafts.
     const recovered = await t.rememberReminderKeys(t.createReminderKeyGrant(moved, 'Personal/Tasks'), () => true, 'Reminders');

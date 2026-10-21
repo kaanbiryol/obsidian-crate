@@ -3,7 +3,7 @@ import { capturePwaSession } from './session-generation';
 import { ConnectionError } from './connection/issues';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { detectWebSessionName } from './session-label';
-import { preparePwaEncryption } from './encryption/encryption-session';
+import { prepareReminderEncryption } from './reminders/encryption-session';
 import type { EncryptedReminderApi } from './reminders/encrypted-reminder-api';
 import type { StoredReminderKeys } from './encryption/encryption-keys';
 import { EncryptionScopeChangedError, routeFolderRequest } from './encryption/encryption-folder-routing';
@@ -83,7 +83,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		// Unencrypted vaults skip the probe while responses confirm it stays off.
 		if (!refresh && encryptionOff && !keys) return Promise.resolve();
 		if (refresh) preparing = undefined;
-		return preparing ??= preparePwaEncryption(authToken, rawFetch, refresh).then(async value => {
+		return preparing ??= prepareReminderEncryption(authToken, rawFetch, refresh).then(async value => {
 			const Constructor = value ? (await import('./reminders/encrypted-reminder-api')).EncryptedReminderApi : null;
 			if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed before unlocking');
 			keys = value;
