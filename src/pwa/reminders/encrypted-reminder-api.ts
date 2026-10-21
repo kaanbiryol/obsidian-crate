@@ -16,7 +16,7 @@ import { requireCompatibleServer } from '../server-compatibility';
 import type { StoredReminderKeys } from '../encryption/encryption-keys';
 import type { ApiFetch } from '../types';
 import { routeFolderPath } from '../encryption/encryption-folder-routing';
-import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '../../encryption/file-inventory';
+import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '../../encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { isReminderOperationId } from '@/protocol/reminder-operation';
 import { isSyncPath } from '@/protocol/sync-validation';
@@ -80,19 +80,12 @@ export class EncryptedReminderApi {
 
 	private async inventory(first?: FilePage): Promise<{ files: RemoteFile[]; sequence: number }> {
 		const files: RemoteFile[] = [];
-		let cursor: string | undefined, sequence: number | undefined;
-		const acceptPage = createEncryptedInventoryProgress({ maxFiles: MAX_ENCRYPTED_REMINDER_FILES, maxPages: 1000 });
-		while (true) {
-			const page = first ?? await this.page(cursor);
-			first = undefined;
-			sequence ??= page.sequence;
-			if (page.sequence !== sequence) throw new ReminderCommandError('Reminder files changed while loading. Refresh again.');
-			acceptPage(page);
-			files.push(...page.files);
-			if (!page.nextCursor) break;
-			cursor = page.nextCursor;
-		}
-		return { files, sequence: sequence };
+		first ??= await this.page();
+		for await (const page of encryptedInventoryPages(after => this.page(after), {
+			maxFiles: MAX_ENCRYPTED_REMINDER_FILES, first,
+			changed: () => new ReminderCommandError('Reminder files changed while loading. Refresh again.'),
+		})) files.push(...page.files);
+		return { files, sequence: first.sequence };
 	}
 
 	private async read(file: RemoteFile, cache = this.cached): Promise<string> {

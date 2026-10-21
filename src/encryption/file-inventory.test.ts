@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest';
-import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryPage, ENCRYPTED_INVENTORY_PAGE } from './file-inventory';
+import { expect, it, vi } from 'vitest';
+import { createEncryptedInventoryProgress, encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryPage, ENCRYPTED_INVENTORY_PAGE } from './file-inventory';
 
 const file = (path = 'Reading/Article.md') => ({ path, hash: 'a'.repeat(64), size: 12, revision: 'revision' });
 const page = (patch: Partial<EncryptedInventoryPage> = {}): EncryptedInventoryPage => ({ files: [], sequence: 1, generation: 1, nextCursor: null, ...patch });
@@ -44,4 +44,50 @@ it.each([false, true])('rejects repeated paths within or across pages: %j', acro
 	const accept = createEncryptedInventoryProgress({ maxFiles: 10, maxPages: 10 });
 	if (acrossPages) accept(page({ files: [file()], nextCursor: 'A' }));
 	expect(() => accept(page({ files: acrossPages ? [file()] : [file(), file()] }))).toThrow('repeated a file');
+});
+
+const changed = () => new Error('changed while loading');
+async function collect(pages: AsyncIterable<EncryptedInventoryPage>, onPage = (_page: EncryptedInventoryPage) => {}) {
+	const seen: Array<string | null> = [];
+	for await (const value of pages) { seen.push(value.nextCursor); onPage(value); }
+	return seen;
+}
+
+it('pages from a supplied first page through each cursor at one sequence', async () => {
+	const fetchPage = vi.fn(async (after?: string) => after === 'A' ? page({ files: [file('Reading/2.md')], nextCursor: 'B' }) : page({ files: [file('Reading/3.md')] }));
+	const pages = encryptedInventoryPages(fetchPage, { maxFiles: 3, first: page({ files: [file('Reading/1.md')], nextCursor: 'A' }), changed });
+	expect(await collect(pages)).toEqual(['A', 'B', null]);
+	// The supplied first page is not fetched again, and nothing confirms by default.
+	expect(fetchPage.mock.calls).toEqual([['A'], ['B']]);
+});
+
+it('fetches the first page when none is supplied', async () => {
+	const fetchPage = vi.fn(async () => page());
+	expect(await collect(encryptedInventoryPages(fetchPage, { maxFiles: 1, changed }))).toEqual([null]);
+	expect(fetchPage.mock.calls).toEqual([[]]);
+});
+
+it('throws the caller error when a later page reports another sequence', async () => {
+	const pages = encryptedInventoryPages(async () => page({ sequence: 2 }), { maxFiles: 1, first: page({ nextCursor: 'A' }), changed });
+	await expect(collect(pages)).rejects.toThrow('changed while loading');
+});
+
+it('checks device limits before yielding a page', async () => {
+	const pages = encryptedInventoryPages(async () => page({ files: [file('Reading/2.md')] }), { maxFiles: 1, first: page({ files: [file('Reading/1.md')], nextCursor: 'A' }), changed });
+	const handled: Array<string | null> = [];
+	await expect(collect(pages, value => handled.push(value.nextCursor))).rejects.toThrow('limit');
+	expect(handled).toEqual(['A']);
+});
+
+it.each([[1, null], [2, 'changed while loading']])('confirms sequence %i after the caller handles the last page', async (confirmedSequence, error) => {
+	const events: string[] = [];
+	const fetchPage = vi.fn(async (after?: string) => {
+		events.push(`fetch ${after ?? 'first'}`);
+		return after ? page() : page({ sequence: confirmedSequence });
+	});
+	const pages = encryptedInventoryPages(fetchPage, { maxFiles: 1, first: page({ nextCursor: 'A' }), confirm: true, changed });
+	const result = collect(pages, value => events.push(`handled ${value.nextCursor ?? 'last'}`));
+	if (error) await expect(result).rejects.toThrow(error);
+	else await expect(result).resolves.toEqual(['A', null]);
+	expect(events).toEqual(['handled A', 'fetch A', 'handled last', 'fetch first']);
 });

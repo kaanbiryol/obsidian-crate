@@ -9,7 +9,7 @@ import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } f
 import { readingCapturePath } from '../../reading/core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { reminderRequestHash } from '@/encryption/reminder-receipt';
-import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, type EncryptedInventoryPage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '@/encryption/file-inventory';
+import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '@/encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
@@ -88,27 +88,24 @@ export class EncryptedReadingApi {
   }
   private async inventory(): Promise<EncryptedReadingInventory> {
     const folder = encodeURIComponent(this.options.folderPath);
-    let first: EncryptedInventoryPage | undefined = parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}`), this.options.folderPath, this.options.generation);
+    const fetchPage = async (after?: string) => parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}${after ? '&after=' + encodeURIComponent(after) : ''}`), this.options.folderPath, this.options.generation);
+    const first = await fetchPage();
     if (this.confirmed?.sequence === first.sequence) return this.confirmed.result;
     if (!this.indexLoaded) {
       this.indexLoaded = true;
       try { if (!this.indexed.size) for (const entry of await this.options.loadIndex?.() ?? []) this.indexed.set(entry.file.path, entry); }
       catch { /* A missing or unreadable local index only costs downloads. */ }
     }
-    let cursor: string | null = null, sequence: number | undefined;
     const candidates: ReadingItem[] = [];
     const next = new Map<string, WireFile>(), issues: Array<{ path: string; message: string }> = [];
     const nextIndex = new Map<string, EncryptedReadingIndexEntry>();
     let downloaded = false;
     const nextSources = new Map(this.sources);
-    const acceptPage = createEncryptedInventoryProgress({ maxFiles: MAX_READING_FILES, maxPages: 1000 });
     let metadataBytes = 0;
-    do {
-      const page: EncryptedInventoryPage = first ?? parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}${cursor ? '&after=' + encodeURIComponent(cursor) : ''}`), this.options.folderPath, this.options.generation);
-      first = undefined;
-      sequence ??= page.sequence;
-      if (page.sequence !== sequence) throw new Error('Reading changed while loading. Refresh again.');
-      acceptPage(page);
+    for await (const page of encryptedInventoryPages(fetchPage, {
+      maxFiles: MAX_READING_FILES, first, confirm: true,
+      changed: () => new Error('Reading changed while loading. Refresh again.'),
+    })) {
       const loaded = await mapBounded(page.files, SOURCE_CONCURRENCY, async file => {
         const cached = this.indexed.get(file.path);
         if (cached && sameFile(cached.file, file)) return { item: cached.item };
@@ -127,11 +124,10 @@ export class EncryptedReadingApi {
           nextIndex.set(file.path, { file, item });
         } catch (error) { issues.push({ path: file.path, message: error instanceof Error ? error.message : 'Article could not be opened.' }); }
       }
-      cursor = page.nextCursor;
-    } while (cursor);
-    if (metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
-    const confirmed = parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}`), this.options.folderPath, this.options.generation);
-    if (confirmed.sequence !== sequence) throw new Error('Reading changed while loading. Refresh again.');
+      // An oversized library fails after its last page, before the sequence is confirmed.
+      if (!page.nextCursor && metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
+    }
+    const { sequence } = first;
     const removed = [...this.indexed.keys()].some(path => !nextIndex.has(path));
     this.files = next;
     this.indexed = nextIndex;

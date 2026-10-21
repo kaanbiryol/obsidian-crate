@@ -55,6 +55,31 @@ export function createEncryptedInventoryProgress(limits: { maxFiles: number; max
 	};
 }
 
+/** Pages per encrypted inventory, counted separately from files. */
+const MAX_ENCRYPTED_INVENTORY_PAGES = 1000;
+
+/** Page one complete encrypted inventory at a single vault sequence. Every page
+ * passes the device limits before it is yielded, and a changed sequence throws the
+ * caller's `changed()` error. With `confirm`, a fresh first page fetched after the
+ * caller handled the last page must still report that sequence, so files read
+ * while paging belong to one snapshot. */
+export async function* encryptedInventoryPages(
+	fetchPage: (after?: string) => Promise<EncryptedInventoryPage>,
+	options: { maxFiles: number; first?: EncryptedInventoryPage; confirm?: boolean; changed(): Error },
+): AsyncGenerator<EncryptedInventoryPage, void, undefined> {
+	const acceptPage = createEncryptedInventoryProgress({ maxFiles: options.maxFiles, maxPages: MAX_ENCRYPTED_INVENTORY_PAGES });
+	let page = options.first ?? await fetchPage();
+	const { sequence } = page;
+	while (true) {
+		if (page.sequence !== sequence) throw options.changed();
+		acceptPage(page);
+		yield page;
+		if (!page.nextCursor) break;
+		page = await fetchPage(page.nextCursor);
+	}
+	if (options.confirm && (await fetchPage()).sequence !== sequence) throw options.changed();
+}
+
 /** Coarse ciphertext bound checked before download; features enforce their plaintext limit after opening. */
 export const MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES = 4 * 1024 * 1024;
 
