@@ -5,7 +5,7 @@ import { getReminderProjectFilePath, normalizeReminderProjectPath } from './remi
 import { buildCreateReminderArgs, buildReminderUpdate } from './reminderMutationPlan';
 import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildMovedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderReminderBlocksInContent } from './markdownReminderFile';
-import { DEFAULT_PROJECT } from './constants';
+import { DEFAULT_PROJECT, MAX_REMINDER_NOTE_BYTES } from './constants';
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
 
 /** Distinguishes conflicts that share a status and code, for hosts that answer them differently. */
@@ -48,7 +48,7 @@ function unreadableTitle(): ReminderInputError {
  * Reminder lists skip notes over the 1 MiB index limit, so an edit there could
  * only come from a stale list, and its parsed result would bypass that limit. */
 function checkSize(content: string): void {
-	if (new TextEncoder().encode(content).length > 1024 * 1024) throw new ReminderCommandError('Split reminder notes larger than 1 MiB before editing them in the web app.', 413, 'file_too_large');
+	if (new TextEncoder().encode(content).length > MAX_REMINDER_NOTE_BYTES) throw new ReminderCommandError('Split reminder notes larger than 1 MiB before editing them in the web app.', 413, 'file_too_large');
 }
 
 /** Shared Markdown rules run on the enrolled client; the server receives only

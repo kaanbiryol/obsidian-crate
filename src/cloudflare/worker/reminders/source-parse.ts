@@ -3,7 +3,7 @@ import { decodeMarkdownBytes, MarkdownEncodingError } from '@/reminders/core/mar
 import { reminderDescriptionErrorFromMessage } from '@/reminders/core/reminderDescription';
 import type { SyncIssueCode } from '@/protocol/sync-issues';
 import { scanReminderMarkdownFile } from './scan';
-import { REMINDER_INDEX_MAX_FILE_BYTES } from './cache/types';
+import { MAX_REMINDER_NOTE_BYTES } from '@/reminders/core/constants';
 import type { RemoteReminderRecord } from './types';
 import { MAX_ENCRYPTED_PUBLIC_DATA_BYTES, parseEncryptedFile } from '../../../encryption/file-format';
 import { validateEncryptedSchedules, ENCRYPTED_NOTIFICATION_PREFIX, ENCRYPTED_SCHEDULING_CAPACITY_ISSUE } from '../../../encryption/notification-format';
@@ -36,7 +36,7 @@ export function reminderSourceIssueCode(issue: string): { code: SyncIssueCode; l
 /** Ciphertext includes base64/JWE overhead and bounded public scheduling data.
  * The client validates plaintext size; the server can only bound the transport. */
 export function reminderSourceByteLimit(encrypted: boolean): number {
-	return encrypted ? 2 * REMINDER_INDEX_MAX_FILE_BYTES + MAX_ENCRYPTED_PUBLIC_DATA_BYTES : REMINDER_INDEX_MAX_FILE_BYTES;
+	return encrypted ? 2 * MAX_REMINDER_NOTE_BYTES + MAX_ENCRYPTED_PUBLIC_DATA_BYTES : MAX_REMINDER_NOTE_BYTES;
 }
 
 /** Domain parsing is optional; an uncertain source must never look like an empty note. */
@@ -56,7 +56,7 @@ export function parseReminderSource(path: string, content: string | ArrayBuffer,
 			}) };
 		} catch { return { reminders: [], issue: 'Encrypted reminder scheduling metadata is invalid. Sync this note from an unlocked device.' }; }
 	}
-	if (bytes.byteLength > REMINDER_INDEX_MAX_FILE_BYTES) {
+	if (bytes.byteLength > MAX_REMINDER_NOTE_BYTES) {
 		return { reminders: [], issue: REMINDER_SOURCE_SIZE_ISSUE };
 	}
 	try {

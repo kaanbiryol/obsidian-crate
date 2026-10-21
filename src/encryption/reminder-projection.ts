@@ -1,6 +1,7 @@
 import { scanReminderMarkdownContent } from '../reminders/core/markdownScan';
 import { decodeMarkdownBytes } from '../reminders/core/markdownEncoding';
 import { readableLinkText } from '../reminders/core/grammar/markdownLinks';
+import { MAX_REMINDER_NOTE_BYTES } from '../reminders/core/constants';
 import { decryptJson, encryptJson, importEncryptionSecret, type EncryptionKey } from './envelope';
 import type { ReminderKeyGrant, VaultKeyBundle, ScopeKeys } from './key-bundle';
 import { validateEncryptedNotification, type EncryptedNotification, type EncryptedSchedules } from './notification-format';
@@ -88,7 +89,7 @@ async function sealNotification(vaultId: string, scopeId: string, key: Encryptio
 export async function createReminderProjectionWithKeys(vaultId: string, scope: Pick<ScopeKeys, 'id' | 'folderPath'>,
 	key: EncryptionKey, fingerprintKey: CryptoKey, path: string, bytes: ArrayBuffer): Promise<EncryptedSchedules | null> {
 	if (!path.startsWith(`${scope.folderPath}/`) || !path.toLowerCase().endsWith('.md')) return null;
-	if (bytes.byteLength > 1024 * 1024) return { version: 1, reminders: [], issue: 'size' };
+	if (bytes.byteLength > MAX_REMINDER_NOTE_BYTES) return { version: 1, reminders: [], issue: 'size' };
 	let scanned;
 	try { scanned = scanReminderMarkdownContent(path, decodeMarkdownBytes(bytes), scope.folderPath).reminders; }
 	catch { return { version: 1, reminders: [], issue: 'invalid-reminders' }; }

@@ -9,6 +9,7 @@ import { reminderRequestHash } from '../../encryption/reminder-receipt';
 import { MarkdownEncodingError } from '../../reminders/core/markdownEncoding';
 import { ReminderInputError } from '../../reminders/core/reminderMutationInput';
 import { ReminderMarkdownContextError } from '../../reminders/core/markdownTaskContext';
+import { MAX_REMINDER_NOTE_BYTES } from '../../reminders/core/constants';
 import { validateEncryptedSchedules, ENCRYPTED_SCHEDULING_CAPACITY_ISSUE } from '../../encryption/notification-format';
 import { capturePwaSession } from '../session-generation';
 import { loadEncryptedReminderAttempt, saveEncryptedReminderAttempt, pruneEncryptedReminderAttempts, type EncryptedReminderAttempt as Attempt } from './encrypted-reminder-attempts';
@@ -102,7 +103,7 @@ export class EncryptedReminderApi {
 		if (!response.ok) await json(response);
 		const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, this.authority(file.path),
 			'Encrypted reminder transfer failed integrity validation');
-		if (opened.content.byteLength > 1024 * 1024) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
+		if (opened.content.byteLength > MAX_REMINDER_NOTE_BYTES) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
 		const content = decodeMarkdownBytes(opened.content);
 		validateEncryptedSchedules(opened.publicData);
 		const issue = opened.publicData.issue === 'scheduling-capacity' ? ENCRYPTED_SCHEDULING_CAPACITY_ISSUE : undefined;
