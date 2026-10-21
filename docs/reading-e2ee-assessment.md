@@ -1,6 +1,6 @@
 # Reading and end-to-end encryption
 
-Reading now uses a separate folder key when vault encryption is enabled. The same implementation runs on Cloudflare and self-hosted servers. This document describes the implemented boundary; [the review](archive/e2ee-review.md) records release acceptance.
+Reading now uses a separate folder key when vault encryption is enabled. The same implementation runs on Cloudflare and self-hosted servers. This document describes the implemented boundary.
 
 ## Supported workflow
 

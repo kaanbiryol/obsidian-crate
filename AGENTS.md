@@ -37,7 +37,7 @@ The Worker stores data, serves the PWA/API and schedules notifications; it never
 - Encryption: [e2ee implementation](docs/e2ee-implementation.md)
 - UI: [UI styling](docs/ui-styling.md). Shared components render in Obsidian Shadow DOM and the PWA document; verify both
 - PWA persistence: [storage recovery](docs/pwa-storage-recovery.md), [tab convergence](docs/pwa-tab-convergence.md)
-- Reading: [read it later spec](docs/archive/read-it-later-spec.md), [reading shortcuts](docs/reading-shortcuts.md)
+- Reading: [reading highlights](docs/reading-highlights.md), [reading shortcuts](docs/reading-shortcuts.md)
 - Deployment and releases: [deployment](docs/deployment.md), [releases](docs/releases.md), [self-hosting](docs/self-hosting.md)
 - Choosing tests: [testing](docs/testing.md)
 - Everything else: [documentation index](docs/README.md)

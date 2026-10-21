@@ -56,12 +56,3 @@ Maintainer and contributor documentation for the plugin, Worker and PWA. User-fa
 - [Testing](testing.md) - test suites, harnesses and acceptance checks.
 - [Preparing a plugin release](releases.md) - draft release, signed shortcut, assets and publishing.
 
-## Archive
-
-Historical notes kept for context. They describe past states and may not match the current code; use the documents above for current behavior.
-
-- [Read it later design](archive/read-it-later-spec.md) - original Reading design notes.
-- [Read it later implementation plan](archive/read-it-later-plan.md) - original Reading implementation plan and status.
-- [E2EE review](archive/e2ee-review.md) - dated snapshot review of the encryption work (2026-10-02).
-- [Reading extraction evaluation](archive/reading-extraction-evaluation.md) - comparison of Defuddle, Readability, Firecrawl and Jina on sample pages.
-- [Article fetching research](archive/reading-fetch-research.md) - why article fetching stays on the server rather than in the PWA.

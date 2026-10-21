@@ -1,6 +1,6 @@
 # Test Reading
 
-This branch contains the plugin, server, web library, background extraction, automatic Reading-folder imports, and iPhone/Android capture flows. Reading is included in the schema-1 baseline; protocol 1 is the current contract.
+Reading covers the plugin, server, web library, background extraction, automatic Reading-folder imports, and iPhone/Android capture flows. Reading is included in the schema-1 baseline; protocol 1 is the current contract.
 
 ## Try the browser now
 
@@ -12,7 +12,7 @@ Save a public article, wait for extraction, open it, favorite it, add tags, arch
 
 1. Build with `npm run build`. Copy `dist/main.js`, `dist/styles.css`, and `manifest.json` into a test vault's `.obsidian/plugins/crate/` directory. Reload the plugin.
 2. In **Settings → Crate → Reading**, enable Reading on this device. Use **Crate: Add link to reading list** and **Crate: Open reading library**. These work locally before connecting a server.
-3. Connect the test vault to a server built from this branch. For a fresh local server, use `npm run server -- start --local --data-dir ./test-results/reading-server`. For phone access, use the existing HTTPS server/tunnel setup described in the README.
+3. Connect the test vault to a server built from the same commit. For a fresh local server, use `npm run server -- start --local --data-dir ./test-results/reading-server`. For phone access, use the existing HTTPS server/tunnel setup described in the README.
 4. Select **Enable server reading**. An already enrolled Reminders web app should open Reading through its feature switch without another setup link. For a browser without a Reminders connection, select **Open web reading** or use **Copy setup link** on another device. Setup links expire after 10 minutes and are single use.
 5. Set Obsidian Web Clipper's destination to the Reading folder in the test vault and save with its default template. No Crate template or properties are required. Confirm it appears in the inbox, then favorite and archive it. Crate preserves the clip's body and filename; it appears in the web library after normal sync. With automatic sync off, select **Crate: Sync now**. Also test a plain Markdown note without frontmatter, a nested folder, an old Crate Reading template, and a note outside Reading (which must remain untouched). Notes without links should have no **Original**, **Share article**, or extraction retry action.
 
@@ -69,13 +69,11 @@ Keep the previous build and backup for recovery. Normal startup refuses an old s
 
 ## Verification and limits
 
-Completed on 2026-09-21: source checks (305 files / 2,600 tests), the Worker suite (65 files / 489 tests), 17 local-server/package checks, 3 Reading server/upgrade/network checks, Chromium and WebKit end-to-end flows, 6 Reading visual checks, reminder update/auth/layout regressions, and Docker restart/recovery. Build, CSS scope, artifact and bundle-budget checks pass. Dependency audit reports no vulnerabilities and the secret scan passes.
-
 A live HTTPS capture from `example.com` was extracted, published by the background job, and opened in the reader. Additional native-network probes fetched Wikipedia and rejected a mismatched TLS certificate. The signed Shortcut's variable connections were inspected in Apple's macOS app. Native setup and persistence checks and the subsequent iPhone report are described above; the revised web-sheet presentation remains a device acceptance check.
 
 Automated checks exercise Markdown preservation, stable identities, source edits/deletion during extraction, exact retry receipts, capture-only scopes, one-use browser/install grants, private-network rejection in the actual local runtime, schema upgrades, backup verification, Chromium and WebKit reading/capture flows, and existing reminders behavior. Chromium covers cold offline launch and the share-target POST; Playwright WebKit has a known offline-navigation limitation and covers cached reading without a cold offline reload.
 
-Extraction uses Defuddle 0.19.4 and linkedom 0.18.12 with asynchronous fallbacks disabled. Defuddle's own `createMarkdownContent` produces the Markdown; Crate registers no formatting rules. A module-local DOMParser adapter lets the published browser bundle run in workerd. Crate validates links and excludes remote media before conversion, strips source-content diagnostics at build time, and rejects the library's raw-HTML error fallback. Public X posts with server-rendered markup are selected by their exact post permalink; unrecognized login shells remain saved links. Extraction makes no third-party fallback requests. Defuddle's two aggressive scoring/pattern passes stay disabled because they remove legitimate short lists and repeated headings; structural cleanup remains enabled. Cloudflare deployments enable `global_fetch_strictly_public`; the local runtime supplies a native network binding allowing public addresses only, enforced after DNS resolution. Redirects are checked individually, requests time out after 15 seconds, and decoded HTML is capped at 2 MiB. Crate does not send browser cookies or Crate credentials to websites. See [Cloudflare's public fetch boundary](https://github.com/cloudflare/workerd/blob/main/src/workerd/io/compatibility-date.capnp).
+Extraction uses Defuddle and linkedom (versions pinned in `package.json`). Defuddle's own `createMarkdownContent` produces the Markdown; Crate registers no formatting rules. A module-local DOMParser adapter lets the published browser bundle run in workerd. Crate validates links and excludes remote media before conversion, strips source-content diagnostics at build time, and rejects the library's raw-HTML error fallback. Public X posts with server-rendered markup are selected by their exact post permalink; unrecognized login shells remain saved links. Defuddle's asynchronous extractors for X, Reddit, Bilibili and C2 wiki may call only the hosts allowlisted in `src/reading/extraction/defuddle-fetch.ts`, without cookies and with capped responses. Defuddle's two aggressive scoring/pattern passes stay disabled because they remove legitimate short lists and repeated headings; structural cleanup remains enabled. Cloudflare deployments enable `global_fetch_strictly_public`; the local runtime supplies a native network binding allowing public addresses only, enforced after DNS resolution. Redirects are checked individually, requests time out after 15 seconds, and decoded HTML is capped at 2 MiB. Crate does not send browser cookies or Crate credentials to websites. See [Cloudflare's public fetch boundary](https://github.com/cloudflare/workerd/blob/main/src/workerd/io/compatibility-date.capnp).
 
 Login-only pages, JavaScript-only pages, bot protection, large pages, unsupported destinations, and failed fetches remain usable saved links. The queue holds up to 1,000 extraction jobs and retries fetch failures up to three times. Public capture is limited to 30 requests per minute per credential; Reading writes share a 500-per-day credential budget and the deployment's edge admission limit. These requests, database operations, alarms, and saved files use the deployment's ordinary hosting resources.
 
@@ -119,7 +117,7 @@ Obsidian appearance and device-to-device sync still require host acceptance.
 
 Use matching plugin and Worker/PWA builds. Reload Obsidian after installing the
 plugin build; update the server and accept the PWA update before testing its new
-reader. This change does not publish a server or GitHub release automatically.
+reader.
 
 1. Import [Crate Reading](../templates/crate-reading-clipper.json) into Web Clipper
    and set its note location to your configured Reading folder. Clip a normal

@@ -106,27 +106,12 @@ Its separate 8,000-note benchmark, with notes inside the selected reminder folde
 measures 52,000 row writes on a new database. This is a regression check for normal
 uploads, not the cost of an initial import.
 
-## Local benchmark, 2026-09-13
+## Normal upload benchmark
 
-This historical timing comparison predates the resumable initial import and write-budget changes above.
-
-Fixture: 8,000 distinct Markdown notes of approximately 1 KiB, four concurrent
-requests, real local workerd/D1/R2. Both modes use the batch handler directly.
-These timings exclude internet latency, Obsidian disk work, authentication, and
-Durable Object forwarding. The second phase adds a separate namespace to the same
-local database. They are not predictions of hosted completion times.
-
-| Measurement | Previous path | Bulk new-file path |
-| --- | ---: | ---: |
-| Files | 8,000 | 8,000 |
-| Upload requests | 2,667 | 1,000 |
-| Prepared database statements | 101,334 | 36,000 |
-| Commit transactions | 8,000 | 1,000 |
-| Elapsed time | 28.620 s | 18.222 s |
-
-The comparison shows 62.5% fewer upload requests, 64.5% fewer database statements,
-and 87.5% fewer commit transactions. Local elapsed time decreased by 36.3%; hosted
-performance must be measured separately.
+The bulk new-file benchmark uploads 8,000 distinct Markdown notes of about 1 KiB
+through the batch handler with real local workerd/D1/R2. Its timings exclude internet
+latency, Obsidian disk work, authentication and Durable Object forwarding, so they
+are not predictions of hosted completion times.
 
 Run the benchmark with:
 
@@ -182,52 +167,3 @@ public Worker's Free CPU allowance is 10 ms. The import's existing conditional w
 staging leases and completion checks remain in use. See
 [Durable Object limits](https://developers.cloudflare.com/durable-objects/platform/limits/)
 and [Worker limits](https://developers.cloudflare.com/workers/platform/limits/).
-
-## Hosted verification, 2026-09-14
-
-An isolated Cloudflare Free deployment held 10,000 synthetic files: 8,000 Markdown
-notes and 2,000 attachments, including twenty 1 MiB binaries. Twenty reminder notes
-were inside `Reminders` and its subfolder; another valid reminder outside that folder
-was deliberately excluded. Clients used the real SyncEngine and API transport with
-isolated synthetic vault adapters, rather than physical Obsidian installations.
-
-The run exercised process restarts, a lost successful upload response, edits and a
-deletion during a paused import, and a changed large attachment. It verified zero
-unchanged-file reuploads on resume. A fresh client downloaded all 10,000 files and
-matched every SHA-256 digest against the source fixture. That final download took
-376 seconds in this environment, made 228 API requests, read 30,464 D1 rows, wrote
-zero D1 rows, and returned no errors. Device enrollment is outside this download
-measurement; the synthetic clients shared a test vault credential.
-
-Cloudflare analytics reported 32,103 D1 writes across the entire test
-database. This includes schema/auth setup, reminder projection, interrupted attempts,
-and additional final-route verification; it is not the ordinary-note-only benchmark
-above. The final hosted upload route wrote exactly 100 rows for 32 new notes and zero
-rows on an identical replay. It also successfully uploaded a 1 MiB binary and pruned
-the temporary verification files. The completed database contained exactly 20 reminder
-source records and 20 projections, all inside the selected folder, with no file-version,
-upload-receipt or changelog rows.
-
-The test uncovered CPU exhaustion in both direct Worker upload and bulk-download
-handling. The final transfer-pool download completed without server errors; sampled
-public Worker CPU during that phase was about 2.8 ms at P50 and 12.1 ms at P99. Those
-percentiles describe the forwarding Worker, not total Durable Object CPU. Earlier
-failed implementations are excluded from that CPU window. The test also exposed an
-empty-folder scan marker created during setup: completing an import now resets that
-marker so its newly uploaded reminder files are scanned. Finalization was replayed
-on the isolated fixture to verify that fix before the successful download.
-The synthetic Worker, D1 database and R2 bucket were deleted after verification.
-
-## Schema-6 hosted D1 check, 2026-09-14
-
-A temporary database verified migration through the same REST query API used by
-provisioning. A failing statement after the table replacement rolled the entire
-batch back. Successful migration preserved all 64 synthetic file rows and used
-106 row writes, including schema changes and the new snapshot baseline. This
-upgrade cost is separate from initial-import cost and varies with existing rows
-and schema. Reapplying the current schema used zero writes. Inserting 32 additional
-file records used exactly 32 writes. The temporary database was deleted.
-
-The 11,256-write complete-import figure above is measured with local workerd/D1
-billing metadata; the earlier hosted 10,000-file run predates the baseline inventory layout. No production
-resources were changed during this verification.

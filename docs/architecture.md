@@ -475,8 +475,7 @@ video metadata. Encrypted PWA captures leave missing transcripts pending for a
 trusted Obsidian device. Plugin capture on desktop and mobile
 loads it on demand; all executable code is bundled with the plugin. Unencrypted
 PWA captures retain the durable server queue. Previously queued desktop
-server captures still drain through their original path. See
-[article fetching and CORS](archive/reading-fetch-research.md) for transport limits and browser evidence.
+server captures still drain through their original path.
 
 ## Secret Storage
 
