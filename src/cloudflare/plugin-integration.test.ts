@@ -1,5 +1,5 @@
 import type { CloudflareDeploymentResult } from './deployment/types';
-import { HttpError } from '../sync/api';
+import { HttpError } from '../sync/worker-api/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const reconnectApi = { setAbortSignal: vi.fn(), listTokens: vi.fn(), testConnection: vi.fn() };
@@ -23,7 +23,7 @@ const progress = {
 };
 
 async function loadPluginIntegration() {
-	vi.doMock('../sync/api', () => ({ HttpError, SyncApiClient: class { constructor() { return reconnectApi; } } }));
+	vi.doMock('../sync/worker-api/client', () => ({ HttpError, SyncApiClient: class { constructor() { return reconnectApi; } } }));
 	vi.doMock('./oauth/config', async () => ({ ...await vi.importActual<object>('./oauth/config'), isCloudflareOAuthConfigured: () => true }));
 	vi.doMock('obsidian', () => ({ Notice: vi.fn(), Platform: platform }));
 	vi.doMock('../sync/connection/cloudflare-connection', () => ({ configureCloudflareAuthorizedDevice }));
@@ -88,7 +88,7 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
-	vi.doUnmock('../sync/api');
+	vi.doUnmock('../sync/worker-api/client');
 	vi.doUnmock('./oauth/config');
 	vi.doUnmock('../sync/plugin-integration');
 	vi.doUnmock('../sync/device-token');

@@ -1,7 +1,7 @@
 import type { ConnectionTestResult } from '../types';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from '../worker-api/client';
 import { applySharedSettings, buildSharedSettings } from './shared-settings';
 import type { SharedSettings } from '../../protocol/shared-settings';
 import { createLogger, errorMessage } from '../logger';

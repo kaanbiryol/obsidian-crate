@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SyncEngine } from '../engine/engine';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from '../worker-api/client';
 import { SyncQueueController } from '../queue/controller';
 import { createEmptySyncResult } from '../sync-result';
 import type { SyncResult } from '../types';

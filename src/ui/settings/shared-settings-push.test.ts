@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type CratePlugin from '../../plugin/CratePlugin';
 import type { SharedSettings } from '../../protocol/shared-settings';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
-import { SyncApiClient } from '../../sync/api';
+import { SyncApiClient } from '../../sync/worker-api/client';
 import type { ApiHttpResponse, ApiHttpTransport } from '../../sync/worker-api/http';
 import { Notice } from '../../test/mocks/obsidian';
 import { createSharedSettingsPush, SHARED_SETTINGS_CONFLICT_NOTICE } from './shared-settings-push';

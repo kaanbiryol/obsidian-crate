@@ -25,7 +25,7 @@ export * from './src/encryption/reminder-projection';
 export * from './src/sync/encryption/conversion';
 export * from './src/sync/encryption/reset';
 export * from './src/sync/worker-api/http';
-export * from './src/sync/api';
+export * from './src/sync/worker-api/client';
 export * from './src/sync/encryption/encrypted-files';
 export * from './src/sync/worker-api/sync';
 export * from './src/sync/durability/durable-restores';

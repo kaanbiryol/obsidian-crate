@@ -1,6 +1,6 @@
 import type { CrateServerInfo } from '../../protocol/server-info';
 import { createLogger, errorMessage } from '../logger';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 import { checkServerReachability, SERVER_CHECK_TIMEOUT_MS } from '../connection/server-reachability';
 import type { CrateSettings } from '../../plugin/settings-types';
 

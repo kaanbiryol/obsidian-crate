@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HttpError } from './api';
+import { HttpError } from './worker-api/client';
 import { retryWithBackoff, runConcurrentTasks } from './concurrency';
 
 describe('runConcurrentTasks', () => {

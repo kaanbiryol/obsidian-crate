@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildDiagnosticExport } from './diagnostic-export';
 import { createRuntimeHarness } from '../runtime/runtime-test-harness';
 import { normalizeCrateSettings } from '../../plugin/settings';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from '../worker-api/client';
 import { WorkerApiHttpClient, type ApiHttpTransport } from '../worker-api/http';
 import { MAX_REQUEST_DIAGNOSTICS } from './request-diagnostics';
 import { SyncEngine } from '../engine/engine';

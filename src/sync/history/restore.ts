@@ -4,7 +4,7 @@ import type { FileEntry } from '../../protocol/sync-types';
 import type { LocalManifestView } from '../manifest/manifest';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { assertPortablePaths } from '../../protocol/portable-path';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 import { getAllVaultFiles } from '../local/file-discovery';
 import { assertLocalSyncPath } from '../local/local-path-safety';
 import { readLocalFileEntry } from '../local/local-file-entry';

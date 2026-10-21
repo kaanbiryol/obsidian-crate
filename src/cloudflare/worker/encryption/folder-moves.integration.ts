@@ -7,7 +7,7 @@ import worker from '../index';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, moveEncryptionScopes, openRecoveryBundle } from '../../../encryption/key-bundle';
 import { convertEncryptedVault, readServerEncryption } from '../../../sync/encryption/conversion';
 import { WorkerApiHttpClient, type ApiHttpTransport } from '../../../sync/worker-api/http';
-import { SyncApiClient } from '../../../sync/api';
+import { SyncApiClient } from '../../../sync/worker-api/client';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { FileKeyAuthority } from '../../../encryption/file-authority';
 import { SyncWorkerApi } from '../../../sync/worker-api/sync';

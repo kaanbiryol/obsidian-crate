@@ -1,7 +1,7 @@
 import type { FileEntry } from '../../protocol/sync-types';
 import type { DataAdapter } from 'obsidian';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 import { assertLocalSyncPath } from '../local/local-path-safety';
 import { decodePreviewText, isBinaryPreviewPath } from './preview-format';
 import { MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';

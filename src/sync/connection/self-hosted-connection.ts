@@ -1,7 +1,7 @@
 import { ConnectionSetupError } from './connection-errors';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from '../worker-api/client';
 import { requireNormalizedWorkerUrl } from './worker-url';
 import { applySharedSettings } from './shared-settings';
 import { exchangeSelfHostedPairingCode } from './self-hosted-pairing';

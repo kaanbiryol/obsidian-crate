@@ -17,7 +17,7 @@ import {
 import { processPendingChanges } from './flush';
 import { OVERSIZED_LOCAL_FILE_MESSAGE, SkippedFileError } from '../issues';
 import type { PreparedUpload, SyncResult, SyncState } from '../types';
-import { HttpError } from '../api';
+import { HttpError } from '../worker-api/client';
 import { LocalFilePresentError } from '../local/local-absence';
 import { createEmptySyncResult } from '../sync-result';
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SyncApiClient } from './api';
-import type { ApiHttpTransport } from './worker-api/http';
+import { SyncApiClient } from './client';
+import type { ApiHttpTransport } from './http';
 
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });

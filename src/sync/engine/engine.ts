@@ -11,7 +11,7 @@ import { SyncTimingRecorder } from '../diagnostics/timings';
  */
 
 import { TFolder, type Plugin, type TAbstractFile, type Vault } from 'obsidian';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from '../worker-api/client';
 import { LocalManifest } from '../manifest/manifest';
 import { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import { ConflictStore } from '../conflict/store';

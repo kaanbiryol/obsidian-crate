@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { HttpError } from './api';
+import { HttpError } from './worker-api/client';
 import { createAbortError } from './abort';
 import { getSyncIssues, normalizeSyncIssues, OVERSIZED_LOCAL_FILE_MESSAGE, recordSyncError, SkippedFileError, syncErrorIssues, withSyncFileContext } from './issues';
 import type { SyncIssue } from './types';

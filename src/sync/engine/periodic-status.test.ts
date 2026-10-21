@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHarness, runPeriodicCheck } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
-import { HttpError } from '../api';
+import { HttpError } from '../worker-api/client';
 import { createSyncFailureResult } from '../sync-result';
 import { AUTH_ERROR_MESSAGE } from '../sync-outcome';
 

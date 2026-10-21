@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BatchUploadFile } from '../../protocol/sync-types';
 import type { PreparedUpload } from '../types';
-import { HttpError } from '../api';
+import { HttpError } from '../worker-api/client';
 import { uploadPreparedFiles } from './upload';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';
 

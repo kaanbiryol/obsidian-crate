@@ -1,4 +1,4 @@
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 
 type DiagnosticStatus = 'pass' | 'fail' | 'warn';
 

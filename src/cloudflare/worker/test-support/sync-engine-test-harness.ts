@@ -1,6 +1,6 @@
 import type { Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../../../plugin/settings-types';
-import { SyncApiClient } from '../../../sync/api';
+import { SyncApiClient } from '../../../sync/worker-api/client';
 import { SyncEngine } from '../../../sync/engine/engine';
 import type { EngineFileOperations } from '../../../sync/engine/file-operations';
 import type { ApiHttpTransport } from '../../../sync/worker-api/http';

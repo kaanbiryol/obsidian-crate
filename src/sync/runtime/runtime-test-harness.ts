@@ -1,6 +1,6 @@
 import { afterEach, expect, vi } from 'vitest';
 import { SyncEngine } from '../engine/engine';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 import { SyncRuntime } from './runtime';
 import type { CrateSettings } from '../../plugin/settings-types';
 

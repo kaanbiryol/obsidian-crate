@@ -4,7 +4,7 @@ import { pendingChangeKey } from '../pending/pending-change';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDeferred } from '../runtime/runtime-test-harness';
-import { HttpError } from '../api';
+import { HttpError } from '../worker-api/client';
 import { Notice } from '../../test/mocks/obsidian';
 import { AUTH_ERROR_MESSAGE } from '../sync-outcome';
 import {

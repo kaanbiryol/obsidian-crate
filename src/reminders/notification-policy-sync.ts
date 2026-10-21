@@ -1,5 +1,5 @@
 import type CratePlugin from '../plugin/CratePlugin';
-import type { SyncApiClient } from '../sync/api';
+import type { SyncApiClient } from '../sync/worker-api/client';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { normalizeRemindersFolderPath } from './settings';
 import { createLogger } from './logger';

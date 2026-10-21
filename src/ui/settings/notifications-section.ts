@@ -4,7 +4,7 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../sync/logger';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
-import type { SyncApiClient } from '../../sync/api';
+import type { SyncApiClient } from '../../sync/worker-api/client';
 
 export interface NotificationsSectionContext {
 	containerEl: HTMLElement;

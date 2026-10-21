@@ -1,7 +1,7 @@
-import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
+import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HttpError, SyncApiClient } from './api';
-import type { ApiHttpResponse, ApiHttpTransport } from './worker-api/http';
+import { HttpError, SyncApiClient } from './client';
+import type { ApiHttpResponse, ApiHttpTransport } from './http';
 
 function mockTransport(...responses: Response[]) {
   const explicitMetadata = responses.some(response => response.headers.get('X-Test-Metadata') === 'true');

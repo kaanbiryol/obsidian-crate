@@ -1,7 +1,7 @@
 import type { Vault } from 'obsidian';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { LocalManifestView } from '../manifest/manifest';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 import { HistoryCheckpoints } from '../history/checkpoint';
 import { compareHistorySnapshots, type HistoryComparison, type HistorySnapshot } from '../history/comparison';
 import { getAllVaultFiles } from '../local/file-discovery';

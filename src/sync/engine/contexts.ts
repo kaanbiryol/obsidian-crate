@@ -2,7 +2,7 @@ import { deleteRemoteFiles, type DeleteRemoteFiles } from '../transfer/delete';
 import type { EngineFileOperations } from './file-operations';
 import { PlannedContent } from '../planner/planned-content';
 import type { FileManager, Vault } from 'obsidian';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 import type { LocalManifest, LocalManifestView } from '../manifest/manifest';
 import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { ConflictStore } from '../conflict/store';

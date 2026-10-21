@@ -11,7 +11,7 @@ const api = vi.hoisted(() => ({
 }));
 const exchange = vi.hoisted(() => vi.fn());
 vi.mock('./self-hosted-pairing', () => ({ exchangeSelfHostedPairingCode: exchange }));
-vi.mock('../api', () => ({ SyncApiClient: class { constructor() { return api; } } }));
+vi.mock('../worker-api/client', () => ({ SyncApiClient: class { constructor() { return api; } } }));
 
 function plugin() {
 	return {

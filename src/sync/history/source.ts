@@ -1,5 +1,5 @@
 import type { FileEntry } from '../../protocol/sync-types';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 
 export async function findHistorySource(api: Pick<SyncApiClient, 'listFileVersions' | 'previewFileVersion' | 'downloadFile'>, path: string, wanted: Readonly<FileEntry>, current?: FileEntry): Promise<() => Promise<ArrayBuffer>> {
     if (current?.hash === wanted.hash) return async () => (await api.downloadFile(path)).content;

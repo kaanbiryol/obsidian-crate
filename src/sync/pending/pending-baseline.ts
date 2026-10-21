@@ -1,5 +1,5 @@
 import type { FileEntry } from '../../protocol/sync-types';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 import { assertLocalSyncPath } from '../local/local-path-safety';
 import { findHistorySource } from '../history/source';
 import { sha256Hex } from '../../platform/sha256';

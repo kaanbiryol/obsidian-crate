@@ -2,7 +2,7 @@ import type { Plugin } from 'obsidian';
 import { afterEach } from 'vitest';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../../plugin/settings-types';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from '../worker-api/client';
 import { SyncEngine } from './engine';
 import { LocalManifest } from '../manifest/manifest';
 import { getCheckpointAuthority } from '../connection/worker-url';

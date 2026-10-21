@@ -6,7 +6,7 @@ import {
 } from './engine-test-harness';
 import { Notice } from '../../test/mocks/obsidian';
 import { AUTH_ERROR_MESSAGE } from '../sync-outcome';
-import { HttpError } from '../api';
+import { HttpError } from '../worker-api/client';
 import type { SyncResult } from '../types';
 
 afterEach(() => { vi.useRealTimers(); });

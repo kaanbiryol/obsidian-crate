@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from '../worker-api/client';
 import { LocalManifest } from '../manifest/manifest';
 import { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { ApiHttpTransport } from '../worker-api/http';

@@ -1,7 +1,7 @@
 import { pendingChangeKey, decodePendingChange } from '../pending/pending-change';
 import type { Vault } from 'obsidian';
 import { MAX_FILE_SIZE_BYTES, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 import type { LocalManifest } from '../manifest/manifest';
 import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { SyncQueueController } from '../queue/controller';

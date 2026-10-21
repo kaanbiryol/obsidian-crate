@@ -2,7 +2,7 @@ import { CloudflareOperationPresentation } from '../ui/cloudflare/operation-pres
 import { ResetBlockedError } from './server-reset/reset-errors';
 import { supportsSavedAuthorization, type DeploymentIntent, type SavedDeploymentIntent } from './deployment/types';
 import type { ConnectionTestResult } from '../sync/types';
-import { SyncApiClient, HttpError } from '../sync/api';
+import { SyncApiClient, HttpError } from '../sync/worker-api/client';
 import { checkAndRecoverUpdate } from '../ui/cloudflare/recovery-ui';
 import { DeploymentRecoveryRequiredError } from './deployment/fence';
 import { Notice, Platform } from 'obsidian';

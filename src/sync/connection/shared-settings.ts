@@ -1,6 +1,6 @@
 import { normalizeSharedSettingsValue, type SharedSettings } from '../../protocol/shared-settings';
 import type { SyncSettings } from '../settings';
-import type { SyncApiClient } from '../api';
+import type { SyncApiClient } from '../worker-api/client';
 import { HttpError } from '../worker-api/http';
 
 type SharedSettingsTarget = Pick<

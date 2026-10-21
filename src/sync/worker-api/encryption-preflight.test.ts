@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WorkerApiHttpClient, type ApiHttpTransport } from './http';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from './client';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../encryption/key-bundle';
 import { createEncryptionState } from '../../encryption/server-state';

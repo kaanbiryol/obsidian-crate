@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
-import type { FileEntry } from '../protocol/sync-types';
-import { SyncApiClient } from './api';
-import type { ApiHttpTransport } from './worker-api/http';
+import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
+import type { FileEntry } from '../../protocol/sync-types';
+import { SyncApiClient } from './client';
+import type { ApiHttpTransport } from './http';
 
 const paths = ['__proto__', 'constructor', 'toString'];
 const entry: FileEntry = { hash: 'a'.repeat(64), size: 1, modified: '2026-01-01', revision: 'r1' };

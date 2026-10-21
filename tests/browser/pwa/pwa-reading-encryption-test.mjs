@@ -15,7 +15,7 @@ let runtime, server, browser, loseReply = false, injectShell = false;
 const commits = [];
 try {
   const modulePath = join(dataDir, 'crypto.mjs');
-  const compiled = await build({ stdin: { contents: `export * from './src/encryption/key-bundle'; export * from './src/encryption/server-state'; export * from './src/encryption/file-authority'; export * from './src/encryption/file-codec';  export * from './src/reading/core/notes'; export * from './src/sync/encryption/conversion'; export * from './src/sync/worker-api/http'; export * from './src/sync/api';`, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', alias: { obsidian: join(process.cwd(), 'src/test/mocks/obsidian.ts') } });
+  const compiled = await build({ stdin: { contents: `export * from './src/encryption/key-bundle'; export * from './src/encryption/server-state'; export * from './src/encryption/file-authority'; export * from './src/encryption/file-codec';  export * from './src/reading/core/notes'; export * from './src/sync/encryption/conversion'; export * from './src/sync/worker-api/http'; export * from './src/sync/worker-api/client';`, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', alias: { obsidian: join(process.cwd(), 'src/test/mocks/obsidian.ts') } });
   await writeFile(modulePath, compiled.outputFiles[0].contents);
   const t = await import(pathToFileURL(modulePath).href);
   runtime = await openLocalRuntime({ dataDir: join(dataDir, 'server') });

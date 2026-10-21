@@ -17,7 +17,7 @@ import { changeServerConnection, disconnectServerConnection } from './connection
 import type { EncryptionServerState } from '../../encryption/server-state';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from '../types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from '../worker-api/client';
 import { isConflictFile, notifyConflicts } from '../conflict/conflict';
 import { SyncEngine } from '../engine/engine';
 import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';

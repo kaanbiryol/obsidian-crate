@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SyncEngine } from '../engine/engine';
 import { WorkerApiHttpClient } from '../worker-api/http';
-import { SyncApiClient } from '../api';
+import { SyncApiClient } from '../worker-api/client';
 import { createRuntimeHarness, createDeferred } from './runtime-test-harness';
 import { cancelSyncResult, createEmptySyncResult, createSyncFailureResult } from '../sync-result';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../encryption/key-bundle';

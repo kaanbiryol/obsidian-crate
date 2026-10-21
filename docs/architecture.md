@@ -104,7 +104,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
         ├── SyncEngine (sync/engine/engine.ts) - orchestrates sync operations
         │     uses: planner, transfer, queue, file-discovery, manifest
         │     owns: engine-file-operations - journaled uploads/restores and guarded deletes
-        └── SyncApiClient (sync/api.ts) - HTTP calls to worker
+        └── SyncApiClient (sync/worker-api/client.ts) - HTTP calls to worker
   ├── Reminder runtime (reminders/runtime.ts) - index/writer/repository/watcher setup
   ├── Reminder registrations (reminders/register-integrations.ts) - commands, code blocks, views
   ├── ReminderIndex (reminders/data/reminder-index/) - in-memory reminder index

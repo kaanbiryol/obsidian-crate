@@ -1,11 +1,11 @@
-import { createEngineFileOperations } from './engine/file-operations';
-import type { ConnectionTestResult } from './types';
-import { SharedHistoryApi } from './worker-api/history-checkpoints';
-import type { RequestDiagnostics } from './diagnostics/request-diagnostics';
-import type { MarkdownBaseCache } from './merge/markdown-base-cache';
+import { createEngineFileOperations } from '../engine/file-operations';
+import type { ConnectionTestResult } from '../types';
+import { SharedHistoryApi } from './history-checkpoints';
+import type { RequestDiagnostics } from '../diagnostics/request-diagnostics';
+import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { Vault } from 'obsidian';
-import type { LocalManifest } from './manifest/manifest';
-import type { NotificationPolicy } from '../protocol/notification-policy';
+import type { LocalManifest } from '../manifest/manifest';
+import type { NotificationPolicy } from '../../protocol/notification-policy';
 /**
  * Worker API client facade for sync, setup, and reminder endpoints.
  */
@@ -21,37 +21,37 @@ import type {
 	FileVersionQuery,
 	FileVersionsPage,
 	RemoteFileVersion,
-} from '../protocol/sync-types';
-import type { SharedSettings } from '../protocol/shared-settings';
-import type { CrateServerInfo } from '../protocol/server-info';
-import { AuthWorkerApi } from './worker-api/auth';
-import { WorkerApiHttpClient } from './worker-api/http';
-import type { ApiHttpTransport } from './worker-api/http';
+} from '../../protocol/sync-types';
+import type { SharedSettings } from '../../protocol/shared-settings';
+import type { CrateServerInfo } from '../../protocol/server-info';
+import { AuthWorkerApi } from './auth';
+import { WorkerApiHttpClient } from './http';
+import type { ApiHttpTransport } from './http';
 import type {
 	PushSubscriptionsResponse,
 	PushTestResponse,
-} from './worker-api/notifications';
-import { NotificationsWorkerApi } from './worker-api/notifications';
-import { SharedSettingsWorkerApi, type VersionedSharedSettings } from './worker-api/shared-settings';
-import { SyncWorkerApi, type DownloadedBatch, type DownloadedFile } from './worker-api/sync';
-import { InitialImportApi } from './worker-api/initial-import';
-import { EncryptedFiles } from './encryption/encrypted-files';
-import type { VaultKeyBundle } from '../encryption/key-bundle';
-import { createReminderProjection } from '../encryption/reminder-projection';
-import { readServerEncryption } from './encryption/conversion';
+} from './notifications';
+import { NotificationsWorkerApi } from './notifications';
+import { SharedSettingsWorkerApi, type VersionedSharedSettings } from './shared-settings';
+import { SyncWorkerApi, type DownloadedBatch, type DownloadedFile } from './sync';
+import { InitialImportApi } from './initial-import';
+import { LinksWorkerApi } from './links';
+import { EncryptedFiles } from '../encryption/encrypted-files';
+import type { VaultKeyBundle } from '../../encryption/key-bundle';
+import { createReminderProjection } from '../../encryption/reminder-projection';
+import { readServerEncryption } from '../encryption/conversion';
 
-export { HttpError, SyncTransportError } from './worker-api/http';
+export { HttpError, SyncTransportError } from './http';
 
 export class SyncApiClient {
 	getEncryptionState() { return readServerEncryption(this.http); }
-	private encryption?: EncryptedFiles;
 	async configureEncryption(bundle: VaultKeyBundle): Promise<void> {
 		const encryption = await EncryptedFiles.create(this.http, bundle, (path, bytes) => createReminderProjection(bundle, path, bytes));
 		this.syncApi.setEncryption(encryption);
 		this.sharedHistory.setEncryption(encryption);
 		this.sharedSettingsApi.setEncryption(encryption);
 		this.http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
-		this.encryption = encryption;
+		this.linksApi.setEncryption(encryption);
 	}
 	readonly initialImport: InitialImportApi;
 	createFileOperations(manifest: LocalManifest, vault: Vault, cache: MarkdownBaseCache) {
@@ -66,6 +66,7 @@ export class SyncApiClient {
 	private readonly authApi: AuthWorkerApi;
 	private readonly sharedSettingsApi: SharedSettingsWorkerApi;
 	private readonly notificationsApi: NotificationsWorkerApi;
+	private readonly linksApi: LinksWorkerApi;
 
 	constructor(workerUrl: string, authToken: string, transport?: ApiHttpTransport) {
 		this.http = new WorkerApiHttpClient(workerUrl, authToken, transport);
@@ -76,6 +77,7 @@ export class SyncApiClient {
 		this.authApi = new AuthWorkerApi(this.http);
 		this.sharedSettingsApi = new SharedSettingsWorkerApi(this.http);
 		this.notificationsApi = new NotificationsWorkerApi(this.http);
+		this.linksApi = new LinksWorkerApi(this.http);
 	}
 
 	setAbortSignal(signal: AbortSignal): void {
@@ -87,12 +89,7 @@ export class SyncApiClient {
 	}
 
 	async fetchPageTitle(url: string): Promise<string | null> {
-		if (this.encryption) return null;
-		if (await readServerEncryption(this.http, 7000)) return null;
-		const result = await this.http.requestJson<{ title?: unknown }>('/links/title', {
-			method: 'POST', body: JSON.stringify({ url }),
-		}, 7000);
-		return typeof result.title === 'string' ? result.title : null;
+		return this.linksApi.fetchPageTitle(url);
 	}
 
 	getWorkerUrl(): string {

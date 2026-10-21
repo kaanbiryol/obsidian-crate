@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload } from '../types';
 import { runIncrementalSync } from './incremental';
 import { createSettings } from './planner-test-harness';
-import { HttpError, SyncTransportError } from '../api';
+import { HttpError, SyncTransportError } from '../worker-api/client';
 import { sha256Hex } from '../../platform/sha256';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({
