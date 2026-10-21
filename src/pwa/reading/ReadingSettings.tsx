@@ -1,6 +1,6 @@
 import { ChevronRight } from 'lucide-react';
 import { Button } from '@/ui/shared/Button';
-import { SettingsRow } from '../components/SettingsRow';
+import { SettingsRow } from '../settings/SettingsRow';
 
 export function ReadingSettings({ ready, connected, unavailable, onShortcut }: {
 	ready: boolean;

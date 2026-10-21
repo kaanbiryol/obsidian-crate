@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../reminders/encryption-session';
-import type { SettingsSnapshot } from '../settings-store';
+import type { SettingsSnapshot } from './settings-store';
 import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';
 

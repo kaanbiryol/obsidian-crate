@@ -22,7 +22,7 @@ const ReminderSyncNotice = lazy(() => import('./notices/ReminderSyncNotice')
 
 import { AppSyncIndicator } from '../sync/AppSyncIndicator';
 import { useRemindersRuntime } from './RemindersRuntime';
-import { usePwaPreferences } from '../hooks/usePwaPreferences';
+import { usePwaPreferences } from '../settings/usePwaPreferences';
 
 export function RemindersApp() {
 	const { preferences } = usePwaPreferences();

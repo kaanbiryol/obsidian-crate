@@ -1,8 +1,8 @@
 import { Check } from 'lucide-react';
 import { PwaButton as Button } from '../components/PwaButton';
-import { SettingsRow } from '../components/SettingsRow';
-import { SettingsSection } from '../components/SettingsSection';
-import type { RemindersSettings } from '../settings-store';
+import { SettingsRow } from '../settings/SettingsRow';
+import { SettingsSection } from '../settings/SettingsSection';
+import type { RemindersSettings } from '../settings/settings-store';
 import type { HomeScreenPlatform } from '../hooks/useHomeScreenInstall';
 
 export function ReminderSettings({ model, homeScreenPlatform }: {

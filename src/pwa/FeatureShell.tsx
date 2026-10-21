@@ -11,9 +11,9 @@ import { PwaThemeProvider } from './components/PwaThemeProvider';
 import { PwaThemeIcon } from './components/PwaThemeIcon';
 import { usePwaInputModality } from './hooks/usePwaInputModality';
 import { ReadingFeature } from './reading/ReadingFeature';
-import { createSettingsStore } from './settings-store';
-import { SettingsContext, useSettingsStore } from './settings-context';
-import { SettingsSheet } from './components/SettingsSheet';
+import { createSettingsStore } from './settings/settings-store';
+import { SettingsContext, useSettingsStore } from './settings/settings-context';
+import { SettingsSheet } from './settings/SettingsSheet';
 import { DockMorphContext, useDockMorphState } from '@/ui/shared/navigation/useDockMorph';
 
 export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {

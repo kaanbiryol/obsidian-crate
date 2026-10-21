@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { useSettingsStore } from '../settings-context';
+import { useSettingsStore } from '../settings/settings-context';
 import { PwaSyncStatusIndicator } from '../components/PwaSyncStatusIndicator';
 import { pwaSyncState } from './state';
 import { useSyncFeedback } from './SyncFeedback';

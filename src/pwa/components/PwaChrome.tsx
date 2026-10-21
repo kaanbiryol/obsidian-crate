@@ -11,7 +11,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { DataMode } from '../types';
 import { createPwaOpeningScreenHtml } from '../shell/opening-screen';
 import { resolvePwaOpeningDestination } from '../navigation/opening-destination';
-import { loadPwaPreferences } from '../preferences';
+import { loadPwaPreferences } from '../settings/preferences';
 import { createPwaUpdateScreenHtml } from '../update/update-screen';
 import { IconButton } from '@/ui/shared/IconButton';
 

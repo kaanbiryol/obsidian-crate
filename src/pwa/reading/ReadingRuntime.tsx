@@ -1,11 +1,11 @@
 import { readingUpdateReadiness } from '../update/update-readiness';
 import { createContext, lazy, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { DeferredNotice } from '../components/DeferredNotice';
-import { SettingsRow } from '../components/SettingsRow';
+import { SettingsRow } from '../settings/SettingsRow';
 import { useSyncFailureToast } from '../hooks/useSyncFailureToast';
 import { useSharedFeatures } from '../shared-features';
 import { useSyncFeedback } from '../sync/SyncFeedback';
-import { useFeatureSettings, useSettingsOpen } from '../settings-context';
+import { useFeatureSettings, useSettingsOpen } from '../settings/settings-context';
 import { readingSyncStatus } from '../sync/reading-status';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
 import { assertReadingSession, exportReadingData } from './storage';

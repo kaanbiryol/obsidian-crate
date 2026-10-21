@@ -5,11 +5,11 @@ import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../remi
 
 import { TabSettings } from './TabSettings';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
-import { PwaPushStack } from './PwaPushStack';
+import { PwaPushStack } from '../components/PwaPushStack';
 import { ShortcutSettingsSheet } from './ShortcutSettingsSheet';
 import type { PushedScreenHistory } from '../navigation/pushed-screen-history';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
-import { PwaModalSheet } from './PwaModalSheet';
+import { PwaModalSheet } from '../components/PwaModalSheet';
 import { Button } from '@/ui/shared/Button';
 import { SettingsRow } from './SettingsRow';
 import { SettingsAction } from './SettingsAction';
@@ -19,14 +19,14 @@ import { DeviceStorageSettings } from './DeviceStorageSettings';
 import { GeneralSettings } from './GeneralSettings';
 import { ReminderSettings } from '../reminders/ReminderSettings';
 import { ReadingSettings } from '../reading/ReadingSettings';
-import { HomeScreenInstallSteps } from './HomeScreenInstall';
+import { HomeScreenInstallSteps } from '../components/HomeScreenInstall';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
-import { usePwaPreferences } from '../hooks/usePwaPreferences';
+import { usePwaPreferences } from './usePwaPreferences';
 import { useSheetTransition } from '../hooks/useSheetTransition';
-import { useSettingsStore } from '../settings-context';
+import { useSettingsStore } from './settings-context';
 import { useAppUpdate } from '../update/PwaUpdateProvider';
 import { PwaUpdateNotice, PwaUpdateFeedback } from '../update/PwaUpdateNotice';
-import type { PwaPreferences } from '../preferences';
+import type { PwaPreferences } from './preferences';
 
 type SettingsAction = 'refresh' | 'export-reminders' | 'export-reading' | 'logout';
 

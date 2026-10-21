@@ -1,5 +1,5 @@
 import { youtubeVideoId } from '@/reading/core/youtube';
-import { usePwaPreferences } from '../hooks/usePwaPreferences';
+import { usePwaPreferences } from '../settings/usePwaPreferences';
 import { readingKeys } from './encryption-session';
 
 import type { ReadingHighlight } from '@/reading/core/highlights';
@@ -19,7 +19,7 @@ import { PwaDock } from '../components/PwaDock';
 import { TabTransition } from '../../ui/shared/navigation/TabTransition';
 import { PwaUpdateButton } from '../update/PwaUpdateNotice';
 import { AUTH_TOKEN_KEY } from '../config';
-import { useSettingsOpen } from '../settings-context';
+import { useSettingsOpen } from '../settings/settings-context';
 import { AppSyncIndicator } from '../sync/AppSyncIndicator';
 import { PwaReadingDialog } from './PwaReadingDialog';
 import { ReadingOpening } from './ReadingOpening';

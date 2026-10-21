@@ -1,8 +1,8 @@
 import { AppDock } from '@/ui/shared/navigation/AppDock';
 export { DockAddButton as PwaDockAddButton } from '@/ui/shared/navigation/AppDock';
 import { useSharedFeatures } from '../shared-features';
-import { DOCK_TABS, dockDestinationIndex, type DockTab } from '../dock-preferences';
-import { usePwaPreferences } from '../hooks/usePwaPreferences';
+import { DOCK_TABS, dockDestinationIndex, type DockTab } from '../settings/dock-preferences';
+import { usePwaPreferences } from '../settings/usePwaPreferences';
 import React, { useContext, useEffect, useEffectEvent, useLayoutEffect } from 'react';
 import { useToast } from '../hooks/useToast';
 import { PwaToast } from './PwaToast';

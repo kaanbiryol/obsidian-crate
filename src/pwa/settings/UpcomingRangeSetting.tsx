@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { PwaPreferences } from '../preferences';
+import type { PwaPreferences } from './preferences';
 import { SettingsRow } from './SettingsRow';
 
 export function UpcomingRangeSetting({ days, onChange }: { days: number; onChange: (patch: Partial<PwaPreferences>) => void }) {

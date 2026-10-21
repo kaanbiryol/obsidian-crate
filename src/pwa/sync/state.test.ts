@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SettingsSnapshot } from '../settings-store';
+import type { SettingsSnapshot } from '../settings/settings-store';
 import { pwaSyncState, refreshPwaSync, logoutPwaSync } from './state';
 
 function snapshot(): SettingsSnapshot {

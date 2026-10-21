@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { parseHTML } from 'linkedom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reminderEncryptionSnapshot } from '../reminders/encryption-session';
-import type { SettingsSnapshot } from '../settings-store';
+import type { SettingsSnapshot } from './settings-store';
 import { EncryptionSettings, EncryptionSetupHint } from './EncryptionSettings';
 
 vi.mock('../reminders/encryption-session', () => ({ reminderEncryptionSnapshot: vi.fn(), subscribeReminderEncryption: vi.fn() }));

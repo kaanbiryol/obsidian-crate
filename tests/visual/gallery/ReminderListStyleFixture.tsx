@@ -1,8 +1,8 @@
 import { Fragment, useState } from 'react';
 import { WebReminderCard } from '@/pwa/reminders/WebReminderCard';
-import { usePwaPreferences } from '@/pwa/hooks/usePwaPreferences';
+import { usePwaPreferences } from '@/pwa/settings/usePwaPreferences';
 import { usePwaInputModality } from '@/pwa/hooks/usePwaInputModality';
-import { ListStyleSetting } from '@/pwa/components/ListStyleSetting';
+import { ListStyleSetting } from '@/pwa/settings/ListStyleSetting';
 import { ReadingFixture } from './ReadingFixture';
 import { ReorderableReminderList } from '@/reminders/ui/shared/ReorderableReminderList';
 import { HighlightList } from '@/reading/ui/HighlightList';

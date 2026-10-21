@@ -5,7 +5,7 @@ import { useAppConnection, useConnectionReset } from '../connection/AppConnectio
 import { exportPendingChanges } from './outbox/export-pending-changes';
 import { usePushNotifications } from './usePushNotifications';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
-import { usePwaPreferences } from '../hooks/usePwaPreferences';
+import { usePwaPreferences } from '../settings/usePwaPreferences';
 import { usePwaRefreshLifecycle } from './usePwaRefreshLifecycle';
 import { usePwaStatus } from './usePwaStatus';
 import { useReminderEditorActions } from './editor/useReminderEditorActions';
@@ -17,7 +17,7 @@ import { useSyncFeedback } from '../sync/SyncFeedback';
 import { isInitialPwaContentReady } from '../initial-content-readiness';
 import { useSharedFeatures } from '../shared-features';
 import { toSharedReminder } from './outbox/reminder-list-state';
-import { useFeatureSettings, useSettingsOpen } from '../settings-context';
+import { useFeatureSettings, useSettingsOpen } from '../settings/settings-context';
 import { ReminderRecoveryNotices } from './notices/ReminderRecoveryNotices';
 import { reminderFeatureStatus, reminderSyncStatus } from '../sync/reminder-status';
 import { reminderRetryAt } from './outbox/reminder-outbox';

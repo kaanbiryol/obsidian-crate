@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPushedScreenHistory } from '../navigation/pushed-screen-history';
 import { cancelDetailHistoryOpen, installDetailHistory } from '../navigation/detail-history';
-import { dockDestinationIndex } from '../dock-preferences';
+import { dockDestinationIndex } from '../settings/dock-preferences';
 import type { CrateSection, DockDestination } from '../navigation/feature-navigation';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
 import type { SharedFeatures } from '@/protocol/feature-policy';
-import { loadPwaPreferences } from '../preferences';
+import { loadPwaPreferences } from '../settings/preferences';
 import { resolvePwaOpeningDestination } from '../navigation/opening-destination';
-import { useSettingsOpen, useSettingsStore } from '../settings-context';
-import { usePwaPreferences } from './usePwaPreferences';
+import { useSettingsOpen, useSettingsStore } from '../settings/settings-context';
+import { usePwaPreferences } from '../settings/usePwaPreferences';
 import { usePwaBackGesture } from './usePwaBackGesture';
 
 const currentSection = (): CrateSection => new URL(location.href).searchParams.get('section') === 'reading' ? 'reading' : 'reminders';

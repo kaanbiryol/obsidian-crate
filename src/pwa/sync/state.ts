@@ -1,4 +1,4 @@
-import type { SettingsSnapshot } from '../settings-store';
+import type { SettingsSnapshot } from '../settings/settings-store';
 import type { SyncIndicatorState } from '@/ui/shared/SyncIndicator';
 
 /** Readiness is about durable data, including paused features, never screen mounting. */

@@ -175,7 +175,7 @@ Dock morphs use the shared collapsed height.
   shared header inset on desktop. Plugin and PWA headers reserve the count row
   while loading; PWA loading screens also reserve the floating dock's space
   throughout startup. Feature adapters retain their safe-area ownership.
-- `src/pwa/components/SettingsSection.tsx` and `SettingsRow.tsx` own settings
+- `src/pwa/settings/SettingsSection.tsx` and `SettingsRow.tsx` own settings
   grouping and row structure. Settings reuses the shared list-item surface and title
   mixins, with semantic filled controls and shared button press feedback for its
   theme selector. Native selects and number fields retain 16px text for iPhone focus.

@@ -4,7 +4,7 @@ import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { usePwaUpdate } from './usePwaUpdate';
 import { useToast } from '../hooks/useToast';
 import { PwaToast } from '../components/PwaToast';
-import { useSettingsOpen, useSettingsStore } from '../settings-context';
+import { useSettingsOpen, useSettingsStore } from '../settings/settings-context';
 import { startUpdateChecks, fetchPwaAssetVersion } from './update-checker';
 import type { CrateSection } from '../navigation/feature-navigation';
 import type { ToastState } from '../types';

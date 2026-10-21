@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useState, type ComponentType, type ReactNode } from 'react';
-import { useSettingsOpen } from '../settings-context';
+import { useSettingsOpen } from '../settings/settings-context';
 import { FeatureSwitcherButton } from './FeatureSwitcherButton';
 import { PwaButton } from './PwaButton';
 

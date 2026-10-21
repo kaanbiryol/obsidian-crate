@@ -2,7 +2,7 @@ import { act } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY } from '../config';
-import { PWA_PREFERENCES_KEY } from '../preferences';
+import { PWA_PREFERENCES_KEY } from '../settings/preferences';
 import { ReadingApiError, connectReadingFromReminders, loadReading, readingRequest } from './api';
 import { READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
 import type { PendingReading } from './outbox';

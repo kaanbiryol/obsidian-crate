@@ -1,5 +1,5 @@
-import { normalizeDockTabs, applyOpeningDockPreferences, dockDestinationIndex } from '../dock-preferences';
-import { PWA_PREFERENCES_KEY } from '../preferences';
+import { normalizeDockTabs, applyOpeningDockPreferences, dockDestinationIndex } from '../settings/dock-preferences';
+import { PWA_PREFERENCES_KEY } from '../settings/preferences';
 import { resolvePwaOpeningDestination } from '../navigation/opening-destination';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
 import type { StartTab } from '../types';

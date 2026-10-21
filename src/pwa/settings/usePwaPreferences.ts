@@ -1,6 +1,6 @@
-import { applyOpeningDockPreferences } from '../dock-preferences';
+import { applyOpeningDockPreferences } from './dock-preferences';
 import { useCallback, useEffect, useState } from 'react';
-import { loadPwaPreferences, savePwaPreferences, PWA_PREFERENCES_KEY, type PwaPreferences } from '../preferences';
+import { loadPwaPreferences, savePwaPreferences, PWA_PREFERENCES_KEY, type PwaPreferences } from './preferences';
 
 const CHANGED = 'crate-preferences-changed';
 

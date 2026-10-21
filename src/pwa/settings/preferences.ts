@@ -1,5 +1,5 @@
 import { normalizeDockTabs, type DockTab } from './dock-preferences';
-import type { StartTab } from './types';
+import type { StartTab } from '../types';
 import { DEFAULT_LIST_STYLE, normalizeListStyle, type ListStyle } from '@/ui/shared/list-style';
 
 type PwaStartScreen = StartTab | 'reading' | 'favorites' | 'archive';

@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useState, type ReactNode } from 'react';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 import { useSheetTransition } from '../hooks/useSheetTransition';
-import { PwaModalSheet } from './PwaModalSheet';
+import { PwaModalSheet } from '../components/PwaModalSheet';
 
 /** Keep setup mounted through dismissal, then complete its browser Back entry. */
 export function ShortcutSettingsSheet({ open, onClose, onCloseEnd, children }: {

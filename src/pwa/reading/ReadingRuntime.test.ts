@@ -1,8 +1,8 @@
 import { act, createElement } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
-import { SettingsContext } from '../settings-context';
-import { createSettingsStore } from '../settings-store';
+import { SettingsContext } from '../settings/settings-context';
+import { createSettingsStore } from '../settings/settings-store';
 import { pwaSyncState } from '../sync/state';
 import { ReadingRuntimeProvider, useReadingRuntime } from './ReadingRuntime';
 import { READING_SESSION_KEY, readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, readingLock, savePendingReading, type ReadingSession } from './storage';

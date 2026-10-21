@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Download, KeyRound } from 'lucide-react';
 import { PwaButton as Button } from '../components/PwaButton';
-import { SettingsSection } from '../components/SettingsSection';
+import { SettingsSection } from '../settings/SettingsSection';
 import { SetupStep, SetupSteps } from '../components/SetupSteps';
 import { CopyableText } from '@/ui/shared/CopyableText';
 import { READING_SHORTCUT_URL } from '@/reading/shortcut';
