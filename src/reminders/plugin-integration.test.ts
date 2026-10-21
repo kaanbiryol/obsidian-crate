@@ -115,7 +115,7 @@ async function loadPluginIntegrationModule() {
 	vi.doMock('./commands', () => ({
 		registerReminderCommands,
 	}));
-	vi.doMock('./services/vaultWatcher', () => ({
+	vi.doMock('./data/vault-watcher', () => ({
 		VaultWatcher: class VaultWatcher {
 			register = latestWatcher.register;
 			unregister = latestWatcher.unregister;
@@ -231,7 +231,7 @@ afterEach(() => {
 	vi.doUnmock('./query/injector');
 	vi.doUnmock('./query/remindersBlockLivePreview');
 	vi.doUnmock('./commands');
-	vi.doUnmock('./services/vaultWatcher');
+	vi.doUnmock('./data/vault-watcher');
 	vi.doUnmock('./ui/plugin/workspaceLayout');
 	vi.doUnmock('./ui/plugin/reminders-view');
 	vi.doUnmock('./utils/logger');

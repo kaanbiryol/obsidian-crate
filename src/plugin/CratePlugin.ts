@@ -13,7 +13,7 @@ import {
 	normalizeRemindersSettings,
 	useRemindersSettingsStore,
 } from '../reminders/settings';
-import { type VaultWatcher } from '../reminders/services/vaultWatcher';
+import { type VaultWatcher } from '../reminders/data/vault-watcher';
 import { configureLogger as configureRemindersLogger } from '../reminders/logger';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import type { CrateSettingTab } from '../ui/settings-tab';

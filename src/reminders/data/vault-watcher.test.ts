@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TFile } from 'obsidian';
-import { VaultWatcher } from './vaultWatcher';
+import { VaultWatcher } from './vault-watcher';
 
 type VaultEvent = 'modify' | 'create' | 'delete' | 'rename';
 type VaultHandler = (...args: never[]) => void;

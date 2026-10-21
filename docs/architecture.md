@@ -379,7 +379,7 @@ the article or unmounting prevents delayed errors, save completion, dialog closu
 and clipboard feedback from affecting another reader. Host callbacks still own
 metadata persistence, while `ReadingReader` retains content and navigation layout.
 
-Reminder vault events are debounced by `reminders/services/vaultWatcher.ts`.
+Reminder vault events are debounced by `reminders/data/vault-watcher.ts`.
 The reminder index serializes accepted scans without a second time-based filter.
 Delete and rename events invalidate queued/in-flight scans for their paths; a full
 scan re-reads its inventory if one of those events occurs before publication.

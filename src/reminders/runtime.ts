@@ -2,7 +2,7 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { createReminderIndex } from './data/reminder-index';
 import { createMarkdownWriter } from './data/markdown-writer';
 import { createReminderRepository } from './data/reminder-repository';
-import { VaultWatcher } from './services/vaultWatcher';
+import { VaultWatcher } from './data/vault-watcher';
 import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { Notice } from 'obsidian';

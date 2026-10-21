@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createReminderByteVault } from '@/test/factories/reminder-byte-vault';
-import { createReminderIndex } from '../data/reminder-index';
-import { VaultWatcher } from './vaultWatcher';
+import { createReminderIndex } from './reminder-index';
+import { VaultWatcher } from './vault-watcher';
 
 const fixtures: Awaited<ReturnType<typeof createReminderByteVault>>[] = [];
 afterEach(async () => {
