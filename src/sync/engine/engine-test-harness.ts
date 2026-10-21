@@ -8,6 +8,7 @@ import type { FileManifest, UploadResult } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
 import { LocalManifest } from '../manifest/manifest';
 import { getCheckpointAuthority } from '../connection/worker-url';
+import { createTestSettings } from '@/test/factories/settings';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
@@ -45,24 +46,6 @@ export function spyOnIncrementalSync(engine: SyncEngine, result: SyncResult | nu
 	).mockResolvedValue(result);
 }
 
-function createSettings(): CrateSettings {
-	return {
-		reading: { enabled: false, folderPath: 'Reading' },
-		workerUrl: 'https://worker.example',
-		cloudflareDeployment: null,
-		lastSync: null,
-		lastSeq: 0,
-		deviceId: 'dev-1',
-		ignorePatterns: ['.trash/', '*.tmp'],
-		automaticSync: true,
-		syncInterval: 0,
-		syncHistory: [],
-		pushEnabled: false,
-		debugLogging: false,
-		debounceDelay: 5,
-	};
-}
-
 export function toArrayBuffer(text: string): ArrayBuffer {
 	return new TextEncoder().encode(text).buffer;
 }
@@ -75,7 +58,7 @@ export function createNamedAbortError(message = 'Sync request aborted'): Error {
 
 /** Orchestration tests only; use the persistent harness for file transfer and recovery. */
 export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
-	const settings = { ...createSettings(), ...settingsOverrides };
+	const settings = createTestSettings({ deviceId: 'dev-1', ignorePatterns: ['.trash/', '*.tmp'], ...settingsOverrides });
 
 	const stored = new Map<string, string>();
 	const adapter: MockAdapter = {

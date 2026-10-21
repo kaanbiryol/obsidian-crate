@@ -3,24 +3,10 @@ import type { ChangelogEntry, MutationFailure } from '../../protocol/sync-types'
 import type { CrateSettings } from '../../plugin/settings-types';
 import type { IncrementalSyncPlannerContext } from './types';
 import { updateSyncProgress } from '../settings';
+import { createTestSettings } from '@/test/factories/settings';
 
 export function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
-	return {
-		reading: { enabled: false, folderPath: 'Reading' },
-		workerUrl: 'https://worker.example',
-		cloudflareDeployment: null,
-		lastSync: null,
-		lastSeq: 10,
-		deviceId: 'dev-1',
-		ignorePatterns: [],
-		automaticSync: true,
-		syncInterval: 0,
-		syncHistory: [],
-		pushEnabled: false,
-		debugLogging: false,
-		debounceDelay: 5,
-		...overrides,
-	};
+	return createTestSettings({ lastSeq: 10, deviceId: 'dev-1', ignorePatterns: [], ...overrides });
 }
 export function createIncrementalHarness(overrides: Partial<{
 	settings: Partial<CrateSettings>;

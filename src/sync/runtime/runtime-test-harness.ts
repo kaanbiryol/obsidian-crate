@@ -3,6 +3,7 @@ import { SyncEngine } from '../engine/engine';
 import type { SyncApiClient } from '../worker-api/client';
 import { SyncRuntime } from './runtime';
 import type { CrateSettings } from '../../plugin/settings-types';
+import { createTestSettings } from '@/test/factories/settings';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
@@ -57,27 +58,8 @@ export function createDeferred<T>(): Deferred<T> {
 	return { promise, resolve, reject };
 }
 
-function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
-	return {
-		reading: { enabled: false, folderPath: 'Reading' },
-		workerUrl: 'https://worker.example',
-		cloudflareDeployment: null,
-		lastSync: null,
-		lastSeq: 0,
-		deviceId: 'device-1',
-		ignorePatterns: ['.trash/', '*.tmp'],
-		automaticSync: true,
-		syncInterval: 0,
-		syncHistory: [],
-		pushEnabled: false,
-		debugLogging: false,
-		debounceDelay: 5,
-		...overrides,
-	};
-}
-
 export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> = {}, prepareReminderScope?: () => Promise<void>) {
-	const settings = createSettings(settingsOverrides);
+	const settings = createTestSettings({ deviceId: 'device-1', ignorePatterns: ['.trash/', '*.tmp'], ...settingsOverrides });
 	const plugin = {
 		registerDomEvent: vi.fn(),
 		app: {
