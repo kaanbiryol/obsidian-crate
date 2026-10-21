@@ -13,7 +13,7 @@ Scripts in `package.json` are the source of truth. [Framework and Config](#frame
 | Local server | `npm run test:local-server` | Builds the Worker, then runs every `packages/server/test/*.test.mjs`. |
 | Server package | `npm run test:server-package` | Packs the server and installs it through npx in an isolated cache. |
 | Docker hosting | `npm run test:docker` | Needs a running Docker engine and Compose. |
-| Tooling and release scripts | `npm run test:ci` | Node tests in `scripts/`, including the source-path guard and PWA browser shard coverage. |
+| Tooling and release scripts | `npm run test:ci` | Node tests in `scripts/`, including the source-path guard and PWA browser shard coverage. The guard also fails when a `scripts/*.test.mjs` file runs from no package script. |
 | Server revision | `npm run test:server-revision` and `npm run check:server-revision` | The second checks the server revision and schema against the published release baseline; it needs Git history and `gh`. |
 | Recovery tooling | `npm run test:recovery` | Python `unittest`. |
 | Contract docs | `npm run check:contracts` | Rejects stale values in `current-contract.md`; `node scripts/check-contract-docs.mjs --write` refreshes them. |

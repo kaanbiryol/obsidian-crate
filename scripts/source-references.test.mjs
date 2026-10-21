@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import { test } from 'node:test';
 
@@ -34,4 +34,14 @@ test('files named by package scripts exist', () => {
 	const missing = [...new Set(scripts.match(/(?:src|tests|scripts)\/[\w@./-]+\.(?:mjs|ts|tsx|json|py)/g))]
 		.filter(path => !existsSync(join(root, path)));
 	assert.deepEqual(missing, []);
+});
+
+test('every tooling test in scripts/ runs from a package script', () => {
+	const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts).join(' ');
+	const referenced = new Set(scripts.match(/scripts\/[\w@./-]+\.test\.mjs/g));
+	const unlisted = readdirSync(join(root, 'scripts'))
+		.filter(name => name.endsWith('.test.mjs'))
+		.map(name => `scripts/${name}`)
+		.filter(file => !referenced.has(file));
+	assert.deepEqual(unlisted, []);
 });
