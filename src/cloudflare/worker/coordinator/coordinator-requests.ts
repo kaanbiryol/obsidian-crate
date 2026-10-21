@@ -4,7 +4,7 @@ import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import type { Env } from '../types';
 
 import { publishExtraction, type Publication } from '../reading/extraction/jobs';
-import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
+import { getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
 import { drainNotificationJobs } from '../notifications/outbox';
 import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, REMINDERS_ENABLED_HEADER, TRANSFER_PATHS } from './coordinator';
 import { uploadInitialFiles } from '../sync/initial-import-upload';
@@ -61,7 +61,6 @@ export async function handleCoordinatorRequest(
       await drainNotificationJobs(env, undefined, request.headers.get(REMINDERS_ENABLED_HEADER) === '1' || undefined);
       return new Response(null, { status: 204 });
     }
-    if (path === TRANSFER_PATHS.historyCheckpointCreate && request.method === 'POST') return createSharedCheckpoint(env.BUCKET, env.DB);
     if (path === TRANSFER_PATHS.historyCheckpoint && request.method === 'GET') return getSharedCheckpoint(request, env.BUCKET);
     if (path === TRANSFER_PATHS.historyCheckpointFile && request.method === 'GET') return downloadCheckpointFile(request, env.BUCKET, env.DB);
     if (path === TRANSFER_PATHS.batchDownload && request.method === 'POST') return handleBatchDownload(request, env.BUCKET, env.DB);

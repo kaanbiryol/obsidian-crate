@@ -31,7 +31,6 @@ export const TRANSFER_PATHS = {
 	syncBatchUpload: '/sync-batch-upload',
 	importUpload: '/import-upload',
 	batchDownload: '/batch-download',
-	historyCheckpointCreate: '/history-checkpoint-create',
 	historyCheckpoint: '/history-checkpoint',
 	historyCheckpointFile: '/history-checkpoint-file',
 } as const;
