@@ -1,4 +1,4 @@
-import { reminderUpdateReadiness } from '../sync/update-readiness';
+import { reminderUpdateReadiness } from '../update/update-readiness';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { isStandaloneApp } from '../config';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';

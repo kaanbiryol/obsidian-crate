@@ -17,7 +17,7 @@ import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { PwaPullRefreshIndicator } from '../components/PwaChrome';
 import { PwaDock } from '../components/PwaDock';
 import { TabTransition } from '../../ui/shared/navigation/TabTransition';
-import { PwaUpdateButton } from '../components/PwaUpdateNotice';
+import { PwaUpdateButton } from '../update/PwaUpdateNotice';
 import { AUTH_TOKEN_KEY } from '../config';
 import { useSettingsOpen } from '../settings-context';
 import { AppSyncIndicator } from '../sync/AppSyncIndicator';

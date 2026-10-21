@@ -6,7 +6,7 @@ import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from '..
 import { PWA_LIGHT_THEME_STYLES, PWA_STYLES } from './styles';
 import { PWA_OPENING_DOCK_INIT_JS } from '../../../pwa/shell/opening-dock';
 import { createPwaOpeningScreenHtml, PWA_OPENING_SCREEN_INIT_JS } from '../../../pwa/shell/opening-screen';
-import { createPwaUpdateScreenHtml } from '../../../pwa/shell/update-screen';
+import { createPwaUpdateScreenHtml } from '../../../pwa/update/update-screen';
 import { CRATE_ICON_192_PNG } from './install-assets';
 import {
 	PWA_LIGHT_SCHEME_MEDIA,

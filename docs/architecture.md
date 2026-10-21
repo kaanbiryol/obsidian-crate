@@ -338,7 +338,7 @@ and does not replace the installed app's encryption unlock.
 
 `pwa/sync/state.ts` derives the overall indicator and update readiness from both
 runtime registrations. Each feature explicitly publishes the policy from
-`pwa/sync/update-readiness.ts` and a synchronous guard for work awaiting durability.
+`pwa/update/update-readiness.ts` and a synchronous guard for work awaiting durability.
 Reading queues commands in its runtime, so waiting for Web Locks or IndexedDB blocks
 updates before a pending record exists. Final update checks still reread durable
 queues and drafts. An uninitialized feature is unverified, while a hydrated
@@ -555,7 +555,8 @@ Reading policy requests.
 changes onto the server's version before a conditional write. Production Worker modules
 may import only an allowlist: `protocol/`, `encryption/`, `platform/`, the shared
 reminder and Reading domain folders, release metadata and the PWA shell in
-`pwa/shell/`. `scripts/worker-import-boundary.mjs` enforces it through ESLint.
+`pwa/shell/`, plus the update screen and transition keys in `pwa/update/`.
+`scripts/worker-import-boundary.mjs` enforces it through ESLint.
 
 `pwa/reminders/outbox/reminder-outbox.ts` owns automatic retry eligibility. Mount, foreground,
 connectivity and timer wakeups honor the stored deadline and attempt budget.

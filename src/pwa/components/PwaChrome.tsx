@@ -1,4 +1,4 @@
-import { PwaUpdateButton } from './PwaUpdateNotice';
+import { PwaUpdateButton } from '../update/PwaUpdateNotice';
 import { LoadingSpinner } from '@/ui/shared/LoadingIndicator';
 import React, { useContext, useState } from 'react';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
@@ -12,7 +12,7 @@ import type { DataMode } from '../types';
 import { createPwaOpeningScreenHtml } from '../shell/opening-screen';
 import { resolvePwaOpeningDestination } from '../navigation/opening-destination';
 import { loadPwaPreferences } from '../preferences';
-import { createPwaUpdateScreenHtml } from '../shell/update-screen';
+import { createPwaUpdateScreenHtml } from '../update/update-screen';
 import { IconButton } from '@/ui/shared/IconButton';
 
 function PwaSettingsButton({

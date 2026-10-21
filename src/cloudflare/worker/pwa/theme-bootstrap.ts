@@ -4,7 +4,7 @@ import {
 	PWA_THEME_COLOR_META_ID,
 	PWA_THEME_PREFERENCE_KEY,
 } from '../../../pwa/shell/theme';
-import { PWA_UPDATE_OPENING_PROGRESS, PWA_UPDATE_TRANSITION_KEY, PWA_UPDATE_TRANSITION_MAX_AGE_MS, PWA_UPDATE_TRANSITION_POSITION_KEY } from '../../../pwa/shell/update-transition';
+import { PWA_UPDATE_OPENING_PROGRESS, PWA_UPDATE_TRANSITION_KEY, PWA_UPDATE_TRANSITION_MAX_AGE_MS, PWA_UPDATE_TRANSITION_POSITION_KEY } from '../../../pwa/update/update-transition';
 import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from '../../../pwa/shell/pwa-params';
 
 // Apply the saved theme before app startup to avoid a first-paint flash.

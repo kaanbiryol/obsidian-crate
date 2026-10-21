@@ -9,7 +9,8 @@ const allowed = [
   'src/protocol/', 'src/encryption/', 'src/platform/',
   'src/reminders/core/', 'src/reminders/types/',
   'src/reading/core/', 'src/reading/extraction/', 'src/reading/shortcut', 'src/reading/settings', 'src/reading/ui/reading.scss',
-  'src/pwa/shell/', 'src/pwa/service-worker/config', 'src/pwa/styles/', 'src/pwa/reading/web.scss',
+  'src/pwa/shell/', 'src/pwa/update/update-screen', 'src/pwa/update/update-transition',
+  'src/pwa/service-worker/config', 'src/pwa/styles/', 'src/pwa/reading/web.scss',
   'site/assets/',
 ];
 const blockedPackages = new Set(['obsidian']);

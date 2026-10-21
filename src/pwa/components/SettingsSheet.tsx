@@ -24,8 +24,8 @@ import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import { useSheetTransition } from '../hooks/useSheetTransition';
 import { useSettingsStore } from '../settings-context';
-import { useAppUpdate } from './PwaUpdateProvider';
-import { PwaUpdateNotice, PwaUpdateFeedback } from './PwaUpdateNotice';
+import { useAppUpdate } from '../update/PwaUpdateProvider';
+import { PwaUpdateNotice, PwaUpdateFeedback } from '../update/PwaUpdateNotice';
 import type { PwaPreferences } from '../preferences';
 
 type SettingsAction = 'refresh' | 'export-reminders' | 'export-reading' | 'logout';

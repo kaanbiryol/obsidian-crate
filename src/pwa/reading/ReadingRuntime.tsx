@@ -1,4 +1,4 @@
-import { readingUpdateReadiness } from '../sync/update-readiness';
+import { readingUpdateReadiness } from '../update/update-readiness';
 import { createContext, lazy, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { DeferredNotice } from '../components/DeferredNotice';
 import { SettingsRow } from '../components/SettingsRow';

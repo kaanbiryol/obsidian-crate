@@ -1,7 +1,7 @@
 import { Script } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { PWA_THEME_BOOTSTRAP_JS } from './theme-bootstrap';
-import { PWA_UPDATE_TRANSITION_KEY } from '../../../pwa/shell/update-transition';
+import { PWA_UPDATE_TRANSITION_KEY } from '../../../pwa/update/update-transition';
 
 const now = 1_000_000;
 

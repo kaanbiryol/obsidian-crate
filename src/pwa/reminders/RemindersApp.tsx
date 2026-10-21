@@ -9,7 +9,7 @@ import {
 	PwaRemindersAppShell,
 	type PwaReminderCardRenderer,
 } from './PwaRemindersAppShell';
-import { useAppUpdate } from '../components/PwaUpdateProvider';
+import { useAppUpdate } from '../update/PwaUpdateProvider';
 import { ReminderCacheNotice } from './notices/ReminderCacheNotice';
 import { ReminderSourceNotice } from './notices/ReminderSourceNotice';
 import { ReminderRecoveryNotices } from './notices/ReminderRecoveryNotices';

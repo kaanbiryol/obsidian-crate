@@ -1,5 +1,5 @@
-import { PwaButton } from './PwaButton';
-import { SettingsRow } from './SettingsRow';
+import { PwaButton } from '../components/PwaButton';
+import { SettingsRow } from '../components/SettingsRow';
 import { useAppUpdate } from './PwaUpdateProvider';
 
 function UpdateAction({ disabled = false }: { disabled?: boolean }) {
