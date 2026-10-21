@@ -9,10 +9,14 @@ import { downloadAndSaveFile, validateDownloadedContent } from "./download";
 import { prepareUploadFromPath } from "./prepare";
 import type { DiffApplyOutcome, TransferContext } from "./types";
 import type { ConflictDiff, FileDiff, SyncResult } from '../types';
-import type { FileEntry } from '../../protocol/sync-types';
+import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { assertLocalFileAbsent, LocalFilePresentError } from '../local/local-absence';
 import { sha256Hex } from '../../platform/sha256';
+import { recordSyncError } from '../issues';
+import { errorMessage } from '../logger';
+import { isAbortError } from '../abort';
+import { fileFailure } from '../failures';
 
 export async function processDiff(
   context: TransferContext,
@@ -263,4 +267,39 @@ async function tryAutoMergeMarkdownConflict(
   result.merged++;
   result.mergedPaths.push(diff.path);
   return { status: "applied" };
+}
+
+export interface ApplyDiffsOptions {
+  /** The baseline record each diff updates. */
+  localFiles(diff: FileDiff): Record<string, FileEntry>;
+  /** Runs before each diff applies; an error it throws counts against that diff. */
+  beforeDiff?(diff: FileDiff): void;
+  onFailure?(failure: MutationFailure): void;
+  /** Runs after each diff, whether it applied, was deferred or failed. */
+  afterDiff?(diff: FileDiff): void;
+}
+
+/** Applies diffs in order. A deferred or failed diff is recorded against its path
+ * and the rest continue; cancellation stops them all. */
+export async function applyDiffs(
+  context: { processDiff(diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult): Promise<DiffApplyOutcome> },
+  diffs: readonly FileDiff[],
+  result: SyncResult,
+  options: ApplyDiffsOptions,
+): Promise<void> {
+  for (const diff of diffs) {
+    try {
+      const localFiles = options.localFiles(diff);
+      options.beforeDiff?.(diff);
+      const outcome = await context.processDiff(diff, localFiles, result);
+      if (outcome.status === "deferred") {
+        recordSyncError(result, `${outcome.reason}`, diff.path);
+      }
+    } catch (error) {
+      if (isAbortError(error)) throw error;
+      recordSyncError(result, `${errorMessage(error)}`, diff.path);
+      options.onFailure?.(fileFailure(diff.path, error));
+    }
+    options.afterDiff?.(diff);
+  }
 }

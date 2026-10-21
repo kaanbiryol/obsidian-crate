@@ -257,7 +257,7 @@ complete. Queue settlement and conflict retries remain with the calling mode.
 
 Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable.
 
-Implementation: `transfer/upload.ts`, `transfer/prepare.ts`, `transfer/delete.ts`, `delete-batches.ts`
+Implementation: `transfer/upload.ts`, `transfer/upload-pipeline.ts`, `transfer/prepare.ts`, `transfer/delete.ts`, `delete-batches.ts`
 
 ## Queue System
 

@@ -1,6 +1,7 @@
 import { pendingChangeKey } from '../pending/pending-change';
 import { recordSyncError, skippedFileIssue } from '../issues';
-import { pipelineUploadChunks } from '../transfer/budget';
+import { uploadPipelined } from '../transfer/upload-pipeline';
+import { applyDiffs } from '../transfer/process';
 import { isAbortError } from "../abort";
 import { fileFailure, isTransientSyncFailure } from "../failures";
 import type { IncrementalSyncPlannerContext } from "./types";
@@ -97,71 +98,57 @@ export async function runIncrementalSync(
       }
     }
 
-    for (const diff of conflicts) {
-      try {
-        const localFiles = createPathRecord<FileEntry>();
-        context.reportWork?.('applying');
-        const outcome = await context.processDiff(diff, localFiles, result);
-        if (outcome.status === "deferred") {
-          recordSyncError(result, `${outcome.reason}`, diff.path);
-        }
-      } catch (error) {
-        if (isAbortError(error)) throw error;
-        recordSyncError(result, `${errorMessage(error)}`, diff.path);
-        options.onFailure?.(fileFailure(diff.path, error));
-      }
-    }
+    await applyDiffs(context, conflicts, result, {
+      localFiles: () => createPathRecord<FileEntry>(),
+      beforeDiff: () => context.reportWork?.('applying'),
+      onFailure: options.onFailure,
+    });
 
     current = changesByPath.size;
     options.progressCallback?.(current, total);
 
     if (localOnlyChanges.length) context.reportWork?.('preparing');
-    const preparedChunks = pipelineUploadChunks(localOnlyChanges, async (file) => {
-      context.throwIfDestroyed();
-      try {
-        const uploadFile = await context.prepareUploadFromPath(file.path);
-        if (uploadFile) {
-          if (resurrectPaths.has(file.path)) {
-            uploadFile.expectedHash = null;
-          }
-          return uploadFile;
-        }
-      } catch (error) {
-        if (isAbortError(error)) throw error;
-        recordSyncError(result, `${errorMessage(error)}`, file.path);
-        options.onFailure?.(fileFailure(file.path, error));
-      }
-      current++;
-      options.progressCallback?.(current, total);
-      return null;
-    });
-
     let uploadsProcessed = 0;
-    for await (const chunk of preparedChunks) {
-      context.throwIfDestroyed();
-      let reported = 0;
+    const reportUploads = (count: number) => {
+      uploadsProcessed += count;
       context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
-      await context.uploadPreparedFiles(chunk, result, {
-        onProcessed: (count) => {
-          reported += count;
-          uploadsProcessed += count;
-          context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
-          current += count;
-          options.progressCallback?.(current, total);
-        },
-        concurrency: options.uploadConcurrency,
-        retry: true,
-        onFailure: options.onFailure,
-        ...(context.reconcileVersionConflicts ? {
-          onVersionConflicts: (paths: string[], syncResult: SyncResult) =>
-            context.reconcileVersionConflicts!(paths, syncResult),
-        } : {}),
-      });
-      uploadsProcessed += chunk.length - reported;
-      context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
-      current += chunk.length - reported;
+      current += count;
       options.progressCallback?.(current, total);
-    }
+    };
+    await uploadPipelined(context, localOnlyChanges, result, {
+      prepare: async (file) => {
+        context.throwIfDestroyed();
+        try {
+          const uploadFile = await context.prepareUploadFromPath(file.path);
+          if (uploadFile) {
+            if (resurrectPaths.has(file.path)) {
+              uploadFile.expectedHash = null;
+            }
+            return uploadFile;
+          }
+        } catch (error) {
+          if (isAbortError(error)) throw error;
+          recordSyncError(result, `${errorMessage(error)}`, file.path);
+          options.onFailure?.(fileFailure(file.path, error));
+        }
+        current++;
+        options.progressCallback?.(current, total);
+        return null;
+      },
+      retry: true,
+      concurrency: options.uploadConcurrency,
+      onFailure: options.onFailure,
+      ...(context.reconcileVersionConflicts ? {
+        onVersionConflicts: (paths: string[], syncResult: SyncResult) =>
+          context.reconcileVersionConflicts!(paths, syncResult),
+      } : {}),
+      beforeChunk: () => {
+        context.throwIfDestroyed();
+        context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
+      },
+      onProcessed: reportUploads,
+      afterChunk: reportUploads,
+    });
     const uploaded = new Set(result.uploadedPaths);
     for (const path of resurrectPaths) {
       if (uploaded.has(path)) {

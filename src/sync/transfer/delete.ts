@@ -22,6 +22,18 @@ export interface DeleteOptions {
 
 export type DeleteRemoteFiles = (files: ConditionalDeleteCandidate[], result: SyncResult, options?: DeleteOptions) => Promise<MutationFailure[]>;
 
+/** A conditional delete replaces a known remote version. A path without one is
+ * recorded as an error and left out. */
+export function createDeleteCandidates(
+	versions: ReadonlyArray<{ path: string; hash?: string; revision?: string }>,
+	result: SyncResult,
+): ConditionalDeleteCandidate[] {
+	return versions.flatMap(({ path, hash, revision }) => {
+		if (!hash) { recordSyncError(result, 'Missing remote version for delete', path); return []; }
+		return [{ path, expectedHash: hash, expectedRevision: revision }];
+	});
+}
+
 /** Shared remote deletion policy for every sync mode. The API owns rename guards. */
 export async function deleteRemoteFiles(context: DeleteContext, files: ConditionalDeleteCandidate[], result: SyncResult, options: DeleteOptions = {}): Promise<MutationFailure[]> {
 	if (!files.length) return [];

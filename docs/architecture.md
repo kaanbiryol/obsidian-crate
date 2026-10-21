@@ -162,6 +162,11 @@ and retry scheduling while delegating batching, concurrency, acknowledgements an
 manifest updates to these executors. `sync/transfer/delete-batches.ts` bounds deletion
 requests and drains accepted siblings on cancellation. Sync modes supply their
 planning and conflict-reconciliation policy.
+`sync/transfer/upload-pipeline.ts` prepares the next byte-budgeted chunk while the
+current one uploads; full, incremental and queued sync pass their preparation, retry,
+failure and progress policy. `transfer/process.ts:applyDiffs()` applies remaining
+diffs in order, and `transfer/delete.ts:createDeleteCandidates()` records a delete
+without a known remote version instead of sending it.
 
 `sync/engine/exclusion-cleanup.ts` binds a cleanup review to its original paths,
 hashes, revisions and exclusions. The engine retains exclusive mutation admission

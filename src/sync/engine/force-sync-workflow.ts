@@ -1,6 +1,5 @@
-import type { DeleteRemoteFiles } from '../transfer/delete';
+import { createDeleteCandidates, type DeleteRemoteFiles } from '../transfer/delete';
 import type { Vault } from 'obsidian';
-import { recordSyncError } from '../issues';
 import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
 import {
 	createEmptySyncResult,
@@ -116,11 +115,10 @@ export async function runForceFullSyncWorkflow(
 
 		context.throwIfDestroyed();
 
-		failures.push(...await context.deleteRemoteFiles(remoteOnlyPaths.flatMap(path => {
+		failures.push(...await context.deleteRemoteFiles(createDeleteCandidates(remoteOnlyPaths.map(path => {
 			const entry = getPathEntry(remoteManifest.files, path);
-			if (!entry?.hash) { recordSyncError(result, 'Missing remote version for delete', path); return []; }
-			return [{ path, expectedHash: entry.hash, expectedRevision: entry.revision }];
-		}), result, { onProcessed: count => { current += count; progressCallback?.(current, total); } }));
+			return { path, hash: entry?.hash, revision: entry?.revision };
+		}), result), result, { onProcessed: count => { current += count; progressCallback?.(current, total); } }));
 
 		context.updateState({ work: { phase: 'saving' } });
 		await context.saveLocalManifest();

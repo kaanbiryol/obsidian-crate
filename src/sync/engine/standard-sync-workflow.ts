@@ -1,4 +1,4 @@
-import type { DeleteRemoteFiles } from '../transfer/delete';
+import { createDeleteCandidates, type DeleteRemoteFiles } from '../transfer/delete';
 import { pendingChangeKey } from '../pending/pending-change';
 import { recordSyncError } from '../issues';
 import {
@@ -11,7 +11,7 @@ import {
 	PREPARE_CONCURRENCY,
 } from './constants';
 import { uploadFullSyncPlan, type FullSyncUploadContext } from './full-sync-upload';
-import { createLogger, errorMessage } from '../logger';
+import { createLogger } from '../logger';
 import type { FileDiff, SyncResult, SyncState } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { getPathEntry } from '../../protocol/path-record';
@@ -27,8 +27,7 @@ import {
 	type RemoteManifest,
 	type SyncStatus,
 } from '../sync-outcome';
-import { isAbortError } from '../abort';
-import { fileFailure } from '../failures';
+import { applyDiffs } from '../transfer/process';
 
 const logger = createLogger('SyncEngine');
 
@@ -205,25 +204,18 @@ export async function runSyncWorkflow(
 		const remoteDeletes = remainingDiffs.filter(diff => diff.action === 'delete');
 		const otherDiffs = remainingDiffs.filter(diff => diff.action !== 'delete');
 		if (otherDiffs.length) context.updateState({ work: { phase: 'applying' } });
-		for (const diff of otherDiffs) {
-			try {
-				const outcome = await context.processDiff(diff, localFiles, result);
-				if (outcome.status === 'deferred') {
-					recordSyncError(result, `${outcome.reason}`, diff.path);
-				}
-			} catch (error) {
-				if (isAbortError(error)) throw error;
-				recordSyncError(result, `${errorMessage(error)}`, diff.path);
-				failures.push(fileFailure(diff.path, error));
-			}
-			current++;
-			progressCallback?.(current, total);
-		}
+		await applyDiffs(context, otherDiffs, result, {
+			localFiles: () => localFiles,
+			onFailure: failure => { failures.push(failure); },
+			afterDiff: () => {
+				current++;
+				progressCallback?.(current, total);
+			},
+		});
 
-		failures.push(...await context.deleteRemoteFiles(remoteDeletes.flatMap(diff => {
-			if (!diff.remoteHash) { recordSyncError(result, 'Missing remote version for delete', diff.path); return []; }
-			return [{ path: diff.path, expectedHash: diff.remoteHash, expectedRevision: diff.remoteRevision }];
-		}), result, {
+		failures.push(...await context.deleteRemoteFiles(createDeleteCandidates(remoteDeletes.map(diff => (
+			{ path: diff.path, hash: diff.remoteHash, revision: diff.remoteRevision }
+		)), result), result, {
 			onProcessed: count => { current += count; progressCallback?.(current, total); },
 		}));
 		for (const path of result.deletedPaths) delete localFiles[path];

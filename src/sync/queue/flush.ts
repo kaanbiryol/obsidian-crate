@@ -1,12 +1,11 @@
 import { pendingChangeKey, decodePendingChange } from '../pending/pending-change';
-import { pipelineUploadChunks } from '../transfer/budget';
+import { uploadPipelined } from '../transfer/upload-pipeline';
 import { createAbortError } from '../abort';
 import { createLogger } from '../logger';
 import { isAbortError } from '../abort';
 import { isQueueTerminalFailure, isRetryableSyncError, isVersionConflict } from '../failures';
 import { deletePendingFiles } from './delete';
-import type { QueueFlushContext } from './flush-types';
-import { uploadPendingFiles } from './upload';
+import type { QueueFlushContext, QueueUploadFailure } from './flush-types';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import type { SyncResult } from '../types';
 import { syncErrorIssues, formatSyncIssue, SkippedFileError, skippedFileIssue, withSyncFileContext } from '../issues';
@@ -88,34 +87,56 @@ export async function processPendingChanges(
 			const expectedHash = context.localManifest.getEntry(path)?.hash;
 			return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];
 		});
-		const chunks = pipelineUploadChunks(uploadPaths, async path => {
-			if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');
-			try { return await withSyncFileContext(path, () => context.prepareUploadFromPath(path)); }
-			catch (error) {
-				if (!(error instanceof SkippedFileError)) throw error;
-				// Settle a skipped file rather than failing its batch; a later edit
-				// queues it again and is reported the same way.
-				completedQueueKeys.add(pendingChangeKey('upload', path));
-				skipped.push(skippedFileIssue(path));
-				return null;
-			}
-		});
 		const failures: Array<{ path: string; error: string; status?: number }> = [];
 		let uploadsProcessed = 0;
-		for await (const chunk of chunks) {
-			uploads.push(...chunk.map(upload => ({ path: upload.path })));
-			context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: uploadPaths.length } });
-			const uploadFailures = await uploadPendingFiles(context, chunk, completedQueueKeys, count => {
-				uploadsProcessed += count;
-				context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: uploadPaths.length } });
+		// Queue settlement is mode-specific; transfer and acknowledgement are shared.
+		const uploadResult = createEmptySyncResult();
+		let chunkFailures: QueueUploadFailure[] = [];
+		let chunkConflicts: string[] = [];
+		try {
+			await uploadPipelined(context, uploadPaths, uploadResult, {
+				prepare: async path => {
+					if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');
+					try { return await withSyncFileContext(path, () => context.prepareUploadFromPath(path)); }
+					catch (error) {
+						if (!(error instanceof SkippedFileError)) throw error;
+						// Settle a skipped file rather than failing its batch; a later edit
+						// queues it again and is reported the same way.
+						completedQueueKeys.add(pendingChangeKey('upload', path));
+						skipped.push(skippedFileIssue(path));
+						return null;
+					}
+				},
+				retry: false,
+				onFailure: failure => { chunkFailures.push(failure); },
+				onVersionConflicts: async paths => { chunkConflicts.push(...paths); },
+				beforeChunk: chunk => {
+					uploads.push(...chunk.map(upload => ({ path: upload.path })));
+					context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: uploadPaths.length } });
+				},
+				onProcessed: count => {
+					uploadsProcessed += count;
+					context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: uploadPaths.length } });
+				},
+				afterChunk: () => {
+					const uploadFailures: QueueUploadFailure[] = [
+						...chunkFailures,
+						...chunkConflicts.map(path => ({ path, error: 'Remote file changed since it was read', status: 409, code: 'version_conflict' })),
+					];
+					chunkFailures = [];
+					chunkConflicts = [];
+					for (const failure of uploadFailures) {
+						const key = pendingChangeKey('upload', failure.path);
+						batch.requeue([key]);
+						if (isVersionConflict(failure.status, failure.code)) reconciliationPaths.add(key);
+						if (isQueueTerminalFailure(failure.status, failure.code)) hasTerminalFailure = true;
+					}
+					failures.push(...uploadFailures);
+				},
 			});
-			for (const failure of uploadFailures) {
-				const key = pendingChangeKey('upload', failure.path);
-				batch.requeue([key]);
-				if (isVersionConflict(failure.status, failure.code)) reconciliationPaths.add(key);
-				if (isQueueTerminalFailure(failure.status, failure.code)) hasTerminalFailure = true;
-			}
-			failures.push(...uploadFailures);
+		} finally {
+			// Preserve accepted siblings when another in-flight request is cancelled.
+			for (const path of uploadResult.uploadedPaths) completedQueueKeys.add(pendingChangeKey('upload', path));
 		}
 
 		if (deletes.length > 0 && failures.length > 0) {
