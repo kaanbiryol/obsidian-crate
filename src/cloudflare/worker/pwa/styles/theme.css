@@ -49,6 +49,9 @@
 .pwa-launch-splash>[data-pwa-static-shell]{width:100%;height:100%}
 .pwa-launch-splash.is-updating{position:relative}
 #pwa-update-transition{position:fixed;inset:0;z-index:10000;background:var(--pwa-launch-bg);color:var(--text-muted);font-size:14px;line-height:1.4;visibility:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s}
+/* Match #app: iOS can size the fixed viewport without the translucent status
+   bar, which pushes the centered update screen below the visible center. */
+@media (display-mode:standalone){#pwa-update-transition{bottom:auto;height:100vh}}
 .pwa-update-screen{position:absolute;top:clamp(40%,var(--pwa-update-label-top,50%),60%);left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;width:calc(100% - 48px);max-width:320px;text-align:center}
 .pwa-launch-splash.is-updating .pwa-update-screen{top:50%}
 .pwa-update-screen__icon{position:relative;isolation:isolate;width:76px;height:76px;margin-bottom:28px}
