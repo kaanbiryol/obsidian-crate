@@ -1,5 +1,6 @@
-import type { UploadResult } from '../protocol/sync-types';
+import type { MutationFailure, UploadResult } from '../protocol/sync-types';
 import { HttpError, SyncTransportError } from './worker-api/http';
+import { errorMessage } from './logger';
 
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const VERSION_CONFLICT_HTTP_STATUSES = new Set([409, 412]);
@@ -11,6 +12,11 @@ export function isAuthFailure(status: number | undefined): boolean {
 
 export function isAuthError(error: unknown): boolean {
 	return error instanceof HttpError && isAuthFailure(error.status);
+}
+
+/** One file's failure with the HTTP status that rejected it, so its workflow can classify it. */
+export function fileFailure(path: string, error: unknown): MutationFailure {
+	return { path, error: errorMessage(error), ...(error instanceof HttpError ? { status: error.status } : {}) };
 }
 
 /** Request retries and queue requeues: anything but a non-retryable server status may succeed later. */

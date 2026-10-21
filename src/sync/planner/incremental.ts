@@ -2,11 +2,11 @@ import { pendingChangeKey } from '../pending/pending-change';
 import { recordSyncError, skippedFileIssue } from '../issues';
 import { pipelineUploadChunks } from '../transfer/budget';
 import { isAbortError } from "../abort";
-import { isTransientSyncFailure } from "../failures";
+import { fileFailure, isTransientSyncFailure } from "../failures";
 import type { IncrementalSyncPlannerContext } from "./types";
 import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "../sync-result";
 import { createLogger, errorMessage } from "../logger";
-import type { FileEntry } from '../../protocol/sync-types';
+import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
 import { applyIncrementalLocalDeletes } from './incremental-local-deletes';
 import { reconcileIncrementalRemoteChanges } from './incremental-remote-reconciliation';
@@ -20,6 +20,8 @@ export async function runIncrementalSync(
   options: {
     uploadConcurrency?: number;
     progressCallback?: (current: number, total: number) => void;
+    /** Receives each file's failure with its HTTP status, so the caller can classify the result. */
+    onFailure?: (failure: MutationFailure) => void;
   },
 ): Promise<SyncResult | null> {
   if (context.settings.lastSeq <= 0) {
@@ -86,7 +88,7 @@ export async function runIncrementalSync(
         current++;
         context.reportWork?.('downloading', downloadsProcessed, downloadRequests.length);
         options.progressCallback?.(current, total);
-      });
+      }, options.onFailure);
       const downloaded = new Set(result.downloadedPaths);
       for (const path of restoreDeletedPaths) {
         if (downloaded.has(path) && !hasUnresolvedConflict(result, path)) {
@@ -106,6 +108,7 @@ export async function runIncrementalSync(
       } catch (error) {
         if (isAbortError(error)) throw error;
         recordSyncError(result, `${errorMessage(error)}`, diff.path);
+        options.onFailure?.(fileFailure(diff.path, error));
       }
     }
 
@@ -126,6 +129,7 @@ export async function runIncrementalSync(
       } catch (error) {
         if (isAbortError(error)) throw error;
         recordSyncError(result, `${errorMessage(error)}`, file.path);
+        options.onFailure?.(fileFailure(file.path, error));
       }
       current++;
       options.progressCallback?.(current, total);
@@ -147,6 +151,7 @@ export async function runIncrementalSync(
         },
         concurrency: options.uploadConcurrency,
         retry: true,
+        onFailure: options.onFailure,
         ...(context.reconcileVersionConflicts ? {
           onVersionConflicts: (paths: string[], syncResult: SyncResult) =>
             context.reconcileVersionConflicts!(paths, syncResult),
@@ -165,10 +170,11 @@ export async function runIncrementalSync(
     }
 
     if (localOnlyDeletes.length > 0) {
-      await applyIncrementalLocalDeletes(context, localOnlyDeletes, result, count => {
+      const deleteFailures = await applyIncrementalLocalDeletes(context, localOnlyDeletes, result, count => {
         current += count;
         options.progressCallback?.(current, total);
       });
+      for (const failure of deleteFailures) options.onFailure?.(failure);
     }
 
     context.reportWork?.('saving');

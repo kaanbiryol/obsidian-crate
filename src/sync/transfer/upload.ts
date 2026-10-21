@@ -137,7 +137,8 @@ export async function uploadPreparedFiles(
       } catch (error) {
         if (isAbortError(error)) throw error;
         const message = error instanceof Error ? error.message : 'Version-conflict reconciliation failed';
-        for (const path of paths) recordUploadError(result, `${message}`, path, options);
+        // Keep an HTTP status, such as revoked access, for the workflow's outcome.
+        for (const path of paths) recordUploadError(result, error instanceof HttpError ? error : `${message}`, path, options);
       }
     } else {
       for (const path of paths) {

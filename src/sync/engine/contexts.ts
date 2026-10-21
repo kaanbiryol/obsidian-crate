@@ -24,7 +24,7 @@ import {
 import { createByteBudgetedVaultFileChunks } from '../transfer/budget';
 import { PREPARE_CONCURRENCY, DOWNLOAD_CONCURRENCY } from './constants';
 import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState, SyncWork } from '../types';
-import type { FileEntry } from '../../protocol/sync-types';
+import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
 import type { InitialConfigPull } from './initial-config-pull';
@@ -67,9 +67,10 @@ export class SyncEngineContexts {
 		return planLocalDeletes(this.localDiffPlanner(), discoveredPaths, PREPARE_CONCURRENCY);
 	}
 
-	async incrementalSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult | null> {
+	async incrementalSync(progressCallback?: (current: number, total: number) => void, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult | null> {
 		return runIncrementalSync(this.incrementalPlanner(), {
 			progressCallback,
+			onFailure,
 		});
 	}
 
@@ -80,13 +81,14 @@ export class SyncEngineContexts {
 		}, PREPARE_CONCURRENCY, onUnchanged);
 	}
 
-	private async parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void> {
+	private async parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void> {
 		await transferParallelDownloadAndSaveFiles(
 			this.transfer(),
 			requests,
 			result,
 			DOWNLOAD_CONCURRENCY,
 			onProcessed,
+			onFailure,
 		);
 	}
 

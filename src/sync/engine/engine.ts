@@ -22,7 +22,7 @@ import { SyncQueueController } from '../queue/controller';
 import { createAbortError, isAbortError } from '../abort';
 import { createLogger, errorMessage } from '../logger';
 import type { SyncState, SyncResult, ConflictRecord } from '../types';
-import type { FileEntry } from '../../protocol/sync-types';
+import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';
 import { AUTH_ERROR_MESSAGE, PREPARE_CONCURRENCY } from './constants';
 import { isAuthError } from '../failures';
@@ -36,7 +36,7 @@ import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';
 import { runSyncWorkflow } from './standard-sync-workflow';
-import { completeWorkflowResult, handleWorkflowError, ReconnectNotice } from './workflow-shared';
+import { completeTransferResult, handleWorkflowError, ReconnectNotice } from './workflow-shared';
 import { SyncEngineContexts } from './contexts';
 import { SyncEngineLifecycle } from './lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
@@ -647,13 +647,14 @@ export class SyncEngine {
 			const outcome = { updateState: this.updateState.bind(this), setLastSync: this.contexts.setLastSync, reconnectNotice: this.reconnectNotice };
 			this.updateState({ status: 'syncing' });
 			let result = createEmptySyncResult();
+			const failures: MutationFailure[] = [];
 			try {
-				result = await this.reconcilePaths(queueKeys, !selectedOnly);
+				result = await this.reconcilePaths(queueKeys, !selectedOnly, failure => { failures.push(failure); });
 				if (result.outcome !== 'cancelled') {
 					await this.pendingChanges().settleSynced(result, pendingRevisionSnapshot);
 					if (result.success && !selectedOnly) await this.contexts.finishInitialSetup();
 				}
-				completeWorkflowResult(outcome, result, { errorFallback: 'Reconciliation failed' });
+				completeTransferResult(outcome, result, failures, { errorFallback: 'Reconciliation failed', failureLogPrefix: 'Reconciliation failed', logger });
 				if (result.success) this.pruneMarkdownBaseCacheInBackground();
 				return result;
 			} catch (error) {
@@ -674,7 +675,7 @@ export class SyncEngine {
 		if (reconciliation.outcome === 'cancelled') throw createAbortError('Sync reconciliation aborted');
 	}
 
-	private async reconcilePaths(queueKeys: string[], recover = true): Promise<SyncResult> {
+	private async reconcilePaths(queueKeys: string[], recover = true, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> {
 		if (recover) await this.files.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
 		this.lifecycle.throwIfDestroyed();
 		return reconcileQueuePaths({
@@ -686,17 +687,19 @@ export class SyncEngine {
 			shouldIgnore: this.shouldIgnore.bind(this),
 			uploadDiffs: async (diffs, result) => {
 				const retryPaths: string[] = [];
-				await uploadFullSyncPlan({
+				const failures = await uploadFullSyncPlan({
 					...this.contexts.syncWorkflow(),
 					uploadPreparedFiles: (prepared, syncResult, options) => this.contexts.uploadPreparedFiles(prepared, syncResult, {
 						...options,
 						onVersionConflicts: async paths => { retryPaths.push(...paths); },
 					}),
 				}, diffs, createPathRecord<FileEntry>(), result, () => {});
+				for (const failure of failures) onFailure?.(failure);
 				return retryPaths;
 			},
 			processDiff: (diff, localFiles, syncResult) =>
 				this.contexts.processDiff(diff, localFiles, syncResult),
+			onFailure,
 		}, queueKeys);
 	}
 

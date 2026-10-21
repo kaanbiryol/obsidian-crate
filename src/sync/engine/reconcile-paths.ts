@@ -4,11 +4,11 @@ import { recordSyncError } from '../issues';
 import type { Vault } from 'obsidian';
 import { readLocalFileEntry } from '../local/local-file-entry';
 import { classifyPath } from '../planner/reconciliation';
-import { isVersionConflict } from '../failures';
+import { fileFailure, isVersionConflict } from '../failures';
 import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import { RemoteVersionChangedError } from '../transfer/download';
 import type { FileDiff, SyncResult, SyncWork, UploadDiff } from '../types';
-import type { FileEntry } from '../../protocol/sync-types';
+import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { errorMessage } from '../logger';
 import type { DiffApplyOutcome } from '../transfer/types';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
@@ -39,6 +39,8 @@ export interface TargetedReconcileContext {
 		localFiles: Record<string, FileEntry>,
 		result: SyncResult,
 	): Promise<DiffApplyOutcome>;
+	/** Receives each file's failure with its HTTP status, so the caller can classify the result. */
+	onFailure?(failure: MutationFailure): void;
 }
 
 /** Reconcile selected files or queue paths that lost a compare-and-swap race. */
@@ -114,6 +116,7 @@ export async function reconcileQueuePaths(
 								if (isVersionConflict(failure.status, failure.code)) {
 									throw new HttpError(failure.error, failure.status ?? 409, null, failure.code);
 								}
+								context.onFailure?.(failure);
 								break;
 							}
 							outcome = { status: 'applied' };
@@ -146,6 +149,7 @@ export async function reconcileQueuePaths(
 						continue;
 					}
 					recordSyncError(result, `${errorMessage(error)}`, path);
+					context.onFailure?.(fileFailure(path, error));
 					break;
 				}
 			}
@@ -170,6 +174,7 @@ export async function reconcileQueuePaths(
 					} catch (error) {
 						if (isAbortError(error)) throw error;
 						recordSyncError(result, errorMessage(error), path);
+						context.onFailure?.(fileFailure(path, error));
 						processed += upload.keys.length;
 						reportProgress();
 						continue;
@@ -185,10 +190,11 @@ export async function reconcileQueuePaths(
 		for (const queueKey of deletions) await reconcile(queueKey, { allowDelete: true, collectDeletes: true });
 		if (deleteCandidates.size) {
 			const retryKeys = new Set<string>();
-			await context.deleteRemoteFiles([...deleteCandidates.values()].map(candidate => candidate.file), result, {
+			const failures = await context.deleteRemoteFiles([...deleteCandidates.values()].map(candidate => candidate.file), result, {
 				onProcessed: count => { processed += count; },
 				onVersionConflicts: async keys => { for (const key of keys) retryKeys.add(key); },
 			});
+			for (const failure of failures) context.onFailure?.(failure);
 			const deleted = new Set(result.deletedPaths);
 			for (const [path, candidate] of deleteCandidates) {
 				if (retryKeys.has(pendingChangeKey('delete', path))) {
@@ -198,6 +204,7 @@ export async function reconcileQueuePaths(
 					} catch (error) {
 						if (isAbortError(error)) throw error;
 						recordSyncError(result, errorMessage(error), path);
+						context.onFailure?.(fileFailure(path, error));
 						processed++;
 						continue;
 					}

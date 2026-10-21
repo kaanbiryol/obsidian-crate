@@ -129,7 +129,7 @@ describe('runIncrementalSync', () => {
 
 		expect(parallelDownloadAndSaveFiles).toHaveBeenCalledWith([
 			{ path: 'notes/remote.md', expectedLocalHash: null, expectedRemoteHash: 'remote-hash', remoteSize: 12 },
-		], expect.any(Object), expect.any(Function));
+		], expect.any(Object), expect.any(Function), undefined);
 		expect(batchDelete).toHaveBeenCalledWith(
 			['notes/local-delete.md'],
 			{ 'notes/local-delete.md': 'a'.repeat(64) },

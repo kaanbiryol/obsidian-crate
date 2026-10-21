@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import {
 	createHarness,
@@ -6,6 +6,8 @@ import {
 } from './engine-test-harness';
 import { Notice } from '../../test/mocks/obsidian';
 import { AUTH_ERROR_MESSAGE } from './constants';
+import { HttpError } from '../api';
+import type { SyncResult } from '../types';
 
 afterEach(() => { vi.useRealTimers(); });
 
@@ -214,5 +216,93 @@ describe('SyncEngine slice 5 safeguards', () => {
 
 		expect(harness.api.batchUpload).toHaveBeenCalledOnce();
 		expect(harness.engine.getPendingPaths()).toEqual([]);
+	});
+});
+
+describe('SyncEngine per-file authorization failures', () => {
+	const unauthorized = () => new HttpError('Unauthorized', 401);
+	const remoteChange = { seq: 2, path: 'notes/remote.md', action: 'put', hash: 'remote-hash', size: 10, created_at: '2026-02-06T12:00:00.000Z' };
+	const localFile = { path: 'notes/a.md', extension: 'md', stat: { size: 1, mtime: 1700000000000 } };
+
+	function emptyVault(harness: ReturnType<typeof createHarness>) {
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+	}
+	function vaultWithLocalFile(harness: ReturnType<typeof createHarness>) {
+		harness.vault.getFiles.mockReturnValue([localFile]);
+		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+	}
+	function rejectDownloads(harness: ReturnType<typeof createHarness>) {
+		harness.api.batchDownload.mockRejectedValue(unauthorized());
+		harness.api.downloadFile.mockRejectedValue(unauthorized());
+	}
+	function rejectUploads(harness: ReturnType<typeof createHarness>) {
+		harness.api.batchUpload.mockResolvedValue({
+			success: false,
+			results: [{ path: localFile.path, success: false, status: 401, error: 'Unauthorized' }],
+		});
+	}
+	function expectReconnect(harness: ReturnType<typeof createHarness>, result: SyncResult, lastSeq: number) {
+		expect(result).toMatchObject({ success: false });
+		expect(result.errors).toContain(AUTH_ERROR_MESSAGE);
+		expect(harness.engine.getState()).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
+		expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
+		expect(harness.settings).toMatchObject({ lastSync: null, lastSeq });
+		harness.engine.destroy();
+	}
+
+	beforeEach(() => Notice.reset());
+
+	it('reports a download in a full sync with the reconnect message', async () => {
+		const harness = createHarness({ lastSeq: 0 });
+		harness.api.getManifest.mockResolvedValue({ version: 1, files: { 'notes/remote.md': { hash: 'remote-hash', size: 10, modified: '2026-02-06T12:00:00.000Z' } }, lastSeq: 3 });
+		emptyVault(harness);
+		rejectDownloads(harness);
+		expectReconnect(harness, await harness.engine.sync(), 0);
+	});
+
+	it('reports a download in an incremental sync with the reconnect message', async () => {
+		const harness = createHarness({ lastSeq: 1 });
+		harness.api.getChanges.mockResolvedValue({ changes: [remoteChange], lastSeq: 2, hasMore: false });
+		emptyVault(harness);
+		rejectDownloads(harness);
+		expectReconnect(harness, await harness.engine.sync(), 1);
+	});
+
+	it('reports an upload in an incremental sync with the reconnect message', async () => {
+		const harness = createHarness({ lastSeq: 1 });
+		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 1, hasMore: false });
+		vaultWithLocalFile(harness);
+		rejectUploads(harness);
+		const result = await harness.engine.sync();
+		expect(harness.api.batchUpload).toHaveBeenCalledOnce();
+		expect(harness.api.getManifest).not.toHaveBeenCalled();
+		expectReconnect(harness, result, 1);
+	});
+
+	it('reports a conflicting upload whose reconciliation is rejected with the reconnect message', async () => {
+		const harness = createHarness({ lastSeq: 1 });
+		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 1, hasMore: false });
+		vaultWithLocalFile(harness);
+		harness.api.batchUpload.mockResolvedValue({
+			success: false,
+			results: [{ path: localFile.path, success: false, status: 409, code: 'version_conflict', error: 'Remote file changed' }],
+		});
+		const getFileMetadata = vi.fn().mockRejectedValue(unauthorized());
+		Object.assign(harness.api, { getFileMetadata });
+		const result = await harness.engine.sync();
+		expect(getFileMetadata).toHaveBeenCalledOnce();
+		expectReconnect(harness, result, 1);
+	});
+
+	it('reports an upload in a force full sync with the reconnect message', async () => {
+		const harness = createHarness({ lastSeq: 1 });
+		harness.api.getManifest.mockResolvedValue({ version: 1, files: {}, lastSeq: 1 });
+		vaultWithLocalFile(harness);
+		rejectUploads(harness);
+		expectReconnect(harness, await harness.engine.forceFullSync(), 1);
 	});
 });

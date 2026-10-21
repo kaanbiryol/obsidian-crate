@@ -6,6 +6,8 @@ import { recordAppliedContent } from './applied-content';
 import type { DiffApplyOutcome, TransferContext } from "./types";
 import { createLogger, errorMessage } from "../logger";
 import type { SyncResult } from '../types';
+import type { MutationFailure } from '../../protocol/sync-types';
+import { fileFailure } from '../failures';
 import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 
@@ -74,6 +76,7 @@ export async function parallelDownloadAndSaveFiles(
   result: SyncResult,
   concurrency: number,
   onProcessed?: () => void,
+  onFailure?: (failure: MutationFailure) => void,
 ): Promise<void> {
   const batchable: DownloadRequest[] = [];
   const individual: DownloadRequest[] = [];
@@ -152,6 +155,7 @@ export async function parallelDownloadAndSaveFiles(
             if (isAbortError(error)) throw error;
             const downloadError = error instanceof Error ? error.message : "Download failed";
             recordSyncError(result, `${downloadError}`, file.path);
+            onFailure?.(fileFailure(file.path, error));
           } finally {
             onProcessed?.();
           }
@@ -173,7 +177,7 @@ export async function parallelDownloadAndSaveFiles(
   }
 
   if (individual.length > 0) {
-    await downloadFilesIndividually(context, individual, result, concurrency, onProcessed);
+    await downloadFilesIndividually(context, individual, result, concurrency, onProcessed, onFailure);
   }
 }
 
@@ -183,6 +187,7 @@ async function downloadFilesIndividually(
   result: SyncResult,
   concurrency: number,
   onProcessed?: () => void,
+  onFailure?: (failure: MutationFailure) => void,
 ): Promise<void> {
   const tasks = requests.map((request) => async () => {
     try {
@@ -194,6 +199,7 @@ async function downloadFilesIndividually(
       if (isAbortError(error)) throw error;
       const downloadError = error instanceof Error ? error.message : "Download failed";
       recordSyncError(result, `${downloadError}`, request.path);
+      onFailure?.(fileFailure(request.path, error));
     } finally {
       onProcessed?.();
     }

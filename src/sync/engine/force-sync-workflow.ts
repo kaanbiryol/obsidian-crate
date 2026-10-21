@@ -10,8 +10,9 @@ import { createLogger, errorMessage } from '../logger';
 import type { LocalManifestView } from '../manifest/manifest';
 import { getPathEntry } from '../../protocol/path-record';
 import type { PreparedUpload, SyncResult, SyncState } from '../types';
+import type { MutationFailure } from '../../protocol/sync-types';
 import {
-	completeWorkflowResult,
+	completeTransferResult,
 	getStartFailureResult,
 	handleWorkflowError,
 	type ReconnectNotice,
@@ -62,6 +63,7 @@ export async function runForceFullSyncWorkflow(
 	let previousLocalManifest = context.snapshotLocalManifest();
 	let manifestCommitted = false;
 	let manifestCleared = false;
+	const failures: MutationFailure[] = [];
 
 	try {
 		context.updateState({ work: { phase: 'recovering' } });
@@ -104,6 +106,7 @@ export async function runForceFullSyncWorkflow(
 					uploadsProcessed += count;
 					context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
 				},
+				onFailure: failure => { failures.push(failure); },
 				retry: true,
 			});
 			if (result.errors.length > 0) {
@@ -113,11 +116,11 @@ export async function runForceFullSyncWorkflow(
 
 		context.throwIfDestroyed();
 
-		await context.deleteRemoteFiles(remoteOnlyPaths.flatMap(path => {
+		failures.push(...await context.deleteRemoteFiles(remoteOnlyPaths.flatMap(path => {
 			const entry = getPathEntry(remoteManifest.files, path);
 			if (!entry?.hash) { recordSyncError(result, 'Missing remote version for delete', path); return []; }
 			return [{ path, expectedHash: entry.hash, expectedRevision: entry.revision }];
-		}), result, { onProcessed: count => { current += count; progressCallback?.(current, total); } });
+		}), result, { onProcessed: count => { current += count; progressCallback?.(current, total); } }));
 
 		context.updateState({ work: { phase: 'saving' } });
 		await context.saveLocalManifest();
@@ -127,8 +130,10 @@ export async function runForceFullSyncWorkflow(
 			`Force full sync completed: ${result.uploaded} uploaded, ${result.deleted} remote-only deleted`,
 		);
 		if (!result.errors.length) await context.finishInitialSetup();
-		completeWorkflowResult(context, result, {
+		completeTransferResult(context, result, failures, {
 			errorFallback: 'Force full sync completed with errors',
+			failureLogPrefix: 'Force full sync failed',
+			logger,
 		});
 	} catch (error) {
 			handleWorkflowError(context, result, error, {
@@ -136,6 +141,7 @@ export async function runForceFullSyncWorkflow(
 			failureLogPrefix: 'Force full sync failed',
 			logger,
 			logGenericError: true,
+			failures,
 		});
 	} finally {
 		if (manifestCleared && !manifestCommitted) {

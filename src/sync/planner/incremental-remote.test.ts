@@ -72,7 +72,7 @@ describe('runIncrementalSync', () => {
 		expect(result?.success).toBe(true);
 		expect(harness.vault.adapter.readBinary).not.toHaveBeenCalled();
 		expect(download).toHaveBeenCalledWith(
-			[{ path, expectedLocalHash: 'base', expectedRemoteHash: 'remote', remoteSize: 6 }], expect.anything(), expect.any(Function));
+			[{ path, expectedLocalHash: 'base', expectedRemoteHash: 'remote', remoteSize: 6 }], expect.anything(), expect.any(Function), undefined);
 	});
 
 	it('returns fast success and advances cursor when nothing changed', async () => {

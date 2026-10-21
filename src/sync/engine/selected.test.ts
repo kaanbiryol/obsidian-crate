@@ -79,6 +79,22 @@ describe('selected sync with durable file operations', () => {
         expect(h.settings.lastSync).toBeNull();
     });
 
+    it('reports an upload rejected for revoked access with the reconnect message', async () => {
+        Notice.reset();
+        const h = await harness();
+        h.remote.metadata.mockResolvedValue({ files: {} });
+        const transport = h.transport.getMockImplementation()!;
+        h.transport.mockImplementation(async request => new URL(request.url).pathname === '/sync/batch-upload'
+            ? { ...response({ error: 'Unauthorized' }), status: 401 } : transport(request));
+        const result = await h.engine.syncSelected(['a.md']);
+        expect(result).toMatchObject({ outcome: 'failed', success: false });
+        expect(result.errors).toContain(AUTH_ERROR_MESSAGE);
+        expect(h.engine.getState()).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
+        expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
+        expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
+        expect(h.settings.lastSync).toBeNull();
+    });
+
     it('selects an upload named delete:note.md separately from deleting note.md', async () => {
         const h = await harness(['note.md', 'delete:note.md']);
         h.localManifest.setEntry('note.md', h.entry); await h.localManifest.save();

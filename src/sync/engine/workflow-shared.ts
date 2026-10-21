@@ -136,6 +136,8 @@ export function handleWorkflowError(
 	options: OutcomeOptions & AuthFailureOptions & {
 		abortLogMessage: string;
 		logGenericError?: boolean;
+		/** Per-file failures that stopped the workflow; a 401 among them reads as revoked access. */
+		failures?: ReadonlyArray<{ status?: number }>;
 	},
 ): void {
 	if (isAbortError(error)) {
@@ -145,7 +147,7 @@ export function handleWorkflowError(
 		return;
 	}
 
-	if (isAuthError(error)) {
+	if (isAuthError(error) || options.failures?.some(failure => isAuthFailure(failure.status))) {
 		publishAuthFailure(context, result, options);
 		return;
 	}

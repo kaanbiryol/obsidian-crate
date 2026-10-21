@@ -28,6 +28,7 @@ import {
 	type SyncStatus,
 } from './workflow-shared';
 import { isAbortError } from '../abort';
+import { fileFailure } from '../failures';
 
 const logger = createLogger('SyncEngine');
 
@@ -41,7 +42,8 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 	updateState(updates: Partial<SyncState>): void;
 	getManifest(): Promise<RemoteManifest>;
 	incrementalSync(
-		progressCallback?: (current: number, total: number) => void
+		progressCallback?: (current: number, total: number) => void,
+		onFailure?: (failure: MutationFailure) => void,
 	): Promise<SyncResult | null>;
 	throwIfDestroyed(): void;
 	createFullSyncPlan(
@@ -56,7 +58,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 		localFiles: Record<string, FileEntry>,
 		result: SyncResult
 	): Promise<DiffApplyOutcome>;
-	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void>;
+	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void>;
 	getLocalManifestEntry(path: string): Readonly<FileEntry> | undefined;
 	setLocalManifestEntry(path: string, entry: FileEntry): void;
 	saveLocalManifest(): Promise<void>;
@@ -90,12 +92,15 @@ export async function runSyncWorkflow(
 		context.updateState({ work: { phase: 'server' } });
 		context.throwIfDestroyed();
 		recovering = context.hasSyncCursor?.() ?? false;
-		const incrementalResult = await context.incrementalSync(progressCallback);
+		const incrementalFailures: MutationFailure[] = [];
+		const incrementalResult = await context.incrementalSync(progressCallback, failure => { incrementalFailures.push(failure); });
 		if (incrementalResult) {
 			result = incrementalResult;
 			if (finalizeSyncResult(result)) await context.finishInitialSetup();
-			completeWorkflowResult(context, incrementalResult, {
+			completeTransferResult(context, incrementalResult, incrementalFailures, {
 				errorFallback: 'Incremental sync completed with errors',
+				failureLogPrefix: 'Incremental sync failed',
+				logger,
 			});
 			return incrementalResult;
 		}
@@ -175,6 +180,7 @@ export async function runSyncWorkflow(
 					context.updateState({ work: { phase: 'downloading', current: downloadsProcessed, total: downloadRequests.length } });
 					progressCallback?.(current, total);
 				},
+				failure => { failures.push(failure); },
 			);
 			const downloaded = new Set(result.downloadedPaths);
 			for (const diff of downloadDiffs) {
@@ -208,6 +214,7 @@ export async function runSyncWorkflow(
 			} catch (error) {
 				if (isAbortError(error)) throw error;
 				recordSyncError(result, `${errorMessage(error)}`, diff.path);
+				failures.push(fileFailure(diff.path, error));
 			}
 			current++;
 			progressCallback?.(current, total);
