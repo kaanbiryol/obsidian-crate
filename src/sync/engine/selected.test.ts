@@ -9,7 +9,7 @@ import type { ApiHttpResponse, ApiHttpTransport } from '../worker-api/http';
 import { formatSyncProgress } from '../../ui/activity/progress-label';
 import { sha256Hex } from '../../platform/sha256';
 import { Notice } from '../../test/mocks/obsidian';
-import { AUTH_ERROR_MESSAGE } from './constants';
+import { AUTH_ERROR_MESSAGE } from '../sync-outcome';
 
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
 afterEach(() => vi.unstubAllGlobals());

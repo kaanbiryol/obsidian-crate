@@ -18,7 +18,7 @@ import {
 	type ReconnectNotice,
 	type RemoteManifest,
 	type SyncStatus,
-} from './workflow-shared';
+} from '../sync-outcome';
 
 const logger = createLogger('SyncEngine');
 

@@ -24,7 +24,7 @@ import { createLogger, errorMessage } from '../logger';
 import type { SyncState, SyncResult, ConflictRecord } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';
-import { AUTH_ERROR_MESSAGE, PREPARE_CONCURRENCY } from './constants';
+import { PREPARE_CONCURRENCY } from './constants';
 import { isAuthError } from '../failures';
 import {
 	createIgnoreMatcherContext,
@@ -36,7 +36,7 @@ import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';
 import { runSyncWorkflow } from './standard-sync-workflow';
-import { completeTransferResult, handleWorkflowError, ReconnectNotice } from './workflow-shared';
+import { AUTH_ERROR_MESSAGE, completeTransferResult, handleWorkflowError, ReconnectNotice } from '../sync-outcome';
 import { SyncEngineContexts } from './contexts';
 import { SyncEngineLifecycle } from './lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';

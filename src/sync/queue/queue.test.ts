@@ -21,8 +21,7 @@ import { HttpError } from '../api';
 import { LocalFilePresentError } from '../local/local-absence';
 import { createEmptySyncResult } from '../sync-result';
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
-import { AUTH_ERROR_MESSAGE } from '../engine/constants';
-import { ReconnectNotice } from '../engine/workflow-shared';
+import { AUTH_ERROR_MESSAGE, ReconnectNotice } from '../sync-outcome';
 
 type QueueState = SyncState;
 type UploadArgs = {

@@ -1,4 +1,3 @@
-export const AUTH_ERROR_MESSAGE = 'This device’s sync access is no longer valid. In Crate settings → Account and devices, select “Reconnect”.';
 export const DOWNLOAD_CONCURRENCY = 2;
 export const PREPARE_CONCURRENCY = 2;
 export const MAX_RETRIES = 3;

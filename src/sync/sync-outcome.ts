@@ -1,18 +1,19 @@
 import { Notice } from 'obsidian';
-import { getSyncIssues, recordSyncError } from '../issues';
-import { errorMessage, type Logger } from '../logger';
-import type { SyncResult, SyncState } from '../types';
-import type { FileEntry } from '../../protocol/sync-types';
-import { AUTH_ERROR_MESSAGE } from './constants';
-import { isAuthError, isAuthFailure } from '../failures';
+import { getSyncIssues, recordSyncError } from './issues';
+import { errorMessage, type Logger } from './logger';
+import type { SyncResult, SyncState } from './types';
+import type { FileEntry } from '../protocol/sync-types';
+import { isAuthError, isAuthFailure } from './failures';
 import {
 	cancelSyncResult,
 	createSyncFailureResult,
 	finalizeSyncResult,
 	getSyncResultError,
 	SYNC_ERROR_MESSAGES,
-} from '../sync-result';
-import { isAbortError } from '../abort';
+} from './sync-result';
+import { isAbortError } from './abort';
+
+export const AUTH_ERROR_MESSAGE = 'This device’s sync access is no longer valid. In Crate settings → Account and devices, select “Reconnect”.';
 
 export type SyncStatus = SyncState['status'];
 

@@ -135,6 +135,8 @@ Sync results carry an explicit completed, cancelled or failed outcome. Cancellat
 retains transfer counts and diagnostics, but does not publish a successful sync,
 history checkpoint or error notice. Result aggregation and finalization preserve
 cancellation rather than inferring completion from an empty error list.
+`sync/sync-outcome.ts` publishes every sync path's result, including queue flushes,
+and shows the reconnect notice once per authorization failure.
 Queue revision tracking and settlement snapshots are required dependencies, so
 settling an earlier upload cannot silently bypass the guard for a newer local edit.
 `sync/runtime/history-workflow.ts` keeps pause, persistence, application, sync,

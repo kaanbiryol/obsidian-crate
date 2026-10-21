@@ -29,7 +29,7 @@ import { runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
 import type { InitialConfigPull } from '../planner/initial-config-pull';
 import { updateSyncProgress, type SyncSettings } from '../settings';
-import type { ReconnectNotice } from './workflow-shared';
+import type { ReconnectNotice } from '../sync-outcome';
 
 interface SyncEngineContextDependencies {
 	prepareReminderScope?: () => Promise<void>;

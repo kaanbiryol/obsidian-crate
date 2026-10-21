@@ -2,10 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileDiff, SyncResult } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { runSyncWorkflow, type SyncWorkflowContext } from './standard-sync-workflow';
-import { ReconnectNotice } from './workflow-shared';
+import { AUTH_ERROR_MESSAGE, ReconnectNotice } from '../sync-outcome';
 import { recordSyncError } from '../issues';
 import { Notice } from '../../test/mocks/obsidian';
-import { AUTH_ERROR_MESSAGE } from './constants';
 
 function createContext(options: {
 	prepareFullSyncUpload?: SyncWorkflowContext['prepareFullSyncUpload'];

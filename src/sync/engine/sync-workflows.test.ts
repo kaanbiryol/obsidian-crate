@@ -5,7 +5,7 @@ import {
 	toArrayBuffer,
 } from './engine-test-harness';
 import { Notice } from '../../test/mocks/obsidian';
-import { AUTH_ERROR_MESSAGE } from './constants';
+import { AUTH_ERROR_MESSAGE } from '../sync-outcome';
 import { HttpError } from '../api';
 import type { SyncResult } from '../types';
 

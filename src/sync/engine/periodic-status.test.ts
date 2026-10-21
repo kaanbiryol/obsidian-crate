@@ -3,7 +3,7 @@ import { createHarness, runPeriodicCheck } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import { HttpError } from '../api';
 import { createSyncFailureResult } from '../sync-result';
-import { AUTH_ERROR_MESSAGE } from './constants';
+import { AUTH_ERROR_MESSAGE } from '../sync-outcome';
 
 function fixture() {
 	const h = createHarness({ lastSync: '2026-09-08T10:00:00.000Z', syncInterval: 0 });

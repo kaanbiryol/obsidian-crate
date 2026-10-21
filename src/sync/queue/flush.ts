@@ -12,7 +12,7 @@ import type { SyncResult } from '../types';
 import { syncErrorIssues, formatSyncIssue, SkippedFileError, skippedFileIssue, withSyncFileContext } from '../issues';
 import type { SyncIssue } from '../types';
 import { HttpError } from '../worker-api/http';
-import { completeTransferResult, completeWorkflowResult, handleWorkflowError } from '../engine/workflow-shared';
+import { completeTransferResult, completeWorkflowResult, handleWorkflowError } from '../sync-outcome';
 
 export type { QueueFlushContext } from './flush-types';
 

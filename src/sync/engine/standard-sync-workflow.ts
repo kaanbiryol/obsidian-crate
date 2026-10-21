@@ -26,7 +26,7 @@ import {
 	type ReconnectNotice,
 	type RemoteManifest,
 	type SyncStatus,
-} from './workflow-shared';
+} from '../sync-outcome';
 import { isAbortError } from '../abort';
 import { fileFailure } from '../failures';
 

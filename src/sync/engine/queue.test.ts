@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import { HttpError } from '../api';
 import { Notice } from '../../test/mocks/obsidian';
-import { AUTH_ERROR_MESSAGE } from './constants';
+import { AUTH_ERROR_MESSAGE } from '../sync-outcome';
 import {
 	createHarness,
 	createSyncResult,

@@ -2,7 +2,7 @@ import { notifyConflicts } from '../conflict/conflict';
 import { MAX_CHECK_BACKOFF_MULTIPLIER } from './constants';
 import { createLogger, errorMessage } from '../logger';
 import type { SyncResult } from '../types';
-import type { SyncStatus } from './workflow-shared';
+import type { SyncStatus } from '../sync-outcome';
 import { isAbortError } from '../abort';
 
 const logger = createLogger('SyncEngine');

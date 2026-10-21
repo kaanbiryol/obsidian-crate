@@ -3,7 +3,7 @@ import type { DeleteRemoteFiles } from '../transfer/delete';
 import type { ConditionalDeleteCandidate } from '../transfer/delete-batches';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { PreparedUpload, SyncResult, SyncState } from '../types';
-import type { ReconnectNotice } from '../engine/workflow-shared';
+import type { ReconnectNotice } from '../sync-outcome';
 
 interface QueueApi {
 	isConfigured(): boolean;
