@@ -4,9 +4,9 @@ import { isDiagnosticTimestamp, isUploadSession as opaqueId, normalizeUploadDiag
 import { reminderOperationDay } from '../../protocol/reminder-operation';
 const routes = new Set([
 	'/sync/import', '/sync/import/upload', '/sync/import/prune', '/sync/import/complete', '/.well-known/crate', '/health', '/settings', '/diagnostics',
-	...['manifest', 'metadata', 'upload', 'download', 'delete', 'changes', 'check', 'batch-upload', 'batch-download', 'batch-delete', 'versions', 'version-preview', 'restore', 'restore-version'].map(route => `/sync/${route}`),
-	...['tokens', 'revoke', 'enroll', 'enrollment'].map(route => `/auth/${route}`),
-	'/reminders/notification-policy', '/notifications/subscribe', '/notifications/unsubscribe', '/notifications/subscriptions', '/notifications/test',
+	...['manifest', 'metadata', 'upload', 'download', 'delete', 'changes', 'check', 'batch-upload', 'batch-download', 'batch-delete', 'versions', 'version-preview', 'restore-version'].map(route => `/sync/${route}`),
+	'/auth/tokens',
+	'/reminders/notification-policy', '/notifications/subscribe', '/notifications/subscriptions', '/notifications/test',
 ]);
 const methods = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD']);
 
