@@ -408,6 +408,28 @@ it('defers startup collision repair until the configured connection finishes a s
 	expect(shouldDefer()).toBe(true); // A replaced connection needs its own reconciliation.
 });
 
+it.each(['folder change', 're-enable'])('waits for a completed sync after a %s and keeps it across later rebuilds', async rebuild => {
+	const { initializeReminders, reinitializeReminders, setRemindersEnabled } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	plugin.syncRuntime.isConfigured.mockReturnValue(true);
+	const rebuildBackend = rebuild === 'folder change'
+		? () => reinitializeReminders(plugin as never, 'Tasks')
+		: async () => { await setRemindersEnabled(plugin as never, false); await setRemindersEnabled(plugin as never, true); };
+	await initializeReminders(plugin as never);
+	plugin.syncRuntime.getApiClient.mockReturnValue({}); // Connected, but its first sync has not finished.
+	await rebuildBackend();
+	const shouldDefer = () => indexOptions(reminderIndexFactory.mock.calls.length - 1).shouldDeferCollisionRepair!();
+	expect(shouldDefer()).toBe(true);
+	const listener = plugin.syncRuntime.addStateChangeListener.mock.lastCall?.[0] as () => void;
+	for (const status of ['syncing', 'idle']) {
+		plugin.syncRuntime.getState.mockReturnValue({ status });
+		listener();
+	}
+	expect(shouldDefer()).toBe(false);
+	await rebuildBackend();
+	expect(shouldDefer()).toBe(false);
+});
+
 it('recovers interrupted moves before scanning and protects unresolved file paths from normalization', async () => {
 	const { initializeReminders } = await loadPluginIntegrationModule();
 	const plugin = createPlugin();

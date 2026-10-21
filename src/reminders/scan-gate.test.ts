@@ -15,14 +15,16 @@ function harness({ configured = true, api = null as object | null } = {}) {
 			isPendingFile: (path: string) => state.pendingFiles.has(path),
 		},
 	} as unknown as ReminderScanGateHost;
-	const gate = createReminderScanGate(host);
+	let gate = createReminderScanGate(host);
 	const transition = (...statuses: string[]) => {
 		for (const status of statuses) {
 			state.status = status;
 			gate.onSyncStateChanged();
 		}
 	};
-	return { state, gate, transition };
+	// A folder change or re-enable replaces the backend and its gate.
+	const rebuild = () => (gate = createReminderScanGate(host));
+	return { state, gate, transition, rebuild };
 }
 
 describe('reminder scan gate', () => {
@@ -67,6 +69,31 @@ describe('reminder scan gate', () => {
 		state.status = 'idle';
 		state.api = {};
 		expect(gate.shouldDeferCollisionRepair()).toBe(true); // A replaced connection needs its own reconciliation.
+	});
+
+	it('does not trust an existing connection before it finishes a sync', () => {
+		const { gate, transition } = harness({ api: {} });
+		expect(gate.shouldDeferCollisionRepair()).toBe(true);
+		transition('syncing', 'idle');
+		expect(gate.shouldDeferCollisionRepair()).toBe(false);
+	});
+
+	it('keeps a completed sync verified when the backend is rebuilt', () => {
+		const { state, transition, rebuild } = harness({ api: {} });
+		expect(rebuild().shouldDeferCollisionRepair()).toBe(true);
+		transition('syncing', 'idle');
+		expect(rebuild().shouldDeferCollisionRepair()).toBe(false);
+		state.api = {};
+		expect(rebuild().shouldDeferCollisionRepair()).toBe(true);
+	});
+
+	it('verifies a connection with the sync that was running when the backend was rebuilt', () => {
+		const { state, transition, rebuild } = harness({ api: {} });
+		state.status = 'syncing';
+		const gate = rebuild();
+		expect(gate.shouldDeferCollisionRepair()).toBe(true);
+		transition('idle');
+		expect(gate.shouldDeferCollisionRepair()).toBe(false);
 	});
 
 	it('does not verify a connection replaced during sync', () => {
