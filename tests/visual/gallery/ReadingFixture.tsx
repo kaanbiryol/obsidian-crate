@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ReadingLibraryPanel, type ReadingLibraryProps } from '@/reading/ui/ReadingLibrary';
 import { ReadingReader } from '@/reading/ui/Reader';
 import type { ReadingItem } from '@/reading/core/model';
-import { ReadingDialog, ReadingDialogHost, PluginReadingDialog } from '@/reading/ui/ReadingDialog';
+import { ReadingDialog, ReadingDialogHost } from '@/reading/ui/ReadingDialog';
+import { PluginReadingDialog } from '@/reading/ui/plugin/ObsidianReadingDialog';
 import { SaveLinkDialog } from '@/reading/ui/plugin/SaveLinkDialog';
 import { SaveLinkForm } from '@/reading/ui/SaveLinkForm';
 

@@ -1,7 +1,5 @@
-import React, { createContext, useContext, useRef, useState } from 'react';
-import { BaseModal } from '../../ui/shared/BaseModal';
-import { ModalHeader } from '../../ui/shared/ModalHeader';
-import { useObsidianKeyboardHeight } from '../../reminders/ui/hooks/useObsidianKeyboardHeight';
+import React, { createContext, useContext } from 'react';
+import type { ModalHeader } from '../../ui/shared/ModalHeader';
 
 export interface ReadingDialogProps {
 	className?: string;
@@ -22,19 +20,8 @@ export interface ReadingDialogProps {
 export const ReadingDialogHost = createContext<React.ComponentType<ReadingDialogProps> | null>(null);
 
 export function ReadingDialog(props: ReadingDialogProps) {
-	const Host = useContext(ReadingDialogHost) ?? PluginReadingDialog;
+	const Host = useContext(ReadingDialogHost);
+	if (!Host) throw new Error('ReadingDialog needs a ReadingDialogHost provider.');
 	return <Host {...props} />;
 }
 
-/** Base UI keeps plugin portals inside the same document and Obsidian shadow root. */
-export function PluginReadingDialog({ title, action, variant = 'bottom-sheet', showBackdrop = true, fullHeight = false, onClose, busy = false, children, className = '', contentClassName = 'crate-reading', contained = false }: ReadingDialogProps & { contained?: boolean }) {
-	const marker = useRef<HTMLDivElement>(null);
-	const keyboardInset = useObsidianKeyboardHeight(true);
-	const [closing, setClosing] = useState(false);
-	const close = () => { if (!busy) setClosing(true); };
-	return <div ref={marker}><BaseModal isOpen={!closing} onClose={close} onExitComplete={onClose} dismissible={!busy && !closing} ariaLabel={title} variant={variant} showBackdrop={showBackdrop} className={`crate-reading-dialog${fullHeight ? ' crate-reading-dialog--full' : ''} ${className}`}
-		style={{ bottom: contained ? 0 : keyboardInset }} contentStyle={{ maxHeight: contained ? 'calc(100% - 20px)' : `calc(100dvh - ${keyboardInset + 20}px - env(safe-area-inset-top))` }}>
-		<ModalHeader action={action} title={title} closeLabel={`Close ${title.toLowerCase()}`} closeDisabled={busy || closing} onClose={close} />
-		<div className={`crate-modal-body ${contentClassName}`}>{typeof children === 'function' ? children(close) : children}</div>
-	</BaseModal></div>;
-}

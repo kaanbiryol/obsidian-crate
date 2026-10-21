@@ -7,6 +7,8 @@ import { BaseUiModal } from '../../../ui/plugin/BaseUiModal';
 import { hideNativeModalCloseButton } from '../../../ui/plugin/modalShell';
 import { getReadingLibrary } from '../../runtime';
 import { SaveLinkDialog } from './SaveLinkDialog';
+import { ReadingDialogHost } from '../ReadingDialog';
+import { PluginReadingDialog } from './ObsidianReadingDialog';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { ObsidianIcon } from '@/ui/obsidian-icon';
 
@@ -20,7 +22,7 @@ export class AddReadingLinkModal extends BaseUiModal {
 		hideNativeModalCloseButton(this.modalEl);
 		this.contentEl.addClasses(['crate-reminder-editor-modal__content', 'crate-reminders-ui']);
 		this.root = createRoot(this.contentEl);
-		this.root.render(<ThemeIconProvider renderer={ObsidianIcon}><LocalCapture onExisting={this.onExisting} plugin={this.plugin} onClose={() => this.close()} /></ThemeIconProvider>);
+		this.root.render(<ThemeIconProvider renderer={ObsidianIcon}><ReadingDialogHost.Provider value={PluginReadingDialog}><LocalCapture onExisting={this.onExisting} plugin={this.plugin} onClose={() => this.close()} /></ReadingDialogHost.Provider></ThemeIconProvider>);
 	}
 	onClose(): void { this.root?.unmount(); this.root = undefined; this.contentEl.empty(); }
 }
