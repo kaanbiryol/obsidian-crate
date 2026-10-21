@@ -3,24 +3,12 @@ import { mkdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { compileString } from 'sass';
 import { chromium, webkit, expect } from '@playwright/test';
+import { obsidianDomHelpers, obsidianDialogModule } from '../support/obsidian-dialog-fixture.mjs';
 
 const { outputFiles } = await build({
     stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
         import { ConflictReviewModal } from './src/ui/activity/conflict-review-modal';
-        HTMLElement.prototype.createEl = function(tag, options = {}) {
-            const el = document.createElement(tag);
-            el.className = options.cls ?? ''; el.textContent = options.text ?? '';
-            for (const [key, value] of Object.entries(options.attr ?? {})) el.setAttribute(key, value);
-            this.append(el); return el;
-        };
-        HTMLElement.prototype.createDiv = function(options) { return this.createEl('div', options); };
-        HTMLElement.prototype.createSpan = function(options) { return this.createEl('span', options); };
-        HTMLElement.prototype.addClass = function(...names) { this.classList.add(...names); };
-        HTMLElement.prototype.toggleClass = function(name, value) { this.classList.toggle(name, value); };
-        HTMLElement.prototype.toggle = function(value) { this.style.display = value ? '' : 'none'; };
-        HTMLElement.prototype.setText = function(text) { this.textContent = text; };
-        HTMLElement.prototype.empty = function() { this.replaceChildren(); };
-        Object.defineProperty(HTMLElement.prototype, 'win', { get: () => window });
+        ${obsidianDomHelpers}
         window.current = 'Title\\nCurrent change'; window.saved = 'Title\\nSaved change';
         window.writes = []; window.opened = []; window.revealed = [];
         window.mount = (incoming = false) => {
@@ -35,11 +23,8 @@ const { outputFiles } = await build({
     ` },
     plugins: [{ name: 'host-fixture', setup(builder) {
         builder.onResolve({ filter: /^(obsidian|\.\.\/plugin\/SharedModal|\.\/file-actions)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
-        builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'obsidian' ? `
+        builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'obsidian' ? `${obsidianDialogModule}
             export const Platform = { isMobile: innerWidth < 600, isDesktopApp: innerWidth >= 600 };
-            export class Notice {}
-            export class Setting {}
-            export function setIcon() {}
         ` : args.path === './file-actions' ? `export const getPendingFileActions = (_app, path) => innerWidth < 600 ? [] : [{ id: 'reveal', title: 'Reveal in Finder', run: async () => { window.revealed.push(path); } }];` : `
             export class SharedModal {
                 constructor() {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { chromium, webkit, expect } from '@playwright/test';
+import { obsidianDomHelpers } from '../support/obsidian-dialog-fixture.mjs';
 
 const { outputFiles } = await build({
  external: ['electron'],
@@ -10,18 +11,7 @@ const { outputFiles } = await build({
  import { HistoryRestoreModal } from './src/ui/activity/history-restore-modal';
  import { ActivityHistory } from './src/ui/activity/activity-history';
  import { mergeSharedHistory } from './src/ui/activity/shared-history';
- HTMLElement.prototype.createEl = function(tag, options = {}) {
-  const el = document.createElement(tag); if (options.cls) el.className = options.cls;
-  if (options.text) el.textContent = options.text;
-  for (const [key,value] of Object.entries(options.attr ?? {})) el.setAttribute(key,value);
-  this.append(el); return el;
- };
- HTMLElement.prototype.createDiv = function(options) { return this.createEl('div',options); };
- HTMLElement.prototype.createSpan = function(options) { return this.createEl('span',options); };
- HTMLElement.prototype.toggleClass = function(name, active) { this.classList.toggle(name, active); };
- HTMLElement.prototype.addClass = function(...names) { this.classList.add(...names); };
- HTMLElement.prototype.setText = function(text) { this.textContent = text; };
- HTMLElement.prototype.empty = function() { this.replaceChildren(); };
+ ${obsidianDomHelpers}
  const row = { path:'Reminders/Inbox.md', hash:'a'.repeat(64), storage_key:'first', size:212, created_at:'2026-09-19T11:59:42Z', expires_at:9999999999999, reason:'replaced' };
  window.restores = []; window.previewCalls = []; window.fail = false; window.delay = false;
  const versions = [row, {...row, storage_key:'second', created_at:'2026-09-19T11:59:07Z'}, {...row, path:'Archive/Deleted.md',storage_key:'deleted',reason:'deleted'}, {...row,path:'Notes/A very long file name that should wrap without overflowing the file history pane.md',storage_key:'long'}];

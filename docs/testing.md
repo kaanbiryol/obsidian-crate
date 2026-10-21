@@ -297,6 +297,12 @@ Unit tests use two kinds of Obsidian stand-ins.
 
 `src/test/fakes/obsidian-ui.ts` holds Node-only fakes for UI tests that run without a DOM: `FakeElement` (a minimal element tree), `MockModal`, `MockSetting` and the button, text, toggle and dropdown component mocks. A test installs them with `vi.mock('obsidian', () => createObsidianUiModule())` (or `vi.doMock`), spreading in overrides such as `Platform` when needed, and calls `resetObsidianUiMocks()` between tests. Opened modals and created settings are collected in `MockModal.instances` and `MockSetting.instances`, and notices in `noticeMessages`.
 
+Browser tests that bundle plugin UI with esbuild use `tests/browser/support/obsidian-dialog-fixture.mjs` instead. It exports source text to interpolate into the bundle rather than redefining Obsidian helpers in each test:
+
+- `obsidianDomHelpers` - adds `createEl`, `createDiv`, `createSpan`, `addClass`, `removeClass`, `toggleClass`, `setText`, `appendText`, `empty`, `show`, `hide`, `toggle` and `win` to `HTMLElement.prototype`; place it in the esbuild `stdin` contents
+- `obsidianDialogModule` - a synthetic `obsidian` module with `setIcon`, `Setting`, `Notice` (messages in `window.notices`) and `Modal` (the open modal in `window.currentModal`); serve it from an esbuild plugin and append test-specific exports such as `Platform`
+- `hostStyles` - minimal native host CSS variables and dialog, setting and button rules, with a `.theme-dark` variant
+
 ## Testing Patterns
 
 ### Persistent Engine Harness

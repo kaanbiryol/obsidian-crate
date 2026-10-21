@@ -3,22 +3,13 @@ import { mkdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { compileString } from 'sass';
 import { chromium, webkit, expect } from '@playwright/test';
+import { obsidianDomHelpers } from '../support/obsidian-dialog-fixture.mjs';
 
 // Real error renderer and styles with the host's DOM helpers.
 const { outputFiles } = await build({ write: false, bundle: true, format: 'iife', platform: 'browser', stdin: {
   resolveDir: process.cwd(), loader: 'ts', contents: `
     import { renderSyncIssues } from './src/ui/activity/sync-issues';
-    HTMLElement.prototype.createEl = function(tag, options = {}) {
-      const el = document.createElement(tag);
-      if (options.cls) el.className = options.cls;
-      if (options.text) el.textContent = options.text;
-      for (const [key, value] of Object.entries(options.attr ?? {})) el.setAttribute(key, value);
-      this.append(el); return el;
-    };
-    HTMLElement.prototype.createDiv = function(options) { return this.createEl('div', options); };
-    HTMLElement.prototype.setText = function(text) { this.textContent = text; };
-    HTMLElement.prototype.addClass = function(...names) { this.classList.add(...names); };
-    HTMLElement.prototype.removeClass = function(...names) { this.classList.remove(...names); };
+    ${obsidianDomHelpers}
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { window.copied = text; } } });
     const path = 'Reminders/Projects/café: <img src=x>.md';
     const issues = [

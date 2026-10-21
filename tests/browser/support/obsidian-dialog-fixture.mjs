@@ -13,6 +13,7 @@ export const obsidianDomHelpers = `    HTMLElement.prototype.createEl = function
     HTMLElement.prototype.toggleClass = function(name, value) { this.classList.toggle(name, value); };
     HTMLElement.prototype.hide = function() { this.style.display = 'none'; };
     HTMLElement.prototype.show = function() { this.style.removeProperty('display'); };
+    HTMLElement.prototype.toggle = function(visible) { visible ? this.show() : this.hide(); };
     Object.defineProperty(HTMLElement.prototype,'win',{get:()=>window});
     HTMLElement.prototype.removeClass = function(...names) { this.classList.remove(...names); };
     HTMLElement.prototype.appendText = function(text) { this.append(text); };

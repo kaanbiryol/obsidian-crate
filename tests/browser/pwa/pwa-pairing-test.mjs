@@ -5,6 +5,7 @@ import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
 import { switchFeature } from './pwa-feature-navigation.mjs';
+import { obsidianDomHelpers, obsidianDialogModule } from '../support/obsidian-dialog-fixture.mjs';
 
 // Production PWA + approval modal + WebCrypto in separate browser contexts.
 // Obsidian's DOM host and HTTP relay are fixtures; D1/auth have Worker coverage.
@@ -21,31 +22,12 @@ const scoped = folder => ({ version: 1, mode: 'active', vaultId: state.vaultId, 
 const secrets = [recovery, bundle.vault.secret, ...bundle.scopes.flatMap(scope => [scope.data.secret, scope.notifications.secret])];
 const host = await build({ stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
 import { WebAppPairingModal } from './src/ui/settings/web-app-pairing-modal';
-HTMLElement.prototype.createEl = function(tag, options={}) { const el=document.createElement(tag); el.className=options.cls??''; el.textContent=options.text??''; for(const [key,value] of Object.entries(options.attr??{})) el.setAttribute(key,value); this.append(el); return el; };
-HTMLElement.prototype.createSpan = function(options) { return this.createEl('span',options); };
-HTMLElement.prototype.createDiv = function(options) { return this.createEl('div',options); };
-HTMLElement.prototype.addClass = function(...names) { this.classList.add(...names); };
-HTMLElement.prototype.setText = function(text) { this.textContent=text; };
-HTMLElement.prototype.appendText = function(text) { this.append(text); };
-HTMLElement.prototype.empty = function() { this.replaceChildren(); };
-Object.defineProperty(HTMLElement.prototype,'win',{get:()=>window});
+${obsidianDomHelpers}
 window.openPairing = () => { window.modal=new WebAppPairingModal({app:{}}); window.modal.onOpen(); };
 window.closePairing = () => window.modal.close();
 ` }, bundle: true, write: false, format: 'iife', platform: 'browser', loader: { '.scss': 'empty' }, plugins: [{ name: 'obsidian-host', setup(builder) {
   builder.onResolve({ filter: /(^obsidian$|plugin\/web-app-pairing$)/ }, args => ({ path: args.path, namespace: 'host' }));
-  builder.onLoad({ filter: /.*/, namespace: 'host' }, args => ({ contents: args.path === 'obsidian' ? `
-export function setIcon(el) { el.textContent='×'; }
-export class Modal {
- constructor(){this.modalEl=document.body.createDiv({cls:'modal'});this.contentEl=this.modalEl.createDiv({cls:'modal-content'});}
- setTitle(title){this.modalEl.setAttribute('role','dialog');this.modalEl.setAttribute('aria-label',title);}
- close(){this.onClose();this.modalEl.remove();}
-}
-export class Setting {
- constructor(el){this.settingEl=el.createDiv({cls:'setting-item'});this.settingEl.createDiv({cls:'setting-item-info'});this.el=this.settingEl.createDiv({cls:'setting-item-control'});}
- setClass(name){this.settingEl.classList.add(name);return this;}
- addButton(build){const b=this.el.createEl('button');const api={setButtonText:v=>{b.textContent=v;return api;},setCta:()=>{b.classList.add('mod-cta');return api;},setDisabled:v=>{b.disabled=v;return api;},onClick:fn=>{b.onclick=fn;return api;}};build(api);return this;}
-}
-` : `
+  builder.onLoad({ filter: /.*/, namespace: 'host' }, args => ({ contents: args.path === 'obsidian' ? obsidianDialogModule : `
 export async function openWebAppPairing(plugin,signal) {
  const current=()=>signal.throwIfAborted();
  const request=async(id,body)=>{current(); const r=await fetch('/encryption/pairing'+(id?'?id='+id:''),{method:body?'POST':'GET',headers:{Authorization:'Bearer mac'},body:body?JSON.stringify(body):undefined,signal});current(); if(!r.ok)throw new Error('Connection lost');return r.json();};

@@ -4,6 +4,7 @@ import { build } from 'esbuild';
 import { compileString } from 'sass';
 import { chromium, webkit, expect } from '@playwright/test';
 import { pendingChangeKey } from '../../../src/sync/pending/pending-change.ts';
+import { obsidianDomHelpers } from '../support/obsidian-dialog-fixture.mjs';
 
 // Exercise the production renderer with Obsidian's small DOM helper surface.
 const { outputFiles } = await build({
@@ -12,19 +13,7 @@ const { outputFiles } = await build({
             import { renderPendingPanel } from './src/ui/activity/panels';
             import { PendingDiscardModal } from './src/ui/activity/pending-discard-modal';
             import { pendingChangeKey, decodePendingChange } from './src/sync/pending/pending-change';
-            HTMLElement.prototype.createEl = function(tag, options = {}) {
-                const el = document.createElement(tag);
-                if (options.cls) el.className = options.cls;
-                if (options.text) el.textContent = options.text;
-                for (const [key, value] of Object.entries(options.attr ?? {})) el.setAttribute(key, value);
-                this.append(el); return el;
-            };
-            HTMLElement.prototype.createDiv = function(options) { return this.createEl('div', options); };
-            HTMLElement.prototype.createSpan = function(options) { return this.createEl('span', options); };
-            HTMLElement.prototype.addClass = function(...names) { this.classList.add(...names); };
-            HTMLElement.prototype.setText = function(text) { this.textContent = text; };
-            HTMLElement.prototype.empty = function() { this.replaceChildren(); };
-            HTMLElement.prototype.toggleClass = function(name, active) { this.classList.toggle(name, active); };
+            ${obsidianDomHelpers}
             window.calls = 0;
             window.loadArguments = [];
             window.pendingChangeKey = pendingChangeKey;

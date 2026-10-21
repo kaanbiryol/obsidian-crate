@@ -12,7 +12,6 @@ const { outputFiles } = await build({
     ${obsidianDomHelpers}
     HTMLElement.prototype.addClasses = function(names) { this.classList.add(...names); };
     HTMLElement.prototype.removeClasses = function(names) { this.classList.remove(...names); };
-    HTMLElement.prototype.toggle = function(visible) { visible ? this.show() : this.hide(); };
     const listeners = new Set();
     let status = 'idle';
     let initializing = false;
