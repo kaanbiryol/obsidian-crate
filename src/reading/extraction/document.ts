@@ -11,6 +11,9 @@ import { extractorFetch, type ExtractorTransport } from './defuddle-fetch';
  * `transport`; without one, extraction stays local. Markdown conversion never fetches. */
 export async function extractDocument(html: string, url: string, transport?: ExtractorTransport): Promise<CapturedArticle> {
   const document = parseHTML(html).document;
+  // linkedom's defaultView proxies globalThis. In Obsidian and the PWA, Defuddle would
+  // call the native getComputedStyle on linkedom nodes, throw and return the whole body.
+  Object.defineProperty(document, 'defaultView', { value: null });
   const faviconUrl = discoverFaviconUrl(document, url);
   const post = extractServerRenderedPost(document, url);
   // First request HTML so we can validate links/media before passing it to
