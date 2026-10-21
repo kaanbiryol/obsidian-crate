@@ -5,7 +5,7 @@ const nativeTimeStyles = fileURLToPath(new URL('./native-time.css', import.meta.
 for (const host of ['plugin', 'pwa']) {
   for (const theme of ['light', 'dark']) {
     for (const width of [390, 1280]) {
-      for (const scene of ['cards', 'editor', 'date', 'project', 'weekly', 'monthly']) {
+      for (const scene of ['cards', 'flat', 'editor', 'date', 'project', 'weekly', 'monthly']) {
         test(`${host} ${theme} ${width} ${scene}`, async ({ page }) => {
           await page.setViewportSize({ width, height: 844 });
           await page.clock.setFixedTime(new Date('2026-09-05T10:00:00Z'));

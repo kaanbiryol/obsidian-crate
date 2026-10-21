@@ -58,8 +58,8 @@ test('reading keeps the selected tab indicator in place when a reader returns im
 			const workspace = document.querySelector<HTMLElement>('.crate-reading-workspace')!;
 			const nav = workspace.querySelector<HTMLElement>('.crate-reading__mobile-nav')!;
 			const sample = () => {
-				const active = nav.querySelector<HTMLElement>('.bottom-tab-button.is-active')!;
-				const slider = nav.querySelector<HTMLElement>('.bottom-tab-slider')!;
+				const active = nav.querySelector<HTMLElement>('.pwa-dock__tab.is-active')!;
+				const slider = nav.querySelector<HTMLElement>('.pwa-dock__indicator')!;
 				const buttonRect = active.getBoundingClientRect(), sliderRect = slider.getBoundingClientRect();
 				return { tab: active.dataset.tab, offset: Math.round(sliderRect.left + sliderRect.width / 2 - buttonRect.left - buttonRect.width / 2) };
 			};
@@ -74,13 +74,21 @@ test('reading keeps the selected tab indicator in place when a reader returns im
 		expect(frames.every(frame => frame.tab === tab && Math.abs(frame.offset) < 5), JSON.stringify(frames)).toBe(true);
 		await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'false');
 	};
-	await page.getByRole('button', { name: 'Favorites', exact: true }).click();
+	// Let the dock finish its own tap motion so only the reader return is measured.
+	const selectTab = async (name: string) => {
+		await page.getByRole('button', { name, exact: true }).click();
+		await expect.poll(() => page.locator('.pwa-dock__indicator').evaluate(slider => {
+			const active = slider.closest('.pwa-dock')!.querySelector('.pwa-dock__tab.is-active')!.getBoundingClientRect(), rect = slider.getBoundingClientRect();
+			return Math.round(rect.left + rect.width / 2 - active.left - active.width / 2);
+		})).toBe(0);
+	};
+	await selectTab('Favorites');
 	await article.click();
 	await returnFromReader('favorites');
 	await article.click();
 	await page.getByRole('button', { name: 'Archive article', exact: true }).click();
 	await returnFromReader('favorites');
-	await page.getByRole('button', { name: 'Archive', exact: true }).click();
+	await selectTab('Archive');
 	await article.click();
 	await returnFromReader('archived');
 });
