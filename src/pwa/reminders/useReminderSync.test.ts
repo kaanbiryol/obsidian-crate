@@ -73,6 +73,7 @@ describe('PWA reminder refresh around local writes', () => {
 	it('replaces indexing progress with attention only when the refresh fails', async () => {
 		vi.useFakeTimers();
 		const { rendered, load, settle, warming } = harness();
+		act(() => { window.dispatchEvent(new window.Event('online')); });
 		const pending = load();
 		await warming(0, 3);
 		await settle(1, new Response('Index unavailable', { status: 503 }), pending);

@@ -18,7 +18,8 @@ export function reminderSyncStatus({ changes, isOffline, refreshing, loading, in
 	const pendingCount = changes.filter(change => change.status === 'pending').length;
 	const errorCount = changes.length - pendingCount;
 	const pendingLabel = `${pendingCount} ${pendingCount === 1 ? 'change' : 'changes'}`;
-	if (storageError || errorCount || dataMode === 'error' || error) {
+	// A refresh that fails while offline is expected; only stored-change problems need attention.
+	if (storageError || errorCount || (!isOffline && (dataMode === 'error' || error))) {
 		return {
 			state: 'error',
 			label: storageError ? 'Sync needs attention: pending changes unavailable'
@@ -26,7 +27,10 @@ export function reminderSyncStatus({ changes, isOffline, refreshing, loading, in
 					: 'Sync needs attention: refresh reminders',
 		};
 	}
-	if (isOffline) return { state: 'offline', label: pendingCount ? `Offline: ${pendingLabel} waiting to sync` : 'Offline: showing saved reminders' };
+	if (isOffline) {
+		return { state: 'offline', label: pendingCount ? `Offline: ${pendingLabel} waiting to sync`
+			: dataMode === 'error' ? 'Offline: reminders load when you reconnect' : 'Offline: showing saved reminders' };
+	}
 	if (indexingProgress) return { state: 'syncing', label: `Preparing reminders: ${indexingProgress.indexedFiles} of ${indexingProgress.totalFiles} files indexed…` };
 	if (loading && !pendingCount) return { state: 'syncing', label: 'Loading reminders' };
 	if (pendingCount || refreshing) return { state: 'syncing', label: pendingCount ? `Syncing ${pendingLabel}` : 'Refreshing reminders' };

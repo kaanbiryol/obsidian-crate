@@ -52,6 +52,13 @@ describe('PWA header sync indicator', () => {
 		expect(render({ isOffline: true, changes: [pending] })).toContain('Offline: 1 change waiting to sync');
 	});
 
+	it('reports a refresh that fails while offline as offline, not as needing attention', () => {
+		expect(render({ isOffline: true, dataMode: 'cached', error: 'Failed to fetch' })).toContain('Offline: showing saved reminders');
+		expect(render({ isOffline: true, dataMode: 'error', error: 'Failed to fetch' })).toContain('Offline: reminders load when you reconnect');
+		expect(render({ isOffline: true, error: 'Failed to fetch', storageError: 'Storage unavailable' })).toContain('data-sync-state="error"');
+		expect(render({ isOffline: true, changes: [{ ...pending, status: 'failed' }] })).toContain('data-sync-state="error"');
+	});
+
 	it('keeps failed and uncertain changes visible even while another change syncs', () => {
 		const markup = render({ changes: [pending, { ...pending, operationId: 'failure', status: 'failed' }, { ...pending, operationId: 'uncertain', status: 'uncertain' }] });
 		expect(markup).toContain('data-sync-state="error"');
