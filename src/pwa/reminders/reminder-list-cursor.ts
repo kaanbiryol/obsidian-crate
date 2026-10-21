@@ -1,3 +1,4 @@
+import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 /** HTTP freshness of the confirmed reminder list, kept outside React state. */
 export function createReminderListCursor() {
 	let etag: string | undefined;
@@ -24,7 +25,7 @@ export function createReminderListCursor() {
 		/** Other vault changes refresh the ETag and delta base of unchanged reminders. */
 		notModified(headers: Headers, at: number): void {
 			etag = headers.get('ETag') ?? etag;
-			deltaBase = headers.get('X-Crate-Delta-Base') ?? deltaBase;
+			deltaBase = headers.get(DELTA_BASE_HEADER) ?? deltaBase;
 			lastCheckedAt = at;
 		},
 		confirmed(next: { etag?: string; deltaBase?: string }, at: number): void {

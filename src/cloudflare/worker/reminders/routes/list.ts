@@ -7,6 +7,7 @@ import {
 	REMINDER_CACHE_PARSER_VERSION,
 } from '../cache/index';
 import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
+import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { changedPathsSince, deltaBase, parseChangeEtags, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../../vault-change-token';
 import { sha256Hex } from '../../../../platform/sha256';
 
@@ -33,7 +34,7 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	// advance its delta base too.
 	const notModified = (etag: string) => new Response(null, {
 		status: 304,
-		headers: { ...corsHeaders(), 'Cache-Control': 'private, no-cache', ETag: etag, 'X-Crate-Delta-Base': base },
+		headers: { ...corsHeaders(), 'Cache-Control': 'private, no-cache', ETag: etag, [DELTA_BASE_HEADER]: base },
 	});
 	const cached = requestEtags.map(value => parseChangeEtags(value)[0]);
 	const unchanged = requestEtags.find((_, index) => cached[index]?.changeToken === changeToken);
@@ -73,7 +74,7 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	// A complete, issue-free revision can be the base of a later delta. Issues
 	// include duplicate identities, whose visibility can change in unchanged notes.
 	const complete = workspace.issues.length === 0;
-	const headers = { 'Cache-Control': 'private, no-cache', ...(complete ? { ETag: etag, 'X-Crate-Delta-Base': base } : {}) };
+	const headers = { 'Cache-Control': 'private, no-cache', ...(complete ? { ETag: etag, [DELTA_BASE_HEADER]: base } : {}) };
 	const changedPaths = complete ? await changed() : null;
 	if (changedPaths) {
 		const paths = new Set(changedPaths);

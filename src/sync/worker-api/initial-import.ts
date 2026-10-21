@@ -5,6 +5,7 @@ import { TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
 import { arrayBufferToBase64 } from '../encoding';
 import type { PreparedUpload } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '@/protocol/sync-limits';
+import { FILE_HASH_HEADER, EXPECTED_HASH_HEADER, INITIAL_IMPORT_HEADER } from '@/protocol/http-headers';
 
 export class InitialImportApi {
   private establishedAt?: string;
@@ -26,12 +27,12 @@ export class InitialImportApi {
     const first = files[0];
     if (files.length === 1 && first && first.size >= BATCH_FILE_SIZE_LIMIT) {
       return this.http.requestJson(`/sync/import/upload?path=${encodeURIComponent(first.path)}`, {
-        method: 'PUT', headers: { 'X-Crate-Import': token, 'X-File-Hash': first.hash,
-          'X-Crate-Expected-Hash': first.expectedHash ?? 'absent', 'Content-Type': first.contentType || 'application/octet-stream' },
+        method: 'PUT', headers: { [INITIAL_IMPORT_HEADER]: token, [FILE_HASH_HEADER]: first.hash,
+          [EXPECTED_HASH_HEADER]: first.expectedHash ?? 'absent', 'Content-Type': first.contentType || 'application/octet-stream' },
         body: first.content,
       }, TRANSFER_TIMEOUT_MS);
     }
-    return this.http.requestJson('/sync/import/upload', { method: 'POST', headers: { 'X-Crate-Import': token }, body: JSON.stringify({ files: files.map(file => ({ path: file.path, hash: file.hash, size: file.size,
+    return this.http.requestJson('/sync/import/upload', { method: 'POST', headers: { [INITIAL_IMPORT_HEADER]: token }, body: JSON.stringify({ files: files.map(file => ({ path: file.path, hash: file.hash, size: file.size,
       content: arrayBufferToBase64(file.content), contentType: file.contentType, expectedHash: file.expectedHash ?? null })) }) }, TRANSFER_TIMEOUT_MS);
   }
 

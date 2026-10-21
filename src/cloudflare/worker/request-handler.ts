@@ -29,8 +29,7 @@ import { commitStagedFile } from './sync/mutations';
 import { commitNewFiles } from './sync/bulk-new-file-commit';
 import type { UploadCommitters } from './sync/upload-committers';
 import { ensureProjection, forwardToCoordinator } from '@/cloudflare/worker/coordinator/coordinator';
-
-const REQUEST_ID_HEADER = 'X-Crate-Request-Id';
+import { REQUEST_ID_HEADER } from '../../protocol/http-headers';
 
 function withRequestId(response: Response, requestId: string, started: number, encryptionState?: 'on' | 'off'): Response {
 	const headers = new Headers(response.headers);

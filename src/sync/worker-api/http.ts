@@ -3,6 +3,7 @@ import { emptyRequestTimings } from '../diagnostics/timings';
 import type { CrateServerInfo } from '../../protocol/server-info';
 import { normalizeUploadOperationIds } from '../diagnostics/request-diagnostics';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol/server-info';
+import { UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, CLIENT_SESSION_HEADER, OPERATION_ID_HEADER, REQUEST_ID_HEADER } from '../../protocol/http-headers';
 import { requestUrl } from 'obsidian';
 import { createLogger, errorMessage } from '../logger';
 import { createAbortError } from '../abort';
@@ -244,8 +245,8 @@ export class WorkerApiHttpClient {
 		const operationId = crypto.randomUUID();
 		const started = performance.now();
 		const timings = this.requestTimings;
-		const uploadOperationIds = normalizeUploadOperationIds((getHeader(options.headers ?? {}, 'X-Crate-Upload-Operation')
-			?? getHeader(options.headers ?? {}, 'X-Crate-Upload-Operations') ?? '').split(','));
+		const uploadOperationIds = normalizeUploadOperationIds((getHeader(options.headers ?? {}, UPLOAD_OPERATION_HEADER)
+			?? getHeader(options.headers ?? {}, UPLOAD_OPERATIONS_HEADER) ?? '').split(','));
 		const record = (outcome: RequestDiagnostic['outcome'], response?: ApiHttpResponse) => {
 			const durationMs = Math.max(0, performance.now() - started);
 			const header = response ? getHeader(response.headers, 'Server-Timing') : null;
@@ -263,7 +264,7 @@ export class WorkerApiHttpClient {
 
 			this.requestDiagnostics.push({ at: new Date().toISOString(), operationId, method: options.method ?? 'GET',
 				...(uploadOperationIds.length ? { uploadOperationIds } : {}), route: diagnosticRoute(path), status: response?.status ?? 0, outcome,
-				requestId: response ? getHeader(response.headers, 'X-Crate-Request-Id') ?? undefined : undefined });
+				requestId: response ? getHeader(response.headers, REQUEST_ID_HEADER) ?? undefined : undefined });
 			if (this.requestDiagnostics.length > MAX_REQUEST_DIAGNOSTICS) this.requestDiagnostics.shift();
 		};
 
@@ -310,8 +311,8 @@ export class WorkerApiHttpClient {
 				contentType: resolvedContentType,
 				headers: {
 					Authorization: `Bearer ${authToken}`,
-					'X-Crate-Client-Session': this.clientSession,
-					'X-Crate-Operation-Id': operationId,
+					[CLIENT_SESSION_HEADER]: this.clientSession,
+					[OPERATION_ID_HEADER]: operationId,
 					[CRATE_PROTOCOL_HEADER]: String(protocol),
 					...this.encryptionHeaders,
 					...headersWithoutContentType,
@@ -348,11 +349,11 @@ export class WorkerApiHttpClient {
 				parseRetryAfter(response.headers),
 				details.code,
 				details.currentHash,
-				getHeader(response.headers, 'X-Crate-Request-Id') ?? undefined,
+				getHeader(response.headers, REQUEST_ID_HEADER) ?? undefined,
 			);
 		}
 
-		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, 'X-Crate-Request-Id') ?? 'unavailable'}]`);
+		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, REQUEST_ID_HEADER) ?? 'unavailable'}]`);
 		return parseJsonResponse<T>(response.text, path);
 	}
 
@@ -375,11 +376,11 @@ export class WorkerApiHttpClient {
 				parseRetryAfter(response.headers),
 				details.code,
 				details.currentHash,
-				getHeader(response.headers, 'X-Crate-Request-Id') ?? undefined,
+				getHeader(response.headers, REQUEST_ID_HEADER) ?? undefined,
 			);
 		}
 
-		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, 'X-Crate-Request-Id') ?? 'unavailable'}] (binary)`);
+		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, REQUEST_ID_HEADER) ?? 'unavailable'}] (binary)`);
 		return { body: response.arrayBuffer, headers: response.headers };
 	}
 }

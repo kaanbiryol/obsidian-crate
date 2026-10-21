@@ -2,6 +2,7 @@ import { BULK_NEW_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { reminderOperationDay } from '../../protocol/reminder-operation';
 import type { AuthPrincipal } from './auth/authenticate';
 import { MANAGED_FILE_OBJECT } from '../../protocol/storage-keys';
+import { UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '../../protocol/http-headers';
 
 function opaque(value: string | null): string | undefined {
   return value && /^[a-zA-Z0-9_-]{16,128}$/.test(value) ? value : undefined;
@@ -17,8 +18,8 @@ export interface MutationAuditContext {
 export function mutationAuditContext(request: Request, principal?: AuthPrincipal, requestId: string = crypto.randomUUID()): MutationAuditContext {
   return {
     requestId, deviceId: principal?.tokenId ?? null,
-    clientSession: opaque(request.headers.get('X-Crate-Client-Session')) ?? null,
-    operationId: opaque(request.headers.get('X-Crate-Operation-Id')) ?? null,
+    clientSession: opaque(request.headers.get(CLIENT_SESSION_HEADER)) ?? null,
+    operationId: opaque(request.headers.get(OPERATION_ID_HEADER)) ?? null,
   };
 }
 
@@ -44,9 +45,9 @@ export async function logMutation(request: Request, response: Response, requestI
   console.info('crate.mutation', {
     requestId, status: response.status, method: request.method,
     route: /^\/(sync|reminders|notifications|auth)\/(?:import\/)?[a-z-]+$/.test(path) ? path : 'other',
-    clientSession: opaque(request.headers.get('X-Crate-Client-Session')),
-    operationId: opaque(request.headers.get('X-Crate-Operation-Id')),
-    uploadOperationIds: (request.headers.get('X-Crate-Upload-Operation') ?? request.headers.get('X-Crate-Upload-Operations') ?? '').split(',').filter(id => reminderOperationDay(id) !== null).slice(0, BULK_NEW_UPLOAD_MAX_FILES),
+    clientSession: opaque(request.headers.get(CLIENT_SESSION_HEADER)),
+    operationId: opaque(request.headers.get(OPERATION_ID_HEADER)),
+    uploadOperationIds: (request.headers.get(UPLOAD_OPERATION_HEADER) ?? request.headers.get(UPLOAD_OPERATIONS_HEADER) ?? '').split(',').filter(id => reminderOperationDay(id) !== null).slice(0, BULK_NEW_UPLOAD_MAX_FILES),
     deviceId: principal.tokenId, scope: principal.scope, revisions, consumedRevisions, deleteRequestIds,
   });
 }

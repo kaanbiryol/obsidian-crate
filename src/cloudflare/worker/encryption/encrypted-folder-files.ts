@@ -14,6 +14,7 @@ import { FileVersionConflictError } from '../storage';
 import { beginReminderOperation, reminderOperationEffects } from '../reminders/operations';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { portablePathKey } from '../../../protocol/portable-path';
+import { FILE_HASH_HEADER, REVISION_HEADER } from '../../../protocol/http-headers';
 import type { Env } from '../types';
 import { isSha256Hex } from '../../../platform/validation';
 
@@ -69,7 +70,7 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 	const object = await env.BUCKET.get(file.storageKey);
 	if (!object || !storedObjectMatchesMetadata(object, file)) return corsResponse({ error: 'Note is unavailable' }, 503);
 	return new Response(object.body, { headers: { ...corsHeaders(), 'Content-Type': 'application/vnd.crate.encrypted-file',
-		'Content-Length': String(file.size), 'Cache-Control': 'private, no-store', 'X-File-Hash': file.hash, 'X-Crate-Revision': file.storageKey } });
+		'Content-Length': String(file.size), 'Cache-Control': 'private, no-store', [FILE_HASH_HEADER]: file.hash, [REVISION_HEADER]: file.storageKey } });
 }
 
 async function commitEncryptedFiles(request: Request, env: Env, state: EncryptionServerState, expectedFolder?: string): Promise<Response> {

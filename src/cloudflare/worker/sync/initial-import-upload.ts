@@ -11,6 +11,7 @@ import { uploadMutation } from './mutations';
 import { readLimitedRequestBody } from '../body-reader';
 import { isSha256Hex } from '@/platform/validation';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
+import { FILE_HASH_HEADER, EXPECTED_HASH_HEADER, INITIAL_IMPORT_HEADER } from '@/protocol/http-headers';
 import { sha256Hex } from '@/platform/sha256';
 
 interface ImportFile {
@@ -19,7 +20,7 @@ interface ImportFile {
 }
 
 export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
-  const token = request.headers.get('X-Crate-Import');
+  const token = request.headers.get(INITIAL_IMPORT_HEADER);
   const current = await readInitialImport(db);
   if (!current || current.token !== token || current.state !== 'importing') return corsResponse({ error: 'Initial import is closed or unavailable' }, 409);
   const input: Array<Record<string, unknown>> = [];
@@ -28,8 +29,8 @@ export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db:
     const body = await readLimitedRequestBody(request, MAX_FILE_SIZE_BYTES, 'File exceeds 25MB limit');
     if (!body.ok) return body.response;
     input.push({ path: new URL(request.url).searchParams.get('path'),
-      hash: request.headers.get('X-File-Hash'), content: body.bytes.buffer,
-      contentType: request.headers.get('Content-Type'), expectedHash: parseExpectedFileHash(request.headers.get('X-Crate-Expected-Hash')) });
+      hash: request.headers.get(FILE_HASH_HEADER), content: body.bytes.buffer,
+      contentType: request.headers.get('Content-Type'), expectedHash: parseExpectedFileHash(request.headers.get(EXPECTED_HASH_HEADER)) });
   } else {
     const parsed = await parseJsonObject(request, 15 * 1024 * 1024);
     if (!parsed.ok) return parsed.response;

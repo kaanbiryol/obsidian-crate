@@ -5,6 +5,7 @@ import { storedObjectMatchesMetadata } from '../storage';
 import type { RemoteFileVersion } from '../../../../protocol/sync-types';
 import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES } from '../../../../encryption/file-format';
 import { MAX_PREVIEW_BYTES } from '../../../../protocol/sync-limits';
+import { FILE_HASH_HEADER } from '../../../../protocol/http-headers';
 import { sha256Hex } from '../../../../platform/sha256';
 
 /** Read-only, bounded access to a retained object; never accepts arbitrary R2 keys. */
@@ -28,5 +29,5 @@ export async function handleFileVersionPreview(request: Request, bucket: R2Bucke
 		return corsResponse({ error: 'Stored file version content failed integrity validation' }, 503);
 	}
 	return new Response(content, { headers: { ...corsHeaders(), 'Content-Type': 'application/octet-stream',
-		'Content-Length': String(content.byteLength), 'X-File-Hash': version.hash, 'Cache-Control': 'private, no-store' } });
+		'Content-Length': String(content.byteLength), [FILE_HASH_HEADER]: version.hash, 'Cache-Control': 'private, no-store' } });
 }

@@ -9,6 +9,7 @@ import { createReminderListCursor } from './reminder-list-cursor';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import type { ApiFetch, DataMode, StoredConfig } from '../types';
 import type { CachedReminderSnapshot, LoadReminders, ReminderRecord, ReminderSourceIssue } from './types';
+import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 
 export interface ConfirmedReminderSnapshot {
 	reminders: ReminderRecord[];
@@ -192,7 +193,7 @@ export function useReminderSync({
 				issuesRef.current = result.issues;
 				setIssues(result.issues);
 				void commitConfirmedSnapshot(result.reminders, result.projects, {
-					etag: response.headers.get('ETag') ?? undefined, deltaBase: response.headers.get('X-Crate-Delta-Base') ?? undefined,
+					etag: response.headers.get('ETag') ?? undefined, deltaBase: response.headers.get(DELTA_BASE_HEADER) ?? undefined,
 				});
 			} catch (loadError) {
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;

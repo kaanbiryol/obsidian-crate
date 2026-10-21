@@ -9,6 +9,7 @@ import { sanitizePath } from '../request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
 import { putMaintenanceValue } from '../db';
+import { FILE_HASH_HEADER } from '../../../protocol/http-headers';
 
 const PREFIX = HISTORY_CHECKPOINT_PREFIX;
 // Ten pages cover the largest checkpoint within the Free plan's query budget.
@@ -145,7 +146,7 @@ export async function downloadCheckpointFile(request: Request, bucket: R2Bucket,
     if (!file) return response({ error: 'A file version required by this checkpoint is no longer available.' }, 410);
     const object = await bucket.get(revision);
     if (!object || object.size > fileTransportLimit(object.httpMetadata?.contentType) || !storedObjectMatchesMetadata(object, { hash: file.hash, size: file.size, storageKey: revision })) return response({ error: 'Checkpoint file contents are unavailable.' }, 503);
-    return new Response(object.body, { headers: { ...corsHeaders(), ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(object.size), 'X-File-Hash': file.hash } });
+    return new Response(object.body, { headers: { ...corsHeaders(), ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(object.size), [FILE_HASH_HEADER]: file.hash } });
 }
 
 /** Bounded sweep. Objects younger than a day may still be publishing their index. */

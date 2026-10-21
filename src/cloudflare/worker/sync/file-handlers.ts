@@ -22,6 +22,7 @@ import {
 } from './storage';
 import { isSha256Hex } from '../../../platform/validation';
 import { createManagedObjectKey } from '../../../protocol/storage-keys';
+import { FILE_HASH_HEADER, FILE_SIZE_HEADER, EXPECTED_HASH_HEADER, UPLOAD_OPERATION_HEADER, REVISION_HEADER } from '../../../protocol/http-headers';
 import { sha256Hex } from '../../../platform/sha256';
 
 export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, committers: UploadCommitters, expectedEncryption?: EncryptionServerState | null, resetGeneration?: string | null): Promise<Response> {
@@ -33,13 +34,13 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 	const safePath = sanitizePath(rawPath);
 	if (!safePath) return corsResponse({ error: 'Invalid path' }, 400);
 
-	const hashHeader = request.headers.get('X-File-Hash')?.trim().toLowerCase() || '';
+	const hashHeader = request.headers.get(FILE_HASH_HEADER)?.trim().toLowerCase() || '';
 	if (hashHeader && !isSha256Hex(hashHeader)) {
 		return corsResponse({ error: 'Invalid X-File-Hash header' }, 400);
 	}
 
-	const declaredSize = parseDeclaredSize(request.headers.get('X-File-Size'));
-	if (request.headers.has('X-File-Size') && declaredSize === null) {
+	const declaredSize = parseDeclaredSize(request.headers.get(FILE_SIZE_HEADER));
+	if (request.headers.has(FILE_SIZE_HEADER) && declaredSize === null) {
 		return corsResponse({ error: 'Invalid X-File-Size header' }, 400);
 	}
 	const contentLength = parseDeclaredSize(request.headers.get('Content-Length'));
@@ -50,8 +51,8 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		return corsResponse({ error: 'File exceeds 25MB limit' }, 413);
 	}
 
-	const expectedHash = parseExpectedFileHash(request.headers.get('X-Crate-Expected-Hash'));
-	if (!request.headers.has('X-Crate-Expected-Hash') || expectedHash === undefined) {
+	const expectedHash = parseExpectedFileHash(request.headers.get(EXPECTED_HASH_HEADER));
+	if (!request.headers.has(EXPECTED_HASH_HEADER) || expectedHash === undefined) {
 		return corsResponse({ error: 'Valid X-Crate-Expected-Hash header required' }, 400);
 	}
 	const expectedRemoteHash = expectedHash;
@@ -74,7 +75,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 
 		const hash = hashHeader || computedHash;
 		const size = declaredSize ?? computedSize;
-		const operation = await beginUploadOperation(db, request.headers.get('X-Crate-Upload-Operation'), { path: safePath, hash, size, contentType, expectedHash: expectedRemoteHash });
+		const operation = await beginUploadOperation(db, request.headers.get(UPLOAD_OPERATION_HEADER), { path: safePath, hash, size, contentType, expectedHash: expectedRemoteHash });
 		if (operation instanceof Response) return operation;
 		let previousFile: FileStorageRow | null = null;
 		try {
@@ -178,8 +179,8 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 			'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
 			'Content-Length': String(obj.size),
 			'Cache-Control': 'private, no-store',
-			'X-Crate-Revision': storedFile?.storageKey ?? '',
-			'X-File-Hash': storedFile?.hash || obj.customMetadata?.hash || '',
+			[REVISION_HEADER]: storedFile?.storageKey ?? '',
+			[FILE_HASH_HEADER]: storedFile?.hash || obj.customMetadata?.hash || '',
 			...corsHeaders(),
 		},
 	});

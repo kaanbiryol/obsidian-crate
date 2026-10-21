@@ -36,6 +36,7 @@ import {
 import { assertPortablePathNames, assertPortablePaths } from '../../protocol/portable-path';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
+import { FILE_HASH_HEADER, FILE_SIZE_HEADER, EXPECTED_HASH_HEADER, UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, REVISION_HEADER } from '../../protocol/http-headers';
 import {
 	getHeader,
 	TRANSFER_TIMEOUT_MS,
@@ -209,11 +210,11 @@ export class SyncWorkerApi {
 			method: 'PUT',
 			body: content,
 			headers: {
-				'X-Crate-Upload-Operation': operationId,
+				[UPLOAD_OPERATION_HEADER]: operationId,
 				'Content-Type': contentType,
-				'X-File-Hash': hash,
-				'X-File-Size': String(size),
-				'X-Crate-Expected-Hash': expectedHash === null ? 'absent' : expectedHash,
+				[FILE_HASH_HEADER]: hash,
+				[FILE_SIZE_HEADER]: String(size),
+				[EXPECTED_HASH_HEADER]: expectedHash === null ? 'absent' : expectedHash,
 			},
 		}, TRANSFER_TIMEOUT_MS);
 	}
@@ -235,8 +236,8 @@ export class SyncWorkerApi {
 			content: body,
 			contentType: getHeader(headers, 'Content-Type') || 'application/octet-stream',
 			size: Number.isSafeInteger(contentLength) ? contentLength : body.byteLength,
-			hash: getHeader(headers, 'X-File-Hash') || '',
-			revision: getHeader(headers, 'X-Crate-Revision') || undefined,
+			hash: getHeader(headers, FILE_HASH_HEADER) || '',
+			revision: getHeader(headers, REVISION_HEADER) || undefined,
 		};
 		if (!this.encryption) return result;
 		const opened = await this.encryption.download(path, body, result);
@@ -328,7 +329,7 @@ export class SyncWorkerApi {
 		return this.http.requestJson<BatchUploadResponse>('/sync/batch-upload', {
 			method: 'POST',
 			body: JSON.stringify({ files, ...(bulkNew ? { bulkNewFiles: true } : {}) }),
-			headers: { 'X-Crate-Upload-Operations': files.map(file => file.operationId).join(',') },
+			headers: { [UPLOAD_OPERATIONS_HEADER]: files.map(file => file.operationId).join(',') },
 		}, TRANSFER_TIMEOUT_MS);
 	}
 
@@ -413,7 +414,7 @@ export class SyncWorkerApi {
 		return this.http.requestJson('/sync/restore-version', {
 			method: 'POST',
 			body: JSON.stringify(request),
-			headers: { 'X-Crate-Upload-Operation': request.operationId },
+			headers: { [UPLOAD_OPERATION_HEADER]: request.operationId },
 		});
 	}
 }

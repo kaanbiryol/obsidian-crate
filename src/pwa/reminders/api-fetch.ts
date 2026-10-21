@@ -2,6 +2,7 @@ import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '@
 import { capturePwaSession } from '../session-generation';
 import { ConnectionError } from '../connection/issues';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
+import { CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '@/protocol/http-headers';
 import { detectWebSessionName } from '../session-label';
 import { prepareReminderEncryption } from './encryption-session';
 import type { EncryptedReminderApi } from './encrypted-reminder-api';
@@ -26,12 +27,12 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		// after logout clears local state; it can only revoke this captured token.
 		const revokingSession = init.method === 'DELETE' && path === '/auth/session';
 		const headers = new Headers(init.headers ?? {});
-		headers.set('X-Crate-Client-Session', clientSession);
+		headers.set(CLIENT_SESSION_HEADER, clientSession);
 		headers.set(CRATE_WEB_SESSION_NAME_HEADER, encodeURIComponent(detectWebSessionName()));
 		if (typeof init.body === 'string') {
 			try {
 				const body = JSON.parse(init.body) as { operationId?: unknown };
-				if (typeof body.operationId === 'string') headers.set('X-Crate-Operation-Id', body.operationId);
+				if (typeof body.operationId === 'string') headers.set(OPERATION_ID_HEADER, body.operationId);
 			} catch { /* Non-JSON requests use their server request ID. */ }
 		}
 		headers.set(CRATE_PROTOCOL_HEADER, String(CRATE_PLUGIN_PROTOCOL.current));

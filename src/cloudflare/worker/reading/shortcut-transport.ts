@@ -1,5 +1,6 @@
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
+import { REQUEST_ID_HEADER } from '@/protocol/http-headers';
 import release from '../../server-release.json';
 import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 import { ReadingError } from './common';
@@ -33,7 +34,7 @@ export async function shortcutLaunchResponse(request: Request, response: Respons
     data = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
   }
   catch { data = {}; }
-  const requestId = response.headers.get('X-Crate-Request-Id') ?? crypto.randomUUID();
+  const requestId = response.headers.get(REQUEST_ID_HEADER) ?? crypto.randomUUID();
   if (!response.ok) {
     const diagnostic = { stage: transport.kind === 'exchange' ? 'pair' : 'prepare', status: response.status,
       code: typeof data.code === 'string' && /^[a-z_]{1,64}$/.test(data.code) ? data.code : 'request_failed', requestId,
@@ -52,6 +53,6 @@ export async function shortcutLaunchResponse(request: Request, response: Respons
   headers.set('Content-Type', 'application/json');
   headers.delete('Content-Length');
   headers.set('Cache-Control', 'no-store');
-  headers.set('X-Crate-Request-Id', requestId);
+  headers.set(REQUEST_ID_HEADER, requestId);
   return new Response(JSON.stringify(data), { status: response.status, headers });
 }
