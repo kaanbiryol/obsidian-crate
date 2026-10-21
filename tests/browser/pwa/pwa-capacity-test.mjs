@@ -6,8 +6,7 @@ import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs'
 // Use the built production app. Only the reminder API is replaced with local,
 // deterministic data; all list, navigation, editor and cache code is real.
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const cardSelector = '.sidebar-reminder-card-wrapper';
 const pageSize = 200;
 const round = value => Math.round(value);

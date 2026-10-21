@@ -17,6 +17,9 @@ function isAuthorized(req) {
 	return req.headers.authorization === `Bearer ${previewAuthToken}`;
 }
 
+const listeningOrigin = server => `http://127.0.0.1:${server.address().port}`;
+
+// Without an origin, requests resolve against the address this server listens on.
 export function createPwaPreviewServer({ assets, origin, failMutationPaths = [], folderPath = 'Reminders' }) {
 	let state = createInitialState(folderPath);
 	const receipts = new Map();
@@ -41,7 +44,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [],
 	} = assets;
 
 	const handleRequest = async (req, res) => {
-		const url = new URL(req.url || '/', origin);
+		const url = new URL(req.url || '/', origin ?? listeningOrigin(server));
 		const path = url.pathname;
 		const method = req.method || 'GET';
 		if (method !== 'GET' && failMutationPaths.includes(path)) {
@@ -322,7 +325,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [],
 
 		sendJson(res, 404, { error: 'Not found' });
 	};
-	return http.createServer((req, res) => {
+	const server = http.createServer((req, res) => {
 		void handleRequest(req, res).catch(error => {
 			// Closing a browser can abort an in-flight request body during teardown.
 			if (req.aborted && error.code === 'ECONNRESET') return;
@@ -331,14 +334,14 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [],
 			else res.destroy(error);
 		});
 	});
+	return server;
 }
 
 export async function listenPwaPreviewServer({ port, assets, failMutationPaths = [] }) {
-	const origin = `http://127.0.0.1:${port}`;
-	const server = createPwaPreviewServer({ assets, origin, failMutationPaths });
+	const server = createPwaPreviewServer({ assets, failMutationPaths });
 	await new Promise((resolve, reject) => {
 		server.once('error', reject);
 		server.listen(port, '127.0.0.1', resolve);
 	});
-	return { server, origin };
+	return { server, origin: listeningOrigin(server) };
 }

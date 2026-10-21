@@ -4,8 +4,7 @@ import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 try {
   for (const [browserType, theme] of [chromium, webkit].flatMap(browser => ['light', 'dark'].map(theme => [browser, theme]))) {
     const browser = await browserType.launch();

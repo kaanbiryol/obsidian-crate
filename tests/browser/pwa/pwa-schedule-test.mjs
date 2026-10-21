@@ -318,8 +318,7 @@ let previewAssets;
 function scheduleScenario(engine, name, run, { reducedMotion = 'no-preference', list = reminders } = {}) {
 	test(`PWA schedule ${engine.name()}: ${name}`, { timeout: 90000 }, async () => {
 		previewAssets ??= buildPwaPreviewAssets();
-		const { server } = await listenPwaPreviewServer({ port: 0, assets: await previewAssets });
-		const origin = `http://127.0.0.1:${server.address().port}`;
+		const { server, origin } = await listenPwaPreviewServer({ port: 0, assets: await previewAssets });
 		let browser, page;
 		try {
 			await mkdir('test-results/schedule', { recursive: true });

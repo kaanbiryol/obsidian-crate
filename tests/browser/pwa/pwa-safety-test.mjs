@@ -2,10 +2,9 @@ import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets, failMutationPaths: ['/reminders/update'] });
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets, failMutationPaths: ['/reminders/update'] });
 let revocations = 0;
 server.on('request', req => { if (req.method === 'DELETE' && req.url === '/auth/session') revocations += 1; });
-const origin = `http://127.0.0.1:${server.address().port}`;
 try {
 	for (const browserType of [chromium, webkit]) {
 		revocations = 0;

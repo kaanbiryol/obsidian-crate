@@ -491,13 +491,13 @@ function indicatorScenario(engine) {
   const name = engine.name();
   test(`PWA dock ${name}: indicator travel, reversal and settled pixels`, { timeout: 30000 }, async () => {
     previewAssets ??= buildPwaPreviewAssets();
-    const { server } = await listenPwaPreviewServer({ port: 0, assets: await previewAssets });
+    const { server, origin } = await listenPwaPreviewServer({ port: 0, assets: await previewAssets });
     let browser;
     try {
       await mkdir('test-results/dock', { recursive: true });
       browser = await engine.launch();
       const page = await browser.newPage({ viewport: { width: 393, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true, colorScheme: 'dark' });
-      await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders`);
+      await page.goto(`${origin}/notifications?folder=Reminders`);
       const dock = () => page.locator('.crate-feature-panel[data-active="true"] .pwa-dock');
       // DOM bounds miss a fractional-pixel repaint when a transform stops being
       // composited. Compare the final animated frame with the settled pixels.

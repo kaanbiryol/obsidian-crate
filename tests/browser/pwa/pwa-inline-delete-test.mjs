@@ -3,7 +3,7 @@ import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
 const assets = await buildPwaPreviewAssets();
 for (const type of [chromium, webkit]) {
- const { server } = await listenPwaPreviewServer({ port: 0, assets });
+ const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
  try {
   const browser = await type.launch();
   try {
@@ -13,7 +13,7 @@ for (const type of [chromium, webkit]) {
     return stage && !document.querySelector('.reminder-action-chips')?.inert
      && Math.abs(new DOMMatrixReadOnly(getComputedStyle(stage).transform).m42) < 0.1;
    });
-   await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders&tab=inbox`);
+   await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
    const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
    await card.tap();
    const title = page.locator('[aria-label="Reminder title"]');

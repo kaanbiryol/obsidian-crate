@@ -5,8 +5,7 @@ import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs'
 // Real built PWA and native IndexedDB, with controlled list/network responses.
 // Worker runtime tests separately exercise actual oversized and duplicate sources.
 const assets = await buildPwaPreviewAssets({ assetVersion: 'source-issues-regression' });
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const issues = [
   { path: 'Reminders/Large.md', reason: 'Split this note into files of 1 MiB or smaller to use its reminders in the web app. The vault file remains synced.' },
   { path: 'Reminders/Original.md', reason: 'Duplicate reminder ID. Repair the reminder metadata in Obsidian.' },

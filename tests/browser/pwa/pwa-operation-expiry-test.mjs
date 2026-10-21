@@ -6,8 +6,7 @@ import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs'
 import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'operation-expiry-regression' });
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const expiredId = 'e1_00000001_11111111-1111-4111-8111-111111111111';
 const key = `crate-reminder-outbox:v1:${createHash('sha256').update(previewAuthToken).digest('hex')}:Reminders:${expiredId}`;
 const notice = page => page.getByRole('region', { name: 'Change needs review: Reminder', exact: true });

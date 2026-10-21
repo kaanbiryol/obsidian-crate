@@ -56,8 +56,7 @@ const pickers = [
 	{ button: 'Recurrence', dialog: 'Repeat reminder', selector: '.pwa-repeat-picker-sheet' },
 ];
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 try {
 	for (const browserType of [chromium, webkit]) {
 		const browser = await browserType.launch();

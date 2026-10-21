@@ -5,7 +5,7 @@ import { checkSaveLinkKeyboard } from './pwa-sheet-field-checks.mjs';
 import { checkSheetDragPosition } from './pwa-sheet-drag-checks.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 try {
 	for (const engine of [chromium, webkit]) {
 		const browser = await engine.launch();
@@ -15,7 +15,7 @@ try {
 				id: 'sheet-focus-test', folderPath: 'Reading', generation: 'sheet-focus-generation', expiresAt: Date.now() + 86400000,
 			} }));
 			await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
-			await page.goto(`http://127.0.0.1:${server.address().port}/notifications?section=reading`);
+			await page.goto(`${origin}/notifications?section=reading`);
 			await page.evaluate(() => {
 				window.caretFrames = [];
 				const sample = () => {

@@ -6,13 +6,13 @@ import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets();
 for (const browserType of [chromium, webkit]) {
-  const { server } = await listenPwaPreviewServer({ port: 0, assets });
+  const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
   const browser = await browserType.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders&tab=inbox`);
+    await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
     await page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }).tap();
     const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
     const replaceTitle = async text => {
@@ -250,9 +250,9 @@ for (const browserType of [chromium, webkit]) {
     assert.equal(inboxBody.project, 'Inbox');
     assert.equal(inboxBody.priority, 1);
     await expect(title).toBeHidden();
-    await verifyRepeatPicker(browser, server);
-    await verifyChronoSchedules(browser, server);
-    await verifyRecurrenceTimezones(browser, server);
+    await verifyRepeatPicker(browser, origin);
+    await verifyChronoSchedules(browser, origin);
+    await verifyRecurrenceTimezones(browser, origin);
     assert.deepEqual(errors, []);
     console.log(`${browserType.name()}: Editor autocomplete after links, caret, undo/redo, marker preservation, schedule validation, saved Markdown, draft reload, validation and history isolation passed`);
   } finally {
@@ -261,8 +261,7 @@ for (const browserType of [chromium, webkit]) {
   }
 }
 
-async function verifyChronoSchedules(browser, server) {
-  const origin = `http://127.0.0.1:${server.address().port}`;
+async function verifyChronoSchedules(browser, origin) {
   for (const [schedule, instant, content = 'Call Alex', datePart = schedule] of [
     ['in 5 minutes', '2026-09-21T13:05:37.123Z'],
     ['in 2 hours', '2026-09-21T15:00:37.123Z'],
@@ -312,8 +311,7 @@ async function verifyChronoSchedules(browser, server) {
   }
 }
 
-async function verifyRecurrenceTimezones(browser, server) {
-  const origin = `http://127.0.0.1:${server.address().port}`;
+async function verifyRecurrenceTimezones(browser, origin) {
   for (const [timezone, dueDatetime, precision = {}] of [
     ['UTC', '2026-09-28T09:00:30.123Z', { second: 30, millisecond: 123 }],
     ['America/New_York', '2026-09-28T13:00:37.123Z'],
@@ -364,8 +362,7 @@ async function verifyRecurrenceTimezones(browser, server) {
 }
 
 
-async function verifyRepeatPicker(browser, server) {
-  const origin = `http://127.0.0.1:${server.address().port}`;
+async function verifyRepeatPicker(browser, origin) {
   for (const scenario of ['unchanged', 'reverted', 'all-day', 'implicit monthly', 'change', 'add', 'remove']) {
     await fetch(`${origin}/preview/reset`, { method: 'POST' });
     const page = await browser.newPage({ timezoneId: 'Europe/Berlin', viewport: { width: 390, height: 844 }, hasTouch: true });

@@ -6,8 +6,7 @@ import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs'
 // Exercise production rendering and mutations with deterministic reminder API
 // responses. Browser timings are not pass/fail performance thresholds.
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const cardSelector = '.sidebar-reminder-card-wrapper';
 const pageSize = 200;
 

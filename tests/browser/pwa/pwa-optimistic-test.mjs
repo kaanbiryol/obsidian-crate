@@ -4,8 +4,7 @@ import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs'
 import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 
 try {
 	for (const browserType of [chromium, webkit]) {

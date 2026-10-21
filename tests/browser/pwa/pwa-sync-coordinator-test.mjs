@@ -5,8 +5,7 @@ import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
 import { switchFeature } from './pwa-feature-navigation.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const session = { id: 'reminders:coordinator:g1', token: previewAuthToken, generation: 'g1', folderPath: 'Reading', source: 'reminders', expiresAt: Date.now() + 86400000 };
 
 async function setup(browser, { reading = true, reminders = true, pendingReading = false, pendingReminder = false } = {}) {

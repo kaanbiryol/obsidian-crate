@@ -7,7 +7,7 @@ import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { checkProjectMouseFeedback, checkProjectTouchFeedback } from './pwa-project-touch-checks.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 try {
   for (const type of [chromium, webkit]) {
     const browser = await type.launch();
@@ -19,7 +19,7 @@ try {
         projects, reminders: projects.map((project, index) => ({ id: `project-${index}`, content: `Reminder ${index}`, project,
           priority: 4, completed: false, filePath: `Reminders/${project}.md`, lineNumber: 1 })),
       } }));
-      await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders&tab=browse`);
+      await page.goto(`${origin}/notifications?folder=Reminders&tab=browse`);
       const target = page.getByRole('button', { name: 'Open Errands', exact: true });
       await expect(target).toBeVisible();
       const surface = page.locator('[data-project="Errands"] .premium-project-content');
@@ -227,7 +227,7 @@ try {
       assert.equal(await page.evaluate(() => window.projectDocumentMarker), documentMarker, 'History swipe must stay in this document');
       assert.equal(await page.evaluate(() => history.length), detailHistoryLength, 'Repeated project visits must reuse their history slot');
       await checkBackGesture(page, '.reminders-browse-view');
-      await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders&project=Personal%2FFinance`);
+      await page.goto(`${origin}/notifications?folder=Reminders&project=Personal%2FFinance`);
       await expect(page.getByRole('heading', { name: 'Personal/Finance', exact: true })).toBeVisible();
       await page.waitForFunction(() => history.state?.reminderProject === 'Personal/Finance');
       await checkBackGesture(page, '.pwa-project-layer', true);
@@ -236,7 +236,7 @@ try {
       await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
       await expect(page.locator('.pwa-screen > .pwa-dock')).not.toHaveAttribute('inert', '');
       console.log(`${type.name()}: project overlay, back navigation, and edge gesture passed`);
-      await checkProjectMouseFeedback(browser, `http://127.0.0.1:${server.address().port}`);
+      await checkProjectMouseFeedback(browser, origin);
       console.log(`${type.name()}: project touch hover and mouse feedback passed in both themes`);
     } finally { await browser.close(); }
   }

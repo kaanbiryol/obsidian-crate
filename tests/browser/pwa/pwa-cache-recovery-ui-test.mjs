@@ -5,8 +5,7 @@ import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs'
 import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'cache-recovery-regression' });
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const cacheNotice = page => page.getByRole('region', { name: 'Offline copy unavailable', exact: true });
 const operationId = '11111111-1111-4111-8111-111111111111';
 const pendingKey = `crate-reminder-outbox:v1:${createHash('sha256').update('old-session').digest('hex')}:Reminders:${operationId}`;

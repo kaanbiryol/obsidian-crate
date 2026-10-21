@@ -8,8 +8,7 @@ const assets = await buildPwaPreviewAssets();
 for (const browserType of [chromium, webkit]) {
 	// Mutations settle after optimistic removal. Isolate browser fixtures so a
 	// late deletion cannot race a reset and remove the next browser's reminder.
-	const { server } = await listenPwaPreviewServer({ port: 0, assets });
-	const origin = `http://127.0.0.1:${server.address().port}`;
+	const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 	try {
 		const browser = await browserType.launch();
 		try {

@@ -929,8 +929,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: open reader follows extraction transitions`, { timeout: 60000 }, async () => {
   const { buildPwaPreviewAssets } = await import('../../../scripts/pwa-preview-assets.mjs');
   const { listenPwaPreviewServer } = await import('../../../scripts/pwa-preview-server.mjs');
-  const { server } = await listenPwaPreviewServer({ port: 0, assets: await buildPwaPreviewAssets() });
-  const origin = `http://127.0.0.1:${server.address().port}`;
+  const { server, origin } = await listenPwaPreviewServer({ port: 0, assets: await buildPwaPreviewAssets() });
   const browser = await engine.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', serviceWorkers: 'block' });

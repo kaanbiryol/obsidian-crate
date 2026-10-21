@@ -45,8 +45,7 @@ const hostCss = `
 .setting-item{display:flex}.setting-item-control{display:flex;gap:8px}button{font:inherit;color:inherit;border:1px solid var(--background-modifier-border);border-radius:6px;background:transparent}
 `;
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1';
 await mkdir('.generated/pwa-pairing', { recursive: true });
 

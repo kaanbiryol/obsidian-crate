@@ -6,8 +6,7 @@ import { createInitialState } from '../../../scripts/pwa-preview-fixtures.mjs';
 
 const content = 'A long reminder with enough text to scroll inside the title. '.repeat(16).trim();
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 
 async function selectionState(title) {
 	return title.evaluate(element => {

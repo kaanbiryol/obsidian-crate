@@ -5,8 +5,7 @@ import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs'
 // Built application, native localStorage/IndexedDB and Web Locks. The HTTP preview
 // implements mutation receipts; delayed list responses expose stale-read races.
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const row = (page, title) => page.getByRole('group', { name: `${title}. Press Enter to edit reminder.`, exact: true });
 const ids = page => page.locator('.sidebar-reminder-card-wrapper').evaluateAll(nodes => nodes.map(node => node.closest('[data-reminder-id]')?.getAttribute('data-reminder-id')));
 

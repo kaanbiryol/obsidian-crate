@@ -6,8 +6,7 @@ import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
 import { verifyReadingEnrollmentAuthority } from './pwa-reading-session-checks.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'auth-recovery-regression' });
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const authKey = 'crate-reminders-auth-token';
 const cardName = 'Check this article. Press Enter to edit reminder.';
 const outboxEntries = page => page.evaluate(() => Object.keys(localStorage)

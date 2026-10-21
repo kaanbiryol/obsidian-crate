@@ -19,8 +19,7 @@ const state = feature => {
     scope: { id: scope.id, folderPath: scope.folderPath, purpose: scope.purpose, keyId: scope.data.id, notificationKeyId: scope.notifications.id } };
 };
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1';
 await mkdir('.generated/encryption-onboarding', { recursive: true });
 

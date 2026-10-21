@@ -8,8 +8,7 @@ const version = 'notice-before';
 // Update checks run on launch, foreground and reconnect, not on a timer.
 const returnToForeground = page => page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
 const assets = await buildPwaPreviewAssets({ assetVersion: version });
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 await mkdir('test-results/update-notice', { recursive: true });
 try {
   for (const engine of [chromium, webkit]) {

@@ -18,8 +18,7 @@ async function expectTheme(page, scheme, preference) {
 }
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = 'http://127.0.0.1:' + server.address().port;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 await mkdir('test-results/settings', { recursive: true });
 try {
 	for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {

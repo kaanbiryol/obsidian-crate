@@ -3,8 +3,7 @@ import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const session = { token: 'reading-appearance-test', id: 'reading-appearance-test', folderPath: 'Reading', generation: 'appearance-test', expiresAt: Date.now() + 86400000 };
 const items = [1, 2].map(index => ({
   crate_reading_version: 1, crate_reading_id: `67de6c50-c70c-4c85-93f2-${String(index).padStart(12, '0')}`,

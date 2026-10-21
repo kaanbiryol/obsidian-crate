@@ -6,8 +6,7 @@ import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs'
 import { previewEnrollmentToken } from '../../../scripts/pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'startup-empty-regression' });
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 try {
  for (const engine of [chromium, webkit]) {
  const browser = await engine.launch();

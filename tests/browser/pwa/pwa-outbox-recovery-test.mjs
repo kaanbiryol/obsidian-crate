@@ -6,8 +6,7 @@ import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs'
 import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'outbox-recovery-regression' });
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const key = (token, id, folder = 'Reminders') => `crate-reminder-outbox:v1:${createHash('sha256').update(token).digest('hex')}:${encodeURIComponent(folder)}:${id}`;
 const id = digit => `${digit.repeat(8)}-${digit.repeat(4)}-4${digit.repeat(3)}-8${digit.repeat(3)}-${digit.repeat(12)}`;
 const badKey = key(previewAuthToken, id('1'));

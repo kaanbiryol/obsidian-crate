@@ -6,8 +6,7 @@ import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
 // Browser/provider and registration responses are controlled here. Real Worker
 // authentication, endpoint ownership and D1 upserts have separate runtime tests.
 const assets = await buildPwaPreviewAssets({ assetVersion: 'push-registration-regression' });
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const authKey = 'crate-reminders-auth-token';
 const providerKey = 'test-push-provider';
 const firstEndpoint = 'https://fcm.googleapis.com/fcm/send/first';

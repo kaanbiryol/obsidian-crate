@@ -29,7 +29,7 @@ async function swipe(session, point, distance) {
 }
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 try {
   for (const browserType of [chromium, webkit]) {
     const browser = await browserType.launch();
@@ -45,7 +45,7 @@ try {
           completed: false, filePath: 'Reminders/Inbox.md', revision: 'one' }],
         projects: ['Inbox', projectName],
       } }));
-      await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders&tab=inbox`);
+      await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
       await page.locator('[data-reminder-id="chips"]').tap();
       const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
       const editor = page.getByRole('dialog', { name: 'Edit reminder', exact: true });

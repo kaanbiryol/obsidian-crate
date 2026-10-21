@@ -4,8 +4,7 @@ import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'draft-recovery-regression' });
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const key = 'crate-reminder-draft:Reminders:new';
 const bad = JSON.stringify({ mode: 'create', draft: { content: 'Unsaved title', description: { text: 'Keep exact details 🗒️ <script>window.injected=true</script>' },
 	project: 'Inbox', defaultProject: 'Inbox', priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: false } });

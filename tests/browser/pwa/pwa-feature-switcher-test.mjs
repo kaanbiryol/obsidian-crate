@@ -7,8 +7,7 @@ import { mkdir } from 'node:fs/promises';
 import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const headerGeometry = page => page.locator('.crate-feature-panel[data-active="true"] .view-header').evaluate(header => {
   const rect = selector => {
     const bounds = header.querySelector(selector).getBoundingClientRect();

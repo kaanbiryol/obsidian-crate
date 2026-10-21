@@ -9,8 +9,7 @@ import { swipe } from '../support/browser-touch-swipe.mjs';
 import { recordSwipeDiagnostics, saveSwipeFailure } from '../support/browser-swipe-diagnostics.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 try {
 	for (const browserType of [chromium, webkit]) {
 		const browser = await browserType.launch();
