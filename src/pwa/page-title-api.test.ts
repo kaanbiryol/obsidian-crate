@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { makeApiFetch } from './api';
+import { makeApiFetch } from './reminders/api-fetch';
 import { fetchPageTitle } from './reminders/reminder-api';
 import { invalidatePwaSession } from './session-generation';
 

@@ -8,7 +8,7 @@ import worker from './index';
 import { handleSubscribe, handleUnsubscribe } from './notifications/subscription-handlers';
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { writeCommittedMarkdownFile } from './storage';
-import { makeApiFetch } from '@/pwa/api';
+import { makeApiFetch } from '@/pwa/reminders/api-fetch';
 import { performPwaLogout } from '@/pwa/connection/usePwaSessionLifecycle';
 import { invalidatePwaSession } from '@/pwa/session-generation';
 import { createReminderOperationId } from '@/protocol/reminder-operation';

@@ -1,34 +1,15 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol/server-info';
-import { capturePwaSession } from './session-generation';
-import { ConnectionError } from './connection/issues';
+import { capturePwaSession } from '../session-generation';
+import { ConnectionError } from '../connection/issues';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
-import { detectWebSessionName } from './session-label';
-import { prepareReminderEncryption } from './reminders/encryption-session';
-import type { EncryptedReminderApi } from './reminders/encrypted-reminder-api';
-import type { StoredReminderKeys } from './encryption/encryption-keys';
-import { EncryptionScopeChangedError, routeFolderRequest } from './encryption/encryption-folder-routing';
-import { requestSharedFeaturesRefresh } from './shared-features';
+import { detectWebSessionName } from '../session-label';
+import { prepareReminderEncryption } from './encryption-session';
+import type { EncryptedReminderApi } from './encrypted-reminder-api';
+import type { StoredReminderKeys } from '../encryption/encryption-keys';
+import { EncryptionScopeChangedError, routeFolderRequest } from '../encryption/encryption-folder-routing';
+import { requestSharedFeaturesRefresh } from '../shared-features';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
-import { requireCompatibleServer as fetchCompatibleServer } from './server-compatibility';
-
-export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
-	const protocol = await requireCompatibleServer();
-	const response = await fetch('/notifications/reminders-exchange', {
-		signal: AbortSignal.timeout(30_000),
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(protocol) },
-		body: JSON.stringify({ token, deviceName: detectWebSessionName(), ...(previousAuthToken ? { previousAuthToken } : {}) }),
-	});
-
-	if (!response.ok) {
-		const body = await response.text().catch(() => '');
-		throw new ConnectionError(response.status === 401 ? 'reconnect' : 'unavailable', body || response.statusText);
-	}
-
-	const result = await response.json() as { authToken?: string };
-	if (!result.authToken) throw new ConnectionError('reconnect', 'Missing auth token');
-	return result.authToken;
-}
+import { requireCompatibleProtocol } from '../server-compatibility';
 
 export function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {
 	const sessionCurrent = capturePwaSession();
@@ -54,7 +35,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 			} catch { /* Non-JSON requests use their server request ID. */ }
 		}
 		headers.set(CRATE_PROTOCOL_HEADER, String(CRATE_PLUGIN_PROTOCOL.current));
-		if (isCrateMutation(path, init.method)) headers.set(CRATE_PROTOCOL_HEADER, String(await requireCompatibleServer()));
+		if (isCrateMutation(path, init.method)) headers.set(CRATE_PROTOCOL_HEADER, String(await requireCompatibleProtocol()));
 		if (!sessionCurrent() && !revokingSession) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		headers.set('Authorization', `Bearer ${authToken}`);
 		if (keys) {
@@ -84,7 +65,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		if (!refresh && encryptionOff && !keys) return Promise.resolve();
 		if (refresh) preparing = undefined;
 		return preparing ??= prepareReminderEncryption(authToken, rawFetch, refresh).then(async value => {
-			const Constructor = value ? (await import('./reminders/encrypted-reminder-api')).EncryptedReminderApi : null;
+			const Constructor = value ? (await import('./encrypted-reminder-api')).EncryptedReminderApi : null;
 			if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed before unlocking');
 			keys = value;
 			encrypted = keys && Constructor ? new Constructor(keys, rawFetch) : null;
@@ -108,8 +89,3 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 	return Object.assign(apiFetch, { ready });
 }
 
-/** Fetched per mutation: operation ids take the server's current day from this response. */
-async function requireCompatibleServer(): Promise<number> {
-	const info = await fetchCompatibleServer();
-	return Math.min(CRATE_PLUGIN_PROTOCOL.current, info.protocol.current);
-}

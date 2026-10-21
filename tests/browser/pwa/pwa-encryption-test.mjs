@@ -29,7 +29,7 @@ export * from './src/sync/worker-api/client';
 export * from './src/sync/encryption/encrypted-files';
 export * from './src/sync/worker-api/sync';
 export * from './src/sync/durability/durable-restores';
-export { makeApiFetch } from './src/pwa/api';
+export { makeApiFetch } from './src/pwa/reminders/api-fetch';
 export { AUTH_TOKEN_KEY } from './src/pwa/config';
 export * from './src/pwa/encryption/encrypted-push';
 export * from './src/pwa/encryption/encryption-keys';

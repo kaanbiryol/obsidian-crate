@@ -1,9 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../protocol/web-session';
-import { exchangeEnrollmentToken, makeApiFetch } from './api';
+import { exchangeEnrollmentToken } from './connection/enrollment-exchange';
+import { makeApiFetch } from './reminders/api-fetch';
 
 vi.mock('./reminders/encryption-session', () => ({ prepareReminderEncryption: async () => null, reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }) }));
-vi.mock('./server-compatibility', () => ({ requireCompatibleServer: vi.fn().mockResolvedValue({ protocol: { current: 1, oldestCompatible: 1 } }) }));
+vi.mock('./server-compatibility', () => ({ requireCompatibleProtocol: vi.fn().mockResolvedValue(1) }));
 afterEach(() => vi.unstubAllGlobals());
 
 it.each([false, true])('reports a session label during enrollment and existing-session requests (standalone=%s)', async standalone => {

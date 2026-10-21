@@ -15,7 +15,8 @@ import {
 	saveConfig,
 } from '../config';
 import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from '../install-enrollment';
-import { exchangeEnrollmentToken, makeApiFetch } from '../api';
+import { exchangeEnrollmentToken } from './enrollment-exchange';
+import { makeApiFetch } from '../reminders/api-fetch';
 import type { ShowToast, StartTab, StoredConfig } from '../types';
 
 export function usePwaBootstrap({

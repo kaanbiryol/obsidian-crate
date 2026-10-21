@@ -1,6 +1,6 @@
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { afterEach, expect, it, vi } from 'vitest';
-import { makeApiFetch } from './api';
+import { makeApiFetch } from './reminders/api-fetch';
 import { AUTH_TOKEN_KEY } from './config';
 import { READING_SESSION_KEY } from './reading/storage';
 import { invalidatePwaSession } from './session-generation';

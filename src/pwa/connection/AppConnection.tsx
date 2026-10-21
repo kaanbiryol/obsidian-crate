@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
-import { makeApiFetch } from '../api';
+import { makeApiFetch } from '../reminders/api-fetch';
 import { onConnectionExpired } from './expiration';
 import type { ConnectionIssue } from './issues';
 import { READING_SESSION_KEY, readingSession } from '../reading/storage';
