@@ -41,7 +41,7 @@ Maintainer and contributor documentation for the plugin, Worker and PWA. User-fa
 ## PWA and shared UI
 
 - [PWA storage recovery](pwa-storage-recovery.md) - browser storage for confirmed offline copies, pending commands and drafts, and how it recovers.
-- [Tab convergence](pwa-tab-convergence.md) - how confirmed reminder changes reach other open tabs.
+- [Tab convergence](pwa-tab-convergence.md) - how confirmed reminder changes reach other open tabs, and how Reading tabs share one queue.
 - [UI styling](ui-styling.md) - shared plugin and PWA components, Sass and visual rules.
 
 ## Server and deployment

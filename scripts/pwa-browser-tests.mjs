@@ -48,6 +48,7 @@ export const browserScripts = [
 	'tests/browser/pwa/pwa-push-registration-test.mjs',
 	'tests/browser/pwa/pwa-source-issues-test.mjs',
 	'tests/browser/pwa/pwa-multitab-test.mjs',
+	'tests/browser/pwa/pwa-reading-multitab-test.mjs',
 	'tests/browser/pwa/pwa-clock-test.mjs',
 	'tests/browser/pwa/pwa-optimistic-test.mjs',
 	'tests/browser/pwa/pwa-install-test.mjs',

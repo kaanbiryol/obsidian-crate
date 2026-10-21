@@ -4,7 +4,8 @@
     "tests/browser/pwa/pwa-sync-coordinator-test.mjs": "local chromium/webkit run on 2026-09-29: 12.4 seconds",
     "tests/browser/pwa/pwa-reading-encryption-test.mjs": "local encrypted Reading workflow; conservative 45-second scheduling estimate",
     "tests/browser/pwa/pwa-reading-encryption-storage-test.mjs": "local Chromium/WebKit storage and key recovery; conservative 10-second scheduling estimate",
-    "tests/browser/pwa/pwa-web-app-unlock-test.mjs": "local Chromium/WebKit combined key import and draft recovery; conservative 10-second scheduling estimate"
+    "tests/browser/pwa/pwa-web-app-unlock-test.mjs": "local Chromium/WebKit combined key import and draft recovery; conservative 10-second scheduling estimate",
+    "tests/browser/pwa/pwa-reading-multitab-test.mjs": "local Chromium/WebKit run on 2026-10-21: 23.5 seconds; conservative 25-second scheduling estimate"
   },
   "seconds": {
 	"tests/browser/pwa/pwa-encryption-onboarding-test.mjs": 30,
@@ -62,6 +63,7 @@
     "tests/browser/pwa/pwa-encryption-regressions-test.mjs": 45,
     "tests/browser/pwa/pwa-reading-encryption-test.mjs": 45,
     "tests/browser/pwa/pwa-reading-encryption-storage-test.mjs": 10,
-    "tests/browser/pwa/pwa-web-app-unlock-test.mjs": 10
+    "tests/browser/pwa/pwa-web-app-unlock-test.mjs": 10,
+    "tests/browser/pwa/pwa-reading-multitab-test.mjs": 25
   }
 }
