@@ -1,5 +1,5 @@
 import { Notice, Platform, setIcon, type App } from 'obsidian';
-import { SharedModal } from '../plugin/SharedModal';
+import { SharedModal } from '../plugin/shared-modal';
 import type { FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 import { MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import type { SyncRuntime } from '../../sync/runtime/runtime';

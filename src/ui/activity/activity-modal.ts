@@ -16,7 +16,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { ActivitySheet } from './ActivitySheet';
 import { ActivityTabs } from './ActivityTabs';
 import { ActivityHeader } from './activity-header';
-import { hideNativeModalCloseButton } from '../plugin/modalShell';
+import { hideNativeModalCloseButton } from '../plugin/shared-modal';
 import type { CrateSettings } from '../../plugin/settings-types';
 import type { ConflictRecord, SyncState, SyncActivityProgress } from '../../sync/types';
 import { ActivityHistory } from './activity-history';

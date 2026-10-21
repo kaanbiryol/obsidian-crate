@@ -4,7 +4,7 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import type { BackupChoice } from '../../cloudflare/restore/archive';
 const { progress, confirm, connect } = vi.hoisted(() => ({ progress: { dismiss: vi.fn(), setWorking: vi.fn(), fail: vi.fn() }, confirm: vi.fn(), connect: vi.fn() }));
 vi.mock('obsidian', () => createObsidianUiModule());
-vi.mock('../plugin/SharedModal', () => ({ SharedModal: class extends MockModal { bodyEl = new FakeElement('div'); openLayout() {} } }));
+vi.mock('../plugin/shared-modal', () => ({ SharedModal: class extends MockModal { bodyEl = new FakeElement('div'); openLayout() {} } }));
 vi.mock('./deployment-modal', () => ({ openCloudflareDeploymentModal: () => progress, revealCloudflareOperation: () => false }));
 vi.mock('../confirmation-modal', () => ({ openConfirmationModal: confirm }));
 vi.mock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment: connect }));

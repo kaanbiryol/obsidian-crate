@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Notice, Platform } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
 import { BaseUiModal } from '../../../ui/plugin/BaseUiModal';
-import { hideNativeModalCloseButton } from '../../../ui/plugin/modalShell';
+import { hideNativeModalCloseButton } from '../../../ui/plugin/shared-modal';
 import { getReadingLibrary } from '../../runtime';
 import { SaveLinkDialog } from './SaveLinkDialog';
 import { ReadingDialogHost } from '../ReadingDialog';

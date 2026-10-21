@@ -4,7 +4,7 @@ import { Modal, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ModalLayout } from '../shared/ModalLayout';
-import { applySharedModalShell } from '../plugin/SharedModal';
+import { applySharedModalShell } from '../plugin/shared-modal';
 import { StatusContent } from '../shared/StatusContent';
 import { Button } from '../shared/Button';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';

@@ -8,7 +8,7 @@ import { createLogger } from "@/reminders/logger";
 import type { Reminder } from "@/reminders/types/reminder";
 import { ReminderModal } from "./createReminderModal";
 import { ModalContext, PluginContext } from "./reminders-context";
-import { hideNativeModalCloseButton } from "../../../ui/plugin/modalShell";
+import { hideNativeModalCloseButton } from "../../../ui/plugin/shared-modal";
 
 const log = createLogger("ReminderEditModal");
 

@@ -1,8 +1,7 @@
-import { createModalActions, createModalFooter } from '../../plugin/modal-elements';
+import { createModalActions, createModalFooter, SharedModal } from '../../plugin/shared-modal';
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { SharedModal } from '../../plugin/SharedModal';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
 import { errorMessage } from '../../../sync/logger';
 import { SECRET_KEYS } from '../../../platform/secret-keys';

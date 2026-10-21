@@ -1,6 +1,6 @@
 import { vaultChoiceLabel } from '../../cloudflare/vault-name';
 import { Setting, type App } from 'obsidian';
-import { SharedModal } from '../plugin/SharedModal';
+import { SharedModal } from '../plugin/shared-modal';
 import type { DiscoveredCloudflareDeployment } from '../../cloudflare/deployment/discovery';
 
 class CloudflareServerPickerModal extends SharedModal {

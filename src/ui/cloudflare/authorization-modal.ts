@@ -1,5 +1,5 @@
 import type { App } from 'obsidian';
-import { SharedModal } from '../plugin/SharedModal';
+import { SharedModal } from '../plugin/shared-modal';
 
 const activeAuthorization = new WeakMap<App, CloudflareAuthorizationModal>();
 

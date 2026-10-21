@@ -1,7 +1,6 @@
-import { createModalActions, createModalFooter } from '../plugin/modal-elements';
+import { createModalActions, createModalFooter, SharedModal } from '../plugin/shared-modal';
 import type { Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
-import { SharedModal } from '../plugin/SharedModal';
 import { openWebAppPairing } from '../../plugin/web-app-pairing';
 import { answerAppPairing } from '../../encryption/pairing/session';
 import { PairingEndedError } from '../../encryption/pairing/protocol';

@@ -3,7 +3,7 @@ import { Platform, Setting, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ExclusionSheet } from './ExclusionSheet';
-import { hideNativeModalCloseButton } from './plugin/modalShell';
+import { hideNativeModalCloseButton } from './plugin/shared-modal';
 
 export class ExclusionPreviewModal extends BaseUiModal {
 	private root?: Root;

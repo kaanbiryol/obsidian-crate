@@ -3,7 +3,7 @@ import { BaseUiModal } from "../../../ui/plugin/BaseUiModal";
 import type CratePlugin from "@/main";
 import { PluginContext } from "./reminders-context";
 import { ProjectSheet } from "./ProjectSheet";
-import { hideNativeModalCloseButton } from "../../../ui/plugin/modalShell";
+import { hideNativeModalCloseButton } from "../../../ui/plugin/shared-modal";
 import { createShadowReactMount, type ShadowReactMount } from "../../../ui/plugin/shadowReactMount";
 
 class CompactReminderModal extends BaseUiModal {

@@ -22,10 +22,11 @@ const { outputFiles } = await build({
         window.mount();
     ` },
     plugins: [{ name: 'host-fixture', setup(builder) {
-        builder.onResolve({ filter: /^(obsidian|\.\.\/plugin\/SharedModal|\.\/file-actions)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
+        builder.onResolve({ filter: /^(obsidian|\.\.\/plugin\/shared-modal|\.\/file-actions)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'obsidian' ? `${obsidianDialogModule}
             export const Platform = { isMobile: innerWidth < 600, isDesktopApp: innerWidth >= 600 };
         ` : args.path === './file-actions' ? `export const getPendingFileActions = (_app, path) => innerWidth < 600 ? [] : [{ id: 'reveal', title: 'Reveal in Finder', run: async () => { window.revealed.push(path); } }];` : `
+            export const createModalFooter = container => container.createDiv({ cls: 'crate-modal-footer' });
             export class SharedModal {
                 constructor() {
                     this.modalEl = document.createElement('div'); this.modalEl.className = 'modal crate-shared-modal';

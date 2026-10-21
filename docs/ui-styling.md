@@ -913,8 +913,9 @@ without an error alert. Keep navigation mounted while **Check again** is pending
 
 Native dialogs use `SharedModal`; React content in an Obsidian shell uses
 `ModalLayout`. Both use `ModalHeader`, 16px body insets, and a 12px/16px footer.
-`modal-elements.ts` provides native footer/action builders with the same layout as
-React's `crate-modal-actions`. Buttons use the shared action mixins and semantic
+`ui/plugin/shared-modal.ts` owns `SharedModal`, its shell classes and the native
+footer/action builders with the same layout as React's `crate-modal-actions`.
+Buttons use the shared action mixins and semantic
 variants, with 44px touch targets. Footers stay outside scrolling content.
 Encryption setup retains a stable height through loading, progress and completion;
 file history, conflict review and editor/picker sheets retain their workspace sizing.

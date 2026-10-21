@@ -1,8 +1,7 @@
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
-import { createModalActions } from '../../plugin/modal-elements';
+import { createModalActions, SharedModal } from '../../plugin/shared-modal';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { SharedModal } from '../../plugin/SharedModal';
 import { addEncryptedReading, encryptVault, loadDeviceEncryptionKeys, prepareEncryptionKeys, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
 import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import { WorkerApiHttpClient } from '../../../sync/worker-api/http';
