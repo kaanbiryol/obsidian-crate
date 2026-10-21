@@ -10,6 +10,7 @@ Maintainer and contributor documentation for the plugin, Worker and PWA. User-fa
 - [Current contract](current-contract.md) - generated, source-checked server revision, schema, protocol and transfer limits.
 - [Compatibility](compatibility.md) - upgrade order, compatibility and rollback rules across plugin, Worker, PWA and persisted formats.
 - [End-to-end encryption](e2ee-implementation.md) - opt-in encryption: enabling, recovery, approval protocol, protection boundary and limits.
+- [Privacy and data handling](privacy.md) - what data Crate sends, stores and keeps, per feature.
 
 ## Sync
 
