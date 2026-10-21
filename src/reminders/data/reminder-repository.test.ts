@@ -1,10 +1,10 @@
-import { reminderRevision } from '../../core/reminderRevision';
-import { toReminder } from '../toReminder';
+import { reminderRevision } from '../core/reminderRevision';
+import { toReminder } from './toReminder';
 import { describe, expect, it, vi } from 'vitest';
-import type { ReminderIndex, IndexedReminder } from '../reminder-index';
-import type { MarkdownWriter } from '../markdown-writer';
-import { createReminderRepository } from '.';
-import { timezone as getLocalTimeZone } from '../../core/dates/time';
+import type { ReminderIndex, IndexedReminder } from './reminder-index';
+import type { MarkdownWriter } from './markdown-writer';
+import { createReminderRepository } from './reminder-repository';
+import { timezone as getLocalTimeZone } from '../core/dates/time';
 
 function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 	return {

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { TFile } from 'obsidian';
 import { createMockAppWithVault } from '@/test/factories/obsidian';
-import { createReminderIndex } from '../reminder-index';
-import { createMarkdownWriter } from '../markdown-writer';
-import { createReminderRepository } from './index';
-import { toReminder } from '../toReminder';
-import { buildCreatedReminderBlock, appendCreatedReminderBlock } from '../../core/markdownReminderMutation';
-import type { UpdateReminderParams } from '../../types/reminder';
+import { createReminderIndex } from './reminder-index';
+import { createMarkdownWriter } from './markdown-writer';
+import { createReminderRepository } from './reminder-repository';
+import { toReminder } from './toReminder';
+import { buildCreatedReminderBlock, appendCreatedReminderBlock } from '../core/markdownReminderMutation';
+import type { UpdateReminderParams } from '../types/reminder';
 
 const path = 'Reminders/Inbox.md';
 const rule = { frequency: 'daily' as const, timezone: 'Europe/Berlin', count: 5, completedCount: 1 };
