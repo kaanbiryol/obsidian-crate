@@ -12,7 +12,7 @@ export { readReadingCache, readReadingArticle, commitReadingCache, cacheReadingA
 
 // Feature callers use these scoped operations; database keys remain inside storage.
 interface ReadingDraft { url: string }
-interface ReadingAttempt { requestHash: string; body: string; generation?: number }
+interface ReadingAttempt { requestHash: string; body: string; generation?: number; rejected?: true }
 
 async function readDraft(key: string): Promise<ReadingDraft | undefined> {
   const value = await readReadingValue(key);

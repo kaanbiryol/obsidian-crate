@@ -39,13 +39,18 @@ async function setup(mode: 'active' | 'converting' = 'active', readingScope = tr
   const headers = { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '1', 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) };
   const request = (path: string, body?: string) => worker.fetch(new Request('https://test' + path, { method: body ? 'POST' : 'GET', headers, body }), env);
   const attempts = new Map<string, unknown>(), requests: string[] = [];
-  let loseReply = false;
+  let loseReply = false, beforeCommit: (() => Promise<unknown>) | undefined;
   const api = (captureArticle?: (url: string) => Promise<CapturedArticle>) => new EncryptedReadingApi({ captureArticle, folderPath: 'Reading', generation: bundle.generation, authority: keys.forPath('Reading/receipt.md'),
-    request: async (path, body) => { if (body) requests.push(body); const response = await request(path, body); if (loseReply && path.endsWith('encrypted-commit') && response.ok) { loseReply = false; throw new Error('Lost reply'); } return response; },
+    request: async (path, body) => {
+      if (beforeCommit && path.endsWith('encrypted-commit')) { const run = beforeCommit; beforeCommit = undefined; await run(); }
+      if (body) requests.push(body); const response = await request(path, body); if (loseReply && path.endsWith('encrypted-commit') && response.ok) { loseReply = false; throw new Error('Lost reply'); } return response;
+    },
     readAttempt: id => Promise.resolve(attempts.get(id)), writeAttempt: (id, value) => { attempts.set(id, value); return Promise.resolve(); },
     error: (message, status) => new Error(`${status}: ${message}`),
   });
-  return { bundle, recovery, keys, state, headers, request, api, attempts, requests, loseNextReply: () => { loseReply = true; } };
+  return { bundle, recovery, keys, state, headers, request, api, attempts, requests, loseNextReply: () => { loseReply = true; },
+    /** Run another client's change after the next attempt is built but before it commits. */
+    beforeNextCommit: (run: () => Promise<unknown>) => { beforeCommit = run; } };
 }
 it('keeps Reading captures, content, edits and replay receipts encrypted across a lost response', async () => {
   const h = await setup(), body = JSON.stringify({ operationId: operation(), url: 'https://private.example/confidential-article', title: 'Private Reading title' });
@@ -64,6 +69,46 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
   expect(new TextDecoder().decode((await openFile(bytes, file!.path, h.keys.forPath(file!.path))).content)).toContain('favorite: true');
   expect((await env.DB.prepare('SELECT * FROM reading_sources').all()).results).toHaveLength(0);
   expect((await env.DB.prepare('SELECT * FROM reading_jobs').all()).results).toHaveLength(0);
+});
+async function concurrentEdit() {
+  const h = await setup();
+  const saved = await h.api().request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/concurrent' })) as { id: string };
+  const { items: [item] } = await h.api().request('/reading/list') as { items: ReadingItem[] };
+  const otherDevice = (changes: object, before: object) => () => h.api().request('/reading/update', JSON.stringify({ operationId: operation(), id: saved.id, changes, before }));
+  const id = operation(), favorite = JSON.stringify({ operationId: id, id: saved.id, changes: { favorite: true }, before: { favorite: item!.favorite } });
+  const sent = () => h.requests.filter(body => (JSON.parse(body) as { operationId: string }).operationId === id);
+  const opened = async () => (await h.api().request(`/reading/item?id=${saved.id}`) as { item: ReadingItem }).item;
+  return { h, item: item!, id, favorite, sent, opened, otherDevice };
+}
+it('rebuilds an encrypted Reading edit once against a note another device changed', async () => {
+  const { h, item, id, favorite, sent, opened, otherDevice } = await concurrentEdit();
+  h.beforeNextCommit(otherDevice({ tags: ['other-device'] }, { tags: item.tags }));
+  expect(await h.api().request('/reading/update', favorite)).toMatchObject({ saved: true, id: item.crate_reading_id });
+  const [rejected, rebuilt] = sent();
+  expect(sent()).toHaveLength(2); expect(rebuilt).not.toBe(rejected);
+  expect((h.attempts.get(id) as { rejected?: true }).rejected).toBeUndefined();
+  expect(await opened()).toMatchObject({ favorite: true, tags: ['other-device'] });
+  // A retried delivery resends the rebuilt ciphertext and replays its receipt.
+  expect(await h.api().request('/reading/update', favorite)).toMatchObject({ saved: true });
+  expect(sent()).toHaveLength(3); expect(sent()[2]).toBe(rebuilt);
+});
+it('sends an encrypted Reading edit to review when its rebuild conflicts again', async () => {
+  const first = await concurrentEdit();
+  first.h.beforeNextCommit(async () => {
+    await first.otherDevice({ tags: ['other-device'] }, { tags: first.item.tags })();
+    first.h.beforeNextCommit(first.otherDevice({ reading_status: 'archived' }, { reading_status: first.item.reading_status }));
+  });
+  await expect(first.h.api().request('/reading/update', first.favorite)).rejects.toThrow('409: A note changed');
+  expect(first.sent()).toHaveLength(2);
+  expect((first.h.attempts.get(first.id) as { rejected?: true }).rejected).toBe(true);
+  expect(await first.opened()).toMatchObject({ favorite: false, tags: ['other-device'], reading_status: 'archived' });
+});
+it('sends an encrypted Reading edit to review when another device changed the same field', async () => {
+  const same = await concurrentEdit();
+  same.h.beforeNextCommit(same.otherDevice({ favorite: true }, { favorite: same.item.favorite }));
+  await expect(same.h.api().request('/reading/update', same.favorite)).rejects.toThrow('changed on another device');
+  expect(same.sent()).toHaveLength(1);
+  expect((same.h.attempts.get(same.id) as { rejected?: true }).rejected).toBe(true);
 });
 it('allows scoped encryption discovery but rejects plaintext saves and sibling-folder access', async () => {
   const h = await setup();

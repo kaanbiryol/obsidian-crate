@@ -24,7 +24,8 @@ interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path
 interface Source { file: WireFile; content: string; item: ReadingItem }
 /** Authenticated metadata for one encrypted note, reusable while its file is unchanged. */
 export interface EncryptedReadingIndexEntry { file: WireFile; item: ReadingItem }
-interface Attempt { requestHash: string; body: string; generation: number }
+/** `rejected` marks an attempt the Worker refused with `version_conflict`; it is rebuilt, never resent. */
+interface Attempt { requestHash: string; body: string; generation: number; rejected?: true }
 interface EncryptedReadingOptions {
   folderPath: string; generation: number; authority: FileEncryptionAuthority;
   captureArticle?(url: string): Promise<CapturedArticle>;
@@ -177,57 +178,78 @@ export class EncryptedReadingApi {
       // did not commit. Rebuild against current files, preserving the operation ID.
       attempt = undefined;
     }
-    if (!attempt) {
-      const converted = await this.json<{ envelope: string | null }>(`/reading/encrypted-receipt?operationId=${encodeURIComponent(id)}`);
-      if (converted.envelope) {
-        const result = await decryptJson(converted.envelope, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
-        if (result.requestHash !== requestHash) throw this.options.error('The saved operation belongs to a different change.', 409);
-        return result.response;
+    for (let rebuilt = false; ; rebuilt = true) {
+      if (!attempt || attempt.rejected) {
+        const prepared = await this.prepare(action, body, id, rawBody, requestHash);
+        if ('response' in prepared) return prepared.response;
+        attempt = prepared.attempt;
       }
-      const list = await this.inventory();
-      if (list.issues.length) throw this.options.error('Refresh or resolve unreadable Reading notes before saving changes.', 409, 'reading_conflict');
-      let path: string, content: string, previous: WireFile | undefined, itemId: string;
-      if (action === 'capture') {
-        const link = readingUrl(body.url), matches = list.items.filter(item => item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(link));
-        if (matches.length > 1) throw this.options.error('Several notes already save this link.', 409);
-        if (matches[0]) return { saved: true, alreadySaved: true, id: matches[0].crate_reading_id };
-        // Stable even if preparation is interrupted before ciphertext persistence.
-        itemId = typeof body.captureId === 'string' ? body.captureId : await readingImportId(id, rawBody);
-        content = createReadingNote({ id: itemId, url: link, title: typeof body.title === 'string' ? body.title : undefined, savedAt: new Date().toISOString() });
-        if (body.fetchArticle === false) content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' });
-        path = await readingCapturePath(this.options.folderPath, 'Article', itemId, candidate => [...this.files.keys()].some(p => portablePathKey(p) === portablePathKey(candidate)));
-      } else {
-        const item = list.items.find(item => item.crate_reading_id === body.id);
-        if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
-        const source = await this.source(this.files.get(item.path)!); path = item.path; previous = source.file; itemId = item.crate_reading_id;
-        if (action === 'retry') {
-          if (!isEmptyReadingCapture(source.content, item)) throw this.options.error('Only empty saved links can be downloaded.', 409);
-          content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });
-        }
-        else {
-          if (!body.changes || typeof body.changes !== 'object' || !body.before || typeof body.before !== 'object') throw new Error('Choose a Reading change.');
-          if (readingUpdateIssue(item, body.before, body.changes)) throw this.options.error('This article changed on another device. Refresh before editing.', 409, 'reading_conflict');
-          content = updateReadingNote(source.content, itemId, body.changes);
-        }
+      const response = await this.options.request('/reading/encrypted-commit', attempt.body);
+      const result = await response.json() as { encrypted?: string; error?: string; code?: string };
+      if (response.status === 409 && result.code === 'version_conflict') {
+        // The Worker replays a committed copy of this operation before reporting a
+        // conflict, so the immutable attempt never committed. Rebuild it once against
+        // the current note under the same operation ID; a second conflict needs review.
+        attempt = { ...attempt, rejected: true };
+        await this.options.writeAttempt(id, attempt);
+        if (rebuilt) throw this.options.error(result.error ?? 'A note changed. Refresh before retrying.', response.status, result.code);
+        continue;
       }
-      if ((action === 'capture' && body.fetchArticle !== false || action === 'retry') && this.options.captureArticle) {
-        const item = parseReadingNote(content)!;
-        try {
-          const article = await this.options.captureArticle(item.source_url);
-          content = applyLocalArticle(patchReadingFrontmatter(content, { extraction_status: 'unavailable' }), { ...item, path }, article);
-        } catch { /* The pending encrypted bookmark is completed by a trusted Obsidian device. */ }
-      }
-      const sealed = await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: null }, this.options.authority);
-      const response = { saved: true, id: itemId };
-      const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
-      attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.folderPath, operationId: id, files: [{ path, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) }], acknowledgment }) };
-      await this.options.writeAttempt(id, attempt);
+      if (!response.ok || typeof result.encrypted !== 'string') throw this.options.error(result.error ?? 'Reading request failed.', response.status, result.code);
+      const receipt = await decryptJson(result.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
+      if (receipt.requestHash !== requestHash) throw new Error('The encrypted Reading acknowledgment does not match this change.');
+      // Other decrypted notes stay valid; `sameFile` rejects any that changed elsewhere.
+      for (const file of (JSON.parse(attempt.body) as { files: Array<{ path: string }> }).files) this.sources.delete(file.path);
+      return receipt.response;
     }
-    const result = await this.json<{ encrypted: string }>('/reading/encrypted-commit', attempt.body);
-    const receipt = await decryptJson(result.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
-    if (receipt.requestHash !== requestHash) throw new Error('The encrypted Reading acknowledgment does not match this change.');
-    // Other decrypted notes stay valid; `sameFile` rejects any that changed elsewhere.
-    for (const file of (JSON.parse(attempt.body) as { files: Array<{ path: string }> }).files) this.sources.delete(file.path);
-    return receipt.response;
+  }
+  /** Build and persist exact ciphertext for one operation against the current
+   * library, or answer from a receipt the operation already committed. */
+  private async prepare(action: string, body: Record<string, unknown>, id: string, rawBody: string, requestHash: string): Promise<{ attempt: Attempt } | { response: unknown }> {
+    const converted = await this.json<{ envelope: string | null }>(`/reading/encrypted-receipt?operationId=${encodeURIComponent(id)}`);
+    if (converted.envelope) {
+      const result = await decryptJson(converted.envelope, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
+      if (result.requestHash !== requestHash) throw this.options.error('The saved operation belongs to a different change.', 409);
+      return { response: result.response };
+    }
+    const list = await this.inventory();
+    if (list.issues.length) throw this.options.error('Refresh or resolve unreadable Reading notes before saving changes.', 409, 'reading_conflict');
+    let path: string, content: string, previous: WireFile | undefined, itemId: string;
+    if (action === 'capture') {
+      const link = readingUrl(body.url), matches = list.items.filter(item => item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(link));
+      if (matches.length > 1) throw this.options.error('Several notes already save this link.', 409);
+      if (matches[0]) return { response: { saved: true, alreadySaved: true, id: matches[0].crate_reading_id } };
+      // Stable even if preparation is interrupted before ciphertext persistence.
+      itemId = typeof body.captureId === 'string' ? body.captureId : await readingImportId(id, rawBody);
+      content = createReadingNote({ id: itemId, url: link, title: typeof body.title === 'string' ? body.title : undefined, savedAt: new Date().toISOString() });
+      if (body.fetchArticle === false) content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' });
+      path = await readingCapturePath(this.options.folderPath, 'Article', itemId, candidate => [...this.files.keys()].some(p => portablePathKey(p) === portablePathKey(candidate)));
+    } else {
+      const item = list.items.find(item => item.crate_reading_id === body.id);
+      if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
+      const source = await this.source(this.files.get(item.path)!); path = item.path; previous = source.file; itemId = item.crate_reading_id;
+      if (action === 'retry') {
+        if (!isEmptyReadingCapture(source.content, item)) throw this.options.error('Only empty saved links can be downloaded.', 409);
+        content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });
+      }
+      else {
+        if (!body.changes || typeof body.changes !== 'object' || !body.before || typeof body.before !== 'object') throw new Error('Choose a Reading change.');
+        if (readingUpdateIssue(item, body.before, body.changes)) throw this.options.error('This article changed on another device. Refresh before editing.', 409, 'reading_conflict');
+        content = updateReadingNote(source.content, itemId, body.changes);
+      }
+    }
+    if ((action === 'capture' && body.fetchArticle !== false || action === 'retry') && this.options.captureArticle) {
+      const item = parseReadingNote(content)!;
+      try {
+        const article = await this.options.captureArticle(item.source_url);
+        content = applyLocalArticle(patchReadingFrontmatter(content, { extraction_status: 'unavailable' }), { ...item, path }, article);
+      } catch { /* The pending encrypted bookmark is completed by a trusted Obsidian device. */ }
+    }
+    const sealed = await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: null }, this.options.authority);
+    const response = { saved: true, id: itemId };
+    const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
+    const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.folderPath, operationId: id, files: [{ path, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) }], acknowledgment }) };
+    await this.options.writeAttempt(id, attempt);
+    return { attempt };
   }
 }
