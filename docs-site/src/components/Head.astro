@@ -4,6 +4,9 @@ import StarlightHead from '@astrojs/starlight/components/Head.astro';
 
 <StarlightHead />
 
+<!-- Paint each page only once its content is parsed, so navigation never shows a half-rendered page. -->
+<link rel="expect" href="#docs-render-ready" blocking="render" />
+
 <!-- Paint the document canvas in the selected theme before external CSS loads. -->
 <style is:inline>
   html { background: #0b0b0e; color-scheme: dark; }
