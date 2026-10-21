@@ -4,22 +4,13 @@ import { runConcurrentTasks } from '../concurrency';
 import type { QueueFlushContext } from './flush-types';
 import { base64ToArrayBuffer } from '../encoding';
 import { pendingChangeKey } from '../pending/pending-change';
-import { TFolder } from 'obsidian';
 import { Notice } from '../../test/mocks/obsidian';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-	clearSyncedPendingPaths,
-	debouncedSync,
-	onFileChange,
-	onFileDelete,
-	onFileRename,
-} from './queue';
+import { describe, expect, it, vi } from 'vitest';
 import { processPendingChanges } from './flush';
 import { OVERSIZED_LOCAL_FILE_MESSAGE, SkippedFileError } from '../issues';
-import type { PreparedUpload, SyncResult, SyncState } from '../types';
+import type { PreparedUpload, SyncState } from '../types';
 import { HttpError } from '../worker-api/client';
 import { LocalFilePresentError } from '../local/local-absence';
-import { createEmptySyncResult } from '../sync-result';
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
 import { AUTH_ERROR_MESSAGE, ReconnectNotice } from '../sync-outcome';
 
@@ -31,26 +22,6 @@ type UploadArgs = {
 	size: number;
 	contentType: string;
 };
-
-function createEventContext() {
-	const pendingPaths = new Set<string>();
-	const pendingRevisions = new Map<string, number>();
-	let revision = 0;
-	const triggerDebouncedSync = vi.fn();
-	const shouldIgnore = vi.fn((path: string) => path.startsWith('.trash/'));
-	return {
-		context: {
-			pendingPaths,
-			shouldIgnore,
-			markPending: (path: string) => pendingRevisions.set(path, ++revision),
-			clearPending: (path: string) => pendingRevisions.delete(path),
-			triggerDebouncedSync,
-		},
-		pendingPaths,
-		pendingRevisions,
-		triggerDebouncedSync,
-	};
-}
 
 function createFlushHarness(overrides: Partial<{
 	status: QueueState['status'];
@@ -190,13 +161,6 @@ function createFlushHarness(overrides: Partial<{
 	};
 }
 
-function createSyncResult(overrides: Partial<SyncResult> = {}): SyncResult {
-	return {
-		...createEmptySyncResult(),
-		...overrides,
-	};
-}
-
 it('records the affected file and preserves earlier uploads if queue preparation fails', async () => {
   const h = createFlushHarness({
     prepareUploadFromPath: async path => {
@@ -257,246 +221,6 @@ function createNamedAbortError(message = 'Sync request aborted'): Error {
 	error.name = 'AbortError';
 	return error;
 }
-
-describe('queue event handlers', () => {
-	it('keeps literal delete-prefixed names independent during edits, deletes and renames', () => {
-		const h = createEventContext();
-		onFileChange(h.context, { path: 'note.md' });
-		onFileChange(h.context, { path: 'delete:note.md' });
-		onFileDelete(h.context, { path: 'note.md' });
-		expect([...h.pendingPaths]).toEqual(['delete:note.md', pendingChangeKey('delete', 'note.md')]);
-		onFileRename(h.context, { path: 'renamed.md' } as never, 'delete:note.md');
-		expect([...h.pendingPaths]).toEqual([
-			pendingChangeKey('delete', 'note.md'), pendingChangeKey('delete', 'delete:note.md'), 'renamed.md',
-		]);
-		expect([...h.pendingRevisions.keys()]).toEqual([...h.pendingPaths]);
-	});
-
-	it('settles the matching deletion without clearing a newer edit to a prefixed filename', () => {
-		const h = createEventContext();
-		onFileChange(h.context, { path: 'delete:note.md' });
-		onFileDelete(h.context, { path: 'note.md' });
-		const revisions = new Map(h.pendingRevisions);
-		onFileChange(h.context, { path: 'delete:note.md' });
-		clearSyncedPendingPaths({ ...h.context, pendingRevisions: h.pendingRevisions, clearDebounceTimer: vi.fn(), updateState: vi.fn() },
-			createSyncResult({ uploadedPaths: ['delete:note.md'], deletedPaths: ['note.md'] }), revisions);
-		expect([...h.pendingPaths]).toEqual(['delete:note.md']);
-		expect([...h.pendingRevisions.keys()]).toEqual(['delete:note.md']);
-	});
-
-	it('queues file changes for syncable paths', () => {
-		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
-
-		onFileChange(context, { path: 'notes/a.md' });
-
-		expect(pendingPaths.has('notes/a.md')).toBe(true);
-		expect(triggerDebouncedSync).toHaveBeenCalledTimes(1);
-	});
-
-	it('queues delete markers for syncable paths', () => {
-		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
-
-		onFileDelete(context, { path: 'notes/a.md' });
-
-		expect(pendingPaths.has(pendingChangeKey('delete', 'notes/a.md'))).toBe(true);
-		expect(triggerDebouncedSync).toHaveBeenCalledTimes(1);
-	});
-
-	it('handles rename transitions across ignored boundaries', () => {
-		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
-
-		onFileRename(context, { path: '.trash/a.md' } as never, 'notes/a.md');
-		onFileRename(context, { path: 'notes/b.md' } as never, '.trash/b.md');
-
-		expect(pendingPaths.has(pendingChangeKey('delete', 'notes/a.md'))).toBe(true);
-		expect(pendingPaths.has('notes/b.md')).toBe(true);
-		expect(pendingPaths.has('.trash/b.md')).toBe(false);
-		expect(triggerDebouncedSync).toHaveBeenCalledTimes(2);
-	});
-});
-
-describe('debouncedSync', () => {
-	afterEach(() => {
-		vi.useRealTimers();
-	});
-
-	it('triggers flush after delay', async () => {
-		vi.useFakeTimers();
-		const pendingPaths = new Set(['notes/a.md']);
-		let timer: ReturnType<typeof setTimeout> | null = null;
-		let maxWaitStart: number | null = null;
-		const processPending = vi.fn(async () => {});
-
-		debouncedSync(
-			{
-				pendingPaths,
-				isDestroyed: () => false,
-				getDebounceTimer: () => timer,
-				setDebounceTimer: value => {
-					timer = value;
-				},
-				getMaxWaitStart: () => maxWaitStart,
-				setMaxWaitStart: value => {
-					maxWaitStart = value;
-				},
-				processPendingChanges: processPending,
-			},
-			25,
-		);
-
-		expect(timer).not.toBeNull();
-
-		await vi.advanceTimersByTimeAsync(25);
-
-		expect(processPending).toHaveBeenCalledTimes(1);
-		expect(timer).toBeNull();
-		expect(maxWaitStart).toBeNull();
-	});
-
-	it('no-ops when queue is destroyed', () => {
-		const processPending = vi.fn(async () => {});
-
-		debouncedSync(
-			{
-				pendingPaths: new Set(['notes/a.md']),
-				isDestroyed: () => true,
-				getDebounceTimer: () => null,
-				setDebounceTimer: vi.fn(),
-				getMaxWaitStart: () => null,
-				setMaxWaitStart: vi.fn(),
-				processPendingChanges: processPending,
-			},
-			25,
-		);
-
-		expect(processPending).not.toHaveBeenCalled();
-	});
-
-	it('fires immediately when max-wait is exceeded', () => {
-		vi.useFakeTimers();
-		const pendingPaths = new Set(['notes/a.md']);
-		let timer: ReturnType<typeof setTimeout> | null = null;
-		let maxWaitStart: number | null = Date.now() - 100; // started 100ms ago
-		const updateState = vi.fn();
-		const processPending = vi.fn(async () => {});
-
-		const context = {
-			pendingPaths,
-			isDestroyed: () => false,
-			getDebounceTimer: () => timer,
-			setDebounceTimer: (value: ReturnType<typeof setTimeout> | null) => {
-				timer = value;
-			},
-			getMaxWaitStart: () => maxWaitStart,
-			setMaxWaitStart: (value: number | null) => {
-				maxWaitStart = value;
-			},
-			updateState,
-			processPendingChanges: processPending,
-		};
-
-		// Simulate an existing timer (debounce in progress)
-		timer = setTimeout(() => {}, 10000);
-
-		debouncedSync(context, 25, 50); // maxWait=50ms, but we're already 100ms in
-
-		expect(processPending).toHaveBeenCalledTimes(1);
-		expect(timer).toBeNull();
-		expect(maxWaitStart).toBeNull();
-	});
-});
-
-describe('clearSyncedPendingPaths', () => {
-	it('removes successful uploaded, downloaded, merged, and deleted paths from the queue', () => {
-		const pendingPaths = new Set([
-			'notes/uploaded.md',
-			'notes/downloaded.md',
-			'notes/merged.md',
-			pendingChangeKey('delete', 'notes/deleted.md'),
-		]);
-		const clearDebounceTimer = vi.fn();
-		const updateState = vi.fn();
-		const pendingRevisions = new Map([...pendingPaths].map(path => [path, 1]));
-
-		clearSyncedPendingPaths(
-			{ pendingPaths, pendingRevisions, clearDebounceTimer, updateState },
-			createSyncResult({
-				uploadedPaths: ['notes/uploaded.md'],
-				downloadedPaths: ['notes/downloaded.md'],
-				mergedPaths: ['notes/merged.md'],
-				deletedPaths: ['notes/deleted.md'],
-			}),
-			new Map(pendingRevisions),
-		);
-
-		expect(pendingPaths.size).toBe(0);
-		expect(clearDebounceTimer).toHaveBeenCalledTimes(1);
-		expect(updateState).toHaveBeenCalledWith({ pendingChanges: 0 });
-	});
-
-	it('keeps unrelated pending paths and updates the pending count', () => {
-		const pendingPaths = new Set([
-			'notes/uploaded.md',
-			'notes/still-pending.md',
-		]);
-		const clearDebounceTimer = vi.fn();
-		const updateState = vi.fn();
-		const pendingRevisions = new Map([...pendingPaths].map(path => [path, 1]));
-
-		clearSyncedPendingPaths(
-			{ pendingPaths, pendingRevisions, clearDebounceTimer, updateState },
-			createSyncResult({ uploadedPaths: ['notes/uploaded.md'] }),
-			new Map(pendingRevisions),
-		);
-
-		expect([...pendingPaths]).toEqual(['notes/still-pending.md']);
-		expect(clearDebounceTimer).not.toHaveBeenCalled();
-		expect(updateState).toHaveBeenCalledWith({ pendingChanges: 1 });
-	});
-
-	it('does not change the queue when the sync result failed', () => {
-		const pendingPaths = new Set(['notes/a.md']);
-		const clearDebounceTimer = vi.fn();
-		const updateState = vi.fn();
-		const pendingRevisions = new Map([...pendingPaths].map(path => [path, 1]));
-
-		clearSyncedPendingPaths(
-			{ pendingPaths, pendingRevisions, clearDebounceTimer, updateState },
-			createSyncResult({ success: false, uploadedPaths: ['notes/a.md'] }),
-			new Map(pendingRevisions),
-		);
-
-		expect([...pendingPaths]).toEqual(['notes/a.md']);
-		expect(clearDebounceTimer).not.toHaveBeenCalled();
-		expect(updateState).not.toHaveBeenCalled();
-	});
-
-	it('keeps a newer event for the same path during sync reconciliation', () => {
-		const pendingPaths = new Set(['notes/a.md']);
-		const pendingRevisions = new Map([['notes/a.md', 2]]);
-		const clearDebounceTimer = vi.fn();
-		const updateState = vi.fn();
-
-		clearSyncedPendingPaths(
-			{ pendingPaths, pendingRevisions, clearDebounceTimer, updateState },
-			createSyncResult({ uploadedPaths: ['notes/a.md'] }),
-			new Map([['notes/a.md', 1]]),
-		);
-
-		expect([...pendingPaths]).toEqual(['notes/a.md']);
-		expect(pendingRevisions.get('notes/a.md')).toBe(2);
-		expect(updateState).not.toHaveBeenCalled();
-	});
-
-	it('coalesces opposite upload and delete events for one path', () => {
-		const eventContext = createEventContext();
-		onFileDelete(eventContext.context, { path: 'notes/a.md' });
-		onFileChange(eventContext.context, { path: 'notes/a.md' });
-
-		expect([...eventContext.pendingPaths]).toEqual(['notes/a.md']);
-		expect([...eventContext.pendingRevisions.keys()]).toEqual(['notes/a.md']);
-	});
-});
 
 describe('processPendingChanges', () => {
 	it('uploads bounded chunks before preparing the entire queue', async () => {
@@ -820,15 +544,6 @@ describe('queued deletion revalidation', () => {
 		expect(harness.pendingPaths.has(pendingChangeKey('delete', 'note.md'))).toBe(true);
 		expect(harness.state.lastError).toContain('adapter unavailable');
 	});
-});
-
-
-it('does not queue deleted folders as files', () => {
- const h = createEventContext();
- const folder = Object.assign(new TFolder(), { path: 'Fake conflicts' });
- onFileDelete(h.context, folder);
- expect(h.pendingPaths.size).toBe(0);
- expect(h.triggerDebouncedSync).not.toHaveBeenCalled();
 });
 
 it('uploads a delete-prefixed filename while deleting its unprefixed neighbor', async () => {

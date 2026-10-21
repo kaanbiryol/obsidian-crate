@@ -1,7 +1,7 @@
 import type { SyncResult, SyncState } from '../types';
 import { createAbortError, isAbortError } from '../abort';
-import { LOCAL_CONTENT_CHECK_INTERVAL_MS, MAX_RETRIES, RETRY_BASE_DELAY_MS } from './constants';
-import { runPeriodicCheckWorkflow } from './periodic-workflow';
+import { LOCAL_CONTENT_CHECK_INTERVAL_MS, MAX_CHECK_BACKOFF_MULTIPLIER, MAX_RETRIES, RETRY_BASE_DELAY_MS } from './constants';
+import { notifyConflicts } from '../conflict/conflict';
 import { retryWithBackoff, runConcurrentTasks } from '../concurrency';
 import { createLogger, errorMessage } from '../logger';
 
@@ -100,17 +100,57 @@ export class SyncEngineLifecycle {
 	async periodicCheck(): Promise<void> {
 		if (this.destroyed || this.checking) return;
 		this.checking = true;
-		try { await runPeriodicCheckWorkflow({
-			...this.dependencies,
-			getConsecutiveCheckFailures: () => this.consecutiveCheckFailures,
-			setConsecutiveCheckFailures: (value: number) => {
-				this.consecutiveCheckFailures = value;
-			},
-			getLastCheckAttempt: () => this.lastCheckAttempt,
-			setLastCheckAttempt: (value: number) => {
-				this.lastCheckAttempt = value;
-			},
-		}); } finally { this.checking = false; }
+		try { await this.runPeriodicCheck(); } finally { this.checking = false; }
+	}
+
+	private async runPeriodicCheck(): Promise<void> {
+		const dependencies = this.dependencies;
+		if (dependencies.getStatus() === 'syncing' || dependencies.automaticSyncEnabled?.() === false) return;
+		if (!dependencies.apiConfigured()) return;
+
+		if (this.consecutiveCheckFailures > 0) {
+			const multiplier = Math.min(
+				2 ** (this.consecutiveCheckFailures - 1),
+				MAX_CHECK_BACKOFF_MULTIPLIER,
+			);
+			const backoffMs = dependencies.getSyncIntervalSeconds() * 1000 * multiplier;
+			if (Date.now() - this.lastCheckAttempt < backoffMs) {
+				return;
+			}
+		}
+		this.lastCheckAttempt = Date.now();
+
+		try {
+			const { hasChanges, cursorExpired } = await dependencies.checkForChanges(dependencies.getLastSeq());
+			// A sync walks the vault itself, so only look for missed local edits
+			// when nothing else would start one.
+			const syncNeeded = hasChanges || cursorExpired || dependencies.getPendingPathCount() > 0
+				|| await dependencies.hasLocalFileChanges();
+
+			if (!syncNeeded) {
+				logger.debug('Periodic check: no changes');
+				this.consecutiveCheckFailures = 0;
+				dependencies.onCheckSuccess();
+				return;
+			}
+
+			if (dependencies.automaticSyncEnabled?.() === false) return;
+			logger.info('Periodic check: changes detected, running sync');
+			const result = await dependencies.sync();
+			if (result.outcome === 'cancelled') return;
+			notifyConflicts(result.conflicts);
+			this.consecutiveCheckFailures = result.success ? 0 : this.consecutiveCheckFailures + 1;
+		} catch (error) {
+			if (isAbortError(error)) return;
+			const failures = this.consecutiveCheckFailures + 1;
+			const multiplier = Math.min(2 ** (failures - 1), MAX_CHECK_BACKOFF_MULTIPLIER);
+			this.consecutiveCheckFailures = failures;
+			dependencies.onCheckFailure(error);
+			logger.warn(
+				`Periodic check failed (attempt ${failures}, next in ~${multiplier}x interval):`,
+				errorMessage(error),
+			);
+		}
 	}
 
 	private stopPeriodicSync(): void {

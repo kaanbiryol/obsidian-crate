@@ -4,8 +4,7 @@ import { createAbortError } from '../abort';
 import { createLogger } from '../logger';
 import { isAbortError } from '../abort';
 import { isQueueTerminalFailure, isRetryableSyncError, isVersionConflict } from '../failures';
-import { deletePendingFiles } from './delete';
-import type { QueueFlushContext, QueueUploadFailure } from './flush-types';
+import type { QueueDeleteCandidate, QueueDeleteFailure, QueueFlushContext, QueueUploadFailure } from './flush-types';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import type { SyncResult } from '../types';
 import { syncErrorIssues, formatSyncIssue, SkippedFileError, skippedFileIssue, withSyncFileContext } from '../issues';
@@ -36,6 +35,30 @@ function buildQueueSyncResult(
 	result.errors.push(...errors);
 	finalizeSyncResult(result);
 	return result;
+}
+
+async function deletePendingFiles(
+	context: QueueFlushContext,
+	deletes: QueueDeleteCandidate[],
+	completedQueueKeys: Set<string>,
+): Promise<{ failures: QueueDeleteFailure[]; reconciliationPaths: string[]; hasTerminalFailure: boolean }> {
+	const result = createEmptySyncResult();
+	let failures: QueueDeleteFailure[];
+	try {
+		failures = await context.deleteRemoteFiles(deletes, result);
+	} finally {
+		for (const path of result.deletedPaths) completedQueueKeys.add(pendingChangeKey('delete', path));
+	}
+
+	const reconciliationPaths: string[] = [];
+	let hasTerminalFailure = false;
+	for (const failure of failures) {
+		if (isVersionConflict(failure.status, failure.code)) {
+			reconciliationPaths.push(pendingChangeKey('delete', failure.path));
+		}
+		if (isQueueTerminalFailure(failure.status, failure.code)) hasTerminalFailure = true;
+	}
+	return { failures, reconciliationPaths, hasTerminalFailure };
 }
 
 async function reportFlushResult(context: QueueFlushContext, result: SyncResult): Promise<void> {

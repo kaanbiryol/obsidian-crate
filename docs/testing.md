@@ -539,7 +539,7 @@ updates, including a failed preference write followed by queued persistence.
 `runtime/operations.test.ts` verifies that checkpoint attachment retains newer
 history entries without mutating a previously captured settings snapshot.
 
-`sync/queue/queue.test.ts`, `engine/selected.test.ts`, `pending-discard.test.ts`,
+`sync/queue/controller.test.ts`, `sync/queue/flush.test.ts`, `engine/selected.test.ts`, `pending-discard.test.ts`,
 `engine/startup-pending.test.ts` and `engine/pending-verification.test.ts` distinguish
 a literal `delete:note.md` filename from deletion of `note.md`, including renames,
 startup recovery, selection, discard and newer edits during settlement.

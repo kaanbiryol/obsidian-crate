@@ -1,63 +1,59 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { runPeriodicCheckWorkflow, type PeriodicCheckWorkflowContext } from './periodic-workflow';
+import { SyncEngineLifecycle } from './lifecycle';
 import { cancelSyncResult, createEmptySyncResult } from '../sync-result';
+import type { SyncResult } from '../types';
 
 function createContext(overrides: Partial<{
-	checkForChanges: PeriodicCheckWorkflowContext['checkForChanges'];
+	checkForChanges: (lastSeq: number) => Promise<{ hasChanges: boolean; cursorExpired?: boolean }>;
 	localFilesChanged: boolean;
 	pendingPathCount: number;
 	syncIntervalSeconds: number;
 }> = {}) {
-	let consecutiveCheckFailures = 0;
-	let lastCheckAttempt = 0;
+	let automaticSync = true;
 	const checkForChanges = vi.fn(
 		overrides.checkForChanges ?? (async () => ({ hasChanges: false })),
 	);
-	const sync = vi.fn(async () => createEmptySyncResult());
+	const sync = vi.fn(async (): Promise<SyncResult> => createEmptySyncResult());
 	const hasLocalFileChanges = vi.fn(async () => overrides.localFilesChanged ?? false);
+	const dependencies = {
+		automaticSyncEnabled: () => automaticSync,
+		apiConfigured: () => true,
+		getStatus: () => 'idle' as const,
+		getSyncIntervalSeconds: () => overrides.syncIntervalSeconds ?? 60,
+		getLastSeq: () => 10,
+		getPendingPathCount: () => overrides.pendingPathCount ?? 0,
+		hasLocalFileChanges,
+		checkForChanges,
+		sync,
+		onCheckSuccess: vi.fn(),
+		onCheckFailure: vi.fn(),
+	};
+	const lifecycle = new SyncEngineLifecycle(dependencies);
 
 	return {
 		checkForChanges,
 		hasLocalFileChanges,
-		getFailures: () => consecutiveCheckFailures,
+		getFailures: () => lifecycle.checkFailureCount,
+		setAutomaticSync: (enabled: boolean) => { automaticSync = enabled; },
 		sync,
-		context: {
-			automaticSyncEnabled: () => true,
-			apiConfigured: () => true,
-			getStatus: () => 'idle' as const,
-			getSyncIntervalSeconds: () => overrides.syncIntervalSeconds ?? 60,
-			getLastSeq: () => 10,
-			getPendingPathCount: () => overrides.pendingPathCount ?? 0,
-			getConsecutiveCheckFailures: () => consecutiveCheckFailures,
-			setConsecutiveCheckFailures: (value: number) => {
-				consecutiveCheckFailures = value;
-			},
-			getLastCheckAttempt: () => lastCheckAttempt,
-			setLastCheckAttempt: (value: number) => {
-				lastCheckAttempt = value;
-			},
-			hasLocalFileChanges,
-			checkForChanges,
-			sync,
-			onCheckSuccess: vi.fn(),
-			onCheckFailure: vi.fn(),
-		},
+		dependencies,
+		lifecycle,
 	};
 }
 
-describe('runPeriodicCheckWorkflow', () => {
+describe('SyncEngineLifecycle periodic check', () => {
 	it('does not count a cancelled sync as a failed periodic check', async () => {
 		const harness = createContext({ localFilesChanged: true });
 		harness.sync.mockResolvedValue(cancelSyncResult(createEmptySyncResult()));
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 		expect(harness.getFailures()).toBe(0);
-		expect(harness.context.onCheckFailure).not.toHaveBeenCalled();
+		expect(harness.dependencies.onCheckFailure).not.toHaveBeenCalled();
 	});
 
 	it('does not check or sync when periodic syncing is disabled', async () => {
 		const harness = createContext({ localFilesChanged: true });
-		harness.context.automaticSyncEnabled = () => false;
-		await runPeriodicCheckWorkflow(harness.context);
+		harness.setAutomaticSync(false);
+		await harness.lifecycle.periodicCheck();
 		expect(harness.checkForChanges).not.toHaveBeenCalled();
 		expect(harness.sync).not.toHaveBeenCalled();
 	});
@@ -65,10 +61,10 @@ describe('runPeriodicCheckWorkflow', () => {
 	it('does not start a sync if disabled during a periodic check', async () => {
 		const harness = createContext({ localFilesChanged: true });
 		harness.checkForChanges.mockImplementation(async () => {
-			harness.context.automaticSyncEnabled = () => false;
+			harness.setAutomaticSync(false);
 			return { hasChanges: true };
 		});
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 		expect(harness.sync).not.toHaveBeenCalled();
 	});
 
@@ -85,11 +81,11 @@ describe('runPeriodicCheckWorkflow', () => {
 			},
 		});
 
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 		expect(harness.getFailures()).toBe(1);
 
 		vi.mocked(Date.now).mockReturnValue(now + 61_000);
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 
 		expect(harness.getFailures()).toBe(2);
 	});
@@ -102,11 +98,11 @@ describe('runPeriodicCheckWorkflow', () => {
 			.mockRejectedValueOnce(new Error('network error'))
 			.mockResolvedValueOnce({ hasChanges: false });
 
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 		expect(harness.getFailures()).toBe(1);
 
 		vi.mocked(Date.now).mockReturnValue(now + 120_000);
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 
 		expect(harness.getFailures()).toBe(0);
 	});
@@ -114,7 +110,7 @@ describe('runPeriodicCheckWorkflow', () => {
 	it('syncs when local files changed without remote changes', async () => {
 		const harness = createContext({ localFilesChanged: true });
 
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 
 		expect(harness.sync).toHaveBeenCalledTimes(1);
 	});
@@ -124,7 +120,7 @@ describe('runPeriodicCheckWorkflow', () => {
 			checkForChanges: async () => ({ hasChanges: false, cursorExpired: true }),
 		});
 
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 
 		expect(harness.sync).toHaveBeenCalledTimes(1);
 	});
@@ -136,7 +132,7 @@ describe('runPeriodicCheckWorkflow', () => {
 	])('leaves the vault walk to the sync when %s', async (_label, overrides) => {
 		const harness = createContext(overrides);
 
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 
 		expect(harness.hasLocalFileChanges).not.toHaveBeenCalled();
 		expect(harness.sync).toHaveBeenCalledTimes(1);
@@ -144,12 +140,12 @@ describe('runPeriodicCheckWorkflow', () => {
 
 	it('walks the vault once on an idle check and not after a failed server check', async () => {
 		const harness = createContext();
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
 		expect(harness.hasLocalFileChanges).toHaveBeenCalledTimes(1);
 		expect(harness.sync).not.toHaveBeenCalled();
 
 		const failing = createContext({ checkForChanges: async () => { throw new Error('network error'); } });
-		await runPeriodicCheckWorkflow(failing.context);
+		await failing.lifecycle.periodicCheck();
 		expect(failing.hasLocalFileChanges).not.toHaveBeenCalled();
 	});
 
@@ -162,8 +158,8 @@ describe('runPeriodicCheckWorkflow', () => {
 			},
 		});
 
-		await runPeriodicCheckWorkflow(harness.context);
-		await runPeriodicCheckWorkflow(harness.context);
+		await harness.lifecycle.periodicCheck();
+		await harness.lifecycle.periodicCheck();
 
 		expect(harness.checkForChanges).toHaveBeenCalledTimes(1);
 	});
