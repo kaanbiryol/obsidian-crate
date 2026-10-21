@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SyncResult } from '../types';
 import { cancelSyncResult, createEmptySyncResult } from '../sync-result';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../../plugin/settings';
-import { recordSyncHistory } from './history';
+import { recordSyncHistory } from './sync-activity';
 import { SyncRuntime } from './runtime';
 import { formatSyncProgress } from '../../ui/activity/progress-label';
 import {

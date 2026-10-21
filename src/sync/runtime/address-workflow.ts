@@ -3,7 +3,7 @@ import type { SecretStorageService } from '../../plugin/secret-storage';
 import { prepareEncryptedAddressChange } from '../encryption/encrypted-connection';
 import { loadEncryptionReset, saveEncryptionReset, verifyEncryptionResetAddress } from '../encryption/reset';
 import type { RuntimeConfigurationTransition } from './runtime';
-import { resetStoredSyncState } from './history';
+import { resetStoredSyncState } from './sync-activity';
 import { getCheckpointAuthority, requireNormalizedWorkerUrl } from '../connection/worker-url';
 import { WorkerApiHttpClient } from '../worker-api/http';
 import { SECRET_KEYS } from '../../platform/secret-keys';

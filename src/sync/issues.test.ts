@@ -4,7 +4,7 @@ import { createAbortError } from './abort';
 import { getSyncIssues, normalizeSyncIssues, OVERSIZED_LOCAL_FILE_MESSAGE, recordSyncError, SkippedFileError, syncErrorIssues, withSyncFileContext } from './issues';
 import type { SyncIssue } from './types';
 import { createEmptySyncResult, mergeSyncResults } from './sync-result';
-import { recordSyncHistory } from './runtime/history';
+import { recordSyncHistory } from './runtime/sync-activity';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { DEFAULT_SETTINGS } from '../plugin/settings-types';
 

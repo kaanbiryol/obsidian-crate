@@ -5,7 +5,7 @@ import type { SecretStorageService } from '../../plugin/secret-storage';
 import type { SyncApiClient } from '../worker-api/client';
 import type { RuntimeConfigurationTransition } from './runtime';
 import { applyInfrastructureConfigState, clearSyncConfigurationState, type ApplyInfrastructureConfigInput } from './config';
-import { resetStoredSyncState } from './history';
+import { resetStoredSyncState } from './sync-activity';
 import { normalizeWorkerUrl, requireNormalizedWorkerUrl } from '../connection/worker-url';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import type { SyncSettings } from '../settings';

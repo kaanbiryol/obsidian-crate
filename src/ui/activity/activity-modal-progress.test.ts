@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createObsidianUiModule, FakeElement } from '../../test/fakes/obsidian-ui';
 import { ActivityModal } from './activity-modal';
-import { recordSyncHistory } from '../../sync/runtime/history';
+import { recordSyncHistory } from '../../sync/runtime/sync-activity';
 import { createEmptySyncResult } from '../../sync/sync-result';
 import { DEFAULT_SETTINGS } from '../../plugin/settings-types';
 import type { SyncState } from '../../sync/types';

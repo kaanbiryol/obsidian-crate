@@ -22,7 +22,7 @@ import { isConflictFile, notifyConflicts } from '../conflict/conflict';
 import { SyncEngine } from '../engine/engine';
 import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';
 import { deleteManifestFile, type ApplyInfrastructureConfigInput } from './config';
-import { checkpointDue, recordSyncHistory } from './history';
+import { checkpointDue, recordSyncHistory } from './sync-activity';
 import { emitStateChange, emitSyncProgress } from './listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { RuntimeServerStatus } from './server-status';

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CratePlugin from './CratePlugin';
 import { normalizeCrateSettings } from './settings';
 import { ensurePluginDeviceId } from './deviceId';
-import { recordSyncHistory } from '../sync/runtime/history';
+import { recordSyncHistory } from '../sync/runtime/sync-activity';
 import { createEmptySyncResult } from '../sync/sync-result';
 import {
 	DEFAULT_REMINDERS_SETTINGS,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SyncHistoryEntry } from '../types';
-import { checkpointDue } from './history';
+import { checkpointDue } from './sync-activity';
 
 const entry = (timestamp: string, fields: Partial<SyncHistoryEntry> = {}) => ({ timestamp, type: 'sync', success: true, ...fields }) as SyncHistoryEntry;
 const now = Date.parse('2026-05-01T12:00:00Z');

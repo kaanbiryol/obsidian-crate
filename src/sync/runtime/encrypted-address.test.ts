@@ -9,7 +9,7 @@ import { LocalManifest } from '../manifest/manifest';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { WorkerApiHttpClient } from '../worker-api/http';
 import { createRuntimeHarness } from './runtime-test-harness';
-import { resetStoredSyncState } from './history';
+import { resetStoredSyncState } from './sync-activity';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 
 afterEach(() => vi.restoreAllMocks());
