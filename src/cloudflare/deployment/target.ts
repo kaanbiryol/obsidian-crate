@@ -3,12 +3,14 @@ import { discoverCloudflareDeployments, type DiscoveredCloudflareDeployment } fr
 import type { CloudflareDeploymentMetadata, DeploymentRequest } from './types';
 import { normalizeVaultName } from '../vault-name';
 import { randomHex } from '../oauth/pkce';
+import { DEVELOPMENT_BUILD } from '../../protocol/server-build';
 
 export type SelectDeployment = (deployments: DiscoveredCloudflareDeployment[], missingServer?: boolean)
 	=> Promise<DiscoveredCloudflareDeployment | 'create' | null>;
 
 export function createCloudflareDeploymentMetadata(vaultName?: string): CloudflareDeploymentMetadata {
-	const deploymentId = randomHex(8);
+	// A development build is fenced to one Worker, so a new server must be created under that name.
+	const deploymentId = DEVELOPMENT_BUILD ? DEVELOPMENT_BUILD.worker.slice('crate-'.length) : randomHex(8);
 	const resourceName = `crate-${deploymentId}`;
 	return {
 		deploymentId,

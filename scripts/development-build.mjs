@@ -1,10 +1,20 @@
-import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadEnv } from 'vite';
 
-export function createDevelopmentBuild(root, worker = loadEnv('development', root, 'CRATE_DEV_WORKER').CRATE_DEV_WORKER) {
-  if (!/^crate-[a-f0-9]{16}$/.test(worker ?? '')) throw new Error('Set CRATE_DEV_WORKER in .env.development.local or your shell to the exact Worker name of your development server (crate- followed by 16 hex characters).');
+// Without a configured Worker, pick a name once and save it so the plugin creates its dev server under it.
+function resolveDevelopmentWorker(root) {
+  const configured = loadEnv('development', root, 'CRATE_DEV_WORKER').CRATE_DEV_WORKER;
+  if (configured) return configured;
+  const generated = `crate-${randomBytes(8).toString('hex')}`;
+  appendFileSync(resolve(root, '.env.development.local'), `\nCRATE_DEV_WORKER=${generated}\n`);
+  console.log(`Generated development Worker name ${generated} and saved it to .env.development.local`);
+  return generated;
+}
+
+export function createDevelopmentBuild(root, worker = resolveDevelopmentWorker(root)) {
+  if (!/^crate-[a-f0-9]{16}$/.test(worker ?? '')) throw new Error('CRATE_DEV_WORKER must be crate- followed by 16 hex characters.');
   const { revision } = JSON.parse(readFileSync(resolve(root, 'src/cloudflare/server-release.json'), 'utf8'));
   if (!Number.isSafeInteger(revision) || revision < 1) throw new Error('Invalid public server revision');
   const path = resolve(root, 'server-development.local.json');

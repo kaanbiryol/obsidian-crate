@@ -26,35 +26,40 @@ test('requires a designated server and persists a counter across builds', () => 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('loads the development Worker from local env files and honors shell overrides', () => {
+test('generates a development Worker once, then loads it from local env files and honors shell overrides', () => {
   const root = mkdtempSync(join(tmpdir(), 'crate-dev-env-'));
   const previousWorker = process.env.CRATE_DEV_WORKER;
   try {
     delete process.env.CRATE_DEV_WORKER;
     mkdirSync(join(root, 'src/cloudflare'), { recursive: true });
     writeFileSync(join(root, 'src/cloudflare/server-release.json'), JSON.stringify({ revision: 3 }));
-    assert.throws(() => createDevelopmentBuild(root), /\.env\.development\.local/);
+    // Without a configured Worker, the first build picks a name and saves it for later builds.
+    const generated = createDevelopmentBuild(root);
+    assert.match(generated.worker, /^crate-[a-f0-9]{16}$/);
+    assert.equal(generated.number, 1);
+    assert.match(readFileSync(join(root, '.env.development.local'), 'utf8'), new RegExp(`CRATE_DEV_WORKER=${generated.worker}`));
+    assert.deepEqual(createDevelopmentBuild(root), { number: 2, worker: generated.worker });
 
     const localWorker = `crate-${'a'.repeat(16)}`;
     const shellWorker = `crate-${'b'.repeat(16)}`;
     writeFileSync(join(root, '.env'), `CRATE_DEV_WORKER=${shellWorker}\n`);
     writeFileSync(join(root, '.env.development.local'), `CRATE_DEV_WORKER="${localWorker}"\n`);
-    assert.deepEqual(createDevelopmentBuild(root), { number: 1, worker: localWorker });
+    assert.deepEqual(createDevelopmentBuild(root), { number: 3, worker: localWorker });
 
     // Re-read the file on each build so a running watcher can pick up changes.
     writeFileSync(join(root, '.env.development.local'), `CRATE_DEV_WORKER=${shellWorker}\n`);
-    assert.deepEqual(createDevelopmentBuild(root), { number: 2, worker: shellWorker });
+    assert.deepEqual(createDevelopmentBuild(root), { number: 4, worker: shellWorker });
     process.env.CRATE_DEV_WORKER = localWorker;
-    assert.deepEqual(createDevelopmentBuild(root), { number: 3, worker: localWorker });
+    assert.deepEqual(createDevelopmentBuild(root), { number: 5, worker: localWorker });
 
-    for (const worker of ['', 'crate-invalid', `https://${localWorker}.example.workers.dev`]) {
+    for (const worker of ['crate-invalid', `https://${localWorker}.example.workers.dev`]) {
       process.env.CRATE_DEV_WORKER = worker;
       assert.throws(() => createDevelopmentBuild(root), /CRATE_DEV_WORKER/);
     }
     delete process.env.CRATE_DEV_WORKER;
     writeFileSync(join(root, '.env.development.local'), 'CRATE_DEV_WORKER=crate-invalid\n');
     assert.throws(() => createDevelopmentBuild(root), /CRATE_DEV_WORKER/);
-    assert.deepEqual(JSON.parse(readFileSync(join(root, 'server-development.local.json'), 'utf8')), { version: '3-dev.3' });
+    assert.deepEqual(JSON.parse(readFileSync(join(root, 'server-development.local.json'), 'utf8')), { version: '3-dev.5' });
   } finally {
     if (previousWorker === undefined) delete process.env.CRATE_DEV_WORKER;
     else process.env.CRATE_DEV_WORKER = previousWorker;
