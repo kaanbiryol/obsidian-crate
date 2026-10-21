@@ -1,6 +1,7 @@
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES, isReceiptEnvelope } from '../../../encryption/receipt-format';
 
-import { ENCRYPTED_INVENTORY_PAGE } from '../../../encryption/file-inventory';
+import { ENCRYPTED_INVENTORY_PAGE, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '../../../encryption/file-inventory';
+import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { fileFolderArgs } from '../sync/file-identity';
 import { corsHeaders, corsResponse } from '../cors';
 import { parseJsonObject, sanitizePath } from '../request-validation';
@@ -18,7 +19,6 @@ import { FILE_HASH_HEADER, REVISION_HEADER } from '../../../protocol/http-header
 import type { Env } from '../types';
 import { isSha256Hex } from '../../../platform/validation';
 
-const MAX_WEB_FILE_BYTES = 4 * 1024 * 1024;
 interface EncryptedWebFile { path: string; content: string; expectedHash: string | null; expectedRevision?: string }
 
 function scopedPath(value: unknown, folder: string, state: EncryptionServerState): string | null {
@@ -66,10 +66,10 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 	const file = await getStoredFileRow(env.DB, filePath);
 	if (!file) return corsResponse({ error: 'Note not found' }, 404);
 	if (params.get('revision') && params.get('revision') !== file.storageKey) return corsResponse({ error: 'Note changed', code: 'version_conflict' }, 409);
-	if (file.size > MAX_WEB_FILE_BYTES) return corsResponse({ error: `This note is too large for the ${label} app` }, 413);
+	if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) return corsResponse({ error: `This note is too large for the ${label} app` }, 413);
 	const object = await env.BUCKET.get(file.storageKey);
 	if (!object || !storedObjectMatchesMetadata(object, file)) return corsResponse({ error: 'Note is unavailable' }, 503);
-	return new Response(object.body, { headers: { ...corsHeaders(), 'Content-Type': 'application/vnd.crate.encrypted-file',
+	return new Response(object.body, { headers: { ...corsHeaders(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE,
 		'Content-Length': String(file.size), 'Cache-Control': 'private, no-store', [FILE_HASH_HEADER]: file.hash, [REVISION_HEADER]: file.storageKey } });
 }
 
@@ -90,7 +90,7 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 		const file = raw as Partial<EncryptedWebFile>;
 		const filePath = scopedPath(file.path, body.folderPath, state);
 		if (Object.keys(file).some(key => !['path', 'content', 'expectedHash', 'expectedRevision'].includes(key)) || !filePath
-			|| typeof file.content !== 'string' || new TextEncoder().encode(file.content).byteLength > MAX_WEB_FILE_BYTES
+			|| typeof file.content !== 'string' || new TextEncoder().encode(file.content).byteLength > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES
 			|| (file.expectedHash !== null && (typeof file.expectedHash !== 'string' || !isSha256Hex(file.expectedHash)))
 			|| (file.expectedHash !== null && !isSyncRevision(file.expectedRevision))) return corsResponse({ error: 'Invalid encrypted file precondition' }, 400);
 		await prepareEncryptedFileCommit(env.DB, filePath, file.content);

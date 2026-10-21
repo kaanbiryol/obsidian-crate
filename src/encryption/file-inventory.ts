@@ -80,7 +80,8 @@ export async function* encryptedInventoryPages(
 	if (options.confirm && (await fetchPage()).sequence !== sequence) throw options.changed();
 }
 
-/** Coarse ciphertext bound checked before download; features enforce their plaintext limit after opening. */
+/** Coarse ciphertext bound checked before download; features enforce their plaintext limit after opening.
+ * The Worker applies the same bound to encrypted web app downloads and commits. */
 export const MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES = 4 * 1024 * 1024;
 
 /** Open transferred ciphertext only when it matches its inventory entry byte for byte. */
