@@ -18,6 +18,14 @@ export async function readEncryptionState(db: D1Database): Promise<EncryptionSer
 	return state;
 }
 
+/** What a folder-scoped session may see: public settings, the encrypted recovery
+ * bundle and its own folder's scope, without the vault key ID or other folders' scopes. */
+export function scopedEncryptionState(state: EncryptionServerState, folderPath: string | undefined):
+	Pick<EncryptionServerState, 'version' | 'vaultId' | 'generation' | 'mode' | 'recovery'> & { scope: EncryptionServerState['scopes'][number] | null } {
+	return { version: state.version, vaultId: state.vaultId, generation: state.generation,
+		mode: state.mode, recovery: state.recovery, scope: state.scopes.find(scope => scope.folderPath === folderPath) ?? null };
+}
+
 /** Whether the request was made with this vault's current encryption keys. */
 export function hasEncryptionAuthority(request: Request, state: EncryptionServerState): boolean {
 	return request.headers.get(ENCRYPTION_VAULT_HEADER) === state.vaultId
