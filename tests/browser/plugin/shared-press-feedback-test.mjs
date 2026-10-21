@@ -15,7 +15,7 @@ const { outputFiles } = await build({
     import { Button } from './src/ui/shared/Button';
     import { ToggleButton } from './src/ui/shared/ToggleButton';
     import { ShadowDOMNativeMotionButton } from './src/reminders/ui/shared/ShadowDOMNativeMotionButton';
-    import { PickerFieldRow } from './src/reminders/ui/reminder-modal/PickerFieldRow';
+    import { PickerFieldRow } from './src/reminders/ui/reminder-editor/PickerFieldRow';
     function Fixture() {
       const [selected, setSelected] = useState(false);
       const [clicks, setClicks] = useState(0);

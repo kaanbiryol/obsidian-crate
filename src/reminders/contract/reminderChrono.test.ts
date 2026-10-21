@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as chrono from 'chrono-node';
-import { buildRichTextSegments } from '../ui/editor/richTextRenderer';
+import { buildRichTextSegments } from '../ui/reminder-editor/richTextRenderer';
 import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';

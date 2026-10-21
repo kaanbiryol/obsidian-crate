@@ -1,6 +1,6 @@
 import { getIcon } from 'obsidian';
 import { useLayoutEffect, useRef, type ComponentProps } from 'react';
-import { ReminderEditorFields } from '../reminder-modal/ReminderEditorFields';
+import { ReminderEditorFields } from '../reminder-editor/ReminderEditorFields';
 
 /** Obsidian's icon registry stays outside the shared editor. */
 export function PluginReminderEditorFields(props: ComponentProps<typeof ReminderEditorFields>) {

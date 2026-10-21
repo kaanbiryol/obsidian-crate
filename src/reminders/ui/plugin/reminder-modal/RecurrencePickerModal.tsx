@@ -1,4 +1,4 @@
-import { RecurrencePickerContent } from '../../reminder-modal/RecurrencePickerContent';
+import { RecurrencePickerContent } from '../../reminder-editor/RecurrencePickerContent';
 import { ThemeIconProvider } from '../../../../ui/shared/ThemeIcon';
 import { ObsidianIcon } from '../../../../ui/obsidian-icon';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -12,8 +12,8 @@ import {
 	buildRecurrencePickerState,
 	isRecurrencePickerStateUnchanged,
 	recurrenceRuleFromPickerState,
-} from '../../reminder-modal/recurrencePickerShared';
-import { REMINDER_PICKER_COPY } from '../../reminder-modal/pickerCopy';
+} from '../../reminder-editor/recurrencePickerShared';
+import { REMINDER_PICKER_COPY } from '../../reminder-editor/pickerCopy';
 
 interface RecurrencePickerModalProps {
     isOpen: boolean;

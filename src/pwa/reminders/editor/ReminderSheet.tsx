@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { useKeyboardHeight } from '@/pwa/hooks/useKeyboardHeight';
-import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
+import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-editor/pickerCopy';
 import {
 	getReminderSheetClosedOffset,
 	useReminderSheetNavigation,
@@ -15,7 +15,7 @@ import {
 } from './ReminderEditorScreen';
 import { PwaModalSheet } from '../../components/PwaModalSheet';
 import { PwaDeleteConfirmation } from './PwaDeleteConfirmation';
-import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-modal/deleteConfirmation';
+import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-editor/deleteConfirmation';
 import { useEditorSheetHeight } from './useEditorSheetHeight';
 import { DeferredNotice } from '../../components/DeferredNotice';
 import { PWA_SURFACE_SPRING, PWA_PICKER_EXIT, PWA_PICKER_RETURN } from '../../../ui/shared/navigation/motion';

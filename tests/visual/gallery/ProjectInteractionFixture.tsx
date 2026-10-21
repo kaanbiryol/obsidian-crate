@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { AddReminderModal } from '@/reminders/ui/plugin/reminder-modal/AddReminderModal';
-import { ProjectPickerContent } from '@/reminders/ui/reminder-modal/ProjectPickerContent';
-import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEditorFields';
+import { ProjectPickerContent } from '@/reminders/ui/reminder-editor/ProjectPickerContent';
+import { ReminderEditorFields } from '@/reminders/ui/reminder-editor/ReminderEditorFields';
 import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
 import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 

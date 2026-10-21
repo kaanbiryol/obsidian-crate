@@ -8,7 +8,7 @@ import { scanReminderMarkdownContent } from '../core/markdownScan';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { buildInitialReminderContent, rebuildReminderContent } from '../core/reminderDraft';
 import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
-import { buildRichTextSegments } from '../ui/editor/richTextRenderer';
+import { buildRichTextSegments } from '../ui/reminder-editor/richTextRenderer';
 import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 const now = new Date('2026-09-21T13:00:37.123Z');

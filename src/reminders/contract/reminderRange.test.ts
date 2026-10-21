@@ -7,7 +7,7 @@ import { scanReminderMarkdownContent } from '../core/markdownScan';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { buildInitialReminderContent } from '../core/reminderDraft';
 import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
-import { buildRichTextSegments } from '../ui/editor/richTextRenderer';
+import { buildRichTextSegments } from '../ui/reminder-editor/richTextRenderer';
 import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 beforeEach(() => {

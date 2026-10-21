@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { IconButton } from './plugin/IconButton';
 import { ProgressMeter } from './shared/ProgressMeter';
-import { PickerFieldRow } from './reminder-modal/PickerFieldRow';
-import { PickerSection } from './reminder-modal/PickerSection';
+import { PickerFieldRow } from './reminder-editor/PickerFieldRow';
+import { PickerSection } from './reminder-editor/PickerSection';
 import { CompletedReminderSection } from './views/CompletedReminderSection';
 
 describe('shared UI primitives', () => {

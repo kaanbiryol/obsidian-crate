@@ -1,10 +1,10 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import type React from 'react';
 
-import { filterProjects, extractHashtagQuery } from '../editor/projectSearch';
-import { getPlainText } from '../editor/richTextPlainText';
-import { saveCursorPosition } from '../editor/cursorPosition';
-import { replaceReminderProject, toReminderTextOffset, toReminderCursorOffset } from '../editor/reminderEditorEdits';
+import { filterProjects, extractHashtagQuery } from './projectSearch';
+import { getPlainText } from './richTextPlainText';
+import { saveCursorPosition } from './cursorPosition';
+import { replaceReminderProject, toReminderTextOffset, toReminderCursorOffset } from './reminderEditorEdits';
 import type { RichTextInputHandle } from '../shared/RichTextInput';
 
 const MAX_RESULTS = 10;

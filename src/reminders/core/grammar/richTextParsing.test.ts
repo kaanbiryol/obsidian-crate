@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { getPlainText } from '../../ui/editor/richTextPlainText';
+import { getPlainText } from '../../ui/reminder-editor/richTextPlainText';
 import { findProjectMatches, findPriorityMatches, findLinkMatches, findAllMatches } from './richTextMatchers';
 
 describe('findProjectMatches', () => {

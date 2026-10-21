@@ -154,7 +154,7 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['src/ui/shared/**/*.{ts,tsx}', 'src/reminders/ui/{shared,reminder-modal,views,editor,format}/**/*.{ts,tsx}', 'src/reading/ui/**/*.{ts,tsx}'],
+		files: ['src/ui/shared/**/*.{ts,tsx}', 'src/reminders/ui/{shared,reminder-editor,views,format}/**/*.{ts,tsx}', 'src/reading/ui/**/*.{ts,tsx}'],
 		ignores: ['src/reading/ui/plugin/**'],
 		rules: {
 			'@typescript-eslint/no-restricted-imports': ['error', {

@@ -5,8 +5,8 @@ import { ObsidianIcon } from '../../../../ui/obsidian-icon';
 import type { AnimationConfig } from '../animations';
 import { getPickerModalProps } from '../glassStyles';
 import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
-import { ProjectPickerContent } from '../../reminder-modal/ProjectPickerContent';
-import { REMINDER_PICKER_COPY } from '../../reminder-modal/pickerCopy';
+import { ProjectPickerContent } from '../../reminder-editor/ProjectPickerContent';
+import { REMINDER_PICKER_COPY } from '../../reminder-editor/pickerCopy';
 
 type ProjectPickerModalProps = ComponentProps<typeof ProjectPickerContent> & {
     animationConfig: AnimationConfig;

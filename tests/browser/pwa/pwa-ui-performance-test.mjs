@@ -12,7 +12,7 @@ const { outputFiles } = await build({
 			import { RichTextInput } from './src/reminders/ui/shared/RichTextInput';
 			import { useKeyboardHeight } from './src/pwa/hooks/useKeyboardHeight';
 			import { PwaPullRefreshIndicator } from './src/pwa/components/PwaChrome';
-			export { getPlainText } from './src/reminders/ui/editor/richTextPlainText';
+			export { getPlainText } from './src/reminders/ui/reminder-editor/richTextPlainText';
 			function Editor() {
 				const [value, setValue] = useState('Task #Work !');
 				return <><RichTextInput value={value} onChange={setValue} knownProjects={['Work']} ariaLabel="Test editor" autoFocus syncContentBeforePaint /><output id="value">{value}</output></>;

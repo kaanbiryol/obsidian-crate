@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
-import { replaceReminderProject, toReminderCursorOffset } from '@/reminders/ui/editor/reminderEditorEdits';
+import { replaceReminderProject, toReminderCursorOffset } from '@/reminders/ui/reminder-editor/reminderEditorEdits';
 import { ReminderDraftFixture, ReminderModalFixture, PwaSaveFixture } from './reminder-draft-fixture';
 import css from '@/styles/main.scss?inline';
 import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';

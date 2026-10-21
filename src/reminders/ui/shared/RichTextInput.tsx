@@ -9,8 +9,8 @@ import { $readReminder, $writeReminder } from './lexical/reminderDocument';
 import { $restoreOffsets, $selectionOffsets } from './lexical/selection';
 import { registerReminderEditing } from './lexical/registerReminderEditing';
 import { getEditorSelectionRange } from '../../../ui/shared/editorSelection';
-import { getLogicalCursorOffset } from '../editor/cursorPosition';
-import { extractHashtagQuery } from '../editor/projectSearch';
+import { getLogicalCursorOffset } from '../reminder-editor/cursorPosition';
+import { extractHashtagQuery } from '../reminder-editor/projectSearch';
 import type { RichTextInputHandle, RichTextInputProps } from './lexical/types';
 export type { RichTextInputHandle, RichTextInputProps } from './lexical/types';
 

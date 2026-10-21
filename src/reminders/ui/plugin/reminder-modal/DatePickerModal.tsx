@@ -1,4 +1,4 @@
-import { DatePickerContent } from '../../reminder-modal/DatePickerContent';
+import { DatePickerContent } from '../../reminder-editor/DatePickerContent';
 import { ThemeIconProvider } from '../../../../ui/shared/ThemeIcon';
 import { ObsidianIcon } from '../../../../ui/obsidian-icon';
 import React, { useCallback } from 'react';
@@ -9,8 +9,8 @@ import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
 import { getPickerModalProps } from '../glassStyles';
 import { parseLocalDateKey, parseReminderDateValue } from '../../../core/dates/reminderDate';
 import { buildDatePickerDateSelection, buildDatePickerTimeSelection } from './datePickerSelection';
-import { getReminderDateForPreset, type ReminderDatePreset } from '../../reminder-modal/datePresets';
-import { REMINDER_PICKER_COPY } from '../../reminder-modal/pickerCopy';
+import { getReminderDateForPreset, type ReminderDatePreset } from '../../reminder-editor/datePresets';
+import { REMINDER_PICKER_COPY } from '../../reminder-editor/pickerCopy';
 
 interface DatePickerModalProps {
     isOpen: boolean;

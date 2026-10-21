@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as matchers from './richTextMatchers';
-import { buildRichTextSegments } from '../../ui/editor/richTextRenderer';
+import { buildRichTextSegments } from '../../ui/reminder-editor/richTextRenderer';
 import { parseCheckboxLine, rebuildCheckboxLine } from './checkboxParser';
 import { parseReminderContent } from './reminderParser';
 

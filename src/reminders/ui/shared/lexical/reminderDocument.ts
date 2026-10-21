@@ -4,7 +4,7 @@ import {
 } from 'lexical';
 import { $isLinkNode } from '@lexical/link';
 import { ReminderLinkNode } from './ReminderLinkNode';
-import { buildRichTextSegments } from '@/reminders/ui/editor/richTextRenderer';
+import { buildRichTextSegments } from '@/reminders/ui/reminder-editor/richTextRenderer';
 import { findActiveReminderMatches } from '@/reminders/core/grammar/reminderEditorParsing';
 import { ReminderTextNode } from './ReminderTextNode';
 

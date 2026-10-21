@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findAllMatches } from './richTextMatchers';
-import { buildRichTextSegments } from '../../ui/editor/richTextRenderer';
+import { buildRichTextSegments } from '../../ui/reminder-editor/richTextRenderer';
 import { parseReminderContent } from './reminderParser';
 
 const projects = ['Home', 'Home Office', 'Tomorrow', 'Every Monday'];

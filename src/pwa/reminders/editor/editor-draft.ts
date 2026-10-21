@@ -11,7 +11,7 @@ import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '@/reminders
 import {
 	getReminderDateForPreset,
 	type ReminderDatePreset,
-} from '@/reminders/ui/reminder-modal/datePresets';
+} from '@/reminders/ui/reminder-editor/datePresets';
 import type { ModalDraft } from '../types';
 
 export function formatModalDueSummary(draft: ModalDraft): string {

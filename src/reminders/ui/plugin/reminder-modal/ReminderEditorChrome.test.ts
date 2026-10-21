@@ -6,8 +6,8 @@ import { AddReminderModalHeader } from './AddReminderModalHeader';
 import { DatePickerModal } from './DatePickerModal';
 import { ProjectPickerModal } from './ProjectPickerModal';
 import { RecurrencePickerModal } from './RecurrencePickerModal';
-import { ReminderActionChips } from '../../reminder-modal/ReminderActionChips';
-import { ReminderEditorFields } from '../../reminder-modal/ReminderEditorFields';
+import { ReminderActionChips } from '../../reminder-editor/ReminderActionChips';
+import { ReminderEditorFields } from '../../reminder-editor/ReminderEditorFields';
 import { parseReminderContent } from '../../../core/grammar/reminderParser';
 
 // Portals do not render during SSR; keep these assertions focused on the editor's content.

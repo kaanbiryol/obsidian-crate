@@ -8,7 +8,7 @@ import { buildReminderSubmission } from '../../ui/plugin/reminder-modal/reminder
 import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
 import { applyReminderTextUpdate, deriveDraftPatchFromContent } from '@/pwa/reminders/editor/editor-draft';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
-import { buildRecurrencePickerState, recurrenceRuleFromPickerState } from '../../ui/reminder-modal/recurrencePickerShared';
+import { buildRecurrencePickerState, recurrenceRuleFromPickerState } from '../../ui/reminder-editor/recurrencePickerShared';
 import { preserveRecurrenceMetadata } from './recurrenceRule';
 import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 

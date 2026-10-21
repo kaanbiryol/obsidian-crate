@@ -4,7 +4,7 @@ import { PageTitleContext } from '../../shared/lexical/pageTitles';
 import type { RichTextInputHandle } from '../../shared/RichTextInput';
 import type { ReminderDraft } from './useReminderDraft';
 import { getProjectColor } from '../../format/projectColors';
-import { ReminderActionChips } from '../../reminder-modal/ReminderActionChips';
+import { ReminderActionChips } from '../../reminder-editor/ReminderActionChips';
 import { PluginReminderEditorFields as ReminderEditorFields } from '../PluginReminderEditorFields';
 import { ThemeIconProvider } from '../../../../ui/shared/ThemeIcon';
 import { ObsidianIcon } from '../../../../ui/obsidian-icon';

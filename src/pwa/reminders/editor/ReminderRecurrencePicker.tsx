@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
-import { RecurrencePickerContent } from '@/reminders/ui/reminder-modal/RecurrencePickerContent';
-import { buildRecurrencePickerDraft, buildRecurrencePickerState, isRecurrencePickerStateUnchanged, recurrenceRuleFromPickerDraft } from '@/reminders/ui/reminder-modal/recurrencePickerShared';
+import { RecurrencePickerContent } from '@/reminders/ui/reminder-editor/RecurrencePickerContent';
+import { buildRecurrencePickerDraft, buildRecurrencePickerState, isRecurrencePickerStateUnchanged, recurrenceRuleFromPickerDraft } from '@/reminders/ui/reminder-editor/recurrencePickerShared';
 import { applyReminderTextUpdate } from './editor-draft';
 import type { ModalDraft } from '../types';
 
