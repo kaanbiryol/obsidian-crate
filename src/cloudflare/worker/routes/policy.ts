@@ -1,5 +1,6 @@
 import type { AuthPrincipal } from '../auth/authenticate';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
+import { TRANSFER_PATHS } from '../coordinator/coordinator';
 
 type Scope = AuthPrincipal['scope'];
 interface ApiRoutePolicy {
@@ -7,7 +8,7 @@ interface ApiRoutePolicy {
 	readonly execution?:
 		| { readonly kind: 'coordinator'; readonly wake: boolean }
 		| { readonly kind: 'reading-grant' }
-		| { readonly kind: 'transfer'; readonly path: '/sync-upload' | '/sync-batch-upload' };
+		| { readonly kind: 'transfer'; readonly path: typeof TRANSFER_PATHS.syncUpload | typeof TRANSFER_PATHS.syncBatchUpload };
 	readonly initializeProjection?: boolean;
 }
 
@@ -80,11 +81,11 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /sync/import/upload': { scopes: VAULT },
 	'POST /sync/metadata': { scopes: VAULT },
 	'POST /sync/delete': { scopes: VAULT, execution: COORDINATOR },
-	'POST /sync/batch-upload': { scopes: VAULT, execution: { kind: 'transfer', path: '/sync-batch-upload' } },
+	'POST /sync/batch-upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncBatchUpload } },
 	'POST /sync/batch-download': { scopes: VAULT },
 	'POST /sync/batch-delete': { scopes: VAULT, execution: COORDINATOR },
 	'POST /sync/restore-version': { scopes: VAULT, execution: COORDINATOR },
-	'PUT /sync/upload': { scopes: VAULT, execution: { kind: 'transfer', path: '/sync-upload' } },
+	'PUT /sync/upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncUpload } },
 	'PUT /sync/import/upload': { scopes: VAULT },
 	'POST /notifications/retry': { scopes: VAULT, execution: COORDINATOR },
 	'POST /notifications/reminders-exchange': { scopes: VAULT },

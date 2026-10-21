@@ -6,7 +6,7 @@ import type { Env } from '../types';
 import { publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
 import { drainNotificationJobs } from '../notifications/outbox';
-import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, REMINDERS_ENABLED_HEADER } from './coordinator';
+import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, REMINDERS_ENABLED_HEADER, TRANSFER_PATHS } from './coordinator';
 import { uploadInitialFiles } from '../sync/initial-import-upload';
 import { handleBatchDownload } from '../sync/batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/bulk-upload-dispatch';
@@ -21,10 +21,10 @@ export async function handleCoordinatorRequest(
   withStateLock: StateLock, handleReminder: () => Promise<Response>,
 ): Promise<Response> {
   const path = new URL(request.url).pathname;
-  if ((path === '/sync-upload' && request.method === 'PUT') || (path === '/sync-batch-upload' && request.method === 'POST')) {
+  if ((path === TRANSFER_PATHS.syncUpload && request.method === 'PUT') || (path === TRANSFER_PATHS.syncBatchUpload && request.method === 'POST')) {
     // Reauthenticate inside the transfer queue so reset/revocation fences waiting writers.
     const target = new URL(request.url);
-    target.pathname = path === '/sync-upload' ? '/sync/upload' : '/sync/batch-upload';
+    target.pathname = path === TRANSFER_PATHS.syncUpload ? '/sync/upload' : '/sync/batch-upload';
     return withStateLock(() => fetchWorkerRequest(new Request(target, request), env, { kind: 'transfer' }));
   }
   if (path === COORDINATOR_PATHS.commitNewFiles && request.method === 'POST') {
@@ -61,11 +61,11 @@ export async function handleCoordinatorRequest(
       await drainNotificationJobs(env, undefined, request.headers.get(REMINDERS_ENABLED_HEADER) === '1' || undefined);
       return new Response(null, { status: 204 });
     }
-    if (path === '/history-checkpoint-create' && request.method === 'POST') return createSharedCheckpoint(env.BUCKET, env.DB);
-    if (path === '/history-checkpoint' && request.method === 'GET') return getSharedCheckpoint(request, env.BUCKET);
-    if (path === '/history-checkpoint-file' && request.method === 'GET') return downloadCheckpointFile(request, env.BUCKET, env.DB);
-    if (path === '/batch-download' && request.method === 'POST') return handleBatchDownload(request, env.BUCKET, env.DB);
-    if (path === '/import-upload' && ['POST', 'PUT'].includes(request.method)) {
+    if (path === TRANSFER_PATHS.historyCheckpointCreate && request.method === 'POST') return createSharedCheckpoint(env.BUCKET, env.DB);
+    if (path === TRANSFER_PATHS.historyCheckpoint && request.method === 'GET') return getSharedCheckpoint(request, env.BUCKET);
+    if (path === TRANSFER_PATHS.historyCheckpointFile && request.method === 'GET') return downloadCheckpointFile(request, env.BUCKET, env.DB);
+    if (path === TRANSFER_PATHS.batchDownload && request.method === 'POST') return handleBatchDownload(request, env.BUCKET, env.DB);
+    if (path === TRANSFER_PATHS.importUpload && ['POST', 'PUT'].includes(request.method)) {
       // One unpublished batch at a time bounds decoded attachment memory.
       return uploadInitialFiles(request, env.BUCKET, env.DB);
     }

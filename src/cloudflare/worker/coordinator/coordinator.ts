@@ -25,6 +25,18 @@ export const COORDINATOR_PATHS = {
 } as const;
 type CoordinatorPath = typeof COORDINATOR_PATHS[keyof typeof COORDINATOR_PATHS];
 
+/** Transfer pool endpoints; `coordinator-requests.ts` dispatches these paths too. */
+export const TRANSFER_PATHS = {
+	syncUpload: '/sync-upload',
+	syncBatchUpload: '/sync-batch-upload',
+	importUpload: '/import-upload',
+	batchDownload: '/batch-download',
+	historyCheckpointCreate: '/history-checkpoint-create',
+	historyCheckpoint: '/history-checkpoint',
+	historyCheckpointFile: '/history-checkpoint-file',
+} as const;
+export type TransferPath = typeof TRANSFER_PATHS[keyof typeof TRANSFER_PATHS];
+
 /** Set by a coordinator pass that has just loaded the feature policy. */
 export const REMINDERS_ENABLED_HEADER = 'X-Crate-Reminders-Enabled';
 /** Marks a public request that the Worker forwarded to run under the coordinator lock. */

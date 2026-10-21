@@ -1,8 +1,7 @@
 import type { Env } from '../types';
-import { transferStub } from '../coordinator/coordinator';
+import { TRANSFER_PATHS, transferStub, type TransferPath } from '../coordinator/coordinator';
 
-type TransferPath = '/import-upload' | '/sync-upload' | '/sync-batch-upload' | '/batch-download' | '/history-checkpoint-create' | '/history-checkpoint' | '/history-checkpoint-file';
-const READ_PATHS = new Set<TransferPath>(['/batch-download', '/history-checkpoint', '/history-checkpoint-file']);
+const READ_PATHS = new Set<TransferPath>([TRANSFER_PATHS.batchDownload, TRANSFER_PATHS.historyCheckpoint, TRANSFER_PATHS.historyCheckpointFile]);
 
 /** A fixed compute pool keeps transfers parallel with one decoded batch per object.
  * Reads use a separate pool, so a slow upload body never delays downloads.

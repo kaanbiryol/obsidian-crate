@@ -25,7 +25,7 @@ import { pruneInitialImport } from '../sync/initial-import-prune';
 import { forwardTransferRequest } from '../sync/transfer-dispatch';
 import { finishInitialReminderSetup } from '../sync/initial-import-readiness';
 import type { UploadCommitters } from '../sync/upload-committers';
-import { wakeProjection } from '../coordinator/coordinator';
+import { TRANSFER_PATHS, wakeProjection } from '../coordinator/coordinator';
 
 export async function handleSyncRoute(
 	request: Request,
@@ -41,8 +41,8 @@ export async function handleSyncRoute(
 	const bucket = env.BUCKET;
     if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(bucket);
     if (path === '/sync/checkpoints' && method === 'POST') return createSharedCheckpoint(bucket, db);
-    if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, '/history-checkpoint');
-    if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, '/history-checkpoint-file');
+    if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpoint);
+    if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpointFile);
   if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, async () => {
     if (!await wakeProjection(env)) throw new Error('Unable to resume reminder setup');
   });
@@ -52,7 +52,7 @@ export async function handleSyncRoute(
   if (path === '/sync/import/upload' && (method === 'POST' || method === 'PUT')) {
     // Hashing, R2 writes and D1 publication use the existing object's CPU allowance.
     // The public Worker has already checked protocol, authorization and maintenance.
-    return forwardTransferRequest(request, env, '/import-upload');
+    return forwardTransferRequest(request, env, TRANSFER_PATHS.importUpload);
   }
 
 	if (path === '/sync/check' && method === 'GET') {
@@ -80,7 +80,7 @@ export async function handleSyncRoute(
 		return await handleBatchUpload(request, bucket, db, uploadCommitters, encryption, resetGeneration);
 	}
 	if (path === '/sync/batch-download' && method === 'POST') {
-		return forwardTransferRequest(request, env, '/batch-download');
+		return forwardTransferRequest(request, env, TRANSFER_PATHS.batchDownload);
 	}
 	if (path === '/sync/batch-delete' && method === 'POST') {
 		return await handleBatchDelete(request, bucket, db, audit);
