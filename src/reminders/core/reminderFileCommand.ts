@@ -5,7 +5,7 @@ import { getReminderProjectFilePath, normalizeReminderProjectPath } from './remi
 import { buildCreateReminderArgs, buildReminderUpdate } from './reminderMutationPlan';
 import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildMovedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderReminderBlocksInContent } from './markdownReminderFile';
-import { DEFAULT_PROJECT, MAX_REMINDER_NOTE_BYTES } from './constants';
+import { DEFAULT_PROJECT, MAX_REMINDER_NOTE_BYTES, MAX_REMINDERS_PER_NOTE } from './constants';
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
 
 /** Distinguishes conflicts that share a status and code, for hosts that answer them differently. */
@@ -96,7 +96,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		if (content === null) throw new ReminderCommandError('Project file not found', 404, 'not_found');
 		const current = scan(path, content).map(item => item.id);
 		if (JSON.stringify(current) !== JSON.stringify(body.expectedOrder)) throw new ReminderCommandError('Project order changed. Refresh before reordering.', 409, 'version_conflict', 'order');
-		if (!Array.isArray(body.orderedIds) || body.orderedIds.length > 10000 || body.orderedIds.some(id => typeof id !== 'string')) throw new ReminderCommandError('Invalid reminder order', 400, 'invalid_reminder_input');
+		if (!Array.isArray(body.orderedIds) || body.orderedIds.length > MAX_REMINDERS_PER_NOTE || body.orderedIds.some(id => typeof id !== 'string')) throw new ReminderCommandError('Invalid reminder order', 400, 'invalid_reminder_input');
 		changes.set(path, reorderReminderBlocksInContent(content, body.orderedIds as string[]));
 	} else {
 		if (typeof body.filePath !== 'string' || typeof body.id !== 'string') throw new ReminderCommandError('Reload the reminder before saving', 428, 'revision_required');

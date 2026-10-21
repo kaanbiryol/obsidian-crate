@@ -1,6 +1,7 @@
 import { applyReminderFileCommand, ReminderCommandError } from '@/reminders/core/reminderFileCommand';
 import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { ReminderReorderConflictError } from '@/reminders/core/markdownReminderFile';
+import { MAX_REMINDERS_PER_NOTE } from '@/reminders/core/constants';
 import { isSha256Hex } from '@/platform/validation';
 import { corsResponse } from '../cors';
 import { parseStringArray } from '../request-validation';
@@ -15,9 +16,6 @@ import { scanReminderMarkdownFile } from './scan';
 
 type ReminderAction = 'create' | 'update' | 'set-completed' | 'delete' | 'reorder';
 
-// Paging changes only mounted rows; reorder still submits the complete project
-// order. The shared JSON reader also bounds the entire request to 1 MiB.
-export const MAX_REORDER_REMINDERS = 10_000;
 const REMINDER_EXISTS = 'This reminder already exists. Reload to see its committed state.';
 
 /** Plaintext routes keep the failure responses released before they shared the
@@ -36,7 +34,7 @@ export function plaintextFailureResponse(error: unknown, request: Record<string,
 			: corsResponse({ error: 'Reload the reminder before saving', code: 'revision_required' }, 428);
 		case 'order': return !Array.isArray(request.expectedOrder)
 			? corsResponse({ error: 'Expected project order required. Reload before reordering.' }, 428)
-			: !parseStringArray(request.expectedOrder, MAX_REORDER_REMINDERS, 128)
+			: !parseStringArray(request.expectedOrder, MAX_REMINDERS_PER_NOTE, 128)
 				? corsResponse({ error: 'Invalid expected project order.' }, 400)
 				: corsResponse({ error: 'Project order changed. Reload before reordering.' }, 409);
 	}

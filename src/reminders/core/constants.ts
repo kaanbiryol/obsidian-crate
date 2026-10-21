@@ -11,6 +11,9 @@ export const DEFAULT_PROJECT = 'Inbox';
  * and web app edits cannot read or grow a note past it. */
 export const MAX_REMINDER_NOTE_BYTES = 1024 * 1024;
 
+/** Most reminders one note can reorder or publish as encrypted schedules. */
+export const MAX_REMINDERS_PER_NOTE = 10_000;
+
 /** Project choices with the default project first. */
 export function projectOptionsWithDefault(projects: readonly string[]): string[] {
   return [DEFAULT_PROJECT, ...projects.filter(project => project !== DEFAULT_PROJECT)];

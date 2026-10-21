@@ -1,4 +1,5 @@
 import { isEncryptionId } from './encoding';
+import { MAX_REMINDERS_PER_NOTE } from '../reminders/core/constants';
 
 export const ENCRYPTED_NOTIFICATION_PREFIX = 'crate-notification-v1:';
 export interface EncryptedNotification {
@@ -43,7 +44,7 @@ export function parseEncryptedNotification(content: string): EncryptedNotificati
 export function validateEncryptedSchedules(value: unknown): asserts value is EncryptedSchedules {
 	if (!record(value)) throw new Error('Missing encrypted reminder scheduling metadata');
 	fields(value, ['version', 'reminders', 'issue']);
-	if (value.version !== 1 || !Array.isArray(value.reminders) || value.reminders.length > 10_000
+	if (value.version !== 1 || !Array.isArray(value.reminders) || value.reminders.length > MAX_REMINDERS_PER_NOTE
 		|| (value.issue !== undefined && value.issue !== 'size' && value.issue !== 'invalid-reminders' && value.issue !== 'scheduling-capacity')
 		|| (value.issue !== undefined && value.reminders.length !== 0)) throw new Error('Invalid encrypted reminder scheduling metadata');
 	for (const reminder of value.reminders) {

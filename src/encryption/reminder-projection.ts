@@ -1,7 +1,7 @@
 import { scanReminderMarkdownContent } from '../reminders/core/markdownScan';
 import { decodeMarkdownBytes } from '../reminders/core/markdownEncoding';
 import { readableLinkText } from '../reminders/core/grammar/markdownLinks';
-import { MAX_REMINDER_NOTE_BYTES } from '../reminders/core/constants';
+import { MAX_REMINDER_NOTE_BYTES, MAX_REMINDERS_PER_NOTE } from '../reminders/core/constants';
 import { decryptJson, encryptJson, importEncryptionSecret, type EncryptionKey } from './envelope';
 import type { ReminderKeyGrant, VaultKeyBundle, ScopeKeys } from './key-bundle';
 import { validateEncryptedNotification, type EncryptedNotification, type EncryptedSchedules } from './notification-format';
@@ -93,7 +93,7 @@ export async function createReminderProjectionWithKeys(vaultId: string, scope: P
 	let scanned;
 	try { scanned = scanReminderMarkdownContent(path, decodeMarkdownBytes(bytes), scope.folderPath).reminders; }
 	catch { return { version: 1, reminders: [], issue: 'invalid-reminders' }; }
-	if (scanned.length > 10_000) return { version: 1, reminders: [], issue: 'scheduling-capacity' };
+	if (scanned.length > MAX_REMINDERS_PER_NOTE) return { version: 1, reminders: [], issue: 'scheduling-capacity' };
 	const reminders: EncryptedSchedules['reminders'] = [];
 	let projectionBytes = new TextEncoder().encode(JSON.stringify({ version: 1, reminders: [] })).byteLength;
 	for (let offset = 0; offset < scanned.length; offset += NOTIFICATION_CONCURRENCY) {
