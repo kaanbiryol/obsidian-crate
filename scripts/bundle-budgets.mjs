@@ -21,8 +21,9 @@ export const bundleBudgets = {
 		// adding 0.42 KB gzip to the preceding build. Retain about 4.5 KB gzip margin.
 		// The 2026-10 performance pass measures 5.632 MB raw / 2.831 MB gzip.
 		// Quantized PWA icons bring it to 5.292 MB raw / 2.587 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5310000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2600000', 10),
+		// 2026-10 dependency updates measure 5.361 MB raw / 2.625 MB gzip; retain about 1% margin.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5420000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2650000', 10),
 	},
 	{
 		path: 'dist/styles.css',
@@ -49,8 +50,9 @@ export const bundleBudgets = {
 		// adding 1.22 KB to the preceding build. Retain about 8.5 KB raw margin.
 		// The 2026-10 performance pass measures 5.417 MB raw / 1.849 MB gzip.
 		// Quantized PWA icons bring it to 5.105 MB raw / 1.614 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5120000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1625000', 10),
+		// 2026-10 dependency updates measure 5.135 MB raw / 1.629 MB gzip; retain about 1% margin.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5185000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1645000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
@@ -71,8 +73,9 @@ export const bundleBudgets = {
 		// adding 1.21 KB raw to the preceding build. Retain about 3.5 KB raw margin.
 		// 0.7.0 startup assets measure 397.1 KB gzip; retain less than 1 KB margin.
 		// Loading the encrypted Reading client on demand: 935.3 KB raw / 316.7 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '945000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '320000', 10),
+		// 2026-10 dependency updates measure 956.5 KB raw / 324.9 KB gzip; retain about 1% margin.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '965000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '328000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,

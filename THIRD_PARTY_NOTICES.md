@@ -4,9 +4,9 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 
 | Package | Version | Declared license |
 | --- | --- | --- |
-| @babel/runtime | 7.29.7 | MIT |
-| @base-ui/react | 1.8.0 | MIT |
-| @base-ui/utils | 0.4.0 | MIT |
+| @babel/runtime | 8.0.7 | MIT |
+| @base-ui/react | 1.9.0 | MIT |
+| @base-ui/utils | 0.5.0 | MIT |
 | @floating-ui/core | 1.8.0 | MIT |
 | @floating-ui/dom | 1.8.0 | MIT |
 | @floating-ui/react-dom | 2.1.9 | MIT |
@@ -36,7 +36,7 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | bn.js | 4.12.5 | MIT |
 | boolbase | 2.0.0 | ISC |
 | buffer-equal-constant-time | 1.0.1 | BSD-3-Clause |
-| chrono-node | 2.10.1 | MIT |
+| chrono-node | 2.10.3 | MIT |
 | classnames | 2.5.1 | MIT |
 | commander | 12.1.0 | MIT |
 | css-select | 7.0.0 | BSD-2-Clause |
@@ -45,7 +45,7 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | csstype | 3.2.3 | MIT |
 | date-fns | 4.4.0 | MIT |
 | debug | 4.4.3 | MIT |
-| defuddle | 0.19.4 | MIT |
+| defuddle | 0.19.5 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
 | dom-serializer | 3.1.1 | MIT |
 | dom-serializer | 2.0.0 | MIT |
@@ -53,40 +53,40 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | domelementtype | 2.3.0 | BSD-2-Clause |
 | domhandler | 6.0.1 | BSD-2-Clause |
 | domhandler | 5.0.3 | BSD-2-Clause |
-| dompurify | 3.4.16 | (MPL-2.0 OR Apache-2.0) |
+| dompurify | 3.4.17 | (MPL-2.0 OR Apache-2.0) |
 | domutils | 4.0.2 | BSD-2-Clause |
 | domutils | 3.2.2 | BSD-2-Clause |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
 | entities | 8.1.0 | BSD-2-Clause |
 | entities | 4.5.0 | BSD-2-Clause |
 | entities | 7.0.1 | BSD-2-Clause |
-| framer-motion | 13.4.4 | MIT |
+| framer-motion | 14.5.0 | MIT |
 | highlight.js | 11.12.0 | BSD-3-Clause |
 | html-escaper | 3.0.3 | MIT |
 | htmlparser2 | 12.0.0 | MIT |
 | htmlparser2 | 10.1.0 | MIT |
 | http_ece | 1.2.0 | MIT |
 | https-proxy-agent | 7.0.6 | MIT |
-| idb | 8.0.3 | ISC |
+| idb | 8.0.4 | ISC |
 | inherits | 2.0.4 | ISC |
-| jose | 6.2.12 | MIT |
+| jose | 6.2.13 | MIT |
 | jwa | 2.0.1 | MIT |
 | jws | 4.0.1 | MIT |
 | lexical | 0.52.0 | MIT |
 | linkedom | 0.18.13 | ISC |
-| lucide-react | 1.48.0 | ISC |
-| marked | 18.0.14 | MIT |
+| lucide-react | 1.61.0 | ISC |
+| marked | 18.1.1 | MIT |
 | mathml-to-latex | 1.8.0 | MIT |
 | minimalistic-assert | 1.0.1 | ISC |
 | minimist | 1.2.8 | MIT |
-| motion | 13.4.4 | MIT |
-| motion-dom | 13.4.4 | MIT |
-| motion-utils | 13.3.0 | MIT |
+| motion | 14.5.0 | MIT |
+| motion-dom | 14.5.0 | MIT |
+| motion-utils | 14.1.1 | MIT |
 | ms | 2.1.3 | MIT |
 | nth-check | 3.0.1 | BSD-2-Clause |
 | qrcode-generator | 2.0.4 | MIT |
-| react | 19.3.0 | MIT |
-| react-dom | 19.3.0 | MIT |
+| react | 19.3.1 | MIT |
+| react-dom | 19.3.1 | MIT |
 | reselect | 5.3.0 | MIT |
 | safe-buffer | 5.2.1 | MIT |
 | safer-buffer | 2.1.2 | MIT |
@@ -103,7 +103,7 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | yaml | 2.9.1 | ISC |
 | zustand | 5.0.15 | MIT |
 
-## @babel/runtime@7.29.7
+## @babel/runtime@8.0.7
 
 Declared license: MIT
 
@@ -134,7 +134,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## @base-ui/react@1.8.0
+## @base-ui/react@1.9.0
 
 Declared license: MIT
 
@@ -164,7 +164,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @base-ui/utils@0.4.0
+## @base-ui/utils@0.5.0
 
 Declared license: MIT
 
@@ -1394,7 +1394,7 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## chrono-node@2.10.1
+## chrono-node@2.10.3
 
 Declared license: MIT
 
@@ -1640,7 +1640,7 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## defuddle@0.19.4
+## defuddle@0.19.5
 
 Declared license: MIT
 
@@ -1824,7 +1824,7 @@ THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRE
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## dompurify@3.4.16
+## dompurify@3.4.17
 
 Declared license: (MPL-2.0 OR Apache-2.0)
 
@@ -2344,7 +2344,7 @@ THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRE
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## framer-motion@13.4.4
+## framer-motion@14.5.0
 
 Declared license: MIT
 
@@ -2555,7 +2555,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## idb@8.0.3
+## idb@8.0.4
 
 Declared license: ISC
 
@@ -2594,7 +2594,7 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## jose@6.2.12
+## jose@6.2.13
 
 Declared license: MIT
 
@@ -2730,7 +2730,7 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## lucide-react@1.48.0
+## lucide-react@1.61.0
 
 Declared license: ISC
 
@@ -2782,7 +2782,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## marked@18.0.14
+## marked@18.1.1
 
 Declared license: MIT
 
@@ -2914,7 +2914,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## motion@13.4.4
+## motion@14.5.0
 
 Declared license: MIT
 
@@ -2944,7 +2944,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## motion-dom@13.4.4
+## motion-dom@14.5.0
 
 Declared license: MIT
 
@@ -2974,7 +2974,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## motion-utils@13.3.0
+## motion-utils@14.1.1
 
 Declared license: MIT
 
@@ -3084,7 +3084,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## react@19.3.0
+## react@19.3.1
 
 Declared license: MIT
 
@@ -3114,7 +3114,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## react-dom@19.3.0
+## react-dom@19.3.1
 
 Declared license: MIT
 
