@@ -8,6 +8,7 @@ import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 import { isSha256Hex } from '@/platform/validation';
 import { sha256Hex } from '@/platform/sha256';
+import { createRandomHexToken } from '@/platform/random-hex';
 
 export async function updatePolicy(db: D1Database, body: Record<string, unknown>) {
   const existing = await policy(db);
@@ -29,9 +30,8 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
     .bind(current.enabled, folder, current.generation, current.revision).run();
   return readingResponse({ policy: current });
 }
-function secret() { return `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, ''); }
 export async function issueReadingAccess(db: D1Database, current: ReadingPolicy, body: Record<string, unknown>, origin: string) {
-  const token = secret();
+  const token = createRandomHexToken();
   if (body.kind === 'capture') {
     const id = crypto.randomUUID(), expiresAt = Date.now() + 90 * 86400_000;
     await db.prepare(`INSERT INTO auth_tokens(id, token_hash, device_name, platform, scope, folder_path, reading_generation, expires_at)
@@ -52,8 +52,8 @@ export async function exchangeReadingAccess(db: D1Database, body: Record<string,
     .bind(hash, Date.now(), current.generation).first<{ scope: string }>();
   if (!enrollment || !['reading', 'reading_install'].includes(enrollment.scope)) throw new ReadingError('This setup link expired or was already used. Open a fresh one from Crate settings.', 401);
   const limited = await limitNotificationAction(request, db, hash); if (limited) return limited;
-  const id = crypto.randomUUID(), token = secret(), expiresAt = Date.now() + 90 * 86400_000;
-  const installToken = enrollment.scope === 'reading' ? secret() : undefined;
+  const id = crypto.randomUUID(), token = createRandomHexToken(), expiresAt = Date.now() + 90 * 86400_000;
+  const installToken = enrollment.scope === 'reading' ? createRandomHexToken() : undefined;
   const results = await db.batch([
     db.prepare(`INSERT INTO auth_tokens(id, token_hash, device_name, platform, scope, folder_path, reading_generation, expires_at)
       SELECT ?, ?, 'Reading web app', 'web', 'reading', ?, ?, ? WHERE EXISTS (SELECT 1 FROM reading_enrollments WHERE token_hash=? AND expires_at>?)`)
@@ -75,7 +75,7 @@ export async function prepareHandoff(db: D1Database, principal: AuthPrincipal, b
   try { url = readingUrl(body.url); } catch { throw new ReadingError('Share a complete HTTP or HTTPS link.'); }
   const prepared = { url, ...(typeof body.title === 'string' ? { title: body.title.slice(0, 1000) } : {}),
     operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)) };
-  const token = secret(), expiresAt = Date.now() + 5 * 60_000;
+  const token = createRandomHexToken(), expiresAt = Date.now() + 5 * 60_000;
   await db.prepare('INSERT INTO reading_handoffs(token_hash, principal_id, generation, body, expires_at) VALUES (?, ?, ?, ?, ?)')
     .bind(await sha256Hex(token), principal.tokenId, current.generation, JSON.stringify(prepared), expiresAt).run();
   return readingResponse({ launchUrl: `${origin}/notifications/save-reading#${token}`, expiresAt });

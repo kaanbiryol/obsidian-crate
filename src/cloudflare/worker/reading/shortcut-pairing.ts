@@ -6,8 +6,8 @@ import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
 import { isSha256Hex } from '@/platform/validation';
 import { sha256Hex } from '@/platform/sha256';
+import { createRandomHexToken } from '@/platform/random-hex';
 
-const secret = () => `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, '');
 const invalidPairing = () => new ReadingError('This pairing code expired or was already used. Create a new code in Reading settings.', 410);
 
 // Enrollment scopes name the issuer so revoking it also invalidates unredeemed
@@ -15,7 +15,7 @@ const invalidPairing = () => new ReadingError('This pairing code expired or was 
 export async function issueShortcutPairing(db: D1Database, principal: AuthPrincipal, current: ReadingPolicy, origin: string) {
   if (principal.scope !== 'reading' && principal.scope !== 'reminders' && principal.scope !== 'vault') throw new ReadingError('Reading access is required.', 403);
   if (!origin.startsWith('https://')) throw new ReadingError('Open Crate over HTTPS to connect an iPhone shortcut.');
-  const token = secret(), expiresAt = Date.now() + 10 * 60_000;
+  const token = createRandomHexToken(), expiresAt = Date.now() + 10 * 60_000;
   const scope = `reading_capture:${principal.tokenId}`;
   await db.batch([
     db.prepare('DELETE FROM reading_enrollments WHERE scope=?').bind(scope),
@@ -40,7 +40,7 @@ export async function exchangeShortcutPairing(db: D1Database, body: Record<strin
   const grant = await db.prepare(`SELECT a.id ${grantSql}`).bind(hash, now, now).first<{ id: string }>();
   if (!grant) throw invalidPairing();
   const limited = await limitNotificationAction(request, db, grant.id); if (limited) return limited;
-  const token = secret(), id = crypto.randomUUID();
+  const token = createRandomHexToken(), id = crypto.randomUUID();
   // Recheck the grant and its issuer within the consume transaction. Concurrent
   // exchanges can create only one credential. A lost reply requires a new code.
   const results = await db.batch([
