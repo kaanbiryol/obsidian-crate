@@ -65,28 +65,8 @@ export function createMarkdownWriter(
   };
 
   return {
-    createReminder: (
-      project,
-      content,
-      dueDate,
-      priority,
-      recurrence,
-      hasTime,
-      reminderId,
-      description,
-    ) => enqueueMutation(() =>
-      createReminderInMarkdown(
-        context,
-        project,
-        content,
-        dueDate,
-        priority,
-        recurrence,
-        hasTime,
-        reminderId,
-        description,
-      ), () => [getReminderProjectFilePath(index.remindersFolderPath, project)]
-    ),
+    createReminder: (input) =>
+      enqueueMutation(() => createReminderInMarkdown(context, input), () => [getReminderProjectFilePath(index.remindersFolderPath, input.project)]),
     updateReminder: (reminder, updates) =>
       enqueueMutation(() => updateReminderInMarkdown(context, reminder, updates), () => [reminder.filePath,
         ...(updates.project ? [getReminderProjectFilePath(index.remindersFolderPath, updates.project)] : [])]),

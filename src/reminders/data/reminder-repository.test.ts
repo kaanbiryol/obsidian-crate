@@ -33,14 +33,14 @@ function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 function createWriter(): {
 	writer: MarkdownWriter;
 	spies: {
-		createReminder: ReturnType<typeof vi.fn>;
+		createReminder: ReturnType<typeof vi.fn<MarkdownWriter['createReminder']>>;
 		updateReminder: ReturnType<typeof vi.fn>;
 		deleteReminder: ReturnType<typeof vi.fn>;
 		toggleComplete: ReturnType<typeof vi.fn>;
 		reorderReminders: ReturnType<typeof vi.fn>;
 	};
 } {
-	const createReminder = vi.fn(async () => {});
+	const createReminder = vi.fn<MarkdownWriter['createReminder']>(async () => {});
 	const updateReminder = vi.fn(async () => {});
 	const deleteReminder = vi.fn(async () => {});
 	const toggleComplete = vi.fn(async () => {});
@@ -94,16 +94,16 @@ describe('reminderRepository.create', () => {
 
 		expect(created.id).toBe(persistedId);
 		expect(created.content).toBe('Task A');
-		expect(spies.createReminder).toHaveBeenCalledWith(
-			'Work',
-			'Task A',
-			undefined,
-			1,
-			undefined,
-			undefined,
-			created.id,
-			undefined,
-		);
+		expect(spies.createReminder).toHaveBeenCalledWith({
+			project: 'Work',
+			content: 'Task A',
+			dueDate: undefined,
+			priority: 1,
+			recurrence: undefined,
+			hasTime: undefined,
+			reminderId: created.id,
+			description: undefined,
+		});
 	});
 
 	it('passes recurrence through on create', async () => {
@@ -119,16 +119,16 @@ describe('reminderRepository.create', () => {
 			recurrence,
 		});
 
-		expect(spies.createReminder).toHaveBeenCalledWith(
-			'Work',
-			'Task recur',
-			undefined,
-			1,
-			{ frequency: 'daily', timezone: getLocalTimeZone() },
-			undefined,
-			created.id,
-			undefined,
-		);
+		expect(spies.createReminder).toHaveBeenCalledWith({
+			project: 'Work',
+			content: 'Task recur',
+			dueDate: undefined,
+			priority: 1,
+			recurrence: { frequency: 'daily', timezone: getLocalTimeZone() },
+			hasTime: undefined,
+			reminderId: created.id,
+			description: undefined,
+		});
 	});
 
 	it('passes date-only reminders through with hasTime false', async () => {
@@ -143,11 +143,11 @@ describe('reminderRepository.create', () => {
 			dueDate: '2026-01-10',
 		});
 
-		const call = spies.createReminder.mock.calls[0];
-		expect(call?.[0]).toBe('Work');
-		expect(call?.[1]).toBe('Task dated');
-		expect(call?.[2]).toEqual(new Date(2026, 0, 10));
-		expect(call?.[5]).toBe(false);
+		const input = spies.createReminder.mock.calls[0]?.[0];
+		expect(input?.project).toBe('Work');
+		expect(input?.content).toBe('Task dated');
+		expect(input?.dueDate).toEqual(new Date(2026, 0, 10));
+		expect(input?.hasTime).toBe(false);
 	});
 
 	it('returns the generated reminder id when optimistic state is unavailable', async () => {
@@ -161,7 +161,7 @@ describe('reminderRepository.create', () => {
 			priority: 4,
 		});
 
-		expect(created.id).toBe(spies.createReminder.mock.calls[0]?.[6]);
+		expect(created.id).toBe(spies.createReminder.mock.calls[0]?.[0]?.reminderId);
 		expect(created.id).toMatch(
 			/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
 		);

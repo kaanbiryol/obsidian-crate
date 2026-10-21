@@ -41,7 +41,7 @@ describe('plugin reminder byte safety', () => {
 		await h.put(affected, malformed);
 		const before = await Promise.all([h.readBytes(source), h.readBytes(destination)]);
 		const actions = {
-			create: () => h.writer.createReminder('A', 'New', undefined, 4),
+			create: () => h.writer.createReminder({ project: 'A', content: 'New', priority: 4 }),
 			update: () => h.writer.updateReminder(reminder, { content: 'Updated' }),
 			toggle: () => h.writer.toggleComplete(reminder),
 			delete: () => h.writer.deleteReminder(reminder),

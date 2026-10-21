@@ -39,7 +39,7 @@ describe('markdownWriter', () => {
     const writer = createMarkdownWriter(app, index);
 
     const dueDate = new Date(2026, 0, 13, 12, 0);
-    await writer.createReminder('Work', 'Task A', dueDate, 1);
+    await writer.createReminder({ project: 'Work', content: 'Task A', dueDate, priority: 1 });
 
     expect(folders.has('Reminders')).toBe(true);
     const content = files.get('Reminders/Work.md') || '';
@@ -55,8 +55,8 @@ describe('markdownWriter', () => {
     const writer = createMarkdownWriter(app, index);
 
     await Promise.all([
-      writer.createReminder('Work', 'Task A', undefined, 4, undefined, undefined, 'rem-a'),
-      writer.createReminder('Work', 'Task B', undefined, 4, undefined, undefined, 'rem-b'),
+      writer.createReminder({ project: 'Work', content: 'Task A', priority: 4, reminderId: 'rem-a' }),
+      writer.createReminder({ project: 'Work', content: 'Task B', priority: 4, reminderId: 'rem-b' }),
     ]);
 
     const content = files.get('Reminders/Work.md') || '';
@@ -71,15 +71,12 @@ describe('markdownWriter', () => {
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
-    await writer.createReminder(
-      'Personal/Health',
-      'Book appointment',
-      undefined,
-      4,
-      undefined,
-      undefined,
-      'rem-health',
-    );
+    await writer.createReminder({
+      project: 'Personal/Health',
+      content: 'Book appointment',
+      priority: 4,
+      reminderId: 'rem-health',
+    });
 
     expect(folders).toEqual(new Set(['Reminders', 'Reminders/Personal']));
     expect(files.get('Reminders/Personal/Health.md')).toContain('Book appointment');
@@ -91,7 +88,7 @@ describe('markdownWriter', () => {
     const writer = createMarkdownWriter(app, index);
 
     await expect(
-      writer.createReminder('Personal//Health', 'Task', undefined, 4),
+      writer.createReminder({ project: 'Personal//Health', content: 'Task', priority: 4 }),
     ).rejects.toThrow('Invalid reminder project path');
 
     expect(files.size).toBe(0);
@@ -234,11 +231,11 @@ describe('markdownWriter', () => {
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
-    await writer.createReminder('Work', 'Task D', undefined, 4, {
+    await writer.createReminder({ project: 'Work', content: 'Task D', priority: 4, recurrence: {
       frequency: 'daily',
       hour: 14,
       minute: 30,
-    });
+    } });
 
     const content = files.get('Reminders/Work.md') || '';
     expect(content).toContain('Task D');
@@ -254,9 +251,9 @@ describe('markdownWriter', () => {
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
-    await writer.createReminder('Work', 'Task all day', undefined, 4, {
+    await writer.createReminder({ project: 'Work', content: 'Task all day', priority: 4, recurrence: {
       frequency: 'daily',
-    });
+    } });
 
     const content = files.get('Reminders/Work.md') || '';
     expect(content).toContain('Task all day');
@@ -555,7 +552,7 @@ it('does not duplicate a local create after a lost disk acknowledgement', async 
   const writer = createMarkdownWriter(app, createMockIndex());
   const process = app.vault.process.bind(app.vault);
   vi.spyOn(app.vault, 'process').mockImplementationOnce(async (file, callback) => { await process(file, callback); throw new Error('Lost disk reply'); });
-  await expect(writer.createReminder('Inbox', 'Task', undefined, 4, undefined, false, 'retry-id')).rejects.toThrow('Lost disk reply');
-  await expect(writer.createReminder('Inbox', 'Task', undefined, 4, undefined, false, 'retry-id')).rejects.toThrow('already exists');
+  await expect(writer.createReminder({ project: 'Inbox', content: 'Task', priority: 4, hasTime: false, reminderId: 'retry-id' })).rejects.toThrow('Lost disk reply');
+  await expect(writer.createReminder({ project: 'Inbox', content: 'Task', priority: 4, hasTime: false, reminderId: 'retry-id' })).rejects.toThrow('already exists');
   expect(files.get('Reminders/Inbox.md')?.match(/crate-id:retry-id/g)).toHaveLength(1);
 });

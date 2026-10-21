@@ -83,7 +83,7 @@ describe('real reminder writes respect Markdown context', () => {
 
 	it.each(['```md', '<!--', '<pre>', '---'])('rejects appending a new reminder into an unclosed hidden block: %s', async content => {
 		const { files, writer } = await workspace(content);
-		await expect(writer.createReminder('Inbox', 'New task', undefined, 4)).rejects.toThrow('Close the code or hidden Markdown block');
+		await expect(writer.createReminder({ project: 'Inbox', content: 'New task', priority: 4 })).rejects.toThrow('Close the code or hidden Markdown block');
 		expect(files.get(path)).toBe(content);
 	});
 });

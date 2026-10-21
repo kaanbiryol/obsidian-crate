@@ -105,16 +105,16 @@ function createReminderRepositoryMutations({ index, writer }: ReminderRepository
       const createArgs = buildCreateReminderArgs(params);
       const reminderId = createArgs.reminderId || createReminderId();
 
-      await writer.createReminder(
-        createArgs.project,
-        params.content,
-        createArgs.dueDate,
-        createArgs.priority,
-        createArgs.recurrence,
-        createArgs.hasTime,
+      await writer.createReminder({
+        project: createArgs.project,
+        content: params.content,
+        dueDate: createArgs.dueDate,
+        priority: createArgs.priority,
+        recurrence: createArgs.recurrence,
+        hasTime: createArgs.hasTime,
         reminderId,
-        params.description,
-      );
+        description: params.description,
+      });
 
       const createdReminder = index.getById(reminderId);
       if (createdReminder) {

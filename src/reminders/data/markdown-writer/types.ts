@@ -18,17 +18,19 @@ export interface MarkdownWriterContext {
   getOnFileWritten(): OnFileWrittenCallback | undefined;
 }
 
+export interface CreateReminderInput {
+  project: string;
+  content: string;
+  dueDate?: Date;
+  priority: Priority;
+  recurrence?: RecurrenceRule;
+  hasTime?: boolean;
+  reminderId?: string;
+  description?: string;
+}
+
 export interface MarkdownWriter {
-  createReminder(
-    project: string,
-    content: string,
-    dueDate: Date | undefined,
-    priority: Priority,
-    recurrence?: RecurrenceRule,
-    hasTime?: boolean,
-    reminderId?: string,
-    description?: string,
-  ): Promise<void>;
+  createReminder(input: CreateReminderInput): Promise<void>;
 
   updateReminder(
     reminder: IndexedReminder,

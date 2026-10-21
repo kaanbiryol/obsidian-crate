@@ -1,5 +1,4 @@
 import { processVaultMarkdown } from '../vault-markdown';
-import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 import { createReminderId } from "../../core/reminderIdentity";
 import type { IndexedReminder } from "../reminder-index";
 import {
@@ -7,7 +6,7 @@ import {
   buildCreatedReminderBlock,
 } from "../../core/markdownReminderMutation";
 import { requireReminderProjectPath } from "../../core/reminderProjectPath";
-import type { MarkdownWriterContext } from "./types";
+import type { CreateReminderInput, MarkdownWriterContext } from "./types";
 import {
   markdownWriterLog,
   notifyFileWritten,
@@ -15,14 +14,7 @@ import {
 
 export async function createReminderInMarkdown(
   context: MarkdownWriterContext,
-  project: string,
-  content: string,
-  dueDate: Date | undefined,
-  priority: Priority,
-  recurrence?: RecurrenceRule,
-  hasTime?: boolean,
-  reminderId?: string,
-  description?: string,
+  { project, content, dueDate, priority, recurrence, hasTime, reminderId, description }: CreateReminderInput,
 ): Promise<void> {
   const normalizedProject = requireReminderProjectPath(project);
   const stableReminderId = reminderId ?? createReminderId();
