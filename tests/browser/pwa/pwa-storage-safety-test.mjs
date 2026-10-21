@@ -47,37 +47,24 @@ try {
     if (failure === 'token') expect(await page.evaluate(() => localStorage.getItem('crate-reminders-auth-token'))).toBeTruthy();
     await page.close();
    }
-   for (const granted of [true, false, null]) {
+   for (const [standalone, granted] of [[false, true], [true, true], [true, false], [true, null]]) {
     const page = await browser.newPage({ serviceWorkers: 'block' });
-    await page.addInitScript(granted => {
+    await page.addInitScript(([standalone, granted]) => {
+     window.persistRequests = 0;
+     if (standalone) Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
      let persistent = false;
      Object.defineProperty(navigator, 'storage', { configurable: true, value: granted === null ? undefined : {
-      persisted: async () => persistent, persist: async () => { persistent = granted; return granted; },
+      persisted: async () => persistent, persist: async () => { window.persistRequests++; persistent = granted; return granted; },
      } });
-    }, granted);
+    }, [standalone, granted]);
     await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+    // Only the installed app asks at launch; a browser tab never requests unprompted.
+    await expect.poll(() => page.evaluate(() => window.persistRequests)).toBe(standalone && granted !== null ? 1 : 0);
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
-    if (granted === null) await expect(page.getByRole('status').filter({ hasText: /^Unavailable$/ })).toBeVisible();
-    else {
-     const protect = page.getByRole('button', { name: 'Protect offline data', exact: true });
-     await expect(protect).toBeVisible();
-     for (const width of [320, 393, 820]) {
-      await page.setViewportSize({ width, height: 844 });
-      await protect.scrollIntoViewIfNeeded();
-      const layout = await protect.evaluate(button => {
-       const bounds = button.getBoundingClientRect();
-       const row = button.closest('.settings-group').getBoundingClientRect();
-       const copy = button.closest('.settings-group').querySelector('.settings-row__copy').getBoundingClientRect();
-       return { fits: button.scrollWidth <= button.clientWidth && bounds.left >= row.left && bounds.right <= row.right,
-        belowCopy: bounds.top >= copy.bottom, height: bounds.height };
-      });
-      expect(layout.fits).toBe(true);
-      expect(layout.belowCopy).toBe(true);
-      expect(layout.height).toBeGreaterThanOrEqual(44);
-     }
-     await protect.click();
-     await expect(page.getByText(granted ? 'Protected' : 'Best effort', { exact: false })).toBeVisible();
-    }
+    await expect(page.getByRole('heading', { name: 'Sync', exact: true })).toBeVisible();
+    // With nothing waiting to sync, storage needs no attention in Settings.
+    await expect(page.getByRole('region', { name: 'Device storage', exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => window.persistRequests)).toBe(standalone && granted !== null ? 1 : 0);
     await page.close();
    }
    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });

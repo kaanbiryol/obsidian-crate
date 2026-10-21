@@ -8,7 +8,7 @@ import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
 
 export function GeneralSettings(props: ComponentProps<typeof ListStyleSetting>) {
 	const { themePreference, setThemePreference } = usePwaColorScheme();
-	return <SettingsSection title="General">
+	return <SettingsSection title="Appearance">
 		<SettingsRow className="settings-row--theme" title="Theme">
 			<div className="settings-theme-picker" role="group" aria-label="Theme">
 				{([

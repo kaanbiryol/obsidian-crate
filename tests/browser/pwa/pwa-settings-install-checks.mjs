@@ -18,12 +18,11 @@ export async function checkInstallSettings(browser, origin, name) {
 			const install = page.getByRole('dialog', { name: 'Add to home screen', exact: true });
 			const open = settings.getByRole('button', { name: 'Add to home screen', exact: true });
 			await expect(settings.locator('.pwa-home-screen-instructions')).toHaveCount(0);
-			const encryption = settings.getByRole('region', { name: 'Encryption', exact: true });
-			await expect(encryption.getByText('Not enabled', { exact: true })).toHaveCount(2);
-			await expect(encryption.getByText('Set up encryption in Crate in Obsidian.', { exact: true })).toHaveCount(1);
-			const storage = settings.getByRole('region', { name: 'Device storage', exact: true });
-			await expect(storage.getByText('Offline data', { exact: true })).toBeVisible();
-			await expect(settings.getByRole('region', { name: 'Sync', exact: true }).getByText('Offline data', { exact: true })).toHaveCount(0);
+			// Encryption details appear only once a folder is encrypted; until then Sync points to setup.
+			await expect(settings.getByRole('region', { name: 'Encryption', exact: true })).toHaveCount(0);
+			await expect(settings.getByRole('region', { name: 'Sync', exact: true }).getByText('Encryption is off. Set it up in Obsidian under Crate settings → Sync → Manage encryption.', { exact: true })).toHaveCount(1);
+			// Storage only needs attention while unsynced changes sit in clearable storage.
+			await expect(settings.getByRole('region', { name: 'Device storage', exact: true })).toHaveCount(0);
 			for (const method of ['button', 'native', 'escape']) {
 				await open.click();
 				const scroll = await page.locator('.settings-main').evaluate(el => el.scrollTop);

@@ -14,12 +14,12 @@ export function EncryptionSettings({ reading, remindersConnected }: { reading: S
 		: encryption.status === 'checking' && !remindersConnected ? 'Connect Reminders to check this device.' : undefined;
 	const readingDescription = reading?.encryption?.status === 'locked' ? 'Unlock or verify Reading in the app before using this folder.'
 		: reading?.ready && !reading.encryption ? 'Connect Reading to check this device.' : undefined;
-	const showSetup = encryption.status === 'unencrypted' || reading?.encryption?.status === 'unencrypted';
 	const hasUnlockedFolder = encryption.status === 'ready' || reading?.encryption?.status === 'ready';
+	const inUse = [encryption.status, reading?.encryption?.status].some(status => status === 'ready' || status === 'locked');
+	if (!inUse) return null;
 	return <SettingsSection title="Encryption" groupProps={{ 'aria-live': 'polite' }}>
 		<SettingsRow title="Reminders" description={reminderDescription}><span className="settings-value">{reminderStatus}</span></SettingsRow>
 		<SettingsRow title="Reading" description={readingDescription}><span className="settings-value">{readingStatus}</span></SettingsRow>
-		{showSetup && <p className="settings-help">Set up encryption in Crate in Obsidian.</p>}
 		{hasUnlockedFolder && <details className="settings-encryption-details">
 			<summary>Encryption details</summary>
 			{encryption.status === 'ready' && <>
@@ -30,4 +30,11 @@ export function EncryptionSettings({ reading, remindersConnected }: { reading: S
 			<p className="settings-help">The server can still see file paths and notification times. Keep your recovery key outside the vault.</p>
 		</details>}
 	</SettingsSection>;
+}
+
+/** Encryption is off for at least one connected feature: point to where it is set up. */
+export function EncryptionSetupHint({ reading }: { reading: SettingsSnapshot['reading'] }) {
+	const encryption = useSyncExternalStore(subscribeEncryption, encryptionSnapshot);
+	if (encryption.status !== 'unencrypted' && reading?.encryption?.status !== 'unencrypted') return null;
+	return <p className="settings-help">Encryption is off. Set it up in Obsidian under <strong>Crate settings → Sync → Manage encryption</strong>.</p>;
 }

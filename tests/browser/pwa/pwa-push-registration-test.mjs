@@ -161,7 +161,7 @@ async function renewalAndProviderChanges(browser) {
     const previousAttempts = attempts.length;
     await retry(page).click();
     await expect.poll(() => attempts.length).toBe(previousAttempts + 1);
-    await page.getByRole('region', { name: 'Reminders', exact: true }).getByText('Checking…', { exact: true }).waitFor();
+    await page.getByRole('region', { name: 'Notifications', exact: true }).getByText('Checking…', { exact: true }).waitFor();
     await provider(page, { endpoint: nextEndpoint });
     release();
     await retry(page).waitFor();
@@ -193,7 +193,7 @@ async function logoutDuringConfirmation(browser) {
     control.holdToken = previewAuthToken;
     await open();
     await expect.poll(() => attempts.length).toBe(1);
-    await page.getByRole('region', { name: 'Reminders', exact: true }).getByText('Checking…', { exact: true }).waitFor();
+    await page.getByRole('region', { name: 'Notifications', exact: true }).getByText('Checking…', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Log out', exact: true }).click();
     await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
     await expect.poll(() => page.evaluate(key => localStorage.getItem(key), authKey)).toBe(null);
@@ -222,7 +222,7 @@ async function pausedVault(browser) {
     await expect(on(page)).toHaveCount(0);
     expect(rows.size).toBe(1);
     expect((await providerState(page)).permission).toBe('granted');
-    const section = page.getByRole('region', { name: 'Reminders', exact: true });
+    const section = page.getByRole('region', { name: 'Notifications', exact: true });
     await expect(section).toContainText('This device is registered, but notifications are off for this vault.');
     await expect(section).toContainText('Obsidian');
     control.notificationsEnabled = true;

@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
 import { normalizeListStyle } from '@/ui/shared/list-style';
 import type { PwaPreferences } from '../preferences';
 import { SettingsRow } from './SettingsRow';
@@ -14,7 +14,7 @@ export function ListStyleSetting({ preferences, onPreferencesChange }: {
 				<option value="flat">Flat</option>
 				<option value="cards">Cards</option>
 			</select>
-			<ChevronDown size={14} aria-hidden="true" />
+			<ChevronsUpDown size={14} aria-hidden="true" />
 		</span>
 	</SettingsRow>;
 }

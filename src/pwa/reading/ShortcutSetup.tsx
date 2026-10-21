@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Download, KeyRound } from 'lucide-react';
 import { PwaButton as Button } from '../components/PwaButton';
 import { SettingsSection } from '../components/SettingsSection';
+import { SetupStep, SetupSteps } from '../components/SetupSteps';
 import { CopyableText } from '@/ui/shared/CopyableText';
 import { READING_SHORTCUT_URL } from '@/reading/shortcut';
 import { readingRequest } from './api';
@@ -33,32 +35,32 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
     finally { working.current = false; if (alive.current) setBusy(false); }
   };
   return <div className="crate-reading-shortcut">
-    <div className="crate-reading-shortcut__intro"><p>Save articles from the iPhone share sheet.</p><span>iOS 27+ · Internet connection required</span></div>
-    <ol aria-label="Shortcut setup steps">
-      <li><SettingsSection title="1. Install the shortcut"><p>Download <strong>Save to Crate</strong>, then select <strong>Add Shortcut</strong>. If it opens in Files, find it in <strong>Downloads</strong>.</p>
-        <a className="crate-action-button" data-variant="outline" data-size="touch" href={READING_SHORTCUT_URL} target="_blank" rel="noopener noreferrer">Download Save to Crate</a>
-      </SettingsSection></li>
-      <li><SettingsSection title="2. Connect your library"><p>Create a pairing code. In <strong>Shortcuts → All Shortcuts</strong>, run <strong>Save to Crate</strong> and paste the code when asked.</p>
-        <Button size="touch" variant="outline" disabled={busy || !online} onClick={() => void create()}>{busy ? 'Creating code…' : pairing ? 'Create new pairing code' : 'Create pairing code'}</Button>
-        {pairing && !expired && <div className="crate-reading-shortcut__code">
-          <CopyableText key={pairing.pairingCode} value={pairing.pairingCode} label="Pairing code" copyLabel="Copy pairing code" alwaysShow
-            successMessage="Copied. Open the shortcut from your Shortcuts library and paste when asked."
-            failureMessage="Could not copy. Select the pairing code below and copy it manually."
-            beforeCopy={() => {
-              if (pairing.expiresAt <= Date.now()) { setNow(Date.now()); return false; }
-              assertReadingSession(session);
-              return true;
-            }} />
-          <p>Use once within {Math.max(1, Math.ceil((pairing.expiresAt - now) / 60_000))} minutes. Keep this code private. Creating a new code replaces the previous one.</p>
-        </div>}
-        {expired && <p role="status">This pairing code expired. Create a new code to continue.</p>}
-        {!online && <p role="status">Connect to the internet to pair your shortcut.</p>}
-        {error && <p role="alert">{error}</p>}
-      </SettingsSection></li>
-      <li><SettingsSection title="3. Save your first article"><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate</strong>. Crate opens with your link. Select <strong>Save</strong> to store it.</p></SettingsSection></li>
-    </ol>
-    <SettingsSection title="Privacy and access"><p>The shortcut opens your link in Crate using a private URL fragment. Unlock Reading in Safari if asked. Your browser encrypts the saved link before syncing it; the shortcut cannot read your library. Reinstall the current shortcut after enabling encryption.</p></SettingsSection>
-    <SettingsSection title="Updates and troubleshooting"><p>Install the current shortcut, then return here to create a pairing code. If setup fails, use <strong>Copy diagnostics</strong> or <strong>Report on GitHub</strong> on the error page. Select <strong>Save</strong> in Reading to finish saving your link.</p></SettingsSection>
-
+    <SettingsSection title="Setup" description="Save articles from the iPhone share sheet. Requires iOS 27 or later and an internet connection.">
+      <SetupSteps aria-label="Shortcut setup steps">
+        <SetupStep number={1} title="Install the shortcut" extra={
+          <a className="crate-action-button setup-step__action" data-variant="outline" href={READING_SHORTCUT_URL} target="_blank" rel="noopener noreferrer"><Download size={15} aria-hidden="true" />Download Save to Crate</a>
+        }>Select <strong>Add Shortcut</strong> after it downloads. If it opens in Files, look in <strong>Downloads</strong>. After turning on encryption, install it again.</SetupStep>
+        <SetupStep number={2} title="Connect your library" extra={<>
+          {pairing && !expired ? <div className="crate-reading-shortcut__code">
+            <CopyableText key={pairing.pairingCode} value={pairing.pairingCode} label="Pairing code" copyLabel="Copy code" alwaysShow
+              buttonClassName="setup-step__action"
+              successMessage="Copied. Open the shortcut from your Shortcuts library and paste when asked."
+              failureMessage="Could not copy. Select the pairing code below and copy it manually."
+              beforeCopy={() => {
+                if (pairing.expiresAt <= Date.now()) { setNow(Date.now()); return false; }
+                assertReadingSession(session);
+                return true;
+              }} />
+            <p className="setup-step__status">Use once within {Math.max(1, Math.ceil((pairing.expiresAt - now) / 60_000))} minutes. Keep it private. A new code replaces this one.</p>
+          </div> : null}
+          <Button className="setup-step__action" variant="outline" disabled={busy || !online} onClick={() => void create()}><KeyRound size={15} aria-hidden="true" />{busy ? 'Creating code…' : pairing ? 'New code' : 'Create pairing code'}</Button>
+          {expired && <p className="setup-step__status" role="status">This pairing code expired. Create a new code to continue.</p>}
+          {!online && <p className="setup-step__status" role="status">Connect to the internet to pair your shortcut.</p>}
+          {error && <p className="setup-step__status" role="alert">{error}</p>}
+        </>}>Create a code, then run <strong>Save to Crate</strong> from <strong>Shortcuts → All Shortcuts</strong> and paste it.</SetupStep>
+        <SetupStep number={3} title="Save your first article">After <strong>Crate setup saved</strong> appears, share an article to <strong>Save to Crate</strong>, then select <strong>Save</strong> in Crate.</SetupStep>
+      </SetupSteps>
+    </SettingsSection>
+    <p className="setup-steps-note">Links reach Crate through a private URL fragment and are encrypted in your browser before syncing, so the shortcut can’t read your library.</p>
   </div>;
 }

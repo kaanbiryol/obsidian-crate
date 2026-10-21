@@ -9,3 +9,11 @@ export async function browserStorageStatus(request = false): Promise<BrowserStor
 		return 'best-effort';
 	} catch { return 'unavailable'; }
 }
+
+/**
+ * Installed apps ask once at launch, where browsers grant persistence without a prompt.
+ * Browser tabs never ask unprompted; Settings offers the request while unsynced work is at risk.
+ */
+export function protectInstalledAppStorage(standalone: boolean): Promise<BrowserStorageStatus> | null {
+	return standalone ? browserStorageStatus(true) : null;
+}

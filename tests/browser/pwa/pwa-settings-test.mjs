@@ -94,7 +94,7 @@ try {
 			await expect(sheet.locator('.settings-sheet')).toHaveCSS('height', '534px');
 			await sheet.evaluate(element => element.classList.remove('settings-keyboard-test'));
 			await keyboardStyles.evaluate(element => element.remove());
-			for (const title of ['General', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
+			for (const title of ['Appearance', 'Notifications', 'Install']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
 			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
 			await expect(page.getByRole('dialog')).toHaveCount(1);
 			await expect(page.locator('[data-crate-section="reminders"]')).toHaveAttribute('inert', '');
@@ -289,7 +289,7 @@ try {
 			await offlineContext.setOffline(true);
 			await offlinePage.getByRole('button', { name: 'Open settings', exact: true }).click();
 			const offlineSheet = offlinePage.getByRole('dialog', { name: 'Settings', exact: true });
-			await expect(offlineSheet.getByRole('heading', { name: 'General', exact: true })).toBeVisible();
+			await expect(offlineSheet.getByRole('heading', { name: 'Appearance', exact: true })).toBeVisible();
 			await expect(offlineSheet.getByRole('button', { name: 'Close settings', exact: true })).toBeEnabled();
 			await offlineSheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 			await expect(offlineSheet).toHaveCount(0);

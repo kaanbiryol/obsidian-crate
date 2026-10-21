@@ -55,7 +55,6 @@
 	.browser-setup .settings-panel__section {
 		padding: 0;
 		.settings-panel__title { margin-bottom: 12px; font-size: 14px; font-weight: 500; }
-		.pwa-home-screen-instructions { padding: 0; background: transparent; border: 0; font-size: 13px; }
-		p { font-size: 13px; }
+		.setup-steps-card { padding-inline: 0; }
 	}
 }

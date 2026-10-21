@@ -1,10 +1,12 @@
+import { ShieldCheck } from 'lucide-react';
 import { SettingsAction } from './SettingsAction';
 import React, { useEffect, useState } from 'react';
 import { browserStorageStatus, type BrowserStorageStatus } from '../storage/browser-storage';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 
-export function DeviceStorageSettings() {
+/** Shown only while unsynced work sits in storage the browser may clear. */
+export function DeviceStorageSettings({ unsynced }: { unsynced: boolean }) {
 	const [status, setStatus] = useState<BrowserStorageStatus | 'checking'>('checking');
 	const [requesting, setRequesting] = useState(false);
 	useEffect(() => {
@@ -12,12 +14,12 @@ export function DeviceStorageSettings() {
 		void browserStorageStatus().then(value => { if (active) setStatus(value); });
 		return () => { active = false; };
 	}, []);
+	if (status !== 'best-effort' || !unsynced) return null;
 	return <SettingsSection title="Device storage">
-		<SettingsRow title="Offline data"><span className="settings-value" role="status">{status === 'persistent' ? 'Protected' : status === 'checking' ? 'Checking…' : status === 'unavailable' ? 'Unavailable' : 'Best effort'}</span></SettingsRow>
-		<p className="settings-help">{status === 'persistent' ? 'Sync pending changes before clearing site data.' : 'Your browser may remove offline data. Sync pending changes to keep them safe.'}</p>
-		{status === 'best-effort' && <SettingsAction disabled={requesting} aria-busy={requesting} onClick={() => {
+		<SettingsRow title="Offline data" description="Unsynced changes are in storage your browser may clear. Sync them, or add Crate to your home screen to keep them safe."><span className="settings-value" role="status">At risk</span></SettingsRow>
+		<SettingsAction icon={ShieldCheck} disabled={requesting} aria-busy={requesting} onClick={() => {
 			setRequesting(true);
 			void browserStorageStatus(true).then(setStatus).finally(() => setRequesting(false));
-		}}>Protect offline data</SettingsAction>}
+		}}>Ask browser to keep data</SettingsAction>
 	</SettingsSection>;
 }

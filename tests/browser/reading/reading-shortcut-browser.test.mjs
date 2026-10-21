@@ -57,10 +57,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const code = await input.inputValue(); assert.ok(!code.includes('Bearer'));
     // Clipboard denial leaves a selectable fallback; no second credential is minted.
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Denied'); } } }));
-    await dialog.getByRole('button', { name: 'Copy pairing code' }).click();
+    await dialog.getByRole('button', { name: 'Copy code', exact: true }).click();
     await expect(dialog.getByRole('alert')).toContainText('copy it manually'); assert.equal(creates, 1);
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async value => { window.copiedPairing = value; } } }));
-    await dialog.getByRole('button', { name: 'Copy pairing code' }).click();
+    await dialog.getByRole('button', { name: 'Copy code', exact: true }).click();
     assert.equal(await page.evaluate(() => window.copiedPairing), code);
     await expect(dialog.getByText('Copied. Open the shortcut', { exact: false })).toBeVisible();
     const connected = await api(contract.exchangePath, { token: new URL(code).hash.slice(1) }, '');
@@ -103,14 +103,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await expect.poll(() => download.evaluate(el => {
         const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
         ctx.fillStyle = getComputedStyle(el).color; ctx.fillRect(0, 0, 1, 1);
-        return ctx.getImageData(0, 0, 1, 1).data[0];
+        return Math.max(...ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
       })).toBeGreaterThan(colorScheme === 'dark' ? 150 : 0);
       await page.screenshot({ path: `test-results/reading/${name}-shortcut-${colorScheme}.png`, fullPage: true, animations: 'disabled' });
       assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
     }
     await page.setViewportSize({ width: 320, height: 568 });
-    await dialog.getByRole('heading', { name: '3. Save your first article', exact: true }).scrollIntoViewIfNeeded();
-    await expect(dialog.getByRole('heading', { name: '3. Save your first article', exact: true })).toBeVisible();
+    await dialog.getByRole('heading', { name: 'Save your first article', exact: true }).scrollIntoViewIfNeeded();
+    await expect(dialog.getByRole('heading', { name: 'Save your first article', exact: true })).toBeVisible();
     assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
     const closeBox = await dialog.getByRole('button', { name: 'Close shortcut setup' }).boundingBox();
     assert.ok(closeBox && closeBox.y >= 0 && closeBox.y + closeBox.height <= 568, 'The close control must stay visible while scrolling');

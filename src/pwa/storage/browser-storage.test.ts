@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { browserStorageStatus } from './browser-storage';
+import { browserStorageStatus, protectInstalledAppStorage } from './browser-storage';
 afterEach(() => vi.unstubAllGlobals());
 it.each([true, false])('reports the browser persistence decision (%s)', async granted => {
  const persist = vi.fn().mockResolvedValue(granted);
@@ -13,4 +13,10 @@ it('does not request persistence again when already granted', async () => {
 });
 it.each([undefined, { persisted: () => { throw new Error('Unavailable'); } }])('handles unavailable browser storage', async storage => {
  vi.stubGlobal('navigator', {storage}); expect(await browserStorageStatus(true)).toBe('unavailable');
+});
+it('asks for persistence at launch only in the installed app', async () => {
+ const persist = vi.fn().mockResolvedValue(true);
+ vi.stubGlobal('navigator', { storage: { persisted: async () => false, persist } });
+ expect(protectInstalledAppStorage(false)).toBeNull(); expect(persist).not.toHaveBeenCalled();
+ expect(await protectInstalledAppStorage(true)).toBe('persistent'); expect(persist).toHaveBeenCalledOnce();
 });

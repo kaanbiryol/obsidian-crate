@@ -12,7 +12,6 @@
 @use './layout-modes';
 @use './mobile-layout';
 @use './navigation';
-@use './home-screen-install';
 @use './reminder-sync-notices';
 @use './reminder-pagination';
 @use './schedule-switcher';
@@ -31,7 +30,6 @@
 	@include primary-screen.styles;
 	@include mobile-layout.styles;
 	@include navigation.styles;
-	@include home-screen-install.styles;
 	@include reminder-sync-notices.styles;
 	@include reminder-pagination.styles;
 	@include schedule-switcher.styles;

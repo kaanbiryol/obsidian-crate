@@ -14,12 +14,12 @@ export async function checkSettingsNavigation(page) {
 	const open = settings.getByRole('button', { name: 'Set up iPhone shortcut', exact: true });
 	const main = page.locator('.settings-main');
 	await expect(settings.getByRole('region', { name: 'Tabs', exact: true }).getByRole('combobox', { name: 'Open app to' })).toBeVisible();
-	for (const section of ['Sync', 'Device storage', 'About']) {
+	for (const section of ['Sync', 'About']) {
 		await expect(settings.getByRole('region', { name: section, exact: true })).toBeVisible();
 		await expect(settings.getByRole('button', { name: section, exact: true })).toHaveCount(0);
 	}
-	await expect(settings.getByText('Device storage', { exact: true })).toBeVisible();
-	await expect(settings.getByText('Web app', { exact: true })).toBeVisible();
+	await expect(settings.getByRole('region', { name: 'Device storage', exact: true })).toHaveCount(0);
+	await expect(settings.getByRole('heading', { name: 'Install', exact: true })).toBeVisible();
 	expect(await allowsNativeBack(settings.getByRole('heading', { name: 'Settings', exact: true }))).toBe(false);
 	let length;
 	for (const method of ['native', 'button', 'escape']) {

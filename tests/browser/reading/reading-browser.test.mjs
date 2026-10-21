@@ -432,7 +432,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // An empty animation list in that frame does not mean it is on screen.
     await expect(sheet).toHaveCSS('transform', 'none');
     await expect.poll(() => sheet.evaluate(el => el.getAnimations().length)).toBe(0);
-    for (const title of ['General', 'Tabs', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    for (const title of ['Appearance', 'Tabs', 'Notifications', 'Install']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
     await expect(sheet.getByRole('button',{name:'Close settings'}).locator('svg[data-icon="x"]')).toHaveCount(1);
     await page.screenshot({path:`test-results/reading/${name}-settings-${theme}.png`});
     // This checks dismissal and focus, independently of native flick velocity.

@@ -33,7 +33,7 @@
 	z-index: 4;
 	pointer-events: none;
 
-	.settings-panel { gap: 0; padding: 0 var(--crate-space-16) calc(var(--crate-space-24) + env(safe-area-inset-bottom)); scroll-padding-block: var(--crate-space-16); }
+	.settings-panel { gap: 0; padding: 0 var(--crate-space-4) calc(var(--crate-space-24) + env(safe-area-inset-bottom)); scroll-padding-block: var(--crate-space-16); }
 	.settings-shortcut-body { flex: 1; min-height: 0; overflow-y: auto; }
 	.settings-page-stack { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 	.settings-panel[inert] { pointer-events: none; }
@@ -50,8 +50,14 @@
 		line-height: 1.4; text-align: left; white-space: normal; cursor: pointer;
 	}
 	.crate-action-button.settings-action-row { border: 0 !important; }
-	.settings-action-row, .settings-row--diagnostics .settings-action-row { touch-action: manipulation; justify-content: flex-start; color: var(--crate-accent-text); }
-	.settings-action-row[data-tone="danger"] { color: var(--crate-danger); }
+	.settings-action-row, .settings-row--diagnostics .settings-action-row { touch-action: manipulation; justify-content: space-between; color: var(--text-normal); }
+	.settings-action-row > svg { flex-shrink: 0; color: var(--text-faint); }
+	.settings-action-row[data-tone="danger"], .settings-action-row[data-tone="danger"] > svg { color: var(--crate-danger); }
+	// CopyableText owns its label, so the trailing copy icon is drawn here.
+	.settings-row--diagnostics .settings-action-row::after {
+		content: ''; flex-shrink: 0; width: 17px; height: 17px; background: var(--text-faint);
+		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='14' height='14' x='8' y='8' rx='2'/%3E%3Cpath d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/%3E%3C/svg%3E") center / contain no-repeat;
+	}
 	.settings-action-row:disabled { opacity: .45; cursor: default; }
 	.settings-navigation-row:focus-visible, .settings-action-row:focus-visible {
 		outline: 2px solid var(--crate-focus-ring); outline-offset: -2px;
@@ -63,10 +69,6 @@
 		.settings-action-row:not(:disabled):hover, .settings-navigation-row:not(:disabled):hover {
 			background: var(--crate-control-hover-bg);
 		}
-	}
-	.settings-group > .settings-action-row:not(:first-child)::before, .settings-action-row + .settings-action-row::before {
-		content: ''; position: absolute; top: 0; inset-inline: var(--crate-space-16);
-		border-top: 1px solid var(--crate-divider); pointer-events: none;
 	}
 	:is(.settings-group, .settings-account, .settings-recovery-actions) > :is(.settings-navigation-row, .settings-action-row) {
 		&:first-child {
@@ -83,13 +85,12 @@
 		border-end-end-radius: calc(var(--crate-radius-card) - 1px);
 	}
 	.settings-row.settings-row--diagnostics { padding: 0; min-height: 0; }
-	.settings-action-row + .settings-row { border-top: 1px solid var(--crate-divider); }
 	.settings-row--diagnostics .crate-copyable-text { width: 100%; gap: 0; }
 	.settings-row--diagnostics .crate-field__description:empty { display: none; }
-	.settings-account, .settings-recovery-actions {
-		@include list-item.surface;
-		margin-top: var(--crate-space-24); padding-inline: var(--crate-space-16);
-	}
+	.settings-account, .settings-recovery-actions { margin-top: var(--crate-space-12); padding-inline: var(--crate-space-16); }
+	// Flat page: a full-bleed divider separates the account action from the last section.
+	.settings-account { margin-inline: calc(-1 * var(--crate-space-4)); padding: var(--crate-space-8) var(--crate-space-20) 0; border-top: 1px solid var(--crate-divider); }
+	.settings-account .settings-action-row { justify-content: space-between; }
 	.settings-inline-action { --crate-action-text: var(--crate-accent-text); padding-inline: 8px; }
 	.settings-navigation-row svg { color: var(--text-faint); }
 	.settings-row__copy { gap: var(--crate-space-4); }
@@ -97,18 +98,18 @@
 	.settings-row__copy > span { color: var(--text-muted); font-size: var(--pwa-font-detail); line-height: 1.45; }
 	.settings-theme-picker {
 		width: 100%; gap: 4px; padding: 4px; box-sizing: border-box;
-		border: 1px solid var(--crate-divider); border-radius: var(--crate-radius-card);
-		background: var(--crate-control-bg); box-shadow: none;
+		border: 0; border-radius: 12px;
+		background: color-mix(in srgb, var(--text-normal) 6%, transparent); box-shadow: none;
 	}
 	.settings-theme-option {
-		min-height: 44px; padding: 0 8px; gap: 6px;
-		border: 1px solid transparent; border-radius: var(--crate-radius-card);
+		min-height: 40px; padding: 0 8px; gap: 6px;
+		border: 0; border-radius: 9px;
 		background: transparent; box-shadow: none;
 		font-size: var(--reminder-font-sm); font-weight: var(--reminder-font-weight-medium); color: var(--text-muted);
 	}
 	.settings-theme-option.is-active {
-		background: var(--crate-tab-active-bg); border-color: var(--crate-selection-border);
-		box-shadow: none; color: var(--crate-tab-active-color);
+		background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+		box-shadow: none; color: var(--text-normal);
 	}
 	.settings-theme-option[data-press-active] { background: var(--crate-control-active-bg); }
 	@media (hover: hover) and (pointer: fine) {
@@ -117,51 +118,42 @@
 	.settings-theme-option:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 2px; }
 	.settings-preference-control, .settings-tab-choice { @include focus.within; }
 	.settings-preference-control {
-		background: var(--crate-control-bg); border-color: var(--crate-divider);
-		border-radius: var(--crate-radius-card); box-shadow: none; color: var(--text-normal);
+		background: color-mix(in srgb, var(--text-normal) 6%, transparent); border-color: transparent;
+		border-radius: 10px; box-shadow: none; color: var(--text-normal);
 		// Theme colors switch together; interpolating only the field background
 		// briefly puts the new text color against the previous theme.
 		transition: none;
 	}
 	.settings-preference-control .settings-preference-input { font-weight: var(--reminder-font-weight-normal); }
-	.settings-preference-control--select .settings-preference-input { padding-right: 28px; }
-	.settings-preference-control--select svg { right: 10px; }
+	.settings-preference-control--select { justify-content: flex-end; background: transparent; }
+	.settings-preference-control--select .settings-preference-input { padding: 0 22px 0 0; text-align: right; text-align-last: right; color: var(--text-normal); font-size: var(--reminder-font-base); }
+	.settings-preference-control--select svg { right: 0; color: var(--text-faint); }
 	.settings-preference-control--days { flex-basis: 100px; width: 100px; }
 	.settings-preference-control--days input { width: 60px; }
 	.settings-preference-unit { padding-right: 10px; }
 	.settings-help { margin: 0 0 8px; }
 	.settings-panel__section .settings-help { margin-bottom: 0; padding-bottom: 12px; }
 	.settings-main { display: flex; flex-direction: column; }
-	.settings-panel__section { flex-shrink: 0; padding: var(--crate-space-24) 0 0; border-bottom: 0; }
-	.settings-panel__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--crate-space-8); min-height: 20px; margin-bottom: var(--crate-space-8); padding-inline: var(--crate-space-16); }
-	.settings-panel__title { margin: 0; color: var(--text-muted); font-size: var(--pwa-font-detail); font-weight: var(--reminder-font-weight-semibold); line-height: 1.4; letter-spacing: normal; }
+	.settings-panel__section { flex-shrink: 0; padding: var(--crate-space-20) 0 var(--crate-space-8); border-bottom: 0; }
+	// Linear-style flat sections: no cards, one full-bleed divider between groups.
+	.settings-panel .settings-panel__section {
+		margin-inline: calc(-1 * var(--crate-space-4)); padding-inline: var(--crate-space-4); border-top: 1px solid var(--crate-divider);
+	}
+	:is(.settings-main, .crate-reading-shortcut) > .settings-panel__section:first-of-type { border-top: 0; }
+	.settings-panel__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--crate-space-8); min-height: 20px; margin-bottom: var(--crate-space-4); padding-inline: var(--crate-space-16); }
+	.settings-panel__title { margin: 0; color: var(--text-muted); font-size: var(--pwa-font-detail); font-weight: 400; line-height: 1.4; letter-spacing: normal; }
 	.settings-group { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-	.settings-panel__section > .settings-group {
-		@include list-item.surface;
-		padding-inline: var(--crate-space-16);
-	}
-	.settings-panel__section > .settings-group.pwa-home-screen-instructions, .settings-install-instructions {
-		padding-block: var(--crate-space-16);
-		font-size: var(--pwa-font-detail);
-		line-height: 1.5;
-		ol { margin-block: var(--crate-space-12); padding-left: var(--crate-space-20); }
-		ol:only-child { margin: 0; }
-		li { padding-left: var(--crate-space-4); }
-		li + li { margin-top: var(--crate-space-12); }
-		strong { font-weight: var(--reminder-font-weight-semibold); }
-	}
-	.settings-install-instructions {
-		@include list-item.surface;
-		flex-shrink: 0; margin-top: var(--crate-space-24); padding-inline: var(--crate-space-16);
-	}
+	.settings-panel__section > .settings-group { padding-inline: var(--crate-space-16); }
+	.settings-install-instructions { flex-shrink: 0; margin-top: var(--crate-space-24); }
 	.settings-row { box-sizing: border-box; padding: var(--crate-settings-row-padding) 0; min-height: 52px; gap: var(--crate-settings-row-gap); }
 	.settings-row--value { font-size: var(--reminder-font-base); }
 	.settings-row--value, .settings-row--value > strong { color: var(--text-normal); font-weight: 400; }
 	.settings-row--value > strong { color: var(--text-muted); font-size: var(--pwa-font-detail); }
-	.settings-row--version { min-height: 48px; font-size: var(--pwa-font-detail); }
-	.settings-row--version > strong { font-size: var(--pwa-font-caption); white-space: normal; overflow-wrap: anywhere; }
-	.settings-row + .settings-row { border-top: 1px solid var(--crate-divider); }
+	.settings-row--version { min-height: 52px; font-size: var(--reminder-font-base); }
+	.settings-row--version > strong { font-size: var(--pwa-font-detail); white-space: normal; overflow-wrap: anywhere; }
 
+	// Flat groups: no row dividers, including the legacy Worker stylesheet's.
+	.settings-row + .settings-row { border-top: 0; }
 	.settings-row--theme { flex-direction: column; align-items: stretch; gap: 10px; }
 	.settings-preference-control--select { flex-basis: 152px; width: 152px; }
 	.settings-value { color: var(--text-muted); font-size: var(--reminder-font-base); text-align: right; max-width: 60%; overflow-wrap: anywhere; }
@@ -169,14 +161,19 @@
 	.settings-navigation-row { font-size: var(--reminder-font-base); font-weight: var(--reminder-font-weight-medium); }
 	.settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; }
 	.settings-actions > button { max-width: 100%; white-space: normal; }
+	.settings-actions > .crate-action-button {
+		min-height: 40px; padding: 0 16px; border: 0 !important; border-radius: 999px;
+		background: color-mix(in srgb, var(--text-normal) 8%, transparent); font-weight: 500;
+		&[data-tone="danger"] { background: color-mix(in srgb, var(--crate-danger) 14%, transparent); }
+	}
 	.settings-feedback, .settings-attention, .settings-help { font-size: var(--pwa-font-detail); line-height: 1.45; overflow-wrap: anywhere; }
 	.settings-feedback { color: var(--crate-danger); }
 	.settings-attention { color: var(--text-muted); }
 	.settings-attention p { margin: 8px 0; }
 	.settings-help { color: var(--text-muted); }
+	.settings-help strong { color: var(--text-normal); font-weight: 500; }
 	.settings-tabs-help { padding-top: var(--crate-space-12); }
 	.settings-encryption-details {
-		border-top: 1px solid var(--crate-divider);
 		summary { min-height: 44px; padding-block: var(--crate-space-12); color: var(--text-muted); font-size: var(--pwa-font-detail); cursor: pointer; }
 	}
 	.settings-subpage { min-width: 0; }
@@ -190,16 +187,14 @@
 
 	.settings-section-description { margin: 0; padding: 0 var(--crate-space-16) var(--crate-space-12); color: var(--text-muted); font-size: var(--pwa-font-caption); line-height: 1.45; }
 	.settings-tab-list { margin: 0; padding: 0; list-style: none; }
-	.settings-row + .settings-tab-list { border-top: 1px solid var(--crate-divider); }
 	.settings-tab-row { position: relative; display: flex; align-items: center; min-height: 48px; gap: 12px; }
-	.settings-tab-row + .settings-tab-row { border-top: 1px solid var(--crate-divider); }
 	.settings-tab-row > svg { color: var(--text-muted); flex-shrink: 0; }
 	.settings-tab-row button { min-width: 44px; min-height: 44px; padding: 0; color: var(--text-muted); }
 	.settings-tab-row .settings-tab-handle { color: var(--text-faint); touch-action: none; cursor: grab; }
 	.settings-tab-row .settings-tab-handle[data-press-active] { cursor: grabbing; }
 	.settings-tab-choice { position: relative; display: flex; flex: 1; min-width: 0; align-items: center; }
 	// Give the native picker an opaque snapshot surface when it opens on iOS.
-	.settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: var(--crate-reminder-card-bg); color: var(--text-normal); font: inherit; font-size: 16px; font-weight: var(--reminder-font-weight-medium); box-shadow: none; }
+	.settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: var(--background-primary); color: var(--text-normal); font: inherit; font-size: 16px; font-weight: var(--reminder-font-weight-medium); box-shadow: none; }
 	.settings-tab-choice > svg { position: absolute; right: 0; pointer-events: none; color: var(--text-muted); }
 	.settings-tabs-reset { --crate-action-text: var(--crate-accent-text); --crate-action-font-size: var(--pwa-font-caption); min-height: 44px; margin-block: -8px; margin-right: -8px; padding-inline: 8px; color: var(--crate-accent-text); font-size: var(--pwa-font-caption); font-weight: 400; }
 }

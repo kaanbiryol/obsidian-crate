@@ -14,6 +14,7 @@
 @use "header-chrome";
 @use "sheet-headers";
 @use "browser-setup";
+@use "setup-steps";
 
 // Shared PWA theme and controls. Feature styles only own their content/layout.
 .crate-reminders-ui {
@@ -32,6 +33,7 @@
 	@include delete-confirmation.styles;
 	@include sheet-headers.styles;
 	@include browser-setup.styles;
+	@include setup-steps.styles;
 
 	&.pwa-shadow-root, &.pwa-reading-root {
 		--crate-tab-active-color: var(--text-accent, var(--interactive-accent));
