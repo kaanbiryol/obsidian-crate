@@ -13,8 +13,7 @@ import {
 } from './types';
 import { parseReminderCacheEntries, selectReminderIndexWarmBatch } from './warm';
 import { getProjectFromPath } from '../scan';
-import type { RemoteReminderRecord } from '../types';
-import { ReminderIdentityConflictError } from '../source-identity';
+import { buildReminderList } from '@/reminders/core/reminder-list';
 
 export { REMINDER_CACHE_PARSER_VERSION, saveReminderFileCache };
 
@@ -69,25 +68,9 @@ export async function loadIncrementalReminderIndex(
 		return { ready: false, reason: 'warming', remainingFiles };
 	}
 
-	const reminders: RemoteReminderRecord[] = [];
-	const projects = new Set<string>();
-	for (const file of metadata) {
+	const sources = metadata.flatMap(file => {
 		const resolved = resolvedFiles.get(file.path);
-		if (!resolved) continue;
-		projects.add(getProjectFromPath(file.path, folderPath));
-		reminders.push(...resolved.reminders);
-	}
-
-	const counts = new Map<string, number>();
-	for (const reminder of reminders) counts.set(reminder.id, (counts.get(reminder.id) ?? 0) + 1);
-	const duplicateFiles = new Set(reminders.filter(reminder => counts.get(reminder.id)! > 1).map(reminder => reminder.filePath));
-	return {
-		ready: true,
-		issues: [...resolvedFiles.values()].flatMap(file => {
-      const reason = file.issue ?? (duplicateFiles.has(file.filePath) ? new ReminderIdentityConflictError().message : undefined);
-      return reason ? [{ path: file.filePath, reason }] : [];
-    }),
-		reminders: reminders.filter(reminder => counts.get(reminder.id) === 1),
-		projects: Array.from(projects).sort((left, right) => left.localeCompare(right)),
-	};
+		return resolved ? [{ path: file.path, project: getProjectFromPath(file.path, folderPath), reminders: resolved.reminders, issue: resolved.issue }] : [];
+	});
+	return { ready: true, ...buildReminderList(sources) };
 }

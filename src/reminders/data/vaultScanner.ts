@@ -16,6 +16,7 @@ import {
 } from "@/reminders/core/markdownScan";
 import { createPersistedCheckboxParses } from "@/reminders/core/grammar/checkboxParser";
 import { normalizeReminderIds } from "@/reminders/core/normalizeReminderIds";
+import { compareProjects } from "@/reminders/core/reminder-list";
 import { createLogger } from "@/reminders/logger";
 import type { IndexedReminder } from "./reminder-index";
 import { addReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
@@ -279,7 +280,7 @@ export async function scanVault(
     filesScanned,
     totalLines,
     scanDurationMs,
-    discoveredProjects: Array.from(discoveredProjects).sort(),
+    discoveredProjects: Array.from(discoveredProjects).sort(compareProjects),
     ...(deferred ? { deferred: true } : {}),
     ...(deferred ? { ambiguousOwners: allReminders.filter(reminder => (identityCounts.get(reminder.id) ?? 0) > 1)
       .map(({ id, filePath }) => ({ id, filePath })) } : {}),

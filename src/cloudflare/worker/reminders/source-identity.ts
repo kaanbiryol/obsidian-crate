@@ -1,7 +1,8 @@
 import { queryRows } from '../db';
+import { REMINDER_IDENTITY_CONFLICT_ISSUE } from '@/reminders/core/reminder-list';
 
 export class ReminderIdentityConflictError extends Error {
-  constructor() { super('Duplicate reminder identifiers. Open the affected notes in Obsidian to assign unique identifiers before editing or scheduling them.'); }
+  constructor() { super(REMINDER_IDENTITY_CONFLICT_ISSUE); }
 }
 
 export async function assertUniqueReminderSources(db: D1Database, folder: string, ids: string[]): Promise<void> {

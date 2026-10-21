@@ -205,6 +205,11 @@ web app's answers. `cloudflare/worker/reminders/` holds these routes in
 `routes/`, the parsed reminder cache in `cache/`, and the operation receipts
 and notification source records they share.
 
+`reminders/core/reminder-list.ts` builds the web list from parsed notes for the
+Worker index and encrypted web apps: every copy of a duplicated identity is hidden
+and each affected file reports one issue. Its `compareProjects` orders projects in
+the plugin too. `reminders/list-parity.integration.ts` checks that both lists agree.
+
 `cloudflare/worker/request-handler.ts` distinguishes public, coordinator and
 transfer execution with a tagged argument. `request-guards.ts` owns stateless
 protocol and encryption checks; the handler retains their ordering around

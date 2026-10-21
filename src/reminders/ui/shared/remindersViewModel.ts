@@ -1,6 +1,7 @@
 import {
   DEFAULT_PROJECT,
 } from "@/reminders/core/constants";
+import { compareProjects } from "@/reminders/core/reminder-list";
 import { getUpcomingReminders, selectTodayReminders } from "@/reminders/core/reminderSort";
 import { isReminderOverdue } from "@/reminders/core/dates/reminderDate";
 import type { Reminder } from "@/reminders/types/reminder";
@@ -25,7 +26,7 @@ export interface CurrentHeaderData extends RemindersHeaderStats {
 }
 
 export function getReminderProjects(reminders: Reminder[]): string[] {
-  return Array.from(new Set(reminders.map((reminder) => reminder.project || DEFAULT_PROJECT))).sort();
+  return Array.from(new Set(reminders.map((reminder) => reminder.project || DEFAULT_PROJECT))).sort(compareProjects);
 }
 
 export function getRemindersHeaderData(

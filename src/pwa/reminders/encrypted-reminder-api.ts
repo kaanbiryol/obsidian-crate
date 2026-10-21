@@ -3,6 +3,7 @@ import { decryptJson, encryptJson } from '../../encryption/envelope';
 import { createReminderProjectionWithKeys } from '../../encryption/reminder-projection';
 import { scanReminderMarkdownContent, getProjectFromPath } from '../../reminders/core/markdownScan';
 import { decodeMarkdownBytes } from '../../reminders/core/markdownEncoding';
+import { buildReminderList } from '../../reminders/core/reminder-list';
 import { applyReminderFileCommand, reminderCommandPayload, ReminderCommandError } from '../../reminders/core/reminderFileCommand';
 import { reminderRequestHash } from '../../encryption/reminder-receipt';
 import { MarkdownEncodingError } from '../../reminders/core/markdownEncoding';
@@ -14,7 +15,6 @@ import { loadEncryptedReminderAttempt, saveEncryptedReminderAttempt, pruneEncryp
 import { requireCompatibleServer } from '../server-compatibility';
 import type { StoredReminderKeys } from '../encryption/encryption-keys';
 import type { ApiFetch } from '../types';
-import type { ReminderSourceIssue } from './types';
 import { routeFolderPath } from '../encryption/encryption-folder-routing';
 import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '../../encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
@@ -129,8 +129,7 @@ export class EncryptedReminderApi {
 				if (etag === previousEtag) return new Response(null, { status: 304, headers: { ETag: etag } });
 				const inventory = await this.inventory(first);
 				const nextCache = new Map(this.cached);
-				const reminders: Awaited<ReturnType<typeof reminderCommandPayload>>[] = [], issues: ReminderSourceIssue[] = [];
-				const projects = new Set<string>();
+				const sources: Array<{ path: string; project: string; reminders: ReminderPayload[]; issue?: string }> = [];
 				const nextScanned = new Map<string, ScannedNote>();
 				const loaded = await mapBounded(inventory.files, NOTE_CONCURRENCY, async (file): Promise<ScannedNote | { file: RemoteFile; error: unknown }> => {
 					try {
@@ -146,23 +145,20 @@ export class EncryptedReminderApi {
 				});
 				for (const entry of loaded) {
 					const { file } = entry;
-					projects.add(getProjectFromPath(file.path, this.keys.folderPath));
+					const source = { path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), project: getProjectFromPath(file.path, this.keys.folderPath) };
 					if ('error' in entry) {
-						issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: entry.error instanceof Error ? entry.error.message : 'This note could not be decrypted' });
+						sources.push({ ...source, reminders: [], issue: entry.error instanceof Error ? entry.error.message : 'This note could not be decrypted' });
 						continue;
 					}
 					nextScanned.set(file.revision, entry);
-					if (entry.issue) issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: entry.issue });
-					reminders.push(...entry.reminders);
+					sources.push({ ...source, reminders: entry.reminders, issue: entry.issue });
 				}
 				if ((await this.page()).sequence !== inventory.sequence) throw new ReminderCommandError('Reminder files changed while loading. Refresh again.');
-				const counts = new Map<string, number>();
-				for (const reminder of reminders) counts.set(reminder.id, (counts.get(reminder.id) ?? 0) + 1);
-				for (const reminder of reminders) if (counts.get(reminder.id)! > 1) issues.push({ path: reminder.filePath, reason: 'Duplicate reminder identity. Repair this note in Obsidian.' });
+				const result = buildReminderList(sources);
 				this.assertCurrent();
 				this.cached = nextCache;
 				this.scanned = nextScanned;
-				return Response.json({ reminders: reminders.filter(reminder => counts.get(reminder.id) === 1), projects: [...projects].sort(), issues }, { headers: { ETag: etag } });
+				return Response.json(result, { headers: { ETag: etag } });
 			} catch (error) {
 				if (!(error instanceof ReminderCommandError) || error.status !== 409 || attempt === 2) throw error;
 			}

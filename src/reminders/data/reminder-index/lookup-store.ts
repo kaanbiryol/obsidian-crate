@@ -1,3 +1,4 @@
+import { compareProjects } from "@/reminders/core/reminder-list";
 import type { IndexedReminder } from "./index";
 
 export interface ReminderLookupStore {
@@ -78,7 +79,7 @@ export function createReminderLookupStore(): ReminderLookupStore {
     },
 
     getProjects(discoveredProjects: Set<string>) {
-      return Array.from(new Set([...projectCounts.keys(), ...discoveredProjects])).sort();
+      return Array.from(new Set([...projectCounts.keys(), ...discoveredProjects])).sort(compareProjects);
     },
   };
 }
