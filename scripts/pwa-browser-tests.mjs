@@ -57,6 +57,7 @@ export const browserScripts = [
 	'tests/browser/pwa/pwa-capacity-test.mjs',
 	'tests/browser/pwa/pwa-pagination-test.mjs',
 	'tests/browser/pwa/pwa-reminder-scroll-test.mjs',
+	'tests/browser/pwa/pwa-document-scroll-test.mjs',
 	'tests/browser/pwa/pwa-reorder-touch-test.mjs',
 	'tests/browser/pwa/pwa-project-transition-test.mjs',
 	'tests/browser/reading/reading-touch-test.mjs',

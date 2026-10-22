@@ -77,6 +77,26 @@
 	}
 }
 
+// A settled iOS list screen scrolls the document so the status-bar tap reaches it.
+// `document-scroll.ts` pins its chrome in place with inline fixed offsets.
+html.pwa-document-scroll {
+	overflow-x: clip;
+	overflow-y: auto;
+	scrollbar-width: none;
+	&::-webkit-scrollbar { display: none; }
+	&, body { overscroll-behavior-y: contain; }
+	// Rows pass under the header area, including gaps between its controls.
+	[data-document-scroll="true"]::before {
+		content: '';
+		position: fixed;
+		z-index: 9;
+		inset: 0 0 auto;
+		height: var(--pwa-document-scroll-cover);
+		background: var(--pwa-document-scroll-bg);
+		pointer-events: none;
+	}
+}
+
 // A long article uses native document scrolling; leave its frozen canvas in place.
 html.pwa-document-reader .crate-feature-shell > .crate-modal-canvas {
 	overflow: visible;

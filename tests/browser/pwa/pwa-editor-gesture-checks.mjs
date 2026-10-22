@@ -24,8 +24,12 @@ export async function checkNativeEditorGestures(page, title) {
 		return { selected, collapsed: dispatch(element), background: dispatch(background) };
 	});
 	assert.deepEqual(gestures.selected, [false, false, false], 'Selected editor gestures must remain native');
-	assert.deepEqual(gestures.collapsed, [false, false, false], 'Caret gestures must remain native');
-	assert.deepEqual(gestures.background, [false, false, false], 'Scroll containment must not cancel touch events');
+	// As on iOS, a focused field with a caret still hands drags to the sheet.
+	assert.equal(gestures.collapsed[0], false, 'Caret touches must start natively');
+	assert.equal(gestures.collapsed[1], true, 'Caret drags hand off to the sheet swipe');
+	// As in UIKit, a drag on the sheet's non-scrolling background belongs to the
+	// sheet swipe, like a header drag. Its touchstart stays native for taps and focus.
+	assert.deepEqual(gestures.background, [false, true, true], 'Background drags must hand off to the sheet swipe');
 
 	// Scroll to both ends of the containment layer. Its contents must stay
 	// anchored even though it has a native scroll range for WebKit to latch to.

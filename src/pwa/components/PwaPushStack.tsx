@@ -46,14 +46,14 @@ export function PwaPushStack<Page extends string>({ page, entryId, immediate, on
 				if (event.target instanceof Element) returnFocus.current = event.target.closest<HTMLElement>('button, a, input, select, textarea');
 			}}>
 			{rootHeader}
-			<div ref={rootRef} className={`pwa-push-stack__body ${rootClassName}`} inert={!!page} data-base-ui-swipe-ignore="">{children}</div>
+			<div ref={rootRef} className={`pwa-push-stack__body ${rootClassName}`} inert={!!page}>{children}</div>
 		</div>
 		<motion.div className="pwa-push-stack__detail" inert={!page} aria-hidden={!page}
 			initial={false} animate={{ x: page ? '0%' : '100%' }}
 			onAnimationComplete={finish} transition={instant ? { duration: 0 } : PWA_NAVIGATION_SPRING}>
 			{retained && <Fragment key={retained.entryId}>
 				{renderHeader(retained.page)}
-				<div ref={detailRef} className={`pwa-push-stack__body ${detailClassName}`} data-base-ui-swipe-ignore="">{renderPage(retained.page)}</div>
+				<div ref={detailRef} className={`pwa-push-stack__body ${detailClassName}`}>{renderPage(retained.page)}</div>
 			</Fragment>}
 		</motion.div>
 	</div>;

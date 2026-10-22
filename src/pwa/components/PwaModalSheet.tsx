@@ -121,11 +121,10 @@ export function PwaModalSheet({
 					className={`pwa-modal-sheet pwa-modal-sheet--${variant}${sheetClassName ? ` ${sheetClassName}` : ''}${keyboardInset > 0 ? ' is-keyboard-open' : ''}`}>
 					<div className="pwa-modal-sheet__scroll-boundary" onTouchStartCapture={(event) => {
 						// WebKit focus can scroll this invisible one-pixel boundary to
-						// its end. Start header drags at its top so Base UI does not
-						// mistake the containment layer for content that must scroll.
-						if (event.target instanceof Element && event.target.closest('.reminder-modal-header')) {
-							event.currentTarget.scrollTop = 0;
-						}
+						// its end. Start every drag at its top so Base UI does not
+						// mistake the containment layer for content that must scroll;
+						// its sticky viewport keeps the sheet still either way.
+						event.currentTarget.scrollTop = 0;
 					}}>
 						<div className="pwa-modal-sheet__scroll-track">
 							<Drawer.Viewport className="pwa-modal-sheet__viewport">

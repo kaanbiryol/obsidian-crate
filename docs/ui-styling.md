@@ -250,8 +250,10 @@ Dock morphs use the shared collapsed height.
 - `src/pwa/components/PwaModalSheet.tsx` wraps Base UI Drawer for focus containment,
   dismissal, and downward swipe gestures. `drawer.css` owns its transitions,
   including reduced motion. The PWA retains its document scroll lock and editor
-  keyboard geometry; editor fields opt out of swiping to preserve native selection
-  and scrolling. Swiping the editor retains its draft, while swiping a picker or
+  keyboard geometry. As in UIKit, content scrolled to its top hands a downward
+  drag to the sheet, including from a focused field; Base UI ignores swipes over
+  an expanded selection so its handles stay native.
+  Swiping the editor retains its draft, while swiping a picker or
   delete confirmation returns to the editor. Explicit editor close still discards
   the draft. Busy operations and screen transitions block dismissal.
   Forms opt into opening focus with `data-initial-focus`. The shared sheet focuses
@@ -338,6 +340,20 @@ Dock morphs use the shared collapsed height.
   sticky action header hides on downward scroll and returns on upward scroll or
   keyboard focus. Verify the status-bar gesture in an installed app on an iPhone;
   desktop browser automation cannot establish that OS behavior.
+
+- On phone-sized iOS layouts, the settled reminders lists, Projects, a pushed
+  project and the Reading library also scroll the document
+  (`src/pwa/navigation/document-scroll.ts`, `useDocumentScrollScreens`). Their
+  ancestors grow to the list, and sibling header, notice and dock chrome is
+  pinned where it is drawn with inline fixed offsets, so iOS bounces never move
+  it. Screens covered by a pushed layer are hidden, a fixed cover hides rows under
+  the header area, and any chrome resize hands the scroll back for a fresh
+  measurement. The handoff waits until no touch, scroll, screen
+  transition or focused field is active. Tab, feature and project transitions,
+  sheets and the reader return the offset to the embedded scroller first, so
+  they animate exactly as before. Scroll consumers read the active owner
+  through `scrollPort`. `pwa-document-scroll-test.mjs` checks that both modes
+  draw identical pixels.
 
 - `src/ui/shared/BaseModal.tsx` uses Base UI Dialog on desktop and
   Drawer for mobile sheets. Portals remain inside the same themed mount and

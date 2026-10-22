@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PullRefreshState } from '../types';
+import { scrollPort } from '@/ui/shared/scroll-port';
 
 const PULL_REFRESH_THRESHOLD = 70;
 const PULL_REFRESH_MAX_DISTANCE = 120;
@@ -64,7 +65,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			if (refreshing || active || event.touches.length !== 1) return;
 			if ((event.target as Element | null)?.closest('.pwa-modal-sheet, [inert]')) return;
 			const nextScrollTarget = findPullScrollTarget(event.target, scrollSelector);
-			if (!nextScrollTarget || nextScrollTarget.scrollTop > 0) return;
+			if (!nextScrollTarget || scrollPort(nextScrollTarget).scrollTop > 0) return;
 
 			const touch = event.touches.item(0);
 			if (!touch) return;
@@ -81,7 +82,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 
 		function handleTouchMove(event: TouchEvent) {
 			if (!active || event.touches.length !== 1) return;
-			if (!scrollTarget || scrollTarget.scrollTop > 0) {
+			if (!scrollTarget || scrollPort(scrollTarget).scrollTop > 0) {
 				reset();
 				return;
 			}

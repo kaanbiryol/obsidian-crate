@@ -51,6 +51,19 @@ try {
 			await expect(settings).toHaveCount(0);
 			await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);
 
+			// As on iOS, content scrolled to its top hands a downward drag to the sheet.
+			await page.getByRole('button', { name: 'Open settings', exact: true }).tap();
+			await expect(settings).toHaveCSS('transform', 'none');
+			const settingsBody = settings.locator('.settings-main');
+			await settingsBody.evaluate(element => { element.scrollTop = 300; });
+			await swipe(page, settingsBody);
+			await expect(settings).toBeVisible();
+			await expect(settings).toHaveCSS('transform', 'none');
+			await settingsBody.evaluate(element => { element.scrollTop = 0; });
+			await swipe(page, settingsBody);
+			await expect(settings).toHaveCount(0);
+			await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);
+
 			const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
 			const cardBox = await card.boundingBox();
 			assert.ok(cardBox);
@@ -66,7 +79,8 @@ try {
 			await expect(page.locator('.pwa-modal-sheet__backdrop')).toHaveCSS('transition-duration', '0s');
 			await checkSheetDragPosition(page, editor, { recedeCanvas: false });
 			await title.fill('Keep my swiped draft');
-			await swipe(page, title, 40);
+			// A short, slow drag from a focused field moves the sheet, then settles back.
+			await swipe(page, title, 40, 600);
 			await expect(editor).toBeVisible();
 			await expect(editor).toHaveCSS('transform', 'none');
 			await expect(title).toHaveText('Keep my swiped draft');
@@ -82,6 +96,21 @@ try {
 			await checkDismissal();
 			await expect(editor).toHaveCount(0);
 			await expect.poll(scale).toBe(1);
+			await card.tap();
+			await expect(title).toHaveText('Keep my swiped draft');
+			// As on iOS, content at its top hands a downward drag to the sheet, even
+			// from a focused field, and dismissal keeps the draft.
+			await expect(editor).toHaveCSS('transform', 'none');
+			await title.focus();
+			await swipe(page, title);
+			await expect(editor).toHaveCount(0);
+			await card.tap();
+			await expect(title).toHaveText('Keep my swiped draft');
+			// WebKit scrolls the sheet's one-pixel containment layer when a field is
+			// focused; the drag must still reach the sheet.
+			await expect(editor).toHaveCSS('transform', 'none');
+			await swipe(page, editor.getByRole('textbox', { name: 'Reminder description', exact: true }));
+			await expect(editor).toHaveCount(0);
 			await card.tap();
 			await expect(title).toHaveText('Keep my swiped draft');
 

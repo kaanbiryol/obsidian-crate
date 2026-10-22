@@ -1,9 +1,13 @@
+import { suspendDocumentScroll } from './document-scroll';
+
 let lockCount = 0;
 let restoreDocument: (() => void) | undefined;
 
 /** Lock the page, without intercepting selection or scrolling inside the sheet. */
 export function lockSheetDocumentScroll(viewportPortal = false): () => void {
 	if (lockCount++ === 0) {
+		// A list screen returns its document offset first, so sheets recede it as usual.
+		const resume = suspendDocumentScroll();
 		const body = document.body;
 		const root = document.documentElement;
 		const viewport = window.visualViewport;
@@ -55,6 +59,7 @@ export function lockSheetDocumentScroll(viewportPortal = false): () => void {
 				else element.style.removeProperty(property);
 			}
 			window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
+			resume();
 		};
 	}
 	let released = false;

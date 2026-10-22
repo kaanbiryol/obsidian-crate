@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
+import { scrollPort } from '../../../../ui/shared/scroll-port';
 
 export interface ReminderScrollAnchor {
   id: string;
@@ -53,7 +54,7 @@ interface ViewportSnapshot {
 
 function captureAnchors(container: HTMLElement): MeasuredAnchor[] {
   const containerTop = layoutOffsetTop(container);
-  const scrollTop = container.scrollTop;
+  const scrollTop = scrollPort(container).scrollTop;
 
   return Array.from(container.querySelectorAll<HTMLElement>('[data-reminder-scroll-anchor]'))
     .map((element) => ({
@@ -75,14 +76,16 @@ function visibleAnchorsAt(snapshot: ViewportSnapshot, scrollTop: number): Remind
 }
 
 function attachStableScroll(container: HTMLElement, isSuspended: () => boolean) {
-  let snapshot: ViewportSnapshot = { anchors: [], scrollTop: container.scrollTop, viewportHeight: container.clientHeight };
-  let lastScrollTop = container.scrollTop;
+  // The PWA can hand this list's scrolling to the document while its screen is settled.
+  const port = () => scrollPort(container);
+  let snapshot: ViewportSnapshot = { anchors: [], scrollTop: port().scrollTop, viewportHeight: port().clientHeight };
+  let lastScrollTop = port().scrollTop;
   const captureCurrentViewport = () => {
-    snapshot = { anchors: captureAnchors(container), scrollTop: container.scrollTop, viewportHeight: container.clientHeight };
-    lastScrollTop = container.scrollTop;
+    snapshot = { anchors: captureAnchors(container), scrollTop: port().scrollTop, viewportHeight: port().clientHeight };
+    lastScrollTop = port().scrollTop;
   };
   const stabilize = () => {
-    const scrollTop = container.scrollTop;
+    const scrollTop = port().scrollTop;
     // The old anchor may have moved completely outside the viewport.
     const current = captureAnchors(container);
     const adjustment = calculateStableScrollAdjustment(
@@ -91,10 +94,10 @@ function attachStableScroll(container: HTMLElement, isSuspended: () => boolean) 
       isSuspended(),
     );
     if (adjustment !== null && Math.abs(adjustment) > 0.5) {
-      container.scrollTop += adjustment;
+      port().scrollTop += adjustment;
     }
-    snapshot = { anchors: current, scrollTop, viewportHeight: container.clientHeight };
-    lastScrollTop = container.scrollTop;
+    snapshot = { anchors: current, scrollTop, viewportHeight: port().clientHeight };
+    lastScrollTop = port().scrollTop;
   };
   stabilize();
 
@@ -137,10 +140,11 @@ function attachStableScroll(container: HTMLElement, isSuspended: () => boolean) 
     attributeFilter: ['data-reminder-scroll-anchor'],
   });
   const handleScroll = () => {
-    lastScrollTop = container.scrollTop;
+    lastScrollTop = port().scrollTop;
   };
   const visualViewport = window.visualViewport;
   container.addEventListener('scroll', handleScroll, { passive: true });
+  container.ownerDocument.addEventListener('scroll', handleScroll, { passive: true });
   container.addEventListener('pointerdown', captureCurrentViewport, true);
   window.addEventListener('resize', captureCurrentViewport);
   visualViewport?.addEventListener('resize', captureCurrentViewport);
@@ -152,6 +156,7 @@ function attachStableScroll(container: HTMLElement, isSuspended: () => boolean) 
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       mutationObserver.disconnect();
       container.removeEventListener('scroll', handleScroll);
+      container.ownerDocument.removeEventListener('scroll', handleScroll);
       container.removeEventListener('pointerdown', captureCurrentViewport, true);
       window.removeEventListener('resize', captureCurrentViewport);
       visualViewport?.removeEventListener('resize', captureCurrentViewport);

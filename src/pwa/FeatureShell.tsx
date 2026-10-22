@@ -10,6 +10,7 @@ import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { PwaThemeProvider } from './components/PwaThemeProvider';
 import { PwaThemeIcon } from './components/PwaThemeIcon';
 import { usePwaInputModality } from './hooks/usePwaInputModality';
+import { useDocumentScrollScreens } from './hooks/useDocumentScrollScreens';
 import { ReadingFeature } from './reading/ReadingFeature';
 import { createSettingsStore } from './settings/settings-store';
 import { SettingsContext, useSettingsStore } from './settings/settings-context';
@@ -31,6 +32,7 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		frontSection, leavingSection, visited, panelStyle, finishSettledSection,
 		switchSection, navigate, toggle, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab,
 	} = useFeatureNavigation(features);
+	useDocumentScrollScreens();
 	const paused = (feature: CrateSection) => <div className="crate-reading__empty pwa-feature-paused" role="status">
 		<h2>{feature === 'reading' ? 'Reading' : 'Reminders'} paused</h2>
 		<Button onClick={() => settings.openSync()}>Sync and settings</Button>

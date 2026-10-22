@@ -199,7 +199,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 						type: 'submit', disabled: !canSubmit, busy: saving, dataAction: 'save-reminder',
 					}}
 				/>
-				<div className="reminder-modal-body" data-base-ui-swipe-ignore="">
+				<div className="reminder-modal-body">
 					<ReminderEditorFields
 						content={draft.content}
 						onContentChange={(content) => onPatchDraft({ content })}

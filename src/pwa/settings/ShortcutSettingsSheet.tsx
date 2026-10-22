@@ -23,7 +23,7 @@ export function ShortcutSettingsSheet({ open, onClose, onCloseEnd, children }: {
 		variant="settings" sheetClassName="pwa-shortcut-sheet" label="Set up iPhone shortcut" recedeCanvas={false}>
 		<aside className="settings-sheet settings-sheet--unified outline-none" data-pwa-back={open} tabIndex={-1}>
 			<ModalHeader title="Set up iPhone shortcut" closeLabel="Close shortcut setup" onClose={close} closeDisabled={isClosing} />
-			<div className="settings-panel settings-shortcut-body" data-base-ui-swipe-ignore="">
+			<div className="settings-panel settings-shortcut-body">
 				<div className="crate-reading settings-subpage">{children}</div>
 			</div>
 		</aside>
