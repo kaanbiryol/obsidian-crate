@@ -31,7 +31,8 @@ export async function checkSettingsNavigation(page) {
 		await expect(shortcut).toHaveCSS('transform', 'none');
 		await expect(shortcut.locator('.settings-shortcut-body')).toBeVisible();
 		await expect(page.locator('.settings-page-stack')).toHaveAttribute('inert', '');
-		expect(await allowsNativeBack(shortcut.getByRole('heading', { name: 'Set up iPhone shortcut', exact: true }))).toBe(true);
+		// A modal sheet dismisses downward or with its close control, not by edge swipe.
+		expect(await allowsNativeBack(shortcut.getByRole('heading', { name: 'Set up iPhone shortcut', exact: true }))).toBe(false);
 		const currentLength = await page.evaluate(() => history.length);
 		if (length !== undefined) expect(currentLength).toBe(length);
 		length = currentLength;

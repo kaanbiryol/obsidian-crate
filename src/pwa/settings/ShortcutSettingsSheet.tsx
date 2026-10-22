@@ -21,7 +21,7 @@ export function ShortcutSettingsSheet({ open, onClose, onCloseEnd, children }: {
 	const close = () => { onClose(); requestClose(); };
 	return <PwaModalSheet isOpen={open && !isClosing} onClose={close} onCloseEnd={finishClose}
 		variant="settings" sheetClassName="pwa-shortcut-sheet" label="Set up iPhone shortcut" recedeCanvas={false}>
-		<aside className="settings-sheet settings-sheet--unified outline-none" data-pwa-back={open} tabIndex={-1}>
+		<aside className="settings-sheet settings-sheet--unified outline-none" tabIndex={-1}>
 			<ModalHeader title="Set up iPhone shortcut" closeLabel="Close shortcut setup" onClose={close} closeDisabled={isClosing} />
 			<div className="settings-panel settings-shortcut-body">
 				<div className="crate-reading settings-subpage">{children}</div>

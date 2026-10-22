@@ -716,7 +716,8 @@ unsynced reminder exports and recovery before clearing private device data.
 Its circular close control, downward swipe, Escape, and browser Back return to
 the retained Settings screen and scroll position. The nested sheet keeps the
 app canvas at the parent sheet's depth and shares the existing reduced-motion
-and keyboard behavior. Browser Forward can reopen setup.
+and keyboard behavior. Browser Forward can reopen setup. As a modal sheet it
+blocks the native left-edge Back swipe.
 The separate circular add action uses the existing editor/capture flow, including
 on Projects. Insets reserve the home indicator once. Loading shells use matching
 dock geometry.
