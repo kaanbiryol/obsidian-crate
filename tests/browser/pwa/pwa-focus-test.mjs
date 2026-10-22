@@ -110,11 +110,13 @@ for (const browserType of [chromium, webkit]) {
 				const titleRect = await title.boundingBox();
 				const descriptionRect = await description.boundingBox();
 				const points = [
-					{ x: 190, y: 200 }, // backdrop
-					{ x: titleRect.x + 20, y: titleRect.y + titleRect.height / 2 },
-					{ x: descriptionRect.x + 20, y: descriptionRect.y + descriptionRect.height / 2 },
+					{ x: 190, y: 200, directions: [-1, 1] }, // backdrop
+					// As on iOS, a downward drag from a field moves the sheet to dismiss
+					// it; pwa-drawer-swipe-test covers that. Upward drags stay put.
+					{ x: titleRect.x + 20, y: titleRect.y + titleRect.height / 2, directions: [-1] },
+					{ x: descriptionRect.x + 20, y: descriptionRect.y + descriptionRect.height / 2, directions: [-1] },
 				];
-				for (const point of points) for (const direction of [-1, 1]) {
+				for (const { directions, ...point } of points) for (const direction of directions) {
 					const beforeSwipe = await title.boundingBox();
 					await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
 					for (const distance of [15, 30, 45, 60]) {
