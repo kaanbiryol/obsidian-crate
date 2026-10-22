@@ -49,7 +49,6 @@ interface PwaRemindersAppShellProps {
 	belowHeaderContent?: (isProjectDetail: boolean) => React.ReactNode;
 	children?: React.ReactNode;
 	className?: string;
-	suppressFab?: boolean;
 	backgroundInert?: boolean;
 	incomplete?: boolean;
 	checkingReminders?: boolean;
@@ -81,7 +80,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	belowHeaderContent,
 	children,
 	className = '',
-	suppressFab = false,
 	backgroundInert = false,
 	incomplete = false,
 	checkingReminders = false,
@@ -234,7 +232,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 
 				<PwaDock section="reminders" items={TABS} activeTab={viewMode} onTabChange={handleViewModeChange}
 					inert={initializing || backgroundInert || projectOpen}
-					onAdd={initializing || !suppressFab ? handleAdd : undefined} />
+					onAdd={handleAdd} />
 
 				<div className="pwa-project-layer" data-project-open={projectOpen} data-pwa-back={canGoBack} inert={initializing}>
 					<AnimatePresence initial={false} custom={navigationMotion} onExitComplete={finishProjectClose}>
@@ -251,14 +249,13 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 									onBack={handleBackToProjects}
 									animationConfig={projectAnimationConfig}
 									renderCard={panelCardRenderer}
-									hasFab={!suppressFab}
 									onReorder={handleReorder}
 									onReorderDragActiveChange={onReorderDragActiveChange}
 									colorScheme={isDarkMode ? 'dark' : 'light'}
 									reorderInteraction="long-press"
 								/>
 							</div>
-							{(initializing || !suppressFab) && <div className="pwa-dock pwa-project-dock" inert={initializing || backgroundInert}><PwaDockAddButton section="reminders" onClick={handleAdd} className="pwa-project-fab" /></div>}
+							<div className="pwa-dock pwa-project-dock" inert={initializing || backgroundInert}><PwaDockAddButton section="reminders" onClick={handleAdd} className="pwa-project-fab" /></div>
 						</NavigationScreen>}
 					</AnimatePresence>
 				</div>

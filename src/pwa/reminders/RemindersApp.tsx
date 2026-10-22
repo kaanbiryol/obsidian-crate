@@ -36,7 +36,7 @@ export function RemindersApp() {
 		recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges,
 	} = mutations;
 	const { modal, saving, transition: modalTransition, closeModal, openReminder, openModal, editFailedChange, editReminder, saveReminder, deleteReminder } = editor;
-	const { readOnlyMessage, readOnly, canShowNotificationPrompt, statusText, statusKind } = status;
+	const { readOnlyMessage, canShowNotificationPrompt, statusText, statusKind } = status;
 	const {
 		colorScheme, isDarkMode, settingsOpen, toggleSettings, reorderDragging, setReorderDragging,
 		showToast, handlePullRefresh, initialContentReady, sharedReminders, resolvePageTitle,
@@ -142,7 +142,6 @@ export function RemindersApp() {
 						</PwaTopNotices>
 					</>
 				) : undefined}
-				suppressFab={readOnly || !mutationsReady}
 				backgroundInert={Boolean(modal) || settingsOpen}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
