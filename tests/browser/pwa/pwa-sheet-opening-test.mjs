@@ -4,6 +4,7 @@ import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
 import { checkEditorOpeningGeometry } from './pwa-editor-opening-geometry.mjs';
 import { checkPickerReturnTiming } from './pwa-picker-return-timing.mjs';
+import { keepOtherFeatureCold } from './pwa-cold-tab-checks.mjs';
 
 async function trackOpening(page, content, animated) {
 	await page.evaluate(({ content, animated }) => {
@@ -70,6 +71,8 @@ try {
 						serviceWorkers: 'block', reducedMotion,
 					});
 					try {
+						// Only the picker chunk may load once the list is ready.
+						await keepOtherFeatureCold(page);
 						await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
 						const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
 						await card.waitFor();

@@ -14,27 +14,17 @@ async function verify(browser) {
 	const page = await context.newPage();
 	const errors = []; page.on('pageerror', error => errors.push(error.message));
 	let writes = 0;
-	let failAssets = false;
-	await context.route('**/notifications/assets/*.js', route => failAssets ? route.abort() : route.continue());
 	await context.route('**/reminders/create', route => { writes++; return route.abort(); });
 	const recovery = () => page.getByRole('dialog', { name: 'Saved draft needs review', exact: true });
 	const open = () => page.locator('[data-action="open-create-modal"]').click();
 	const retained = () => page.evaluate(key => sessionStorage.getItem(key), key);
 	try {
 		await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
-		// Finish loading the reminder screen before failing the deferred recovery chunk.
 		await expect(page.locator('[data-action="open-create-modal"]')).toBeVisible();
 		await page.evaluate(({ key, bad }) => {
 			sessionStorage.setItem(key, bad);
 			sessionStorage.setItem('crate-reminder-draft:Private:new', 'Another folder stays private');
 		}, { key, bad });
-		failAssets = true;
-		await open();
-		await expect(page.getByRole('alert')).toContainText('Recovery controls could not be loaded');
-		expect(await retained()).toBe(bad);
-		await expect(page.getByRole('textbox', { name: 'Reminder title', exact: true })).toHaveCount(0);
-		failAssets = false;
-		await page.getByRole('button', { name: 'Reload app', exact: true }).click();
 		await open();
 		await expect(recovery()).toBeVisible();
 		await expect(page.getByRole('textbox', { name: 'Reminder title', exact: true })).toHaveCount(0);

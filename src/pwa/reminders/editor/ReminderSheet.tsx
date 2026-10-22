@@ -17,15 +17,13 @@ import { PwaModalSheet } from '../../components/PwaModalSheet';
 import { PwaDeleteConfirmation } from './PwaDeleteConfirmation';
 import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-editor/deleteConfirmation';
 import { useEditorSheetHeight } from './useEditorSheetHeight';
-import { DeferredNotice } from '../../components/DeferredNotice';
 import { PWA_SURFACE_SPRING, PWA_PICKER_EXIT, PWA_PICKER_RETURN } from '../../../ui/shared/navigation/motion';
 import { PwaSheetSurface } from '../../components/PwaSheetSurface';
 import { projectOptionsWithDefault } from '@/reminders/core/constants';
+import { ReminderDraftRecoverySheet } from './ReminderDraftRecoverySheet';
 const loadReminderPickerSheet = () => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet }));
 const ReminderPickerSheet = lazy(loadReminderPickerSheet);
-const ReminderDraftRecoverySheet = lazy(() => import('./ReminderDraftRecoverySheet')
-	.then(module => ({ default: module.ReminderDraftRecoverySheet })));
 
 type ReminderSheetProps = {
 	modal: ModalState;
@@ -42,10 +40,9 @@ type ReminderSheetProps = {
 
 export function ReminderSheet(props: ReminderSheetProps) {
 	const [inspection, setInspection] = useState(() => inspectReminderDraft(props.modal, props.folderPath));
-	if (inspection.recovery || inspection.unavailable) return <DeferredNotice>
-		<ReminderDraftRecoverySheet inspection={inspection} initial={props.modal} folderPath={props.folderPath} isClosing={props.isClosing}
-			onClose={props.onClose} onClosed={props.onClosed} onRetry={() => setInspection(inspectReminderDraft(props.modal, props.folderPath))} />
-	</DeferredNotice>;
+	if (inspection.recovery || inspection.unavailable) return <ReminderDraftRecoverySheet inspection={inspection} initial={props.modal}
+		folderPath={props.folderPath} isClosing={props.isClosing} onClose={props.onClose} onClosed={props.onClosed}
+		onRetry={() => setInspection(inspectReminderDraft(props.modal, props.folderPath))} />;
 	return <ReminderEditorSheet {...props} />;
 }
 

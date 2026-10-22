@@ -9,15 +9,31 @@ class FeatureLoadBoundary extends Component<{ children: ReactNode; fallback: Rea
 	render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
+type FeatureModule = { default: ComponentType };
+
+/** Share one chunk request between a background preload and the first mount. */
+export function featureLoader(importFeature: () => Promise<FeatureModule>) {
+	let pending: Promise<FeatureModule> | undefined;
+	let loaded: ComponentType | undefined;
+	return {
+		load: () => pending ??= importFeature().then(module => { loaded = module.default; return module; },
+			(error: unknown) => { pending = undefined; throw error; }),
+		loaded: () => loaded,
+	};
+}
+
+export type FeatureLoader = ReturnType<typeof featureLoader>;
+
 /** A missing screen chunk must not unmount sync, the other feature or settings. */
-export function LazyPwaFeature({ name, load, opening }: {
+export function LazyPwaFeature({ name, feature, opening }: {
 	name: 'Reading' | 'Reminders';
-	load: () => Promise<{ default: ComponentType }>;
+	feature: FeatureLoader;
 	opening: ReactNode;
 }) {
 	const [, setSettingsOpen] = useSettingsOpen();
-	const [attempt, setAttempt] = useState(() => ({ id: 0, View: lazy(load) }));
-	const retry = () => setAttempt(current => ({ id: current.id + 1, View: lazy(load) }));
+	// A preloaded feature mounts directly, without a loading frame.
+	const [attempt, setAttempt] = useState(() => ({ id: 0, View: feature.loaded() ?? lazy(feature.load) }));
+	const retry = () => setAttempt(current => ({ id: current.id + 1, View: lazy(feature.load) }));
 	const fallback = <main className="pwa-screen"><section className="crate-reading crate-reading-welcome">
 		<div className="pwa-feature-welcome-action"><FeatureSwitcherButton /></div>
 		<h1>{name} is unavailable</h1><p role="alert">{name} could not open. Reconnect and retry. Saved data is still on this device.</p>

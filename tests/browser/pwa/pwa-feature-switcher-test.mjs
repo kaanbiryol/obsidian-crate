@@ -1,4 +1,4 @@
-import { checkColdReadingTabs, checkColdReminderTabs, checkWarmTabDestinations } from './pwa-cold-tab-checks.mjs';
+import { checkColdReadingTabs, checkColdReminderTabs, checkPreloadedFeature, checkWarmTabDestinations, keepOtherFeatureCold } from './pwa-cold-tab-checks.mjs';
 import { switchFeature, featureNavigationTarget, installFeatureNavigation } from './pwa-feature-navigation.mjs';
 import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
@@ -27,6 +27,7 @@ try {
     try {
       await checkColdReadingTabs(browser, origin);
       await checkColdReminderTabs(browser, origin);
+      await checkPreloadedFeature(browser, origin);
       await checkWarmTabDestinations(browser, origin);
       for (const theme of ['light','dark']) {
         const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme:theme, reducedMotion:'reduce', hasTouch:true });
@@ -80,6 +81,7 @@ try {
       }
       const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, reducedMotion: 'no-preference', serviceWorkers: 'block' });
       try {
+        await keepOtherFeatureCold(context);
         const page = await context.newPage(); await installFeatureNavigation(page);
         await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
         await featureNavigationTarget(page).waitFor();

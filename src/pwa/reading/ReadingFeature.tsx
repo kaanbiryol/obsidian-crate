@@ -1,7 +1,7 @@
-import { LazyPwaFeature } from '../components/LazyPwaFeature';
+import { featureLoader, LazyPwaFeature } from '../components/LazyPwaFeature';
 import { ReadingOpening } from './ReadingOpening';
 
-const load = () => import('./App');
+export const readingFeature = featureLoader(() => import('./App'));
 export function ReadingFeature() {
-	return <LazyPwaFeature name="Reading" load={load} opening={<ReadingOpening />} />;
+	return <LazyPwaFeature name="Reading" feature={readingFeature} opening={<ReadingOpening />} />;
 }

@@ -1,6 +1,5 @@
 import { readingUpdateReadiness } from '../update/update-readiness';
-import { createContext, lazy, useContext, useEffect, useRef, type ReactNode } from 'react';
-import { DeferredNotice } from '../components/DeferredNotice';
+import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { SettingsRow } from '../settings/SettingsRow';
 import { useSyncFailureToast } from '../hooks/useSyncFailureToast';
 import { useSharedFeatures } from '../shared-features';
@@ -15,9 +14,7 @@ import { useReadingSync } from './useReadingSync';
 import { useReadingMutations } from './useReadingMutations';
 import { readingKeys } from './encryption-session';
 import { readingNeedsAttention, readingRetryAt } from './outbox';
-
-
-const ShortcutSetup = lazy(() => import('./ShortcutSetup').then(module => ({ default: module.ShortcutSetup })));
+import { ShortcutSetup } from './ShortcutSetup';
 
 function useReadingController() {
   const enabled = useSharedFeatures().reading;
@@ -60,7 +57,7 @@ function useReadingController() {
     onExport: pending.length || recovery ? exportReadingData : undefined,
     clearView: resetSession,
     onLogout: app.logOut,
-    shortcut: session ? <DeferredNotice><ShortcutSetup session={session} /></DeferredNotice> : null,
+    shortcut: session ? <ShortcutSetup session={session} /> : null,
     issues: <>
       {recovery && <SettingsRow title="Earlier changes need review" description="Changes from an earlier sign-in are still stored on this device." />}
       {pending.filter(op => op.error || op.review).map(op => <SettingsRow key={op.id} title={op.review ? 'Change needs review' : 'Couldn’t sync'} description={op.error || 'This change is still stored on this device.'} />)}

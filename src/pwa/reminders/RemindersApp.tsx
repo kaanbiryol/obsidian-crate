@@ -1,8 +1,7 @@
 import { PageTitleContext } from '@/reminders/ui/shared/lexical/pageTitles';
-import { lazy, useCallback, useContext } from 'react';
+import { useCallback, useContext } from 'react';
 import { useLaunchReminderModal } from './useLaunchReminderModal';
 import { usePrepareReminderEditor } from './editor/usePrepareReminderEditor';
-import { DeferredNotice } from '../components/DeferredNotice';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from '../components/PwaChrome';
 import {
@@ -13,12 +12,11 @@ import { useAppUpdate } from '../update/PwaUpdateProvider';
 import { ReminderCacheNotice } from './notices/ReminderCacheNotice';
 import { ReminderSourceNotice } from './notices/ReminderSourceNotice';
 import { ReminderRecoveryNotices } from './notices/ReminderRecoveryNotices';
+import { ReminderSyncNotice } from './notices/ReminderSyncNotice';
 import { WebReminderCard } from './WebReminderCard';
 
 // Keep the editor ready for the tap's synchronous focus/keyboard activation.
 import { ReminderSheet } from './editor/ReminderSheet';
-const ReminderSyncNotice = lazy(() => import('./notices/ReminderSyncNotice')
-	.then(module => ({ default: module.ReminderSyncNotice })));
 
 import { AppSyncIndicator } from '../sync/AppSyncIndicator';
 import { useRemindersRuntime } from './RemindersRuntime';
@@ -128,7 +126,7 @@ export function RemindersApp() {
 						>
 							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
 							<ReminderCacheNotice isOffline={isOffline} onRebuild={rebuildOfflineCache} />
-							{(changes.some(change => change.status !== 'pending') || storageError) && <DeferredNotice><ReminderSyncNotice
+							{(changes.some(change => change.status !== 'pending') || storageError) && <ReminderSyncNotice
 								changes={changes}
 								isOffline={isOffline}
 								storageError={storageError}
@@ -136,7 +134,7 @@ export function RemindersApp() {
 								onRetry={retryChange}
 								onEdit={editFailedChange}
 								onDiscard={discardChange}
-							/></DeferredNotice>}
+							/>}
 							<ReminderRecoveryNotices recoveryChanges={recoveryChanges} quarantinedChanges={quarantinedChanges} folderPath={config.folderPath}
 								onResume={recoverChanges} onRemove={removeQuarantinedChanges} />
 						</PwaTopNotices>

@@ -654,7 +654,9 @@ inside Reminders, so neither appears
 as a dock slot or expanded-menu choice. **Open app to** can open **Reminders — Today**
 or **Reminders — Upcoming** at launch. The dock contains one Reminders slot. Settings changes and resets immediately update the menu.
 The feature shell routes explicit tab requests across lazy feature mounts, while
-each feature owns its view, search, and list state. The same controls remain
+each feature owns its view, search, and list state. Once the open feature has
+loaded, `usePreloadFeature` loads the other one at idle so the first switch
+mounts it without a loading screen. The same controls remain
 available while reading, so returning to a reminder view takes one tap.
 The pill expands with a heavily damped spring, maintaining its height and velocity
 when opening is interrupted or reversed. Its corner radius follows the same

@@ -74,13 +74,15 @@ export const bundleBudgets = {
 		// 0.7.0 startup assets measure 397.1 KB gzip; retain less than 1 KB margin.
 		// Loading the encrypted Reading client on demand: 935.3 KB raw / 316.7 KB gzip.
 		// 2026-10 dependency updates measure 956.5 KB raw / 324.9 KB gzip; retain about 1% margin.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '965000', 10),
+		// Bundling shortcut setup and reminder recovery notices with the app removes their
+		// loading states: 967.7 KB raw / 326.1 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '972000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '328000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
-		// Reading and shortcut pairing stay deferred. Unified settings brings totals to
+		// Reading stays deferred; shortcut setup loads at startup. Unified settings brings totals to
 		// 1.208 MB raw / 404.6 KB gzip, including the shared control additions.
 		// Deferred Markdown source mapping and highlight review: about 1.37 MB / 470 KB.
 		// Expanded PWA article code highlighting: about 1.54 MB raw / 523 KB gzip.

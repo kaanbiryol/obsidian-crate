@@ -1,5 +1,37 @@
 import { expect } from '@playwright/test';
 
+/** Feature preloading runs at idle; disable it so the next switch stays cold. */
+export async function keepOtherFeatureCold(context) {
+  await context.addInitScript(() => { window.requestIdleCallback = () => 0; window.cancelIdleCallback = () => {}; });
+}
+
+/** Once the open feature is idle, the other one loads in the background and
+ * mounts on the first switch without a loading screen. */
+export async function checkPreloadedFeature(browser, origin) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: 'reduce', serviceWorkers: 'block' });
+  try {
+    await context.route('**/reading/session', route => route.fulfill({ json: { id: 'preloaded-reading', folderPath: 'Reading', generation: 'one', expiresAt: Date.now() + 86400000 } }));
+    await context.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(`${origin}/notifications?tab=inbox`);
+    await page.locator('.pwa-reminders-view:not([data-pwa-opening])').waitFor();
+    await page.waitForLoadState('networkidle');
+    // Any further chunk request would mean Reading was not preloaded.
+    await page.route('**/notifications/assets/*.js', route => route.abort());
+    await page.evaluate(() => {
+      window.__readingOpened = false;
+      new MutationObserver(() => { window.__readingOpened ||= !!document.querySelector('.pwa-reading-opening'); })
+        .observe(document.querySelector('[data-crate-section="reading"]'), { subtree: true, childList: true });
+    });
+    await page.locator('.crate-feature-panel[data-active="true"] .pwa-dock').getByRole('button', { name: 'Reading', exact: true }).click();
+    await page.locator('[data-crate-section="reading"] .crate-reading-workspace').waitFor();
+    expect(await page.evaluate(() => window.__readingOpened)).toBe(false);
+    expect(errors).toEqual([]);
+  } finally { await context.close(); }
+}
+
 /** Pinned Reading destinations must survive the lazy feature handoff without
  * painting the default library or starting a second tab dissolve. */
 export async function checkColdReadingTabs(browser, origin) {
@@ -8,6 +40,7 @@ export async function checkColdReadingTabs(browser, origin) {
       const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion, serviceWorkers: 'block' });
       const held = Promise.withResolvers();
       try {
+        await keepOtherFeatureCold(context);
         await context.addInitScript(tab => localStorage.setItem('crate-reminders-preferences', JSON.stringify({ dockTabs: ['inbox', 'today', 'browse', tab] })), tab);
         await context.route('**/reading/session', route => route.fulfill({ json: { id: 'cold-reading', folderPath: 'Reading', generation: 'one', expiresAt: Date.now() + 86400000 } }));
         await context.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
@@ -63,6 +96,7 @@ export async function checkColdReminderTabs(browser, origin) {
       let release;
       const held = new Promise(resolve => { release = resolve; });
       try {
+        await keepOtherFeatureCold(context);
         await context.addInitScript(() => localStorage.setItem('crate-reminders-preferences', JSON.stringify({ defaultScreen: 'reading' })));
         const page = await context.newPage();
         await page.goto(`${origin}/notifications`);
