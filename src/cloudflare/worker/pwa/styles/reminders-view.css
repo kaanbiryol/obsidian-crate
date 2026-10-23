@@ -49,11 +49,9 @@ html,body{background:var(--pwa-launch-bg);font-family:var(--font-interface);colo
 .pwa-status-line.is-live{background:rgba(255,255,255,.018)}
 .pwa-picker-option[data-press-active],.pwa-project-option[data-press-active],.pwa-repeat-frequency[data-press-active],.pwa-repeat-stepper__button[data-press-active],.pwa-repeat-day[data-press-active]{transform:scale(.97)}
 .pwa-inline-button svg{width:14px;height:14px;display:block}
-.pwa-notification-prompt{display:flex;align-items:center;gap:12px;padding:12px}
-.pwa-notification-prompt__icon{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border-radius:10px;background:rgba(var(--accent-rgb),.14);color:var(--accent)}
-.pwa-notification-prompt__copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.pwa-notification-prompt__copy strong{font-size:13px;font-weight:700;color:var(--text-normal);line-height:1.25}
-.pwa-notification-prompt__copy span{font-size:12px;color:var(--text-muted);line-height:1.35}
+.pwa-notification-prompt{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 6px 6px 12px;border:0;border-radius:8px}
+.pwa-notification-prompt__icon{flex-shrink:0;color:var(--text-faint)}
+.pwa-notification-prompt__copy{flex:1;min-width:0;font-size:13px;line-height:1.35;color:var(--text-muted)}
 .pwa-pull-refresh{position:relative;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:height .38s cubic-bezier(.22,1,.36,1),opacity .2s ease}
 .pwa-pull-refresh.is-visible{opacity:1}
 .pwa-pull-refresh.is-pulling{transition:none}
@@ -73,11 +71,8 @@ html,body{background:var(--pwa-launch-bg);font-family:var(--font-interface);colo
 @media (prefers-reduced-motion:reduce){:is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-icon{transition:none}:is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-button[data-press-active] .bottom-tab-icon{transform:none}}
 .pwa-reminders-view .reminders-fab{position:absolute;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}
 
-.pwa-notification-prompt .pwa-notification-prompt__enable{flex-shrink:0;min-width:64px;height:44px;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:rgba(var(--accent-rgb),.09);color:var(--accent);font-size:13px;font-weight:600;box-shadow:none;justify-content:center}
-@media (hover: hover) and (pointer: fine) {
-  .pwa-notification-prompt .pwa-notification-prompt__enable:hover {background:rgba(var(--accent-rgb),.15)}
-}
+.pwa-notification-prompt .pwa-notification-prompt__enable{position:relative;flex-shrink:0;height:28px;min-height:28px;padding:0 10px;font-size:13px;box-shadow:none;justify-content:center}
+.pwa-notification-prompt .pwa-notification-prompt__enable::after{content:"";position:absolute;inset:-8px -6px}
 .pwa-notification-prompt .pwa-notification-prompt__enable:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-@media(max-width:340px){.pwa-notification-prompt{flex-wrap:wrap}.pwa-notification-prompt__copy{flex-basis:calc(100% - 44px)}.pwa-notification-prompt .pwa-notification-prompt__enable{margin-left:44px}}
 
 @media(prefers-reduced-motion:reduce){.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:none}.pwa-pull-refresh{transition:none}.pwa-pull-refresh.is-refreshing .pwa-pull-refresh__glyph{animation:none}}

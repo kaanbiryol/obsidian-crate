@@ -14,3 +14,18 @@
 }
 // A modal makes the source screen inert; it must not retain pressed feedback.
 .crate-reminders-ui [inert] .crate-icon-button:not(:disabled)[data-press-active] { opacity: 1; }
+
+// Secondary text actions use a borderless filled surface. Rows, toggles and
+// floating reader controls keep their own treatment.
+.crate-reminders-ui .crate-action-button[data-variant="outline"]:not(.settings-action-row, .settings-navigation-row, .pwa-update-button, .crate-reading-reader__highlights-button, [aria-pressed]) {
+  border: 0 !important;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-normal) 7%, transparent);
+  color: var(--text-normal);
+  font-weight: 500;
+  &[data-tone="danger"] { background: color-mix(in srgb, var(--crate-danger) 14%, transparent); color: var(--crate-danger); }
+  &:not(:disabled) {
+    @media (hover: hover) and (pointer: fine) { &:hover { background: color-mix(in srgb, var(--text-normal) 11%, transparent); } }
+    &[data-press-active] { background: color-mix(in srgb, var(--text-normal) 14%, transparent); }
+  }
+}
