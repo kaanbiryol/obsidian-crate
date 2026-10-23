@@ -1,6 +1,7 @@
 import {
   Archive,
   ArchiveRestore,
+  ArrowUp,
   ArrowUpRight,
   Play,
   Pin,
@@ -55,6 +56,7 @@ const ICONS: Record<string, LucideIcon> = {
   'archive-restore': ArchiveRestore,
   'arrow-up-right': ArrowUpRight,
   'play': Play,
+  'arrow-up': ArrowUp,
   pin: Pin,
   'pin-off': PinOff,
   'file-text': FileText,

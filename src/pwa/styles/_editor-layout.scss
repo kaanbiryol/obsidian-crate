@@ -39,8 +39,7 @@
 
     .reminder-modal-header {
       flex-shrink: 0;
-      --pwa-header-side-width: 116px;
-      border-bottom-color: color-mix(in srgb, var(--crate-divider) 55%, transparent);
+      --pwa-header-side-width: 80px;
     }
 
     .reminder-modal-header-side.is-right {

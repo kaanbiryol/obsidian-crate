@@ -2,10 +2,14 @@
 
 @mixin styles {
   :is(.pwa-modal-sheet, .pwa-reading-root .crate-reading-dialog, .reading-gallery .crate-reading-dialog) .reminder-modal-header {
-    --crate-icon-button-size: 44px;
+    // Compact 36px controls like iOS sheet toolbars; the ::after below keeps 44px touch targets.
+    --crate-icon-button-size: 36px;
+    --reminder-modal-header-control-size: 36px;
     flex-shrink: 0;
     min-height: 56px;
-    padding: var(--pwa-sheet-header-top-padding, 6px) 12px 6px;
+    padding: var(--pwa-sheet-header-top-padding, 6px) 16px 8px;
+    // iOS sheets show no hairline under the header at rest.
+    border-bottom: 0;
     column-gap: 8px;
     // Matching side tracks center the title on the sheet, regardless of actions.
     grid-template-columns:
@@ -18,11 +22,19 @@
     }
 
     // Keep secondary delete icons quiet beside the title and primary action.
+    // Text actions like Done stay plain text, as in iOS sheet toolbars.
     .reminder-modal-header-side > button {
-      &:not(.reminder-header-delete) {
+      &:not(.reminder-header-delete):not(.reminder-modal-header-action) {
         @include rounded-sheet-control.surface;
       }
-      min-height: 44px;
+      position: relative;
+      min-height: 36px;
+
+      &::after {
+        content: "";
+        position: absolute;
+        inset: -4px;
+      }
 
       &:not(:disabled)[data-press-active] { opacity: .5; }
     }
@@ -34,8 +46,8 @@
     }
 
     .reminder-modal-header-close {
-      --crate-icon-button-control-size: 44px;
-      min-height: 44px;
+      --crate-icon-button-control-size: 36px;
+      min-height: 36px;
       padding: 0;
       color: var(--text-muted);
 
@@ -54,8 +66,32 @@
 
     .reminder-modal-header-action {
       min-width: 64px;
-      min-height: 44px;
+      min-height: 36px;
       padding-inline: 12px;
+    }
+
+    // Submit actions read as a send control: a soft tonal circle with an up arrow.
+    .reminder-modal-header-side > .reminder-modal-header-action.is-icon {
+      width: 36px;
+      min-width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 0 !important;
+      border-radius: 999px;
+      color: var(--text-faint);
+
+      // Outrank the rounded surface hover rules shared by header buttons.
+      &, &:hover:not(:focus-visible) {
+        background: color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
+      }
+
+      &.is-enabled {
+        color: var(--text-normal);
+
+        &, &:hover:not(:focus-visible) {
+          background: color-mix(in srgb, var(--text-normal) 20%, transparent) !important;
+        }
+      }
     }
 
     .reminder-modal-header-title {

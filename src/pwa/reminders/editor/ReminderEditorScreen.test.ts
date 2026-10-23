@@ -63,7 +63,7 @@ describe('PWA shared editor integration', () => {
 			expect(field).toContain('aria-readonly="true"');
 		}
 		expect(button(markup, 'save-reminder')).toContain('aria-label="Save reminder"');
-		expect(markup).toContain('>Save</span>');
+		expect(markup).toContain('data-icon="arrow-up"');
 		expect(markup).not.toContain('Saving');
 	});
 

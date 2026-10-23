@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 
 import { Button } from './Button';
 import { IconButton } from './IconButton';
+import { ThemeIcon } from './ThemeIcon';
 import { usePreserveFieldFocus } from './usePreserveFieldFocus';
 
 interface ModalHeaderAction {
@@ -14,6 +15,8 @@ interface ModalHeaderAction {
     busy?: boolean;
     tone?: 'accent' | 'danger';
     dataAction?: string;
+    /** Shows this icon in place of the label; the label stays the accessible name. */
+    icon?: string;
 }
 
 interface ModalHeaderProps {
@@ -81,9 +84,12 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
                         preventFocusOnPress={preventFocusOnPress}
                         disabled={action.disabled}
                         aria-label={action.ariaLabel ?? action.label}
-                        className={`reminder-modal-header-action${action.disabled ? '' : ' is-enabled'}`}
+                        title={action.icon ? action.label : undefined}
+                        className={`reminder-modal-header-action${action.icon ? ' is-icon' : ''}${action.disabled ? '' : ' is-enabled'}`}
                     >
-                        <span className="reminder-modal-header-action-label">{action.label}</span>
+                        {action.icon
+                            ? <ThemeIcon id={action.icon} size="m" aria-hidden="true" />
+                            : <span className="reminder-modal-header-action-label">{action.label}</span>}
                     </Button>
                 )}
             </div>

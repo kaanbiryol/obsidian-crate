@@ -196,7 +196,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 					action={{
 						label: isEditing ? 'Save' : 'Add',
 						ariaLabel: isEditing ? 'Save reminder' : 'Add reminder',
-						type: 'submit', disabled: !canSubmit, busy: saving, dataAction: 'save-reminder',
+						type: 'submit', disabled: !canSubmit, busy: saving, dataAction: 'save-reminder', icon: 'arrow-up',
 					}}
 				/>
 				<div className="reminder-modal-body">
