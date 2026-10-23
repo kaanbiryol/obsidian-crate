@@ -86,6 +86,9 @@ async function checkIos27(browser, colorScheme, belowStatusBar = false) {
 	await expect(page.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible();
 	const backdrop = await page.locator('.pwa-modal-sheet__backdrop').boundingBox();
 	assert.ok(backdrop.y === 0 && backdrop.height === height, 'sheet covers the full installed viewport');
+	// The receded screen must peek out between the strip and the settled sheet.
+	await expect.poll(async () => Math.round((await page.locator('.pwa-modal-sheet__container--settings').boundingBox()).y))
+		.toBe((belowStatusBar ? 12 : 62) + 10);
 	const sheetLayer = Number(await page.locator('.pwa-modal-sheet').first().evaluate(el => getComputedStyle(el).zIndex));
 	assert.ok(Number(await strip.evaluate(el => getComputedStyle(el).zIndex)) > sheetLayer, 'strip stays above the sheet backdrop');
 	// iOS paints the status bar from the strip, so the strip matches the backdrop.

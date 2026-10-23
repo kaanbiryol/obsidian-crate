@@ -21,6 +21,9 @@ html[data-pwa-ios27-standalone="true"] {
 	/* Keep content clear of the strip. Use only the remaining inset reported for
 	   content, not the maximum from translucent/full-screen mode. */
 	--pwa-safe-area-top:max(env(safe-area-inset-top),12px);
+	/* Sheets start below the strip too, so the receded screen and covered
+	   sheets still peek out above them. */
+	--pwa-sheet-top-inset:var(--pwa-safe-area-top);
 }
 /* The app may start below the status bar or, for older installs, under it. In
    the latter mode, fixed insets and percentages can use the shortened layout

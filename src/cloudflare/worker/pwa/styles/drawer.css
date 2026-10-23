@@ -23,7 +23,7 @@
 .pwa-modal-sheet__content{display:flex;flex-direction:column}
 .pwa-modal-sheet__scroller{flex:1}
 .pwa-sheet-surface{position:relative;display:flex;flex-direction:column;box-sizing:border-box;min-height:0;flex-shrink:0;background:var(--pwa-sheet-surface);overflow:clip}
-.pwa-modal-sheet--settings .pwa-sheet-surface{max-height:var(--pwa-settings-height,calc(var(--pwa-sheet-layout-height,100dvh) - env(safe-area-inset-top) - 28px))}
+.pwa-modal-sheet--settings .pwa-sheet-surface{max-height:var(--pwa-settings-height,calc(var(--pwa-sheet-layout-height,100dvh) - var(--pwa-sheet-top-inset,env(safe-area-inset-top)) - 28px))}
 .pwa-modal-sheet--settings .pwa-sheet-surface>.settings-sheet{flex:1 1 auto;min-height:0;max-height:none}
 /* Only each form's content panel scrolls. Hidden overflow still lets WebKit
    pan outer wrappers when focusing a field, lifting the entire sheet. */

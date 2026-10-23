@@ -3,7 +3,7 @@
 
 .pwa-settings-root, .pwa-reading-full-height {
 	.pwa-modal-sheet__container--settings {
-		--pwa-settings-height: min(760px, calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 28px));
+		--pwa-settings-height: min(760px, calc(var(--pwa-sheet-layout-height, 100dvh) - var(--pwa-sheet-top-inset, env(safe-area-inset-top)) - 28px));
 		max-height: var(--pwa-settings-height) !important;
 	}
 
@@ -16,7 +16,7 @@
 	// Use the locked layout height so keyboard space is subtracted only once.
 	@media (max-width: 759px) {
 		.pwa-modal-sheet__container--settings {
-			--pwa-settings-height: calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 10px);
+			--pwa-settings-height: calc(var(--pwa-sheet-layout-height, 100dvh) - var(--pwa-sheet-top-inset, env(safe-area-inset-top)) - 10px);
 			width: 100% !important;
 		}
 	}
@@ -91,7 +91,6 @@
 	// Flat page: a full-bleed divider separates the account action from the last section.
 	.settings-account { margin-inline: calc(-1 * var(--crate-space-4)); padding: var(--crate-space-8) var(--crate-space-20) 0; border-top: 1px solid var(--crate-divider); }
 	.settings-account .settings-action-row { justify-content: space-between; }
-	.settings-inline-action { --crate-action-text: var(--crate-accent-text); padding-inline: 8px; }
 	.settings-navigation-row svg { color: var(--text-faint); }
 	.settings-row__copy { gap: var(--crate-space-4); }
 	.settings-row__copy > strong { @include list-item.title; }
