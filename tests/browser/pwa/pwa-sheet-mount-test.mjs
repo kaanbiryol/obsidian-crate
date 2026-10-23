@@ -19,6 +19,8 @@ const { outputFiles } = await build({
 					onCloseEnd={() => {}} variant="reminder" label="Edit reminder" dismissible={dismissible}>
 					<h2 id="title">Edit reminder</h2>
 					<button id="close" onClick={() => setOpen(false)}>Close</button>
+					<input id="text-field" />
+					<input id="date-field" type="date" />
 				</PwaModalSheet>}
 			</div>;
 		}
@@ -36,6 +38,13 @@ for (const browserType of [chromium, webkit]) {
 		for (let opening = 0; opening < 2; opening++) {
 			await expect(page.locator('.pwa-shadow-root .pwa-modal-sheet #title')).toHaveCount(1);
 			await expect(page.locator('#title')).toHaveCSS('font-size', '17px');
+			// Touch focuses text fields early, but native date pickers must open from their own tap.
+			const touchDown = id => page.locator(`#${id}`).dispatchEvent('pointerdown', { pointerType: 'touch', button: 0, bubbles: true });
+			const focusedId = () => page.evaluate(() => document.activeElement?.id);
+			await touchDown('date-field');
+			assert.notEqual(await focusedId(), 'date-field');
+			await touchDown('text-field');
+			assert.equal(await focusedId(), 'text-field');
 			assert.equal(await page.locator('body > .pwa-modal-sheet').count(), 0);
 			await page.evaluate(() => window.setSheetDismissible(false));
 			await expect(page.getByRole('dialog')).toHaveAttribute('data-base-ui-swipe-ignore', '');

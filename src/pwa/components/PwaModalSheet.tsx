@@ -135,7 +135,8 @@ export function PwaModalSheet({
 									data-base-ui-swipe-ignore={!dismissible ? '' : undefined}
 									onPointerDown={(event) => {
 										if (event.pointerType !== 'touch' || event.button !== 0 || !(event.target instanceof Element)) return;
-										const field = event.target.closest<HTMLElement>('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, [contenteditable="true"]');
+										// Native picker inputs open on focus in WebKit; an early focus lets the tap close them again.
+										const field = event.target.closest<HTMLElement>('input:not([type="checkbox"], [type="radio"], [type="range"], [type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]), textarea, [contenteditable="true"]');
 										if (field && field !== field.ownerDocument.activeElement) field.focus({ preventScroll: true });
 									}}
 									initialFocus={variant === 'reminder' ? false : () => popupRef.current?.querySelector<HTMLElement>('[data-initial-focus]:not(:disabled)') ?? popupRef.current}
