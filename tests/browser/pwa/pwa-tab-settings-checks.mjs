@@ -21,6 +21,8 @@ export async function checkTabSettings(page, name) {
 	const to = await sheet.getByRole('button', { name: 'Reorder Favorites', exact: true }).boundingBox();
 	await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
 	await page.mouse.down();
+	// A hold lifts the row before it follows the pointer.
+	await expect(sheet.locator('.settings-tab-row[data-settings-tab="archive"]')).toHaveAttribute('data-lifted', 'true');
 	for (let step = 1; step <= 12; step++) {
 		await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 + (to.y - from.y - 8) * step / 12);
 		await page.evaluate(() => new Promise(requestAnimationFrame));
@@ -35,7 +37,15 @@ export async function checkTabSettings(page, name) {
 			const start = await sheet.getByRole('button', { name: 'Reorder Reminders', exact: true }).boundingBox();
 			const end = await sheet.getByRole('button', { name: 'Reorder Archive', exact: true }).boundingBox();
 			const point = { x: start.x + start.width / 2, y: start.y + start.height / 2 };
+			// Moving before the hold activates leaves the order alone.
 			await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+			for (let step = 1; step <= 4; step++) await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...point, y: point.y + (end.y - start.y) * step / 4 }] });
+			await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+			await page.waitForTimeout(500);
+			await expect(sheet.locator('.settings-tab-row[data-lifted]')).toHaveCount(0);
+			await expect.poll(savedTabs).toEqual(['archive', 'favorites', 'highlights', 'today']);
+			await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+			await expect(sheet.locator('.settings-tab-row[data-settings-tab="today"]')).toHaveAttribute('data-lifted', 'true');
 			for (let step = 1; step <= 12; step++) {
 				await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...point, y: point.y + (end.y - start.y - 8) * step / 12 }] });
 				await page.evaluate(() => new Promise(requestAnimationFrame));

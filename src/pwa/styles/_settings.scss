@@ -190,8 +190,10 @@
 	.settings-tab-row { position: relative; display: flex; align-items: center; min-height: 48px; gap: 12px; }
 	.settings-tab-row > svg { color: var(--text-muted); flex-shrink: 0; }
 	.settings-tab-row button { min-width: 44px; min-height: 44px; padding: 0; color: var(--text-muted); }
-	.settings-tab-row .settings-tab-handle { color: var(--text-faint); touch-action: none; cursor: grab; }
+	.settings-tab-row .settings-tab-handle { color: var(--text-faint); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 	.settings-tab-row .settings-tab-handle[data-press-active] { cursor: grabbing; }
+	.settings-tab-row[data-lifted] { z-index: 1; background: var(--background-primary); border-radius: var(--crate-radius-card); box-shadow: 0 6px 20px rgb(0 0 0 / 0.16); }
+	.settings-tab-row[data-lifted] .settings-tab-handle { color: var(--text-muted); cursor: grabbing; }
 	.settings-tab-choice { position: relative; display: flex; flex: 1; min-width: 0; align-items: center; }
 	// Give the native picker an opaque snapshot surface when it opens on iOS.
 	.settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: var(--background-primary); color: var(--text-normal); font: inherit; font-size: 16px; font-weight: var(--reminder-font-weight-medium); box-shadow: none; }

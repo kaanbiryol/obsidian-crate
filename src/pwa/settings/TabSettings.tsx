@@ -1,5 +1,5 @@
 import { PWA_CONTROL_SPRING } from '../../ui/shared/navigation/motion';
-import { useId } from 'react';
+import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
 import { ChevronsUpDown, GripVertical } from 'lucide-react';
 import { Reorder, useDragControls, useReducedMotion } from 'motion/react';
 import { DEFAULT_DOCK_TABS, DOCK_TABS, type DockTab } from './dock-preferences';
@@ -10,14 +10,39 @@ import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';
 import { UpcomingRangeSetting } from './UpcomingRangeSetting';
 
+const HOLD_DELAY_MS = 380;
+const HOLD_MOVE_TOLERANCE = 9;
+
 function TabRow({ tab, tabs, onChange, description }: {
 	tab: DockTab; tabs: DockTab[]; onChange: (tabs: DockTab[]) => void; description: string;
 }) {
 	const controls = useDragControls();
 	const reducedMotion = useReducedMotion();
 	const item = DOCK_TABS.find(item => item.id === tab)!;
+	const hold = useRef<{ timer: number; x: number; y: number } | null>(null);
+	const [lifted, setLifted] = useState(false);
+	const cancelHold = () => {
+		if (hold.current) window.clearTimeout(hold.current.timer);
+		hold.current = null;
+	};
+	useEffect(() => cancelHold, []);
+	// Holding the handle lifts the row before it follows the pointer, so a stray touch never reorders.
+	const startHold = (event: PointerEvent<HTMLButtonElement>) => {
+		if (!event.isPrimary || event.button !== 0) return;
+		cancelHold();
+		hold.current = { x: event.clientX, y: event.clientY, timer: window.setTimeout(() => {
+			hold.current = null;
+			setLifted(true);
+			controls.start(event);
+		}, HOLD_DELAY_MS) };
+	};
+	const moveHold = (event: PointerEvent<HTMLButtonElement>) => {
+		const start = hold.current;
+		if (start && (Math.abs(event.clientX - start.x) > HOLD_MOVE_TOLERANCE || Math.abs(event.clientY - start.y) > HOLD_MOVE_TOLERANCE)) cancelHold();
+	};
+	const endHold = () => { cancelHold(); setLifted(false); };
 	return <Reorder.Item value={tab} dragListener={false} dragControls={controls} layout="position" transition={reducedMotion ? { duration: 0 } : PWA_CONTROL_SPRING}
-		className="settings-tab-row" data-settings-tab={tab}>
+		onDragEnd={endHold} className="settings-tab-row" data-settings-tab={tab} data-lifted={lifted || undefined}>
 		<ThemeIcon id={item.iconName} size="m" aria-hidden="true" />
 		<span className="settings-tab-choice">
 			<select aria-label={`Tab ${tabs.indexOf(tab) + 1}`} aria-describedby={description} value={tab}
@@ -27,7 +52,8 @@ function TabRow({ tab, tabs, onChange, description }: {
 			<ChevronsUpDown size={14} aria-hidden="true" />
 		</span>
 		<Button variant="ghost" className="settings-tab-handle" aria-label={`Reorder ${item.label}`} aria-describedby={description}
-			onPointerDown={event => controls.start(event)} onKeyDown={event => {
+			onPointerDown={startHold} onPointerMove={moveHold} onPointerUp={endHold} onPointerCancel={endHold}
+			onContextMenu={event => event.preventDefault()} onKeyDown={event => {
 				if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
 				event.preventDefault();
 				const index = tabs.indexOf(tab), nextIndex = index + (event.key === 'ArrowUp' ? -1 : 1);
@@ -68,6 +94,6 @@ export function TabSettings({ preferences, upcomingDays, onChange }: {
 		<Reorder.Group axis="y" values={tabs} onReorder={changeTabs} className="settings-tab-list" aria-label="Your tabs">
 			{tabs.map(tab => <TabRow key={tab} tab={tab} tabs={tabs} onChange={changeTabs} description={description} />)}
 		</Reorder.Group>
-		<p id={description} className="settings-help settings-tabs-help">Select a tab to replace it. Drag to reorder.<span className="pwa-dock__sr"> You can also reorder with the Up and Down arrow keys.</span></p>
+		<p id={description} className="settings-help settings-tabs-help">Select a tab to replace it. Hold the handle and drag to reorder.<span className="pwa-dock__sr"> You can also reorder with the Up and Down arrow keys.</span></p>
 	</SettingsSection>;
 }
