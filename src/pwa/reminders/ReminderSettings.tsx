@@ -20,7 +20,7 @@ export function ReminderSettings({ model, homeScreenPlatform }: {
 					: push?.phase === 'checking' ? <span className="settings-status" role="status">Checking…</span>
 					: push?.phase === 'blocked' ? <span className="settings-status">Blocked</span>
 					: homeScreenPlatform === 'ios' || push?.phase === 'install' ? <span className="settings-status">Install first</span>
-					: push?.phase === 'off' || push?.phase === 'error' ? <Button size="touch" variant="ghost" className="settings-inline-action" data-action="enable-push" onClick={model.onEnablePush}>{push.phase === 'error' ? 'Retry' : 'Enable'}</Button>
+					: push?.phase === 'off' || push?.phase === 'error' ? <Button className="pwa-raised-button" data-action="enable-push" onClick={model.onEnablePush}>{push.phase === 'error' ? 'Retry' : 'Enable'}</Button>
 					: <span className="settings-status">Not supported</span>}
 			</SettingsRow>
 		</>}

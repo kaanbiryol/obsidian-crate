@@ -82,7 +82,7 @@ export function PwaTopNotices({
 				<div className="pwa-notification-prompt">
 					<Bell className="pwa-notification-prompt__icon" size={14} aria-hidden="true" />
 					<span className="pwa-notification-prompt__copy">Get alerts when reminders are due</span>
-					<Button className="pwa-inline-button pwa-notification-prompt__enable" type="button" onClick={onEnableNotifications}>
+					<Button className="pwa-inline-button pwa-raised-button pwa-notification-prompt__enable" type="button" onClick={onEnableNotifications}>
 						Enable
 					</Button>
 				</div>

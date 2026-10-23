@@ -38,6 +38,9 @@
 	--pwa-light-surface-hover:rgba(24,24,27,.065);
 	--pwa-light-border:var(--background-modifier-border);
 	--pwa-light-border-strong:var(--background-modifier-border-hover);
+	--pwa-raised-button-bg:#ffffff;
+	--pwa-raised-button-hover-bg:#f4f4f5;
+	--pwa-raised-button-shadow:0 1px 2px rgba(24,24,27,.06);
 	--pwa-light-accent-text:var(--interactive-accent);
 	--pwa-light-danger-text:var(--text-error);
 	--pwa-light-warning-text:var(--text-warning);

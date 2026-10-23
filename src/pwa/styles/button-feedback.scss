@@ -29,3 +29,20 @@
     &[data-press-active] { background: color-mix(in srgb, var(--text-normal) 14%, transparent); }
   }
 }
+
+// Raised secondary: a compact surface with a hairline and a slight lift for
+// small inline opt-ins. The pseudo-element keeps a 44px touch target.
+.crate-reminders-ui .crate-action-button.pwa-raised-button[data-variant="outline"] {
+  position: relative;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
+  background: var(--pwa-raised-button-bg, color-mix(in srgb, var(--text-normal) 6%, transparent));
+  box-shadow: var(--pwa-raised-button-shadow, 0 1px 1px rgba(0, 0, 0, .12));
+  &::after { content: ""; position: absolute; inset: -8px -6px; }
+  &:not(:disabled) {
+    @media (hover: hover) and (pointer: fine) { &:hover { background: var(--pwa-raised-button-hover-bg, color-mix(in srgb, var(--text-normal) 9%, transparent)); } }
+    &[data-press-active] { background: color-mix(in srgb, var(--text-normal) 12%, transparent); }
+  }
+}
