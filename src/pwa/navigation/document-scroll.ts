@@ -43,6 +43,10 @@ function promote(element: HTMLElement, boundary: HTMLElement, onLayoutChange: ()
 
 	// Measure everything before changing layout.
 	const ownerBounds = element.getBoundingClientRect();
+	// Installed iOS apps are 100vh tall, which includes the status bar inset that
+	// the document scrolls against (innerHeight) excludes. Fit the screen to the
+	// scrolling viewport, or a short list scrolls by that inset and stays there.
+	const viewport = window.innerHeight;
 	const background = opaqueBackground(element);
 	const inner: HTMLElement[] = [];
 	for (let current = element.parentElement; current; current = current.parentElement) {
@@ -126,12 +130,17 @@ function promote(element: HTMLElement, boundary: HTMLElement, onLayoutChange: ()
 	}
 	for (const target of covered) set(target, 'visibility', 'hidden');
 	for (const target of outer) set(target, 'overflow', 'visible');
+	for (const target of [root, ...outer]) {
+		if (target.getBoundingClientRect().height <= viewport) continue;
+		set(target, 'height', `${viewport}px`);
+		set(target, 'min-height', '0');
+	}
 	// Bounces past either end reveal the document canvas; match the screen.
 	set(root, 'background-color', background);
 	set(element, 'overflow', 'visible');
 	set(element, 'height', 'auto');
 	set(element, 'flex', 'none');
-	set(element, 'min-height', `${ownerBounds.height}px`);
+	set(element, 'min-height', `${Math.min(ownerBounds.height, viewport - ownerBounds.top)}px`);
 	set(element, '--pwa-document-scroll-cover', `${ownerBounds.top}px`);
 	set(element, '--pwa-document-scroll-bg', background);
 	// Scrolling into view must stop below the header, as it did inside the list.

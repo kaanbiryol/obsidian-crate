@@ -348,7 +348,10 @@ Dock morphs use the shared collapsed height.
   pinned where it is drawn with inline fixed offsets, so iOS bounces never move
   it. Screens covered by a pushed layer are hidden, a fixed cover hides rows under
   the header area, and any chrome resize hands the scroll back for a fresh
-  measurement. The handoff waits until no touch, scroll, screen
+  measurement. Installed iOS apps are taller than the layout viewport the
+  document scrolls against (see `ios27.css`), so the handoff fits the screen to
+  `innerHeight`; otherwise a short list scrolls by the status bar inset and stays
+  under its header. The handoff waits until no touch, scroll, screen
   transition or focused field is active. Tab, feature and project transitions,
   sheets and the reader return the offset to the embedded scroller first, so
   they animate exactly as before. Scroll consumers read the active owner

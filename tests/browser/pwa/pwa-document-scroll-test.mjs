@@ -21,10 +21,15 @@ const reminders = Array.from({ length: 60 }, (_, index) => ({
   id: `document-scroll-${index}`, content: `Document scroll reminder ${index}`, project: index % 2 ? 'Inbox' : 'Work',
   priority: 4, completed: false, dueDate: '2026-09-26', filePath: 'Reminders/Inbox.md', revision: 'document-scroll-1', lineNumber: index + 1,
 }));
+// A project short enough to fit on screen.
+const errands = ['Pick up coffee beans', 'Print photos'].map((content, index) => ({
+  id: `document-scroll-errand-${index}`, content, project: 'Errands', priority: 4, completed: false, dueDate: '2026-12-01',
+  filePath: 'Reminders/Errands.md', revision: 'document-scroll-1', lineNumber: index + 1,
+}));
 
 const browser = await webkit.launch();
 
-async function openApp(userAgent, path) {
+async function openApp(userAgent, path, { statusBarInset = 0 } = {}) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent,
     serviceWorkers: 'block', timezoneId: 'UTC', reducedMotion: 'reduce',
@@ -40,12 +45,19 @@ async function openApp(userAgent, path) {
     item: articles.find(item => item.crate_reading_id === new URL(route.request().url()).searchParams.get('id')),
     markdown: 'A long article for document scrolling. '.repeat(600),
   } }));
-  await context.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox', 'Work'] } }));
+  await context.route('**/reminders/list?*', route => route.fulfill({ json: statusBarInset
+    ? { reminders: [...reminders, ...errands], projects: ['Inbox', 'Work', 'Errands'] }
+    : { reminders, projects: ['Inbox', 'Work'] } }));
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.clock.setFixedTime(new Date('2026-09-26T12:00:00Z'));
   await page.goto(`${origin}${path}`);
+  // Installed iOS apps recover the status bar inset that the shortened layout
+  // viewport, and so innerHeight, excludes (ios27.css). Simulate that inset
+  // before the list settles and hands its scrolling to the document.
+  const app = 'html[data-pwa-ios27-standalone="true"]';
+  if (statusBarInset) await page.addStyleTag({ content: `${app}, ${app} body, ${app} #app { height: calc(100vh + ${statusBarInset}px); }` });
   return { context, page, errors };
 }
 
@@ -169,6 +181,25 @@ try {
   assert.equal(await notice.evaluate(element => element.getBoundingClientRect().top), noticeTop, 'the notice stays in place');
   assert.deepEqual(offline.errors, []);
   await offline.context.close();
+  // The status bar inset must not let a short list scroll and stay under its
+  // header, while a long list still reaches its last row.
+  const inset = await openApp(IPHONE, '/notifications?folder=Reminders&tab=browse', { statusBarInset: 60 });
+  await expectOwner(inset.page, 'is-tab-aware');
+  const range = () => inset.page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+  assert.equal(await range(), 0, 'a short list cannot scroll');
+  await inset.page.locator('.premium-project-card').filter({ hasText: 'Errands' }).first().tap();
+  await expect.poll(() => inset.page.evaluate(() => Boolean(document.querySelector('.pwa-project-layer [data-document-scroll="true"]')))).toBe(true);
+  assert.equal(await range(), 0, 'a short project cannot scroll');
+  assert.deepEqual(inset.errors, []);
+  await inset.context.close();
+  const long = await openApp(IPHONE, '/notifications?folder=Reminders&tab=today', { statusBarInset: 60 });
+  await expect(long.page.locator('.reminder-render-item')).toHaveCount(reminders.length);
+  await expectOwner(long.page, 'reminders-view-scroll');
+  assert.ok(await long.page.evaluate(() => document.documentElement.scrollHeight - innerHeight) > 0, 'a long list still scrolls');
+  await long.page.evaluate(() => scrollTo({ top: 100000, behavior: 'instant' }));
+  await expect(long.page.locator('.reminder-render-item').last()).toBeInViewport();
+  assert.deepEqual(long.errors, []);
+  await long.context.close();
   console.log('PWA document scroll checks passed.');
 } finally {
   await browser.close();
