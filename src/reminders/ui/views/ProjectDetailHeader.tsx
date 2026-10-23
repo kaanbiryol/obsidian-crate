@@ -34,11 +34,7 @@ export const ProjectDetailHeader = memo(function ProjectDetailHeader({
         <div className="project-detail-header-bottom">
           <div className="project-detail-stats-text">
             <span className="project-detail-stat">
-              {header.activeCount} active
-            </span>
-            <span className="project-detail-stat-dot">&middot;</span>
-            <span className="project-detail-stat">
-              {header.completedCount} of {header.total} done
+              {header.completedCount} of {header.total}
             </span>
             {metaContent}
           </div>

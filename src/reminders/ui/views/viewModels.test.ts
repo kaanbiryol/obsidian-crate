@@ -153,13 +153,11 @@ describe("reminder view models", () => {
 
     expect(typeof header.accentColor).toBe("string");
     expect({
-      activeCount: header.activeCount,
       completedCount: header.completedCount,
       total: header.total,
       completionPercentage: header.completionPercentage,
       isComplete: header.isComplete,
     }).toEqual({
-      activeCount: 0,
       completedCount: 2,
       total: 2,
       completionPercentage: 100,

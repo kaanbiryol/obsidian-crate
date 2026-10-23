@@ -18,7 +18,6 @@ export interface BrowseProjectCardViewModel {
 }
 
 export interface ProjectDetailHeaderViewModel {
-  activeCount: number;
   completedCount: number;
   total: number;
   completionPercentage: number;
@@ -155,7 +154,6 @@ export function buildProjectDetailHeaderViewModel(
   detail: ReturnType<typeof buildProjectDetailViewModel>,
 ): ProjectDetailHeaderViewModel {
   return {
-    activeCount: detail.active.length,
     completedCount: detail.completed.length,
     total: detail.total,
     completionPercentage: detail.completionPercentage,

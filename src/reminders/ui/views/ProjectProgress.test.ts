@@ -18,7 +18,6 @@ describe('project progress', () => {
 		const detailMarkup = renderToStaticMarkup(React.createElement(ProjectDetailHeader, {
 			project: 'Work',
 			header: {
-				activeCount: 1,
 				completedCount: 1,
 				total: 2,
 				completionPercentage: 50,
