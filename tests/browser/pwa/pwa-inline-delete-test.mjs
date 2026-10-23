@@ -63,7 +63,11 @@ for (const type of [chromium, webkit]) {
        fits: text.width <= title.width + 1,
        centered: Math.abs(title.x + title.width / 2 - innerWidth / 2) < 1,
        separated: text.right <= button.left && text.left >= closeBounds.right,
-       touchTargets: [button, closeBounds].every(rect => rect.width >= 44 && rect.height >= 44),
+       // Header controls draw at 40px; an ::after inset extends the touch target to 44px.
+       touchTargets: [[action, button], [close, closeBounds]].every(([control, rect]) => {
+        const outset = -parseFloat(getComputedStyle(control, '::after').top) || 0;
+        return rect.width + 2 * outset >= 44 && rect.height + 2 * outset >= 44;
+       }),
        dangerColor: getComputedStyle(action).color === dangerColor,
       };
      })).toEqual({ lines: 1, fits: true, centered: true, separated: true, touchTargets: true, dangerColor: true });

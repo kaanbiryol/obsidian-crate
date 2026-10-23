@@ -2,9 +2,9 @@
 
 @mixin styles {
   :is(.pwa-modal-sheet, .pwa-reading-root .crate-reading-dialog, .reading-gallery .crate-reading-dialog) .reminder-modal-header {
-    // Compact 36px controls like iOS sheet toolbars; the ::after below keeps 44px touch targets.
-    --crate-icon-button-size: 36px;
-    --reminder-modal-header-control-size: 36px;
+    // 40px controls like iOS sheet toolbars; the ::after below keeps 44px touch targets.
+    --crate-icon-button-size: 40px;
+    --reminder-modal-header-control-size: 40px;
     flex-shrink: 0;
     min-height: 56px;
     padding: var(--pwa-sheet-header-top-padding, 6px) 16px 8px;
@@ -22,18 +22,18 @@
     }
 
     // Keep secondary delete icons quiet beside the title and primary action.
-    // Text actions like Done stay plain text, as in iOS sheet toolbars.
+    // Text actions like Done stay plain text, as in iOS sheet toolbars; destructive ones keep the pill.
     .reminder-modal-header-side > button {
-      &:not(.reminder-header-delete):not(.reminder-modal-header-action) {
+      &:not(.reminder-header-delete):not(.reminder-modal-header-action:not([data-tone="danger"])) {
         @include rounded-sheet-control.surface;
       }
       position: relative;
-      min-height: 36px;
+      min-height: 40px;
 
       &::after {
         content: "";
         position: absolute;
-        inset: -4px;
+        inset: -2px;
       }
 
       &:not(:disabled)[data-press-active] { opacity: .5; }
@@ -46,8 +46,8 @@
     }
 
     .reminder-modal-header-close {
-      --crate-icon-button-control-size: 36px;
-      min-height: 36px;
+      --crate-icon-button-control-size: 40px;
+      min-height: 40px;
       padding: 0;
       color: var(--text-muted);
 
@@ -66,15 +66,15 @@
 
     .reminder-modal-header-action {
       min-width: 64px;
-      min-height: 36px;
+      min-height: 40px;
       padding-inline: 12px;
     }
 
     // Submit actions read as a send control: a soft tonal circle with an up arrow.
     .reminder-modal-header-side > .reminder-modal-header-action.is-icon {
-      width: 36px;
-      min-width: 36px;
-      height: 36px;
+      width: 40px;
+      min-width: 40px;
+      height: 40px;
       padding: 0;
       border: 0 !important;
       border-radius: 999px;
