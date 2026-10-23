@@ -1,4 +1,4 @@
-import { checkColdReadingTabs, checkColdReminderTabs, checkPreloadedFeature, checkWarmTabDestinations, keepOtherFeatureCold } from './pwa-cold-tab-checks.mjs';
+import { checkWarmTabDestinations } from './pwa-cold-tab-checks.mjs';
 import { switchFeature, featureNavigationTarget, installFeatureNavigation } from './pwa-feature-navigation.mjs';
 import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
@@ -25,9 +25,6 @@ try {
   for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
     const browser = await engine.launch({headless:true});
     try {
-      await checkColdReadingTabs(browser, origin);
-      await checkColdReminderTabs(browser, origin);
-      await checkPreloadedFeature(browser, origin);
       await checkWarmTabDestinations(browser, origin);
       for (const theme of ['light','dark']) {
         const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme:theme, reducedMotion:'reduce', hasTouch:true });
@@ -81,7 +78,6 @@ try {
       }
       const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, reducedMotion: 'no-preference', serviceWorkers: 'block' });
       try {
-        await keepOtherFeatureCold(context);
         const page = await context.newPage(); await installFeatureNavigation(page);
         await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
         await featureNavigationTarget(page).waitFor();
@@ -117,10 +113,7 @@ try {
           assert.ok(dissolve.duration <= 320 && dissolve.interactive && dissolve.covered);
           await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
         }
-        // A lazy feature must show an opaque loading surface under the dissolve.
-        let releaseReading;
-        const heldReading = new Promise(resolve => { releaseReading = resolve; });
-        await page.route('**/notifications/assets/*', async route => { await heldReading; await route.continue(); });
+        // The first switch to a feature must stay opaque under the dissolve.
         const sampleSwitch = async destination => page.evaluate(async destination => {
           const panels = [...document.querySelectorAll('.crate-feature-panel')];
           const outgoing = panels.find(el => el.dataset.active === 'true');
@@ -135,12 +128,9 @@ try {
           }
           return samples;
         }, destination);
-        try {
-          const frames = await sampleSwitch('Reading');
-          assert.ok(frames.some(frame => frame.outgoing > 0 && frame.outgoing < 1), JSON.stringify(frames));
-          assert.ok(frames.every(frame => frame.coverage === 1 && frame.stationary && frame.inert));
-          await expect(page.getByRole('status', { name: 'Loading Reading' })).toBeVisible();
-        } finally { releaseReading(); }
+        const frames = await sampleSwitch('Reading');
+        assert.ok(frames.some(frame => frame.outgoing > 0 && frame.outgoing < 1), JSON.stringify(frames));
+        assert.ok(frames.every(frame => frame.coverage === 1 && frame.stationary && frame.inert));
         await page.getByRole('heading', { name: 'Connect your Reading folder', exact: true }).waitFor();
         await settled('reading');
         await expect(featureNavigationTarget(page)).toBeFocused();

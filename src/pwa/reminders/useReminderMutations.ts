@@ -7,6 +7,7 @@ import type { PendingReminderChange } from './outbox/reminder-outbox-types';
 import { useReminderOutbox } from './useReminderOutbox';
 import type { ApiFetch, ShowToast, StoredConfig } from '../types';
 import type { LoadReminders, ModalState, ReminderRecord } from './types';
+import { createSaveReminderChange } from './outbox/save-reminder-command';
 
 export function useReminderMutations(options: {
 	enabled?: boolean;
@@ -54,7 +55,6 @@ export function useReminderMutations(options: {
 		preparingRef.current = true;
 		const finishPreparation = beginPreparation();
 		try {
-			const { createSaveReminderChange } = await import('./outbox/save-reminder-command');
 			if (!sessionCurrent()) return false;
 			const previous = getSnapshot().reminders.find(item => item.id === modal.reminderId);
 			const change = await createSaveReminderChange(modal, config, projects, selectedProject, previous);

@@ -2,6 +2,8 @@ import { reportExpiredConnection } from './expiration';
 import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
 import { hasEncryptedSessionEvidence, parseScopedEncryptionState, type ScopedEncryptionState } from '../encryption/encryption-scope';
 import type { StoredReminderKeys } from '../encryption/encryption-keys';
+import { readReminderKeys, followEncryptionScope } from '../encryption/encryption-keys';
+import { rememberRecoveryKey } from '../encryption/web-app-unlock';
 
 export class EncryptionVerificationUnavailableError extends Error {}
 
@@ -35,8 +37,7 @@ export async function loadEncryptionState({ token, purpose, fragment, request, c
 
 /** Shared key import and scope checks; features retain their own local-data hydration. */
 export async function loadScopeKeys(expected: ScopedEncryptionState, localFolder: string, current: () => boolean, code?: string): Promise<StoredReminderKeys> {
-  const { readReminderKeys, followEncryptionScope } = await import('../encryption/encryption-keys');
-  if (code) await (await import('../encryption/web-app-unlock')).rememberRecoveryKey(code, expected, localFolder, current);
+  if (code) await rememberRecoveryKey(code, expected, localFolder, current);
   const saved = await readReminderKeys(expected.vaultId, expected.scope.id);
   if (!saved) throw new EncryptionKeyRequiredError(expected.vaultId);
   const keys = await followEncryptionScope(saved, expected, localFolder, current);

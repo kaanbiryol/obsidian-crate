@@ -1,13 +1,14 @@
 import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders } from './encryption-session';
-import type { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingIndex, writeReadingAttempt } from './storage';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../session-generation';
 import { READING_SESSION_KEY, assertReadingSession, commitReadingCache, readingSession, type ReadingSession, type ReadingCache } from './storage';
 import { ReadingApiError } from './api-error';
+import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
+import { captureBrowserArticle } from './capture-article';
 export { ReadingApiError } from './api-error';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './record-validation';
 import { EncryptionScopeChangedError, routeFolderPath } from '../encryption/encryption-folder-routing';
@@ -64,10 +65,8 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
     if (keys && /^\/reading\/(list|item|capture|update|retry)(?:\?|$)/.test(path)) {
       const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.scopeId, keys.generation]);
       const indexIdentity = JSON.stringify([keys.vaultId, keys.scopeId, keys.generation, keys.folderPath]);
-      // Only encrypted vaults need this client; keep it out of the startup bundle.
-      const { EncryptedReadingApi } = await import('@/pwa/reading/encrypted-api');
       if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
-        captureArticle: async url => (await import('./capture-article')).captureBrowserArticle(url),
+        captureArticle: captureBrowserArticle,
         folderPath: keys.folderPath, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data },
         request: (route, wire) => rawReadingRequest(route, session, wire),
         readAttempt: id => readReadingAttempt(session, id),

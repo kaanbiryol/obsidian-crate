@@ -58,8 +58,9 @@ export const bundleBudgets = {
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
 		// Includes React DOM, shared controls and encryption bootstrap: 355 KB raw / 112 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '360000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '113000', 10),
+		// Loading every feature at startup measures 2.192 MB raw / 695.7 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '2250000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '720000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
@@ -76,13 +77,15 @@ export const bundleBudgets = {
 		// 2026-10 dependency updates measure 956.5 KB raw / 324.9 KB gzip; retain about 1% margin.
 		// Bundling shortcut setup and reminder recovery notices with the app removes their
 		// loading states: 967.7 KB raw / 326.1 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '972000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '328000', 10),
+		// Loading every feature at startup, including encryption and article extraction,
+		// makes startup equal to all assets: 2.912 MB raw / 936.1 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '3000000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '990000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
-		// Reading stays deferred; shortcut setup loads at startup. Unified settings brings totals to
+		// Every asset now loads at startup. Unified settings brings totals to
 		// 1.208 MB raw / 404.6 KB gzip, including the shared control additions.
 		// Deferred Markdown source mapping and highlight review: about 1.37 MB / 470 KB.
 		// Expanded PWA article code highlighting: about 1.54 MB raw / 523 KB gzip.

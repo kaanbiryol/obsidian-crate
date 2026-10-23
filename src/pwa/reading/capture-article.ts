@@ -2,6 +2,8 @@ import { extractionUrl } from '@/reading/extraction/url';
 import type { CapturedArticle } from '@/reading/extraction/types';
 import { youtubeVideoId } from '@/reading/core/youtube';
 import { youtubeMetadata, youtubeMetadataUrl, YOUTUBE_METADATA_MAX_BYTES } from '@/reading/extraction/youtube';
+import { withYoutubeTranscript } from '@/reading/extraction/youtube-transcript';
+import { extractDocument } from '@/reading/extraction/document';
 /** Direct, credential-free download. CORS failures leave an encrypted bookmark
  * for an unlocked Obsidian device; URLs never go through the Crate server. */
 export async function captureBrowserArticle(source: string): Promise<CapturedArticle> {
@@ -16,10 +18,8 @@ export async function captureBrowserArticle(source: string): Promise<CapturedArt
   const bytes = new Uint8Array(length); let at = 0; for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.length; }
   if (videoId) {
     const article = youtubeMetadata(new TextDecoder().decode(bytes));
-    const { withYoutubeTranscript } = await import('@/reading/extraction/youtube-transcript');
     const captured = await withYoutubeTranscript(article, videoId, request => fetch(request));
     return { ...captured, ...(!captured.markdown ? { deferTranscript: true as const } : {}) };
   }
-  const { extractDocument } = await import('@/reading/extraction/document');
   return extractDocument(new TextDecoder().decode(bytes), response.url || source);
 }

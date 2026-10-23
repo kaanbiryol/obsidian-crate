@@ -308,7 +308,7 @@ asset hashing and server revision checks; cache policy and browser message forma
 remain owned by the runtime.
 
 The PWA mounts one `PwaSyncProvider` under the application shell. It owns the
-Reading and Reminders runtimes independently of their lazy screens, so pending work
+Reading and Reminders runtimes independently of their screens, so pending work
 resumes without visiting either section. Feature adapters retain their existing
 queues, storage formats, API endpoints and confirmation rules. Pausing a feature
 stops new sends and refreshes while retaining its local hydration, recovery state
@@ -530,7 +530,7 @@ icon renderer lives in `src/ui/obsidian-icon/`. Reminder import paths re-export
 these implementations for existing feature consumers.
 
 `src/pwa/main.tsx` mounts the feature shell. `reminders/RemindersRuntime.tsx` composes
-reminder data, session, outbox, and editor hooks independently of the lazy screen.
+reminder data, session, outbox, and editor hooks independently of the screen.
 Its screen-facing contract groups connection, sync, mutations, editor, status and
 presentation models. The always-mounted provider retains hydration, recovery and
 update-readiness registration when the reminders screen is hidden.

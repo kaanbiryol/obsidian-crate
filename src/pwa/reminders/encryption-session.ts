@@ -7,6 +7,8 @@ import { capturePwaSession } from '../session-generation';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
 import type { ApiFetch } from '../types';
 import { takeFragmentValues } from '../encryption/encryption-fragments';
+import { unlockLocalState } from '../encryption/encryption-keys';
+import { rememberRecoveryKey } from '../encryption/web-app-unlock';
 
 type ScopeState = ScopedEncryptionState;
 type EncryptionView = { status: 'checking' | 'unencrypted' } | { status: 'ready'; folderPath: string }
@@ -53,7 +55,6 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 		if (view.status !== 'ready') requirePrivateStorageUnlock();
 		assertEncryptionActive(expected);
 		const localFolder = loadStoredConfig().folderPath;
-		const { unlockLocalState } = await import('../encryption/encryption-keys');
 		const keys = await loadScopeKeys(expected, localFolder, current, fragmentCode);
 		fragmentCode = undefined;
 		const local = await unlockLocalState(keys);
@@ -77,7 +78,6 @@ export async function unlockRemindersWithCode(code: string): Promise<void> {
 	if (!token || !state) throw new Error('Open a fresh enrollment link from Crate first');
 	const expected = state;
 	const current = () => sessionCurrent() && state === expected;
-	const { rememberRecoveryKey } = await import('../encryption/web-app-unlock');
 	await rememberRecoveryKey(code, expected, loadStoredConfig().folderPath, current);
 	if (!current()) throw new Error('Session changed before unlocking');
 	// Reload into the same durable outbox and drafts after keys are committed.

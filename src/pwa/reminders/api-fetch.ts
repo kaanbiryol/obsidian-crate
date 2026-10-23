@@ -5,12 +5,12 @@ import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '@/protocol/http-headers';
 import { detectWebSessionName } from '../session-label';
 import { prepareReminderEncryption } from './encryption-session';
-import type { EncryptedReminderApi } from './encrypted-reminder-api';
 import type { StoredReminderKeys } from '../encryption/encryption-keys';
 import { EncryptionScopeChangedError, routeFolderRequest } from '../encryption/encryption-folder-routing';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
 import { requireCompatibleProtocol } from '../server-compatibility';
+import { EncryptedReminderApi } from './encrypted-reminder-api';
 
 export function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {
 	const sessionCurrent = capturePwaSession();
@@ -65,11 +65,10 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		// Unencrypted vaults skip the probe while responses confirm it stays off.
 		if (!refresh && encryptionOff && !keys) return Promise.resolve();
 		if (refresh) preparing = undefined;
-		return preparing ??= prepareReminderEncryption(authToken, rawFetch, refresh).then(async value => {
-			const Constructor = value ? (await import('./encrypted-reminder-api')).EncryptedReminderApi : null;
+		return preparing ??= prepareReminderEncryption(authToken, rawFetch, refresh).then(value => {
 			if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed before unlocking');
 			keys = value;
-			encrypted = keys && Constructor ? new Constructor(keys, rawFetch) : null;
+			encrypted = keys ? new EncryptedReminderApi(keys, rawFetch) : null;
 		}).finally(() => { if (!keys) preparing = undefined; });
 	}
 	async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {

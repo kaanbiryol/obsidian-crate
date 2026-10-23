@@ -653,10 +653,10 @@ and the new fourth destination is excluded. Today and Upcoming are date views
 inside Reminders, so neither appears
 as a dock slot or expanded-menu choice. **Open app to** can open **Reminders — Today**
 or **Reminders — Upcoming** at launch. The dock contains one Reminders slot. Settings changes and resets immediately update the menu.
-The feature shell routes explicit tab requests across lazy feature mounts, while
-each feature owns its view, search, and list state. Once the open feature has
-loaded, `usePreloadFeature` loads the other one at idle so the first switch
-mounts it without a loading screen. The same controls remain
+The feature shell routes explicit tab requests across feature mounts, while
+each feature owns its view, search, and list state. All PWA code, including
+encryption and article extraction, loads at startup, so no screen shows a
+loading state. The same controls remain
 available while reading, so returning to a reminder view takes one tap.
 The pill expands with a heavily damped spring, maintaining its height and velocity
 when opening is interrupted or reversed. Its corner radius follows the same
@@ -843,7 +843,7 @@ marked unless it still matches the saved text at the saved offsets.
 ### Article code examples
 
 The shared reader enables `highlightReadingCode` for both the plugin and PWA.
-Syntax grammars stay in the PWA’s deferred Reading bundle and are bundled into
+Syntax grammars load with the PWA’s startup bundle and are bundled into
 the plugin. Code
 uses language labels where available and bounded detection for short unlabelled
 blocks. Unsupported languages and oversized examples remain plain text. Highlighted

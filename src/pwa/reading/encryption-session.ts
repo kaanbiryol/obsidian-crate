@@ -11,6 +11,7 @@ import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from './
 import { assertReadingSession, type ReadingSession } from './session';
 import { readingDatabase } from './database';
 import { isSessionReadingKey } from '@/pwa/reading/storage-keys';
+import { rememberRecoveryKey } from '../encryption/web-app-unlock';
 
 type ReadingEncryptionState = ScopedEncryptionState;
 let pending: { identity: string; promise: Promise<StoredReminderKeys | null> } | undefined;
@@ -82,7 +83,6 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 export async function unlockReadingWithCode(code: string, session: ReadingSession): Promise<void> {
   if (!expected) throw new Error('Verify the Reading connection first.');
   const state = expected;
-  const { rememberRecoveryKey } = await import('../encryption/web-app-unlock');
   await rememberRecoveryKey(code, state, session.folderPath, () => { try { assertReadingSession(session); return expected === state; } catch { return false; } });
   location.reload();
 }

@@ -1,11 +1,11 @@
 import { pendingReadingCapture, forgetReadingCapture } from '../encryption/encryption-fragments';
 import { readingUrl } from '@/reading/core/model';
+import { receiveReadingShare } from '@/pwa/shell/share-target';
 
 /** Preserve a Shortcut's private URL before any enrollment can reset in-memory keys. */
 export async function preserveIncomingShare(current: () => boolean): Promise<void> {
   const incoming = pendingReadingCapture();
   if (!incoming) return;
-  const { receiveReadingShare } = await import('@/pwa/shell/share-target');
   if (!current()) return;
   const saved = await receiveReadingShare(new Request(location.origin + '/notifications/share/reading', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

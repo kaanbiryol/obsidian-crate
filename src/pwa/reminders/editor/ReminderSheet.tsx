@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { useKeyboardHeight } from '@/pwa/hooks/useKeyboardHeight';
 import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-editor/pickerCopy';
@@ -21,9 +21,7 @@ import { PWA_SURFACE_SPRING, PWA_PICKER_EXIT, PWA_PICKER_RETURN } from '../../..
 import { PwaSheetSurface } from '../../components/PwaSheetSurface';
 import { projectOptionsWithDefault } from '@/reminders/core/constants';
 import { ReminderDraftRecoverySheet } from './ReminderDraftRecoverySheet';
-const loadReminderPickerSheet = () => import('./ReminderPickerSheet')
-	.then(module => ({ default: module.ReminderPickerSheet }));
-const ReminderPickerSheet = lazy(loadReminderPickerSheet);
+import { ReminderPickerSheet } from './ReminderPickerSheet';
 
 type ReminderSheetProps = {
 	modal: ModalState;
@@ -62,21 +60,6 @@ function ReminderEditorSheet({
 	const { modal, patchDraft, discardDraft } = usePersistedReminderDraft(initialModal, folderPath);
 	const [pickerReady, setPickerReady] = useState(false);
 	const handlePickerReady = useCallback(() => setPickerReady(true), []);
-	const [preloadedPicker, setPreloadedPicker] = useState<typeof import('./ReminderPickerSheet').ReminderPickerSheet | null>(null);
-	const [entranceComplete, setEntranceComplete] = useState(false);
-	const handleOpenEnd = useCallback(() => setEntranceComplete(true), []);
-	const PickerSheet = preloadedPicker ?? ReminderPickerSheet;
-	useEffect(() => {
-		if (!entranceComplete || isClosing) return;
-		// Keep picker module evaluation out of the entrance animation. An earlier
-		// chip tap still loads it on demand through Suspense. Render the resolved
-		// component directly to avoid a fallback delay on subsequent chip taps.
-		let active = true;
-		void loadReminderPickerSheet().then(module => {
-			if (active) setPreloadedPicker(() => module.default);
-		}).catch(() => undefined);
-		return () => { active = false; };
-	}, [entranceComplete, isClosing]);
 	const editorScreenRef = useRef<ReminderEditorScreenHandle | null>(null);
 	const onClose = () => {
 		editorScreenRef.current?.dismissKeyboard();
@@ -164,7 +147,6 @@ function ReminderEditorSheet({
 				return false;
 			}}
 			onCloseEnd={handleCloseEnd}
-			onOpenEnd={handleOpenEnd}
 			variant="reminder"
 			recedeCanvas={false}
 			label={activeScreen === 'editor' ? modal.mode === 'edit' ? 'Edit reminder' : 'New reminder'
@@ -229,7 +211,7 @@ function ReminderEditorSheet({
 				)}
 				{activeScreen !== 'editor' && activeScreen !== 'delete' && (
 					<div className="pwa-reminder-sheet-screen pwa-reminder-sheet-screen--picker is-active">
-						<Suspense fallback={null}><PickerSheet
+						<ReminderPickerSheet
 							isDark={colorScheme === 'dark'}
 							draft={modal.draft}
 							projectOptions={projectOptions}
@@ -237,7 +219,7 @@ function ReminderEditorSheet({
 							onSelect={returnToEditor}
 							onClose={() => returnToEditor()}
 							onReady={handlePickerReady}
-						/></Suspense>
+						/>
 					</div>
 				)}
 			</PwaSheetSurface>

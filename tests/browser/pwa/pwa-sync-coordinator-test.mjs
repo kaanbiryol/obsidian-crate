@@ -148,22 +148,6 @@ try {
 				expect(errors).toEqual([]); await context.close();
 			}
 			{
-				const { page, context } = await setup(browser, { pendingReading: true });
-				const chunk = Object.entries(assets.PWA_CLIENT_ASSETS).find(([, source]) => source.includes('app-shell pwa-reminders-view'))?.[0];
-				expect(chunk).toBeTruthy();
-				await page.route(`**/notifications/assets/${chunk}*`, route => route.abort());
-				await page.route('**/reading/capture', route => route.fulfill({ json: {} }));
-				await page.goto(origin + '/notifications?tab=inbox');
-				await expect(page.getByRole('heading', { name: 'Reminders is unavailable' })).toBeVisible();
-				await expect.poll(async () => (await pendingReading(page)).length).toBe(0);
-				await page.getByRole('button', { name: 'Open settings', exact: true }).click();
-				await expect(page.getByRole('button', { name: 'Refresh all', exact: true })).toBeEnabled();
-				await page.getByRole('button', { name: 'Close settings', exact: true }).click();
-				await page.getByRole('button', { name: 'Switch to Reading', exact: true }).click();
-				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'synced');
-				await context.close();
-			}
-			{
 				const { page, context, errors } = await setup(browser);
 				let release; const cleanup = new Promise(resolve => { release = resolve; });
 				await page.route('**/auth/session', async route => { await cleanup; await route.fulfill({ status: 503, json: { error: 'Unavailable' } }); });
@@ -178,7 +162,7 @@ try {
 				await expect(page.locator('.toast')).toContainText('Remote session cleanup could not finish');
 				expect(errors).toEqual([]); await context.close();
 			}
-			console.log(`${engine.name()}: cross-feature delivery, shared status, failure isolation, paused queues, resume, missing screen chunks and logout feedback passed`);
+			console.log(`${engine.name()}: cross-feature delivery, shared status, failure isolation, paused queues, resume and logout feedback passed`);
 		} finally { await browser.close(); }
 	}
 } finally { await new Promise(resolve => server.close(resolve)); }
