@@ -24,7 +24,7 @@ interface ReminderCardWrapperProps {
   onUpdate?: () => void;
   index?: number;
   hideProject?: boolean;
-  colorScheme?: ProjectColorScheme;
+  colorScheme: ProjectColorScheme;
 }
 
 /**
@@ -38,7 +38,7 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
   onUpdate,
   index,
   hideProject = false,
-  colorScheme = 'dark',
+  colorScheme,
 }: ReminderCardWrapperProps) {
   const plugin = PluginContext.use();
   const listStyle = useRemindersSettingsStore(state => state.listStyle);

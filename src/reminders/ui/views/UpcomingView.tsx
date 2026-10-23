@@ -29,7 +29,7 @@ export interface UpcomingViewProps {
   hasFab?: boolean;
   /** Custom class name for the container */
   className?: string;
-  colorScheme?: ProjectColorScheme;
+  colorScheme: ProjectColorScheme;
 }
 
 /**
@@ -43,7 +43,7 @@ export const UpcomingView = memo(function UpcomingView({
   renderCard,
   hasFab = true,
   className = '',
-  colorScheme = 'dark',
+  colorScheme,
 }: UpcomingViewProps) {
   const reduceMotion = useReducedMotion();
   const clock = useReminderClock(reminders);

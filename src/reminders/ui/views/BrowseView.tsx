@@ -19,7 +19,7 @@ export interface BrowseViewProps {
   showHeader?: boolean;
   /** Custom class name for the container */
   className?: string;
-  colorScheme?: ProjectColorScheme;
+  colorScheme: ProjectColorScheme;
 }
 
 /**
@@ -34,7 +34,7 @@ export const BrowseView = memo(function BrowseView({
   headerContent,
   showHeader = false,
   className = '',
-  colorScheme = 'dark',
+  colorScheme,
 }: BrowseViewProps) {
   const reduceMotion = useReducedMotion();
   const animationsEnabled = animationConfig.enabled && !reduceMotion;

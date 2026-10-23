@@ -3,10 +3,12 @@ import { ReminderCard as SharedReminderCard } from '@/reminders/ui/shared/Remind
 import { useReminderCardInteractions } from '@/reminders/ui/shared/useReminderCardInteractions';
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
 import type { ListStyle } from '@/ui/shared/list-style';
+import type { ProjectColorScheme } from '@/reminders/ui/format/projectColors';
 
 export const WebReminderCard = memo(function WebReminderCard({
 	reminder,
 	listStyle,
+	colorScheme,
 	index,
 	hideProject,
 	onEdit,
@@ -14,6 +16,7 @@ export const WebReminderCard = memo(function WebReminderCard({
 }: {
 	reminder: SharedReminder;
 	listStyle?: ListStyle;
+	colorScheme: ProjectColorScheme;
 	index: number;
 	hideProject: boolean;
 	onEdit: (id: string) => void;
@@ -64,6 +67,7 @@ export const WebReminderCard = memo(function WebReminderCard({
 		>
 			<SharedReminderCard
 				listStyle={listStyle}
+				colorScheme={colorScheme}
 				reminder={reminder}
 				completionPreview={completionPreview}
 				animationConfig={{ enabled: false }}

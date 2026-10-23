@@ -72,7 +72,7 @@ interface ReminderCardProps {
     animationConfig?: AnimationConfig;
     className?: string;
     hideProject?: boolean; // Hide project tag (useful when viewing within a project)
-    colorScheme?: ProjectColorScheme;
+    colorScheme: ProjectColorScheme;
     completionPreview?: boolean;
 }
 
@@ -87,7 +87,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     animationConfig = { enabled: true },
     className = '',
     hideProject = false,
-    colorScheme = 'dark',
+    colorScheme,
     completionPreview = false,
 }) => {
     const { pressed, events: pressEvents } = usePressFeedback<HTMLDivElement>();

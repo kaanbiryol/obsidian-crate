@@ -27,7 +27,7 @@ export interface InboxViewProps {
   onReorder?: (orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
   reorderInteraction?: 'drag' | 'long-press';
-  colorScheme?: ProjectColorScheme;
+  colorScheme: ProjectColorScheme;
 }
 
 /**
@@ -44,7 +44,7 @@ export const InboxView = memo(function InboxView({
   onReorder,
   onReorderDragActiveChange,
   reorderInteraction = 'drag',
-  colorScheme = 'dark',
+  colorScheme,
 }: InboxViewProps) {
   const { active, completed } = useMemo(() => buildInboxViewModel(reminders), [reminders]);
   const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);

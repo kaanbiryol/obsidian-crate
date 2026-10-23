@@ -39,7 +39,7 @@ export interface ProjectDetailViewProps {
   onReorder?: (orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
   reorderInteraction?: 'drag' | 'long-press';
-  colorScheme?: ProjectColorScheme;
+  colorScheme: ProjectColorScheme;
 }
 
 
@@ -68,7 +68,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   onReorder,
   onReorderDragActiveChange,
   reorderInteraction = 'drag',
-  colorScheme = 'dark',
+  colorScheme,
 }: ProjectDetailViewProps) {
   const detail = useMemo(() => {
     return buildProjectDetailViewModel(reminders, project, colorScheme);

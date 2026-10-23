@@ -13,7 +13,7 @@ const reminder: Reminder = {
 };
 const completed: Reminder = { ...reminder, id: 'done', content: 'Finished task', completed: true };
 const renderCard = (item: Reminder) => React.createElement('span', null, item.content);
-const common = { renderCard, animationConfig: { enabled: false } };
+const common = { renderCard, animationConfig: { enabled: false }, colorScheme: 'light' as const };
 
 function scrollClass(markup: string) {
   return markup.match(/class="([^"]*reminders-view-scroll[^"]*)"/)?.[1];

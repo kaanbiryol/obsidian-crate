@@ -23,7 +23,7 @@ export interface TodayViewProps {
   hasFab?: boolean;
   /** Custom class name for the container */
   className?: string;
-  colorScheme?: ProjectColorScheme;
+  colorScheme: ProjectColorScheme;
 }
 
 /**
@@ -36,7 +36,7 @@ export const TodayView = memo(function TodayView({
   renderCard,
   hasFab = true,
   className = '',
-  colorScheme = 'dark',
+  colorScheme,
 }: TodayViewProps) {
   const reduceMotion = useReducedMotion();
   const clock = useReminderClock(reminders);

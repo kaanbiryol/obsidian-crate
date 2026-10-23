@@ -65,6 +65,7 @@ export function RemindersApp() {
 	const renderSharedCard = useCallback<PwaReminderCardRenderer>(({ reminder, index, hideProject }) => (
 		<WebReminderCard
 			listStyle={preferences.reminderListStyle}
+			colorScheme={colorScheme}
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 			reminder={reminder}
 			index={index}
@@ -72,7 +73,7 @@ export function RemindersApp() {
 			onEdit={editReminder}
 			onToggleComplete={toggleReminderCompleted}
 		/>
-	), [editReminder, toggleReminderCompleted, preferences.reminderListStyle]);
+	), [editReminder, toggleReminderCompleted, preferences.reminderListStyle, colorScheme]);
 
 	// Resolve the launch destination first, then keep the real chrome mounted
 	// while data, pending changes, and notification state finish loading.

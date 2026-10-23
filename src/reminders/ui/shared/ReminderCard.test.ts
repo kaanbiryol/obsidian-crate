@@ -13,6 +13,7 @@ describe('ReminderCard', () => {
     it('previews a checked circle without marking the card content completed', () => {
         const markup = renderToStaticMarkup(React.createElement(ReminderCard, {
             reminder,
+            colorScheme: 'light',
             animationConfig: { enabled: false },
             completionPreview: true,
         }));
@@ -30,6 +31,7 @@ describe('ReminderCard', () => {
     it('renders important status as a labeled title-row indicator', () => {
         const markup = renderToStaticMarkup(React.createElement(ReminderCard, {
             reminder: { ...reminder, priority: 1 },
+            colorScheme: 'light',
             animationConfig: { enabled: false },
         }));
 
