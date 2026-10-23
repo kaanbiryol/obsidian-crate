@@ -7,13 +7,12 @@ const desktop = (device: string) => `Mozilla/5.0 (${device}) AppleWebKit/605.1.1
 
 function bootstrap(userAgent: string, { standalone = true, displayMode = false, platform = 'iPhone', maxTouchPoints = 5 } = {}) {
 	const root = { dataset: {} as Record<string, string> };
-	const meta = { content: 'black-translucent', setAttribute(_name: string, value: string) { this.content = value; } };
 	new Script(PWA_STATUS_BAR_INIT_JS).runInNewContext({
 		navigator: { userAgent, standalone, platform, maxTouchPoints },
 		window: { matchMedia: () => ({ matches: displayMode }) },
-		document: { documentElement: root, querySelector: () => meta },
+		document: { documentElement: root },
 	});
-	return { mode: meta.content, enabled: root.dataset.pwaIos27Standalone === 'true' };
+	return root.dataset.pwaIos27Standalone === 'true';
 }
 
 describe('iOS 27 status-bar startup', () => {
@@ -23,12 +22,12 @@ describe('iOS 27 status-bar startup', () => {
 		iphone('18_6_2', 'Version/27.0 Safari/604.1'), // Frozen Safari OS token.
 		'Mozilla/5.0 (iPad; CPU OS 27_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
 	])('enables the workaround for an identified iOS 27 installation: %s', ua => {
-		expect(bootstrap(ua)).toEqual({ mode: 'default', enabled: true });
+		expect(bootstrap(ua)).toBe(true);
 	});
 
 	it('recognizes an iPad using the desktop Safari UA', () => {
 		expect(bootstrap(desktop('Macintosh; Intel Mac OS X 10_15_7'), { platform: 'MacIntel' }))
-			.toEqual({ mode: 'default', enabled: true });
+			.toBe(true);
 	});
 
 	it.each([
@@ -40,21 +39,21 @@ describe('iOS 27 status-bar startup', () => {
 		iphone('18_6_2', 'FxiOS/27.0 Version/27.0'),
 		desktop('Linux; Android 27'),
 	])('preserves other or unknown versions: %s', ua => {
-		expect(bootstrap(ua, { platform: 'Linux armv8l' })).toEqual({ mode: 'black-translucent', enabled: false });
+		expect(bootstrap(ua, { platform: 'Linux armv8l' })).toBe(false);
 	});
 
 	it('leaves macOS Safari 27 unchanged', () => {
 		expect(bootstrap(desktop('Macintosh; Intel Mac OS X 10_15_7'), { platform: 'MacIntel', maxTouchPoints: 0 }))
-			.toEqual({ mode: 'black-translucent', enabled: false });
+			.toBe(false);
 	});
 
-	it('sets installation metadata in Safari without changing the browser layout', () => {
+	it('leaves the Safari browser layout unchanged', () => {
 		expect(bootstrap(iphone('18_6_2', 'Version/27.0 Safari/604.1'), { standalone: false }))
-			.toEqual({ mode: 'default', enabled: false });
+			.toBe(false);
 	});
 
 	it('also accepts the standard standalone display mode', () => {
 		expect(bootstrap(iphone('27_0'), { standalone: false, displayMode: true }))
-			.toEqual({ mode: 'default', enabled: true });
+			.toBe(true);
 	});
 });

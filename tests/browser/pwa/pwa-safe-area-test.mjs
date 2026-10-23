@@ -49,19 +49,19 @@ async function checkNavigation(page, inset, height = page.viewportSize().height)
 	}
 }
 
-async function checkIos27(browser, colorScheme, retainedTranslucent = false, shortLayoutViewport = false) {
-	// Existing installs can keep the full translucent canvas despite new metadata.
-	const height = retainedTranslucent ? 852 : 790;
-	const layoutHeight = shortLayoutViewport ? 790 : height;
-	const page = await browser.newPage({ viewport: { width: 393, height: layoutHeight }, hasTouch: true, colorScheme,
+async function checkIos27(browser, colorScheme, belowStatusBar = false) {
+	// iOS 27 can start the app below the status bar (no top inset, 100vh still
+	// spans the screen) or, for older installs, under it.
+	const height = belowStatusBar ? 790 : 852;
+	const page = await browser.newPage({ viewport: { width: 393, height }, hasTouch: true, colorScheme,
 		userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1' });
 	await page.addInitScript(() => Object.defineProperty(navigator, 'standalone', { value: true }));
 	await page.route('**/notifications?*', async route => {
 		const response = await route.fetch();
 		const body = (await response.text()).replace(/<style\b[^>]*>[\s\S]*?<\/style>/g, style => style
 			.replaceAll('(display-mode:standalone)', '(min-width:0px)')
-			.replaceAll(retainedTranslucent && !shortLayoutViewport ? '100dvh' : '100vh', retainedTranslucent && !shortLayoutViewport ? 'calc(100vh - 62px)' : 'calc(100dvh + 62px)')
-			.replaceAll('env(safe-area-inset-top)', retainedTranslucent ? '62px' : '0px')
+			.replaceAll(belowStatusBar ? '100vh' : '100dvh', belowStatusBar ? 'calc(100dvh + 62px)' : 'calc(100vh - 62px)')
+			.replaceAll('env(safe-area-inset-top)', belowStatusBar ? '0px' : '62px')
 			.replaceAll('env(safe-area-max-inset-top,0px)', '62px')
 			.replaceAll('env(safe-area-inset-bottom)', '34px')
 			.replaceAll('env(safe-area-max-inset-bottom,0px)', '34px'));
@@ -69,30 +69,31 @@ async function checkIos27(browser, colorScheme, retainedTranslucent = false, sho
 	});
 	await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
 	await expect(page.locator('html')).toHaveAttribute('data-pwa-ios27-standalone', 'true');
-	await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'default');
+	await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'black-translucent');
 	await page.locator('.pwa-dock [data-dock-active]').waitFor();
+	const launchColor = colorScheme === 'light' ? 'rgb(247, 247, 248)' : 'rgb(13, 13, 15)';
+	const strip = page.locator('#pwa-status-bar');
+	await expect(strip).toHaveCSS('position', 'fixed');
+	await expect(strip).toHaveCSS('background-color', launchColor);
+	assert.deepEqual(await strip.boundingBox(), { x: 0, y: 0, width: 393, height: 12 }, 'strip spans the top edge');
 	const header = page.locator('.pwa-reminders-view .view-header').first();
 	await expect(header).toHaveCSS('position', 'sticky');
-	await expect(header).toHaveCSS('padding-top', retainedTranslucent ? '66px' : '4px');
-	await expect(header).toHaveCSS('background-color', colorScheme === 'light' ? 'rgb(247, 247, 248)' : 'rgb(13, 13, 15)');
+	// Content stays clear of the 12px strip when there is no top inset.
+	await expect(header).toHaveCSS('padding-top', belowStatusBar ? '16px' : '66px');
+	await expect(header).toHaveCSS('background-color', launchColor);
 	await checkNavigation(page, 34, height);
-	const top = (await header.boundingBox()).y;
-	await page.addStyleTag({ content: '.ios27-scroll-fixture { height:2000px }' });
-	await page.locator('.reminders-view-scroll').first().evaluate(el => {
-		const spacer = document.createElement('div'); spacer.className = 'ios27-scroll-fixture'; el.append(spacer); el.scrollTop = 400;
-	});
-	assert.equal((await header.boundingBox()).y, top, 'opaque header stays at the top while content scrolls');
 	await page.getByRole('button', { name: 'Open settings', exact: true }).click();
 	await expect(page.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible();
 	const backdrop = await page.locator('.pwa-modal-sheet__backdrop').boundingBox();
-	assert.ok(backdrop.y === 0 && backdrop.height === height, 'sheet covers the actual installed viewport');
+	assert.ok(backdrop.y === 0 && backdrop.height === height, 'sheet covers the full installed viewport');
+	const sheetLayer = Number(await page.locator('.pwa-modal-sheet').first().evaluate(el => getComputedStyle(el).zIndex));
+	assert.ok(Number(await strip.evaluate(el => getComputedStyle(el).zIndex)) > sheetLayer, 'strip stays above the sheet backdrop');
+	// iOS paints the status bar from the strip, so the strip matches the backdrop.
+	await expect(strip).toHaveCSS('background-color', colorScheme === 'light' ? 'rgb(207, 207, 208)' : 'rgb(9, 9, 10)');
 	await page.keyboard.press('Escape');
 	await page.locator('.pwa-modal-sheet').waitFor({ state: 'detached' });
+	await expect(strip).toHaveCSS('background-color', launchColor);
 	await checkNavigation(page, 34, height);
-	// Landscape no longer reserves the portrait status bar.
-	if (shortLayoutViewport) await page.addStyleTag({ content: 'html[data-pwa-ios27-standalone="true"]{--pwa-safe-area-top:0px}' });
-	await page.setViewportSize({ width: 852, height: 393 });
-	await checkNavigation(page, 34);
 	await page.close();
 }
 
@@ -183,8 +184,6 @@ try {
 			for (const colorScheme of ['light', 'dark']) {
 				await checkIos27(browser, colorScheme);
 				await checkIos27(browser, colorScheme, true);
-				// Fixed insets and percentages can end at 790px even though vh can paint 852px.
-				await checkIos27(browser, colorScheme, true, true);
 			}
 			console.log(`${browserType.name()}: navigation safe areas, standalone viewport, rotation, and sheet dismissal passed`);
 		} finally {

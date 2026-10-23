@@ -1,3 +1,5 @@
+const channels = (color: string) => color.match(/[\d.]+/g)?.map(Number) ?? [];
+
 /** Keep background depth tied to the painted sheet, including interrupted drags. */
 export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true, coveredPopup?: HTMLElement | null): () => void {
 	// Focus must stay synchronous with the opening tap to activate iOS's keyboard.
@@ -5,6 +7,21 @@ export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true, 
 	popup.setAttribute('data-sheet-moving', '');
 	const sheet = popup.closest<HTMLElement>('.pwa-modal-sheet');
 	const backdrop = sheet?.querySelector<HTMLElement>('.pwa-modal-sheet__backdrop');
+	// iOS 27 paints the status bar from the fixed strip's color; the backdrop
+	// cannot reach it, so tint the strip to match the backdrop.
+	const statusBar = backdrop && document.documentElement.dataset.pwaIos27Standalone === 'true'
+		? document.getElementById('pwa-status-bar') : null;
+	const dimStatusBar = (progress: number) => {
+		if (!statusBar || !backdrop?.isConnected) return;
+		const base = channels(getComputedStyle(document.body).backgroundColor);
+		const [r = 0, g = 0, b = 0, alpha = 1] = channels(getComputedStyle(backdrop).backgroundColor);
+		const amount = alpha * (1 - progress);
+		const mixed = [r, g, b].map((value, i) => {
+			const from = base[i] ?? 0;
+			return Math.round(from + (value - from) * amount);
+		});
+		statusBar.style.setProperty('--pwa-status-bar-tint', `rgb(${mixed.join(', ')})`);
+	};
 	const canvas = recedeCanvas ? sheet?.closest('.crate-feature-shell')?.querySelector<HTMLElement>('.crate-modal-canvas') : null;
 	// A nested sheet pushes the sheet it covers back, like a stacked iOS page sheet.
 	coveredPopup?.setAttribute('data-sheet-covered', '');
@@ -39,9 +56,12 @@ export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true, 
 		const progress = String(position(style.transform, travel));
 		canvas?.style.setProperty('--pwa-sheet-position', progress);
 		backdrop?.style.setProperty('--pwa-sheet-position', progress);
+		dimStatusBar(Number(progress));
 		coveredSheet?.style.setProperty('--pwa-covering-sheet-position', progress);
 		const transition = popup.getAnimations().find(animation =>
 			'transitionProperty' in animation && animation.transitionProperty === 'transform' && animation.playState === 'running');
+		// iOS only repaints the status bar from style changes, so follow the slide per frame.
+		if (statusBar && transition) schedule();
 		popup.toggleAttribute('data-sheet-moving', Boolean(transition)
 			|| popup.hasAttribute('data-starting-style') || popup.hasAttribute('data-ending-style') || popup.hasAttribute('data-swiping'));
 		if (transition === source && sourceTravel === travel) return;
@@ -95,6 +115,8 @@ export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true, 
 		popup.removeAttribute('data-sheet-moving');
 		canvas?.style.removeProperty('--pwa-sheet-position');
 		backdrop?.style.removeProperty('--pwa-sheet-position');
+		if (coveredPopup) dimStatusBar(0);
+		else statusBar?.style.removeProperty('--pwa-status-bar-tint');
 		coveredPopup?.removeAttribute('data-sheet-covered');
 		coveredSheet?.style.removeProperty('--pwa-covering-sheet-position');
 	};

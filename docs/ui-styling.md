@@ -777,21 +777,24 @@ Phone screen headers use a 24px title at its natural line height and a compact
 20px count row separated by 2px. The top gap is 4px beyond the status-bar safe area; bottom padding is 8px.
 Loaded and opening headers share these PWA spacing tokens so hydration does not
 move the title or content. Sync and settings retain 44px touch targets.
-On identified iOS/iPadOS 27 Home Screen apps, the head bootstrap selects `default`
-status-bar mode and enables opaque sticky headers for the iOS 27 progressive-blur
-workaround. It accepts a real OS 27 token or Safari 27 on an Apple mobile device
-(including desktop-mode iPads); ambiguous frozen user agents keep the old mode.
+On identified iOS/iPadOS 27 Home Screen apps, the head bootstrap enables the
+iOS 27 progressive-blur workaround while keeping `black-translucent` status-bar
+mode. It accepts a real OS 27 token or Safari 27 on an Apple mobile device
+(including desktop-mode iPads); ambiguous frozen user agents skip it.
 Other versions and ordinary browser layouts retain their existing styling.
-The workaround uses the current top safe-area inset once, without the maximum
-inset fallback. The document and app use `min(100vh, 100dvh + top inset)`:
-existing installations may retain translucent status-bar mode after the metadata
-changes. Both the dynamic viewport and fixed-position containing block can be
-shorter than the drawable canvas. Restore only the reported top inset, capped
-at `100vh`; default status-bar mode has no top inset and keeps its smaller canvas.
-Reading retains its wrapper inset; Reminders retains its header inset. Header
-surfaces use the same theme color as startup chrome. Check launch/resume, rotation,
-light/dark themes, scrolling, and sheets on an installed iOS 27 device: desktop
-WebKit can verify layout and platform gating but cannot reproduce native blur.
+iOS 27 Home Screen apps start below the status bar whatever the status-bar
+style, and blur content scrolling under it. iOS paints the status bar in the
+color of a real fixed element at the top, so a 12px `#pwa-status-bar` strip
+sets it to the theme color. iOS ignores pseudo-elements for this, and the
+element must stay at least 6px tall and 80% wide. The strip stays above sheets,
+which tint it to match their backdrop as they move. Content reserves at least
+the strip's height at the top. The document and app use
+`min(100vh, 100dvh + top inset)`, because `100vh` still spans the whole screen
+when the app starts below the status bar.
+Headers stay opaque and sticky in the same theme color. Check launch/resume,
+rotation, light/dark themes, scrolling, and sheets on an installed iOS 27
+device: desktop WebKit can verify layout and platform gating but cannot
+reproduce native blur or status-bar tinting.
 `tests/browser/pwa/pwa-safe-area-test.mjs` covers the inset and viewport geometry;
 `tests/browser/pwa/pwa-ios27-header-test.mjs` covers Reading headers, dock menus, sheets,
 theme changes, rotation, and reload against the built local Worker.

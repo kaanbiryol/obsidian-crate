@@ -40,7 +40,7 @@ html,body,#app{background:var(--pwa-launch-bg);color-scheme:inherit}
 <meta name="color-scheme" content="light dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
-<!-- Retain translucent chrome except for the iOS 27 workaround applied below. -->
+<!-- Let sheet backdrops cover the status bar; content reserves its top safe area. -->
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script nonce="${nonce}" id="pwa-status-bar-init">${PWA_STATUS_BAR_INIT_JS}</script>
 <meta name="application-name" content="Crate">
@@ -61,6 +61,7 @@ ${PWA_LIGHT_THEME_STYLES}
 	<script nonce="${nonce}" id="pwa-theme-styles">${PWA_THEME_STYLES_JS}</script>
 </head>
 <body>
+	<div id="pwa-status-bar" aria-hidden="true"></div>
 	<div id="pwa-update-transition" role="status" aria-live="polite">${updateScreenHtml}</div>
 	<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate">${createPwaOpeningScreenHtml()}</div></div>
 	<script nonce="${nonce}" id="pwa-opening-screen-init">${PWA_OPENING_SCREEN_INIT_JS}</script>

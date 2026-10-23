@@ -1,18 +1,34 @@
-/* iOS 27 Home Screen apps: give native chrome an opaque, stationary top
-   surface. Other OS versions and ordinary browser layouts keep their styling. */
-html[data-pwa-ios27-standalone="true"] {
-	/* Default status-bar mode owns its own inset. Use only the remaining inset
-	   reported for content, not the maximum from translucent/full-screen mode. */
-	--pwa-safe-area-top:env(safe-area-inset-top);
+/* iOS 27 Home Screen apps start below the status bar whatever the status-bar
+   style, and blur content scrolling under it. iOS paints the status bar in the
+   color of a real fixed element at the top (at least 6px tall and 80% wide;
+   pseudo-elements are ignored), so this strip sets it. It stays above sheets so
+   open sheets can tint it to match their backdrop. Other OS versions and
+   ordinary browser layouts keep their styling. */
+#pwa-status-bar{display:none}
+html[data-pwa-ios27-standalone="true"] #pwa-status-bar {
+	display:block;
+	position:fixed;
+	top:0;
+	left:0;
+	right:0;
+	height:12px;
+	z-index:1001;
+	/* Open sheets set the tint to match their backdrop. */
+	background:var(--pwa-status-bar-tint,var(--pwa-launch-bg));
+	pointer-events:none;
 }
-/* Installed apps may retain translucent status-bar mode until reinstalled.
-   In that mode, fixed insets and percentages can use the shortened layout
-   viewport too. Recover its top inset, capped at the full CSS viewport; default
-   status-bar mode reports no top inset and keeps the smaller content canvas. */
+html[data-pwa-ios27-standalone="true"] {
+	/* Keep content clear of the strip. Use only the remaining inset reported for
+	   content, not the maximum from translucent/full-screen mode. */
+	--pwa-safe-area-top:max(env(safe-area-inset-top),12px);
+}
+/* The app may start below the status bar or, for older installs, under it. In
+   the latter mode, fixed insets and percentages can use the shortened layout
+   viewport too. Recover its top inset, capped at the full CSS viewport. */
 html[data-pwa-ios27-standalone="true"],
 html[data-pwa-ios27-standalone="true"] body,
 html[data-pwa-ios27-standalone="true"] #app {
-	height:min(100vh,calc(100dvh + var(--pwa-safe-area-top)));
+	height:min(100vh,calc(100dvh + env(safe-area-inset-top)));
 	min-height:0;
 }
 html[data-pwa-ios27-standalone="true"] .crate-reminders-ui :is(.view-header,.crate-reading-reader__nav) {

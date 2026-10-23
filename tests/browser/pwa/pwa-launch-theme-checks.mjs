@@ -55,7 +55,7 @@ export async function checkReadingOpening(browser, origin) {
   await page.route('**/reading/session', async route => { await session.promise; await route.abort(); });
   try {
    await page.goto(`${origin}/notifications?section=reading`, { waitUntil: 'commit' });
-   await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'default');
+   await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'black-translucent');
    await expect(page.locator('html')).toHaveAttribute('data-pwa-ios27-standalone', 'true');
    await expect(page.locator('.pwa-launch-splash .view-header-title')).toHaveText('Reading');
    await expect(page.locator('.pwa-launch-splash [data-icon="settings"]')).toBeVisible();

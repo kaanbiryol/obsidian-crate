@@ -17,7 +17,7 @@ for (const engine of [chromium, webkit]) test(`iOS 27 headers in ${engine.name()
     await page.addInitScript(() => Object.defineProperty(navigator, 'standalone', { value: true }));
     await page.goto(`${origin}/notifications?token=${enrollment.token}`);
     await expect(page.locator('html')).toHaveAttribute('data-pwa-ios27-standalone', 'true');
-    await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'default');
+    await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'black-translucent');
     const panel = page.locator('.crate-feature-panel[data-active="true"]');
     const dock = panel.locator('.pwa-dock');
     await dock.getByRole('button', { name: 'Reading', exact: true }).tap();
