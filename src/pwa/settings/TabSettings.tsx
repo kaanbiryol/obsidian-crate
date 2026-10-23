@@ -13,8 +13,8 @@ import { UpcomingRangeSetting } from './UpcomingRangeSetting';
 const HOLD_DELAY_MS = 380;
 const HOLD_MOVE_TOLERANCE = 9;
 
-function TabRow({ tab, tabs, onChange, description }: {
-	tab: DockTab; tabs: DockTab[]; onChange: (tabs: DockTab[]) => void; description: string;
+function TabRow({ tab, tabs, onChange, onDrop, description }: {
+	tab: DockTab; tabs: DockTab[]; onChange: (tabs: DockTab[]) => void; onDrop: () => void; description: string;
 }) {
 	const controls = useDragControls();
 	const reducedMotion = useReducedMotion();
@@ -42,7 +42,7 @@ function TabRow({ tab, tabs, onChange, description }: {
 	};
 	const endHold = () => { cancelHold(); setLifted(false); };
 	return <Reorder.Item value={tab} dragListener={false} dragControls={controls} layout="position" transition={reducedMotion ? { duration: 0 } : PWA_CONTROL_SPRING}
-		onDragEnd={endHold} className="settings-tab-row" data-settings-tab={tab} data-lifted={lifted || undefined}>
+		onDragEnd={() => { endHold(); onDrop(); }} className="settings-tab-row" data-settings-tab={tab} data-lifted={lifted || undefined}>
 		<ThemeIcon id={item.iconName} size="m" aria-hidden="true" />
 		<span className="settings-tab-choice">
 			<select aria-label={`Tab ${tabs.indexOf(tab) + 1}`} aria-describedby={description} value={tab}
@@ -74,6 +74,16 @@ export function TabSettings({ preferences, upcomingDays, onChange }: {
 	const description = useId();
 	const customized = tabs.some((tab, index) => tab !== DEFAULT_DOCK_TABS[index]);
 	const changeTabs = (dockTabs: DockTab[]) => onChange({ dockTabs });
+	// A drag previews its order locally and saves only when the row is dropped.
+	const [dragOrder, setDragOrder] = useState<DockTab[] | null>(null);
+	const dragOrderRef = useRef(dragOrder);
+	dragOrderRef.current = dragOrder;
+	const shownTabs = dragOrder ?? tabs;
+	const dropTabs = () => {
+		const order = dragOrderRef.current;
+		setDragOrder(null);
+		if (order && order.some((tab, index) => tab !== tabs[index])) changeTabs(order);
+	};
 	return <SettingsSection title="Tabs" action={customized && <Button variant="ghost" size="touch" className="settings-tabs-reset" onClick={() => changeTabs([...DEFAULT_DOCK_TABS])}>Reset tabs</Button>}>
 		<SettingsRow as="label" className="settings-row--preference" title="Open app to">
 			<span className="settings-preference-control settings-preference-control--select">
@@ -91,8 +101,8 @@ export function TabSettings({ preferences, upcomingDays, onChange }: {
 			</span>
 		</SettingsRow>
 		{upcomingDays !== undefined && <UpcomingRangeSetting days={upcomingDays} onChange={onChange} />}
-		<Reorder.Group axis="y" values={tabs} onReorder={changeTabs} className="settings-tab-list" aria-label="Your tabs">
-			{tabs.map(tab => <TabRow key={tab} tab={tab} tabs={tabs} onChange={changeTabs} description={description} />)}
+		<Reorder.Group axis="y" values={shownTabs} onReorder={setDragOrder} className="settings-tab-list" aria-label="Your tabs">
+			{shownTabs.map(tab => <TabRow key={tab} tab={tab} tabs={shownTabs} onChange={changeTabs} onDrop={dropTabs} description={description} />)}
 		</Reorder.Group>
 		<p id={description} className="settings-help settings-tabs-help">Select a tab to replace it. Hold the handle and drag to reorder.<span className="pwa-dock__sr"> You can also reorder with the Up and Down arrow keys.</span></p>
 	</SettingsSection>;

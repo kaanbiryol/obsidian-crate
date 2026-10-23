@@ -4,10 +4,15 @@ export async function checkTabSettings(page, name) {
 	const gear = page.getByRole('button', { name: 'Open settings', exact: true });
 	const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
 	await expect(sheet.getByRole('button', { name: 'Reset tabs', exact: true })).toHaveCount(0);
+	const listTop = () => sheet.locator('.settings-tab-list').evaluate(el => el.getBoundingClientRect().top);
+	const topWithoutReset = await listTop();
 	// Every destination can occupy a slot; exactly four tabs are always present.
 	for (const [index, tab] of ['highlights', 'favorites', 'archive', 'today'].entries()) {
 		await sheet.getByRole('combobox', { name: `Tab ${index + 1}`, exact: true }).selectOption(tab);
 	}
+	await expect(sheet.getByRole('button', { name: 'Reset tabs', exact: true })).toBeVisible();
+	// The reset action overlays the heading instead of pushing the tabs down.
+	expect(await listTop()).toBe(topWithoutReset);
 	await expect(sheet.getByRole('combobox', { name: 'Add tab', exact: true })).toHaveCount(0);
 	await expect(sheet.getByRole('button', { name: /^Remove .* tab$/ })).toHaveCount(0);
 	await expect(sheet.locator('.settings-tab-list select')).toHaveCount(4);
@@ -27,6 +32,9 @@ export async function checkTabSettings(page, name) {
 		await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 + (to.y - from.y - 8) * step / 12);
 		await page.evaluate(() => new Promise(requestAnimationFrame));
 	}
+	// The order previews during the drag and saves only on drop.
+	await expect(sheet.locator('.settings-tab-row').first()).toHaveAttribute('data-settings-tab', 'archive');
+	expect(await savedTabs()).toEqual(['favorites', 'highlights', 'archive', 'today']);
 	await page.mouse.up();
 	await expect.poll(savedTabs).toEqual(['archive', 'favorites', 'highlights', 'today']);
 	if (name === 'chromium') {

@@ -140,7 +140,7 @@
 		margin-inline: calc(-1 * var(--crate-space-4)); padding-inline: var(--crate-space-4); border-top: 1px solid var(--crate-divider);
 	}
 	:is(.settings-main, .crate-reading-shortcut) > .settings-panel__section:first-of-type { border-top: 0; }
-	.settings-panel__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--crate-space-8); min-height: 20px; margin-bottom: var(--crate-space-4); padding-inline: var(--crate-space-16); }
+	.settings-panel__heading { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--crate-space-8); min-height: 20px; margin-bottom: var(--crate-space-4); padding-inline: var(--crate-space-16); }
 	.settings-panel__title { margin: 0; color: var(--text-muted); font-size: var(--pwa-font-detail); font-weight: 400; line-height: 1.4; letter-spacing: normal; }
 	.settings-group { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 	.settings-panel__section > .settings-group { padding-inline: var(--crate-space-16); }
@@ -198,5 +198,5 @@
 	// Give the native picker an opaque snapshot surface when it opens on iOS.
 	.settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: var(--background-primary); color: var(--text-normal); font: inherit; font-size: 16px; font-weight: var(--reminder-font-weight-medium); box-shadow: none; }
 	.settings-tab-choice > svg { position: absolute; right: 0; pointer-events: none; color: var(--text-muted); }
-	.settings-tabs-reset { --crate-action-text: var(--crate-accent-text); --crate-action-font-size: var(--pwa-font-caption); min-height: 44px; margin-block: -8px; margin-right: -8px; padding-inline: 8px; color: var(--crate-accent-text); font-size: var(--pwa-font-caption); font-weight: 400; }
+	.settings-tabs-reset { --crate-action-text: var(--crate-accent-text); --crate-action-font-size: var(--pwa-font-caption); position: absolute; top: 50%; right: calc(var(--crate-space-16) - 8px); min-height: 44px; padding-inline: 8px; transform: translateY(-50%); color: var(--crate-accent-text); font-size: var(--pwa-font-caption); font-weight: 400; }
 }
