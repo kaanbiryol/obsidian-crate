@@ -31,6 +31,24 @@
 	}
 }
 
+// Touch hosts (Obsidian mobile and the PWA) share one compact editor chip.
+@mixin touch-editor-chips {
+  .reminder-action-chip {
+    --reminder-font-sm: 14px;
+    --reminder-font-weight-medium: 600;
+    --reminder-action-chip-height: 30px;
+    position: relative;
+    height: 30px;
+    min-height: 30px;
+    min-width: 30px;
+    padding: 4px 6px;
+    gap: 4px;
+
+    // Invisible 44px tall tap area; the chip row's padding keeps it unclipped.
+    &::before { content: ""; position: absolute; inset: -7px 0; }
+  }
+}
+
 @mixin dock {
   --pwa-dock-control-height: 56px;
   --pwa-dock-height: calc(66px + var(--pwa-dock-bottom-inset));

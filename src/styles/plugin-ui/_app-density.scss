@@ -36,7 +36,7 @@
     .reminder-recurrence-picker .recurrence-stepper { --stepper-button-size: 44px; }
     .reminder-recurrence-picker .recurrence-stepper-button { width: 44px; height: 44px; }
     .picker-native-control :is(.picker-date-input, .picker-time-input) { height: 44px; }
-    .reminder-action-chip { height: 44px; min-width: 44px; }
+    @include app-density.touch-editor-chips;
 
     // Follow the phone's text size setting while keeping the shared list scale at 1x.
     :is(.reminders-view.is-primary, .crate-reading, .reminders-list-container) {

@@ -1,3 +1,5 @@
+@use "../../ui/shared/styles/app-density";
+
 // Browser sheet geometry and touch targets. Editor presentation is shared.
 @mixin styles {
   // Hidden overflow still allows Safari's focus scrolling. Only the editor body
@@ -83,18 +85,12 @@
       }
     }
 
-    // Match the plugin's compact chips independently of standalone form defaults.
+    @include app-density.touch-editor-chips;
+
     .reminder-action-chip {
+      // Obsidian supplies --input-radius in the plugin; match the PWA pickers here.
       --crate-radius-control: 8px;
-      --reminder-font-sm: 14px;
-      --reminder-font-weight-medium: 600;
-      --reminder-action-chip-height: 30px;
-      height: auto;
-      min-height: 30px;
-      min-width: 30px;
       max-width: none;
-      padding: 4px 6px;
-      gap: 4px;
       color: color-mix(in srgb, var(--text-muted) 60%, var(--background-primary));
 
       // Start native pans on the button, not a clipped animated label or SVG.
