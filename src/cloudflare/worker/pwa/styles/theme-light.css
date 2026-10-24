@@ -10,7 +10,7 @@
 	--pwa-line-soft:rgba(24,24,27,.075);
 	--text-muted:#52525b;
 	--text-faint:#66666f;
-	--accent-rgb:109,40,217;
+	--accent-rgb:24,24,27;
 	--background-primary:#f7f7f8;
 	--background-primary-alt:#ffffff;
 	--background-secondary:#f0f0f3;
@@ -27,8 +27,8 @@
 	--text-warning:#92400e;
 	--text-success:#166534;
 	--text-on-accent:#ffffff;
-	--interactive-accent:#6d28d9;
-	--interactive-accent-hover:#5b21b6;
+	--interactive-accent:#18181b;
+	--interactive-accent-hover:#3f3f46;
 	--interactive-normal:rgba(24,24,27,.04);
 	--interactive-hover:rgba(24,24,27,.07);
 	--pwa-sheet-surface:#f7f7f8;

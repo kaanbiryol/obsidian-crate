@@ -21,14 +21,14 @@
 	--text-warning:#f59e0b;
 	--text-success:#22c55e;
 	--color-blue:#60a5fa;
-	--text-on-accent:#ffffff;
-	--interactive-accent:#8b5cf6;
-	--interactive-accent-hover:#9b75f7;
+	--text-on-accent:#0d0d0f;
+	--interactive-accent:#f0f0f2;
+	--interactive-accent-hover:#d4d4d8;
 	--interactive-normal:rgba(255,255,255,.045);
 	--interactive-hover:rgba(255,255,255,.07);
 	--shadow-s:0 2px 8px rgba(0,0,0,.18);
 	--shadow-l:0 25px 50px -12px rgba(0,0,0,.35);
-	--accent-rgb:139,92,246;
+	--accent-rgb:240,240,242;
 	--pwa-control-surface:#17171b;
 	--pwa-control-active-surface:#1d1d22;
 	--pwa-line-soft:rgba(255,255,255,.052);
