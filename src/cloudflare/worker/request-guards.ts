@@ -2,7 +2,7 @@ import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '.
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { corsResponse } from './cors';
 import { EncryptionStateError, hasEncryptionAuthority } from './encryption/state';
-import { shortcutCompatibility, type ShortcutTransport } from './reading/shortcut-transport';
+import { shortcutCompatibility, shortcutTransport, type ShortcutTransport } from './reading/shortcut-transport';
 
 /** Runs after admission, before public grants or authenticated route handling. */
 export function checkRequestProtocol(request: Request, shortcut: ShortcutTransport | null): Response | null {
@@ -30,6 +30,11 @@ export function assertRequestEncryption(request: Request, encryption: Encryption
 	const method = request.method;
 	if (encryption?.mode === 'resetting' && !ENCRYPTION_RESET_PATHS.includes(path)) {
 		throw new EncryptionStateError('Encryption reset is in progress. Resume it on the device that started it.', 423);
+	}
+	// The native shortcut holds no keys; the server seals its note to the vault.
+	if (encryption && shortcutTransport(request)?.kind === 'prepare') {
+		if (encryption.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.', 423);
+		return;
 	}
 	if (encryption && !(KEYLESS_ENCRYPTED_READ_PATHS.includes(path) && method === 'GET') && path !== '/health' && !path.startsWith('/encryption') && !path.startsWith('/auth/')) {
 		const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));

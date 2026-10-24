@@ -39,7 +39,7 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
       <SetupSteps aria-label="Shortcut setup steps">
         <SetupStep number={1} title="Install the shortcut" extra={
           <a className="crate-action-button setup-step__action" data-variant="outline" href={READING_SHORTCUT_URL} target="_blank" rel="noopener noreferrer"><Download size={15} aria-hidden="true" />Download Save to Crate</a>
-        }>Select <strong>Add Shortcut</strong> after it downloads. If it opens in Files, look in <strong>Downloads</strong>. After turning on encryption, install it again.</SetupStep>
+        }>Select <strong>Add Shortcut</strong> after it downloads. If it opens in Files, look in <strong>Downloads</strong>.</SetupStep>
         <SetupStep number={2} title="Connect your library" extra={<>
           {pairing && !expired ? <div className="crate-reading-shortcut__code">
             <CopyableText key={pairing.pairingCode} value={pairing.pairingCode} label="Pairing code" copyLabel="Copy code" alwaysShow
@@ -58,9 +58,9 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
           {!online && <p className="setup-step__status" role="status">Connect to the internet to pair your shortcut.</p>}
           {error && <p className="setup-step__status" role="alert">{error}</p>}
         </>}>Create a code, then run <strong>Save to Crate</strong> from <strong>Shortcuts → All Shortcuts</strong> and paste it.</SetupStep>
-        <SetupStep number={3} title="Save your first article">After <strong>Crate setup saved</strong> appears, share an article to <strong>Save to Crate</strong>, then select <strong>Save</strong> in Crate.</SetupStep>
+        <SetupStep number={3} title="Save your first article">After <strong>Crate setup saved</strong> appears, share an article to <strong>Save to Crate</strong>. It saves straight to Reading.</SetupStep>
       </SetupSteps>
     </SettingsSection>
-    <p className="setup-steps-note">Links reach Crate through a private URL fragment and are encrypted in your browser before syncing, so the shortcut can’t read your library.</p>
+    <p className="setup-steps-note">Your server downloads each shared article. With encryption, it saves the note locked to your vault and can’t read it back; the shortcut can’t read your library.</p>
   </div>;
 }

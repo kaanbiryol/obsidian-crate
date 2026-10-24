@@ -42,7 +42,7 @@ waits for an existing branch verification before dispatch, avoiding a duplicate
 full test run. Existing local or remote tags resume their exact commit and are
 never moved. Ordinary pushes refuse divergent branches and tags.
 
-The private-fragment v1 assets are `save-to-crate-ios-27-v1.shortcut` and
+The v1 shortcut assets are `save-to-crate-ios-27-v1.shortcut` and
 `reading-shortcut-v1.json`. Shortcut metadata records the signed file's SHA-256 and the source fingerprint.
 No file is selected by modification time, and stale files in the original checkout's
 `dist/` are never used. Retries reuse an existing draft shortcut only after its tag,
@@ -98,7 +98,7 @@ and serves it at `shortcuts/v1/Save to Crate.shortcut`.
 Plugin-only releases do not replace that selection. An incomplete or corrupted
 shortcut release fails deployment instead of silently serving another version.
 
-Until a v2 shortcut release is published, Pages generates an unavailable install
+Until a v1 shortcut release is published, Pages generates an unavailable install
 page with a manual-save alternative. Existing releases without shortcut metadata
 are not modified automatically. Publishing manually through
 GitHub triggers Pages; if publishing via a workflow's `GITHUB_TOKEN`, explicitly

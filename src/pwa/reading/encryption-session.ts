@@ -5,7 +5,7 @@ import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encrypt
 import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../connection/encryption';
 import type { EncryptionServerState } from '@/encryption/server-state';
 import { unlockLocalState, type FeatureKeys } from '../encryption/encryption-keys';
-import { pendingReadingKey, forgetReadingKey, forgetReadingCapture } from '../encryption/encryption-fragments';
+import { pendingReadingKey, forgetReadingKey } from '../encryption/encryption-fragments';
 import { abortTransaction } from '../storage/abort-transaction';
 import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from './private-storage';
 import { assertReadingSession, type ReadingSession } from './session';
@@ -19,7 +19,7 @@ let expected: EncryptionServerState | null = null;
 let verifiedIdentity: string | undefined;
 onReadingEncryptionReset(discardKeys => {
   pending = undefined; currentKeys = null; expected = null; verifiedIdentity = undefined;
-  if (discardKeys) { forgetReadingKey(); forgetReadingCapture(); }
+  if (discardKeys) forgetReadingKey();
   lockReadingStorage();
 });
 export function readingEncryptionHeaders(): Record<string, string> {

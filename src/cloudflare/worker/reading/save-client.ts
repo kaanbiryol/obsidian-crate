@@ -17,7 +17,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
   const number = (value: unknown): number | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : null;
   const codes = new Set(['reading_error', 'reading_not_configured', 'feature_paused', 'protocol_incompatible',
     'shortcut_update_required', 'shortcut_access_required', 'invalid_shortcut_request', 'invalid_response', 'request_failed',
-    'network_error', 'save_link_expired', 'missing_save_link']);
+    'network_error', 'save_link_expired', 'missing_save_link', 'encryption_required', 'reading_save_failed']);
   const normalize = (value: unknown): Record<string, unknown> => {
     const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
     return { stage: typeof input.stage === 'string' && ['pair', 'prepare', 'handoff'].includes(input.stage) ? input.stage : 'handoff',
@@ -35,6 +35,8 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
   let shortcutContract = number(Number(query.get('contract'))) || config.shortcutContract;
   const fragment = location.hash.slice(1);
   let token = /^[a-f0-9]{64}$/.test(fragment) && !config.supportOnly ? fragment : '';
+  // Encrypted vaults save during the shortcut's request; this page only confirms it.
+  const saved = fragment === 'saved' && !config.supportOnly;
   // Neither the capability nor error context belongs in browser history.
   history.replaceState(null, '', location.pathname);
   // A browser can reuse this sheet for another share without loading a new
@@ -45,7 +47,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
     try { incomingError = normalize(fragment.length <= 4096 ? JSON.parse(decodeURIComponent(fragment.slice(6))) : { code: 'invalid_response' }); }
     catch { incomingError = normalize({ code: 'invalid_response' }); }
   }
-  if (fragment && !token && !incomingError) incomingError = normalize({ code: 'missing_save_link' });
+  if (fragment && !token && !saved && !incomingError) incomingError = normalize({ code: 'missing_save_link' });
   const stored = (storageKey: string): Record<string, unknown> | null => {
     const value: unknown = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
     return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -55,7 +57,9 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
       sessionStorage.removeItem(key);
       sessionStorage.setItem(errorKey, JSON.stringify({ data: incomingError, until: Date.now() + 300000 }));
     }
-    else if (token) {
+    else if (saved) {
+      sessionStorage.removeItem(key); sessionStorage.removeItem(errorKey);
+    } else if (token) {
       sessionStorage.removeItem(errorKey);
       sessionStorage.setItem(key, JSON.stringify({ token, until: Date.now() + 300000, shortcutRevision, shortcutContract }));
     } else if (!config.supportOnly) {
@@ -165,6 +169,11 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
     shortcutRevision = number(incomingError.shortcutRevision) || 1;
     shortcutContract = number(incomingError.shortcutContract) || config.shortcutContract;
     failure(incomingError);
+  } else if (saved) {
+    progress.hidden = true;
+    title.textContent = 'Saved';
+    message.textContent = 'It’s in Reading on your devices. You can close this window.';
+    updateAvailable();
   } else if (!token || config.supportOnly) failure({ stage: config.supportOnly ? 'prepare' : 'handoff', code: config.supportOnly ? 'invalid_response' : 'missing_save_link' });
   else void save();
 }

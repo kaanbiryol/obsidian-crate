@@ -99,7 +99,7 @@ extracts arbitrary folder content itself.
 
 Encrypted Reading uses the vault key and its own encrypted-file routes. It is part of every encrypted vault.
 
-The iPhone Shortcut sends saved URLs only in browser fragments. Publish its signed release asset before distributing the PWA. Encrypted Android manifests omit native share-target POSTs; in-app saving remains supported.
+The iPhone Shortcut sends shared URLs to the preparation route; encrypted vaults receive notes sealed to the vault seal key. Publish its signed release asset before distributing the PWA. Encrypted Android manifests omit native share-target POSTs; in-app saving remains supported.
 
 Reading's derived source index uses projection format 1 (`_highlightIndex: 1`) and derives YouTube
 URL identities from notes. Watch, Shorts, live, embed and shortened URLs

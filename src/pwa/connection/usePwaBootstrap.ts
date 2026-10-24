@@ -1,4 +1,3 @@
-import { preserveIncomingShare } from './incoming-share';
 import { connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from './issues';
 import { capturePwaSession } from '../session-generation';
 import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
@@ -62,8 +61,6 @@ export function usePwaBootstrap({
 
 		async function bootstrap() {
 			try {
-				if (cancelled || !sessionCurrent()) return;
-				await preserveIncomingShare(() => !cancelled && sessionCurrent());
 				if (cancelled || !sessionCurrent()) return;
 				const storedConfig = loadStoredConfig();
 				const applied = applyConfigFromUrl(storedConfig);

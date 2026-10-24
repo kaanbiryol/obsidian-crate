@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import contract from '../src/reading/shortcut-contract.json' with { type: 'json' };
 import { readingShortcutWithFirstRunSetup } from './reading-shortcut-first-run.mjs';
-import { privateShortcutSource, shortcutSource, shortcutTemplate, shortcutIdentifier as identifier, shortcutRequest, shortcutValue } from './reading-shortcut-fixture.mjs';
+import { readingShortcutTemplate } from './reading-shortcut-template.mjs';
+import { releaseShortcutSource, shortcutSource, shortcutTemplate, shortcutIdentifier as identifier, shortcutRequest, shortcutValue } from './reading-shortcut-fixture.mjs';
 
 const workflows = () => [shortcutTemplate, readingShortcutWithFirstRunSetup(shortcutSource), readingShortcutWithFirstRunSetup(shortcutSource, { pairing: true })];
 const token = value => {
@@ -132,23 +133,8 @@ test('reads the configured endpoint directly without rewriting it', () => {
 });
 
 
-test('private capture variants keep URLs in fragments and resolve their native outputs', () => {
-  for (const workflow of [privateShortcutSource, readingShortcutWithFirstRunSetup(privateShortcutSource), readingShortcutWithFirstRunSetup(privateShortcutSource, { pairing: true })]) {
-    const actions = workflow.WFWorkflowActions, capture = actions.slice(-5), seen = new Set();
-    const check = value => {
-      if (!value || typeof value !== 'object') return;
-      if (value.Type === 'ActionOutput') assert.ok(seen.has(value.OutputUUID), `Unresolved output: ${value.OutputUUID}`);
-      Object.values(value).forEach(check);
-    };
-    for (const action of actions) { check(action); const id = action.WFWorkflowActionParameters.UUID; assert.ok(!seen.has(id)); seen.add(id); }
-    assert.deepEqual(capture.map(identifier), ['getitemfromlist', 'urlencode', 'text.replace', 'gettext', 'openurl']);
-    assert.equal(capture[1].WFWorkflowActionParameters.WFEncodeMode, 'Encode');
-    assert.equal(token(capture[1].WFWorkflowActionParameters.WFInput).OutputUUID, capture[0].WFWorkflowActionParameters.UUID);
-    const prefix = capture[2].WFWorkflowActionParameters;
-    for (const path of [contract.preparePath]) assert.equal(('https://crate.example' + path).replace(new RegExp(prefix.WFReplaceTextFind), prefix.WFReplaceTextReplace), 'https://crate.example/notifications?section=reading#readingCapture=');
-    const assembled = capture[3].WFWorkflowActionParameters.WFTextActionText;
-    assert.equal(assembled.Value.attachmentsByRange['{0, 1}'].OutputUUID, prefix.UUID);
-    assert.equal(assembled.Value.attachmentsByRange['{1, 1}'].OutputUUID, capture[1].WFWorkflowActionParameters.UUID);
-    assert.equal(token(capture[4].WFWorkflowActionParameters.WFInput).OutputUUID, capture[3].WFWorkflowActionParameters.UUID);
-  }
+test('the released shortcut sends the link to the server and shows its save page', () => {
+  // Encrypted and unencrypted vaults use the same request; the server seals encrypted notes.
+  assert.deepEqual(releaseShortcutSource, shortcutSource);
+  assert.ok(!JSON.stringify(readingShortcutTemplate(releaseShortcutSource)).includes('openurl'));
 });

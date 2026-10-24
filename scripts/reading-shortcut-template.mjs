@@ -37,8 +37,6 @@ export function readingShortcutTemplate(template) {
   actions[0].WFWorkflowActionParameters.WFTextActionText = `https://YOUR-CRATE-SERVER${contract.preparePath}`;
   workflow.WFWorkflowImportQuestions[0].DefaultValue = actions[0].WFWorkflowActionParameters.WFTextActionText;
   const request = actions.find(action => action.WFWorkflowActionIdentifier === 'is.workflow.actions.downloadurl');
-  // Private captures open the PWA with a fragment and have no capture request.
-  if (!request) return workflow;
   request.WFWorkflowActionParameters.WFHTTPHeaders.Value.WFDictionaryFieldValueItems = [
     request.WFWorkflowActionParameters.WFHTTPHeaders.Value.WFDictionaryFieldValueItems[0],
     ...shortcutDictionary([[contract.revisionHeader, String(contract.revision)]]).Value.WFDictionaryFieldValueItems,

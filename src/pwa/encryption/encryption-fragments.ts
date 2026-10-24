@@ -13,14 +13,9 @@ export function takeFragmentValues<Name extends string>(names: readonly Name[]):
   return values;
 }
 
-let readingCapture: string | undefined;
-export const pendingReadingCapture = () => readingCapture;
-export function forgetReadingCapture(): void { readingCapture = undefined; }
 let readingKey: string | undefined;
 export function consumeReadingKeyFragment(): void {
-  const values = takeFragmentValues(['readingCapture', 'crateReadingKey']);
-  readingCapture = values.readingCapture ?? readingCapture;
-  readingKey = values.crateReadingKey ?? readingKey;
+  readingKey = takeFragmentValues(['crateReadingKey']).crateReadingKey ?? readingKey;
 }
 export const pendingReadingKey = () => readingKey;
 export function forgetReadingKey(): void { readingKey = undefined; }

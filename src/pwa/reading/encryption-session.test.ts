@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { prepareReadingEncryption } from './encryption-session';
 import { resetReadingEncryption } from './encryption-lifecycle';
-import { consumeReadingKeyFragment, pendingReadingCapture, pendingReadingKey } from '../encryption/encryption-fragments';
+import { consumeReadingKeyFragment, pendingReadingKey } from '../encryption/encryption-fragments';
 import { readingRequest } from './api';
 import { decodeReadingValue, encodeReadingValue } from './private-storage';
 import { READING_SESSION_KEY, type ReadingSession } from './storage';
@@ -61,11 +61,11 @@ it('keeps unverified Reading storage locked after a network failure', async () =
 });
 
 it('keeps this link\'s Reading key through sign-in and forgets it on logout', () => {
-  vi.stubGlobal('window', { location: { pathname: '/notifications', search: '', hash: '#crateReadingKey=code&readingCapture=https%3A%2F%2Fprivate.example' },
+  vi.stubGlobal('window', { location: { pathname: '/notifications', search: '', hash: '#crateReadingKey=code' },
     history: { state: null, replaceState: vi.fn() } });
   consumeReadingKeyFragment();
   resetReadingEncryption();
-  expect([pendingReadingKey(), pendingReadingCapture()]).toEqual(['code', 'https://private.example']);
+  expect(pendingReadingKey()).toBe('code');
   resetReadingEncryption(true);
-  expect([pendingReadingKey(), pendingReadingCapture()]).toEqual([undefined, undefined]);
+  expect(pendingReadingKey()).toBeUndefined();
 });

@@ -19,6 +19,7 @@ export const COORDINATOR_PATHS = {
 	maintain: '/maintain',
 	readingWake: '/reading-wake',
 	readingPublish: '/reading-publish',
+	readingSealed: '/reading-sealed',
 	dispatchJobs: '/dispatch-jobs',
 	commitUpload: '/commit-upload',
 	commitNewFiles: '/commit-new-files',
@@ -91,6 +92,11 @@ export async function wakeReading(env: AlarmBinding): Promise<boolean> {
 /** Publishes a fetched Reading capture or extraction under the coordinator lock. */
 export async function publishReading(env: AlarmBinding, publication: object): Promise<boolean> {
 	return (await post(coordinatorStub(env), COORDINATOR_PATHS.readingPublish, { body: JSON.stringify(publication) })).ok;
+}
+
+/** Seals and commits a Save to Crate note for an encrypted vault under the coordinator lock. */
+export async function commitSealedReading(env: AlarmBinding, note: object): Promise<boolean> {
+	return (await post(coordinatorStub(env), COORDINATOR_PATHS.readingSealed, { body: JSON.stringify(note) })).status === 204;
 }
 
 /** Drains due notification jobs on the dispatcher role, with its own request budget. */

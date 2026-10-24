@@ -253,6 +253,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.reload(); await expandDiagnostics(); await expect(page.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible(); await noSuccess();
       assert.equal(handoffs, 0);
     }
+    // Encrypted vaults save during the shortcut request; the page only confirms,
+    // without a handoff, a stale stored capability or an Open Reading link.
+    await page.evaluate(() => sessionStorage.setItem('crate-reading-handoff-v1', JSON.stringify({ token: 'e'.repeat(64), until: Date.now() + 300000 })));
+    await page.goto(`${origin}/notifications/save-reading?shortcut=${contract.revision}&contract=${contract.version}#saved`);
+    await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open Reading', exact: true })).toBeHidden();
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('crate-reading-handoff-v1')), null);
+    assert.equal(handoffs, 0);
     const staticError = { stage: 'prepare', code: 'invalid_response', shortcutRevision: contract.revision, shortcutContract: contract.version };
     await page.goto(`${origin}/shortcuts/help/#error=${encodeURIComponent(JSON.stringify(staticError))}`);
     await expect(page.getByRole('heading', { name: 'Save not confirmed', exact: true })).toBeVisible(); await noSuccess();

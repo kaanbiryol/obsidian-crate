@@ -149,34 +149,30 @@ try {
     const count = await new Promise((resolve, reject) => { const r = db.transaction('keys').objectStore('keys').count(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); }); db.close(); return count;
   })).toBe(0);
   assert.equal(await page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('crate-encryption-session:'))), false);
-  // A fresh Safari/PWA partition must keep an incoming Shortcut URL through
-  // folder-key recovery, without placing that URL in any server request.
+  // A fresh Safari/PWA partition unlocks with the recovery key and keeps one vault key record.
   const freshToken = await enroll();
   const lockedContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   // This context signs in through Reminders, which checks push subscriptions.
   if (type === webkit) await lockedContext.addInitScript(() => {
     Object.defineProperty(ServiceWorkerRegistration.prototype, 'pushManager', { get: () => undefined });
   });
-  const locked = await lockedContext.newPage(), privateUrl = 'https://example.invalid/private-shortcut-draft';
-  const wire = []; locked.on('request', request => wire.push(request.url() + (request.postData() ?? '')));
-  await locked.goto(`${origin}/notifications?section=reading&browserToken=${freshToken}#readingCapture=${encodeURIComponent(privateUrl)}`);
+  const locked = await lockedContext.newPage();
+  await locked.goto(`${origin}/notifications?section=reading&browserToken=${freshToken}`);
   await expect(locked.getByRole('heading', { name: 'Unlock Crate', exact: true })).toBeVisible();
-  assert.ok(!locked.url().includes('readingCapture'));
   await locked.getByRole('button', { name: 'Use recovery key instead', exact: true }).click();
   await locked.getByLabel('Recovery key', { exact: true }).fill(recovery);
   await locked.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
-  await expect(locked.getByLabel('Link', { exact: true })).toHaveValue(privateUrl, { timeout: 20000 });
+  await expect(locked.getByRole('button', { name: 'Save a link', exact: true })).toBeVisible({ timeout: 20000 });
   const remembered = await locked.evaluate(async () => {
     const db = await new Promise((resolve, reject) => { const r = indexedDB.open('crate-encryption-keys'); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
     const ids = await new Promise((resolve, reject) => { const r = db.transaction('keys').objectStore('keys').getAllKeys(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); }); db.close(); return ids;
   });
   assert.deepEqual(remembered, [bundle.vaultId]);
-  assert.ok(!wire.some(request => request.includes(privateUrl) || request.includes(encodeURIComponent(privateUrl))));
   await lockedContext.close();
   assert.equal(recoverySent, false, 'Recovery key must never be sent to the server');
   assert.deepEqual(errors, []);
   assert.ok(!requests.some(request => request.body.includes('private-reading')));
-  console.log(`Reading plaintext-to-encrypted transition, encrypted enrollment, private cache, article access, server extraction, locked Shortcut recovery,${type === chromium ? ' offline edits, exact replay after a lost reply,' : ''} and logout cleanup passed (${type.name()})`);
+  console.log(`Reading plaintext-to-encrypted transition, encrypted enrollment, private cache, article access, server extraction, locked recovery,${type === chromium ? ' offline edits, exact replay after a lost reply,' : ''} and logout cleanup passed (${type.name()})`);
 } finally {
   await browser?.close();
   await new Promise(resolve => server ? server.close(resolve) : resolve());

@@ -16,10 +16,10 @@ protocol in `src/protocol/server-info.ts`, server revision in `server-release.js
 schema are separate numbers. Do not change the capture contract or native
 headers merely because one of those numbers changes.
 
-The published download opens Reading with the shared URL in a browser-only
-fragment. The user confirms the save in Reading; encrypted vaults encrypt the
-link in the browser before syncing. Paired capture credentials use the
-versioned preparation flow below.
+The published download sends the shared URL to the versioned preparation flow
+below and shows the server's save page in a Shortcuts sheet. Unencrypted vaults
+finish through a one-use handoff; encrypted vaults save a note sealed to the
+vault during the preparation request, so the page only confirms it.
 
 - `POST /reading/shortcut/v1/exchange` accepts only `{ token }`, redeems a
   short-lived pairing grant once, and returns capture access. Pairing codes use

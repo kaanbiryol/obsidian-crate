@@ -1,5 +1,7 @@
 import { handleReadingRoute } from './reading/routes';
 import { shortcutLaunchResponse, shortcutTransport } from './reading/shortcut-transport';
+import { captureSealedReading } from './reading/sealed-capture';
+import { ReadingError, readingResponse } from './reading/common';
 import { withD1Usage } from './d1-usage';
 import { coordinatedNewFiles } from './sync/bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
@@ -129,6 +131,11 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 		return forwardedResponse(await forwardTransferRequest(request, env, routeExecution.path), context);
 	}
 	const mutation = isCrateMutation(path, method);
+	// Download outside the coordinator; only the sealed commit takes its lock.
+	if (shortcut?.kind === 'prepare' && encryption && execution.kind !== 'coordinator') {
+		try { return await captureSealedReading(request, env, authResult.principal, encryption); }
+		catch (error) { if (error instanceof ReadingError) return readingResponse({ error: error.message, code: error.code }, error.status); throw error; }
+	}
 	if (routeExecution?.kind === 'coordinator' && execution.kind !== 'coordinator') return forwardedResponse(await forwardToCoordinator(env, request), context);
 	if (!mutation && execution.kind !== 'coordinator' && routePolicy?.initializeProjection && !ensuredProjections.has(projectionBinding)) {
 		if (!await ensureProjection(env)) throw new Error('Unable to initialize notification processing');

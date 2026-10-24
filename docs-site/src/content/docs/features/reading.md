@@ -69,7 +69,7 @@ On iPhone with iOS 27 or later, **Reading settings → Set up iPhone shortcut** 
 
 You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/). Select **Download shortcut**, then **Add Shortcut**, and return to Reading settings to create a pairing code. If the page says the shortcut is not available yet, use **Reading → Save a link** until it is published.
 
-After enabling encryption, reinstall the current shortcut. Sharing opens the link in Crate; unlock Reading if asked, then select **Save**.
+With encryption, the shortcut works the same way: your server downloads the article and saves it locked to your vault, and your devices open it. Sharing the same link twice saves it twice.
 
 On Android browsers that support Web Share Target, unencrypted vaults can use **Share → Crate** after installing the web app. For encrypted vaults, paste the link into Crate’s Reading library.
 

@@ -9,7 +9,7 @@ export function shortcutInstallPage(available) {
 <title>Save to Crate for iPhone</title><link rel="stylesheet" href="/assets/status.css"></head>
 <body><main><a class="brand-lockup" href="/"><img src="/assets/logo.png" alt="Crate"></a>
 <section><h1>Save to Crate</h1>
-${available ? `<p class="status-copy">Save links from your iPhone share sheet. Works with encrypted vaults.</p>
+${available ? `<p class="status-copy">Save links from your iPhone share sheet, including to encrypted vaults.</p>
 <a class="button" href="./${encodeURIComponent(shortcutName)}">Download shortcut</a>
 <p class="helper">Requires iOS 27 or later. Select <strong>Add Shortcut</strong>, then return to Crate to create a pairing code.</p>`
     : `<p class="status-copy">The new iPhone shortcut is not available yet.</p>

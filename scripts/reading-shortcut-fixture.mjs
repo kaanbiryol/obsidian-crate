@@ -19,7 +19,7 @@ function plist(element) {
 }
 // Frozen source for compatibility tests of already distributed native captures.
 export const shortcutSource = await parseSource('../tests/fixtures/reading-shortcut-v1.plist');
-export const privateShortcutSource = await parseSource('../docs/shortcuts/save-to-crate.plist');
+export const releaseShortcutSource = await parseSource('../docs/shortcuts/save-to-crate.plist');
 export const shortcutTemplate = readingShortcutTemplate(shortcutSource);
 export const shortcutIdentifier = action => action.WFWorkflowActionIdentifier.replace('is.workflow.actions.', '');
 
