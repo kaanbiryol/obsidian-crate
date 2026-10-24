@@ -38,7 +38,8 @@ export function useReaderNavigation(article: RefObject<HTMLElement | null>, enab
 		const onScroll = (event: Event) => {
 			if (event.target !== scroller && event.target !== scroller.ownerDocument) return;
 			// Clamp rubber-band overscroll so bouncing at either edge cannot reverse the header.
-			if (scroller.ownerDocument.body.classList.contains('pwa-sheet-scroll-locked')) return;
+			const { body, documentElement } = scroller.ownerDocument;
+			if (body.classList.contains('pwa-sheet-scroll-locked') || documentElement.classList.contains('pwa-sheet-scroll-held')) return;
 			const scrollElement = readerScrollElement(scroller);
 			const top = Math.max(0, Math.min(scrollElement.scrollTop, scrollElement.scrollHeight - scrollElement.clientHeight));
 			const delta = top - previous;

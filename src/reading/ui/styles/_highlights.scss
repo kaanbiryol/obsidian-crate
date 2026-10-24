@@ -1,43 +1,98 @@
 @use "../../../ui/shared/styles/list-item";
 
+// Linear-style rows: quiet hairlines, an accent bar per excerpt and trailing controls.
 .crate-reminders-ui .crate-reading-highlights {
-	list-style: none; margin: 0; padding: 0; display: grid; gap: var(--crate-list-row-gap);
-	&__card { @include list-item.passage-spacing; border: 1px solid var(--crate-divider); border-radius: 12px; background: var(--crate-panel-bg); overflow-wrap: anywhere; }
-	&__card blockquote { margin: 0 0 var(--crate-space-16); padding: 0 0 0 var(--crate-space-12); border-left: 3px solid var(--text-highlight-bg, #c7a73d); font-size: 17px; line-height: 1.65; white-space: pre-wrap; color: var(--text-normal); }
-	&__source { display: flex; flex-wrap: wrap; gap: var(--crate-space-6) var(--crate-list-content-gap); font-size: 12px; color: var(--text-muted); }
-	&__source strong { width: 100%; font-weight: 500; color: var(--text-normal); }
-	&__note { white-space: pre-wrap; margin: var(--crate-space-16) 0 0; font-size: 14px; line-height: 1.6; }
-	&__actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--crate-space-4);
-		margin: var(--crate-space-12) calc(-1 * var(--crate-space-8)) calc(-1 * var(--crate-space-8));
-		.crate-action-button {
-			gap: 6px;
-			padding: 10px 8px;
-			border-radius: 6px;
-			color: var(--text-muted);
-			font-size: 13px;
-			font-weight: 500;
-			line-height: 1.4;
-			@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { color: var(--text-normal); } }
-			&[data-press-active]:not(:disabled), &:focus-visible { color: var(--text-normal); }
-		}
+	--crate-highlight-accent: var(--text-highlight-bg, #c7a73d);
+	list-style: none; margin: 0; padding: 0; display: grid;
+	&__item {
+		position: relative; display: grid; gap: var(--crate-space-6);
+		padding: var(--crate-list-passage-padding-block) var(--crate-list-row-padding-inline) var(--crate-space-4);
+		border-radius: 10px; overflow-wrap: anywhere;
 	}
-}
-.crate-reminders-ui .crate-reading[data-list-style="flat"] .crate-reading-highlights {
-	gap: var(--crate-list-flat-row-gap);
-	&__card {
-		@include list-item.flat-surface;
-		position: relative;
+	&__item + .crate-reading-highlights__item::before {
+		content: ''; position: absolute; top: 0; right: var(--crate-list-row-padding-inline); left: var(--crate-list-row-padding-inline);
+		border-top: 1px solid var(--crate-divider); pointer-events: none;
+		transition: opacity var(--crate-motion-duration-fast) var(--crate-motion-easing);
+	}
+	// A pressed row reads as one surface, without hairlines cutting its edges.
+	&__item:has(> .crate-reading-highlights__open[data-press-active]:not(:disabled))::before,
+	&__item:has(> .crate-reading-highlights__open[data-press-active]:not(:disabled)) + .crate-reading-highlights__item::before { opacity: 0; }
+	@media (hover: hover) and (pointer: fine) {
+		&__item:has(> .crate-reading-highlights__open:hover:not(:disabled))::before,
+		&__item:has(> .crate-reading-highlights__open:hover:not(:disabled)) + .crate-reading-highlights__item::before { opacity: 0; }
+	}
+	// The whole row opens the passage; content passes taps through to it.
+	&__open {
+		position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0;
+		border: 0; border-radius: inherit; background: transparent; box-shadow: none;
+		cursor: pointer; -webkit-tap-highlight-color: transparent;
+		transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+		@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: var(--crate-control-hover-bg); } }
+		&[data-press-active]:not(:disabled) { background: var(--crate-control-active-bg); }
+		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: -2px; }
+		&:disabled { cursor: default; }
+	}
+	&__item[data-openable] > :not(.crate-reading-highlights__open) { pointer-events: none; }
+	&__excerpt {
+		position: relative; margin: 0; padding: 0 0 0 var(--crate-space-12);
+		border: 0; font-size: 15px; line-height: 1.55; white-space: pre-wrap; color: var(--text-normal);
+		&::before { content: ''; position: absolute; top: .25em; bottom: .25em; left: 0; width: 3px; border-radius: 2px; background: var(--crate-highlight-accent); }
+	}
+	&__note {
+		position: relative; display: flex; gap: var(--crate-space-8); margin: 0 0 0 var(--crate-space-12);
+		font-size: 14px; line-height: 1.5; white-space: pre-wrap; color: var(--text-muted);
+		svg { flex-shrink: 0; margin-top: 3px; color: var(--text-faint); }
+	}
+	&__meta {
+		position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--crate-space-8);
+		min-height: 36px; margin-left: var(--crate-space-12);
+		font-size: 12px; line-height: 1.4; color: var(--text-faint); font-variant-numeric: tabular-nums;
+	}
+	&__actions {
+		display: flex; align-items: center; gap: var(--crate-space-4); margin-right: calc(-1 * var(--crate-space-6));
+		pointer-events: auto;
+		// Compact 32px controls keep 44px touch targets.
+		> :is(button, a) { position: relative; flex-shrink: 0; }
+		> :is(button, a)::after { content: ''; position: absolute; inset: -6px; }
+	}
+	&__annotate.crate-icon-button { --crate-icon-button-control-size: 32px; border-radius: 8px; }
+	&__link {
+		display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+		border-radius: 8px; color: var(--text-muted);
+		@media (hover: hover) and (pointer: fine) { &:hover { background: var(--crate-control-hover-bg); color: var(--text-normal); } }
+		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 0; }
+	}
+	&__seek {
+		display: inline-flex; align-items: center; gap: var(--crate-space-4); height: 28px; margin: 0; padding: 0 10px;
+		border: 0; border-radius: 999px; box-shadow: none;
+		background: color-mix(in srgb, var(--text-normal) 8%, transparent); color: var(--text-normal);
+		font: inherit; font-size: 12px; font-weight: 500; cursor: pointer;
+		@media (hover: hover) and (pointer: fine) { &:hover { background: color-mix(in srgb, var(--text-normal) 12%, transparent); } }
+		&[data-press-active] { background: color-mix(in srgb, var(--text-normal) 16%, transparent); }
+		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 0; }
 	}
 }
 .crate-reminders-ui .crate-reading-reader {
 	&__tabs { display: flex; gap: 8px; margin: 0 0 24px; border-bottom: 1px solid var(--crate-divider); }
 	&__tabs button { flex: 1; min-height: 44px; border-radius: 8px 8px 0 0; }
 	&__tabs button[aria-pressed="true"] { background: var(--crate-selection-bg); }
-	&__annotation { display: grid; gap: 14px; }
-	&__annotation textarea { width: 100%; min-height: 140px; resize: vertical; padding: 12px; font: inherit; font-size: 16px; color: var(--text-normal); background: var(--crate-panel-bg); border: 1px solid var(--crate-divider); border-radius: 8px; }
+}
+
+// Highlight note sheet: the excerpt for context, then the shared rounded field.
+.crate-reminders-ui .crate-reading-note {
+	display: grid; gap: var(--crate-space-16);
+	&__excerpt {
+		position: relative; margin: 0; padding: 0 0 0 var(--crate-space-12); border: 0;
+		font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-muted);
+		// Long passages stay in the article; four lines identify the excerpt.
+		display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden;
+		&::before { content: ''; position: absolute; top: .25em; bottom: .25em; left: 0; width: 3px; border-radius: 2px; background: var(--text-highlight-bg, #c7a73d); }
+	}
+	&__input.crate-text-input {
+		display: block; min-height: 132px; max-height: min(320px, 40dvh);
+		padding: 12px var(--crate-field-padding-inline, 16px); line-height: 1.5;
+		resize: none; field-sizing: content;
+	}
 }
 
 .crate-reminders-ui {

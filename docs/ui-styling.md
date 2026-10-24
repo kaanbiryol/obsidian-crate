@@ -85,7 +85,8 @@ Dock morphs use the shared collapsed height.
   pill outlines. Flat reminder and project rows have no dividers, including expanded
   subproject groups; the main header separator remains. Inbox hides its redundant project
   label while retaining dates and recurrence; mixed-project views keep project labels.
-  Reading articles and highlights follow the same divider-free flat/card preference.
+  Reading articles follow the same divider-free flat/card preference. Highlight
+  passages always use compact rows separated by inset hairlines, in both styles.
   The Highlights library groups passages by article, ordered by the newest highlight.
   Article disclosure headers use flat rows at rest with rounded hover/press feedback,
   or card surfaces when Cards is selected. The newest group starts expanded; older
@@ -93,7 +94,7 @@ Dock morphs use the shared collapsed height.
   Reading picker sheet with a close header and scrolling options. In Obsidian it
   rises from the pane bottom to a 20px top inset, with rounded upper corners and
   a drag handle; the PWA uses its tall Settings-style presentation. Closing retains
-  the sheet through its downward exit motion. Article reader highlights retain their existing list.
+  the sheet through its downward exit motion. Article reader highlights use the same rows.
   Reading dialogs opened inside the Obsidian workspace portal into a pane-local
   overlay outside clipped tab and feature layers. Sheets and their backdrops stay
   inside the pane, above its dock, without covering the rest of Obsidian.
@@ -339,7 +340,10 @@ Dock morphs use the shared collapsed height.
   animation; desktop and plugin readers retain their own scroll container. The
   sticky action header hides on downward scroll and returns on upward scroll or
   keyboard focus. Verify the status-bar gesture in an installed app on an iPhone;
-  desktop browser automation cannot establish that OS behavior.
+  desktop browser automation cannot establish that OS behavior. Sheets over the
+  document reader hold its offset with `html.pwa-sheet-scroll-held` instead of
+  fixing the body: re-layering a long article made iOS paint it a frame late,
+  flashing the library and its dock through the article.
 
 - On phone-sized iOS layouts, the settled reminders lists, Projects, a pushed
   project and the Reading library also scroll the document

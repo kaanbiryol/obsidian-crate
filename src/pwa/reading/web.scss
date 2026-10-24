@@ -79,7 +79,7 @@ html.pwa-document-reader {
   overflow-x: clip;
   overflow-y: auto;
   // Allow native vertical rubber-banding only while the article is unlocked.
-  &:not(:has(body.pwa-sheet-scroll-locked)) {
+  &:not(.pwa-sheet-scroll-held) {
     &, body { overscroll-behavior-y: contain; }
   }
   body, #app, .crate-feature-shell,
@@ -100,9 +100,6 @@ html.pwa-document-reader {
       height: calc(100dvh - var(--pwa-safe-area-top, env(safe-area-inset-top)));
     }
   }
-  // The fixed body preserves the passage behind a sheet; clipping #app would
-  // otherwise cut off a long article at the original viewport's bottom edge.
-  body.pwa-sheet-scroll-locked #app { overflow: visible !important; }
 }
 
 // Keep reader actions visible, with the same quiet glass surfaces as the dock.

@@ -26,6 +26,6 @@ function HighlightGroup({ entries, onView, disabled, initiallyOpen }: React.Comp
 			<span className="crate-highlight-group__copy"><strong>{readingTitle(item)}</strong><span>{entries.length} {entries.length === 1 ? 'highlight' : 'highlights'} · <time dateTime={date}>{new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time></span></span>
 			<ThemeIcon id={open ? 'chevron-down' : 'chevron-right'} size="s" aria-hidden="true" />
 		</Button>
-		<div id={id} hidden={!open} className="crate-highlight-group__body">{open && <HighlightList entries={entries} hideSource onView={onView} disabled={disabled} />}</div>
+		<div id={id} hidden={!open} className="crate-highlight-group__body">{open && <HighlightList entries={entries} onView={onView} disabled={disabled} />}</div>
 	</section>;
 }

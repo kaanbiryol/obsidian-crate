@@ -82,13 +82,20 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
       await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
     };
+    const noteSheet = page.getByRole('dialog', { name: 'Highlight note', exact: true });
+    // The note stacks over Highlights, so saving or closing it returns to the list.
     const openHighlightNote = async label => {
       await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
       const highlights = page.getByRole('dialog', { name: 'Highlights', exact: true });
       await expect(highlights).toHaveCSS('transform', 'none');
       await highlights.getByRole('button', { name: label, exact: true }).click();
-      await expect(highlights).toHaveCount(0);
-      await expect(page.getByRole('dialog', { name: 'Highlight note', exact: true })).toBeVisible();
+      await expect(noteSheet).toBeVisible();
+      await expect(page.locator('.crate-reading-highlights')).toHaveCount(1);
+    };
+    const closeHighlights = async () => {
+      await expect(noteSheet).toHaveCount(0);
+      await page.getByRole('button', { name: 'Close highlights', exact: true }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
     };
     const setTags = async (tags, offline = false) => {
       await page.getByRole('button', { name: 'Edit article tags' }).click();
@@ -164,11 +171,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await openHighlightNote('Add note');
     await page.getByLabel('Your note').fill('Keep this draft until the article opens');
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
-    await expect(page.getByRole('dialog').getByRole('alert')).toHaveText('Open the article before saving highlights.');
+    await expect(noteSheet.getByRole('alert')).toHaveText('Open the article before saving highlights.');
     await expect(page.getByLabel('Your note')).toHaveValue('Keep this draft until the article opens');
     await expect(toast).toHaveCount(0);
     assert.equal((await pending(page)).length, 0);
-    await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+    await noteSheet.getByRole('button', { name: 'Close highlight note', exact: true }).click();
+    await closeHighlights();
     opening.release();
     await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
     await expect(toast).toHaveCount(0);
@@ -187,17 +195,15 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await openHighlightNote('Add note');
     await page.getByLabel('Your note').fill('First note');
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
-    await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(toast).toHaveText('Note saved');
+    await expect(page.locator('.crate-reading-highlights__note')).toHaveText('First note');
+    await closeHighlights();
     await openHighlightNote('Edit note');
     await page.getByLabel('Your note').fill('Latest note');
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
-    await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(toast).toHaveText('Note saved');
-    await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
     await expect(page.locator('.crate-reading-highlights__note')).toHaveText('Latest note');
-    await page.getByRole('button', { name: 'Close highlights', exact: true }).click();
-    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await closeHighlights();
     const work = await pending(page);
     assert.equal(work.length, 2); assert.equal(work[0].body, firstBody); assert.equal(work[1].body, undefined);
     update.release();

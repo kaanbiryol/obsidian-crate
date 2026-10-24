@@ -172,7 +172,7 @@ export function reminderListStyleCases() {
       await expect(readingRows).toHaveCount(1);
       expect(await readingRows.first().evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
       await page.getByRole('searchbox', { name: 'Search reading' }).fill('');
-      const highlights = page.locator('.crate-reading-highlights__card');
+      const highlights = page.locator('.crate-reading-highlights__item');
       // Every host/presentation shares the same row rhythm, including embedded
       // and reorderable reminders. Hierarchy and passage reading are exceptions.
       const checkSpacing = async () => {
@@ -220,7 +220,9 @@ export function reminderListStyleCases() {
       await expect(projectSurface).toHaveCSS('border-top-width', '1px');
       await expect(projects.locator('.premium-project-group').first()).toHaveCSS('border-top-width', '1px');
       await expect(readingRows.first()).toHaveCSS('border-top-width', '1px');
-      await expect(highlights.first()).toHaveCSS('border-top-width', '1px');
+      // Highlight passages keep their hairline rows in Cards; only articles become cards.
+      await expect(highlights.first()).toHaveCSS('border-top-width', '0px');
+      await expect(highlights.first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(readingRows.first()).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await checkSpacing();
       await page.reload();

@@ -34,7 +34,7 @@ export function PwaModalSheet({
 	const keyboardInset = keyboardInsetOverride ?? measuredKeyboardInset;
 	// Retain the iOS layout/selection-safe lock through the exit animation.
 	// Base UI owns focus containment; trap-focus avoids a second document lock.
-	useLayoutEffect(() => lockSheetDocumentScroll(viewportPortal), [viewportPortal]);
+	useLayoutEffect(() => lockSheetDocumentScroll(), []);
 	const popupRef = useRef<HTMLDivElement>(null);
 	const anchorRef = useRef<HTMLSpanElement>(null);
 	// Final focus can run after the portal anchor has unmounted. Keep the host

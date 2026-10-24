@@ -283,14 +283,23 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const deepButton = await page.getByRole('button', { name: 'Highlights (1)', exact: true }).boundingBox();
     await page.touchscreen.tap(deepButton.x + deepButton.width / 2, deepButton.y + deepButton.height / 2);
 
-    await expect(page.locator('.crate-reading-highlights__card blockquote')).toHaveText(excerpt);
+    await expect(page.locator('.crate-reading-highlights__excerpt')).toHaveText(excerpt);
     const highlightsPage = page.getByRole('dialog', { name: 'Highlights', exact: true });
     await expect.poll(async () => Math.round((await highlightsPage.boundingBox()).height)).toBe(834);
     await expect.poll(async () => Math.round((await highlightsPage.boundingBox()).y)).toBe(10);
     await expect(highlightsPage).toBeVisible();
-    await expect(page.locator('body')).toHaveCSS('top', '0px');
-    await expect(page.locator('#app')).toHaveCSS('top', '-6000px');
+    // The document holds its offset: fixing the body would re-layer the article,
+    // which iOS paints a frame late with the library and its dock showing through.
+    await expect(page.locator('html')).toHaveClass(/pwa-sheet-scroll-held/);
+    await expect(page.locator('html')).toHaveCSS('overflow-y', 'hidden');
+    await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);
+    assert.equal(await page.evaluate(() => window.scrollY), 6000, 'The document keeps its offset under Highlights');
     assert.deepEqual(await page.locator('.crate-reading-reader__body').boundingBox(), backgroundBeforeSheet, 'The article remains behind Highlights without moving');
+    if (name === 'chromium') {
+      await page.mouse.wheel(0, 600);
+      await page.waitForTimeout(100);
+      assert.equal(await page.evaluate(() => window.scrollY), 6000, 'The held article does not scroll behind Highlights');
+    }
     assert.equal(await highlightsPage.evaluate(element => element.closest('.pwa-sheet-portal')?.parentElement === document.body), true);
     const articleUrl = page.url();
     await page.getByRole('button', { name: 'Close highlights', exact: true }).click();
@@ -298,7 +307,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(6000);
     assert.equal(page.url(), articleUrl, 'Dismissing Highlights stays in the article');
     await expect(page.locator('.pwa-sheet-portal')).toHaveCount(0);
-    assert.equal(await page.locator('#app').evaluate(element => element.style.top), '', 'Dismissal restores the app layout');
+    await expect(page.locator('html')).not.toHaveClass(/pwa-sheet-scroll-held/);
     await page.getByRole('button', { name: 'Highlights (1)', exact: true }).evaluate(element => element.click());
     await expect.poll(async () => Math.round((await highlightsPage.boundingBox()).y)).toBe(10);
     await swipe(page, highlightsPage.getByRole('heading', { name: 'Highlights', exact: true }));
@@ -330,10 +339,35 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await longArticle.evaluate(element => element.remove());
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
-    await page.getByRole('button', { name: 'Add note', exact: true }).click();
+    const highlightList = page.getByRole('dialog', { name: 'Highlights', exact: true });
+    const listNote = page.getByRole('dialog', { name: 'Highlight note', exact: true });
+    // The note sheet stacks over Highlights; closing or saving it returns to the list.
+    await highlightList.getByRole('button', { name: 'Add note', exact: true }).click();
+    await expect(listNote).toBeVisible();
+    await expect(page.locator('.crate-reading-highlights')).toHaveCount(1);
+    await listNote.getByRole('button', { name: 'Close highlight note', exact: true }).click();
+    await expect(listNote).toHaveCount(0);
+    await expect(highlightList).toBeVisible();
+    await highlightList.getByRole('button', { name: 'Add note', exact: true }).click();
     await page.getByLabel('Your note', { exact: true }).fill('A thought worth keeping');
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
+    await expect(listNote).toHaveCount(0);
+    await expect(highlightList.locator('.crate-reading-highlights__note')).toHaveText('A thought worth keeping');
     await expect.poll(async () => (await api(`/reading/item?id=${saved.id}`)).item.highlights?.[0]?.note).toBe('A thought worth keeping');
+    await highlightList.getByRole('button', { name: 'Close highlights', exact: true }).click();
+    // The selection menu edits the same note without a trip through the list.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await marks.first().tap();
+    await page.getByRole('button', { name: 'Edit highlight note', exact: true }).tap();
+    await expect(page.getByRole('group', { name: 'Highlight actions' })).toHaveCount(0);
+    const noteSheet = page.getByRole('dialog', { name: 'Highlight note', exact: true });
+    const noteField = noteSheet.getByLabel('Your note', { exact: true });
+    await expect(noteField).toHaveValue('A thought worth keeping');
+    await expect(noteSheet.getByRole('button', { name: 'Save note', exact: true })).toBeDisabled();
+    await noteField.fill('A thought worth keeping, revisited');
+    await noteSheet.getByRole('button', { name: 'Save note', exact: true }).click();
+    await expect(noteSheet).toHaveCount(0);
+    await expect.poll(async () => (await api(`/reading/item?id=${saved.id}`)).item.highlights?.[0]?.note).toBe('A thought worth keeping, revisited');
     await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
     // Wait for the reader exit and native history traversal before opening another entry.
     await expect.poll(() => new URL(page.url()).searchParams.get('item')).toBeNull();
@@ -343,7 +377,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button', { name: 'Highlights', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Highlights', exact: true })).toBeVisible();
     await page.getByRole('searchbox', { name: 'Search reading' }).fill('worth keeping');
-    await expect(page.locator('.crate-reading-highlights__card')).toHaveCount(1);
+    await expect(page.locator('.crate-reading-highlights__item')).toHaveCount(1);
     await page.screenshot({ path: `test-results/reading/${name}-highlights-library.png` });
     await page.getByRole('button', { name: 'View in article', exact: true }).click();
     await expect(marks.first()).toBeFocused();
@@ -445,7 +479,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.equal(await code.textContent(), literalCode);
     await expect(code.locator('.hljs-keyword')).toHaveText('let');
     await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
-    assert.equal(await page.locator('.crate-reading-highlights__card blockquote').textContent(), codeExcerpt);
+    assert.equal(await page.locator('.crate-reading-highlights__excerpt').textContent(), codeExcerpt);
     await page.screenshot({ path: `test-results/reading/${name}-code-highlights.png` });
 
     // Exercise the actual sanitized reader, offline queue, and source writer
@@ -512,7 +546,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.reload();
       await expect.poll(async () => (await marks.allTextContents()).join('')).toBe(excerpt);
       await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
-      assert.equal(await page.locator('.crate-reading-highlights__card blockquote:visible').textContent(), excerpt);
+      assert.equal(await page.locator('.crate-reading-highlights__excerpt:visible').textContent(), excerpt);
       await page.getByRole('button', { name: 'View in article', exact: true }).click();
       await expect(marks.first()).toBeFocused();
       await marks.first().tap();

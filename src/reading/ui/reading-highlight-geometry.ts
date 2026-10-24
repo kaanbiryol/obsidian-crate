@@ -1,6 +1,8 @@
 type Box = { left: number; top: number; width: number; height: number };
 type Rect = Box & { right: number; bottom: number };
 export type HighlightGeometry = { boxes: Box[]; start: Box; end: Box; menu: { left: number; top: number }; feedback: { left: number; top: number } };
+/** Matches `.crate-reading-reader__selection`: Copy, Share, Note and Delete. */
+export const HIGHLIGHT_MENU_WIDTH = 256;
 
 /** Place the selection overlay in reader coordinates, clear of the header and handles. */
 export function readingHighlightGeometry({ rects, bounds, scrollTop, viewportHeight, navigationBottom, headingBottom }: {
@@ -19,8 +21,8 @@ export function readingHighlightGeometry({ rects, bounds, scrollTop, viewportHei
 	// Keep the toolbar close, with extra clearance only where it crosses a handle.
 	const passageLeft = Math.min(...rects.map(rect => rect.left));
 	const passageRight = Math.max(...rects.map(rect => rect.right));
-	const left = Math.max(12, Math.min(bounds.width - 220, (passageLeft + passageRight) / 2 - bounds.left - 104));
-	const clearsHandles = [firstRect.left, lastRect.right].every(x => x + 22 <= bounds.left + left || x - 22 >= bounds.left + left + 208);
+	const left = Math.max(12, Math.min(bounds.width - HIGHLIGHT_MENU_WIDTH - 12, (passageLeft + passageRight) / 2 - bounds.left - HIGHLIGHT_MENU_WIDTH / 2));
+	const clearsHandles = [firstRect.left, lastRect.right].every(x => x + 22 <= bounds.left + left || x - 22 >= bounds.left + left + HIGHLIGHT_MENU_WIDTH);
 	const gap = clearsHandles ? 8 : 28;
 	const above = firstRect.top - 52 - gap;
 	const below = lastRect.bottom + gap;

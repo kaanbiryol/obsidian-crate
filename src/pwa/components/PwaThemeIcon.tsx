@@ -46,6 +46,8 @@ import {
   Sparkles,
   SquarePen,
   Smartphone,
+  StickyNote,
+  ExternalLink,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -100,6 +102,8 @@ const ICONS: Record<string, LucideIcon> = {
   sparkles: Sparkles,
   'square-pen': SquarePen,
   smartphone: Smartphone,
+  'sticky-note': StickyNote,
+  'external-link': ExternalLink,
 };
 
 const ICON_SIZES: Record<ThemeIconSize, number> = {

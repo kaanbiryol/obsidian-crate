@@ -39,14 +39,20 @@ rendered-text mismatch (for example, malformed HTML repaired differently by the
 browser) still stops the edit instead of attaching a highlight to the wrong text.
 
 Releasing an article selection saves its highlight and opens a menu with **Copy**,
-**Share**, and **Delete highlight**. Copy and Share operate on the excerpt text;
-Share falls back to copying when native sharing is unavailable. Scrolling, tapping
+**Share**, **Note**, and **Delete highlight**. Copy and Share operate on the excerpt text;
+Share falls back to copying when native sharing is unavailable. **Note** opens the
+highlight's note sheet once its save has finished. Scrolling, tapping
 outside, or Escape dismisses the controls while retaining the highlight. Tapping
 a saved highlight reopens the menu and custom resize handles. A pending save does
 not disable Copy or Share, and a late completion never reopens a dismissed menu.
 
 The shared reader offers **Article** and **Highlights**, with personal notes and
-**View in article** navigation. The library's **Highlights** view collects excerpts
+**View in article** navigation. Highlights render as compact rows: an accent bar
+beside the excerpt, the note below it, and the date with a trailing note control.
+Selecting a row opens its passage. The note sheet shows the excerpt above one
+field and saves from its header; the save control stays disabled until the note
+changes, and the typed note survives a failed save. Opened from the Highlights
+sheet, the note sheet stacks over it, so saving or closing returns to the list. The library's **Highlights** view collects excerpts
 from inbox, favorites, and archived articles; search covers excerpts, annotations,
 titles, authors, sources, and tags. Article and tag filters narrow the results.
 The list renders at most 100 excerpts until **Show more** is selected. The PWA

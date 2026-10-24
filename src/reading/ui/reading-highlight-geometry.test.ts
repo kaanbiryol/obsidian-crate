@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readingHighlightGeometry } from './reading-highlight-geometry';
+import { HIGHLIGHT_MENU_WIDTH, readingHighlightGeometry } from './reading-highlight-geometry';
 
 const rect = (left: number, top: number, width: number, height: number) => ({ left, top, width, height, right: left + width, bottom: top + height });
 
@@ -24,7 +24,7 @@ describe('reading highlight geometry', () => {
 		})!;
 		expect(geometry.menu.top).toBeGreaterThan(244);
 		expect(geometry.menu.left).toBeGreaterThanOrEqual(12);
-		expect(geometry.menu.left + 208).toBeLessThanOrEqual(390 - 12);
+		expect(geometry.menu.left + HIGHLIGHT_MENU_WIDTH).toBeLessThanOrEqual(390 - 12);
 	});
 
 	it('keeps the toolbar and feedback in view near the bottom of a narrow viewport', () => {
@@ -32,7 +32,7 @@ describe('reading highlight geometry', () => {
 			bounds: rect(0, 0, 320, 844), scrollTop: 100, viewportHeight: 600,
 			navigationBottom: 60, rects: [rect(250, 570, 50, 24)],
 		})!;
-		expect(geometry.menu.left + 208).toBeLessThanOrEqual(320 - 12);
+		expect(geometry.menu.left + HIGHLIGHT_MENU_WIDTH).toBeLessThanOrEqual(320 - 12);
 		expect(geometry.menu.top - 100 + 52).toBeLessThanOrEqual(600);
 		expect(geometry.feedback.top).toBeLessThan(geometry.menu.top);
 		expect(geometry.feedback.top - 100).toBeGreaterThanOrEqual(68);

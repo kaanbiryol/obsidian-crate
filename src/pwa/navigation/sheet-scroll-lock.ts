@@ -4,7 +4,7 @@ let lockCount = 0;
 let restoreDocument: (() => void) | undefined;
 
 /** Lock the page, without intercepting selection or scrolling inside the sheet. */
-export function lockSheetDocumentScroll(viewportPortal = false): () => void {
+export function lockSheetDocumentScroll(): () => void {
 	if (lockCount++ === 0) {
 		// A list screen returns its document offset first, so sheets recede it as usual.
 		const resume = suspendDocumentScroll();
@@ -19,23 +19,18 @@ export function lockSheetDocumentScroll(viewportPortal = false): () => void {
 		let layoutHeight = measureLayoutHeight();
 		const scrollX = window.scrollX;
 		const scrollY = window.scrollY;
-		// A viewport portal is outside #app. Keep the body at the viewport origin
-		// and offset only the article canvas, so WebKit never clips an offscreen body.
-		const app = viewportPortal && root.classList.contains('pwa-document-reader')
-			? document.getElementById('app') : null;
-		const savedStyles = [
-			...(['top', 'left'] as const).map(property => ({ element: body, property })),
-			...(app ? (['top', 'left'] as const).map(property => ({ element: app, property })) : []),
-		].map(({ element, property }) => ({ element, property,
-			value: element.style.getPropertyValue(property), priority: element.style.getPropertyPriority(property),
+		// The phone reader scrolls the document. Fixing the body would move its
+		// long article into a new layer, which iOS paints a frame late, showing
+		// the library behind it. Hold the document at its offset instead.
+		const hold = root.classList.contains('pwa-document-reader');
+		const savedStyles = (hold ? [] : ['top', 'left'] as const).map(property => ({ property,
+			value: body.style.getPropertyValue(property), priority: body.style.getPropertyPriority(property),
 		}));
-		body.classList.add('pwa-sheet-scroll-locked');
-		body.style.setProperty('top', `${app ? 0 : -scrollY}px`, 'important');
-		body.style.setProperty('left', `${app ? 0 : -scrollX}px`, 'important');
-		if (app) {
-			app.classList.add('pwa-sheet-canvas-locked');
-			app.style.setProperty('top', `${-scrollY}px`, 'important');
-			app.style.setProperty('left', `${-scrollX}px`, 'important');
+		if (hold) root.classList.add('pwa-sheet-scroll-held');
+		else {
+			body.classList.add('pwa-sheet-scroll-locked');
+			body.style.setProperty('top', `${-scrollY}px`, 'important');
+			body.style.setProperty('left', `${-scrollX}px`, 'important');
 		}
 		const preserveLayoutHeight = () => {
 			if (window.innerWidth !== layoutWidth) {
@@ -52,12 +47,13 @@ export function lockSheetDocumentScroll(viewportPortal = false): () => void {
 		restoreDocument = () => {
 			window.removeEventListener('resize', preserveLayoutHeight);
 			body.classList.remove('pwa-sheet-scroll-locked');
-			app?.classList.remove('pwa-sheet-canvas-locked');
+			root.classList.remove('pwa-sheet-scroll-held');
 			root.style.removeProperty('--pwa-sheet-layout-height');
-			for (const { element, property, value, priority } of savedStyles) {
-				if (value) element.style.setProperty(property, value, priority);
-				else element.style.removeProperty(property);
+			for (const { property, value, priority } of savedStyles) {
+				if (value) body.style.setProperty(property, value, priority);
+				else body.style.removeProperty(property);
 			}
+			// Also returns a held document that a focused field scrolled.
 			window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
 			resume();
 		};

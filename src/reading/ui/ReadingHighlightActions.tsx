@@ -7,17 +7,19 @@ import { readingHighlightGeometry, type HighlightGeometry } from './reading-high
 import { registerReadingHighlightInteraction, type HighlightEdit } from './reading-highlight-interaction';
 
 /** Native initial selection; portable handles for editing a saved annotation. */
-export function ReadingHighlightActions({ body, article, content, highlights, onSave, onCopyComplete, onSelect, disabled }: {
+export function ReadingHighlightActions({ body, article, content, highlights, onSave, onAnnotate, onCopyComplete, onSelect, disabled }: {
 	body: React.RefObject<HTMLDivElement | null>; article: React.RefObject<HTMLElement | null>;
 	content: DocumentFragment | null; highlights: ReadingHighlight[]; onSave: (highlights: ReadingHighlight[]) => Promise<void>; disabled: boolean;
+	/** Opens the note editor for a saved highlight. */
+	onAnnotate: (highlight: ReadingHighlight) => void;
 	onCopyComplete?: () => void; onSelect?: (highlight: ReadingHighlight) => void;
 }) {
 	const controls = useRef<HTMLDivElement>(null), editing = useRef<HighlightEdit | null>(null), saving = useRef(false);
-	const latest = useRef({ highlights, onSave, onCopyComplete, onSelect, disabled });
-	useLayoutEffect(() => { latest.current = { highlights, onSave, onCopyComplete, onSelect, disabled }; }, [highlights, onSave, onCopyComplete, onSelect, disabled]);
+	const latest = useRef({ highlights, onSave, onAnnotate, onCopyComplete, onSelect, disabled });
+	useLayoutEffect(() => { latest.current = { highlights, onSave, onAnnotate, onCopyComplete, onSelect, disabled }; }, [highlights, onSave, onAnnotate, onCopyComplete, onSelect, disabled]);
 	const [draft, setDraft] = useState<HighlightEdit | null>(null), [geometry, setGeometry] = useState<HighlightGeometry | null>(null);
 	const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
-	const commands = useRef({ copy: () => {}, share: () => {}, save: () => {}, remove: () => {} });
+	const commands = useRef({ copy: () => {}, share: () => {}, annotate: () => {}, save: () => {}, remove: () => {} });
 	const [transferBusy, setTransferBusy] = useState(false);
 	const [feedback, setFeedback] = useState<{ message: string; failed: boolean } | null>(null);
 	const [layout, setLayout] = useState(0);
@@ -95,6 +97,14 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		commands.current = {
 			copy: () => { void transfer(false); },
 			share: () => { void transfer(true); },
+			annotate: () => {
+				const value = editing.current;
+				if (!value || saving.current) return;
+				const saved = savedHighlight(latest.current.highlights, value.highlight);
+				if (!saved) { setFeedback({ message: 'Save this highlight before adding a note.', failed: true }); return; }
+				dismiss();
+				latest.current.onAnnotate(saved);
+			},
 			save: () => { if (editing.current) void persist(editing.current, retryRemove); },
 			remove: () => { if (editing.current) void persist(editing.current, true); },
 		};
@@ -112,6 +122,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		return () => { alive = false; interaction.dispose(); };
 	}, [article, body]);
 
+	const note = draft && savedHighlight(highlights, draft.highlight)?.note;
 	return draft && geometry && <div ref={controls} className="crate-reading-reader__highlight-editor">
 		<div aria-hidden="true">{geometry.boxes.map((box, index) => <span key={index} className="crate-reading-reader__highlight-preview" style={box} />)}</div>
 		{(['start', 'end'] as const).map(edge => {
@@ -122,6 +133,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		<div className="crate-reading-reader__selection" role="group" aria-label="Highlight actions" style={geometry.menu}>
 			<Button variant="ghost" aria-label="Copy text" disabled={transferBusy} onClick={() => commands.current.copy()}>Copy</Button>
 			<Button variant="ghost" aria-label="Share text" disabled={transferBusy} onClick={() => commands.current.share()}>Share</Button>
+			<Button variant="ghost" aria-label={note ? 'Edit highlight note' : 'Add highlight note'} disabled={busy || disabled} onClick={() => commands.current.annotate()}>Note</Button>
 			<span className="crate-reading-reader__selection-divider" aria-hidden="true" />
 			<IconButton className="crate-reading-reader__delete-highlight" icon="trash-2" size="large" variant="surface" tone="danger" label="Delete highlight" disabled={busy || disabled} onClick={() => commands.current.remove()} />
 			{busy && <span className="crate-reading__sr-only" role="status">Saving highlight</span>}
@@ -129,4 +141,8 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		{feedback && !error && <div className="crate-reading-reader__highlight-error" style={geometry.feedback}><p role={feedback.failed ? 'alert' : 'status'}>{feedback.message}</p></div>}
 		{error && <div className="crate-reading-reader__highlight-error" style={geometry.feedback}><p role="alert">{error}</p><Button variant="ghost" disabled={busy || disabled} onClick={() => commands.current.save()}>Retry highlight</Button></div>}
 	</div>;
+}
+
+function savedHighlight(highlights: ReadingHighlight[], highlight: ReadingHighlight): ReadingHighlight | undefined {
+	return highlights.find(entry => entry.start === highlight.start && entry.end === highlight.end);
 }

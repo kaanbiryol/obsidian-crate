@@ -4,31 +4,42 @@ import { timestampLabel } from '../core/transcript';
 import type { ReadingHighlight } from '../core/highlights';
 import type { ReadingMetadata } from '../core/model';
 import { Button } from '../../ui/shared/Button';
+import { IconButton } from '../../ui/shared/IconButton';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 
-export function HighlightList<T extends ReadingMetadata>({ entries, onView, onAnnotate, disabled = false, hideSource = false, moment, onPlay }: {
+function highlightDate(value: string): string {
+	const date = new Date(value);
+	return date.toLocaleDateString(undefined, date.getFullYear() === new Date().getFullYear()
+		? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Compact rows: the row opens the passage; trailing controls stay separate targets. */
+export function HighlightList<T extends ReadingMetadata>({ entries, onView, onAnnotate, disabled = false, moment, onPlay }: {
 	moment?: (highlight: ReadingHighlight) => number | undefined;
 	onPlay?: (seconds: number) => void;
 	entries: { item: T; highlight: ReadingHighlight }[];
 	onView?: (item: T, highlight: ReadingHighlight) => void;
 	onAnnotate?: (item: T, highlight: ReadingHighlight) => void;
 	disabled?: boolean;
-	hideSource?: boolean;
 }) {
-	return <ul className="crate-reading-highlights" aria-label="Highlights">{entries.map(({ item, highlight }, index) => <li className="crate-reading-highlights__card" key={`${item.crate_reading_id}:${highlight.id ?? index}`}>
-		<blockquote>{highlight.text}</blockquote>
-		{!hideSource && <div className="crate-reading-highlights__source"><strong>{item.title}</strong>{item.author && <span>{item.author}</span>}{highlight.createdAt && <time dateTime={highlight.createdAt}>{new Date(highlight.createdAt).toLocaleDateString()}</time>}</div>}
-		{highlight.note && <p className="crate-reading-highlights__note">{highlight.note}</p>}
-		{(onView || onAnnotate) && <div className="crate-reading-highlights__actions">
-			{onView && <Button variant="ghost" size="touch" data-reading-id={item.crate_reading_id} disabled={disabled} onClick={() => onView(item, highlight)}>
-				<ThemeIcon id="arrow-up-right" size="s" aria-hidden="true" />
-				<span>{youtubeVideoId(item.source_url) ? 'View in transcript' : 'View in article'}</span>
+	return <ul className="crate-reading-highlights" aria-label="Highlights">{entries.map(({ item, highlight }, index) => {
+		const seconds = moment?.(highlight);
+		return <li className="crate-reading-highlights__item" data-openable={onView ? '' : undefined} key={`${item.crate_reading_id}:${highlight.id ?? index}`}>
+			{onView && <Button className="crate-reading-highlights__open" data-reading-id={item.crate_reading_id} disabled={disabled} onClick={() => onView(item, highlight)}>
+				<span className="crate-reading__sr-only">{youtubeVideoId(item.source_url) ? 'View in transcript' : 'View in article'}</span>
 			</Button>}
-			{moment?.(highlight) !== undefined && <><Button variant="ghost" size="touch" onClick={() => onPlay?.(moment(highlight)!)}>Seek to {timestampLabel(moment(highlight)!)}</Button><a href={youtubeMomentUrl(item.source_url, moment(highlight)!)} target="_blank" rel="noopener noreferrer">Open moment on YouTube</a></>}
-			{onAnnotate && <Button variant="ghost" size="touch" disabled={disabled} onClick={() => onAnnotate(item, highlight)}>
-				<ThemeIcon id="square-pen" size="s" aria-hidden="true" />
-				<span>{highlight.note ? 'Edit note' : 'Add note'}</span>
-			</Button>}
-		</div>}
-	</li>)}</ul>;
+			<blockquote className="crate-reading-highlights__excerpt">{highlight.text}</blockquote>
+			{highlight.note && <p className="crate-reading-highlights__note"><ThemeIcon id="sticky-note" size="xs" aria-hidden="true" /><span>{highlight.note}</span></p>}
+			<div className="crate-reading-highlights__meta">
+				{highlight.createdAt ? <time dateTime={highlight.createdAt}>{highlightDate(highlight.createdAt)}</time> : <span />}
+				<div className="crate-reading-highlights__actions">
+					{seconds !== undefined && <>
+						<Button className="crate-reading-highlights__seek" aria-label={`Seek to ${timestampLabel(seconds)}`} onClick={() => onPlay?.(seconds)}><ThemeIcon id="play" size="xs" aria-hidden="true" /><span>{timestampLabel(seconds)}</span></Button>
+						<a className="crate-reading-highlights__link" href={youtubeMomentUrl(item.source_url, seconds)} target="_blank" rel="noopener noreferrer" aria-label="Open moment on YouTube" title="Open moment on YouTube"><ThemeIcon id="external-link" size="s" aria-hidden="true" /></a>
+					</>}
+					{onAnnotate && <IconButton className="crate-reading-highlights__annotate" icon="square-pen" iconSize="s" label={highlight.note ? 'Edit note' : 'Add note'} disabled={disabled} onClick={() => onAnnotate(item, highlight)} />}
+				</div>
+			</div>
+		</li>;
+	})}</ul>;
 }
