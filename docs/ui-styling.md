@@ -209,6 +209,7 @@ Dock morphs use the shared collapsed height.
 - `src/pwa/components/PwaToast.tsx` renders feedback from `useToast` in either
   feature. Errors use assertive alerts; other feedback uses polite status messages.
   Both features share bottom-center positioning above the dock and safe area.
+  Toasts use the chrome glass with a denser fill so their text stays legible.
   Toasts fade in and out over 160ms without moving; reduced motion skips the fade.
   Replacing feedback updates the current toast instead of stacking another one.
   Reading confirms explicit link, tag, and highlight-note saves after local
@@ -417,8 +418,10 @@ the destination icon without shifting it or adding a badge background. The cache
 launch shell uses the same order, visibility, and selection before React starts.
 
 Both hosts’ **Reminders** screens contain a compact **Today / Upcoming** segmented
-control with a shared frosted track and sliding selection. It uses 13px labels
-and a 32px visible track within 44px touch targets.
+control with a translucent track and sliding selection. The PWA track uses the
+chrome glass, keeping its rim without a floating shadow because it sits in the
+list flow; Obsidian keeps the shared frosted track. It uses 13px labels and a
+32px visible track within 44px touch targets.
 `ScheduleSwitcher` in `src/ui/shared/navigation/` keeps the controls mounted while the shared reminder panels
 change. Their content reuses the shared `TabTransition` for the same stationary dissolve
 as dock navigation, while the heading and segmented control stay mounted.
@@ -738,7 +741,8 @@ into the host background from the pill's top edge through the bottom safe area,
 with only slight softening, so rows recede instead of remaining readable through
 the controls.
 The PWA uses one glass material for all floating chrome: the dock pill, add
-button, back button, header actions, and article reader controls.
+button, back button, header actions, article reader controls, sheet header
+buttons, the **Today / Upcoming** track, and toasts.
 `src/pwa/styles/_glass.scss` defines it; the theme files set its `--pwa-glass-*`
 fill, sheen, border, rim, and shadow. A translucent fill blurs and saturates the
 content behind it, with a bright top rim and a soft shadow small enough to stay
@@ -939,10 +943,12 @@ there are no footer actions. Saving includes unfinished input and removes
 duplicate tags. Chip colors match the rich-text editor's accent treatment; the
 compound field owns its focus outline and retains 44px touch targets.
 
-All PWA sheet header buttons use the shared rounded surface from
-`_sheet-headers.scss`, including close/back controls, text actions, and secondary
-icon actions. Save and destructive actions retain their semantic text colors;
-features must not opt in by action name or duplicate the surface styling.
+All PWA sheet header buttons use the chrome glass through
+`_rounded-sheet-control.scss`, applied in `_sheet-headers.scss` to close/back
+controls, destructive actions, and secondary icon actions. Plain text actions
+and the tonal submit circle keep their own treatment. Save and destructive actions
+retain their semantic text colors; features must not opt in by action name or
+duplicate the surface styling.
 
 Disabled server Reading keeps the library header, search, sidebar, and tab bar.
 Show setup guidance inline in the list area with the shared empty-state styles,

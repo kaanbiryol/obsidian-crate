@@ -1,4 +1,12 @@
+@use "glass";
+
 @mixin styles {
+	// Toasts float over content in the chrome glass, denser so their text stays legible.
+	.toast {
+		@include glass.surface($fill: 82%);
+		color: var(--text-normal);
+	}
+
 	.pwa-notice {
 		padding: 12px 12px 2px;
 		border: 1px solid var(--background-modifier-border);

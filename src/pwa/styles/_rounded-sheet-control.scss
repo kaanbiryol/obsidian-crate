@@ -1,16 +1,18 @@
+@use "glass";
+
+// Sheet header buttons use the chrome glass. Important flags outrank the shared
+// modal header, which forces transparent close buttons.
 @mixin surface {
+  @include glass.surface($important: true);
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
-  background: var(--background-primary-alt) !important;
 
   &:hover:not(:focus-visible) {
-    border-color: color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
-    background: var(--background-primary-alt) !important;
+    @include glass.surface($important: true);
   }
 
   @media (hover: hover) and (pointer: fine) {
     &:hover:not(:disabled) {
-      background: color-mix(in srgb, var(--text-normal) 5%, var(--background-primary-alt)) !important;
+      background-color: color-mix(in srgb, var(--pwa-glass-fill) 82%, transparent) !important;
     }
   }
 }

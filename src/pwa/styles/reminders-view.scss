@@ -15,6 +15,7 @@
 @use './reminder-sync-notices';
 @use './reminder-pagination';
 @use './schedule-switcher';
+@use './glass';
 
 .crate-reminders-ui {
 	@include editor-fields.styles;
@@ -33,6 +34,12 @@
 	@include reminder-sync-notices.styles;
 	@include reminder-pagination.styles;
 	@include schedule-switcher.styles;
+	// The PWA track uses the chrome glass; Obsidian keeps the shared frosted track.
+	// It sits in the list flow, so it keeps the rim without a floating shadow.
+	.pwa-schedule-control::before {
+		@include glass.surface;
+		box-shadow: var(--pwa-glass-rim);
+	}
 	@include reminder-cards.flat-styles;
 	@include projects.flat-styles;
 
