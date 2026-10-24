@@ -9,7 +9,7 @@ Crate keeps reminders as Markdown tasks in your vault. Work with them in Obsidia
 
 1. Open Obsidian's command palette and run **Crate: Create reminder**.
 2. Enter a title such as “Send the proposal tomorrow at 12” and review the parsed date. You can set the date explicitly, choose a project, add a description, mark a priority, or make it repeat.
-3. Save the reminder, then run **Crate: Open reminders sidebar** to see your reminders.
+3. Save the reminder, then run **Crate: Open sidebar** to see your reminders.
 
 Reminders starts enabled and uses the `Reminders` folder. Once connected to a server, you can choose a different folder under **Settings → Crate → Reminders → Reminders folder**. Local reminders do not require a server; syncing and notifications do.
 

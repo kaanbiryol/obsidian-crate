@@ -23,7 +23,7 @@ export class RemindersView extends ItemView {
     }
 
     getDisplayText(): string {
-        return "Reminders";
+        return "Crate";
     }
 
     getIcon(): string {

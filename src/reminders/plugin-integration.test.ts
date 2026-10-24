@@ -248,11 +248,11 @@ describe('initializeReminders', () => {
 		}
 		expect(plugin.registerEditorExtension).toHaveBeenCalledWith('extension');
 		expect(plugin.registerView).toHaveBeenCalledWith('reminders-view', expect.any(Function));
-		expect(plugin.addRibbonIcon).toHaveBeenCalledWith('crate-logo', 'Open reminders', expect.any(Function));
+		expect(plugin.addRibbonIcon).toHaveBeenCalledWith('crate-logo', 'Open Crate', expect.any(Function));
 		expect(registerReminderCommands).toHaveBeenCalledWith(plugin);
 		expect(plugin.addCommand).toHaveBeenCalledWith(expect.objectContaining({
 			id: 'open-reminders-view',
-			name: 'Open reminders sidebar',
+			name: 'Open sidebar',
 		}));
 		expect(plugin.addCommand).not.toHaveBeenCalledWith(expect.objectContaining({
 			id: 'open-reminders-fullscreen',

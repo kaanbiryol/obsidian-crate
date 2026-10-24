@@ -44,7 +44,7 @@ export async function registerReminderIntegrations(plugin: CratePlugin, openView
 		VIEW_TYPE_REMINDERS,
 		(leaf) => new RemindersView(leaf, plugin),
 	);
-	const ribbon = plugin.addRibbonIcon(CRATE_ICON_ID, 'Open reminders', () => {
+	const ribbon = plugin.addRibbonIcon(CRATE_ICON_ID, 'Open Crate', () => {
 		void openView();
 	});
 
@@ -53,7 +53,7 @@ export async function registerReminderIntegrations(plugin: CratePlugin, openView
 
 	plugin.addCommand({
 		id: 'open-reminders-view',
-		name: 'Open reminders sidebar',
+		name: 'Open sidebar',
 		callback: () => openView(),
 	});
 
