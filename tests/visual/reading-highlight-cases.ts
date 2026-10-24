@@ -121,6 +121,11 @@ export function registerReadingHighlightTests() {
         await note.getByRole('button', { name: 'Save note', exact: true }).click();
         await expect(note).toHaveCount(0);
         await expect(list.locator('.crate-reading-highlights__note')).toHaveText('From the list');
+        await list.getByRole('button', { name: 'Delete highlight', exact: true }).click();
+        const confirmDelete = page.getByRole('dialog', { name: 'Delete highlight', exact: true });
+        await confirmDelete.getByRole('button', { name: 'Confirm delete highlight', exact: true }).click();
+        await expect(confirmDelete).toHaveCount(0);
+        await expect(list.locator('.crate-reading-highlights__item')).toHaveCount(0);
         await list.getByRole('button', { name: 'Close highlights', exact: true }).click();
         await expect(list).toHaveCount(0);
       });

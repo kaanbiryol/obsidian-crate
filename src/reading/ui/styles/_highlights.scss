@@ -1,6 +1,6 @@
 @use "../../../ui/shared/styles/list-item";
 
-// Linear-style rows: quiet hairlines, an accent bar per excerpt and trailing controls.
+// Linear-style rows: quiet hairlines, an accent dot per excerpt and always-visible row controls.
 .crate-reminders-ui .crate-reading-highlights {
 	--crate-highlight-accent: var(--text-highlight-bg, #c7a73d);
 	list-style: none; margin: 0; padding: 0; display: grid;
@@ -35,41 +35,60 @@
 	&__item[data-openable] > :not(.crate-reading-highlights__open) { pointer-events: none; }
 	&__excerpt {
 		position: relative; margin: 0; padding: 0 0 0 var(--crate-space-12);
-		border: 0; font-size: 15px; line-height: 1.55; white-space: pre-wrap; color: var(--text-normal);
-		&::before { content: ''; position: absolute; top: .25em; bottom: .25em; left: 0; width: 3px; border-radius: 2px; background: var(--crate-highlight-accent); }
+		border: 0; font-size: 15px; line-height: 1.55; white-space: pre-wrap; color: color-mix(in srgb, var(--text-normal) 86%, transparent);
+		&::before { content: ''; position: absolute; top: calc(.775em - 3px); left: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--crate-highlight-accent); }
 	}
+	// Long passages stay short in the list; the article shows the whole excerpt.
+	&__item[data-openable] > .crate-reading-highlights__excerpt {
+		display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden;
+	}
+	// The note reads as a quoted reply: a thin rule beside muted text.
 	&__note {
-		position: relative; display: flex; gap: var(--crate-space-8); margin: 0 0 0 var(--crate-space-12);
+		position: relative; margin: 2px 0 0 var(--crate-space-12); padding-left: var(--crate-space-12);
+		border-left: 2px solid var(--crate-divider); border-radius: 0;
 		font-size: 14px; line-height: 1.5; white-space: pre-wrap; color: var(--text-muted);
-		svg { flex-shrink: 0; margin-top: 3px; color: var(--text-faint); }
 	}
 	&__meta {
 		position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--crate-space-8);
-		min-height: 36px; margin-left: var(--crate-space-12);
+		min-height: 44px; margin-left: var(--crate-space-12);
 		font-size: 12px; line-height: 1.4; color: var(--text-faint); font-variant-numeric: tabular-nums;
 	}
+	// 44px controls with 16px icons; negative margins keep the icons on the text edge.
 	&__actions {
-		display: flex; align-items: center; gap: var(--crate-space-4); margin-right: calc(-1 * var(--crate-space-6));
+		display: flex; align-items: center; margin-right: -14px;
 		pointer-events: auto;
-		// Compact 32px controls keep 44px touch targets.
 		> :is(button, a) { position: relative; flex-shrink: 0; }
-		> :is(button, a)::after { content: ''; position: absolute; inset: -6px; }
 	}
-	&__annotate.crate-icon-button { --crate-icon-button-control-size: 32px; border-radius: 8px; }
+	// Option B toolbar: the date on the text edge, controls grouped on the right.
+	&__toolbar {
+		position: relative; display: flex; align-items: center; min-height: 44px;
+		margin: calc(-1 * var(--crate-space-4)) -14px 0 calc(var(--crate-space-12) - 14px);
+		> * { position: relative; flex-shrink: 0; pointer-events: auto; }
+		> .crate-icon-button { --crate-icon-button-control-size: 44px; border-radius: 10px; }
+		> .crate-reading-highlights__seek { margin-inline: var(--crate-space-4); }
+		// Line box matches the icon height so the date's glyphs sit on the icons' centre line.
+		> .crate-reading-highlights__date {
+			margin-left: 14px; margin-right: auto; font-size: 12px; line-height: 16px;
+			color: var(--text-faint); font-variant-numeric: tabular-nums; pointer-events: none;
+		}
+		> .crate-reading-highlights__delete[data-tone="danger"][data-variant] { color: color-mix(in srgb, var(--crate-danger) 72%, var(--text-normal)); }
+	}
 	&__link {
-		display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+		display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px;
 		border-radius: 8px; color: var(--text-muted);
 		@media (hover: hover) and (pointer: fine) { &:hover { background: var(--crate-control-hover-bg); color: var(--text-normal); } }
 		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 0; }
 	}
 	&__seek {
-		display: inline-flex; align-items: center; gap: var(--crate-space-4); height: 28px; margin: 0; padding: 0 10px;
+		display: inline-flex; align-items: center; gap: var(--crate-space-4); height: 28px; margin: 0 var(--crate-space-4) 0 0; padding: 0 10px;
 		border: 0; border-radius: 999px; box-shadow: none;
 		background: color-mix(in srgb, var(--text-normal) 8%, transparent); color: var(--text-normal);
 		font: inherit; font-size: 12px; font-weight: 500; cursor: pointer;
 		@media (hover: hover) and (pointer: fine) { &:hover { background: color-mix(in srgb, var(--text-normal) 12%, transparent); } }
 		&[data-press-active] { background: color-mix(in srgb, var(--text-normal) 16%, transparent); }
 		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 0; }
+		// The 28px chip keeps a 44px tall touch target.
+		&::after { content: ''; position: absolute; inset: -8px 0; }
 	}
 }
 .crate-reminders-ui .crate-reading-reader {
@@ -78,7 +97,7 @@
 	&__tabs button[aria-pressed="true"] { background: var(--crate-selection-bg); }
 }
 
-// Highlight note sheet: the excerpt for context, then the shared rounded field.
+// Highlight note sheet: the excerpt for context, then an inline field under a hairline.
 .crate-reminders-ui .crate-reading-note {
 	display: grid; gap: var(--crate-space-16);
 	&__excerpt {
@@ -88,10 +107,14 @@
 		display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden;
 		&::before { content: ''; position: absolute; top: .25em; bottom: .25em; left: 0; width: 3px; border-radius: 2px; background: var(--text-highlight-bg, #c7a73d); }
 	}
+	&__message { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text-normal); }
 	&__input.crate-text-input {
 		display: block; min-height: 132px; max-height: min(320px, 40dvh);
-		padding: 12px var(--crate-field-padding-inline, 16px); line-height: 1.5;
+		padding: var(--crate-space-16) 0 0; line-height: 1.5;
+		border: 0; border-top: 1px solid var(--crate-divider); border-radius: 0; background: transparent;
 		resize: none; field-sizing: content;
+		&:focus { border-color: var(--crate-divider); }
+		&[aria-invalid="true"] { border-color: var(--text-error); }
 	}
 }
 

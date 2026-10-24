@@ -354,6 +354,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
     await expect(listNote).toHaveCount(0);
     await expect(highlightList.locator('.crate-reading-highlights__note')).toHaveText('A thought worth keeping');
+    // Deleting from the list asks first; cancelling keeps the highlight.
+    await highlightList.getByRole('button', { name: 'Delete highlight', exact: true }).click();
+    const confirmDelete = page.getByRole('dialog', { name: 'Delete highlight', exact: true });
+    await expect(confirmDelete).toContainText('This removes the highlight and its note.');
+    await confirmDelete.getByRole('button', { name: /^Close/ }).click();
+    await expect(confirmDelete).toHaveCount(0);
+    await expect(highlightList.locator('.crate-reading-highlights__item')).toHaveCount(1);
     await expect.poll(async () => (await api(`/reading/item?id=${saved.id}`)).item.highlights?.[0]?.note).toBe('A thought worth keeping');
     await highlightList.getByRole('button', { name: 'Close highlights', exact: true }).click();
     // The selection menu edits the same note without a trip through the list.

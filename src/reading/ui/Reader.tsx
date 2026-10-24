@@ -46,7 +46,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	status?: string; onRetry?: () => Promise<void>; notice?: React.ReactNode; mutationPending?: boolean; highlightsPending?: boolean;
 }) {
 	const body = useRef<HTMLDivElement>(null);
-	const tagsFormId = useId(), noteFormId = useId();
+	const tagsFormId = useId(), noteFormId = useId(), deleteFormId = useId();
 	const { error, setError, busy, sharing, copied, run, shareLink } = useReadingReaderActions(item.crate_reading_id);
 	const [dialog, setDialog] = useState<'appearance' | 'tags' | null>(null);
 	const [localAppearance, setLocalAppearance] = useState(DEFAULT_READING_APPEARANCE);
@@ -62,6 +62,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	const targetAfterSheet = useRef(false);
 	const [target, setTarget] = useState<ReadingHighlight | null>(null);
 	const [annotation, setAnnotation] = useState<ReadingHighlight | null>(null), [note, setNote] = useState('');
+	const [pendingDelete, setPendingDelete] = useState<ReadingHighlight | null>(null);
 	// A note opened from the Highlights sheet stacks over it, so closing returns to the list.
 	const [noteOverHighlights, setNoteOverHighlights] = useState(false);
 	const article = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
@@ -90,7 +91,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	useEffect(() => {
 		if (article.current) readerScrollElement(article.current).scrollTo({ top: 0 }); (heading.current ?? article.current)?.focus({ preventScroll: true });
 		setDialog(null); setVideoSeek(null); setVideoPinned(true);
-		setMode('article'); setAnnotation(null); setHighlightsOpen(false); sheetAction.current = null;
+		setMode('article'); setAnnotation(null); setPendingDelete(null); setHighlightsOpen(false); sheetAction.current = null;
 	}, [item.crate_reading_id]);
 	useEffect(() => {
 		// Transfer opening focus without taking it from a control used while loading.
@@ -134,6 +135,11 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		if (!current || current.text !== annotation.text || current.note !== annotation.note) throw new Error('This highlight changed elsewhere. Your note is still here; copy it before reopening the highlight.');
 		await saveHighlights((item.highlights ?? []).map(highlight => highlight === current ? { ...highlight, note: note.trim() } : highlight));
 	};
+	const deleteHighlight = async (target: ReadingHighlight) => {
+		const current = item.highlights?.find(highlight => target.id ? highlight.id === target.id : highlight.start === target.start && highlight.end === target.end);
+		if (!current) throw new Error('This highlight changed elsewhere. Reopen the article and try again.');
+		await saveHighlights((item.highlights ?? []).filter(highlight => highlight !== current));
+	};
 	const canSaveNote = Boolean(annotation) && !busy && !highlightsPending && note.trim() !== (annotation?.note ?? '');
 	const openNote = (highlight: ReadingHighlight, overHighlights = false) => { setError(null); setAnnotation(highlight); setNote(highlight.note ?? ''); setNoteOverHighlights(overHighlights); };
 	const perform = (action: () => void, close?: () => void) => {
@@ -142,9 +148,17 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	const noteDialog = annotation && <ReadingDialog title="Highlight note" action={{ label: 'Save', ariaLabel: 'Save note', type: 'submit', form: noteFormId, disabled: !canSaveNote, busy }} busy={busy} onClose={() => setAnnotation(null)}>{close => <ReadingHighlightNoteForm id={noteFormId} excerpt={annotation.text} note={note} busy={busy} canSave={canSaveNote} error={error} onChange={setNote} onSave={() => { void run(async isCurrent => { await saveNote(); if (!isCurrent()) return; onSaveComplete?.('note'); if (isCurrent()) close(); }); }} />}</ReadingDialog>;
 	const renderHighlights = (close?: () => void) => <>
 		{!item.highlights?.length && <EmptyState compact icon="highlighter" iconColor="secondary" title="No highlights yet" description="Select a passage in the article to save your first highlight." />}
-		<HighlightList moment={highlight => transcriptMoment(segments, highlight.start, highlight.end)} onPlay={seconds => perform(() => { setMode('article'); setVideoSeek({ seconds }); }, close)} entries={(item.highlights ?? []).map(highlight => ({ item, highlight }))} disabled={busy || highlightsPending} onView={(_item, highlight) => perform(() => { targetAfterSheet.current = Boolean(close); setMode('article'); setTarget(highlight); }, close)} onAnnotate={onUpdate ? (_item, highlight) => openNote(highlight, Boolean(close)) : undefined} />
+		<HighlightList moment={highlight => transcriptMoment(segments, highlight.start, highlight.end)} onPlay={seconds => perform(() => { setMode('article'); setVideoSeek({ seconds }); }, close)} entries={(item.highlights ?? []).map(highlight => ({ item, highlight }))} disabled={busy || highlightsPending} onView={(_item, highlight) => perform(() => { targetAfterSheet.current = Boolean(close); setMode('article'); setTarget(highlight); }, close)} onAnnotate={onUpdate ? (_item, highlight) => openNote(highlight, Boolean(close)) : undefined} onDelete={onUpdate ? (_item, highlight) => { setError(null); setPendingDelete(highlight); } : undefined} onCopy={onCopyComplete} />
 		{!!item.highlight_recovery?.length && <details className="crate-reading__notice"><summary>{item.highlight_recovery.length} saved highlights need reselecting</summary><p>The original excerpts are preserved here. Select their current passages in the article to highlight them again.</p><HighlightList entries={item.highlight_recovery.map(highlight => ({ item, highlight }))} /></details>}
 		{close && noteOverHighlights && noteDialog}
+		{pendingDelete && <ReadingDialog title="Delete highlight" action={{ label: 'Delete', ariaLabel: 'Confirm delete highlight', type: 'submit', form: deleteFormId, tone: 'danger', disabled: busy || highlightsPending, busy }} busy={busy} onClose={() => setPendingDelete(null)}>{closeDelete => <form id={deleteFormId} className="crate-reading-note" onSubmit={event => {
+			event.preventDefault();
+			void run(async isCurrent => { await deleteHighlight(pendingDelete); if (isCurrent()) closeDelete(); });
+		}}>
+			<blockquote className="crate-reading-note__excerpt">{pendingDelete.text}</blockquote>
+			<p className="crate-reading-note__message">{pendingDelete.note ? 'This removes the highlight and its note.' : 'This removes the highlight from the article.'}</p>
+			{error && <span className="crate-field__error" role="alert">{error}</span>}
+		</form>}</ReadingDialog>}
 	</>;
 	const minutes = useMemo(() => Math.max(1, Math.ceil((markdown ?? '').trim().split(/\s+/).length / 220)), [markdown]);
 	return <article ref={article} tabIndex={-1} className="crate-reading crate-reading-reader" data-serif={serif} style={{ '--reading-font-size': `${fontSize}px` } as React.CSSProperties}>
