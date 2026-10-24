@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const MIN_SYNC_MOTION_MS = 650;
+const MIN_SYNC_MOTION_MS = 250;
 // Match the outward success wave, which starts with the color transition.
 const SETTLE_MOTION_MS = 1400;
 

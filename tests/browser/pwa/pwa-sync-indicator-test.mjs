@@ -86,10 +86,10 @@ for (const browserType of [chromium, webkit]) {
 		await expect(indicator).toHaveAttribute('data-sync-state', 'synced');
 		await expect(indicator).toHaveAttribute('title', 'All changes synced');
 		await expect(visual).toHaveAttribute('data-visual-state', 'syncing');
-		await page.clock.runFor(250);
+		await page.clock.runFor(150);
 		await expect(visual).toHaveAttribute('data-visual-state', 'syncing');
 		assert.equal(await visual.evaluate(el => getComputedStyle(el).getPropertyValue('--sync-indicator-color').trim()), '#f59e0b', 'Fast success keeps the visual indicator orange through its minimum syncing phase');
-		await page.clock.runFor(400);
+		await page.clock.runFor(100);
 		await expect(visual).toHaveAttribute('data-visual-state', 'settling');
 		assert.equal(await indicator.locator('.crate-sync-indicator__ripple').evaluate(el => getComputedStyle(el).animationName), 'pwa-sync-ripple');
 		assert.equal(await visual.evaluate(el => getComputedStyle(el).getPropertyValue('--sync-indicator-color').trim()), '#22c55e');
