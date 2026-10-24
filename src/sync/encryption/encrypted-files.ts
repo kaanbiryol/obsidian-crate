@@ -39,8 +39,9 @@ export class EncryptedFiles {
 	private constructor(private readonly http: WorkerApiHttpClient, readonly keys: FileKeyAuthority,
 		readonly generation: number, private readonly publicData: PublicDataBuilder) {}
 
-	static async create(http: WorkerApiHttpClient, bundle: VaultKeyBundle, publicData: PublicDataBuilder): Promise<EncryptedFiles> {
-		return new EncryptedFiles(http, await FileKeyAuthority.fromBundle(bundle), bundle.generation, publicData);
+	/** `readingFolder` is where notes the server sealed to the vault are accepted. */
+	static async create(http: WorkerApiHttpClient, bundle: VaultKeyBundle, publicData: PublicDataBuilder, readingFolder?: () => string | null): Promise<EncryptedFiles> {
+		return new EncryptedFiles(http, await FileKeyAuthority.fromBundle(bundle, readingFolder), bundle.generation, publicData);
 	}
 
 	async metadata<T extends WireMetadata>(entries: Array<{ path: string; entry: T }>): Promise<T[]> {

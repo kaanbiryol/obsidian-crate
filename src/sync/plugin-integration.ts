@@ -22,6 +22,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		update => update ? plugin.writeSettings(update) : plugin.saveSettings(),
     () => ensureReminderNotificationPolicy(plugin, true),
 		() => [plugin.remindersSettings.remindersFolderPath],
+		() => plugin.settings.reading?.enabled ? plugin.settings.reading.folderPath : null,
 	);
 	registerSyncStatus(plugin, plugin.syncRuntime, () => {
 		new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();

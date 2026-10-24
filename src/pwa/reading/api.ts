@@ -67,7 +67,7 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
       const indexIdentity = JSON.stringify([keys.vaultId, keys.generation, keys.folderPath]);
       if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
         captureArticle: url => captureServerArticle(url, body => rawReadingRequest('/reading/encrypted-extract', session, body)),
-        folderPath: keys.folderPath, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault },
+        folderPath: keys.folderPath, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault, seal: keys.seal },
         request: (route, wire) => rawReadingRequest(route, session, wire),
         readAttempt: id => readReadingAttempt(session, id),
         writeAttempt: (id, attempt) => writeReadingAttempt(session, id, attempt),

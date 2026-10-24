@@ -144,3 +144,17 @@ it.each(['single', 'batch'] as const)('commits an encrypted %s Markdown upload w
 	expect(await env.DB.prepare('SELECT path FROM files').first()).toEqual({ path: 'note.md' });
 	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).not.toBeNull();
 });
+
+it('rejects a client upload sealed to the vault seal key, even inside the Reading folder', async () => {
+	const { sealFileForVault } = await import('../../../encryption/sealed-file');
+	const path = 'Reading/Article - forged.md';
+	const sealed = await sealFileForVault({ path, content: new TextEncoder().encode('forged article'), contentType: 'text/markdown' },
+		{ vaultId: state.vaultId, keyId: state.seal.keyId, publicKey: state.seal.publicKey });
+	const response = await worker.fetch(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, {
+		method: 'PUT', body: sealed.bytes,
+		headers: { ...headers(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE,
+			'X-File-Hash': sealed.hash, 'X-File-Size': String(sealed.bytes.length), 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
+	}), env);
+	expect(response.status, await response.clone().text()).toBe(428);
+	await expectNoPublication();
+});

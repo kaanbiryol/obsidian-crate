@@ -45,10 +45,11 @@ export { HttpError, SyncTransportError } from './http';
 
 export class SyncApiClient {
 	getEncryptionState() { return readServerEncryption(this.http); }
-	/** Notes inside `reminderFolders()` carry encrypted notification schedules. */
-	async configureEncryption(bundle: VaultKeyBundle, reminderFolders: () => readonly string[]): Promise<void> {
+	/** Notes inside `reminderFolders()` carry encrypted notification schedules; notes the
+	 * server sealed to the vault are accepted only inside `readingFolder()`. */
+	async configureEncryption(bundle: VaultKeyBundle, reminderFolders: () => readonly string[], readingFolder?: () => string | null): Promise<void> {
 		const notifications = await importNotificationKeys(bundle.vaultId, bundle.notifications);
-		const encryption = await EncryptedFiles.create(this.http, bundle, (path, bytes) => createReminderProjection(notifications, reminderFolders(), path, bytes));
+		const encryption = await EncryptedFiles.create(this.http, bundle, (path, bytes) => createReminderProjection(notifications, reminderFolders(), path, bytes), readingFolder);
 		this.syncApi.setEncryption(encryption);
 		this.sharedHistory.setEncryption(encryption);
 		this.sharedSettingsApi.setEncryption(encryption);

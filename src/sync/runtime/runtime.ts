@@ -125,6 +125,8 @@ export class SyncRuntime {
 	private prepareReminderScope?: () => Promise<void>,
 		/** Notes inside these folders carry encrypted notification schedules. */
 		private reminderFolders: () => readonly string[] = () => [],
+		/** Where notes the server sealed to the vault (Save to Crate captures) are accepted. */
+		private readingFolder: () => string | null = () => null,
 	) {
 		this.initializing = this.isConfigured();
 		this.serverStatus = new RuntimeServerStatus({
@@ -286,7 +288,7 @@ export class SyncRuntime {
 		);
 		try {
 			const keys = loadEncryptionKeys(this.secretStorage);
-			if (keys) await this.apiClient.configureEncryption(keys, this.reminderFolders);
+			if (keys) await this.apiClient.configureEncryption(keys, this.reminderFolders, this.readingFolder);
 		} catch (error) {
 			if (this.initializationRevision !== initializationRevision) return;
 			this.initializationError = errorMessage(error);

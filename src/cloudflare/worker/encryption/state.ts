@@ -34,14 +34,14 @@ export function encryptionWriteGuard(state: EncryptionServerState | null): { sql
 		args: [ENCRYPTION_STATE_KEY, state.vaultId, String(state.generation)] };
 }
 
-export async function prepareEncryptedFileCommit(db: D1Database, path: string, content: string | ArrayBuffer, knownState?: EncryptionServerState | null): Promise<{
+export async function prepareEncryptedFileCommit(db: D1Database, path: string, content: string | ArrayBuffer, knownState?: EncryptionServerState | null, sealed?: SealedCommit): Promise<{
 	state: EncryptionServerState | null;
 	descriptor?: EncryptedFileDescriptor;
 }> {
 	const state = knownState === undefined ? await readEncryptionState(db) : knownState;
 	if (!state) return { state };
 	if (state.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.');
-	return { state, descriptor: validateEncryptedContent(state, path, content) };
+	return { state, descriptor: validateEncryptedContent(state, path, content, sealed) };
 }
 
 /** Validate the entire upload before acquiring leases or storing any R2 bytes.
@@ -64,10 +64,20 @@ export async function validateUploadEncryption(db: D1Database, files: Array<{
 	return state;
 }
 
-export function validateEncryptedContent(state: EncryptionServerState, path: string, content: string | ArrayBuffer | Uint8Array): EncryptedFileDescriptor {
+/** The server's own sealed Reading capture, which may use the seal key in this folder. */
+export interface SealedCommit { readingFolder: string }
+
+export function validateEncryptedContent(state: EncryptionServerState, path: string, content: string | ArrayBuffer | Uint8Array, sealed?: SealedCommit): EncryptedFileDescriptor {
 	const bytes = typeof content === 'string' || content instanceof Uint8Array ? content : new Uint8Array(content);
 	if (!isEncryptedFile(bytes)) throw new EncryptionStateError('This vault requires encrypted file content', 428);
 	const { descriptor, publicData } = parseEncryptedFile(bytes);
+	if (descriptor.seal || sealed) {
+		if (!descriptor.seal || !sealed || descriptor.vaultId !== state.vaultId || descriptor.scopeId !== 'vault' || descriptor.keyId !== state.seal.keyId
+			|| !path.startsWith(`${sealed.readingFolder}/`) || !path.toLowerCase().endsWith('.md') || publicData !== null) {
+			throw new EncryptionStateError('Only the server can create sealed Reading notes', 428);
+		}
+		return descriptor;
+	}
 	if (descriptor.vaultId !== state.vaultId || descriptor.scopeId !== 'vault' || descriptor.keyId !== state.keyId) {
 		throw new EncryptionStateError('File encryption keys do not match this vault', 428);
 	}
