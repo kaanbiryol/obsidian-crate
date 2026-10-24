@@ -1,4 +1,5 @@
 import { setIcon } from 'obsidian';
+import { obsidianIconId } from '../obsidian-icon/tabler';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { StatusBarIndicator } from '../StatusBarIndicator';
@@ -46,7 +47,7 @@ export class ActivityHeader {
 			attr: { role: 'status', 'aria-live': 'polite' },
 		});
 		const errorIconEl = this.errorNoticeEl.createDiv({ cls: 'crate-sync-error-icon' });
-		setIcon(errorIconEl, 'alert-triangle');
+		setIcon(errorIconEl, obsidianIconId('alert-triangle'));
 		const errorCopyEl = this.errorNoticeEl.createDiv({ cls: 'crate-sync-error-copy' });
 		this.errorTitleEl = errorCopyEl.createSpan({ text: 'Sync error', cls: 'crate-sync-error-title' });
 		this.errorIssuesEl = errorCopyEl.createDiv({ cls: 'crate-sync-error-message' });

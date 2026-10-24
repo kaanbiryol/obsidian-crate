@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight } from '@/ui/shared/icons/TablerIcon';
 import { Button } from '@/ui/shared/Button';
 import { SettingsRow } from '../settings/SettingsRow';
 

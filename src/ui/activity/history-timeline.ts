@@ -1,4 +1,5 @@
 import { setIcon } from 'obsidian';
+import { obsidianIconId } from '../obsidian-icon/tabler';
 import { groupHistory } from './history-groups';
 import type { SyncHistoryEntry } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, type FileCardType } from './rendering';
@@ -41,7 +42,7 @@ function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expa
 	const header = element.createDiv({ cls: 'crate-history-header' });
 	if (expandable) {
 		const chevron = header.createDiv({ cls: 'crate-history-chevron', attr: { 'aria-hidden': 'true' } });
-		setIcon(chevron, 'chevron-right');
+		setIcon(chevron, obsidianIconId('chevron-right'));
 	}
 	renderHistorySummary(header, entry, count);
 	const meta = header.createDiv({ cls: 'crate-history-meta' });

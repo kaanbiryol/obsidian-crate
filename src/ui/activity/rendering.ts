@@ -1,4 +1,5 @@
 import { setIcon } from 'obsidian';
+import { obsidianIconId } from '../obsidian-icon/tabler';
 
 export function renderLoadingState(container: HTMLElement, text: string): void {
     const loading = container.createDiv({ cls: 'crate-activity-loading' });
@@ -30,7 +31,7 @@ export function renderFileMicroCard(
 	});
 
 	const iconEl = card.createDiv({ cls: `crate-file-icon crate-file-icon-${type}` });
-	setIcon(iconEl, FILE_CARD_ICONS[type]);
+	setIcon(iconEl, obsidianIconId(FILE_CARD_ICONS[type]));
     iconEl.setAttribute('aria-label', type === 'merge' ? 'Merged' : type === 'conflict' ? 'Conflict' : type === 'delete' ? 'Delete' : type === 'upload' ? 'Upload' : 'Download');
     iconEl.setAttribute('role', 'img');
 
@@ -53,7 +54,7 @@ export function renderEmptyState(
 ): void {
 	const wrapper = container.createDiv({ cls: 'crate-activity-empty-state' });
 	const iconEl = wrapper.createDiv({ cls: `crate-empty-icon crate-empty-icon-${tone}` });
-	setIcon(iconEl, icon);
+	setIcon(iconEl, obsidianIconId(icon));
 	const textEl = wrapper.createDiv({ cls: 'crate-empty-text' });
 	textEl.createSpan({ text: title, cls: 'crate-empty-title' });
 	textEl.createSpan({ text: description, cls: 'crate-empty-desc' });

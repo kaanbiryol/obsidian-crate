@@ -1,4 +1,5 @@
 import { Menu, Notice, Platform, setIcon } from 'obsidian';
+import { obsidianIconId } from '../obsidian-icon/tabler';
 import { decodePendingChange } from '../../sync/pending/pending-change';
 import type { PendingFileAction } from './file-actions';
 import type { PendingRowSelection } from './pending-row-selection';
@@ -54,13 +55,13 @@ export function createPendingActions(
         const { path } = decodePendingChange(key);
         const menu = new Menu();
         const fileActions = actions.fileActions?.(path) ?? [];
-        for (const action of fileActions) menu.addItem(item => item.setTitle(action.title).setIcon(action.icon).onClick(() => {
+        for (const action of fileActions) menu.addItem(item => item.setTitle(action.title).setIcon(obsidianIconId(action.icon)).onClick(() => {
             void action.run().catch((error: unknown) => new Notice(error instanceof Error ? error.message : 'Could not open this file.'));
         }));
         if (fileActions.length) menu.addSeparator();
         if (targets.length) menu.addItem(item => item
             .setTitle(`Discard ${targets.length} item${targets.length === 1 ? '' : 's'}…`)
-            .setIcon('undo-2').setDisabled(busy).onClick(() => actions.discard(targets)));
+            .setIcon(obsidianIconId('undo-2')).setDisabled(busy).onClick(() => actions.discard(targets)));
         return menu;
     };
     update();
@@ -78,7 +79,7 @@ export function createPendingActions(
             if (!Platform.isMobile) return;
             const { path } = decodePendingChange(key);
             const button = row.createEl('button', { cls: 'crate-browser-file-menu', attr: { type: 'button', 'aria-label': `More actions for ${path}`, 'aria-haspopup': 'menu' } });
-            setIcon(button, 'more-horizontal');
+            setIcon(button, obsidianIconId('more-horizontal'));
             button.addEventListener('click', event => {
                 event.stopPropagation();
                 const bounds = button.getBoundingClientRect();

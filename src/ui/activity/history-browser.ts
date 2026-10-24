@@ -1,4 +1,5 @@
 import { setIcon } from 'obsidian';
+import { obsidianIconId } from '../obsidian-icon/tabler';
 import type { SyncHistoryEntry } from '../../sync/types';
 import type { HistoryComparison } from '../../sync/history/comparison';
 import { groupHistory } from './history-groups';
@@ -65,7 +66,7 @@ export class HistoryBrowser {
 
     private back(parent: HTMLElement, label: string, pane: 'history' | 'files'): void {
         const button = parent.createEl('button', { cls: 'crate-history-pane-back', attr: { type: 'button', 'aria-label': `Back to ${label.toLowerCase()}` } });
-        setIcon(button.createSpan({ attr: { 'aria-hidden': 'true' } }), 'arrow-left');
+        setIcon(button.createSpan({ attr: { 'aria-hidden': 'true' } }), obsidianIconId('arrow-left'));
         button.createSpan({ text: label });
         button.addEventListener('click', () => {
             this.showPane(pane);

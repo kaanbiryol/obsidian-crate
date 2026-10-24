@@ -1,4 +1,5 @@
 import { Notice, Platform, setIcon, type App } from 'obsidian';
+import { obsidianIconId } from '../obsidian-icon/tabler';
 import type { ConflictRecord } from '../../sync/types';
 import type { ConflictChoice, ConflictReview } from '../../sync/conflict/review';
 import { buildConflictDiff, renderConflictDiffLine } from './conflict-diff';
@@ -96,7 +97,7 @@ export class ConflictReviewModal extends SharedModal {
             });
             action.title = actionTitle;
             action.setAttribute('aria-label', `${actionTitle}: ${title}`);
-            setIcon(action.createSpan({ attr: { 'aria-hidden': 'true' } }), 'external-link');
+            setIcon(action.createSpan({ attr: { 'aria-hidden': 'true' } }), obsidianIconId('external-link'));
             if (textPreview) {
                 const code = panel.createEl('pre', { cls: 'crate-conflict-code', attr: { tabindex: '0', 'aria-label': title } });
                 for (const row of diff!.rows) renderConflictDiffLine(code, row[version], version);

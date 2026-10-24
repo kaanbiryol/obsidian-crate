@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, RefreshCw, Link2Off, WifiOff, TriangleAlert } from 'lucide-react';
+import { ExternalLink, RefreshCw, Link2Off, WifiOff, TriangleAlert } from '@/ui/shared/icons/TablerIcon';
 import { PwaButton as Button } from './PwaButton';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { isStandaloneApp } from '../config';

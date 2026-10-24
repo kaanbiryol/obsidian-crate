@@ -1,6 +1,6 @@
 import { PWA_CONTROL_SPRING } from '../../ui/shared/navigation/motion';
 import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
-import { ChevronsUpDown, GripVertical } from 'lucide-react';
+import { ChevronsUpDown, GripVertical } from '@/ui/shared/icons/TablerIcon';
 import { Reorder, useDragControls, useReducedMotion } from 'motion/react';
 import { DEFAULT_DOCK_TABS, DOCK_TABS, type DockTab } from './dock-preferences';
 import type { PwaPreferences } from './preferences';

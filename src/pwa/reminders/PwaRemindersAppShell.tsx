@@ -1,7 +1,7 @@
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { PWA_CONTROL_SPRING, PWA_FADE } from '../../ui/shared/navigation/motion';
 import { AnimatePresence, motion } from 'motion/react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '@/ui/shared/icons/TablerIcon';
 import React, { useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 

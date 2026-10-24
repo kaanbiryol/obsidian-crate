@@ -9,5 +9,5 @@ export function FeatureSwitcherButton() {
 	const features = useSharedFeatures();
 	if (!navigation || !features[navigation.section === 'reading' ? 'reminders' : 'reading']) return null;
 	const destination = navigation.section === 'reading' ? 'Reminders' : 'Reading';
-	return <IconButton className="pwa-feature-switch-button" size="large" iconSize="l" icon={navigation.section === 'reading' ? 'list-todo' : 'book-open'} label={`Switch to ${destination}`} onClick={navigation.toggle} />;
+	return <IconButton className="pwa-feature-switch-button" size="large" iconSize="l" icon={navigation.section === 'reading' ? 'circle-check' : 'book-open'} label={`Switch to ${destination}`} onClick={navigation.toggle} />;
 }

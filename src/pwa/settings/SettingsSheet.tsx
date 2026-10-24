@@ -1,6 +1,6 @@
 import { pwaSyncState, refreshPwaSync, logoutPwaSync } from '../sync/state';
 import { EncryptionSettings, EncryptionSetupHint } from './EncryptionSettings';
-import { ChevronRight, Download, LogOut, RefreshCw } from 'lucide-react';
+import { ChevronRight, Download, LogOut, RefreshCw } from '@/ui/shared/icons/TablerIcon';
 import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../reminders/encryption-session';
 
 import { TabSettings } from './TabSettings';

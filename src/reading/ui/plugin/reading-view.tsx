@@ -1,4 +1,5 @@
 import { ItemView, Platform, type WorkspaceLeaf } from 'obsidian';
+import { obsidianIconId } from '../../../ui/obsidian-icon/tabler';
 import type CratePlugin from '../../../plugin/CratePlugin';
 import { createShadowReactMount, type ShadowReactMount } from '../../../ui/plugin/shadowReactMount';
 import { getReadingLibrary, READING_VIEW_TYPE } from '../../runtime';
@@ -9,7 +10,7 @@ export class ReadingView extends ItemView {
 	constructor(leaf: WorkspaceLeaf, private plugin: CratePlugin) { super(leaf); }
 	getViewType(): string { return READING_VIEW_TYPE; }
 	getDisplayText(): string { return 'Reading'; }
-	getIcon(): string { return 'book-open'; }
+	getIcon(): string { return obsidianIconId('book-open'); }
 	async onOpen(): Promise<void> {
 		const library = getReadingLibrary(this.plugin);
 		if (!library) { this.leaf.detach(); return; }

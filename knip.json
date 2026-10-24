@@ -28,6 +28,7 @@
 	],
 	"ignoreDependencies": [
 		"@plugin-build/styles.css",
+		"@tabler/icons",
 		"cloudflare",
 		"electron",
 		"tailwindcss"

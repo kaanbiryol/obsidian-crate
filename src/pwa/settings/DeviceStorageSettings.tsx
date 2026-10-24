@@ -1,4 +1,4 @@
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from '@/ui/shared/icons/TablerIcon';
 import { SettingsAction } from './SettingsAction';
 import React, { useEffect, useState } from 'react';
 import { browserStorageStatus, type BrowserStorageStatus } from '../storage/browser-storage';
