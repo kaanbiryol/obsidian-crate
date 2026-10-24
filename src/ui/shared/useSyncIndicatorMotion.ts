@@ -4,9 +4,10 @@ const MIN_SYNC_MOTION_MS = 250;
 // Match the outward success wave, which starts with the color transition.
 const SETTLE_MOTION_MS = 1400;
 
-/** Hold only the visual success transition; accessible status stays current. */
-export function useSyncIndicatorMotion(state: string): string {
-	const startedAt = useRef<number | null>(null);
+/** Hold only the visual success transition; accessible status stays current.
+ * `syncingSince` dates a sync that was already visible before this mount. */
+export function useSyncIndicatorMotion(state: string, syncingSince?: number): string {
+	const startedAt = useRef<number | null>(state === 'syncing' ? syncingSince ?? null : null);
 	const [phase, setPhase] = useState<'idle' | 'syncing' | 'settling'>(state === 'syncing' ? 'syncing' : 'idle');
 
 	useEffect(() => {

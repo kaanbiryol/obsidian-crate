@@ -27,6 +27,10 @@ const { outputFiles } = await build({
 		}
 		window.root = createRoot(document.getElementById('root'));
 		window.root.render(React.createElement(Harness));
+		window.renderLaunch = state => {
+			window.launchRoot ??= createRoot(document.getElementById('launch'));
+			window.launchRoot.render(React.createElement(PwaSyncStatusIndicator, { state, label: state, onShowStatus() {} }));
+		};
 	`, resolveDir: process.cwd(), loader: 'js' },
 	bundle: true, write: false, format: 'iife', platform: 'browser',
 });
@@ -53,13 +57,23 @@ for (const browserType of [chromium, webkit]) {
 	try {
 		const page = await browser.newPage({viewport:{width:390,height:844}});
 		await page.clock.install();
-		await page.setContent('<div id="root"></div>');
+		await page.setContent('<div id="root"></div><div id="launch"></div>');
 		await page.addStyleTag({ content: css });
 		await page.addScriptTag({ content: outputFiles[0].text });
 		const indicator = page.locator('.pwa-sync-indicator');
 		const visual = indicator.locator('.crate-sync-indicator');
 		const setState = props => page.evaluate(value => window.setSyncProps(value), props);
 		await expect(visual).toHaveAttribute('data-visual-state', 'synced');
+		// The opening screen already showed syncing, so a late mount owes no extra hold.
+		await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 300);
+		const launch = page.locator('#launch .crate-sync-indicator');
+		await page.evaluate(() => window.renderLaunch('syncing'));
+		await expect(launch).toHaveAttribute('data-visual-state', 'syncing');
+		await page.evaluate(() => window.renderLaunch('synced'));
+		await page.clock.runFor(1);
+		await expect(launch).toHaveAttribute('data-visual-state', 'settling');
+		await page.evaluate(() => { window.launchRoot.unmount(); });
+		await page.clock.resume();
 		assert.equal(await indicator.locator('.crate-sync-indicator__dot').evaluate(el => getComputedStyle(el).animationName), 'none', 'Initial idle mount must not celebrate');
 
 		for (const project of process.argv.includes('--motion-only') ? [] : [false, true]) {

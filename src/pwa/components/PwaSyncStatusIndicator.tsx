@@ -12,7 +12,8 @@ interface PwaSyncStatusIndicatorProps {
 export function PwaSyncStatusIndicator({ state, label, onShowStatus }: PwaSyncStatusIndicatorProps) {
 	return <div className="pwa-sync-indicator" data-sync-state={state} title={label}>
 		<BaseButton className="pwa-sync-indicator__button" type="button" aria-label={`Sync status: ${label}`} onClick={() => onShowStatus(label, state)}>
-			<SyncIndicator state={state} />
+			{/* The opening screen shows syncing from first paint, so its hold counts from launch. */}
+			<SyncIndicator state={state} syncingSince={0} />
 		</BaseButton>
 		<span className="pwa-sync-indicator__label" role="status" aria-live="polite" aria-atomic="true">{label}</span>
 	</div>;
