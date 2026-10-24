@@ -395,7 +395,8 @@ headers, to the left of sync and Settings. Selecting **Update** immediately star
 applying the update without a confirmation sheet. Offline or pending work disables
 the action; update failures appear as toast feedback. `PwaUpdateNotice` provides the
 same action at the top of Settings. There is no floating update banner.
-The existing bounded Reminders launch update stays behind its launch splash;
+At launch, a found update downloads and applies behind the Reminders launch splash
+(released only after a 30s stall or on failure, offline or backgrounding);
 after launch, applying an update requires an explicit action. Feature readiness
 and durable pending commands are checked before reload.
 

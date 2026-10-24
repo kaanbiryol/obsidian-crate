@@ -45,7 +45,7 @@ it('reports updating only once a launch update starts applying, and the launch d
 	await act(async () => { downloaded(); await vi.advanceTimersByTimeAsync(0); });
 	expect(hook.current).toMatchObject({ launchPending: true, updating: true });
 
-	await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+	await act(async () => { await vi.advanceTimersByTimeAsync(35_000); });
 	expect(hook.current.launchPending).toBe(true);
 	expect(options.canApply?.()).toBe(true);
 
@@ -53,10 +53,17 @@ it('reports updating only once a launch update starts applying, and the launch d
 	expect(hook.current).toMatchObject({ launchPending: false, updating: false });
 });
 
-it('ends the launch window without an updating screen when the download outlasts the deadline', async () => {
+it('keeps the launch splash while a slow update downloads', async () => {
 	vi.mocked(preparePwaUpdate).mockReturnValue(new Promise(() => {}));
 	const hook = render();
-	await act(async () => { await vi.advanceTimersByTimeAsync(2_500); });
+	await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+	expect(hook.current.launchPending).toBe(true);
+});
+
+it('ends the launch window without an updating screen when the download stalls', async () => {
+	vi.mocked(preparePwaUpdate).mockReturnValue(new Promise(() => {}));
+	const hook = render();
+	await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
 	expect(hook.current).toMatchObject({ launchPending: false, updating: false });
 	expect(applyPwaUpdate).not.toHaveBeenCalled();
 });

@@ -5,7 +5,9 @@ import { PWA_UPDATE_PROGRESS_SETTLE_MS, advancePwaUpdateProgress, finishPwaUpdat
 import { whenUpdateLayoutSettles } from './update-layout-readiness';
 import type { ShowToast } from '../types';
 
-const LAUNCH_UPDATE_BUDGET_MS = 2_500;
+// Launch waits for a found update to download and apply. This only releases a
+// splash stuck on a stalled network or a feature that never becomes ready.
+const LAUNCH_UPDATE_TIMEOUT_MS = 30_000;
 
 export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: {
 	version: string | null;
@@ -22,7 +24,7 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: 
 	const preparedVersion = useRef<string | null>(null);
 	const [launchPending, setLaunchPending] = useState(() => navigator.onLine
 		&& document.visibilityState === 'visible' && document.documentElement.dataset.pwaUpdating !== 'restore');
-	const launchDeadline = useRef(Date.now() + LAUNCH_UPDATE_BUDGET_MS);
+	const launchDeadline = useRef(Date.now() + LAUNCH_UPDATE_TIMEOUT_MS);
 	const launchOpen = useRef(launchPending);
 	const finishLaunch = useCallback(() => {
 		launchOpen.current = false;
@@ -64,8 +66,6 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: 
 	const apply = useCallback(async (options: Parameters<typeof applyPwaUpdate>[1] = {}, showImmediately = false) => {
 		if (inFlight.current) return false;
 		inFlight.current = true;
-		// Start the launch screen's bar from empty so each stage glides forward.
-		if (!showImmediately) advancePwaUpdateProgress('checking');
 		setUpdating(true);
 		let reloading = false;
 		try {
@@ -101,6 +101,9 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: 
 			return;
 		}
 		preparedVersion.current = auto.version;
+		// The launch splash says "Updating" from here; start its bar at the download stage.
+		advancePwaUpdateProgress('checking');
+		advancePwaUpdateProgress('downloading');
 		return startAutoPwaUpdate(auto.version,
 			// The deadline only gates starting; an applying update is not cut off midway.
 			() => launchOpen.current && (inFlight.current || Date.now() < launchDeadline.current) && canAutoApply.current(),

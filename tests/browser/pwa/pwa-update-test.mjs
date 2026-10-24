@@ -553,8 +553,10 @@ async function testLaunchUpdate(browser, mode) {
     page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
     const started = Date.now();
     await page.reload({ waitUntil: 'commit' });
-    if (mode === 'fast') {
-      await expect.poll(() => navigations).toBe(2);
+    if (mode === 'fast' || mode.startsWith('slow')) {
+      // A found update holds the launch splash until it applies, however slow.
+      if (mode === 'slow-install') await expect(page.locator('.pwa-launch-splash.is-updating')).toBeVisible();
+      await expect.poll(() => navigations, { timeout: 15000 }).toBe(2);
       await expect(page.locator('html')).not.toHaveAttribute('data-pwa-updating');
       await expect(page.getByRole('group', { name: cardName, exact: true })).toBeVisible();
       expect(await page.evaluate(() => sessionStorage.getItem('test-launch-exposed-content'))).toBe('false');
@@ -570,10 +572,6 @@ async function testLaunchUpdate(browser, mode) {
       await page.getByRole('group', { name: cardName, exact: true }).waitFor();
       expect(Date.now() - started).toBeLessThan(3_500);
       await expect(page.locator('html')).not.toHaveAttribute('data-pwa-updating');
-      if (mode.startsWith('slow')) {
-        await page.getByRole('button', { name: 'Update available', exact: true }).waitFor();
-        await page.waitForFunction(async () => Boolean((await navigator.serviceWorker.getRegistration())?.waiting));
-      }
       await page.waitForTimeout(2_500);
       expect(navigations).toBe(1);
       expect(await page.locator('script[type="module"]').getAttribute('src')).toContain(beforeVersion);

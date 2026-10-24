@@ -39,7 +39,7 @@ export function RemindersApp() {
 		colorScheme, isDarkMode, settingsOpen, toggleSettings, reorderDragging, setReorderDragging,
 		showToast, handlePullRefresh, initialContentReady, sharedReminders, resolvePageTitle,
 	} = presentation;
-	const { updating, launchPending } = useAppUpdate();
+	const { version: updateVersion, launchPending } = useAppUpdate();
 
 	const launchChange = changes.find(change => launchReminderId && (change.recordId === launchReminderId || change.optimistic?.id === launchReminderId));
 	usePrepareReminderEditor(initialContentReady && !launchPending && Boolean(authToken)
@@ -79,9 +79,8 @@ export function RemindersApp() {
 	// while data, pending changes, and notification state finish loading.
 
 	if (!bootstrapped || launchPending) {
-		// Say "Updating" only once an update is actually applying, not while the
-		// launch window may still defer it to the header's Update button.
-		return <PwaLaunchSplash updating={launchPending && updating} />;
+		// Launch holds the splash while a found update downloads and applies.
+		return <PwaLaunchSplash updating={launchPending && Boolean(updateVersion)} />;
 	}
 
 	return (
