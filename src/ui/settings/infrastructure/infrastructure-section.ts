@@ -39,12 +39,11 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 
 export function renderServerActions(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin } = context;
-	if (context.isConfigured || plugin.settings.cloudflareDeployment?.d1DatabaseId) {
-		createSettingsSubsectionHeading(containerEl, 'Advanced server actions');
-		const advancedEl = containerEl.createDiv();
-		if (context.isConfigured) renderInfrastructureSyncActions({ ...context, containerEl: advancedEl });
-		const saved = plugin.settings.cloudflareDeployment;
-		if (context.isConfigured || saved?.reset?.deleteOnly) renderServerDeleteSetting(advancedEl, plugin);
-	}
+	const saved = plugin.settings.cloudflareDeployment;
+	if (!context.isConfigured && !(saved?.accountId && saved.d1DatabaseId)) return;
+	createSettingsSubsectionHeading(containerEl, 'Advanced server actions');
+	const advancedEl = containerEl.createDiv();
+	if (context.isConfigured) renderInfrastructureSyncActions({ ...context, containerEl: advancedEl });
+	renderServerDeleteSetting(advancedEl, plugin);
 }
 export type { InfrastructureSectionContext } from './infrastructure-types';

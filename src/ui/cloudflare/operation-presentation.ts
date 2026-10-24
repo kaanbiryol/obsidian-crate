@@ -34,21 +34,28 @@ export class CloudflareOperationPresentation {
   operationFailed(message: string, recovery: { needsReview: boolean; canResumeDeletion: boolean; resetBlocked: boolean }): void {
     const { intent, shouldConnectDevice, openSettings, recoverUpdate } = this.context;
     const deleteAction = recovery.canResumeDeletion ? 'Resume server deletion' : 'Delete server and all data';
+    const deleting = intent === 'delete' || recovery.canResumeDeletion;
     if (recovery.needsReview) {
       this.progress.fail(
         'Server operation needs review',
         'Crate couldn’t confirm whether Cloudflare finished the operation. Further server changes are blocked to prevent overlapping updates.',
         [
           'If another device is updating this server, let it finish.',
-          intent === 'delete'
+          deleting
             ? `Once your connection is stable, open Crate settings → Advanced server actions and select ${deleteAction}. Crate will check the interrupted step before continuing. If it still needs review, keep the technical details for support.`
             : 'If the operation was interrupted, its Cloudflare status must be checked and the update lock recovered before trying again.',
           'Closing this message does not clear the lock.',
         ],
-        { technicalDetails: message, action: intent === 'reset' || intent === 'delete'
+        { technicalDetails: message, action: intent === 'reset' || deleting
           ? { label: 'Open settings', onClick: openSettings }
           : { label: 'Check and recover update', onClick: recoverUpdate } },
       );
+      return;
+    }
+    if (recovery.canResumeDeletion && intent !== 'delete') {
+      this.progress.fail('Server deletion is incomplete', 'Finish deleting the saved server before connecting or updating.',
+        ['Open Crate settings → Advanced server actions and select Resume server deletion. Your local vault files are kept.'],
+        { technicalDetails: message, action: { label: 'Open settings', onClick: openSettings } });
       return;
     }
     if (intent === 'delete') {

@@ -379,6 +379,27 @@ it('offers resume only when an interrupted deletion checkpoint is saved', async 
 	expect(JSON.stringify(progress.fail.mock.calls)).toContain('select Resume server deletion');
 });
 
+it.each([false, true])('directs a blocked reconnect to the saved deletion (needs review: %s)', async needsReview => {
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const { DeploymentRecoveryRequiredError } = await import('./deployment-fence');
+	const plugin = createPlugin(false);
+	Object.assign(plugin.settings.cloudflareDeployment, { deletion: { id: 'delete-job', phase: 'clearing-bucket' } });
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(needsReview
+		? new DeploymentRecoveryRequiredError('Deletion needs review')
+		: new Error('Resume server deletion before continuing.'));
+	await startCloudflareDeployment(plugin as never, 'reconnect');
+	expect(progress.fail).toHaveBeenCalledOnce();
+	const details = JSON.stringify(progress.fail.mock.calls);
+	expect(details).toContain('Advanced server actions');
+	expect(details).toContain('select Resume server deletion');
+	expect(details).not.toContain('Select “Reconnect”');
+	expect(details).not.toContain('Connect with Cloudflare');
+	expect(progress.fail.mock.calls[0]?.[3]).toHaveProperty('action.label', 'Open settings');
+	expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
+	expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
+	expect(progress.succeed).not.toHaveBeenCalled();
+});
+
 it.each(['Incompatible Crate server protocol 10', 'This server requires a different plugin'])('uses protocol recovery independently of wording: %s', async message => {
 	const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
 	const plugin = createPlugin();
