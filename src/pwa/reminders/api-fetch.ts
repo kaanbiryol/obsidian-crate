@@ -12,14 +12,16 @@ import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT
 import { requireCompatibleProtocol } from '../server-compatibility';
 import { EncryptedReminderApi } from './encrypted-reminder-api';
 
+// Token whose latest authenticated response said the vault is not encrypted.
+// Shared so the app's client trusts the startup probe instead of repeating it.
+let encryptionOffToken: string | null = null;
+
 export function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {
 	const sessionCurrent = capturePwaSession();
 	const clientSession = crypto.randomUUID();
 	let keys: FeatureKeys | null = null;
 	let encrypted: EncryptedReminderApi | null = null;
 	let preparing: Promise<void> | undefined;
-	// The server's last response said this vault is not encrypted.
-	let encryptionOff = false;
 	async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
 		if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		if (!authToken) throw new ConnectionError('reconnect', 'Not authenticated');
@@ -54,7 +56,8 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 			throw new ConnectionError('reconnect', 'Session expired. Open a fresh link from Crate.');
 		}
 		const encryptionState = response.headers.get(ENCRYPTION_STATE_HEADER);
-		if (encryptionState === 'off' || encryptionState === 'on') encryptionOff = encryptionState === 'off';
+		if (encryptionState === 'off') encryptionOffToken = authToken;
+		else if (encryptionState === 'on' && encryptionOffToken === authToken) encryptionOffToken = null;
 		// Without keys, a 428 from a newly encrypted vault retries after a fresh probe.
 		if ((keys || encryptionState === 'on') && response.status === 428 && path !== '/encryption') throw new EncryptionStateChangedError('The vault encryption changed.');
 		if (response.status === 423) requestSharedFeaturesRefresh(true);
@@ -63,7 +66,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 	function ready(refresh = false): Promise<void> {
 		if (!authToken) return Promise.resolve();
 		// Unencrypted vaults skip the probe while responses confirm it stays off.
-		if (!refresh && encryptionOff && !keys) return Promise.resolve();
+		if (!refresh && encryptionOffToken === authToken && !keys) return Promise.resolve();
 		if (refresh) preparing = undefined;
 		return preparing ??= prepareReminderEncryption(authToken, rawFetch, refresh).then(value => {
 			if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed before unlocking');

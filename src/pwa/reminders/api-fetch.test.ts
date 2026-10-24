@@ -31,3 +31,18 @@ it('probes encryption once while server responses confirm the vault is unencrypt
 	// The 428 retried once after a fresh probe instead of trusting the cached state.
 	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
 });
+
+it('reuses the startup probe in the app client instead of probing again', async () => {
+	const fetchMock = vi.fn(async (_path: string) => Response.json({ encryption: null, reminders: [] }, { headers: { 'X-Crate-Encryption-State': 'off' } }));
+	vi.stubGlobal('fetch', fetchMock);
+	vi.stubGlobal('localStorage', { getItem: () => 'startup' });
+	await makeApiFetch('startup', vi.fn()).ready();
+	const app = makeApiFetch('startup', vi.fn());
+	expect((await app('/reminders/list?folderPath=Reminders')).status).toBe(200);
+	// Before: bootstrap and app clients each probed, adding a serial round trip.
+	expect(prepareReminderEncryption).toHaveBeenCalledOnce();
+	expect(fetchMock.mock.calls.map(([path]) => path)).toEqual(['/encryption', '/reminders/list?folderPath=Reminders']);
+	// Another credential never inherits this confirmation.
+	await makeApiFetch('other', vi.fn())('/reminders/list?folderPath=Reminders');
+	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
+});
