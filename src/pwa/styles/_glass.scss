@@ -1,0 +1,19 @@
+// One glass material for the PWA's floating chrome: dock, add button, back
+// button, header actions and reader controls. Theme files set the
+// --pwa-glass-* tokens. Content stays visible, softened, through the fill.
+@mixin surface {
+  border: 1px solid var(--pwa-glass-border);
+  background: linear-gradient(180deg, var(--pwa-glass-sheen), transparent 55%) var(--pwa-glass-fill);
+  box-shadow: var(--pwa-glass-rim), var(--pwa-glass-shadow);
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    background-color: color-mix(in srgb, var(--pwa-glass-fill) 56%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.8);
+    backdrop-filter: blur(14px) saturate(1.8);
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    background-color: var(--pwa-glass-fill);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  @media (prefers-contrast: more) { border-color: var(--text-muted); }
+}

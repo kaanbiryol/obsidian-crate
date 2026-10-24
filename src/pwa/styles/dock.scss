@@ -1,5 +1,6 @@
 @use "../../ui/shared/styles/app-density";
 @use '../../ui/shared/styles/app-dock';
+@use "glass";
 
 // Navigation paints immediately, with the same icons and geometry while data
 // loads. Only list content shows a loading indicator; the dock never pulses or fades in.
@@ -28,4 +29,14 @@
 
 .crate-reminders-ui:is(.pwa-shadow-root, .pwa-reading-root) {
   @include app-density.dock;
+  // Obsidian keeps the shared, nearly opaque dock; the PWA uses its chrome glass.
+  .pwa-dock { --dock-surface-hover: color-mix(in srgb, var(--pwa-glass-fill) 82%, transparent); }
+  .pwa-dock__surface, .pwa-dock__add { @include glass.surface; }
+  // Rows soften beneath the pill instead of vanishing, so they show through the glass.
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .pwa-dock::before {
+      -webkit-mask-image: linear-gradient(to bottom, transparent 20px, #0004 60px, #0009);
+      mask-image: linear-gradient(to bottom, transparent 20px, #0004 60px, #0009);
+    }
+  }
 }

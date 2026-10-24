@@ -730,15 +730,24 @@ blocks the native left-edge Back swipe.
 The separate circular add action uses the existing editor/capture flow, including
 on Projects. Insets reserve the home indicator once. Loading shells use matching
 dock geometry.
-The dock overlaps the full-height list viewport. Its pill and add button use a
-nearly opaque, raised theme surface with a fine highlight, bright icons, and a
-quiet selection fill. A shared backdrop layer gently dissolves rows into the host
-background from the pill's top edge through the bottom safe area, with only slight
-softening. Content above the pill remains clear; rows beneath it recede instead
-of remaining readable through the controls.
-It spans the PWA viewport or Obsidian pane, even when the pill reaches its maximum
-width. Reduced transparency and increased contrast remove this layer and keep
-the controls opaque. Scroll containers reserve dock height plus a small gap at
+The dock overlaps the full-height list viewport. In Obsidian, its pill and add
+button use a nearly opaque, raised theme surface with a fine highlight, bright
+icons, and a quiet selection fill. A shared backdrop layer gently dissolves rows
+into the host background from the pill's top edge through the bottom safe area,
+with only slight softening, so rows recede instead of remaining readable through
+the controls.
+The PWA uses one glass material for all floating chrome: the dock pill, add
+button, back button, header actions, and article reader controls.
+`src/pwa/styles/_glass.scss` defines it; the theme files set its `--pwa-glass-*`
+fill, sheen, border, rim, and shadow. A translucent fill blurs and saturates the
+content behind it, with a bright top rim and a soft shadow small enough to stay
+inside headers that clip their controls. The PWA backdrop layer starts below the
+pill's top edge and stays partly transparent, so rows soften and show through the
+glass. Content above the pill remains clear.
+The layer spans the PWA viewport or Obsidian pane, even when the pill reaches its
+maximum width. Reduced transparency and increased contrast remove this layer and
+make the controls opaque without blur; increased contrast also strengthens the
+glass border. Scroll containers reserve dock height plus a small gap at
 the end, keeping the final item reachable above the controls. Space around the pill and add button
 passes gestures through to the list; the expanded picker still blocks the backdrop.
 The Reading panel accepts a host navigation renderer; the Obsidian panel keeps
@@ -880,9 +889,9 @@ JavaScript, Python, Bash, JSON, CSS, HTML/XML, SQL, and Swift.
 The PWA article reader keeps its actions visible in their existing positions.
 Back uses a circular surface, archive/favorite share a capsule, and the secondary
 actions use individual rounded surfaces beside the offline status. Article and
-Highlights use a rounded segmented control. These PWA-only styles reuse the dock
-palette, retain 44px targets, and fall back to opaque surfaces without backdrop
-filtering or when reduced transparency is requested. The iOS 27 opaque header
+Highlights use a rounded segmented control. These PWA-only styles use the dock's
+glass material, retain 44px targets, and fall back to opaque surfaces without
+backdrop filtering or when reduced transparency or increased contrast is requested. The iOS 27 opaque header
 workaround remains in place.
 
 The PWA article opens directly into its text without Article / Highlights tabs.

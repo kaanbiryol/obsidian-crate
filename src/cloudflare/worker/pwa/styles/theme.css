@@ -35,7 +35,13 @@
 	--checkbox-color-hover:var(--interactive-accent-hover);
 	--checkbox-marker-color:var(--text-on-accent);
 	--pwa-launch-bg:#0d0d0f;
-	--pwa-tabbar-surface:rgba(13,13,15,.9);
+	/* Glass for floating chrome: dock, back button, header and reader controls. */
+	--pwa-glass-fill:#202024;
+	--pwa-glass-sheen:rgba(255,255,255,.05);
+	--pwa-glass-border:rgba(255,255,255,.08);
+	--pwa-glass-rim:inset 0 1px 0 rgba(255,255,255,.11);
+	/* Fits inside headers that clip 13px below their controls. */
+	--pwa-glass-shadow:0 4px 12px rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.3);
 	/* Keep content below translucent native chrome, while backdrops fill the viewport. */
 	--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px));
 	/* Follow the current viewport. Its static maximum can reserve space that
