@@ -13,9 +13,9 @@
 	<key>WFWorkflowIcon</key>
 	<dict>
 		<key>WFWorkflowIconStartColor</key>
-		<integer>2071128575</integer>
+		<integer>255</integer>
 		<key>WFWorkflowIconGlyphNumber</key>
-		<integer>59417</integer>
+		<integer>59670</integer>
 	</dict>
 	<key>WFWorkflowTypes</key>
 	<array>
