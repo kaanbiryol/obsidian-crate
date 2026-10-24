@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { isObsidianOverlayActive } from '../../../../ui/shared/useObsidianOverlayActive';
 import type { RichTextInputHandle } from '../../shared/RichTextInput';
+import { getReminderTitleCaret } from '../../reminder-editor/reminderEditorEdits';
+import { saveCursorPosition } from '../../reminder-editor/cursorPosition';
 
 interface UseReminderModalPresentationOptions {
 	focusDelayMs: number;
 	onClose: () => void;
 	richTextInputRef: RefObject<RichTextInputHandle | null>;
+	projects: string[];
 }
 
 export function useReminderModalPresentation({
 	focusDelayMs,
 	onClose,
 	richTextInputRef,
+	projects,
 }: UseReminderModalPresentationOptions) {
 	const [currentView, setCurrentView] = useState<'main' | 'date' | 'project' | 'recurrence' | null>('main');
 	const [isClosing, setIsClosing] = useState(false);
@@ -20,6 +24,26 @@ export function useReminderModalPresentation({
 	const [allowAutoFocus, setAllowAutoFocus] = useState(focusDelayMs === 0);
 
 	const hasClosedRef = useRef(false);
+	const pickerCaretRef = useRef<{ content: string; caret: number | null; returning: boolean } | null>(null);
+	const projectsRef = useRef(projects);
+	projectsRef.current = projects;
+
+	// Restore the caret from before a picker. If the picker rebuilt the text,
+	// keep it within the user's words rather than among the chips after them.
+	const focusInput = useCallback(() => {
+		const input = richTextInputRef.current;
+		const element = input?.getElement();
+		if (!input || !element || !isObsidianOverlayActive(element)) return;
+		const saved = pickerCaretRef.current?.returning ? pickerCaretRef.current : null;
+		if (!saved) {
+			input.focus();
+			return;
+		}
+		const value = input.getValue();
+		const limit = value === saved.content ? Infinity : getReminderTitleCaret(value, projectsRef.current);
+		const offset = Math.min(saved.caret ?? Infinity, limit);
+		input.focus(Number.isFinite(offset) ? { offset } : undefined);
+	}, [richTextInputRef]);
 
 	useEffect(() => {
 		if (focusDelayMs === 0) {
@@ -39,12 +63,11 @@ export function useReminderModalPresentation({
 		}
 
 		const frame = window.requestAnimationFrame(() => {
-			const input = richTextInputRef.current;
-			const element = input?.getElement();
-			if (input && element && isObsidianOverlayActive(element)) input.focus();
+			focusInput();
+			pickerCaretRef.current = null;
 		});
 		return () => window.cancelAnimationFrame(frame);
-	}, [allowAutoFocus, currentView, isClosing, richTextInputRef, showModal]);
+	}, [allowAutoFocus, currentView, focusInput, isClosing, showModal]);
 
 	const handleClose = useCallback(() => {
 		if (isClosing) {
@@ -66,17 +89,18 @@ export function useReminderModalPresentation({
 	}, [isClosing, onClose]);
 
 	const transitionToView = useCallback((targetView: 'main' | 'date' | 'project' | 'recurrence') => {
+		const input = richTextInputRef.current;
+		pickerCaretRef.current = targetView === 'main' || !input ? null : {
+			content: input.getValue(), caret: saveCursorPosition(input.getElement()), returning: false,
+		};
 		setCurrentView(targetView);
-	}, []);
+	}, [richTextInputRef]);
 
 	const closePickerModal = useCallback(() => {
+		if (pickerCaretRef.current) pickerCaretRef.current.returning = true;
 		setCurrentView('main');
-		queueMicrotask(() => {
-			const input = richTextInputRef.current;
-			const element = input?.getElement();
-			if (input && element && isObsidianOverlayActive(element)) input.focus();
-		});
-	}, [richTextInputRef]);
+		queueMicrotask(focusInput);
+	}, [focusInput]);
 
 	const handleEntryAnimationComplete = useCallback(() => {
 		setIsEntryAnimationComplete(true);

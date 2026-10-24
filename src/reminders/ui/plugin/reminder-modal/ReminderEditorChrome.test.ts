@@ -61,7 +61,7 @@ describe('reminder editor chrome', () => {
         expect(markup).not.toContain('role="alert"');
     });
 
-    it.each([' ', '\u00a0'])('previews the occurrence when typing a time into a repeat rule (%j)', space => {
+    it.each([' ', '\u00a0'])('keeps the date chip unset when typing a time into a repeat rule (%j)', space => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-09-20T12:00:00Z'));
         try {
@@ -75,9 +75,8 @@ describe('reminder editor chrome', () => {
                 onOpenDatePicker: vi.fn(), onOpenProjectPicker: vi.fn(),
                 onOpenRecurrencePicker: vi.fn(), onTogglePriority: vi.fn(),
             }));
-            expect(markup).toContain('09:00');
-            expect(markup).toContain('tone-primary is-active');
-            expect(markup).not.toContain('>Date<');
+            expect(markup).toContain('>Date<');
+            expect(markup).not.toContain('tone-primary is-active');
         } finally {
             vi.useRealTimers();
         }

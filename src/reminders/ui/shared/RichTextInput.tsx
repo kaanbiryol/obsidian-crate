@@ -35,13 +35,14 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
   const focusRequestRef = useRef(props.focusRequestKey);
   const projectKeyRef = useRef((props.knownProjects ?? []).join('\u0000'));
 
-  const focus = useCallback((options: { select?: boolean } = {}) => {
+  const focus = useCallback((options: { select?: boolean; offset?: number } = {}) => {
     const editor = editorRef.current;
     const element = rootRef.current;
     if (!editor || !element) return;
     element.focus({ preventScroll: true });
     editor.update(() => {
       if (options.select) $getRoot().select(0, $getRoot().getChildrenSize());
+      else if (options.offset !== undefined) $restoreOffsets({ anchor: options.offset, focus: options.offset });
       else $getRoot().selectEnd();
     }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
   }, []);

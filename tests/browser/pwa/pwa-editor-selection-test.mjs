@@ -108,6 +108,26 @@ try {
 			await page.keyboard.insertText('INSERTED ');
 			await expect(title).toContainText(content.slice(0, 220) + 'INSERTED ' + content.slice(220));
 
+			// A caret among the chips moves back to the end of the user's words when a picker rebuilds them.
+			const wordsEnd = content.length + 'INSERTED '.length;
+			for (const [from, to] of [['Work', 'Personal'], ['Personal', 'Work']]) {
+				await title.evaluate(element => {
+					const range = document.createRange();
+					range.selectNodeContents(element);
+					range.collapse(false);
+					document.getSelection().setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
+					document.dispatchEvent(new Event('selectionchange'));
+				});
+				await editor.getByRole('button', { name: from, exact: true }).tap();
+				await expect(project).toBeVisible();
+				await settled(page);
+				await project.getByRole('option', { name: to, exact: true }).tap();
+				await expect(project).toBeHidden();
+				await settled(page);
+				await expect(title).toBeFocused();
+				assert.equal((await selectionState(title)).start, wordsEnd, `Choosing ${to} keeps the caret after the user's words`);
+			}
+
 			await title.evaluate(element => document.getSelection().setBaseAndExtent(document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode(), 230, document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode(), 220));
 			const selected = await selectionState(title);
 			await editor.getByRole('button', { name: 'Work', exact: true }).tap();

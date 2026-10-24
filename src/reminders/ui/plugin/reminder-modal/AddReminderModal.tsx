@@ -15,6 +15,8 @@ import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
 import { Reminder } from '../../../types';
 import { DEFAULT_PROJECT } from '../../../core/constants';
 import { parseReminderContent } from '../../../core/grammar/reminderParser';
+import { getReminderTitleCaret } from '../../reminder-editor/reminderEditorEdits';
+import { saveCursorPosition } from '../../reminder-editor/cursorPosition';
 
 interface AddReminderModalProps {
     onClose: () => void;
@@ -84,6 +86,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         focusDelayMs,
         onClose,
         richTextInputRef,
+        projects,
     });
     const {
         showDeleteConfirm,
@@ -122,11 +125,13 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     const animationsEnabled = animationConfig.enabled && !reduceMotion;
 
     const handlePriorityToggle = useCallback(() => {
+        const caret = saveCursorPosition(richTextInputRef.current?.getElement() ?? null);
         const nextContent = togglePriority();
-        richTextInputRef.current?.setCursorPosition(nextContent.length, {
+        const wordsEnd = getReminderTitleCaret(nextContent, projects);
+        richTextInputRef.current?.setCursorPosition(Math.min(caret ?? wordsEnd, wordsEnd), {
             scrollTop: textareaRef.current?.scrollTop ?? 0,
         });
-    }, [togglePriority]);
+    }, [projects, togglePriority]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {

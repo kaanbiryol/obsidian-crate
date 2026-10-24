@@ -1,4 +1,5 @@
 import { findLinkMatches, findProjectMatches } from '../../core/grammar/richTextMatchers';
+import { parseReminderContent } from '../../core/grammar/reminderParser';
 
 /** DOM caret offsets count link labels; the draft includes their Markdown syntax. */
 export function toReminderTextOffset(text: string, cursor: number): number {
@@ -17,6 +18,12 @@ export function toReminderTextOffset(text: string, cursor: number): number {
 export function toReminderCursorOffset(text: string, offset: number): number {
     return findLinkMatches(text).reduce((cursor, link) =>
         link.index + link.length <= offset ? cursor - link.length + (link.linkText?.length ?? 0) : cursor, offset);
+}
+
+/** Caret after the user's own words. Chip edits rebuild the text with metadata after them. */
+export function getReminderTitleCaret(text: string, knownProjects?: string[]): number {
+    const words = (parseReminderContent(text, knownProjects).cleanContent ?? text).trim();
+    return toReminderCursorOffset(text, text.startsWith(words) ? words.length : text.length);
 }
 
 /** Replace the current project token, including its suffix beyond the caret. */

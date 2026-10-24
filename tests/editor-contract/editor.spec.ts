@@ -150,6 +150,35 @@ test('weekday title text survives reopening an all-day reminder and changing its
     .toMatchObject({ content: reminder.content, dueDate: reminder.dueDate, priority: 1 });
 });
 
+test('chip edits keep the caret within the typed title', async ({ page }, info) => {
+  await page.clock.setFixedTime(new Date('2026-09-21T13:00:37.123Z'));
+  await page.goto(`/?fixture=modal&host=${String(info.project.metadata.host)}`);
+  const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
+  await title.click();
+  await page.keyboard.insertText('Buy milk');
+  await page.locator('.reminder-action-chips [data-picker="recurrence"]').click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(title.locator('.rich-text-chip-date')).toBeVisible();
+  await expectCaret(title, 'Buy milk'.length);
+  // A repeat is not a chosen date: the date chip and picker stay unset.
+  await expect(page.locator('.reminder-action-chips [data-picker="date"]')).toHaveText('Date');
+  await page.locator('.reminder-action-chips [data-picker="date"]').click();
+  await expect(page.locator('.date-quick-button[aria-pressed="true"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Remove schedule', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Tomorrow/ }).click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(title.locator('.rich-text-chip-date')).not.toContainText('every');
+  await expectCaret(title, 'Buy milk'.length);
+  await page.locator('.reminder-action-chips [data-picker="project"]').click();
+  await page.getByRole('option', { name: 'Work', exact: true }).click();
+  await expectCaret(title, 'Buy milk'.length);
+  await range(title, 3);
+  await page.getByRole('button', { name: 'Set priority', exact: true }).click();
+  await expectCaret(title, 3);
+  await page.keyboard.insertText(' fresh');
+  await expect(title).toContainText('Buy fresh milk ');
+});
+
 for (const [timezone, dueDatetime] of [
   ['America/New_York', '2026-09-28T13:00:37.123Z'],
   ['+05:30', '2026-09-28T03:30:37.123Z'],

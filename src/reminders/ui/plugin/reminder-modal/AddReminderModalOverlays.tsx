@@ -51,7 +51,8 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
         finalFocus={editorFocus}
         animationConfig={animationConfig}
         pickerMode={pickerMode}
-        dueDate={draft.dueDate}
+        // A repeat's occurrence is not a chosen date.
+        dueDate={draft.recurrence ? null : draft.dueDate}
         hasTime={draft.hasTime}
         isDark={isDark}
         onDateTimeChange={draft.applyDateSelection}

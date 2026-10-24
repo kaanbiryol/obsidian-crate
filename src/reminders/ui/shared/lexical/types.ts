@@ -1,8 +1,8 @@
 import type React from 'react';
 
 export interface RichTextInputHandle {
-    /** Focus the input */
-    focus: (options?: { select?: boolean }) => void;
+    /** Focus the input, at the end unless a visible-text offset is given */
+    focus: (options?: { select?: boolean; offset?: number }) => void;
     /** Blur the input (dismiss keyboard on mobile) */
     blur: () => void;
     /** Get the underlying DOM element */

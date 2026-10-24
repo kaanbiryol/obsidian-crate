@@ -25,6 +25,8 @@ import {
 } from './editor-draft';
 import type { ModalDraft, ModalPickerId, ModalState } from '../types';
 import { DEFAULT_PROJECT } from '@/reminders/core/constants';
+import { getReminderTitleCaret } from '@/reminders/ui/reminder-editor/reminderEditorEdits';
+import { saveCursorPosition } from '@/reminders/ui/reminder-editor/cursorPosition';
 
 export interface ReminderEditorScreenHandle {
 	dismissKeyboard(): void;
@@ -75,6 +77,9 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 		titleRef: contentRef, descriptionRef, editorRef, active: isActive, keyboardInset,
 	});
 	const draft = modal.draft;
+	const latestContentRef = useRef(draft.content);
+	latestContentRef.current = draft.content;
+	const focusedContentRef = useRef(draft.content);
 	const contentMetadata = useMemo(
 		() => deriveReminderDraftContentMetadata(draft.content, projectOptions, draft.defaultProject),
 		[draft.content, draft.defaultProject, projectOptions],
@@ -127,9 +132,16 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	}, [dismissEditorKeyboard, onClose]);
 
 	useImperativeHandle(ref, () => ({
-		dismissKeyboard: () => { rememberFocus(); dismissEditorKeyboard(); },
-		restoreFocus,
-	}), [dismissEditorKeyboard, rememberFocus, restoreFocus]);
+		dismissKeyboard: () => {
+			focusedContentRef.current = latestContentRef.current;
+			rememberFocus();
+			dismissEditorKeyboard();
+		},
+		restoreFocus: () => {
+			const content = latestContentRef.current;
+			restoreFocus(content === focusedContentRef.current ? undefined : getReminderTitleCaret(content, projectOptions));
+		},
+	}), [dismissEditorKeyboard, projectOptions, rememberFocus, restoreFocus]);
 
 	useEffect(() => {
 		if (!isActive || !canInteract) return;
@@ -144,7 +156,9 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 			priority: draft.priority === 1 ? 4 : 1,
 		});
 		if (typeof patch.content === 'string') {
-			richTextInputRef.current?.setCursorPosition(patch.content.length, {
+			const wordsEnd = getReminderTitleCaret(patch.content, projectOptions);
+			const caret = saveCursorPosition(richTextInputRef.current?.getElement() ?? null);
+			richTextInputRef.current?.setCursorPosition(Math.min(caret ?? wordsEnd, wordsEnd), {
 				scrollTop: richTextInputRef.current.getElement()?.scrollTop ?? 0,
 			});
 		}

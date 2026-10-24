@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { replaceReminderProject, toReminderCursorOffset, toReminderTextOffset } from './reminderEditorEdits';
+import { getReminderTitleCaret, replaceReminderProject, toReminderCursorOffset, toReminderTextOffset } from './reminderEditorEdits';
 
 describe('reminder editor token edits', () => {
     it.each([
@@ -37,4 +37,14 @@ it('preserves spacing and other project mentions outside the completed query', (
     expect(replaceReminderProject('Compare #Work with #ho  carefully', 19, 3, 'Home')).toEqual({
         text: 'Compare #Work with #Home  carefully', cursor: 25,
     });
+});
+
+it.each([
+    ['Buy milk weekly 09:00 ', 8],
+    ['Buy milk tomorrow #Work ! ', 8],
+    ['[Docs](https://example.com) today ', 4],
+    ['today ', 0],
+    ['Buy tomorrow milk', 17],
+])('places the caret after the user words in %s', (text, caret) => {
+    expect(getReminderTitleCaret(text, ['Work'])).toBe(caret);
 });

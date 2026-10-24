@@ -11,21 +11,24 @@ export function ReminderDatePicker({ draft, projectOptions, isDark, onPatch, onS
     onSelect: (patch?: Partial<ModalDraft>) => void;
     onClose: () => void;
 }) {
-    const currentDate = draft.dueDate
-        ? parseReminderDateValue(draft.dueTime ? `${draft.dueDate}T${draft.dueTime}` : draft.dueDate, Boolean(draft.dueTime)) ?? null
+    // A repeat's occurrence is not a chosen date.
+    const dueDate = draft.recurrence ? '' : draft.dueDate;
+    const dueTime = draft.recurrence ? '' : draft.dueTime;
+    const currentDate = dueDate
+        ? parseReminderDateValue(dueTime ? `${dueDate}T${dueTime}` : dueDate, Boolean(dueTime)) ?? null
         : null;
     return (
         <section className="pwa-picker-sheet pwa-date-picker-sheet" tabIndex={-1}>
             <DatePickerContent
-                currentDate={currentDate} hasTime={Boolean(draft.dueTime)} isDark={isDark}
+                currentDate={currentDate} hasTime={Boolean(dueTime)} isDark={isDark}
                 idPrefix="pwa" commitDateOnChange onClose={onClose}
                 onSelectPreset={(preset) => onSelect(applyDatePresetToDraft(draft, projectOptions, preset))}
-                onDateChange={(value) => onPatch(applyDateFieldsToDraft(draft, projectOptions, value, draft.dueTime))}
+                onDateChange={(value) => onPatch(applyDateFieldsToDraft(draft, projectOptions, value, dueTime))}
                 onTimeChange={(hour, minute) => onPatch(applyDateFieldsToDraft(
-                    draft, projectOptions, draft.dueDate || formatLocalDateKey(new Date()),
+                    draft, projectOptions, dueDate || formatLocalDateKey(new Date()),
                     `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
                 ))}
-                onTimeClear={() => onPatch(applyDateFieldsToDraft(draft, projectOptions, draft.dueDate, ''))}
+                onTimeClear={() => onPatch(applyDateFieldsToDraft(draft, projectOptions, dueDate, ''))}
                 onRemove={() => onPatch(applyDatePresetToDraft(draft, projectOptions, 'clear'))}
             />
         </section>

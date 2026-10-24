@@ -41,7 +41,8 @@ export function useEditorFocus({ titleRef, descriptionRef, editorRef, active, ke
 		};
 	}, [body, descriptionRef, titleRef]);
 
-	const restoreFocus = useCallback(() => {
+	/** After a picker rebuilt the text, keep the title caret within the user's words. */
+	const restoreFocus = useCallback((titleCaretLimit?: number) => {
 		const title = titleRef.current;
 		const description = descriptionRef.current;
 		if (!title || !description) return;
@@ -53,7 +54,10 @@ export function useEditorFocus({ titleRef, descriptionRef, editorRef, active, ke
 			restoreTitleSelection(description, saved.descriptionSelection);
 		} else {
 			title.focus({ preventScroll: true });
-			restoreTitleSelection(title, saved?.titleSelection ?? null);
+			const selection = saved?.titleSelection ?? null;
+			const clamp = (offset: number | null | undefined) => Math.min(offset ?? Infinity, titleCaretLimit ?? Infinity);
+			restoreTitleSelection(title, titleCaretLimit === undefined ? selection
+				: { start: clamp(selection?.start), end: clamp(selection?.end), backward: selection?.backward ?? false });
 		}
 		restoreScroll();
 	}, [descriptionRef, restoreScroll, titleRef]);
