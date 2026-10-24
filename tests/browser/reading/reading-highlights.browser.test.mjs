@@ -128,7 +128,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     await context.setOffline(true);
-    await expect(page.locator('.crate-reading__reader-pane')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
+    // The settled pane drops its transform once the reader pins its chrome.
+    await expect(page.locator('.crate-reading__reader-pane')).toHaveCSS('transform', 'none');
     const initialBody = await page.locator('.crate-reading-reader__body').boundingBox();
     await select();
     await expect.poll(() => page.evaluate(() => getSelection().toString())).toBe('');

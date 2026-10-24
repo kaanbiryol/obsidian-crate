@@ -902,7 +902,10 @@ indicator meanwhile; cached text adds no delay beyond the slide. A load failure
 shows the article metadata and original source alongside the error and retry action.
 A floating highlighter/count button opens the article highlights in a full-height
 PWA sheet using the same sizing as Settings. Its zero-height sticky layer overlays the full reading viewport; it
-does not reserve a bottom bar or shorten the article. The button and navigation
+does not reserve a bottom bar or shorten the article. Once the phone reader's
+opening slide settles, the navigation and this layer become fixed and the settled
+pane drops its transform, so iOS rubber-banding moves only the article. The reader
+reserves the navigation's measured height above the article. The button and navigation
 bar share the same scroll-direction threshold: down hides them, up or keyboard
 focus reveals them. At the fully shown/hidden endpoints, a 12px direction threshold
 filters jitter. Once moving, reversals respond immediately. Navigation travels one

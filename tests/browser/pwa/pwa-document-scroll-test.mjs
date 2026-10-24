@@ -158,6 +158,22 @@ try {
   await page.locator('.crate-reading__open').filter({ hasText: 'Document scroll article 12' }).tap();
   await expectOwner(page, 'crate-reading-reader');
   await expect(page.locator('html')).not.toHaveClass(/pwa-document-scroll/);
+  // Fixed chrome stays put while iOS bounces the article beneath it, and the
+  // article still starts right below the header.
+  const chromeLayout = () => page.evaluate(() => {
+    const reader = document.querySelector('.crate-reading-reader');
+    const nav = reader.querySelector('.crate-reading-reader__nav');
+    return [nav, reader.querySelector('.crate-reading-reader__floating')].map(element => getComputedStyle(element).position)
+      .concat(Math.round(reader.querySelector('.crate-reading-reader__page').getBoundingClientRect().top - nav.getBoundingClientRect().bottom));
+  });
+  await expect.poll(chromeLayout).toEqual(['fixed', 'fixed', 0]);
+  // The article page clears the bottom safe area itself. Nothing may follow it,
+  // or an article that fits on screen scrolls by the inset and stays there.
+  const bottomInset = await page.addStyleTag({ content: ':root { --pwa-safe-area-bottom: 34px !important; }' });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollHeight
+    - Math.round(document.querySelector('.crate-reading-reader__page').getBoundingClientRect().bottom + scrollY)), 0,
+  'the document ends with the article page');
+  await bottomInset.evaluate(element => element.remove());
   await page.getByRole('button', { name: 'Back to reading', exact: true }).tap();
   await expectOwner(page, 'crate-reading__list-scroll');
   await expect.poll(() => documentOffset(page)).toBe(500);

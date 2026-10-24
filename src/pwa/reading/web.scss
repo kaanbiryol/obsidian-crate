@@ -96,9 +96,25 @@ html.pwa-document-reader {
     height: auto;
     min-height: calc(100dvh - var(--pwa-safe-area-top, env(safe-area-inset-top)));
     overflow: visible;
-    padding-bottom: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom));
+    // The page already clears the bottom safe area. Repeating it here let an
+    // article that fits on screen scroll by the inset and stay under the strip.
     &:has(.crate-content-loading) {
       height: calc(100dvh - var(--pwa-safe-area-top, env(safe-area-inset-top)));
+    }
+  }
+  // Sticky chrome moves with iOS rubber-banding; pinned chrome stays while only
+  // the article bounces. Drop the settled pane's transform so fixed descendants
+  // position against the viewport rather than the pane.
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-open="true"] .crate-reading__reader-pane:has(.crate-reading-reader[data-pinned-chrome="true"]) {
+    transform: none;
+    transition: none;
+  }
+  .crate-reminders-ui .crate-reading-web .crate-reading-reader[data-pinned-chrome="true"] {
+    padding-top: var(--reader-navigation-height);
+    .crate-reading-reader__nav, .crate-reading-reader__floating {
+      position: fixed;
+      left: env(safe-area-inset-left);
+      right: env(safe-area-inset-right);
     }
   }
 }
