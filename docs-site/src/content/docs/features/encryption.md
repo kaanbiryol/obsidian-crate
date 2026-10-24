@@ -39,7 +39,7 @@ Encryption protects notes, attachments, retained file history, shared settings, 
 
 Some metadata remains visible to your server: file and folder paths, approximate file sizes, revision and sync timing, reminder IDs, completion state, due times, and notification delivery information. Without encryption enabled, your server can also read synced content.
 
-Encrypted Reading saves use your browser to download an article where the source website allows it. Other links wait for an unlocked Obsidian device to extract them. Private reminder links keep their URL labels because server-side page-title lookup is disabled.
+In the web app, your server downloads articles for encrypted Reading without keeping the link, and the web app encrypts them. Obsidian downloads on the device. Private reminder links keep their URL labels because server-side page-title lookup is disabled.
 
 ## Keep your recovery key
 

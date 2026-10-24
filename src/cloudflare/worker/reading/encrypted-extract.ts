@@ -15,7 +15,7 @@ export async function extractForEncryptedReading(request: Request, env: Env): Pr
     const { article } = await fetchReadingCapture(url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN);
     return readingResponse({ article });
   } catch {
-    // The web app keeps an encrypted bookmark for an unlocked Obsidian device.
+    // The web app saves the link as a bookmark with Try again.
     throw new ReadingError('This article could not be downloaded.', 422, 'reading_extract_failed');
   }
 }

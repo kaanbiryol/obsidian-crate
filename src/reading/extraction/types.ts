@@ -3,8 +3,6 @@ export interface CapturedArticle {
   title?: string;
   author?: string;
   faviconUrl?: string;
-  /** Encrypted browser capture may hand an empty video to an unlocked device. */
-  deferTranscript?: true;
   transcript?: { source: 'youtube'; language?: string };
 }
 

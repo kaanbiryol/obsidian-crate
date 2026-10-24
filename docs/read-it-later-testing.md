@@ -105,8 +105,8 @@ retry the retained bookmark after restart. Edit the article block, replace or de
 the note while downloading; a late result must never overwrite or recreate it.
 Metadata and personal notes outside an unchanged empty article block are preserved.
 The mobile plugin uses the same native capture path. Unencrypted PWA captures use
-the server queue; encrypted PWA captures run locally in the browser and retain
-pending work for an unlocked Obsidian device when browser access rules block it.
+the server queue; encrypted PWA captures ask the server to download the page and
+encrypt the result in the browser. A failed download leaves a bookmark with **Try again**.
 
 Automated coverage: `src/reading/desktop-capture.test.ts`,
 `src/reading/data/library.test.ts`, `src/reading/runtime.test.ts`, and
@@ -157,10 +157,9 @@ reader.
    duplicate sources** should show both paths. In Obsidian, fill the empty bookmark
    from the clip, verify its original identity/state/personal notes, and verify the
    clip was kept. Repeating this on a filled bookmark must preserve its content.
-7. With encryption enabled, a PWA caption request blocked by browser access rules
-   should retain an encrypted pending note. Open an unlocked Obsidian device and
-   let it attempt capture after sync. Keep both the source URL and text off the
-   plaintext Worker capture routes.
+7. With encryption enabled, save a link the server cannot download. The web app
+   should save an encrypted bookmark marked unavailable with **Try again**. Keep
+   both the source URL and text off the plaintext Worker capture routes.
 
 Automated coverage: Reading unit tests; local Worker Reading/encryption integration;
 `reading-video.browser.test.mjs` for real Chromium/WebKit document and Shadow DOM

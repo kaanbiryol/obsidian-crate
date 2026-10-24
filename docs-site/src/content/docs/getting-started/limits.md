@@ -36,7 +36,7 @@ In the web app, cached reminders are read-only offline. Reading can queue saves 
 
 ## Some websites cannot be saved as full articles
 
-Pages requiring a login, restricting automated downloads, or relying heavily on scripts may remain bookmarks. Encryption can also mean a web app save waits for an unlocked Obsidian device to download it. YouTube transcripts depend on available captions; videos are streamed, not downloaded.
+Pages requiring a login, restricting automated downloads, or relying heavily on scripts may remain bookmarks. YouTube transcripts depend on available captions; videos are streamed, not downloaded.
 
 Keep the saved link, retry when connected, or [use Web Clipper](/docs/features/reading/#use-obsidian-web-clipper) to save text you can access in your browser.
 

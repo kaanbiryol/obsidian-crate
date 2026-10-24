@@ -28,7 +28,7 @@ export function assembleReadingArticle(content: string, metadata: ReadingMetadat
   const title = replacementTitle ?? metadata.title;
   const changes = {
     ...(capture ? { title } : {}),
-    extraction_status: article ? publication.kind === 'local' && article.deferTranscript && !article.markdown ? 'pending' : 'ready' : 'unavailable',
+    extraction_status: article ? 'ready' : 'unavailable',
     ...(article ? transcriptMetadata(article) : {}),
     ...(!capture && replacementTitle !== undefined ? { title: replacementTitle } : {}),
     ...(article?.author && (capture || !metadata.author) ? { author: article.author } : {}),

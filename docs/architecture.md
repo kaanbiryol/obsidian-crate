@@ -464,7 +464,7 @@ late publication. A failed or interrupted download remains a retryable bookmark.
 `reading/core/article.ts` owns article block assembly and extracted metadata updates
 for local downloads, new Worker captures and existing Worker notes. Each caller
 selects its publication policy, preserving the differences in metadata ownership,
-fallbacks and deferred transcripts. Source eligibility, revision checks, queue
+and fallbacks. Source eligibility, revision checks, queue
 leases and storage commits remain with the local library and Worker workflows.
 
 HTML extraction lives in `src/reading/extraction/` and is shared with the Worker.
@@ -473,7 +473,7 @@ The YouTube-specific enrichment adapter grants bundled Defuddle bounded access
 to an allowlist of YouTube watch/player/caption endpoints; failed captions preserve
 video metadata. Encrypted PWA captures ask the Worker's stateless
 `POST /reading/encrypted-extract` route to download the page, then encrypt the
-result on the device; missing transcripts stay pending for a trusted Obsidian device. Plugin capture on desktop and mobile
+result on the device; a failed download leaves a bookmark with **Try again**. Plugin capture on desktop and mobile
 loads it on demand; all executable code is bundled with the plugin. Unencrypted
 PWA captures retain the durable server queue. Previously queued desktop
 server captures still drain through their original path.

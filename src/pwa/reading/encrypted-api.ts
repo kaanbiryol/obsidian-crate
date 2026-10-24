@@ -243,7 +243,7 @@ export class EncryptedReadingApi {
       try {
         const article = await this.options.captureArticle(item.source_url);
         content = applyLocalArticle(patchReadingFrontmatter(content, { extraction_status: 'unavailable' }), { ...item, path }, article);
-      } catch { /* The pending encrypted bookmark is completed by a trusted Obsidian device. */ }
+      } catch { content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' }); }
     }
     const sealed = await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: null }, this.options.authority);
     const response = { saved: true, id: itemId };

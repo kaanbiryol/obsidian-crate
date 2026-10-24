@@ -13,7 +13,7 @@ On a connected Obsidian device, finish a sync, then open **Settings â†’ Crate â†
 
 Open the connection link on the receiving device. Keep it private: it grants access to your data. If it expires, create a new link from Obsidian. With encryption, follow the [unlock instructions](/docs/features/encryption/#reading-and-reminders-web-app) if prompted.
 
-After connecting, open a synced reminder or article to check that you are seeing the right vault. Your server must stay available, but Obsidian can close. Some encrypted article downloads still [need an unlocked Obsidian device](/docs/features/reading/#where-articles-are-downloaded).
+After connecting, open a synced reminder or article to check that you are seeing the right vault. Your server must stay available, but Obsidian can close.
 
 ## Install on your phone
 

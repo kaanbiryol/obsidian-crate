@@ -71,7 +71,6 @@ export function startReading(plugin: CratePlugin): void {
 	let timer: number | undefined;
 	let lastErrorAt = 0;
   const refreshes = new Set<Promise<void>>();
-  const attemptedArticles = new Set<string>();
 	const refresh = () => {
 		if (controller.signal.aborted || !plugin.app.workspace.layoutReady || plugin.syncRuntime.getState().status === 'syncing') return;
 
@@ -94,12 +93,7 @@ export function startReading(plugin: CratePlugin): void {
         policyChecked = true; schedule();
       })().catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
     }
-		const work = library.refresh().then(async () => {
-      if (loadEncryptionKeys(plugin.secretStorage) && canAdopt()) {
-        const item = library.getSnapshot().items.find(item => item.path && item.extraction_status === 'pending' && !attemptedArticles.has(item.crate_reading_id));
-        if (item) { attemptedArticles.add(item.crate_reading_id); void library.retryCapture(item).catch(() => {}).finally(schedule); }
-      }
-		}).catch(error => { if (!controller.signal.aborted && Date.now() - lastErrorAt > 60_000) { lastErrorAt = Date.now(); new Notice(error instanceof Error ? error.message : 'Could not refresh Reading.'); } });
+		const work = library.refresh().catch(error => { if (!controller.signal.aborted && Date.now() - lastErrorAt > 60_000) { lastErrorAt = Date.now(); new Notice(error instanceof Error ? error.message : 'Could not refresh Reading.'); } });
     refreshes.add(work); void work.finally(() => refreshes.delete(work));
 	};
 	const schedule = () => {

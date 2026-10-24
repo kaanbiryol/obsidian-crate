@@ -67,11 +67,11 @@ describe('Reading article assembly', () => {
     expect(parseReadingNote(content)).toMatchObject({ transcript_source: 'youtube', transcript_language: 'de', resolved_url: 'https://example.com/final' });
   });
 
-  it('defers empty transcripts only for local publication', () => {
+  it('marks an empty video ready in every publication', () => {
     const source = note(), metadata = parseReadingNote(source)!;
-    const article = { markdown: '', title: 'Video', deferTranscript: true as const };
+    const article = { markdown: '', title: 'Video' };
     const local = applyLocalArticle(source, { ...metadata, path: 'Reading/Video.md' }, article);
-    expect(parseReadingNote(local)?.extraction_status).toBe('pending');
+    expect(parseReadingNote(local)?.extraction_status).toBe('ready');
     for (const kind of ['capture', 'extraction'] as const) {
       const { content } = assembleReadingArticle(source, metadata, { kind, block: managedArticle(source)!, article });
       expect(parseReadingNote(content)?.extraction_status).toBe('ready');
