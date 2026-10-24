@@ -63,7 +63,8 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
       return readingResponse(response);
     }
     const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
-    const path = await capturePath(env, current.folder_path, parseReadingNote(content)!.title, id);
+    const item = parseReadingNote(content)!;
+    const path = await capturePath(env, current.folder_path, { title: item.title, url: item.source_url }, id);
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
     const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null, effects: operationEffects(env.DB, op, response) });
     if (!result.committed) throw new ReadingError('This note changed. Retry the same save.', 409);

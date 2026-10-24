@@ -15,7 +15,7 @@ export async function commitSealedReadingNote(env: Env, note: SealedReadingNote)
   const state = await readEncryptionState(env.DB);
   const current = await policy(env.DB);
   if (state?.mode !== 'active' || current?.folder_path !== note.folder || current.generation !== note.generation) return false;
-  const path = await capturePath(env, current.folder_path, 'Article', note.id);
+  const path = await capturePath(env, current.folder_path, null, note.id);
   const sealed = await sealFileForVault({ path, content: new TextEncoder().encode(note.content), contentType: 'text/markdown' },
     { vaultId: state.vaultId, keyId: state.seal.keyId, publicKey: state.seal.publicKey });
   const content = new TextDecoder().decode(sealed.bytes);

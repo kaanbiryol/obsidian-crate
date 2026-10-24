@@ -50,7 +50,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const { runtime, vault, origin, api, readingAppUrl } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const saved = await api('/reading/capture', { url: 'https://example.invalid/article', title: 'Optimistic article', fetchArticle: false, operationId: operationId() });
-    const path = `Reading/Optimistic article - ${saved.id.slice(0, 8)}.md`;
+    const path = `Reading/Optimistic article - example.invalid - ${saved.id.slice(0, 8)}.md`;
     const download = await runtime.mf.dispatchFetch(`${origin}/sync/download?path=${encodeURIComponent(path)}`, { headers: { Authorization: `Bearer ${vault.token}` } });
     const source = await download.text();
     const content = source.slice(0, source.indexOf('\n---\n') + 5).replace(/extraction_status: .*/, 'extraction_status: "ready"') + 'A useful ==article excerpt==.\n\nAnother paragraph to read.';

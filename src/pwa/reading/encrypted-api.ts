@@ -223,7 +223,7 @@ export class EncryptedReadingApi {
       itemId = typeof body.captureId === 'string' ? body.captureId : await readingImportId(id, rawBody);
       content = createReadingNote({ id: itemId, url: link, title: typeof body.title === 'string' ? body.title : undefined, savedAt: new Date().toISOString() });
       if (body.fetchArticle === false) content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' });
-      path = await readingCapturePath(this.options.folderPath, 'Article', itemId, candidate => [...this.files.keys()].some(p => portablePathKey(p) === portablePathKey(candidate)));
+      path = await readingCapturePath(this.options.folderPath, null, itemId, candidate => [...this.files.keys()].some(p => portablePathKey(p) === portablePathKey(candidate)));
     } else {
       const item = list.items.find(item => item.crate_reading_id === body.id);
       if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');

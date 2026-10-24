@@ -166,11 +166,12 @@ export class ReadingLibrary {
 			const id = crypto.randomUUID();
 			const note = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
 			const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
-			const path = await readingCapturePath(this.folder, this.vault.privateFilenames?.() ? 'Article' : parseReadingNote(content)!.title, id, candidate => this.vault.occupied?.(candidate) ?? this.vault.files().some(file => portablePathKey(file.path) === portablePathKey(candidate)));
+			const metadata = parseReadingNote(content)!;
+			const path = await readingCapturePath(this.folder, this.vault.privateFilenames?.() ? null : { title: metadata.title, url: metadata.source_url }, id, candidate => this.vault.occupied?.(candidate) ?? this.vault.files().some(file => portablePathKey(file.path) === portablePathKey(candidate)));
 			this.assertActive();
 			await this.vault.create(path, content);
 			await this.scan();
-			const item = { ...parseReadingNote(content)!, path };
+			const item = { ...metadata, path };
 			if (fetchArticle && this.vault.captureArticle) void this.retryCapture(item).catch(() => { /* The saved bookmark and library issue retain the failure. */ });
 			return { item, duplicate: false };
 		});
