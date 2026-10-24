@@ -1,6 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { startCloudflareDeployment } from '../../../cloudflare/plugin-integration';
+import { startCloudflareDeployment } from '../../../plugin/cloudflare-operations';
 import { openConfirmationModal } from '../../confirmation-modal';
 
 export function renderServerDeleteSetting(containerEl: HTMLElement, plugin: CratePlugin): void {

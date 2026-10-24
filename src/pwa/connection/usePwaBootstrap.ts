@@ -1,5 +1,5 @@
 import { connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from './issues';
-import { capturePwaSession } from '../session-generation';
+import { capturePwaSession } from './session-generation';
 import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
 import { useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
@@ -15,7 +15,7 @@ import {
 } from '../config';
 import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from '../install-enrollment';
 import { exchangeEnrollmentToken } from './enrollment-exchange';
-import { makeApiFetch } from '../reminders/api-fetch';
+import { makeApiFetch } from './api-fetch';
 import type { ShowToast, StartTab, StoredConfig } from '../types';
 
 export function usePwaBootstrap({

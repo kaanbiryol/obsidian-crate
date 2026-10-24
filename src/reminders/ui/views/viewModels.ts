@@ -2,6 +2,7 @@ import { type Reminder } from "@/reminders/types/reminder";
 import { getProjectColor, type ProjectColorScheme } from "@/reminders/ui/format/projectColors";
 import { getUpcomingReminders, selectTodayReminders, sortReminders, sortRemindersByFileOrder } from "@/reminders/core/reminderSort";
 import { DEFAULT_PROJECT } from "@/reminders/core/constants";
+import { reminderProject } from "@/reminders/core/reminderProjectPath";
 
 export interface ProjectStats {
   active: number;
@@ -37,7 +38,7 @@ export function buildInboxViewModel(reminders: Reminder[]): {
   completed: Reminder[];
 } {
   const inboxReminders = reminders.filter(
-    (reminder) => (reminder.project || DEFAULT_PROJECT) === DEFAULT_PROJECT,
+    (reminder) => reminderProject(reminder) === DEFAULT_PROJECT,
   );
   const sorted = sortRemindersByFileOrder(inboxReminders);
 
@@ -74,7 +75,7 @@ export function buildProjectStatsMap(reminders: Reminder[]): Map<string, Project
   const counts = new Map<string, { active: number; completed: number; total: number }>();
 
   for (const reminder of reminders) {
-    const project = reminder.project || DEFAULT_PROJECT;
+    const project = reminderProject(reminder);
     const current = counts.get(project) ?? { active: 0, completed: 0, total: 0 };
     current.total += 1;
     if (reminder.completed) {
@@ -135,7 +136,7 @@ export function buildProjectDetailViewModel(
   total: number;
   completionPercentage: number;
 } {
-  const projectReminders = reminders.filter((reminder) => (reminder.project || DEFAULT_PROJECT) === project);
+  const projectReminders = reminders.filter((reminder) => reminderProject(reminder) === project);
   const sorted = sortRemindersByFileOrder(projectReminders);
   const active = sorted.filter((reminder) => !reminder.completed);
   const completed = sorted.filter((reminder) => reminder.completed);

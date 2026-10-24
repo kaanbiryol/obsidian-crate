@@ -21,7 +21,7 @@ function createController(options: Partial<{
 		automaticSyncEnabled: () => options.automaticSync ?? false,
 		recoverUploads: async () => {},
 		api: { isConfigured },
-		getLocalManifest: () => ({ getEntry: () => undefined, save: async () => {} }),
+		localManifest: { getEntry: () => undefined, save: async () => {} },
 		shouldIgnore: (path: string) => path.startsWith('.trash/'),
 		updateState,
 		setLastSync: vi.fn(),
@@ -39,7 +39,7 @@ function createController(options: Partial<{
 		controller,
 		updateState,
 		flushes: isConfigured,
-		pending: () => controller.getPendingPaths(),
+		pending: () => controller.getPendingKeys(),
 		revisions: () => [...controller.snapshotPendingRevisions().keys()],
 	};
 }
@@ -89,7 +89,7 @@ describe('queue event handlers', () => {
 
 		h.controller.onFileChange({ path: 'notes/a.md' });
 
-		expect(h.controller.hasPendingPath('notes/a.md')).toBe(true);
+		expect(h.controller.hasPendingKey('notes/a.md')).toBe(true);
 		expect(h.updateState).toHaveBeenCalledExactlyOnceWith({ pendingChanges: 1 });
 	});
 
@@ -98,7 +98,7 @@ describe('queue event handlers', () => {
 
 		h.controller.onFileDelete({ path: 'notes/a.md' });
 
-		expect(h.controller.hasPendingPath(pendingChangeKey('delete', 'notes/a.md'))).toBe(true);
+		expect(h.controller.hasPendingKey(pendingChangeKey('delete', 'notes/a.md'))).toBe(true);
 		expect(h.updateState).toHaveBeenCalledExactlyOnceWith({ pendingChanges: 1 });
 	});
 
@@ -108,9 +108,9 @@ describe('queue event handlers', () => {
 		h.controller.onFileRename({ path: '.trash/a.md' } as never, 'notes/a.md');
 		h.controller.onFileRename({ path: 'notes/b.md' } as never, '.trash/b.md');
 
-		expect(h.controller.hasPendingPath(pendingChangeKey('delete', 'notes/a.md'))).toBe(true);
-		expect(h.controller.hasPendingPath('notes/b.md')).toBe(true);
-		expect(h.controller.hasPendingPath('.trash/b.md')).toBe(false);
+		expect(h.controller.hasPendingKey(pendingChangeKey('delete', 'notes/a.md'))).toBe(true);
+		expect(h.controller.hasPendingKey('notes/b.md')).toBe(true);
+		expect(h.controller.hasPendingKey('.trash/b.md')).toBe(false);
 		expect(h.updateState.mock.calls).toEqual([[{ pendingChanges: 1 }], [{ pendingChanges: 2 }]]);
 	});
 

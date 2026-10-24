@@ -7,24 +7,21 @@ import {
 	hasUnresolvedConflict,
 	recordResolvedRace,
 } from '../sync-result';
-import {
-	PREPARE_CONCURRENCY,
-} from './constants';
+import { PREPARE_CONCURRENCY } from '../transfer/constants';
 import { uploadFullSyncPlan, type FullSyncUploadContext } from './full-sync-upload';
 import { createLogger } from '../logger';
-import type { FileDiff, SyncResult, SyncState } from '../types';
+import type { FileDiff, RemoteManifest, SyncResult, SyncState } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { getPathEntry } from '../../protocol/path-record';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { FullSyncPlan } from '../planner/types';
 import {
+	beginSyncAttempt,
 	completeTransferResult,
 	completeWorkflowResult,
-	getStartFailureResult,
 	handleWorkflowError,
 	type ReconnectNotice,
-	type RemoteManifest,
 	type SyncStatus,
 } from '../sync-outcome';
 import { applyDiffs } from '../transfer/process';
@@ -70,10 +67,8 @@ export async function runSyncWorkflow(
 	context: SyncWorkflowContext,
 	progressCallback?: (current: number, total: number) => void
 ): Promise<SyncResult> {
-	const startFailure = getStartFailureResult(context);
+	const startFailure = beginSyncAttempt(context);
 	if (startFailure) return startFailure;
-
-	context.updateState({ status: 'syncing' });
 	logger.info('Sync started');
 	let result = createEmptySyncResult();
 	let recovering = false;

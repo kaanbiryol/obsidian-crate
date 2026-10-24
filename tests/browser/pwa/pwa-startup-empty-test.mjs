@@ -1,9 +1,9 @@
 import { checkEarlyLaunchTheme, checkLaunchThemes, checkReadingOpening } from './pwa-launch-theme-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
-import { previewEnrollmentToken } from '../../../scripts/pwa-preview-fixtures.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { previewEnrollmentToken } from '../support/preview/pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'startup-empty-regression' });
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });

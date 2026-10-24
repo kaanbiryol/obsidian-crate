@@ -2,7 +2,6 @@ import { reminderUpdateReadiness } from '../update/update-readiness';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { isStandaloneApp } from '../config';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
-import { exportPendingChanges } from './outbox/export-pending-changes';
 import { usePushNotifications } from './usePushNotifications';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
 import { usePwaPreferences } from '../settings/usePwaPreferences';
@@ -14,15 +13,20 @@ import { useReminderMutations } from './useReminderMutations';
 import { useReminderSync } from './useReminderSync';
 import { fetchPageTitle } from './reminder-api';
 import { useSyncFeedback } from '../sync/SyncFeedback';
-import { isInitialPwaContentReady } from '../initial-content-readiness';
+import { isInitialPwaContentReady } from './initial-content-readiness';
 import { useSharedFeatures } from '../shared-features';
 import { toSharedReminder } from './outbox/reminder-list-state';
 import { useFeatureSettings, useSettingsOpen } from '../settings/settings-context';
 import { ReminderRecoveryNotices } from './notices/ReminderRecoveryNotices';
 import { reminderFeatureStatus, reminderSyncStatus } from '../sync/reminder-status';
 import { reminderRetryAt } from './outbox/reminder-outbox';
+import type { PendingReminderChange } from './outbox/reminder-outbox-types';
+import { downloadJson } from '../storage/download';
 
-
+/** Review copy only; importing it must never silently mint fresh operation IDs. */
+function exportPendingChanges(changes: PendingReminderChange[]): void {
+	downloadJson('crate-pending-changes.json', { format: 'crate-pending-reminder-changes-v1', origin: location.origin, changes });
+}
 
 function useRemindersController() {
 	const enabled = useSharedFeatures().reminders;

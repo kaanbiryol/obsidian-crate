@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildReminderMutationBody } from './reminder-mutation';
-import { buildModalDraft } from '../editor/reminder-modal-draft';
+import { buildModalDraft } from '../editor/reminder-drafts';
 import { applyReminderTextUpdate, deriveDraftPatchFromContent } from '../editor/editor-draft';
 import type { StoredConfig } from '../../types';
 import type { ModalDraft } from '../types';

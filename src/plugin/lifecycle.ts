@@ -3,7 +3,8 @@ import { Notice } from "obsidian";
 import { registerReading } from '../reading/register-integrations';
 import { stopReading } from '../reading/runtime';
 import { SecretStorageService } from "./secret-storage";
-import { createLogger, errorMessage } from "../sync/logger";
+import { createLogger } from "../sync/logger";
+import { errorMessage } from "../platform/logger";
 import { CrateSettingTab } from "../ui/settings-tab";
 import { activateRemindersView, initializeReminders } from "../reminders/plugin-integration";
 import { ensureReminderNotificationPolicy } from "../reminders/notification-policy-sync";
@@ -18,7 +19,7 @@ import {
   createCloudflareDeploymentService,
   createCloudflareUsageConnection,
   handleCloudflareOAuthProtocol,
-} from "../cloudflare/plugin-integration";
+} from "./cloudflare-operations";
 import { showCloudflareServerUpdateNotice } from "../ui/cloudflare/update-notice";
 import { beginPluginLifecycle, endPluginLifecycle, setSyncReady } from './lifecycle-state';
 

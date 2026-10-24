@@ -1,6 +1,6 @@
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { Setting } from 'obsidian';
-import { errorMessage } from '../../../sync/logger';
+import { errorMessage } from '../../../platform/logger';
 
 export function renderEncryptionManagement(container: HTMLElement, options: {
   copyRecovery(): Promise<void>;

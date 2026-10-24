@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
-import { createInitialState } from '../../../scripts/pwa-preview-fixtures.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { createInitialState } from '../support/preview/pwa-preview-fixtures.mjs';
 
 const content = 'A long reminder with enough text to scroll inside the title. '.repeat(16).trim();
 const assets = await buildPwaPreviewAssets();

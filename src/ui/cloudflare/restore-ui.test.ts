@@ -7,7 +7,7 @@ vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('../plugin/shared-modal', () => ({ SharedModal: class extends MockModal { bodyEl = new FakeElement('div'); openLayout() {} } }));
 vi.mock('./deployment-modal', () => ({ openCloudflareDeploymentModal: () => progress, revealCloudflareOperation: () => false }));
 vi.mock('../confirmation-modal', () => ({ openConfirmationModal: confirm }));
-vi.mock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment: connect }));
+vi.mock('../../plugin/cloudflare-operations', () => ({ startCloudflareDeployment: connect }));
 vi.mock('../../plugin/lifecycle-state', () => ({ getPluginLifecycleSignal: () => new AbortController().signal }));
 import { openServerRestore } from './restore-ui';
 import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';

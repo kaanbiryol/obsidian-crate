@@ -3,14 +3,14 @@ import { createModalActions, SharedModal } from '../../plugin/shared-modal';
 import { openConfirmationModal } from '../../confirmation-modal';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { encryptVault, loadDeviceEncryptionKeys, prepareEncryptionKeys, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
+import { encryptVault, loadDeviceEncryptionKeys, openEncryptionConnection, prepareEncryptionKeys, readEncryptionStatus, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
 import type { VaultKeyBundle } from '../../../encryption/key-bundle';
-import { WorkerApiHttpClient } from '../../../sync/worker-api/http';
+import type { WorkerApiHttpClient } from '../../../sync/worker-api/http';
 import { readServerEncryption } from '../../../sync/encryption/server-encryption';
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { createLogger, errorMessage } from '../../../sync/logger';
+import { createLogger } from '../../../sync/logger';
+import { errorMessage } from '../../../platform/logger';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
-import { normalizeWorkerUrl } from '../../../sync/connection/worker-url';
 import { EncryptionResetModal } from './encryption-reset-modal';
 import { renderRecoveryVerification } from './recovery-verification';
 import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-setup-ui';
@@ -46,17 +46,11 @@ export function renderEncryptionSection(container: HTMLElement, plugin: CratePlu
 		if (plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) {
 			show('Reset in progress', 'Finish the sync reset on this device.', 'Resume reset'); return;
 		}
-		const url = normalizeWorkerUrl(plugin.settings.workerUrl), token = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) ?? '';
 		loading = true;
 		show('Checking…', 'Checking this server’s encryption status.', 'Checking…');
 		try {
-			const http = new WorkerApiHttpClient(url, token);
-			http.setAbortSignal(signal);
-			const state = await readServerEncryption(http, 7000);
+			const state = await readEncryptionStatus(plugin, 7000);
 			if (!active() || request !== revision) return;
-			if (url !== normalizeWorkerUrl(plugin.settings.workerUrl) || token !== (plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) ?? '')) {
-				throw new Error('The server connection changed.');
-			}
 			loading = false;
 			modalTitle = encryptionModalTitle(state);
 			if (state?.mode === 'resetting') show('Reset in progress', 'Continue on the device that started the reset.', 'View reset');
@@ -85,23 +79,19 @@ export function renderEncryptionSection(container: HTMLElement, plugin: CratePlu
 
 class EncryptionModal extends SharedModal {
 	private readonly http: WorkerApiHttpClient;
-	private readonly authToken: string;
+	private readonly assertConnection: () => void;
 	private running = false;
 	private disposeContent?: () => void;
 	constructor(private readonly plugin: CratePlugin, private readonly onChanged: () => void, private readonly initialTitle: string) {
 		super(plugin.app);
-		this.authToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) ?? '';
-		this.http = new WorkerApiHttpClient(plugin.settings.workerUrl, this.authToken);
-		this.http.setAbortSignal(getPluginLifecycleSignal(plugin));
+		({ http: this.http, assertCurrent: this.assertConnection } = openEncryptionConnection(plugin));
 	}
 	onClose(): void {
 		this.disposeContent?.();
 		super.onClose();
 	}
 	private assertCurrentConnection(): void {
-		getPluginLifecycleSignal(this.plugin).throwIfAborted();
-		if (this.http.getWorkerUrl() !== normalizeWorkerUrl(this.plugin.settings.workerUrl)
-			|| this.authToken !== this.plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN)) throw new Error('The server connection changed. Reopen Manage encryption.');
+		this.assertConnection();
 	}
 	onOpen(): void {
 		this.openLayout(this.initialTitle);

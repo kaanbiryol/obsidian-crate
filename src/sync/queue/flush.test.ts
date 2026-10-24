@@ -37,7 +37,7 @@ function createFlushHarness(overrides: Partial<{
 	deleteFile: (path: string) => Promise<{ success: boolean; path: string }>;
 	batchDelete: (paths: string[]) => Promise<{ success: boolean; deleted: string[] }>;
 }> = {}) {
-	const pendingPaths = new Set<string>();
+	const pendingKeys = new Set<string>();
 	const pendingRevisions = new Map<string, number>();
 	const state: QueueState = {
 		status: overrides.status ?? 'idle',
@@ -79,7 +79,7 @@ function createFlushHarness(overrides: Partial<{
 	const harnessContext = { assertLocalFileAbsent: vi.fn(async (_path: string) => {}) };
 	return {
 		state,
-		pendingPaths,
+		pendingKeys,
 		pendingRevisions,
 		updateState,
 		updateStateCalls,
@@ -97,7 +97,7 @@ function createFlushHarness(overrides: Partial<{
 		getModifiedIso,
 		context: {
 			uploadPreparedFiles: ((prepared, result, options) => uploadPreparedFiles({
-				api: {
+				files: {
 					uploadFile: (path, content, hash, size, contentType) => uploadFile({ path, content, hash, size, contentType }),
 					batchUpload: async files => ({ success: true, results: await Promise.all(files.map(file => uploadFile({ ...file, content: base64ToArrayBuffer(file.content) }))) }),
 				},
@@ -106,23 +106,23 @@ function createFlushHarness(overrides: Partial<{
 				retryWithBackoff: fn => fn(),
 			}, prepared, result, options)) satisfies QueueFlushContext['uploadPreparedFiles'],
 			deleteRemoteFiles: ((files, result, options) => deleteRemoteFiles({
-				api: { batchDelete }, localManifest: { removeEntry, save },
+				files: { batchDelete }, localManifest: { removeEntry, save },
 				vault: { getAbstractFileByPath: () => null, adapter: { exists: async (path: string) => { await harnessContext.assertLocalFileAbsent(path); return false; } } } as never,
 				reportWork: work => updateState({ work }),
 			}, files, result, options)) satisfies QueueFlushContext['deleteRemoteFiles'],
 			finishInitialSetup: vi.fn(async () => {}),
 			recoverUploads: vi.fn(async () => {}),
-			getPendingPathCount: () => pendingPaths.size,
+			getPendingPathCount: () => pendingKeys.size,
 			beginBatch: () => {
-				const paths = [...pendingPaths];
+				const paths = [...pendingKeys];
 				const revisions = new Map(pendingRevisions);
-				for (const path of paths) pendingPaths.delete(path);
+				for (const path of paths) pendingKeys.delete(path);
 				return {
 					paths,
-					requeue: (keys: Iterable<string>) => { for (const key of keys) pendingPaths.add(key); },
+					requeue: (keys: Iterable<string>) => { for (const key of keys) pendingKeys.add(key); },
 					settle: (completedKeys: ReadonlySet<string>) => {
 						for (const key of completedKeys) {
-							if (!pendingPaths.has(key) && pendingRevisions.get(key) === revisions.get(key)) pendingRevisions.delete(key);
+							if (!pendingKeys.has(key) && pendingRevisions.get(key) === revisions.get(key)) pendingRevisions.delete(key);
 						}
 					},
 					release: vi.fn(),
@@ -169,14 +169,14 @@ it('records the affected file and preserves earlier uploads if queue preparation
     },
     uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
   });
-  for (let index = 0; index < 128; index++) h.pendingPaths.add(`sent-${index}.md`);
-  h.pendingPaths.add('broken.md');
+  for (let index = 0; index < 128; index++) h.pendingKeys.add(`sent-${index}.md`);
+  h.pendingKeys.add('broken.md');
   await processPendingChanges(h.context);
   expect(h.state.lastIssues).toEqual([{ path: 'broken.md', message: 'EACCES' }]);
   expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
     success: false, uploaded: 128, issues: [{ path: 'broken.md', message: 'EACCES' }], errors: ['broken.md: EACCES'],
   }));
-  expect(h.pendingPaths.has('broken.md')).toBe(true);
+  expect(h.pendingKeys.has('broken.md')).toBe(true);
 });
 
 it('backs off after a failed flush and resets after a successful one', async () => {
@@ -190,7 +190,7 @@ it('backs off after a failed flush and resets after a successful one', async () 
   });
   const retryAfterFailure = vi.fn(), flushSucceeded = vi.fn();
   Object.assign(h.context, { retryAfterFailure, flushSucceeded });
-  h.pendingPaths.add('note.md');
+  h.pendingKeys.add('note.md');
   await processPendingChanges(h.context);
   expect(retryAfterFailure).toHaveBeenCalledOnce();
   expect(h.context.triggerDebouncedSync).not.toHaveBeenCalled();
@@ -207,10 +207,10 @@ it('settles an oversized file without failing the rest of its batch', async () =
     },
     uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
   });
-  h.pendingPaths.add('big.bin');
-  h.pendingPaths.add('note.md');
+  h.pendingKeys.add('big.bin');
+  h.pendingKeys.add('note.md');
   await processPendingChanges(h.context);
-  expect(h.pendingPaths.size).toBe(0);
+  expect(h.pendingKeys.size).toBe(0);
   expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
     success: true, uploaded: 1, errors: [], issues: [{ path: 'big.bin', message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' }],
   }));
@@ -227,12 +227,12 @@ describe('processPendingChanges', () => {
 		const harness = createFlushHarness({ prepareUploadFromPath: async path => ({
 			path, content: new ArrayBuffer(1), size: 1, hash: 'hash', mtime: 1,
 		}) });
-		for (let i = 0; i < 300; i++) harness.pendingPaths.add(`image-${i}.png`);
+		for (let i = 0; i < 300; i++) harness.pendingKeys.add(`image-${i}.png`);
 		await processPendingChanges(harness.context);
 		expect(harness.uploadFile).toHaveBeenCalledTimes(300);
 		expect(harness.uploadFile.mock.invocationCallOrder[0])
 			.toBeLessThan(harness.prepareUploadFromPath.mock.invocationCallOrder[299]!);
-		expect(harness.pendingPaths.size).toBe(0);
+		expect(harness.pendingKeys.size).toBe(0);
 	});
 	it('flushes uploads/deletes and updates manifest/state on success', async () => {
 		const harness = createFlushHarness({
@@ -245,8 +245,8 @@ describe('processPendingChanges', () => {
 				contentType: 'text/plain',
 			}),
 		});
-		harness.pendingPaths.add('notes/a.md');
-		harness.pendingPaths.add(pendingChangeKey('delete', 'notes/old.md'));
+		harness.pendingKeys.add('notes/a.md');
+		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/old.md'));
 
 		await processPendingChanges(harness.context);
 
@@ -265,7 +265,7 @@ describe('processPendingChanges', () => {
 		expect(harness.state.status).toBe('idle');
 		expect(harness.state.lastError).toBeNull();
 		expect(harness.setLastSync).toHaveBeenCalledExactlyOnceWith(harness.state.lastSync);
-		expect(harness.pendingPaths.size).toBe(0);
+		expect(harness.pendingKeys.size).toBe(0);
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 		expect(harness.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
 			success: true,
@@ -278,23 +278,23 @@ describe('processPendingChanges', () => {
 
 	it('reschedules when a sync is already in progress', async () => {
 		const harness = createFlushHarness({ status: 'syncing' });
-		harness.pendingPaths.add('notes/a.md');
+		harness.pendingKeys.add('notes/a.md');
 
 		await processPendingChanges(harness.context);
 
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
 		expect(harness.uploadFile).not.toHaveBeenCalled();
-		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 	});
 
 	it('leaves queue pending when API is not configured', async () => {
 		const harness = createFlushHarness({ configured: false });
-		harness.pendingPaths.add('notes/a.md');
+		harness.pendingKeys.add('notes/a.md');
 
 		await processPendingChanges(harness.context);
 
 		expect(harness.uploadFile).not.toHaveBeenCalled();
-		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 	});
 
@@ -314,13 +314,13 @@ describe('processPendingChanges', () => {
 				error: 'quota exceeded',
 			}),
 		});
-		harness.pendingPaths.add('notes/a.md');
+		harness.pendingKeys.add('notes/a.md');
 
 		await processPendingChanges(harness.context);
 
 		expect(harness.state.status).toBe('error');
 		expect(harness.state.lastError).toContain('quota exceeded');
-		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
 		expect(harness.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
 			success: false,
@@ -342,13 +342,13 @@ describe('processPendingChanges', () => {
 				throw new HttpError('remote changed', 409);
 			},
 		});
-		harness.pendingPaths.add('notes/a.md');
+		harness.pendingKeys.add('notes/a.md');
 		harness.pendingRevisions.set('notes/a.md', 1);
 
 		await processPendingChanges(harness.context);
 
 		expect(harness.state.status).toBe('error');
-		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 		expect(harness.requestReconciliation).toHaveBeenCalledTimes(1);
 		expect(harness.requestReconciliation).toHaveBeenCalledWith(['notes/a.md']);
@@ -368,11 +368,11 @@ describe('processPendingChanges', () => {
 				throw new HttpError('unauthorized', 401);
 			},
 		});
-		harness.pendingPaths.add('notes/a.md');
+		harness.pendingKeys.add('notes/a.md');
 
 		await processPendingChanges(harness.context);
 
-		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 		expect(harness.state).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
@@ -387,11 +387,11 @@ describe('processPendingChanges', () => {
 		Notice.reset();
 		const harness = createFlushHarness();
 		vi.mocked(harness.context.recoverUploads).mockRejectedValue(new HttpError('unauthorized', 401));
-		harness.pendingPaths.add('notes/a.md');
+		harness.pendingKeys.add('notes/a.md');
 
 		await processPendingChanges(harness.context);
 
-		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 		expect(harness.state).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE, pendingChanges: 1 });
 		expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
@@ -403,9 +403,9 @@ describe('processPendingChanges', () => {
 			prepareUploadFromPath: async path => ({ path, content: new ArrayBuffer(1), hash: 'local', size: 1 }),
 			uploadFile: async () => { throw new HttpError('Rename the conflicting file or parent folder', 409, null, 'namespace_conflict'); },
 		});
-		harness.pendingPaths.add('Projects.md');
+		harness.pendingKeys.add('Projects.md');
 		await processPendingChanges(harness.context);
-		expect(harness.pendingPaths.has('Projects.md')).toBe(true);
+		expect(harness.pendingKeys.has('Projects.md')).toBe(true);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 		expect(harness.state.lastError).toContain('Rename the conflicting file');
@@ -414,14 +414,14 @@ describe('processPendingChanges', () => {
 	it('chunks mass deletes to the shared server limit', async () => {
 		const harness = createFlushHarness();
 		for (let index = 0; index < 14; index++) {
-			harness.pendingPaths.add(pendingChangeKey('delete', `notes/${index}.md`));
+			harness.pendingKeys.add(pendingChangeKey('delete', `notes/${index}.md`));
 		}
 
 		await processPendingChanges(harness.context);
 
 		expect(harness.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([4, 4, 4, 2]);
 		expect(harness.removeEntry).toHaveBeenCalledTimes(14);
-		expect(harness.pendingPaths.size).toBe(0);
+		expect(harness.pendingKeys.size).toBe(0);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
 	});
 
@@ -430,7 +430,7 @@ describe('processPendingChanges', () => {
 		const paths = Array.from({ length: BATCH_DELETE_MAX_FILES + 1 }, (_, index) => `deleted-${index}.md`);
 		for (const path of paths) {
 			const key = pendingChangeKey('delete', path);
-			h.pendingPaths.add(key);
+			h.pendingKeys.add(key);
 			h.pendingRevisions.set(key, 1);
 		}
 		h.batchDelete.mockImplementationOnce(async deleted => ({ success: true, deleted }))
@@ -440,7 +440,7 @@ describe('processPendingChanges', () => {
 		expect(h.removeEntry.mock.calls.map((call: unknown[]) => call[0])).toEqual(paths.slice(0, -1));
 		expect(h.context.localManifest.save).toHaveBeenCalledOnce();
 		const remaining = pendingChangeKey('delete', paths.at(-1)!);
-		expect([...h.pendingPaths]).toEqual([remaining]);
+		expect([...h.pendingKeys]).toEqual([remaining]);
 		expect([...h.pendingRevisions]).toEqual([[remaining, 1]]);
 		expect(h.state.status).toBe('idle');
 		expect(h.onFlushResult).not.toHaveBeenCalled();
@@ -456,17 +456,17 @@ describe('processPendingChanges', () => {
 				contentType: 'text/plain',
 			}),
 			uploadFile: async ({ path }) => {
-				harness.pendingPaths.add(path);
+				harness.pendingKeys.add(path);
 				harness.pendingRevisions.set(path, 2);
 				return { success: true, path, hash: 'abc123' };
 			},
 		});
-		harness.pendingPaths.add('notes/a.md');
+		harness.pendingKeys.add('notes/a.md');
 		harness.pendingRevisions.set('notes/a.md', 1);
 
 		await processPendingChanges(harness.context);
 
-		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.pendingRevisions.get('notes/a.md')).toBe(2);
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
 	});
@@ -485,12 +485,12 @@ describe('processPendingChanges', () => {
 				throw createNamedAbortError();
 			},
 		});
-		harness.pendingPaths.add('notes/a.md');
+		harness.pendingKeys.add('notes/a.md');
 
 		await processPendingChanges(harness.context);
 
 		expect(harness.state.status).not.toBe('error');
-		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.state.status).toBe('idle');
 		expect(harness.triggerDebouncedSync).toHaveBeenCalled();
 	});
@@ -505,15 +505,15 @@ describe('processPendingChanges', () => {
 				],
 			}),
 		});
-		harness.pendingPaths.add(pendingChangeKey('delete', 'notes/ok.md'));
-		harness.pendingPaths.add(pendingChangeKey('delete', 'notes/fail.md'));
+		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/ok.md'));
+		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/fail.md'));
 
 		await processPendingChanges(harness.context);
 
 		expect(harness.removeEntry).toHaveBeenCalledWith('notes/ok.md');
 		expect(harness.removeEntry).not.toHaveBeenCalledWith('notes/fail.md');
-		expect(harness.pendingPaths.has(pendingChangeKey('delete', 'notes/fail.md'))).toBe(true);
-		expect(harness.pendingPaths.has(pendingChangeKey('delete', 'notes/ok.md'))).toBe(false);
+		expect(harness.pendingKeys.has(pendingChangeKey('delete', 'notes/fail.md'))).toBe(true);
+		expect(harness.pendingKeys.has(pendingChangeKey('delete', 'notes/ok.md'))).toBe(false);
 		expect(harness.state.status).toBe('error');
 		expect(harness.state.lastError).toContain('notes/fail.md');
 		expect(harness.save).toHaveBeenCalledTimes(1);
@@ -525,23 +525,23 @@ describe('processPendingChanges', () => {
 describe('queued deletion revalidation', () => {
 	it('keeps the checkpoint and reconciles a file recreated after its delete event', async () => {
 		const harness = createFlushHarness();
-		harness.pendingPaths.add(pendingChangeKey('delete', 'note.md'));
+		harness.pendingKeys.add(pendingChangeKey('delete', 'note.md'));
 		harness.context.assertLocalFileAbsent.mockRejectedValue(new LocalFilePresentError('note.md'));
 		await processPendingChanges(harness.context);
 		expect(harness.batchDelete).not.toHaveBeenCalled();
 		expect(harness.removeEntry).not.toHaveBeenCalled();
-		expect(harness.pendingPaths.has(pendingChangeKey('delete', 'note.md'))).toBe(true);
+		expect(harness.pendingKeys.has(pendingChangeKey('delete', 'note.md'))).toBe(true);
 		expect(harness.requestReconciliation).toHaveBeenCalledWith([pendingChangeKey('delete', 'note.md')]);
 	});
 
 	it('preserves pending deletion when local absence cannot be checked', async () => {
 		const harness = createFlushHarness();
-		harness.pendingPaths.add(pendingChangeKey('delete', 'note.md'));
+		harness.pendingKeys.add(pendingChangeKey('delete', 'note.md'));
 		harness.context.assertLocalFileAbsent.mockRejectedValue(new Error('adapter unavailable'));
 		await processPendingChanges(harness.context);
 		expect(harness.batchDelete).not.toHaveBeenCalled();
 		expect(harness.removeEntry).not.toHaveBeenCalled();
-		expect(harness.pendingPaths.has(pendingChangeKey('delete', 'note.md'))).toBe(true);
+		expect(harness.pendingKeys.has(pendingChangeKey('delete', 'note.md'))).toBe(true);
 		expect(harness.state.lastError).toContain('adapter unavailable');
 	});
 });
@@ -550,8 +550,8 @@ it('uploads a delete-prefixed filename while deleting its unprefixed neighbor', 
 	const h = createFlushHarness({ prepareUploadFromPath: async path => ({
 		path, hash: 'a'.repeat(64), size: 1, content: new ArrayBuffer(1), contentType: 'text/plain',
 	}) });
-	h.pendingPaths.add(pendingChangeKey('delete', 'note.md'));
-	h.pendingPaths.add('delete:note.md');
+	h.pendingKeys.add(pendingChangeKey('delete', 'note.md'));
+	h.pendingKeys.add('delete:note.md');
 	await processPendingChanges(h.context);
 	expect(h.prepareUploadFromPath).toHaveBeenCalledExactlyOnceWith('delete:note.md');
 	expect(h.uploadFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'delete:note.md' }));
@@ -559,5 +559,5 @@ it('uploads a delete-prefixed filename while deleting its unprefixed neighbor', 
 	expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
 		success: true, uploadedPaths: ['delete:note.md'], deletedPaths: ['note.md'],
 	}));
-	expect([...h.pendingPaths]).toEqual([]);
+	expect([...h.pendingKeys]).toEqual([]);
 });

@@ -53,7 +53,7 @@ it('pulls server settings without setup conflicts, then preserves real concurren
 	expect(pulled.errors).toEqual([]);
 	expect(pulled.conflicts).toEqual([]);
 	expect(pulled.uploaded).toBe(0);
-	expect(second.engine.getPendingPaths()).toEqual([]);
+	expect(second.engine.getPendingKeys()).toEqual([]);
 	expect(second.engine.getActiveConflicts()).toEqual([]);
 	for (const path of paths) expect(second.disk.text(path)).toBe(remoteText);
 	expect(second.disk.text('note.md')).toBe('vault from a');

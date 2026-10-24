@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import release from '../../cloudflare/server-release.json';
 import type { DevelopmentBuild } from '../../protocol/server-build';
+import { FakeDocumentFragment } from '../../test/factories/obsidian';
 
 const notices: FakeDocumentFragment[] = [];
 const embeddedArtifact = {
@@ -8,37 +9,6 @@ const embeddedArtifact = {
 	fingerprint: 'b'.repeat(64),
 	development: undefined as DevelopmentBuild | undefined,
 };
-
-class FakeLink {
-	private clickHandler?: () => void;
-
-	constructor(readonly text: string) {}
-
-	addEventListener(type: string, listener: () => void): void {
-		if (type === 'click') {
-			this.clickHandler = listener;
-		}
-	}
-
-	click(): void {
-		this.clickHandler?.();
-	}
-}
-
-class FakeDocumentFragment {
-	readonly spans: string[] = [];
-	readonly links: FakeLink[] = [];
-
-	createSpan(options: { text: string }): void {
-		this.spans.push(options.text);
-	}
-
-	createEl(_tag: string, options: { text: string }): FakeLink {
-		const link = new FakeLink(options.text);
-		this.links.push(link);
-		return link;
-	}
-}
 
 async function loadUpdateNotice() {
 	vi.doMock('obsidian', () => ({

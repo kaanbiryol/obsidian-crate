@@ -7,13 +7,13 @@ import { resetStoredSyncState } from './sync-activity';
 import { getCheckpointAuthority, requireNormalizedWorkerUrl } from '../connection/worker-url';
 import { WorkerApiHttpClient } from '../worker-api/http';
 import { SECRET_KEYS } from '../../platform/secret-keys';
-import type { CrateSettings } from '../../plugin/settings-types';
+import type { SyncRuntimeSettings } from '../settings';
 
 interface AddressWorkflowContext {
-	settings: CrateSettings;
+	settings: SyncRuntimeSettings;
 	secretStorage: SecretStorageService;
 	transition: RuntimeConfigurationTransition;
-	persistSettings: (update?: Partial<CrateSettings>) => Promise<void>;
+	persistSettings: () => Promise<void>;
 	clearLocalState: () => Promise<void>;
 	emitCurrentState: () => void;
 }

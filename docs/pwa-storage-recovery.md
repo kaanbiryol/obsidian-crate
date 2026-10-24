@@ -88,8 +88,8 @@ by a confirmed server refresh without discarding pending work. A damaged draft r
 untouched: the empty capture form cannot overwrite it during startup. Export and review
 the retained data before changing browser storage; reload after repairing storage.
 
-`src/pwa/reading/storage.test.ts` covers malformed durable records and exact-byte
-preservation. `tests/browser/reading/reading-optimistic.browser.test.mjs` also verifies native
+`src/pwa/reading/storage/storage.test.ts` covers malformed durable records and exact-byte
+preservation. `tests/browser/reading/reading-optimistic-test.mjs` also verifies native
 IndexedDB preservation through reload and retry in Chromium and WebKit.
 
 Reading refresh commits the list and article removals in one IndexedDB transaction.
@@ -98,7 +98,7 @@ does not authorize removing that source's cached article or its last verified li
 entry; the issue remains visible while the saved copy is retained. Unknown article
 records remain available for export. A complete response without that source or
 an issue still removes its derived offline copy. HTTP failures preserve the prior
-snapshot. `tests/browser/reading/reading-cache-recovery.browser.test.mjs` tests these boundaries
+snapshot. `tests/browser/reading/reading-cache-recovery-test.mjs` tests these boundaries
 in native Chromium and WebKit storage, including a quota failure after pruning.
 
 Reading enrollment captures the current credentials and logout marker before
@@ -121,3 +121,21 @@ Opening either encrypted database rejects a blocked request immediately or stops
 Encrypted Reading protects library/article caches, drafts, pending semantic commands and exact wire attempts in `crate-reading-v1`. Enrollment migrates only the current session's records and shared drafts in one transaction before hydration; failure leaves originals intact. Reading uses an independent local cipher wrapped by its Reading folder key. A recovery export includes readable unlocked records, preserved unreadable ciphertext and wrapped local-key metadata; keep exports private and retain the original folder recovery key.
 
 A link shared to the installed app is staged first with a non-extractable device-local share key, so it survives the unlock reload. Shared records bind their encryption to their random share ID; logout deletes the key and records together. Key creation/write fencing prevents an in-flight share from silently surviving with a deleted key.
+
+## Testing notes
+
+Choosing and running suites is covered in [testing](testing.md).
+
+### PWA sync coordinator
+
+After building the Worker, run `CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-sync-coordinator-test.mjs`.
+It exercises the built app in Chromium and WebKit with native IndexedDB and localStorage:
+Reading dispatch while only Reminders is rendered, reminder dispatch while only Reading
+is rendered, a Reading refresh failure that does not block reminders, shared header
+status, and paused queues retained through reload and resumed without opening their
+screens, plus immediate logout and remote cleanup feedback with the other screen
+unmounted. A blocked Reminders screen chunk must leave sync, settings and Reading
+usable. The preview supplies synthetic domain APIs; existing receipt and auth recovery
+suites cover their separate server and session guarantees. Settings opens sync details
+without mounting the other feature's screen. Physical installed-app acceptance remains
+a device check.

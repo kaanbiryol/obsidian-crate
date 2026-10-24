@@ -1,7 +1,8 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { buildSharedSettings, rebaseSharedSettings, sameSharedSettings, saveSharedSettingsChanges } from '../../sync/connection/shared-settings';
-import { createLogger, errorMessage } from '../../sync/logger';
+import { createLogger } from '../../sync/logger';
+import { errorMessage } from '../../platform/logger';
 
 const logger = createLogger('SharedSettings');
 

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { openWorkerBrowserFixture } from '../support/worker-browser-fixture.mjs';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
 import { captureDockSpring } from './pwa-dock-motion-checks.mjs';
 
 function dockScenario(engine, scenario, run) {

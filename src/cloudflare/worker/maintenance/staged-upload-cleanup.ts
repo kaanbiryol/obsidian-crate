@@ -1,6 +1,6 @@
 import { queryRows } from '../db';
 import { findReferencedStorageKeys } from '../storage-references';
-import { STAGED_UPLOAD_TTL_MS } from '../sync/staged-uploads';
+import { STAGED_UPLOAD_TTL_MS } from '../sync/staging/staged-uploads';
 
 /** Claim before checking R2: expired leases cannot publish after this point. */
 export async function cleanStagedUploads(bucket: R2Bucket, db: D1Database, now = Date.now()): Promise<number> {

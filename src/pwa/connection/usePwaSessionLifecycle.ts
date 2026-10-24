@@ -1,14 +1,14 @@
 import { SESSION_RECOVERY_ISSUE, type ConnectionIssue } from './issues';
-import { readingSession, READING_SESSION_KEY } from '../reading/storage';
+import { readingSession, READING_SESSION_KEY } from '../reading/session/session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import { invalidatePwaSession } from '../session-generation';
+import { invalidatePwaSession } from './session-generation';
 import { clearReminderDrafts } from '../reminders/editor/reminder-drafts';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY, finishEnrollment, loadStoredConfig } from '../config';
 import type { ApiFetch, ShowToast, StoredConfig } from '../types';
 import { captureEncryptionCleanupAuthority } from '../encryption/encryption-cleanup';
 import { resetReminderEncryption } from '../reminders/encryption-session';
-import { resetReadingEncryption } from '../reading/encryption-lifecycle';
+import { resetReadingEncryption } from '../reading/session/encryption-lifecycle';
 import { clearLocalData } from './local-data-cleanup';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 

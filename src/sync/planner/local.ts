@@ -43,7 +43,7 @@ export async function getLocalChanges(
   const skippedPaths = allFiles.filter(isOversizedSyncFile).map(file => file.path);
 
   const candidates = allFiles.filter(file => !isOversizedSyncFile(file)
-    && (context.pendingPaths?.has(pendingChangeKey('upload', file.path))
+    && (context.pendingKeys?.has(pendingChangeKey('upload', file.path))
       || hasLocalMetadataChange(file, context.localManifest.getEntry(file.path))));
 
   const tasks = candidates.map((file) => async () => {

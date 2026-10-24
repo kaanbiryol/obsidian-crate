@@ -73,7 +73,7 @@ it.each([0, 1])('clears pending settings after preserving conflicts in an establ
 		}
 		expect(h.api.uploadFile).not.toHaveBeenCalled();
 		expect(h.api.batchUpload).not.toHaveBeenCalled();
-		expect(h.engine.getPendingPaths()).toEqual([]);
+		expect(h.engine.getPendingKeys()).toEqual([]);
 		expect(h.engine.getState()).toMatchObject({ pendingChanges: 0, conflictCount: 4 });
 	} finally { h.engine.destroy(); }
 });
@@ -88,7 +88,7 @@ it('retains a settings edit made after applying the server version', async () =>
 		expect(result.errors).toEqual([]);
 		expect(h.files.get(path)).toEqual(toArrayBuffer(edited));
 		expect(h.localManifest.getEntry(path)?.hash).toBe(h.remoteHash);
-		expect(h.engine.getPendingPaths()).toEqual([path]);
+		expect(h.engine.getPendingKeys()).toEqual([path]);
 		expect(h.engine.getState()).toMatchObject({ pendingChanges: 1, conflictCount: 4 });
 	} finally { h.engine.destroy(); }
 });
@@ -107,7 +107,7 @@ it('retains a settings event arriving during final content verification', async 
 		});
 		const result = await h.engine.sync();
 		expect(result.errors).toEqual([]);
-		expect(h.engine.getPendingPaths()).toEqual([path]);
+		expect(h.engine.getPendingKeys()).toEqual([path]);
 		expect(h.engine.getState().conflictCount).toBe(4);
 	} finally { h.engine.destroy(); }
 });

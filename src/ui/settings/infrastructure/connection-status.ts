@@ -1,12 +1,12 @@
 import { Notice, Setting } from 'obsidian';
-import type CratePlugin from '../../../plugin/CratePlugin';
+import type { SettingsSectionContext } from '../section-helpers';
 import { ActivityModal } from '../../activity/activity-modal';
 import { notifyConflicts } from '../../../sync/conflict/conflict';
 import { showSyncErrorNotice } from '../../sync-error-notice';
-import { errorMessage } from '../../../sync/logger';
+import { errorMessage } from '../../../platform/logger';
 import { syncConnectionFailureMessage } from './self-hosted-errors';
 
-export function renderConnectionStatus(containerEl: HTMLElement, plugin: CratePlugin): () => void {
+export function renderConnectionStatus({ containerEl, plugin }: Omit<SettingsSectionContext, 'rerender'>): () => void {
 	const runtime = plugin.syncRuntime;
 	const setting = new Setting(containerEl).setName('Sync status');
 	const render = () => {

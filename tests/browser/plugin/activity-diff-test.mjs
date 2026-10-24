@@ -114,7 +114,7 @@ const { outputFiles } = await build({
     } }],
     bundle: true, write: false, format: 'iife', platform: 'browser', loader: { '.scss': 'empty' },
 });
-const css = compileString(`@use 'src/styles/plugin/activity'; @use 'src/styles/plugin/pending-diff'; @use 'src/styles/plugin/pending-browser';`, { loadPaths: [process.cwd()] }).css;
+const css = compileString(`@use 'src/ui/activity/styles/activity'; @use 'src/ui/activity/styles/pending-diff'; @use 'src/ui/activity/styles/pending-browser';`, { loadPaths: [process.cwd()] }).css;
 await mkdir('.generated/activity-diff', { recursive: true });
 
 for (const browserType of [chromium, webkit]) {

@@ -225,7 +225,7 @@ export class CloudflareApiClient {
 	}
 
   async getRecoveryObject(accountId: string, bucketName: string, key: string): Promise<Uint8Array> {
-    const response = await this.transport(`${API_BASE_URL}/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`, {
+    const response = await this.transport(`${API_BASE_URL}${this.r2ObjectPath(accountId, bucketName, key)}`, {
       method: 'GET', headers: { Authorization: `Bearer ${this.accessToken}` },
     });
     if (response.status !== 200 || !response.arrayBuffer) throw new CloudflareApiError(`Recovery object unavailable (${response.status})`, response.status, null);
@@ -233,7 +233,7 @@ export class CloudflareApiClient {
   }
   async putRecoveryObject(accountId: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
     if (!key.startsWith(BACKUPS_PREFIX)) throw new Error('Invalid checkpoint destination');
-    await this.request(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`, {
+    await this.request(this.r2ObjectPath(accountId, bucketName, key), {
       method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
     });
   }
@@ -241,7 +241,7 @@ export class CloudflareApiClient {
   /** Only the isolated restore workflow can write original object keys. */
   async putRestoredObject(accountId: string, sourceBucket: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
     if (bucketName === sourceBucket || !/^crate-[a-f0-9]{16}$/.test(bucketName)) throw new Error('Restore requires a separate bucket');
-    await this.request(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`, {
+    await this.request(this.r2ObjectPath(accountId, bucketName, key), {
       method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
     });
   }
@@ -369,6 +369,10 @@ export class CloudflareApiClient {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ enabled: true, previews_enabled: false }),
 		});
+	}
+
+	private r2ObjectPath(accountId: string, bucketName: string, key: string): string {
+		return `/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`;
 	}
 
 	private async request<T>(path: string, request: HttpRequest = { method: 'GET' }): Promise<T> {

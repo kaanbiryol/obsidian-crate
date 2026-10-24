@@ -95,7 +95,8 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 	const api = {
 		isConfigured: vi.fn().mockReturnValue(true),
 		setAbortSignal: vi.fn(),
-		createFileOperations: vi.fn(),
+		// The engine wraps these mocks directly; see createFiles below.
+		getFileTransport: () => ({ transport: null, clientSession: 'test-session' }),
 		getRequestDiagnostics: vi.fn(() => ({ clientSession: 'test-session', requests: [] })),
 		// Local bookkeeping rather than requests, so offline tests do not count them.
 		getRequestTimings: () => undefined,
@@ -125,13 +126,13 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 		})),
 	};
 
-	api.createFileOperations.mockImplementation(() => ({
+	const createFiles = () => ({
 		...api,
 		getUploadDiagnostics: () => [],
 		recordMergeApplication: vi.fn(async () => {}),
 		restoreFileVersion: vi.fn(async () => {}),
 		finishRestore: vi.fn(async () => {}),
-	}));
+	});
 
 	const fileManager = {
 		trashFile: vi.fn(),
@@ -150,7 +151,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 	};
 
 	const manifest = new LocalManifest(plugin.app as never, plugin.manifest as never, getCheckpointAuthority(settings) || 'unconfigured');
-	const engine = new SyncEngine(plugin as never, api as never, settings, { localManifest: manifest });
+	const engine = new SyncEngine(plugin as never, api as never, settings, { localManifest: manifest, createFiles: createFiles as never });
 
 	const spies = {
 		load: vi.spyOn(manifest, 'load'),

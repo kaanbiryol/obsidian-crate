@@ -39,7 +39,7 @@ For older iOS, `npm run build:reading-shortcut` still creates `dist/Save to Crat
 
 The manual iOS 27 variant remains available with `--first-run-setup` and expects an endpoint and Bearer header from Obsidian. Its native acceptance evidence below does not cover the new one-paste pairing flow.
 
-Before accepting iPhone setup, verify installation, first-run configuration, and a share-sheet save reaching **Saved to Crate** on a physical device. On macOS 27, native testing verified import without questions, both runtime prompts, trimming pasted whitespace, rejecting a non-HTTPS endpoint and a header missing its Bearer prefix, the setup confirmation, and a later shared-link invocation reaching the request permission prompt with the stored endpoint and shared URL. Invalid reconfiguration preserved the previously saved endpoint. Those request probes used dummy credentials and a deliberately invalid hostname, and were stopped before any successful request. A clean reinstall also verified that sharing before configuration opens setup; cancelling left it unconfigured. These checks do not verify iPhone execution. Run `node --test scripts/reading-shortcut.test.mjs` on macOS for serialization and variable-reference regressions. After `npm run build:worker`, run `node --test scripts/reading-shortcut-server.test.mjs tests/browser/reading/reading-shortcut-browser.test.mjs` for real D1 redemption, expiry/revocation/scope boundaries, and Chromium/WebKit setup UI. Physical acceptance must additionally cover the website download opening Shortcuts, one-paste pairing, cancelled/failed re-pairing preserving the previous setup, and a shared link reaching Saved.
+Before accepting iPhone setup, verify installation, first-run configuration, and a share-sheet save reaching **Saved to Crate** on a physical device. On macOS 27, native testing verified import without questions, both runtime prompts, trimming pasted whitespace, rejecting a non-HTTPS endpoint and a header missing its Bearer prefix, the setup confirmation, and a later shared-link invocation reaching the request permission prompt with the stored endpoint and shared URL. Invalid reconfiguration preserved the previously saved endpoint. Those request probes used dummy credentials and a deliberately invalid hostname, and were stopped before any successful request. A clean reinstall also verified that sharing before configuration opens setup; cancelling left it unconfigured. These checks do not verify iPhone execution. Run `node --test scripts/reading-shortcut.test.mjs` on macOS for serialization and variable-reference regressions. After `npm run build:worker`, run `node --test scripts/reading-shortcut-server.test.mjs tests/browser/reading/reading-shortcut-browser-test.mjs` for real D1 redemption, expiry/revocation/scope boundaries, and Chromium/WebKit setup UI. Physical acceptance must additionally cover the website download opening Shortcuts, one-paste pairing, cancelled/failed re-pairing preserving the previous setup, and a shared link reaching Saved.
 
 The tester subsequently reported that the iOS 27 shortcut worked on the phone, but its **Open URLs** action immediately switched to Safari. The current template replaces that action with **Show Web View** and keeps the same prepared handoff. Verify this revised presentation on iPhone: save and duplicate-save confirmation, dismissing back to the source app, retry after a connection interruption, and closing before confirmation. The sheet must retain the handoff fragment long enough to commit the save, and must not be assumed to share the user's Safari Reading session. The iPhone sheet itself has not been verified on the Mac.
 
@@ -80,7 +80,7 @@ Login-only pages, JavaScript-only pages, bot protection, large pages, unsupporte
 The revised iPhone sheet flow, Android installation, an installed Obsidian/Web Clipper round trip, and a live Cloudflare upgrade/extraction run remain device/deployment acceptance checks. They are not implied by the automated browser and workerd results. No production deployment is changed by building or running the sandbox.
 
 Selection highlighting: after `npm run build:worker`, run
-`node --test tests/browser/reading/reading-highlights.browser.test.mjs`. Chromium and WebKit
+`node --test tests/browser/reading/reading-highlights-test.mjs`. Chromium and WebKit
 exercise automatic highlighting on selection release, both resize handles across
 inline formatting and paragraphs, canceled drags, removal, repeated
 undispatched edits offline, reopening, and server confirmation. Chromium also
@@ -162,9 +162,80 @@ reader.
    both the source URL and text off the plaintext Worker capture routes.
 
 Automated coverage: Reading unit tests; local Worker Reading/encryption integration;
-`reading-video.browser.test.mjs` for real Chromium/WebKit document and Shadow DOM
+`reading-video-test.mjs` for real Chromium/WebKit document and Shadow DOM
 selection with a simulated player transport; and the existing content-security
 browser harness. Physical iOS/Android playback, fullscreen, installed-app gestures
 and background/resume remain manual acceptance. A public-video smoke check also
 confirmed real transcript extraction and iframe playback messages from Chromium;
 it does not establish availability for every YouTube video or device.
+
+## Testing notes
+
+Choosing and running suites is covered in [testing](testing.md).
+
+### Optimistic Reading actions
+
+After building the Worker, run `node --test tests/browser/reading/reading-optimistic-test.mjs`
+for Chromium and WebKit coverage of immediate link saves, continued editing during
+delayed requests, tags and highlight notes, offline changes, and conflict rollback.
+The tests use the built PWA, native IndexedDB/Web Locks, and the real local Worker.
+Chromium also verifies offline reload; WebKit verifies offline use in the current
+document. Physical installed-app acceptance remains a device check.
+
+The Reading library, consent, optimistic-action and highlight suites, plus the
+PWA header and dock suites, share
+`tests/browser/support/worker-browser-fixture.mjs` for the disposable Worker, HTTP bridge,
+authenticated setup requests and cleanup. Request gates and lost replies stay in
+their individual scenarios through `handleRequest`; normal requests still reach
+the real Worker and its storage bindings.
+
+`reading-browser-test.mjs` gives shell/settings, cross-feature navigation, reader
+history/geometry, offline replay, sharing and enrollment/logout separate scenarios
+with fresh Worker and browser state. Each seeds its own required articles and
+offline cache, so an earlier layout failure does not skip the remaining checks.
+Both Chromium and WebKit retain their existing platform-specific coverage.
+
+Reading persists changes locally before updating the UI and sends them in the
+background, like Reminders. Unsent edits combine while preserving their original
+preconditions; edits made during a request queue behind its immutable request body.
+Interrupted requests get the same short, bounded retries as Reminders, using those
+exact bytes and their original operation identity. Automatic retry limits survive
+foreground events and reload; **Settings → Sync → Refresh all** can
+retry uncertain changes explicitly. The browser test covers this against real
+server receipts, including repeated lost acknowledgements.
+`useReadingSession.test.ts` and `useReadingSync.test.ts` use real React effects and
+rerenders. Sync coverage checks irrelevant keyed storage events, auth/logout/clear
+invalidation, coalesced connection/list requests, and delayed connection checks
+after pause, replacement or unmount. `useLocalReadingArticle.test.ts` covers competing opens, Back, library
+replacement, unmount and late update completions.
+Rejected edits and their dependents remain available for export in settings.
+New links appear immediately; editing them becomes available when extraction finishes and the server
+publishes their Markdown note. Article extraction still requires a connection.
+
+### Saved YouTube videos
+
+For YouTube video capture, run the focused `youtube`, `desktop-capture`, and
+Reading extraction transport unit tests plus `reading/captures.integration.ts`
+in the Worker runtime. After building the plugin, run
+`node scripts/visual-test-run.mjs tests/visual/reading-video.spec.ts --workers=2`
+for Chromium/WebKit coverage in both plugin and PWA hosts at phone and desktop
+widths. It checks loaded and failed thumbnails, metadata failure/pending states,
+timestamp-preserving watch links, retained note text, tags, favorites, and watched
+state. Screenshots use synthetic thumbnail fixtures; physical-device playback
+handoff and hosted YouTube availability need separate verification.
+
+### Reading fetching consent
+
+After `npm run build:worker`, run
+`node --test tests/browser/reading/reading-consent-test.mjs` for Chromium and WebKit
+coverage of the full article save disclosure, automatic extraction,
+and library access after fetching is disabled. Light/dark phone screenshots are
+written to `test-results/reading-consent/`. This uses a real local Worker; physical
+iPhone keyboard and VoiceOver checks remain separate.
+
+Shared feature regression coverage: `src/plugin/feature-settings.test.ts` checks
+server-first updates, offline failures, and cross-device reconciliation;
+`src/cloudflare/worker/feature-policy.integration.ts` checks stale edits, scoped
+access, blocked Reading publication, retained jobs, and reminder resume without
+repeat delivery. The Reading capture browser test also pauses and resumes from a
+second client and verifies the current browser hides and restores Reading.

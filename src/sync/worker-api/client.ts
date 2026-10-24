@@ -1,11 +1,8 @@
-import { createEngineFileOperations } from '../engine/file-operations';
 import type { ConnectionTestResult } from '../types';
 import { SharedHistoryApi } from './history-checkpoints';
 import type { RequestDiagnostics } from '../diagnostics/request-diagnostics';
-import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
-import type { Vault } from 'obsidian';
-import type { LocalManifest } from '../manifest/manifest';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
+import type { WireStore } from '../encryption/path-index';
 /**
  * Worker API client facade for sync, setup, and reminder endpoints.
  */
@@ -82,9 +79,11 @@ export class SyncApiClient {
 	}
 
 	readonly initialImport: InitialImportApi;
-	createFileOperations(manifest: LocalManifest, vault: Vault, cache: MarkdownBaseCache) {
-		this.syncApi.useWireStore(manifest);
-		return createEngineFileOperations(this.syncApi, manifest, vault, cache, this.http.getRequestDiagnostics().clientSession);
+	/** What the engine's journaled file operations wrap. Sync writes go through those
+	 * operations, never through this transport directly. `store` maps encrypted paths. */
+	getFileTransport(store: WireStore): { readonly transport: SyncWorkerApi; readonly clientSession: string } {
+		this.syncApi.useWireStore(store);
+		return { transport: this.syncApi, clientSession: this.http.getRequestDiagnostics().clientSession };
 	}
 	private readonly http: WorkerApiHttpClient;
 	private readonly syncApi: SyncWorkerApi;

@@ -1,5 +1,6 @@
 import { isConflictFile } from '../conflict/conflict';
-import { createLogger, errorMessage } from '../logger';
+import { createLogger } from '../logger';
+import { errorMessage } from '../../platform/logger';
 
 const logger = createLogger('SyncEngine');
 

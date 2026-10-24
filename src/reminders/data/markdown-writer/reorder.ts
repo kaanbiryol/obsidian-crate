@@ -1,7 +1,7 @@
 import { processVaultMarkdown } from '../vault-markdown';
 import { reorderReminderBlocksInContent } from "../../core/markdownReminderFile";
 import type { MarkdownWriterContext } from "./types";
-import { markdownWriterLog } from "./operation-shared";
+import { markdownWriterLog } from "./helpers";
 
 export async function reorderRemindersInMarkdown(
   context: MarkdownWriterContext,

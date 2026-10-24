@@ -25,6 +25,13 @@ interface ShadowReactRootOptions {
 
 interface ShadowReactMountOptions extends ShadowRootMountOptions, ShadowReactRootOptions {}
 
+/** Mirrors Obsidian's body theme class onto a shadow mount point. */
+export function syncMountTheme(mountPoint: HTMLElement): void {
+  const dark = mountPoint.doc.body.classList.contains("theme-dark");
+  mountPoint.classList.toggle("dark", dark);
+  mountPoint.classList.toggle("light", !dark);
+}
+
 export function createShadowRootMount(
   host: HTMLElement,
   options: ShadowRootMountOptions = {},
@@ -35,16 +42,11 @@ export function createShadowRootMount(
   mountPoint.classList.add("crate-reminders-ui");
   mountPoint.dataset.uiHost = "plugin";
   mountPoint.classList.toggle("is-mobile", host.doc.body.classList.contains("is-mobile"));
-  const syncTheme = () => {
-    const dark = host.doc.body.classList.contains("theme-dark");
-    mountPoint.classList.toggle("dark", dark);
-    mountPoint.classList.toggle("light", !dark);
-  };
-  syncTheme();
+  syncMountTheme(mountPoint);
   // Obsidian switches theme on the body, e.g. when a phone follows the system appearance.
   const themeObserver = new MutationObserver(() => {
     if (!host.isConnected) themeObserver.disconnect();
-    else syncTheme();
+    else syncMountTheme(mountPoint);
   });
   themeObserver.observe(host.doc.body, { attributes: true, attributeFilter: ["class"] });
   options.configureMountPoint?.(mountPoint);

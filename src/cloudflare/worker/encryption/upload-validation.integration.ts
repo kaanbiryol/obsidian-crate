@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
-import { trackStagedUploads } from '../sync/staged-uploads';
+import { trackStagedUploads } from '../sync/staging/staged-uploads';
 import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import type { FileKeyAuthority } from '../../../encryption/file-authority';

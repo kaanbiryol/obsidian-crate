@@ -1,6 +1,6 @@
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { requireCompatibleServer } from '../../server-compatibility';
-import { capturePwaSession } from '../../session-generation';
+import { requireCompatibleServer } from '../../connection/server-compatibility';
+import { capturePwaSession } from '../../connection/session-generation';
 
 /** Issue new commands using the server clock; retries keep their exact IDs. */
 export async function newReminderOperationId(): Promise<string> {

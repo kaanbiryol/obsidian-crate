@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { commitStagedFile } from './mutations';
-import { commitNewFiles } from './bulk-new-file-commit';
+import { commitNewFiles } from './staging/bulk-new-file-commit';
 import { afterEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -10,7 +10,7 @@ import { handleBatchUpload } from './batch/upload';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { meterD1Writes } from '../test-support/d1-write-meter-test-harness';
 import { drainNotificationProjections } from '../notifications/projection';
-import { coordinatedNewFiles } from './bulk-upload-dispatch';
+import { coordinatedNewFiles } from './staging/bulk-upload-dispatch';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 
 afterEach(async () => { await reset(); });

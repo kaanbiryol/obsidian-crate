@@ -9,7 +9,7 @@ export * from './src/encryption/server-state';
 export * from './src/pwa/encryption/web-app-unlock';
 export * from './src/pwa/encryption/encryption-keys';
 export { AUTH_TOKEN_KEY, saveConfig } from './src/pwa/config';
-export { READING_SESSION_KEY } from './src/pwa/reading/storage';
+export { READING_SESSION_KEY } from './src/pwa/reading/session/session';
 `, resolveDir: process.cwd() }, bundle: true, format: 'iife', globalName: 'webKeys', write: false })).outputFiles[0].text;
 
 for (const engine of [chromium, webkit]) {

@@ -9,7 +9,7 @@ import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult } from '../
 import { RemoteVersionChangedError } from '../transfer/download';
 import type { FileDiff, SyncResult, SyncWork, UploadDiff } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
-import { errorMessage } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import type { DiffApplyOutcome } from '../transfer/types';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 import type { DeleteRemoteFiles } from '../transfer/delete';

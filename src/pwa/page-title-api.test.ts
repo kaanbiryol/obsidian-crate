@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { makeApiFetch } from './reminders/api-fetch';
+import { makeApiFetch } from './connection/api-fetch';
 import { fetchPageTitle } from './reminders/reminder-api';
-import { invalidatePwaSession } from './session-generation';
+import { invalidatePwaSession } from './connection/session-generation';
 
 vi.mock('./reminders/encryption-session', () => ({ prepareReminderEncryption: async () => null, reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }) }));
 

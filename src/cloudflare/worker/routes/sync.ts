@@ -19,11 +19,11 @@ import { handleEncryptedSettings } from '../encryption/settings';
 import { readEncryptionState } from '../encryption/state';
 import type { Env } from '../types';
 import type { MutationAuditContext } from '../request-diagnostics';
-import { beginInitialImport, finishInitialImport } from '../sync/initial-import';
-import { pruneInitialImport } from '../sync/initial-import-prune';
+import { beginInitialImport, finishInitialImport } from '../sync/import/initial-import';
+import { pruneInitialImport } from '../sync/import/initial-import-prune';
 import { forwardTransferRequest } from '../sync/transfer-dispatch';
-import { finishInitialReminderSetup } from '../sync/initial-import-readiness';
-import type { UploadCommitters } from '../sync/upload-committers';
+import { finishInitialReminderSetup } from '../sync/import/initial-import-readiness';
+import type { UploadCommitters } from '../sync/staging/upload-committers';
 import { TRANSFER_PATHS, wakeProjection } from '../coordinator/coordinator';
 
 export async function handleSyncRoute(

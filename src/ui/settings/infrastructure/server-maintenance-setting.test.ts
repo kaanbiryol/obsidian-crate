@@ -6,7 +6,7 @@ const start = vi.fn();
 
 async function render(configured = true, resetting = false, deployed = false) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment: start }));
+	vi.doMock('../../../plugin/cloudflare-operations', () => ({ startCloudflareDeployment: start }));
 	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	const { renderServerRepairSetting } = await import('./server-repair-setting');
 	const plugin = {
@@ -28,7 +28,7 @@ beforeEach(() => { resetObsidianUiMocks(); confirm.mockReset(); start.mockReset(
 afterEach(() => {
 	vi.resetModules();
 	vi.doUnmock('obsidian');
-	vi.doUnmock('../../cloudflare/plugin-integration');
+	vi.doUnmock('../../plugin/cloudflare-operations');
 	vi.doUnmock('../confirmation-modal');
 });
 

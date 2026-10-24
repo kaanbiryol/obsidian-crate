@@ -15,12 +15,12 @@ afterEach(() => { resetObsidianUiMocks(); vi.clearAllMocks(); });
 describe('connection status', () => {
 	it('restores the sync button without reporting cancellation as an error', async () => {
 		const sync = vi.fn().mockResolvedValue({ outcome: 'cancelled', success: false, errors: [], conflicts: [] });
-		const cleanup = renderConnectionStatus(new FakeElement('div') as never, {
+		const cleanup = renderConnectionStatus({ containerEl: new FakeElement('div') as never, plugin: {
 			syncRuntime: {
 				getState: () => ({ status: 'idle', lastSync: null }),
 				sync, addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
 			},
-		} as never);
+		} as never });
 		const button = MockSetting.instances[0]!.buttons.find(button => button.buttonEl.textContent === 'Sync now')!;
 		button.click();
 		await vi.waitFor(() => expect(button.buttonEl.classNames.has('is-disabled')).toBe(false));
@@ -33,13 +33,13 @@ describe('connection status', () => {
 
 	it('can stop an active sync without disconnecting the vault', async () => {
 		const stopSync = vi.fn(async () => {});
-		const cleanup = renderConnectionStatus(new FakeElement('div') as never, {
+		const cleanup = renderConnectionStatus({ containerEl: new FakeElement('div') as never, plugin: {
 			refreshSettingsTab: vi.fn(),
 			syncRuntime: {
 				getState: () => ({ status: 'syncing', lastSync: null }),
 				stopSync, addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
 			},
-		} as never);
+		} as never });
 		const button = MockSetting.instances[0]!.buttons.find(button => button.buttonEl.textContent === 'Stop sync')!;
 		button.click();
 		await vi.waitFor(() => expect(stopSync).toHaveBeenCalledOnce());
@@ -50,10 +50,10 @@ describe('connection status', () => {
 		let state: SyncState = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
 		const addStateChangeListener = vi.fn();
 		const removeStateChangeListener = vi.fn();
-		const cleanup = renderConnectionStatus(new FakeElement('div') as never, {
+		const cleanup = renderConnectionStatus({ containerEl: new FakeElement('div') as never, plugin: {
 			settings: { workerUrl: 'https://crate.example' },
 			syncRuntime: { getState: () => state, addStateChangeListener, removeStateChangeListener },
-		} as never);
+		} as never });
 		const setting = MockSetting.instances[0]!;
 		expect(setting.descEl.textContent).toContain('Not synced yet');
 		expect(setting.descEl.textContent).toContain('Last successful sync: Never');

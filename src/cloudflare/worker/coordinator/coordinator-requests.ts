@@ -8,10 +8,10 @@ import { commitSealedReadingNote, type SealedReadingNote } from '../reading/seal
 import { getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
 import { drainNotificationJobs } from '../notifications/outbox';
 import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, REMINDERS_ENABLED_HEADER, TRANSFER_PATHS } from './coordinator';
-import { uploadInitialFiles } from '../sync/initial-import-upload';
+import { uploadInitialFiles } from '../sync/import/initial-import-upload';
 import { handleBatchDownload } from '../sync/batch/download';
-import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/bulk-upload-dispatch';
-import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../sync/staged-upload-dispatch';
+import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/staging/bulk-upload-dispatch';
+import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../sync/staging/staged-upload-dispatch';
 import { scheduleMaintenance } from '../maintenance/schedule';
 
 export type StateLock = <T>(action: () => Promise<T>) => Promise<T>;

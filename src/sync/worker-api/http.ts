@@ -5,7 +5,8 @@ import { normalizeUploadOperationIds } from '../diagnostics/request-diagnostics'
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol/server-info';
 import { UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, CLIENT_SESSION_HEADER, OPERATION_ID_HEADER, REQUEST_ID_HEADER } from '../../protocol/http-headers';
 import { requestUrl } from 'obsidian';
-import { createLogger, errorMessage } from '../logger';
+import { createLogger } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../connection/worker-url';
 import { diagnosticRoute, MAX_REQUEST_DIAGNOSTICS, normalizeRequestDiagnostics, type RequestDiagnostic, type RequestDiagnostics } from '../diagnostics/request-diagnostics';

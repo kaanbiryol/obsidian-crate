@@ -5,8 +5,9 @@ import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec'
 import { decryptJson, encryptJson } from '@/encryption/envelope';
 import { createReadingNote, parseReadingNote, updateReadingNote, readingImportId } from '../../reading/core/notes';
 import { readReadingFrontmatter, patchReadingFrontmatter } from '../../reading/core/frontmatter';
-import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } from '../../reading/core/model';
+import { MAX_READING_BYTES, readingUrl, type ReadingItem } from '../../reading/core/model';
 import { isGeneratedCapturePath, readingCapturePath } from '../../reading/core/filename';
+import { filterUniqueReadingIds, findSavedReadingLink } from '../../reading/core/inventory';
 import { portablePathKey } from '@/protocol/portable-path';
 import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '@/encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
@@ -71,6 +72,9 @@ export class EncryptedReadingApi {
     if (!response.ok) throw this.options.error(value.error ?? 'Reading request failed.', response.status, value.code);
     return value;
   }
+  // 'reminder' is the shared envelope purpose for operation objects in every scope, Reading
+  // included. The plugin binds it into each protected header, so it is a wire value, not a
+  // feature label: renaming it here breaks decryption with the plugin and stored ciphertext.
   private context(id: string) { return { vaultId: this.options.authority.vaultId, scopeId: this.options.authority.scopeId, objectId: id, purpose: 'reminder' as const }; }
   private async source(file: WireFile, sources = this.sources): Promise<Source> {
     const folder = encodeURIComponent(this.options.wireFolder);
@@ -141,12 +145,8 @@ export class EncryptedReadingApi {
     this.wires = new Map([...nextIndex.values()].map(entry => [entry.item.path, entry.file.path]));
     for (const path of nextSources.keys()) if (!next.has(path)) nextSources.delete(path);
     this.sources = nextSources;
-    const counts = new Map<string, number>();
-    for (const item of candidates) counts.set(item.crate_reading_id, (counts.get(item.crate_reading_id) ?? 0) + 1);
-    const items = candidates.flatMap(item => {
-      if (counts.get(item.crate_reading_id) === 1) return [item];
-      issues.push({ path: item.path, message: 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.' }); return [];
-    });
+    const { unique: items, duplicates } = filterUniqueReadingIds(candidates);
+    for (const item of duplicates) issues.push({ path: item.path, message: 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.' });
     // Unrelated vault edits advance the sequence; an unchanged fingerprint lets
     // callers keep their saved library instead of rewriting and redrawing it.
     const fingerprint = JSON.stringify([[...next.values()].map(file => [file.path, file.revision, file.hash, file.size]), issues.map(issue => [issue.path, issue.message])]);
@@ -208,9 +208,9 @@ export class EncryptedReadingApi {
     if (list.issues.length) throw this.options.error('Refresh or resolve unreadable Reading notes before saving changes.', 409, 'reading_conflict');
     let path = '', wire = '', content: string, previous: WireFile | undefined, itemId: string, before: ReadingItem | undefined;
     if (action === 'capture') {
-      const link = readingUrl(body.url), matches = list.items.filter(item => item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(link));
-      if (matches.length > 1) throw this.options.error('Several notes already save this link.', 409);
-      if (matches[0]) return { response: { saved: true, alreadySaved: true, id: matches[0].crate_reading_id } };
+      const link = readingUrl(body.url), saved = findSavedReadingLink(list.items, link);
+      if (saved.kind === 'many') throw this.options.error('Several notes already save this link.', 409);
+      if (saved.kind === 'one') return { response: { saved: true, alreadySaved: true, id: saved.item.crate_reading_id } };
       // Stable even if preparation is interrupted before ciphertext persistence.
       itemId = typeof body.captureId === 'string' ? body.captureId : await readingImportId(id, rawBody);
       content = createReadingNote({ id: itemId, url: link, title: typeof body.title === 'string' ? body.title : undefined, savedAt: new Date().toISOString() });

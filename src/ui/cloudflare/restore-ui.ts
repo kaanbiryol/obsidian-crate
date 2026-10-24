@@ -4,7 +4,7 @@ import { SharedModal } from '../plugin/shared-modal';
 import { openConfirmationModal } from '../confirmation-modal';
 import { openCloudflareDeploymentModal, revealCloudflareOperation } from './deployment-modal';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
-import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
+import { startCloudflareDeployment } from '../../plugin/cloudflare-operations';
 import type { BackupChoice } from '../../cloudflare/restore/archive';
 import { workersDevOrigin } from '../../cloudflare/deployment/worker-origin';
 import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';

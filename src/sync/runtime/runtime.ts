@@ -8,7 +8,8 @@ import type { CrateServerInfo } from '../../protocol/server-info';
 import { createConflictReview } from '../conflict/review';
 import type { SyncActivityProgress } from '../types';
 import type { Plugin, TAbstractFile } from 'obsidian';
-import { createLogger, errorMessage } from '../logger';
+import { createLogger } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { loadEncryptionKeys } from '../encryption/key-storage';
 import { runEncryptionReset, type EncryptionResetRequest } from './encryption-reset-workflow';
@@ -19,18 +20,17 @@ import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from '../types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 import { SyncApiClient } from '../worker-api/client';
-import { isConflictFile, notifyConflicts } from '../conflict/conflict';
+import { isConflictFile } from '../conflict/conflict';
 import { SyncEngine } from '../engine/engine';
 import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';
 import { deleteManifestFile, type ApplyInfrastructureConfigInput } from './config';
 import { checkpointDue, recordSyncHistory } from './sync-activity';
-import { emitStateChange, emitSyncProgress } from './listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { RuntimeServerStatus } from './server-status';
 import { ForegroundSyncScheduler, type ForegroundSyncReason } from './foreground-sync';
+import { runStartupSync } from './startup-sync';
 import { SECRET_KEYS } from '../../platform/secret-keys';
-import { updateSyncProgress } from '../settings';
-import type { CrateSettings } from '../../plugin/settings-types';
+import { updateSyncProgress, type SyncRuntimeSettings, type SyncSettings } from '../settings';
 import { buildSharedSettings } from '../connection/shared-settings';
 
 const logger = createLogger('SyncRuntime');
@@ -86,23 +86,30 @@ export class SyncRuntime {
 
 	/** The API client is created before its engine and kept while initialize() waits for
 	 * the old engine to stop, so server reads check only the client they used. */
-	private async readCurrentApi<T>(read: (api: SyncApiClient) => Promise<T>, staleMessage: string): Promise<T> {
+	/** Runs `read` against the current API client and rejects with `staleMessage` when the
+	 * runtime replaced that client before `read` settled. Multi-step reads check `isCurrent`
+	 * before acting on an earlier response. */
+	async withCurrentApi<T>(read: (api: SyncApiClient, isCurrent: () => boolean) => Promise<T>, staleMessage: string): Promise<T> {
 		const api = this.requireApi();
-		const result = await read(api);
+		const result = await read(api, () => api === this.apiClient);
 		if (api !== this.apiClient) throw new Error(staleMessage);
 		return result;
 	}
 
 	loadCurrentSyncedPreview(path: string) {
-		return this.readCurrentApi(api => loadCurrentSyncedPreview(api, path), FILE_HISTORY_CHANGED);
+		return this.withCurrentApi(api => loadCurrentSyncedPreview(api, path), FILE_HISTORY_CHANGED);
 	}
 
 	loadFileHistoryPreview(version: RemoteFileVersion) {
-		return this.readCurrentApi(api => loadFileHistoryPreview(this.plugin.app.vault.adapter, api, version), FILE_HISTORY_CHANGED);
+		return this.withCurrentApi(api => loadFileHistoryPreview(this.plugin.app.vault.adapter, api, version), FILE_HISTORY_CHANGED);
 	}
 
 	listRecentFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
-		return this.readCurrentApi(api => api.listFileVersions(query), FILE_HISTORY_CHANGED);
+		return this.withCurrentApi(api => api.listFileVersions(query), FILE_HISTORY_CHANGED);
+	}
+
+	listSharedCheckpoints(): Promise<SharedCheckpoint[]> {
+		return this.withCurrentApi(api => api.sharedHistory.list(), HISTORY_CHANGED);
 	}
 
 	async restoreRecentFileVersion(version: RemoteFileVersion): Promise<SyncResult> {
@@ -120,9 +127,9 @@ export class SyncRuntime {
 
 	constructor(
 		private plugin: Plugin,
-		private settings: CrateSettings,
+		private settings: SyncRuntimeSettings,
 		private secretStorage: SecretStorageService,
-		private persistSettings: (update?: Partial<CrateSettings>) => Promise<void>,
+		private persistSettings: (update?: Partial<SyncSettings>) => Promise<void>,
 	private prepareReminderScope?: () => Promise<void>,
 		/** Notes inside these folders carry encrypted notification schedules. */
 		private reminderFolders: () => readonly string[] = () => [],
@@ -160,23 +167,23 @@ export class SyncRuntime {
 		};
 	}
 
-	getPendingPaths(): string[] {
-		return this.syncEngine?.getPendingPaths() ?? [];
+	getPendingKeys(): string[] {
+		return this.syncEngine?.getPendingKeys() ?? [];
 	}
 
 	getPendingChangeCount(): number {
 		return this.syncEngine?.getPendingChangeCount() ?? 0;
 	}
 
-	hasPendingPath(key: string): boolean {
-		return this.syncEngine?.hasPendingPath(key) ?? false;
+	hasPendingKey(key: string): boolean {
+		return this.syncEngine?.hasPendingKey(key) ?? false;
 	}
 
 	async loadPendingDiff(path: string, deleted: boolean) {
 		const engine = this.requireEngine();
 		const pendingPath = pendingChangeKey(deleted ? 'delete' : 'upload', path);
 		const verify = () => {
-			if (engine !== this.syncEngine || this.getState().status === 'syncing' || !engine.hasPendingPath(pendingPath)) {
+			if (engine !== this.syncEngine || this.getState().status === 'syncing' || !engine.hasPendingKey(pendingPath)) {
 				throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');
 			}
 		};
@@ -327,38 +334,18 @@ export class SyncRuntime {
 		this.emitCurrentState();
 
 		if (this.settings.automaticSync && !options.skipStartupSync) {
-			this.startupSyncTask = this.sync()
-				.then(async result => {
-					if (result.outcome === 'cancelled') return false;
-					notifyConflicts(result.conflicts);
-					if (
-						result.success
-						&& this.initializationRevision === initializationRevision
-						&& this.syncEngine === syncEngine
-					) {
-						// Resume event capture before probing so edits made after the
-						// startup operation cannot fall into a second blind window.
-						this.acceptingEvents = true;
-						if (await syncEngine.hasUnsyncedLocalChanges() && this.settings.automaticSync) {
-							logger.info('Local changes detected after startup sync; running a recovery pass');
-							const recoveryResult = await this.sync();
-							if (recoveryResult.outcome === 'cancelled') return false;
-							notifyConflicts(recoveryResult.conflicts);
-						}
-					}
-					return true;
-				})
-				.catch(error => {
-					logger.error('Startup sync failed:', error);
-					return true;
-				})
-				.finally(() => {
-					if (this.initializationRevision === initializationRevision && this.syncEngine === syncEngine) {
-						this.acceptingEvents = true;
-						this.initializing = false;
-						this.emitCurrentState();
-					}
-				});
+			this.startupSyncTask = runStartupSync({
+				sync: () => this.sync(),
+				isCurrent: () => this.initializationRevision === initializationRevision && this.syncEngine === syncEngine,
+				hasUnsyncedLocalChanges: () => syncEngine.hasUnsyncedLocalChanges(),
+				automaticSync: () => this.settings.automaticSync,
+				resumeEvents: () => { this.acceptingEvents = true; },
+				finish: () => {
+					this.acceptingEvents = true;
+					this.initializing = false;
+					this.emitCurrentState();
+				},
+			});
 			return;
 		}
 
@@ -400,7 +387,7 @@ export class SyncRuntime {
 			this.emitCurrentState();
 		});
 		this.emitCurrentState();
-		emitSyncProgress(this.progressListeners, 0, 0);
+		this.emitProgress(0, 0);
 		return this.stopSyncTask;
 	}
 
@@ -619,7 +606,12 @@ export class SyncRuntime {
 	}
 
 	private emitCurrentState(): void {
-		emitStateChange(this.stateChangeListeners, this.getState());
+		const state = this.getState();
+		for (const listener of this.stateChangeListeners) listener(state);
+	}
+
+	private emitProgress(current: number, total: number): void {
+		for (const listener of this.progressListeners) listener(current, total);
 	}
 
 	/** The engine already recorded `lastSync` in these settings while publishing the result. */
@@ -652,13 +644,12 @@ export class SyncRuntime {
 
 		const active: SyncActivityProgress = { type, current: 0, total: 0 };
 		this.activityProgress = active;
-		emitSyncProgress(this.progressListeners, 0, 0);
+		this.emitProgress(0, 0);
 		const wrappedCallback = (current: number, total: number) => {
 			if (this.syncEngine !== engine) return;
 			Object.assign(active, { current, total });
-			emitSyncProgress(this.progressListeners, current, total, {
-				onExternalProgress: progressCallback,
-			});
+			progressCallback?.(current, total);
+			this.emitProgress(current, total);
 		};
 		try {
 			const result = await operation(engine, wrappedCallback);
@@ -666,7 +657,7 @@ export class SyncRuntime {
 			// The engine is finished, but checkpoint and settings persistence can
 			// still take time. Keep that work visible after the engine clears its phase.
 			active.work = { phase: 'saving' };
-			emitSyncProgress(this.progressListeners, active.current, active.total);
+			this.emitProgress(active.current, active.total);
 			if (type === 'sync') this.foregroundSync.recordSync();
 			await this.recordSyncResult(engine, type, result);
 			if (this.syncEngine !== engine) return result;
@@ -675,7 +666,7 @@ export class SyncRuntime {
 		} finally {
 			if (this.activityProgress === active) this.activityProgress = null;
 			if (this.syncEngine === engine) {
-				emitSyncProgress(this.progressListeners, 0, 0);
+				this.emitProgress(0, 0);
 			}
 		}
 	}
@@ -710,10 +701,6 @@ export class SyncRuntime {
 
 	async createPendingDiscard(keys: string[]) {
 		return this.requireEngine().createPendingDiscard(keys);
-	}
-
-	listSharedCheckpoints(): Promise<SharedCheckpoint[]> {
-		return this.readCurrentApi(api => api.sharedHistory.list(), HISTORY_CHANGED);
 	}
 
 	async loadHistoryComparison(entry: SyncHistoryEntry) {

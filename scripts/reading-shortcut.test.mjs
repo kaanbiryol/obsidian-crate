@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import contract from '../src/reading/shortcut-contract.json' with { type: 'json' };
 import { readingShortcutWithFirstRunSetup } from './reading-shortcut-first-run.mjs';
 import { readingShortcutTemplate } from './reading-shortcut-template.mjs';
-import { releaseShortcutSource, shortcutSource, shortcutTemplate, shortcutIdentifier as identifier, shortcutRequest, shortcutValue } from './reading-shortcut-fixture.mjs';
+import { releaseShortcutSource, shortcutSource, shortcutTemplate, shortcutIdentifier as identifier, shortcutRequest, shortcutValue } from '../tests/browser/support/reading-shortcut-fixture.mjs';
 
 const workflows = () => [shortcutTemplate, readingShortcutWithFirstRunSetup(shortcutSource), readingShortcutWithFirstRunSetup(shortcutSource, { pairing: true })];
 const token = value => {

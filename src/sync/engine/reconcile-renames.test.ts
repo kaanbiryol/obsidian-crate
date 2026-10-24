@@ -52,7 +52,7 @@ async function harness(destinationUploaded: boolean) {
 		paths.flatMap(path => remote[path] ? [[path, remote[path]]] : []),
 	));
 	const context: TargetedReconcileContext = {
-		deleteRemoteFiles: (files, result, options) => deleteRemoteFiles({ vault, localManifest: manifest, api: {
+		deleteRemoteFiles: (files, result, options) => deleteRemoteFiles({ vault, localManifest: manifest, files: {
     batchDelete: async paths => {
       for (const path of paths) {
         await assertRenamePreserved(manifest, vault, path);

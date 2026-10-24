@@ -28,7 +28,7 @@ it.each([path, '.vault-config/plugins/example/main.js', '.vault-config/app.json'
 		const stateChanged = vi.fn();
 		harness.engine.setStateChangeCallback(stateChanged);
 		await harness.engine.onRawFileChange(changedPath);
-		expect(harness.engine.getPendingPaths()).toEqual([changedPath]);
+		expect(harness.engine.getPendingKeys()).toEqual([changedPath]);
 		expect(stateChanged).toHaveBeenLastCalledWith(expect.objectContaining({ pendingChanges: 1 }));
 	},
 );
@@ -36,29 +36,29 @@ it.each([path, '.vault-config/plugins/example/main.js', '.vault-config/app.json'
 it('queues configuration files in a custom non-hidden configuration folder', async () => {
 	Object.assign(harness.vault, { configDir: 'custom-config' });
 	await harness.engine.onRawFileChange('custom-config/plugins/example/data.json');
-	expect(harness.engine.getPendingPaths()).toEqual(['custom-config/plugins/example/data.json']);
+	expect(harness.engine.getPendingKeys()).toEqual(['custom-config/plugins/example/data.json']);
 });
 
 it.each(['notes/note.md', '.trash/file.json', '.vault-config/plugins/crate/data.json', '.hidden/file.tmp'])(
 	'leaves indexed and ignored paths out of the raw queue: %s', async ignoredPath => {
 		await harness.engine.onRawFileChange(ignoredPath);
 		expect(harness.vault.adapter.stat).not.toHaveBeenCalled();
-		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getPendingKeys()).toEqual([]);
 	},
 );
 
 it('queues deletion and replaces it when the file is recreated', async () => {
 	harness.vault.adapter.stat.mockResolvedValueOnce(null);
 	await harness.engine.onRawFileChange(path);
-	expect(harness.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', path)]);
+	expect(harness.engine.getPendingKeys()).toEqual([pendingChangeKey('delete', path)]);
 	await harness.engine.onRawFileChange(path);
-	expect(harness.engine.getPendingPaths()).toEqual([path]);
+	expect(harness.engine.getPendingKeys()).toEqual([path]);
 });
 
 it('does not queue existing folders', async () => {
 	harness.vault.adapter.stat.mockResolvedValue({ ...fileStat, type: 'folder' });
 	await harness.engine.onRawFileChange('.vault-config/plugins');
-	expect(harness.engine.getPendingPaths()).toEqual([]);
+	expect(harness.engine.getPendingKeys()).toEqual([]);
 });
 
 it('discards an older inspection that completes after a newer event', async () => {
@@ -68,7 +68,7 @@ it('discards an older inspection that completes after a newer event', async () =
 	await harness.engine.onRawFileChange(path);
 	old.resolve(null);
 	await pending;
-	expect(harness.engine.getPendingPaths()).toEqual([path]);
+	expect(harness.engine.getPendingKeys()).toEqual([path]);
 });
 
 it('does not queue an inspection that completes after unload', async () => {
@@ -78,7 +78,7 @@ it('does not queue an inspection that completes after unload', async () => {
 	harness.engine.destroy();
 	pendingStat.resolve(fileStat);
 	await pending;
-	expect(harness.engine.getPendingPaths()).toEqual([]);
+	expect(harness.engine.getPendingKeys()).toEqual([]);
 });
 
 it('never publishes touched configuration files when their contents match the last sync', async () => {
@@ -92,12 +92,12 @@ it('never publishes touched configuration files when their contents match the la
 		harness.engine.setStateChangeCallback(stateChanged);
 		for (let i = 0; i < 3; i++) {
 			await harness.engine.onRawFileChange(path);
-			expect(harness.engine.getPendingPaths()).toEqual([]);
+			expect(harness.engine.getPendingKeys()).toEqual([]);
 			expect(harness.engine.getState().pendingChanges).toBe(0);
 		}
 		await vi.advanceTimersByTimeAsync(250);
 		await harness.engine.waitForIdle();
-		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getPendingKeys()).toEqual([]);
 		expect(harness.engine.getState().pendingChanges).toBe(0);
 		expect(stateChanged).not.toHaveBeenCalled();
 		expect(harness.localManifest.getEntry(path)?.modified).toBe(new Date(50).toISOString());
@@ -112,7 +112,7 @@ it('checks settings and binary theme assets without publishing startup noise', a
 	const stateChanged = vi.fn();
 	harness.engine.setStateChangeCallback(stateChanged);
 	await Promise.all(paths.map(candidate => harness.engine.onRawFileChange(candidate)));
-	expect(harness.engine.getPendingPaths()).toEqual([]);
+	expect(harness.engine.getPendingKeys()).toEqual([]);
 	expect(stateChanged).not.toHaveBeenCalled();
 	expect(harness.vault.adapter.readBinary).toHaveBeenCalledTimes(paths.length);
 	expect(harness.api.getManifest).not.toHaveBeenCalled();
@@ -123,7 +123,7 @@ it('publishes a real settings edit even when its size and timestamp match the ch
 	await trackedFile();
 	harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('new! bytes'));
 	await harness.engine.onRawFileChange(path);
-	expect(harness.engine.getPendingPaths()).toEqual([path]);
+	expect(harness.engine.getPendingKeys()).toEqual([path]);
 	expect(harness.engine.getState().pendingChanges).toBe(1);
 });
 
@@ -135,7 +135,7 @@ it.each(['read', 'save'])('keeps a configuration change pending after a verifica
 		harness.localManifest.save.mockRejectedValue(new Error('save failed'));
 	}
 	await harness.engine.onRawFileChange(path);
-	expect(harness.engine.getPendingPaths()).toEqual([path]);
+	expect(harness.engine.getPendingKeys()).toEqual([path]);
 });
 
 it('preserves a deletion arriving while an older settings notification is being verified', async () => {
@@ -149,7 +149,7 @@ it('preserves a deletion arriving while an older settings notification is being 
 	await harness.engine.onRawFileChange(path);
 	reading.resolve(bytes);
 	await previous;
-	expect(harness.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', path)]);
+	expect(harness.engine.getPendingKeys()).toEqual([pendingChangeKey('delete', path)]);
 });
 
 it('preserves a newer edit while serializing settings verification', async () => {
@@ -163,7 +163,7 @@ it('preserves a newer edit while serializing settings verification', async () =>
 	const next = harness.engine.onRawFileChange(path);
 	reading.resolve(bytes);
 	await Promise.all([previous, next]);
-	expect(harness.engine.getPendingPaths()).toEqual([path]);
+	expect(harness.engine.getPendingKeys()).toEqual([path]);
 });
 
 it('does not accept an old hash check when a manual sync ran during verification', async () => {
@@ -177,14 +177,14 @@ it('does not accept an old hash check when a manual sync ran during verification
 	await harness.engine.sync();
 	reading.resolve(bytes);
 	await notification;
-	expect(harness.engine.getPendingPaths()).toEqual([path]);
+	expect(harness.engine.getPendingKeys()).toEqual([path]);
 });
 
 it('leaves settings pending while a durable restore needs reconciliation', async () => {
 	await trackedFile();
 	harness.api.getPendingRestores.mockReturnValue([{ path }]);
 	await harness.engine.onRawFileChange(path);
-	expect(harness.engine.getPendingPaths()).toEqual([path]);
+	expect(harness.engine.getPendingKeys()).toEqual([path]);
 	expect(harness.vault.adapter.readBinary).not.toHaveBeenCalled();
 });
 
@@ -206,5 +206,5 @@ it('drains a settings timestamp checkpoint on unload without publishing a late p
 		release.resolve();
 		await Promise.all([notification, stopping]);
 	}
-	expect(harness.engine.getPendingPaths()).toEqual([]);
+	expect(harness.engine.getPendingKeys()).toEqual([]);
 });

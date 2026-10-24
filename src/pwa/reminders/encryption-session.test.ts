@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { consumeReminderEncryptionFragment, reminderEncryptionSnapshot, prepareReminderEncryption, resetReminderEncryption } from './encryption-session';
-import { invalidatePwaSession } from '../session-generation';
+import { invalidatePwaSession } from '../connection/session-generation';
 import { AUTH_TOKEN_KEY } from '../config';
 import { LocalStateCipher } from '../../encryption/local-state';
 import { unlockPrivateStorage, privateStorageEnabled, sealPrivateValue, openPrivateValue } from './private-storage';
@@ -108,4 +108,15 @@ it('keeps storage locked after an unavailable check and permits writes after a s
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 	await prepareReminderEncryption('session', async () => Response.json({ encryption: null }));
 	expect(sealPrivateValue('new draft', 'draft')).toBe('new draft');
+});
+
+// Intended difference from Reading (see reading/session/encryption-session.test.ts): Reading
+// keeps a verified session's local access when verification is unavailable, while reminders
+// lock until a check succeeds again.
+it('locks a verified session when a later encryption check is unavailable', async () => {
+	await prepareReminderEncryption('session', async () => Response.json({ encryption: null }));
+	expect(sealPrivateValue('verified draft', 'draft')).toBe('verified draft');
+	await expect(prepareReminderEncryption('session', async () => { throw new TypeError('Failed to fetch'); }, true)).rejects.toThrow('Could not verify encryption');
+	expect(reminderEncryptionSnapshot().status).toBe('locked');
+	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 });

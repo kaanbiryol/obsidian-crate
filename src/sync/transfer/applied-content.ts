@@ -31,6 +31,6 @@ export async function recordAppliedContent(
   context.localManifest.setEntry(path, entry);
   if (isMarkdownPath(path)) await context.markdownBaseCache?.putBase(path, hash, content);
   await context.conflictStore?.resolveAppliedIncoming?.(path, hash);
-  await context.api.recordMergeApplication?.(path, hash, 'local-applied');
+  await context.files.recordMergeApplication?.(path, hash, 'local-applied');
   return entry;
 }

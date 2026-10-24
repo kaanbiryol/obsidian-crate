@@ -1,5 +1,5 @@
 import { commitStagedFile } from './mutations';
-import { commitNewFiles } from './bulk-new-file-commit';
+import { commitNewFiles } from './staging/bulk-new-file-commit';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	handleBatchDownload,

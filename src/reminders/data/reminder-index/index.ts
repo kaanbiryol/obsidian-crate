@@ -13,6 +13,7 @@ import { createReminderLookupStore } from "./lookup-store";
 import { createReminderOptimisticState } from "./optimistic-state";
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
 import { addReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from '../reminder-identity-owners';
+import { applyFileScanResult } from './file-scan-result';
 import type { ReminderSourceIssue } from '../reminder-source-issues';
 import { readVaultMarkdown } from '../vault-markdown';
 import { sha256Hex } from '../../../platform/sha256';
@@ -150,39 +151,16 @@ export function createReminderIndex(
     });
     if (signal?.aborted || !scan.current || file.path !== scan.path) return false;
     if (result.deferred) { deferredPaths.add(filePath); return false; }
-    if (result.error) {
-      scannedDigests.delete(filePath);
-      sourceIssues.set(filePath, { path: filePath, reason: result.error, ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}) });
-      log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
+    const outcome = applyFileScanResult({
+      reminders, ambiguousOwners, sourceIssues, scannedDigests, discoveredProjects, lookupStore, optimisticState, batchOwners: batch?.owners,
+    }, { filePath, project: getProjectFromPath(filePath, remindersFolderPath), digest, result });
+    if (!outcome.applied) {
+      log.error(` Keeping the previous reminder index for ${filePath}: ${outcome.error}`);
       publishChange();
       return false;
     }
-
-    sourceIssues.delete(filePath);
-    if (digest) scannedDigests.set(filePath, digest);
-
-    discoveredProjects.add(getProjectFromPath(filePath, remindersFolderPath));
-
-    const persistedReminders = lookupStore.getByFile(filePath);
-    optimisticState.clearFileState(filePath, [...persistedReminders, ...result.reminders]);
-
-    const released = new Set((result.releasedOwners ?? []).map(owner => `${owner.filePath}\0${owner.id}`));
-    const isReplaced = (owner: ReminderIdentityOwner) => owner.filePath === filePath || released.has(`${owner.filePath}\0${owner.id}`);
-    if (batch?.owners) {
-      for (const owner of [...reminders, ...ambiguousOwners]) if (isReplaced(owner)) batch.owners.get(owner.id)?.delete(owner.filePath);
-      addReminderIdentityOwners(batch.owners, result.reminders);
-    }
-    ambiguousOwners = ambiguousOwners.filter(owner => !isReplaced(owner));
-    reminders = reminders.filter(reminder => !isReplaced(reminder));
-
-    reminders.push(...result.reminders);
-    // A move can release an indexed owner that has not received its own
-    // refresh yet. Publish the ownership transfer as one index transition.
-    if (released.size) lookupStore.rebuild(reminders);
-    else {
-      lookupStore.removeFile(filePath);
-      lookupStore.addReminders(result.reminders);
-    }
+    reminders = outcome.reminders;
+    ambiguousOwners = outcome.ambiguousOwners;
     publishChange();
 
     log.info(` File rescanned, found ${result.reminders.length} reminders`);

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { AUTH_TOKEN_KEY } from './config';
-import { readingSession } from './reading/storage';
+import { readingSession } from './reading/session/session';
 import { parseSharedFeatures, type SharedFeatures } from '@/protocol/feature-policy';
 
 const CACHE_KEY = 'crate-shared-features';

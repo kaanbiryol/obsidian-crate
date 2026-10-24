@@ -4,7 +4,7 @@ import { rememberPairedBundle, rememberRecoveryKey } from './web-app-unlock';
 import { createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { rememberVaultKeys } from './encryption-keys';
 import { AUTH_TOKEN_KEY, saveConfig } from '../config';
-import { READING_SESSION_KEY } from '../reading/storage';
+import { READING_SESSION_KEY } from '../reading/session/session';
 vi.mock('./encryption-keys', () => ({ rememberVaultKeys: vi.fn(async () => {}) }));
 
 beforeEach(() => {

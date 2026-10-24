@@ -6,7 +6,7 @@ import { SetupStep, SetupSteps } from '../components/SetupSteps';
 import { CopyableText } from '@/ui/shared/CopyableText';
 import { DEVELOPMENT_SHORTCUT_PATH, READING_SHORTCUT_URL } from '@/reading/shortcut';
 import { readingRequest } from './api';
-import { assertReadingSession, type ReadingSession } from './storage';
+import { assertReadingSession, type ReadingSession } from './session/session';
 
 interface Pairing { pairingCode: string; expiresAt: number }
 

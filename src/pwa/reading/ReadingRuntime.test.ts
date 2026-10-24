@@ -5,7 +5,8 @@ import { SettingsContext } from '../settings/settings-context';
 import { createSettingsStore } from '../settings/settings-store';
 import { pwaSyncState } from '../sync/state';
 import { ReadingRuntimeProvider, useReadingRuntime } from './ReadingRuntime';
-import { READING_SESSION_KEY, readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, readingLock, savePendingReading, type ReadingSession } from './storage';
+import { readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, readingLock, savePendingReading } from './storage/storage';
+import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import type { PendingReading, ReadingCommand } from './outbox';
 import type { ReadingItem } from '@/reading/core/model';
 
@@ -17,8 +18,8 @@ vi.mock('../connection/AppConnection', () => ({
 vi.mock('./useReadingSync', () => ({ useReadingSync: () => ({
   refresh: vi.fn(), refreshManually: vi.fn(), syncing: false, syncedSession: session, isOffline: false,
 }) }));
-vi.mock('./storage', async importOriginal => ({
-  ...await importOriginal<typeof import('./storage')>(),
+vi.mock('./storage/storage', async importOriginal => ({
+  ...await importOriginal<typeof import('./storage/storage')>(),
   readReadingCache: vi.fn(async () => ({ items: [], issues: [], savedAt: 1 })),
   pendingReading: vi.fn(async () => []), readReadingDraft: vi.fn(async () => undefined),
   hasEarlierReadingChanges: vi.fn(async () => false), saveReadingDraft: vi.fn(async () => {}), savePendingReading: vi.fn(async () => {}),

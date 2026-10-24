@@ -1,7 +1,7 @@
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { createModalActions, createModalFooter } from '../../plugin/shared-modal';
 import { Setting, type ButtonComponent } from 'obsidian';
-import { errorMessage } from '../../../sync/logger';
+import { errorMessage } from '../../../platform/logger';
 import type { EncryptionProgress } from '../../../sync/encryption/server-encryption';
 import { renderEncryptionProgress } from './encryption-progress-ui';
 

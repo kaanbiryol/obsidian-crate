@@ -14,6 +14,7 @@ import type CratePlugin from "@/main";
 import {
   createShadowReactRoot,
   createShadowRootMount,
+  syncMountTheme,
   type ShadowRootMount,
 } from "@/ui/plugin/shadowReactMount";
 import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
@@ -44,7 +45,7 @@ export class RemindersBlockWidget extends WidgetType {
   private readonly currentFilePath: string | undefined;
   private readonly view: EditorView;
   private readonly from: number;
-  private to: number;
+  private readonly to: number;
 
   constructor(
     plugin: CratePlugin,
@@ -64,22 +65,18 @@ export class RemindersBlockWidget extends WidgetType {
   }
 
   eq(other: RemindersBlockWidget): boolean {
-    // Consider widgets equal if only showCompleted changed
-    // This prevents unnecessary widget recreation when toggling
+    // Ignore showCompleted so an unchanged range keeps its DOM. A changed range is
+    // not equal, so CodeMirror calls updateDOM on the new widget, which carries the
+    // current range and updates the existing DOM in place instead of recreating it.
     const optionsWithoutShowCompleted = { ...this.options, showCompleted: undefined };
     const otherOptionsWithoutShowCompleted = { ...other.options, showCompleted: undefined };
 
-    const isSameBlock =
+    return (
       this.currentFilePath === other.currentFilePath &&
       JSON.stringify(optionsWithoutShowCompleted) === JSON.stringify(otherOptionsWithoutShowCompleted) &&
-      this.from === other.from;
-
-    if (isSameBlock) {
-      // Keep track of the latest range so updateDOM reads the full block.
-      this.to = other.to;
-    }
-
-    return isSameBlock;
+      this.from === other.from &&
+      this.to === other.to
+    );
   }
 
   updateDOM(dom: HTMLElement, view: EditorView): boolean {
@@ -103,14 +100,7 @@ export class RemindersBlockWidget extends WidgetType {
     const shadowRoot = host.crateShadowRoot;
     const mountPoint = host.crateMountPoint;
     if (root && shadowRoot) {
-      // Update dark mode class
-      if (mountPoint) {
-        if (mountPoint.doc.body.classList.contains("theme-dark")) {
-          mountPoint.classList.add("dark");
-        } else {
-          mountPoint.classList.remove("dark");
-        }
-      }
+      if (mountPoint) syncMountTheme(mountPoint);
 
       // Typing above the block only moves it; the list itself is unchanged.
       if (host.crateRenderedOptions !== JSON.stringify(newOptions)) this.render(host, root);
@@ -156,14 +146,8 @@ export class RemindersBlockWidget extends WidgetType {
   toDOM(): HTMLElement {
     const container = createDiv({ cls: "reminders-block-widget" }) as WidgetHost;
 
-    const mount = createShadowRootMount(container, {
-      configureMountPoint: (mountPoint) => {
-        // Sync dark mode
-        if (mountPoint.doc.body.classList.contains("theme-dark")) {
-          mountPoint.classList.add("dark");
-        }
-      },
-    });
+    // The mount syncs the theme class itself.
+    const mount = createShadowRootMount(container);
 
     container.crateShadowRoot = mount.shadowRoot;
     container.crateMountPoint = mount.mountPoint;

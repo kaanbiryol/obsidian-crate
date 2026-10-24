@@ -1,10 +1,10 @@
 import { Setting } from 'obsidian';
-import type CratePlugin from '../../../plugin/CratePlugin';
 import type { UsageMetric } from '../../../cloudflare/usage/service';
 import type { UsageSnapshot } from '../../../cloudflare/usage/snapshot';
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
+import type { SettingsSectionContext } from '../section-helpers';
 
-export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin): () => void {
+export function renderUsageSection({ containerEl, plugin }: Omit<SettingsSectionContext, 'rerender'>): () => void {
 	const accountId = plugin.settings.cloudflareDeployment?.accountId;
 	if (!accountId) return () => {};
 	const container = containerEl;

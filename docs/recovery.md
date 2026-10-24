@@ -73,3 +73,51 @@ Collect the server request ID, approximate time, plugin/PWA/Worker versions, ope
 ## Encrypted vaults
 
 Paired archives preserve encryption configuration, folder labels, recovery envelopes, immutable descriptors and ciphertext stored under tagged names. Restoring those bytes does not decrypt them. Keep the recovery key outside the archive and vault, restore with an encryption-capable server, and unlock clients before syncing. Archives created before encryption was turned on remain plaintext. Server authentication and push credentials in an archive still require private storage even when note content is encrypted.
+
+## Testing notes
+
+Choosing and running suites is covered in [testing](testing.md).
+
+### File history browser checks
+
+Run `npm run build && npm run test:file-history-browser` for the production file-history renderer in Chromium and WebKit, at desktop/mobile widths in light and dark themes. The harness covers chronological history, direct file access including deleted files and files with no earlier versions, desktop/mobile version navigation, keyboard selection, compact no-difference previews, saved text escaping, local comparisons, deletion filtering, preview retry, and restore confirmation/cancellation. Screenshots are written to `.generated/file-history/`. Obsidian supplies the real modal focus shell; verify native focus/dismissal and physical-device navigation separately.
+
+Whole-vault history restore is covered by `src/sync/history/restore.test.ts`,
+`src/sync/runtime/history-restore.test.ts`, and
+`src/cloudflare/worker/sync/history-state-restore.integration.ts`. The file-history browser
+harness also checks the checkpoint action, per-file preview, cancellation, busy
+controls, unavailable versions, and retry in both engines and viewport sizes.
+History rows show second-level timestamps; restore-point IDs appear in the confirmation. Browser checks
+cover selecting same-minute points, exact-point text diffs, addition/removal
+previews, escaped text, and ignoring stale previews when switching files.
+The History tab retains expandable sync entries and per-file history actions. One
+**Browse vault history** button opens the dedicated three-pane screen. The harness
+checks file actions, expanded rows and focus across refresh, lazy loading,
+stacked dialog dismissal and focus return to the preserved activity list, desktop
+columns, mobile pane navigation, selected restore targets,
+current-vault comparisons even for the oldest checkpoint, matching-state messages,
+explicit comparison refresh, load retry, stale sync requests, and selection
+stability during refresh. `engine/history.test.ts`,
+`history-comparison.test.ts`, and `runtime/history-comparison.test.ts` cover
+complete-inventory comparisons, unsynced edits, hidden configuration, exclusions,
+incomplete reads, missing saved states, byte verification, preview limits, and
+connection changes.
+`file-history-preview.test.ts`, `pending-diff.test.ts`, `history-comparison.test.ts`
+and `conflict/review.test.ts` protect each flow's BOM behavior and rejection of
+binary or invalid UTF-8 text alongside storage, size and integrity checks.
+Restore opens a compact confirmation directly from Vault history. Browser checks
+cover transparent footer actions, current-file counts, cancellation during preflight,
+unavailable versions, unchanged states, busy dismissal guards, and failed-restore
+retry with a fresh preflight. No extra diff review or second confirmation appears.
+For native Obsidian acceptance, verify dismissal is blocked while restoring,
+restore an edit/deletion/rename/addition checkpoint in a disposable synced vault,
+and confirm another device converges. Interrupt a restore and restart Obsidian to
+verify automatic sync stays off and the local recovery copies remain available.
+
+Shared-checkpoint coverage also exercises a second device discovering and restoring
+another device's checkpoint without its local history, retained attachments over
+256 KB, concurrent publication, lost index-write responses, page-generation races,
+20-entry limits, expiry, metadata cleanup, and vault-token authorization. Run
+`npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/history-state-restore.integration.ts`
+for those real D1/R2/DO checks. Hosted and physical-device acceptance still requires
+updating the server and plugin on both devices and restoring from the second one.

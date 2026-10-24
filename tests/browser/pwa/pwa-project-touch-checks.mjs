@@ -52,8 +52,11 @@ export async function checkProjectTouchFeedback(page) {
     await settleAppearance(card);
     const resting = await appearance(card);
     // Force :hover to remain on a touch surface after release, including WebKit.
-    await card.hover();
-    assert.ok(await card.evaluate(element => element.matches(':hover')));
+    // Under load the scroll can still settle after hover(), so hover again until it sticks.
+    await expect(async () => {
+      await card.hover();
+      assert.ok(await card.evaluate(element => element.matches(':hover')));
+    }).toPass({ timeout: 5_000 });
     const pointer = await page.evaluate(() => ({
       hover: matchMedia('(hover: hover)').matches, fine: matchMedia('(pointer: fine)').matches, touchPoints: navigator.maxTouchPoints,
     }));

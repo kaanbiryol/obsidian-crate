@@ -66,7 +66,7 @@ it.each(['current', 'retained'])('discards uncached JSON against the %s last-syn
     expect(persisted.files[path]).toMatchObject({
         hash: h.baseline.hash, revision: h.baseline.revision,
     });
-    expect(h.engine.getPendingPaths()).not.toContain(h.key);
+    expect(h.engine.getPendingKeys()).not.toContain(h.key);
     expect(h.transport.mock.calls.every(([request]) => !/\/sync\/(upload|changes)/.test(request.url))).toBe(true);
     if (source === 'retained') {
         expect(h.remote.previewFileVersion).toHaveBeenCalledTimes(2);
@@ -78,7 +78,7 @@ it('restores a locally deleted JSON file from its verified server copy', async (
     const h = await setup('{"theme":"saved"}', null);
     await (await h.engine.createPendingDiscard([h.key])).discard();
     expect(h.disk.read(path)).toEqual(h.base);
-    expect(h.engine.getPendingPaths()).not.toContain(h.key);
+    expect(h.engine.getPendingKeys()).not.toContain(h.key);
 });
 
 it('does not apply the text preview limit to discarding a current server file', async () => {
@@ -98,7 +98,7 @@ it.each(['offline', 'corrupt', 'expired'])('keeps local JSON and its pending cha
     }
     await expect(h.engine.createPendingDiscard([h.key])).rejects.toThrow();
     expect(h.disk.read(path)).toEqual(original);
-    expect(h.engine.getPendingPaths()).toContain(h.key);
+    expect(h.engine.getPendingKeys()).toContain(h.key);
     expect(h.process).not.toHaveBeenCalled();
     expect(h.writeBinary).not.toHaveBeenCalled();
     expect(h.setEntry).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ it('keeps an edit made while downloading the confirmed replacement', async () =>
     });
     await expect(review.discard()).rejects.toThrow('changed');
     expect(h.disk.read(path)).toEqual(toArrayBuffer('new edit while downloading'));
-    expect(h.engine.getPendingPaths()).toContain(h.key);
+    expect(h.engine.getPendingKeys()).toContain(h.key);
     expect(h.process).not.toHaveBeenCalled();
 });
 
@@ -124,7 +124,7 @@ it('rejects changed server bytes after confirmation without overwriting the loca
     h.remote.downloadFile.mockResolvedValue({ content: toArrayBuffer('different server version') });
     await expect(review.discard()).rejects.toThrow('could not be verified');
     expect(h.disk.read(path)).toEqual(original);
-    expect(h.engine.getPendingPaths()).toContain(h.key);
+    expect(h.engine.getPendingKeys()).toContain(h.key);
     expect(h.process).not.toHaveBeenCalled();
     expect(h.writeBinary).not.toHaveBeenCalled();
 });

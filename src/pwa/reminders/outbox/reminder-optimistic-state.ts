@@ -1,4 +1,4 @@
-import { buildCreatedReminderBlock, buildReminderCompletionPlan } from '@/reminders/core/markdownReminderMutation';
+import { buildCreatedReminderBlock, planReminderCompletion } from '@/reminders/core/markdownReminderMutation';
 import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
 import { parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
 import { applyReminderListEffect, type ReminderList } from './reminder-list-state';
@@ -23,7 +23,7 @@ export function predictSavedReminder(id: string, input: ReminderMutationBody, pr
 }
 
 export function predictReminderCompletion(reminder: ReminderRecord, completed: boolean): ReminderRecord {
-	const plan = buildReminderCompletionPlan({ ...reminder, rawLine: reminder.completed ? '- [x]' : '- [ ]', lineNumber: reminder.lineNumber ?? 0 }, completed);
+	const plan = planReminderCompletion(reminder, completed);
 	return { ...reminder, completed: plan.completed, dueDate: plan.dueDate, dueDatetime: plan.dueDatetime, recurrence: plan.recurrence };
 }
 

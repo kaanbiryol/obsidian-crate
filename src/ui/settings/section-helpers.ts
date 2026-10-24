@@ -8,6 +8,9 @@ export interface SettingsSectionContext {
 	rerender: () => void;
 }
 
+/** Renders one settings tab section; returns a cleanup when it holds subscriptions or timers. */
+export type SettingsSection = (context: SettingsSectionContext) => (() => void) | void;
+
 export function createSettingsSectionHeading(containerEl: HTMLElement, title: string): Setting {
 	return new Setting(containerEl)
 		.setName(title)

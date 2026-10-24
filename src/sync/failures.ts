@@ -1,6 +1,6 @@
 import type { MutationFailure, UploadResult } from '../protocol/sync-types';
 import { HttpError, SyncTransportError } from './worker-api/http';
-import { errorMessage } from './logger';
+import { errorMessage } from '../platform/logger';
 
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const VERSION_CONFLICT_HTTP_STATUSES = new Set([409, 412]);

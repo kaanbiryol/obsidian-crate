@@ -1,6 +1,6 @@
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
 import { isAbortError } from '../abort';
-import { errorMessage } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { LocalFilePresentError } from '../local/local-absence';
 import { BATCH_DELETE_CONCURRENCY } from './constants';

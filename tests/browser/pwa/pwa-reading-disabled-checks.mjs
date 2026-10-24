@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { switchFeature } from './pwa-feature-navigation.mjs';
+import { switchFeature } from '../support/pwa-feature-navigation.mjs';
 
 export async function checkDisabledReading(browser, origin, name) {
 	// A missing Reading folder is setup state, not an unsynced error.

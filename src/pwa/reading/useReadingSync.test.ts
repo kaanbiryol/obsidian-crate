@@ -4,22 +4,26 @@ import { renderHook } from '../../test/react-hooks';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY } from '../config';
 import { PWA_PREFERENCES_KEY } from '../settings/preferences';
 import { ReadingApiError, connectReadingFromReminders, loadReading, readingRequest } from './api';
-import { READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
+import { type ReadingCache } from './storage/storage';
+import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import type { PendingReading } from './outbox';
 import { useReadingSync } from './useReadingSync';
 import { prefetchReadingArticles } from './prefetch';
 import { useReadingSession } from './useReadingSession';
-import type { ReadingConnection } from './useReadingConnection';
+import type { ReadingConnection } from './session/useReadingConnection';
 
 const stored = vi.hoisted(() => ({ queue: [] as PendingReading[], session: null as ReadingSession | null, sessionError: null as Error | null }));
 vi.mock('./api', async importOriginal => ({
   ...await importOriginal<typeof import('./api')>(), readingRequest: vi.fn(), loadReading: vi.fn(), connectReadingFromReminders: vi.fn(),
 }));
 vi.mock('./prefetch', () => ({ prefetchReadingArticles: vi.fn(async () => {}) }));
-vi.mock('./storage', async importOriginal => ({
-  ...await importOriginal<typeof import('./storage')>(),
+vi.mock('./session/session', async importOriginal => ({
+  ...await importOriginal<typeof import('./session/session')>(),
   assertReadingSession: (session: ReadingSession) => { if (stored.session !== session) throw new Error('Session changed'); },
   readingSession: () => { if (stored.sessionError) throw stored.sessionError; return stored.session; },
+}));
+vi.mock('./storage/storage', async importOriginal => ({
+  ...await importOriginal<typeof import('./storage/storage')>(),
   readingLock: async <T>(action: () => Promise<T>) => action(),
   readingDrainLock: async <T>(action: () => Promise<T>) => action(),
   pendingReading: async () => structuredClone(stored.queue),

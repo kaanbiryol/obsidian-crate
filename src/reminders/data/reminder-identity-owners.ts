@@ -15,6 +15,28 @@ export function addReminderIdentityOwners(owners: ReminderIdentityOwners, remind
 	}
 }
 
+/**
+ * Forget identity claims that current Markdown no longer confirms. Each released
+ * owner leaves `owners`, and every entry it covers (or that belongs to
+ * `replacedFilePath`, whose fresh scan supersedes it) is dropped from the result
+ * and from `owners`. A released ID is never kept through a remaining copy.
+ */
+export function releaseReminderIdentityOwners<T extends ReminderIdentityOwner>(
+	owners: ReminderIdentityOwners | undefined,
+	entries: readonly T[],
+	released: readonly ReminderIdentityOwner[],
+	replacedFilePath?: string,
+): T[] {
+	const key = (owner: ReminderIdentityOwner) => `${owner.filePath}\0${owner.id}`;
+	const releasedKeys = new Set(released.map(key));
+	for (const owner of released) owners?.get(owner.id)?.delete(owner.filePath);
+	return entries.filter(entry => {
+		if (entry.filePath !== replacedFilePath && !releasedKeys.has(key(entry))) return true;
+		owners?.get(entry.id)?.delete(entry.filePath);
+		return false;
+	});
+}
+
 /** Only lines whose marker is wanted are parsed; the marker alone rules out the rest. */
 function contentIds(content: string, wanted: (id: string) => boolean): Set<string> {
 	const ids = new Set<string>();

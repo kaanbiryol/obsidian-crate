@@ -1,6 +1,6 @@
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
 const assets = await buildPwaPreviewAssets();
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets, failMutationPaths: ['/reminders/update'] });
 let revocations = 0;

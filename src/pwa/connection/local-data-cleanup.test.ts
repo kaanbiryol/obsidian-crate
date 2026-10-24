@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearLocalData } from './local-data-cleanup';
-import { clearReadingData } from '../reading/storage';
+import { clearReadingData } from '../reading/storage/storage';
 import { clearReminderDrafts } from '../reminders/editor/reminder-drafts';
 import { clearReminderOutbox } from '../reminders/outbox/reminder-outbox-storage';
 import { clearCachedReminderSnapshots } from '../reminders/cache/reminder-cache';
@@ -13,7 +13,7 @@ vi.mock('../encryption/encryption-cleanup', () => ({
 }));
 vi.mock('../reminders/editor/reminder-drafts', () => ({ clearReminderDrafts: vi.fn(() => { calls.push('drafts'); return true; }) }));
 vi.mock('../reminders/outbox/reminder-outbox-storage', () => ({ clearReminderOutbox: vi.fn(() => { calls.push('outbox'); }) }));
-vi.mock('../reading/storage', () => ({ clearReadingData: vi.fn(async () => { calls.push('reading'); }) }));
+vi.mock('../reading/storage/storage', () => ({ clearReadingData: vi.fn(async () => { calls.push('reading'); }) }));
 vi.mock('../reminders/cache/reminder-cache', () => ({ clearCachedReminderSnapshots: vi.fn(async () => { calls.push('snapshots'); return true; }) }));
 afterEach(() => { calls.length = 0; vi.clearAllMocks(); });
 

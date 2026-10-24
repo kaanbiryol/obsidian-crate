@@ -1,3 +1,5 @@
+import type { FileEntry } from '../protocol/sync-types';
+
 export interface ConnectionTestResult {
 	success: boolean;
 	error?: string;
@@ -157,4 +159,9 @@ export interface SyncActivityProgress {
 	current: number;
 	total: number;
 	work?: SyncWork;
+}
+
+export interface RemoteManifest {
+	files: Record<string, FileEntry>;
+	lastSeq?: number;
 }

@@ -4,7 +4,7 @@ import { applyReminderListEffect } from './reminder-list-state';
 import type { createReminderSettlementChannel } from './reminder-settlement';
 import { subscribeReminderOutboxEvents } from './reminder-outbox-events';
 import type { PendingReminderChange } from './reminder-outbox-types';
-import { REMINDER_OUTBOX_LOCK } from './reminder-storage-keys';
+import { REMINDER_OUTBOX_LOCK } from '../private-storage';
 import type { ApiFetch, ShowToast } from '../../types';
 import type { LoadReminders, ReminderRecord } from '../types';
 

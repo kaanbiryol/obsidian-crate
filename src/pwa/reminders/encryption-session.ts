@@ -3,7 +3,7 @@ import { loadEncryptionState, loadVaultKeys, assertEncryptionActive } from '../c
 import type { EncryptionServerState } from '../../encryption/server-state';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from './private-storage';
-import { capturePwaSession } from '../session-generation';
+import { capturePwaSession } from '../connection/session-generation';
 import { AUTH_TOKEN_KEY, adoptReminderFolder } from '../config';
 import type { ApiFetch } from '../types';
 import { takeFragmentValues } from '../encryption/encryption-fragments';
@@ -66,6 +66,8 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 		publish({ status: 'ready', folderPath: keys.folderPath });
 		return keys;
 	})().catch(error => {
+		// Unlike Reading, which keeps a verified session's access when verification is only
+		// unavailable, any failed check locks reminders until a check succeeds.
 		if (current()) { requirePrivateStorageUnlock(); publish({ status: 'locked', message: error instanceof Error ? error.message : String(error), converting: !!state && state.mode !== 'active', setupRequired: error instanceof EncryptionKeyRequiredError && error.firstUnlock }); }
 		throw error;
 	});

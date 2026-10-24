@@ -40,7 +40,7 @@ const { outputFiles } = await build({
         ` }));
     } }], bundle: true, write: false, format: 'iife', platform: 'browser',
 });
-const css = compileString("@use 'src/styles/plugin/dialogs'; @use 'src/styles/plugin/activity'; @use 'src/ui/shared/styles/modal-layout'; .crate-reminders-ui { @include modal-layout.styles; }", { loadPaths: [process.cwd()] }).css;
+const css = compileString("@use 'src/styles/plugin/dialogs'; @use 'src/ui/activity/styles/activity'; @use 'src/ui/shared/styles/modal-layout'; .crate-reminders-ui { @include modal-layout.styles; }", { loadPaths: [process.cwd()] }).css;
 await mkdir('.generated/conflict-review', { recursive: true });
 for (const browserType of [chromium, webkit]) {
     const browser = await browserType.launch();

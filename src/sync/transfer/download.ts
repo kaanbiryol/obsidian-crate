@@ -4,7 +4,8 @@ import { base64ToArrayBuffer } from "../encoding";
 import { applyRemoteContentIfUnchanged } from "../local/local-apply";
 import { recordAppliedContent } from './applied-content';
 import type { DiffApplyOutcome, TransferContext } from "./types";
-import { createLogger, errorMessage } from "../logger";
+import { createLogger } from "../logger";
+import { errorMessage } from "../../platform/logger";
 import type { SyncResult } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { fileFailure } from '../failures';
@@ -55,7 +56,7 @@ export async function downloadAndSaveFile(
   result: SyncResult,
 ): Promise<DiffApplyOutcome> {
   const { path } = request;
-  const response = await context.api.downloadFile(path);
+  const response = await context.files.downloadFile(path);
   const content = response.content;
   if (content.byteLength > MAX_FILE_SIZE_BYTES) {
     return { status: "deferred", reason: "Skipped remote file larger than 25MB" };
@@ -106,7 +107,7 @@ export async function parallelDownloadAndSaveFiles(
 
     await context.runConcurrent(chunks.map(chunk => async () => {
       try {
-        const response = await context.api.batchDownload(chunk.map((request) => request.path));
+        const response = await context.files.batchDownload(chunk.map((request) => request.path));
         const requestsByPath = new Map(chunk.map((request) => [request.path, request] as const));
         const responsePaths = response.files.map((file) => file.path);
         if (

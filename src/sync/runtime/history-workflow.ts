@@ -5,7 +5,7 @@ import type { SyncHistoryEntry, SyncResult } from '../types';
 import { mergeSyncResults } from '../sync-result';
 import type { SyncSettings } from '../settings';
 
-type HistoryEngine = Pick<SyncEngine, 'createHistoryRestore' | 'updateSettings' | 'getPendingPaths' | 'syncSelected' | 'sync'>;
+type HistoryEngine = Pick<SyncEngine, 'createHistoryRestore' | 'updateSettings' | 'getPendingKeys' | 'syncSelected' | 'sync'>;
 interface HistoryRestoreContext {
   engine: HistoryEngine;
   settings: SyncSettings;
@@ -58,7 +58,7 @@ export async function createRuntimeHistoryRestore({ engine, settings, verify, cl
         if (!review.items.length) return;
         const result = await runSyncOperation(async (current, progress) => {
             const removed = new Set(review.items.filter(item => item.action === 'remove').map(item => item.path));
-            const keys = removed.size ? current.getPendingPaths().filter(key => removed.has(decodePendingChange(key).path)) : [];
+            const keys = removed.size ? current.getPendingKeys().filter(key => removed.has(decodePendingChange(key).path)) : [];
             // The verified local recovery copies allow explicit removals to
             // settle first, freeing paths for historical file/folder renames.
             const deletions = keys.length ? await current.syncSelected(keys) : undefined;

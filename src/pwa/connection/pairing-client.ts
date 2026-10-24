@@ -2,8 +2,8 @@ import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol/ser
 import { PAIRING_PATH, PairingEndedError, type PairingTransport } from '../../encryption/pairing/protocol';
 import { validateEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
-import { READING_SESSION_KEY, readingSession } from '../reading/storage';
-import { capturePwaSession } from '../session-generation';
+import { READING_SESSION_KEY, readingSession } from '../reading/session/session';
+import { capturePwaSession } from './session-generation';
 import { reportExpiredConnection } from './expiration';
 
 export function pairingConnection(feature: 'reading' | 'reminders', signal: AbortSignal) {

@@ -4,7 +4,26 @@ import { createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRec
 import { verifyRecoveryCode } from '../encryption/recovery-verification';
 import { assertEncryptionKeys, type EncryptionServerState } from '../encryption/server-state';
 import { getPluginLifecycleSignal } from './lifecycle-state';
+import { WorkerApiHttpClient } from '../sync/worker-api/http';
+import { readServerEncryption } from '../sync/encryption/server-encryption';
 import { SECRET_KEYS } from '../platform/secret-keys';
+import { captureServerConnection } from './server-request';
+
+/** A Worker API client for the current server connection, and a check that it is still current. */
+export function openEncryptionConnection(plugin: CratePlugin): { http: WorkerApiHttpClient; assertCurrent: () => void } {
+	const { signal, origin, token, assertCurrent } = captureServerConnection(plugin);
+	const http = new WorkerApiHttpClient(origin, token ?? '');
+	http.setAbortSignal(signal);
+	return { http, assertCurrent };
+}
+
+/** The server's encryption state, rejected when the connection changed while it was read. */
+export async function readEncryptionStatus(plugin: CratePlugin, timeout?: number): Promise<EncryptionServerState | null> {
+	const { http, assertCurrent } = openEncryptionConnection(plugin);
+	const state = await readServerEncryption(http, timeout);
+	assertCurrent();
+	return state;
+}
 
 /** Keys saved on this device, or null when they cannot unlock the server's encryption. */
 export function loadDeviceEncryptionKeys(plugin: CratePlugin, state: EncryptionServerState | null): VaultKeyBundle | null {

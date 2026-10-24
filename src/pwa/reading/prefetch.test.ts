@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import { loadReadingArticle } from './api';
-import { cacheReadingArticle, readingArticlesToPrefetch } from './cache';
+import { cacheReadingArticle, readingArticlesToPrefetch } from './storage/cache';
 import { prefetchReadingArticles } from './prefetch';
-import type { ReadingSession } from './session';
+import type { ReadingSession } from './session/session';
 
 vi.mock('./api', () => ({ loadReadingArticle: vi.fn() }));
-vi.mock('./cache', () => ({ cacheReadingArticle: vi.fn(async () => true), readingArticlesToPrefetch: vi.fn() }));
+vi.mock('./storage/cache', () => ({ cacheReadingArticle: vi.fn(async () => true), readingArticlesToPrefetch: vi.fn() }));
 
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const item = (n: number) => ({ crate_reading_id: `id-${n}` }) as ReadingItem;

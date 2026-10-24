@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { SyncApiClient } from '../worker-api/client';
+import { createEngineFileOperations } from './file-operations';
 import { LocalManifest } from '../manifest/manifest';
 import { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { ApiHttpTransport } from '../worker-api/http';
@@ -25,7 +26,8 @@ async function fixture() {
 		return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
 	});
 	const api = new SyncApiClient('https://server.test', 'token', transport);
-	const files = api.createFileOperations(manifest, disk.vault, cache);
+	const { transport: fileTransport, clientSession } = api.getFileTransport(manifest);
+	const files = createEngineFileOperations(fileTransport, manifest, disk.vault, cache, clientSession);
 	return { disk, app, plugin, manifest, content, hash, transport, api, files };
 }
 

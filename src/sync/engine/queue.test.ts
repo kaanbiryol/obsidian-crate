@@ -41,7 +41,7 @@ describe('SyncEngine event queue behavior', () => {
 		harness.engine.updateSettings({ ...harness.settings, automaticSync: false });
 		await vi.advanceTimersByTimeAsync(60_000);
 		expect(harness.api.uploadFile).not.toHaveBeenCalled();
-		expect(harness.engine.getPendingPaths()).toContain('notes/a.md');
+		expect(harness.engine.getPendingKeys()).toContain('notes/a.md');
 	});
 
 	it('notifies state listeners only when a file event changes the pending set', () => {
@@ -56,23 +56,23 @@ describe('SyncEngine event queue behavior', () => {
 		harness.engine.onFileDelete({ path: 'notes/a.md' } as never);
 		harness.engine.onFileChange({ path: 'notes/b.md' } as never);
 		expect(states).toEqual([1, 1, 2]);
-		expect(harness.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', 'notes/a.md'), 'notes/b.md']);
+		expect(harness.engine.getPendingKeys()).toEqual([pendingChangeKey('delete', 'notes/a.md'), 'notes/b.md']);
 	});
 
 	it('queues remote delete when renaming from syncable path into ignored path', () => {
 		harness.engine.onFileRename({ path: '.trash/note.md' } as never, 'notes/note.md');
 
-		const pendingPaths = harness.engine.getPendingPaths();
-		expect(pendingPaths.includes(pendingChangeKey('delete', 'notes/note.md'))).toBe(true);
-		expect(pendingPaths.includes('.trash/note.md')).toBe(false);
+		const pendingKeys = harness.engine.getPendingKeys();
+		expect(pendingKeys.includes(pendingChangeKey('delete', 'notes/note.md'))).toBe(true);
+		expect(pendingKeys.includes('.trash/note.md')).toBe(false);
 	});
 
 	it('queues upload when renaming from ignored path into syncable path', () => {
 		harness.engine.onFileRename({ path: 'notes/note.md' } as never, '.trash/note.md');
 
-		const pendingPaths = harness.engine.getPendingPaths();
-		expect(pendingPaths.includes(pendingChangeKey('delete', '.trash/note.md'))).toBe(false);
-		expect(pendingPaths.includes('notes/note.md')).toBe(true);
+		const pendingKeys = harness.engine.getPendingKeys();
+		expect(pendingKeys.includes(pendingChangeKey('delete', '.trash/note.md'))).toBe(false);
+		expect(pendingKeys.includes('notes/note.md')).toBe(true);
 	});
 
 	it('settles an oversized file without failing the rest of its queued batch', async () => {
@@ -86,7 +86,7 @@ describe('SyncEngine event queue behavior', () => {
 		await vi.advanceTimersByTimeAsync(5000);
 		await harness.engine.waitForIdle();
 		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
-		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getPendingKeys()).toEqual([]);
 		expect(harness.engine.getState()).toMatchObject({ status: 'idle' });
 	});
 
@@ -103,7 +103,7 @@ describe('SyncEngine event queue behavior', () => {
 		const idlePendingCounts: number[] = [];
 		harness.engine.setStateChangeCallback((state) => {
 			if (state.status === 'idle') {
-				idlePendingCounts.push(harness.engine.getPendingPaths().length);
+				idlePendingCounts.push(harness.engine.getPendingKeys().length);
 			}
 		});
 
@@ -238,9 +238,9 @@ describe('SyncEngine event queue behavior', () => {
 		await vi.advanceTimersByTimeAsync(5000);
 		await harness.engine.waitForIdle();
 
-		const pendingPaths = harness.engine.getPendingPaths();
-		expect(pendingPaths.includes('notes/a.md')).toBe(false);
-		expect(pendingPaths.includes('notes/b.md')).toBe(true);
+		const pendingKeys = harness.engine.getPendingKeys();
+		expect(pendingKeys.includes('notes/a.md')).toBe(false);
+		expect(pendingKeys.includes('notes/b.md')).toBe(true);
 	});
 
 	it('uploads a newer edit after settling an earlier upload of the same path', async () => {
@@ -258,12 +258,12 @@ describe('SyncEngine event queue behavior', () => {
 		harness.engine.onFileChange({ path } as never);
 		await vi.advanceTimersByTimeAsync(5000);
 		await harness.engine.waitForIdle();
-		expect(harness.engine.getPendingPaths()).toContain(path);
+		expect(harness.engine.getPendingKeys()).toContain(path);
 
 		await vi.advanceTimersByTimeAsync(5000);
 		await harness.engine.waitForIdle();
 		expect(harness.api.uploadFile.mock.calls.map(([, content]) => new TextDecoder().decode(content))).toEqual(['A', 'B']);
-		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getPendingKeys()).toEqual([]);
 	});
 
 	it.each([
@@ -302,18 +302,18 @@ describe('SyncEngine event queue behavior', () => {
 			await vi.advanceTimersByTimeAsync(5000);
 			await uploadingStarted.promise;
 			expect(harness.api.uploadFile).toHaveBeenCalledTimes(2);
-			expect(harness.engine.getPendingPaths()).toContain(nextPath);
+			expect(harness.engine.getPendingKeys()).toContain(nextPath);
 
 			reporting.resolve();
 			await vi.advanceTimersByTimeAsync(0);
 			expect(harness.engine.getState().status).toBe('syncing');
-			expect(harness.engine.getPendingPaths()).toContain(nextPath);
+			expect(harness.engine.getPendingKeys()).toContain(nextPath);
 		} finally {
 			reporting.resolve();
 			uploading.resolve();
 			await harness.engine.waitForIdle();
 		}
-		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getPendingKeys()).toEqual([]);
 	});
 
 	it('re-queues pending path when upload returns success false', async () => {
@@ -334,8 +334,8 @@ describe('SyncEngine event queue behavior', () => {
 		await vi.advanceTimersByTimeAsync(5000);
 		await harness.engine.waitForIdle();
 
-		const pendingPaths = harness.engine.getPendingPaths();
-		expect(pendingPaths.includes('notes/a.md')).toBe(true);
+		const pendingKeys = harness.engine.getPendingKeys();
+		expect(pendingKeys.includes('notes/a.md')).toBe(true);
 		expect(harness.engine.getState().status).toBe('error');
 		expect(harness.engine.getState().lastError).toContain('quota exceeded');
 	});
@@ -359,12 +359,12 @@ describe('SyncEngine explicit sync queue reconciliation', () => {
 
 		const syncResult = await harness.engine.sync();
 
-		const pendingPaths = harness.engine.getPendingPaths();
+		const pendingKeys = harness.engine.getPendingKeys();
 		expect(syncResult).toBe(result);
-		expect(pendingPaths.includes('notes/uploaded.md')).toBe(false);
-		expect(pendingPaths.includes('notes/downloaded.md')).toBe(false);
-		expect(pendingPaths.includes(pendingChangeKey('delete', 'notes/deleted.md'))).toBe(false);
-		expect(pendingPaths.includes('notes/still-pending.md')).toBe(true);
+		expect(pendingKeys.includes('notes/uploaded.md')).toBe(false);
+		expect(pendingKeys.includes('notes/downloaded.md')).toBe(false);
+		expect(pendingKeys.includes(pendingChangeKey('delete', 'notes/deleted.md'))).toBe(false);
+		expect(pendingKeys.includes('notes/still-pending.md')).toBe(true);
 		expect(harness.engine.getState().pendingChanges).toBe(1);
 		harness.engine.destroy();
 	});
@@ -380,7 +380,7 @@ describe('SyncEngine explicit sync queue reconciliation', () => {
 
 		await harness.engine.sync();
 
-		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getPendingKeys()).toEqual([]);
 		expect(harness.engine.getState().pendingChanges).toBe(0);
 		harness.engine.destroy();
 	});

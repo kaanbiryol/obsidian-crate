@@ -4,10 +4,11 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import { test } from 'node:test';
 
-// Browser tests and tooling bundle source modules by path, which TypeScript never
-// checks. Fail fast when a source move leaves one of these references behind.
+// Browser tests, tooling and the standalone server (run from a checkout) load
+// source modules by path, which TypeScript never checks. Fail fast when a source
+// move leaves one of these references behind.
 const root = join(import.meta.dirname, '..');
-const files = execFileSync('git', ['ls-files', 'scripts/*.mjs', 'tests/browser/**/*.mjs'], { cwd: root, encoding: 'utf8' })
+const files = execFileSync('git', ['ls-files', 'scripts/*.mjs', 'tests/browser/**/*.mjs', 'tests/reading-extraction/*.mjs', 'packages/server/src/*.mjs'], { cwd: root, encoding: 'utf8' })
 	// Tooling unit tests build fixture repositories with placeholder paths.
 	.split('\n').filter(file => file && !(file.startsWith('scripts/') && file.endsWith('.test.mjs')));
 const extensions = ['', '.ts', '.tsx', '.mjs', '.js', '.scss', '.css', '/index.ts'];

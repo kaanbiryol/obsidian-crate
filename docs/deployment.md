@@ -226,7 +226,7 @@ If a request or local save fails, use **Resume server deletion** under **Advance
 
 If the local vault is the source for a fresh server, stop old clients and select **Crate settings → Advanced server actions → Delete server and all data**. Crate verifies ownership and can take over a settled update checkpoint as described above. After deletion finishes, select **Connect with Cloudflare**, create a new server, and select **Crate: Sync now**. Local vault files are kept; the old server's remote data is permanently removed. Back up any remote-only data before deleting.
 
-If deletion still needs review, retain its technical details and inspect the held operation using the command above. An unresolved provider request requires confirmed quiescence before `settle --owner <inspected-owner-id> --confirm-quiescent`; then retry deletion. Do not lower schema/revision markers or erase the fence to make the old deployment appear compatible. Automated coverage includes `server-reset/delete.test.ts`, `server-delete-worker.integration.ts`, `deployment/lifecycle.test.ts`, and `plugin-integration.test.ts`. Hosted deletion and physical-device acceptance still require manual verification.
+If deletion still needs review, retain its technical details and inspect the held operation using the command above. An unresolved provider request requires confirmed quiescence before `settle --owner <inspected-owner-id> --confirm-quiescent`; then retry deletion. Do not lower schema/revision markers or erase the fence to make the old deployment appear compatible. Automated coverage includes `server-reset/delete.test.ts`, `server-delete-worker.integration.ts`, `deployment/lifecycle.test.ts`, and `plugin/cloudflare-operations.test.ts`. Hosted deletion and physical-device acceptance still require manual verification.
 
 ### Notification abuse limits
 
@@ -261,3 +261,26 @@ network request. Startup, reconnect, foreground sync and periodic checks retry i
 Only an explicit pending edit updates an existing server folder; ordinary policy
 initialization cannot overwrite it. Acknowledging an older update cannot clear a
 newer local edit.
+
+## Testing notes
+
+Choosing and running suites is covered in [testing](testing.md).
+
+### Connection recovery
+
+In **Crate → Account and devices**, select **Reconnect** to check Cloudflare
+access and the device credential together. With a valid device credential, verify
+that reconnect preserves it and does not transfer files or publish a server update.
+With a rejected credential, verify that reconnect registers and checks a replacement
+without requiring **Disconnect this device**. Expired Cloudflare authorization
+should open sign-in and resume reconnect after the callback. Network or verification
+failures must not show success. Self-hosted reconnect should accept a new pairing
+code at the saved address and keep the existing local connection on failure.
+
+Focused coverage: `src/plugin/cloudflare-operations.test.ts`,
+`src/cloudflare/deployment/service.test.ts`,
+`src/plugin/self-hosted-connection.test.ts`, and the affected settings tests.
+`self-hosted-pairing.test.ts` and `ui/settings/infrastructure/self-hosted-errors.test.ts` check
+typed setup failures, including address-update guidance and pairing status handling
+that does not depend on server error wording.
+Browser OAuth handoff and real hosted credentials still require manual acceptance.

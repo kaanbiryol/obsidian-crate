@@ -1,4 +1,4 @@
-import { trackStagedUpload } from '../staged-uploads';
+import { trackStagedUpload } from '../staging/staged-uploads';
 import { beginUploadOperation } from '../upload-operations';
 import { isSyncRevision } from '@/protocol/sync-validation';
 import { corsResponse } from '../../cors';

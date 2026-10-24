@@ -1,6 +1,6 @@
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
 
 // Built application, native localStorage/IndexedDB and Web Locks. The HTTP preview
 // implements mutation receipts; delayed list responses expose stale-read races.

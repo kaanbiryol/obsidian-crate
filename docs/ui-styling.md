@@ -451,7 +451,7 @@ in their feature styles. PWA-wide behavior belongs in the host layer:
   input-modality focus, and motion respectively. New features reuse them rather
   than adding a second interaction policy.
 
-Built-app checks in `tests/browser/reading/reading-browser.test.mjs` and
+Built-app checks in `tests/browser/reading/reading-browser-test.mjs` and
 `tests/browser/pwa/pwa-focus-test.mjs` cover the shared screen policy, native Chromium
 pinching, text selection, font sizing, and sheet editing boundaries. Desktop
 WebKit checks the CSS policy and editing behavior; installed iPhone gestures
@@ -830,7 +830,7 @@ multitouch gestures are left to the browser.
 
 Run the Reading visual specs in Chromium and WebKit for both hosts, light/dark
 surfaces, mobile and desktop widths, safe rendering, article actions, capture,
-and appearance controls. `tests/browser/reading/reading-browser.test.mjs` exercises the built
+and appearance controls. `tests/browser/reading/reading-browser-test.mjs` exercises the built
 PWA against real local storage and Worker bindings, including offline reading and
 replay of a save whose response was lost. iPhone keyboard, native sharing, and
 installed-app safe areas still require physical-device acceptance.
@@ -1040,3 +1040,212 @@ and ripples. The dot, glow, halo, and ripple share one SVG center; animation cha
 radii without independently scaling rasterized layers.
 `tests/browser/pwa/pwa-sync-indicator-test.mjs` checks both PWA palettes, centered state
 geometry, motion interruption, reduced motion, and Chromium forced colors.
+
+## Testing notes
+
+Choosing and running suites is covered in [testing](testing.md).
+
+### Unified PWA settings
+
+After building the Worker, run `CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-settings-test.mjs`
+for Chromium and WebKit coverage of both settings entry points, retained view/search
+and focus, shared theme and preferences, Reading launch destinations, explicit-link
+precedence, shortcut and installation navigation, pending Reading warnings from Reminders, and shared
+logout. The test uses the built client, local synthetic APIs, and native browser
+storage; screenshots include light/dark, 320px phone, and desktop layouts.
+The navigation checks cover Open app to in Tabs, always-visible About, Sync,
+and Device storage sections, always-visible storage and version tools, conditional tab
+reset, touch targets, retained settings scroll/focus, native Back/Forward, the
+header Back action, Escape, and shared edge-gesture eligibility. Motion checks
+sample full-page push/pop frames, including the moving header, opaque surface,
+stationary parent, fixed header during scrolling, and restored scroll/focus. Desktop engines
+can check history and gesture arbitration; the interactive OS swipe preview and
+cancellation still need an installed iPhone check. `pushed-screen-history.test.ts`
+covers preserving an underlying feature, repeated visits and quick reopening.
+Installation checks cover iPhone/Android instructions, narrow light/dark layouts,
+Back/Forward, focus/scroll restoration, and hiding the entry after installation.
+`EncryptionSettings.test.ts` covers unknown, disconnected, mixed, locked/setting-up,
+and unlocked states without hiding problems behind the details disclosure.
+Theme checks cover one document update with both features mounted, system-theme
+changes, explicit overrides, settings close/reopen, feature switching, and native
+cross-tab updates including invalid or removed preferences. Early HTML theme
+application before React loads is covered by `tests/browser/pwa/pwa-startup-empty-test.mjs`.
+Run the storage-safety, sheet-interaction, and Reading shortcut browser checks for
+cleanup failures, touch/keyboard behavior, and real local pairing. Physical iPhone
+keyboard, VoiceOver, installed-sheet gestures, and safe areas remain device checks.
+
+Run `node tests/browser/pwa/pwa-sheet-field-test.mjs` for Chromium/WebKit coverage of
+**Save a link** focus, keyboard geometry, and caret visibility during opening,
+closing, interrupted dragging, and retargeted keyboard movement. It also checks
+caret restoration with reduced motion and draft preservation across reopening.
+The keyboard viewport is simulated; native caret painting and software-keyboard
+behavior still require an installed-app check on an iPhone.
+
+### App updates
+
+`useReminderMutations-lifecycle.test.ts` mounts the production hook and settings
+publication with real React. It covers delayed operation identity, overlapping
+preparations, rejection, durable handoff and logout/unmount. `ReadingRuntime.test.ts`
+mounts the production runtime and session hook, holding its storage lock while
+capture, edit and retry commands are prepared. It checks overlapping failures,
+durable publication, and logout/unmount. The mutation and failure-toast suites use
+the shared real React harness for rerenders and effect cleanup. `apply-update.test.ts`
+also starts transient work during asynchronous storage checks before activation
+and reload.
+
+Run `node tests/browser/pwa/pwa-update-notice-test.mjs` for Chromium/WebKit checks of global
+version detection from a Reading-only launch, foreground checks, navigation,
+direct header updates, offline blocking, Settings access, and light/dark mobile layouts.
+Screenshots are written to `test-results/update-notice/`.
+`node tests/browser/pwa/pwa-update-test.mjs` exercises real service-worker preparation,
+activation, failed/slow checks, launch updates, pending writes, and other tabs.
+It delays the server clock while preparing a completion command and checks that
+updates stay blocked before that command reaches the durable outbox. It also holds
+the native Reading mutation lock during an article edit, checks the queue is still
+empty and updates are blocked, then releases the edit and completes a real update.
+Both are included in `npm run test:pwa-browser`. Installed iPhone safe areas,
+app suspension, and VoiceOver announcements still require physical-device checks.
+
+### Portable visual baselines
+
+`npm run test:visual` fixes time, timezone and browser locale. Native time controls still use the operating system's 12/24-hour preference, so screenshots normalize their width and mask only the native time-input region. The time value is asserted independently, the surrounding labels/layout keep the existing 0.1% pixel threshold, and project, repeat-tab and time keyboard behavior run in separate tests. Baseline updates should affect only the intended time-control region; inspect mobile and desktop examples before accepting them. Browser zoom remains enabled in production.
+
+`node scripts/visual-test-run.mjs tests/visual/project-interactions.spec.ts tests/visual/project-interactions-webkit.spec.ts --workers=2`
+checks project pickers and autocomplete using the compiled host styles in plugin
+Shadow DOM and the PWA document. It covers selected-row centering, wheel scroll
+containment, synthetic touch-event propagation, keyboard navigation, dropdown
+placement, and selection/focus restoration through the real plugin editor overlay.
+It also checks title focus during opening, picker width at 320px and desktop sizes,
+and applied autocomplete selection colors in both themes. Interaction coverage does
+not depend on component source text. Physical touch scrolling still requires a device.
+
+After building the plugin styles, run
+`node scripts/visual-test-run.mjs tests/visual/reminder-editor-layout.spec.ts tests/visual/reminder-editor-layout-webkit.spec.ts --workers=2`
+for editor geometry in both hosts. Chromium and WebKit check header alignment,
+title/description hierarchy, compact spacing and long-field scrolling at 320px,
+390px and desktop widths in light and dark themes. They also check placeholders,
+disabled submission, inline marker geometry, property colors, and the delete
+action's hover and keyboard states using the production reminder header. Chip
+selection and pressing must change color without scaling the surface. Picker
+checks cover native date/time inputs, selected rows and keyboard focus at narrow
+and desktop widths.
+These replace the corresponding SCSS text checks; token and scoping conventions
+remain covered by source assertions.
+
+`node scripts/visual-test-run.mjs tests/visual/reminder-list-style.spec.ts tests/visual/reminder-list-style-webkit.spec.ts --workers=2`
+checks the shared list presentation and animated mouse reordering in both hosts.
+The drag surface lifts while row geometry stays unchanged, releasing commits the
+order without opening a reminder, and the next click still opens it. This replaces
+source checks for Motion props and drag wrappers.
+
+`node tests/browser/plugin/activity-empty-layout-test.mjs` mounts the production activity and
+conflict modals against synthetic Obsidian host CSS. Chromium and WebKit check
+header alignment, viewport fit, centered empty states, disabled sync actions and
+matching primary controls in light/dark themes at desktop, mobile and short sizes.
+It is included in `npm run test:activity-browser`; native Obsidian window behavior
+still needs manual acceptance.
+
+### Pasted links and page titles
+
+Run `npm run test:page-titles` for the production build, lookup/transport unit tests,
+authenticated Worker-runtime tests, and Chromium/WebKit editor tests. The browser
+cases run the shared editor in both PWA and plugin hosts; plugin title/description
+fixtures use Shadow DOM. The browser suite is also included in `test:visual` and
+`test:lexical`, while unit and Worker cases join their normal test commands.
+
+Coverage includes automatic lookup without preferences or browser storage; title and description
+pastes; selected labels; Unicode/entity/Markdown handling; caret and focus retention;
+undo/redo; concurrent and out-of-order responses; external loads, remounts, read-only
+state, and composition while a request is pending. Failure cases cover
+network errors, unsupported servers, malformed responses, empty titles, and deadlines.
+Worker tests cover authentication, expired/revoked sessions, rate limits, public URL
+validation on every redirect, request/body size bounds, stream cancellation, and
+ignoring title-like text in scripts, comments, attributes, and other raw-text elements.
+Outbound page responses are controlled fixtures; these tests do not contact websites
+or establish physical-device, installed-PWA, or hosted-network acceptance.
+
+Playwright starts a private static gallery for each visual run. It snapshots the
+built plugin stylesheet before bundling the gallery, chooses an available loopback
+port, and never reuses the live preview. Rebuilding or removing `dist/` after that
+snapshot cannot reload or break active fixtures. Build the plugin before starting
+tests; a missing stylesheet fails with an actionable error. Source changes made
+after the snapshot require a new run.
+
+A run writes its gallery snapshot to `.generated/visual-runs/<run-id>/`, results to
+`test-results/visual-<run-id>/` and the HTML report to
+`playwright-report/visual-<run-id>/`. The launcher deletes that run's directories when
+a local run passes. Failed runs keep them for diagnosis, and CI keeps them for artifact
+upload. `npm run clean` removes accumulated output (`dist/`, `.generated/visual-runs/`,
+`playwright-report/` and `test-results/`), refusing any path Git tracks.
+`npm run preview:ui` remains the live editing server on port 8790.
+`npm run test:ci` checks that concurrent gallery snapshots retain their own styles
+even after the input stylesheet changes or disappears.
+
+### Reading touch feedback
+
+Run `node tests/browser/pwa/pwa-project-transition-test.mjs` for project navigation and
+card feedback in Chromium/WebKit. It checks resting card styles at the history
+push after held presses and native taps, including grouped and nested projects
+in both themes. Verify the browser-owned swipe-back preview on an installed
+iPhone separately.
+
+Run `node tests/browser/reading/reading-touch-test.mjs` for Chromium/WebKit checks of article
+open/Back cycles in both themes, retained hover, and keyboard focus restoration.
+Chromium also exercises native touch cancellation and scrolling, plus a forced
+stale `:active` state. The test uses the built PWA with synthetic Reading APIs
+and is included in `npm run test:pwa-browser`. Installed iPhone behavior still
+requires device verification.
+
+Run `node tests/browser/plugin/shared-press-feedback-test.mjs` for the shared controls’ press
+contract in Chromium and WebKit, in both document and Shadow DOM hosts. It covers
+release outside an inert control, cancellation, movement into scrolling, window
+blur, keyboard activation, disabled controls, persistent toggle selection, and
+native input editing. It is included in `npm run test:pwa-browser`.
+
+### Motion continuity
+
+Use `node scripts/visual-test-run.mjs [Playwright arguments]` for gallery tests.
+The launcher assigns an isolated output directory and port before starting Playwright;
+the configuration itself performs no network work, so static analysis and
+`npx playwright test --list` can read it directly. Preview build/serve lifecycle
+remains in `scripts/visual-preview.mjs`.
+
+`node tests/browser/pwa/pwa-feature-switcher-test.mjs` checks opaque feature dissolves,
+mid-fade reversals, delayed animation cleanup, lazy-loading surfaces, immediate
+reduced-motion switching and focus in Chromium/WebKit. Build the Worker first,
+or let its preview harness build it.
+
+After `npm run build:plugin`, run
+`node scripts/visual-test-run.mjs tests/visual/motion.spec.ts tests/visual/motion-webkit.spec.ts --workers=1`
+for shared empty/list reversals, immediate input, stable list geometry, progress
+fill geometry, restrained checkmarks and reduced motion. The plugin fixture uses
+Shadow DOM and also checks stationary centered dialogs. Actual installed iPhone
+and Obsidian rendering still requires device verification.
+
+### Plugin navigation parity
+
+After building the plugin, run
+`node scripts/visual-test-run.mjs tests/visual/plugin-navigation.spec.ts tests/visual/plugin-navigation-webkit.spec.ts --workers=2`.
+The Shadow DOM fixture covers the production plugin navigation shell at narrow and
+wide widths, Today/Upcoming selection, project Back and retained scroll/focus,
+Reading search and article return, keyboard/held dock expansion, disabled features,
+rapid switching, reduced motion, and compact project sheets. Run `node tests/browser/pwa/pwa-dock-test.mjs` and
+`node tests/browser/pwa/pwa-schedule-test.mjs` after rebuilding the Worker for the shared
+components’ PWA adapters. Actual Obsidian panes, popout windows and mobile navbar
+insets still require host/device acceptance.
+
+### Plugin dialog consistency
+
+After building the plugin, run `npm run test:plugin-dialogs`. It compares computed
+header, body, footer, row and button geometry across native dialogs,
+and exercises reminder deletion in Shadow DOM. Coverage includes Chromium/WebKit,
+light/dark themes, desktop/phone/short screens, narrow dialog containers,
+clipboard actions, expanded disclosures and pending-delete dismissal. The encryption
+suite also checks stable loading/progress/completion geometry and recovery-key
+acknowledgment. Screenshots are saved under `.generated/plugin-dialog-review/` and
+`.generated/encryption-ui-review/`. CI runs it in the third editor shard.
+
+Set `CRATE_PLUGIN_CSS_PATH` to an isolated plugin build's stylesheet when another
+build is using `dist/`. `CRATE_OBSIDIAN_CSS_PATH` optionally overlays a locally
+extracted Obsidian `app.css` in both dialog harnesses. These fixtures do not replace
+manual acceptance in Obsidian, community themes, or physical iOS/Android devices.

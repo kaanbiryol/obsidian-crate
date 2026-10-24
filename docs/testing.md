@@ -14,19 +14,19 @@ Scripts in `package.json` are the source of truth. [Framework and Config](#frame
 | Server package | `npm run test:server-package` | Packs the server and installs it through npx in an isolated cache. |
 | Docker hosting | `npm run test:docker` | Needs a running Docker engine and Compose. |
 | Tooling and release scripts | `npm run test:ci` | Node tests in `scripts/`, including the source-path guard and PWA browser shard coverage. The guard also fails when a `scripts/*.test.mjs` file runs from no package script. |
-| Server revision | `npm run test:server-revision` and `npm run check:server-revision` | The second checks the server revision and schema against the published release baseline; it needs Git history and `gh`. |
+| Server revision | `npm run test:server-revision` and `npm run check:server-revision` | The second checks the server revision and schema against the published release baseline; it needs Git history and `gh`, so it runs beside `check:source` in CI and `release:check` rather than inside it. |
 | Recovery tooling | `npm run test:recovery` | Python `unittest`. |
 | Contract docs | `npm run check:contracts` | Rejects stale values in `current-contract.md`; `node scripts/check-contract-docs.mjs --write` refreshes them. |
 | Static checks | `npm run lint`, `typecheck`, `typecheck:worker`, `typecheck:service-worker`, `typecheck:visual`, `deadcode`, `notices:check` | Run each as `npm run <name>`. |
-| Source checks | `npm run check:source` | Builds the Worker, then runs lint, the plugin, Worker and service-worker type-checks, `deadcode`, `notices:check`, `check:contracts`, `test:ci`, the server revision checks, `test:recovery` and `npm test`. |
+| Source checks | `npm run check:source` | Builds the Worker, then runs lint, the plugin, Worker and service-worker type-checks, `deadcode`, `notices:check`, `check:contracts`, `test:ci`, `test:server-revision`, `test:recovery` and `npm test`. |
 | Everything except browsers | `npm run check` | `check:source`, then `test:worker-runtime` and `test:local-server`. |
 | PWA preview smoke test | `npm run test:pwa-preview` | Smoke test of the built PWA preview and its asset budgets. |
-| PWA browser | `npm run test:pwa-browser` | Chromium and WebKit. `-- --platform=linux --shard=1/4 --list` selects and lists a CI group. One script: `node tests/browser/pwa/<name>.mjs`. |
+| PWA browser | `npm run test:pwa-browser` | Chromium and WebKit, registered in `scripts/browser-tests.mjs`. `-- --platform=linux --shard=1/4 --list` selects and lists a CI group. One script: `node tests/browser/pwa/<name>-test.mjs`. |
 | Reading | `npm run test:reading` | `test:reading-server` (extraction, server and shortcut contracts), then `test:reading-browser`. |
 | Shared UI | `npm run test:visual` | Screenshot comparisons on the reviewed macOS baselines, then the editor contract. A subset: `node scripts/visual-test-run.mjs <spec>`. Local runs record no traces; add `--trace=on` when debugging a failure. |
 | Editor contract | `npm run test:editor-contract` | Playwright editor contract, then the PWA editor contract script. Uses half the local cores (4 workers on CI); `--project=chromium-pwa` runs one of its four projects. |
-| Plugin browser | `npm run test:activity-browser`, `npm run test:file-history-browser`, `npm run test:plugin-dialogs` | Run `npm run build` first. |
-| Benchmarks | `npm run benchmark:reminders`, `npm run benchmark:sync`, `npm run benchmark:pwa` | See [Reminder capacity measurements](#reminder-capacity-measurements) and [sync capacity](sync-capacity.md). |
+| Plugin browser | `npm run test:activity-browser`, `npm run test:file-history-browser`, `npm run test:plugin-dialogs` | Run `npm run build` first. Each runs a registry group: `node scripts/browser-tests.mjs --group=<activity\|file-history\|plugin-dialogs>`; add `--list` to print its scripts. |
+| Benchmarks | `npm run benchmark:reminders`, `npm run benchmark:sync`, `npm run benchmark:pwa` | See [reminder capacity measurements](sync-capacity.md#reminder-capacity-measurements) and [sync capacity](sync-capacity.md). |
 | Focused bundles | `npm run test:page-titles`, `npm run test:lexical` | Editor work. Their pieces also run in the suites above; there is no dedicated CI job. |
 | Release gate | `npm run release:check` | See [Release verification](#release-verification). |
 
@@ -36,7 +36,7 @@ Pushes to any branch and pull requests run `lint.yml` ("Node.js build"), and the
 
 | `verify.yml` job | Runner | What it runs |
 | --- | --- | --- |
-| `checks` | Linux | `security:check`, the `check:source` commands (one step each), `typecheck:visual`, `build:plugin`, `test:pwa-preview`, `check:css-scope`, `size-check`, `verify:release-artifacts`, then the release candidate record and asset staging. |
+| `checks` | Linux | `security:check`, the `check:source` commands (one step each), `check:server-revision`, `typecheck:visual`, `build:plugin`, `test:pwa-preview`, `check:css-scope`, `size-check`, `verify:release-artifacts`, then the release candidate record and asset staging. |
 | `worker` | Linux, Playwright container | `test:worker-runtime`, `test:reading-server`, the `packages/server/test/*.test.mjs` tests (the `test:local-server` tests) and `test:server-package`. |
 | `docker` | Linux AMD64 and ARM64 | `test:docker`. |
 | `editor` (4 shards) | Linux, Playwright container | The editor contract Playwright shard on each; `test:activity-browser` on shard 1, `test:file-history-browser` on shard 2 and `test:plugin-dialogs` on shard 3. |
@@ -113,9 +113,13 @@ npm run test:pwa-browser -- --platform=linux --shard=1/4
 npm run test:pwa-browser -- --platform=macos --shard=1/2
 ```
 
-Omitting both `--platform` and `--shard` runs the complete browser suite. The Linux and native macOS groups cover every script exactly once; `test:ci` checks their combined coverage and balance. Groups are balanced by the measured script durations in `scripts/pwa-browser-durations.json`, which records the source run. The current estimates use the September 30 macOS release run; refresh them from Linux CI logs after the runner change, and whenever workloads change. The runner reports each script's duration and collects ordinary test failures so one run exposes all failures in that group. Each CI shard has its own checkout; do not run shards concurrently in the same working directory.
+Omitting both `--platform` and `--shard` runs the complete browser suite. The Linux and native macOS groups cover every script exactly once; `test:ci` checks their combined coverage and balance. Groups are balanced by the measured script durations in `scripts/browser-durations.json`, which records the source run. The current estimates use the September 30 macOS release run; refresh them from Linux CI logs after the runner change, and whenever workloads change. The runner reports each script's duration and collects ordinary test failures so one run exposes all failures in that group. Each CI shard has its own checkout; do not run shards concurrently in the same working directory.
 
 The runner builds the Worker/PWA once, then sets `CRATE_PWA_PREBUILT=1` for its child scripts to reuse those fresh assets. Standalone scripts build by default; tests requesting explicit asset versions (including service-worker updates) always build those versions separately. Missing prebuilt assets fail the test. `npm run test:ci` checks shard coverage and balance, runner failure handling, and metadata-independent asset versions.
+
+`release:check` builds the Worker once, then exports `CRATE_WORKER_PREBUILT=1` so the nested `build:worker` calls (in `check:source`, the server revision, Worker runtime, local server, server package and Reading suites, and the browser runner) reuse that output. In that mode `scripts/build-worker.mjs` fails instead of reusing output that is missing, a development build, or older than any recorded Worker input in `.generated/cloudflare/server-inputs.json`. Do not export the variable in an interactive shell.
+
+Browser files follow one naming rule, which `test:ci` enforces: entrypoints end in `-test.mjs` and imported helper modules in `-checks.mjs`; shared fixtures live in `tests/browser/support/` (the PWA preview server and assets in `support/preview/`). Every entrypoint must be in the registry, a registry group, or a package script.
 
 PWA asset hashing and raw server-input tracking exclude Finder/Explorer metadata (`.DS_Store`, AppleDouble `._*` files, `Thumbs.db`, and `desktop.ini`). Actual source files, including other dotfiles, still affect the version.
 
@@ -196,9 +200,9 @@ after a host restart.
 
 `sync/initial-config.integration.ts` covers an empty device adopting server settings
 without conflicts, subsequent concurrent settings edits, edits during download,
-and interrupted first pulls across restart. `initial-config-pull.test.ts` covers
-the eligibility boundary, custom configuration folders, checkpoint persistence
-and validation. Physical Obsidian acceptance should start with an empty vault,
+and interrupted first pulls across restart. `planner/initial-config-pull.test.ts` covers
+the eligibility boundary, custom configuration folders and checkpoint persistence;
+`manifest/initial-config-pull.test.ts` covers checkpoint validation. Physical Obsidian acceptance should start with an empty vault,
 install BRAT and Crate, connect to an existing server, and verify the resulting
 theme and settings after the first sync and an Obsidian reload.
 
@@ -440,9 +444,20 @@ const context = {
 
 ## Feature-specific notes
 
-Coverage notes, commands and manual checks for individual features. Search for the feature or test file you changed.
+Coverage notes, commands and manual checks for individual features live in each feature's doc under **Testing notes**:
 
-## Cleanup reviews, storage opening and route execution
+- [reminder source recovery](reminder-source-recovery.md#testing-notes): reminder descriptions and diagnostics
+- [Test Reading](read-it-later-testing.md#testing-notes): optimistic Reading actions, saved YouTube videos, Reading fetching consent
+- [PWA storage recovery](pwa-storage-recovery.md#testing-notes): PWA sync coordinator
+- [shared UI](ui-styling.md#testing-notes): unified PWA settings, app updates, portable visual baselines, pasted links and page titles, Reading touch feedback, motion continuity, plugin navigation parity, plugin dialog consistency
+- [sync capacity](sync-capacity.md#testing-notes): reminder capacity measurements
+- [backup and recovery](recovery.md#testing-notes): file history browser checks
+- [deployment](deployment.md#testing-notes): connection recovery
+- [encryption](e2ee-implementation.md#testing-notes): encryption acceptance, encrypted iPhone onboarding
+
+The cross-feature notes below span sync, Reading, Reminders and the Worker. Search for the feature or test file you changed.
+
+### Cleanup reviews, storage opening and route execution
 
 `sync/engine/ignored-purge.test.ts` binds excluded-file cleanup to reviewed paths,
 hashes, revisions and exclusions, including acknowledged batches before cancellation
@@ -453,7 +468,7 @@ checks confirmation and stale-review guidance.
 `pwa/reminders/useReminderSync.test.ts` composes indexing progress with sync status,
 including HTTP 202 followed by 200/304, terminal failure and request/session
 invalidation. Normal preparation must not publish recovery attention.
-`tests/browser/reading/reading-cache-recovery.browser.test.mjs` exercises Reading's shared
+`tests/browser/reading/reading-cache-recovery-test.mjs` exercises Reading's shared
 single-store opener in Chromium/WebKit: unknown layouts and key configurations,
 blocked/late opens, retry and version-change closure, preserving original bytes.
 `tests/browser/pwa/pwa-encryption-storage-test.mjs` retains native key, attempt, logout and
@@ -466,11 +481,11 @@ rejected revisions that must leave derived state unchanged. Retain the move,
 upload-publication, topology and protocol integration tests when changing these
 boundaries.
 
-## Reading pagination and checkpoint boundaries
+### Reading pagination and checkpoint boundaries
 
 `pwa/reading/list-response.test.ts` exercises malformed page envelopes and cursors,
 cursor cycles, and cumulative item, issue and request limits.
-`tests/browser/reading/reading-cache-recovery.browser.test.mjs` verifies that rejected pagination
+`tests/browser/reading/reading-cache-recovery-test.mjs` verifies that rejected pagination
 preserves the confirmed cache, offline articles and pending commands in Chromium
 and WebKit.
 
@@ -499,7 +514,7 @@ to retain failed cleanup and its diagnostic until a successful retry. It also
 drains 6,000 expired versions in 13 maintenance passes, each within the Free D1
 query limit, without sorting the queue, while referenced objects survive.
 
-## Sync outcomes and reader action lifetimes
+### Sync outcomes and reader action lifetimes
 
 `engine/queue.test.ts` delays automatic result recording while a later upload is
 pending, covering same-path edits, different paths and failed-upload retries.
@@ -544,7 +559,7 @@ same bundler as production and browser previews. `npm run typecheck:service-work
 checks that source with WebWorker globals. Asset-version tests cover runtime-only
 changes so a changed handler cannot retain the previous offline shell version.
 
-## Settings identity and pending-change keys
+### Settings identity and pending-change keys
 
 `plugin/CratePlugin.test.ts` hydrates a device ID before successful and rejected
 core settings writes, verifying that runtime identity survives and persisted JSON
@@ -573,7 +588,7 @@ confirmed reader and cache. Typed persistence writes retain session checks.
 The Reading cache-recovery, optimistic-action and encrypted-storage browser suites
 exercise the extracted storage owners with native IndexedDB and Web Locks.
 
-## Sync shutdown
+### Sync shutdown
 
 `engine/checkpoint-lifecycle.test.ts` holds checkpoint writes and verification reads
 through shutdown. `runtime/operations.test.ts` checks that late saves cannot update
@@ -598,16 +613,7 @@ Worker. `activity/shared-history-loader.test.ts` checks coalesced reloads, error
 disposal through the loader's public interface. `activity/activity-status.test.ts`
 covers completion progress after engine idle, stopping, conflicts and status labels.
 
-## Reminder descriptions and diagnostics
-
-`reminderDescription.test.ts` and `markdownReminderFile.test.ts` cover the description
-format and guarded edits. `vaultScanner.test.ts` and
-`reminder-source-issue-presentation.test.ts` check structured categories and source
-lines through the index and UI, including compatibility with reason-only diagnostics.
-Worker `reminders/input-contract.integration.ts` verifies the shared format across
-plugin-created notes and PWA mutations with local D1/R2/DO bindings.
-
-## Structured merge and Reading recovery
+### Structured merge and Reading recovery
 
 Sync orchestration tests observe the engine's constructor-owned manifest through
 `engine-test-harness.ts`. File transfer and recovery tests use
@@ -616,7 +622,7 @@ persistent vault; only HTTP responses and deliberate I/O failures are substitute
 `engine/selected.test.ts` and `deletion-safety.test.ts` reload saved checkpoints to
 verify selected uploads/deletions, interrupted journals and incomplete discovery.
 
-`reading/obsidian-vault.test.ts` exercises file replacement, rename, exclusion and
+`reading/data/obsidian-vault.test.ts` exercises file replacement, rename, exclusion and
 shutdown while reads or atomic updates are pending. Reading Worker integration
 coverage checks pagination, duplicates across pages, queued items, source integrity
 and preserved plaintext/encrypted conflict responses.
@@ -629,515 +635,7 @@ injects R2 failures, missing/invalid bytes, permanent parse
 errors; it checks duplicate-capture prevention, healthy-source progress, retained
 identity and delayed coordinator retry.
 
-`node --test tests/browser/reading/reading-cache-recovery.browser.test.mjs` exercises the production
+`node --test tests/browser/reading/reading-cache-recovery-test.mjs` exercises the production
 Reading loader and native IndexedDB in Chromium/WebKit. It covers old-server source
 issues, retained offline articles/list entries, definitive deletion, quota rollback
 and malformed-record preservation. It is included in `npm run test:reading-browser`.
-
-## Optimistic Reading actions
-
-After building the Worker, run `node --test tests/browser/reading/reading-optimistic.browser.test.mjs`
-for Chromium and WebKit coverage of immediate link saves, continued editing during
-delayed requests, tags and highlight notes, offline changes, and conflict rollback.
-The tests use the built PWA, native IndexedDB/Web Locks, and the real local Worker.
-Chromium also verifies offline reload; WebKit verifies offline use in the current
-document. Physical installed-app acceptance remains a device check.
-
-The Reading library, consent, optimistic-action and highlight suites, plus the
-PWA header and dock suites, share
-`tests/browser/support/worker-browser-fixture.mjs` for the disposable Worker, HTTP bridge,
-authenticated setup requests and cleanup. Request gates and lost replies stay in
-their individual scenarios through `handleRequest`; normal requests still reach
-the real Worker and its storage bindings.
-
-`reading-browser.test.mjs` gives shell/settings, cross-feature navigation, reader
-history/geometry, offline replay, sharing and enrollment/logout separate scenarios
-with fresh Worker and browser state. Each seeds its own required articles and
-offline cache, so an earlier layout failure does not skip the remaining checks.
-Both Chromium and WebKit retain their existing platform-specific coverage.
-
-Reading persists changes locally before updating the UI and sends them in the
-background, like Reminders. Unsent edits combine while preserving their original
-preconditions; edits made during a request queue behind its immutable request body.
-Interrupted requests get the same short, bounded retries as Reminders, using those
-exact bytes and their original operation identity. Automatic retry limits survive
-foreground events and reload; **Settings → Sync → Refresh all** can
-retry uncertain changes explicitly. The browser test covers this against real
-server receipts, including repeated lost acknowledgements.
-`useReadingSession.test.ts` and `useReadingSync.test.ts` use real React effects and
-rerenders. Sync coverage checks irrelevant keyed storage events, auth/logout/clear
-invalidation, coalesced connection/list requests, and delayed connection checks
-after pause, replacement or unmount. `useLocalReadingArticle.test.ts` covers competing opens, Back, library
-replacement, unmount and late update completions.
-Rejected edits and their dependents remain available for export in settings.
-New links appear immediately; editing them becomes available when extraction finishes and the server
-publishes their Markdown note. Article extraction still requires a connection.
-
-## PWA sync coordinator
-
-After building the Worker, run `CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-sync-coordinator-test.mjs`.
-It exercises the built app in Chromium and WebKit with native IndexedDB and localStorage:
-Reading dispatch while only Reminders is rendered, reminder dispatch while only Reading
-is rendered, a Reading refresh failure that does not block reminders, shared header
-status, and paused queues retained through reload and resumed without opening their
-screens, plus immediate logout and remote cleanup feedback with the other screen
-unmounted. A blocked Reminders screen chunk must leave sync, settings and Reading
-usable. The preview supplies synthetic domain APIs; existing receipt and auth recovery
-suites cover their separate server and session guarantees. Settings opens sync details
-without mounting the other feature's screen. Physical installed-app acceptance remains
-a device check.
-
-## Unified PWA settings
-
-After building the Worker, run `CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-settings-test.mjs`
-for Chromium and WebKit coverage of both settings entry points, retained view/search
-and focus, shared theme and preferences, Reading launch destinations, explicit-link
-precedence, shortcut and installation navigation, pending Reading warnings from Reminders, and shared
-logout. The test uses the built client, local synthetic APIs, and native browser
-storage; screenshots include light/dark, 320px phone, and desktop layouts.
-The navigation checks cover Open app to in Tabs, always-visible About, Sync,
-and Device storage sections, always-visible storage and version tools, conditional tab
-reset, touch targets, retained settings scroll/focus, native Back/Forward, the
-header Back action, Escape, and shared edge-gesture eligibility. Motion checks
-sample full-page push/pop frames, including the moving header, opaque surface,
-stationary parent, fixed header during scrolling, and restored scroll/focus. Desktop engines
-can check history and gesture arbitration; the interactive OS swipe preview and
-cancellation still need an installed iPhone check. `pushed-screen-history.test.ts`
-covers preserving an underlying feature, repeated visits and quick reopening.
-Installation checks cover iPhone/Android instructions, narrow light/dark layouts,
-Back/Forward, focus/scroll restoration, and hiding the entry after installation.
-`EncryptionSettings.test.ts` covers unknown, disconnected, mixed, locked/setting-up,
-and unlocked states without hiding problems behind the details disclosure.
-Theme checks cover one document update with both features mounted, system-theme
-changes, explicit overrides, settings close/reopen, feature switching, and native
-cross-tab updates including invalid or removed preferences. Early HTML theme
-application before React loads is covered by `tests/browser/pwa/pwa-startup-empty-test.mjs`.
-Run the storage-safety, sheet-interaction, and Reading shortcut browser checks for
-cleanup failures, touch/keyboard behavior, and real local pairing. Physical iPhone
-keyboard, VoiceOver, installed-sheet gestures, and safe areas remain device checks.
-
-Run `node tests/browser/pwa/pwa-sheet-field-test.mjs` for Chromium/WebKit coverage of
-**Save a link** focus, keyboard geometry, and caret visibility during opening,
-closing, interrupted dragging, and retargeted keyboard movement. It also checks
-caret restoration with reduced motion and draft preservation across reopening.
-The keyboard viewport is simulated; native caret painting and software-keyboard
-behavior still require an installed-app check on an iPhone.
-
-## App updates
-
-`useReminderMutations-lifecycle.test.ts` mounts the production hook and settings
-publication with real React. It covers delayed operation identity, overlapping
-preparations, rejection, durable handoff and logout/unmount. `ReadingRuntime.test.ts`
-mounts the production runtime and session hook, holding its storage lock while
-capture, edit and retry commands are prepared. It checks overlapping failures,
-durable publication, and logout/unmount. The mutation and failure-toast suites use
-the shared real React harness for rerenders and effect cleanup. `apply-update.test.ts`
-also starts transient work during asynchronous storage checks before activation
-and reload.
-
-Run `node tests/browser/pwa/pwa-update-notice-test.mjs` for Chromium/WebKit checks of global
-version detection from a Reading-only launch, foreground checks, navigation,
-direct header updates, offline blocking, Settings access, and light/dark mobile layouts.
-Screenshots are written to `test-results/update-notice/`.
-`node tests/browser/pwa/pwa-update-test.mjs` exercises real service-worker preparation,
-activation, failed/slow checks, launch updates, pending writes, and other tabs.
-It delays the server clock while preparing a completion command and checks that
-updates stay blocked before that command reaches the durable outbox. It also holds
-the native Reading mutation lock during an article edit, checks the queue is still
-empty and updates are blocked, then releases the edit and completes a real update.
-Both are included in `npm run test:pwa-browser`. Installed iPhone safe areas,
-app suspension, and VoiceOver announcements still require physical-device checks.
-
-## Reminder capacity measurements
-
-```bash
-npm run benchmark:reminders
-```
-
-This repeatable local benchmark also runs as part of the Worker integration suite. Its verbose reporter emits structured measurements for 1,000 and 10,000 reminders: warm folders with one reminder per file, and cold folders with ten reminders per file. It verifies complete, unique results, cache-warming progress, and unchanged responses. It records wall time, response bytes and prepared SQL statements; it does not measure hosted CPU limits, real network latency, browser rendering or device memory.
-
-On September 7, 2026, using Node 24.0.0 and local workerd after the cache decoding improvement:
-
-| Scenario | Files | Reminders | Warm response range | Response bytes | Cold indexing requests |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| One reminder per file | 1,000 | 1,000 | 13–25 ms | 288,930 | Not measured |
-| One reminder per file | 10,000 | 10,000 | 117–133 ms | 2,898,930 | Not measured |
-| Ten reminders per file | 100 | 1,000 | 17–28 ms | 276,240 | 5 |
-| Ten reminders per file | 1,000 | 10,000 | 80–98 ms | 2,771,940 | 50 |
-
-Warm lists prepared three SQL statements; unchanged requests prepared one and took 2–21 ms across these cases. Cold indexing took 137 ms and 1,772 ms of local request time, respectively. The browser additionally honors a one-second delay between warming requests: the 50-request case therefore incurs about 49 seconds of deliberate waiting, plus request time. These are local samples, not latency guarantees or a production capacity certification.
-
-The full list still grows with folder size. Before promising support for large folders, repeat the 1,000/10,000 cases on a disposable hosted deployment and physical devices, recording Worker CPU/errors, D1 rows read, transfer size, time to first usable screen, scroll responsiveness and memory. If large folders are a release requirement, use these measurements to set the supported limit and evaluate a paginated per-reminder index; do not infer hosted support from the local pass.
-
-Hosted capacity tests spend the account's shared D1 quota, even in a disposable
-database. Run write-heavy fixtures locally by default. Before any hosted write
-test, agree on a total row-write budget and account headroom; without one, the
-hosted write budget is zero. Include index updates, reminder projections,
-background jobs, retries and reset/deletion writes in the estimate. Do not infer
-row-write cost from the number of requests or notes. Keep the 1,000/10,000-reminder
-fixtures off a daily-quota-constrained account. For disposable resource cleanup,
-delete the database through the resource API instead of resetting its rows just
-to prepare it for deletion; empty R2 separately without D1 mutations.
-
-### Browser list capacity
-
-`npm run benchmark:pwa` measures the production PWA with a local synthetic API in Chromium and WebKit at a 390 × 844 viewport. It is also included in `test:pwa-browser`. The test checks page navigation, off-page editing, saved changes, complete reorder payloads and bounded rendered rows at 1,000 and 10,000 reminders. The fixture deliberately stresses a single Inbox; it does not claim that 10,000 reminders fit the real per-file indexing limits.
-
-The PWA now pages active, completed and date-grouped lists in batches of 200. A native page selector reaches any range. Paging affects rendered rows only: counts, cache, edits and reorder validation retain the full data. Obsidian's plugin views keep their existing behavior.
-
-Cards within each page remain rendered offscreen. Avoid `content-visibility: auto`
-on reminder rows: fast scrolling can expose unpainted cards and replace estimated
-row heights mid-scroll. Run `node tests/browser/pwa/pwa-reminder-scroll-test.mjs` for
-Chromium/WebKit checks of Today and Upcoming rendering before scrolling, rapid
-scroll reversals with variable-height cards, and completion scroll anchoring.
-Installed iPhone momentum scrolling still requires a physical-device check.
-
-| Local 10,000-reminder Inbox | Before paging | With paging |
-| --- | ---: | ---: |
-| Chromium: first usable list | 7.24 s | 0.227 s |
-| WebKit: first usable list | 23.07 s | 0.282 s |
-| Mounted cards | 10,000 | 200 |
-| DOM elements | 160,114 | 3,372 |
-
-These are unthrottled local samples from September 7, 2026, with service workers disabled, not physical-device or network guarantees. The server still returns the full folder response. Reordering now accepts up to 10,000 IDs while retaining the 1 MiB request limit, stale-order checks and idempotent receipts; a real D1/R2 regression verifies reordering inside a 1,000-reminder project without changing other rows.
-
-## Portable visual baselines
-
-`npm run test:visual` fixes time, timezone and browser locale. Native time controls still use the operating system's 12/24-hour preference, so screenshots normalize their width and mask only the native time-input region. The time value is asserted independently, the surrounding labels/layout keep the existing 0.1% pixel threshold, and project, repeat-tab and time keyboard behavior run in separate tests. Baseline updates should affect only the intended time-control region; inspect mobile and desktop examples before accepting them. Browser zoom remains enabled in production.
-
-`node scripts/visual-test-run.mjs tests/visual/project-interactions.spec.ts tests/visual/project-interactions-webkit.spec.ts --workers=2`
-checks project pickers and autocomplete using the compiled host styles in plugin
-Shadow DOM and the PWA document. It covers selected-row centering, wheel scroll
-containment, synthetic touch-event propagation, keyboard navigation, dropdown
-placement, and selection/focus restoration through the real plugin editor overlay.
-It also checks title focus during opening, picker width at 320px and desktop sizes,
-and applied autocomplete selection colors in both themes. Interaction coverage does
-not depend on component source text. Physical touch scrolling still requires a device.
-
-After building the plugin styles, run
-`node scripts/visual-test-run.mjs tests/visual/reminder-editor-layout.spec.ts tests/visual/reminder-editor-layout-webkit.spec.ts --workers=2`
-for editor geometry in both hosts. Chromium and WebKit check header alignment,
-title/description hierarchy, compact spacing and long-field scrolling at 320px,
-390px and desktop widths in light and dark themes. They also check placeholders,
-disabled submission, inline marker geometry, property colors, and the delete
-action's hover and keyboard states using the production reminder header. Chip
-selection and pressing must change color without scaling the surface. Picker
-checks cover native date/time inputs, selected rows and keyboard focus at narrow
-and desktop widths.
-These replace the corresponding SCSS text checks; token and scoping conventions
-remain covered by source assertions.
-
-`node scripts/visual-test-run.mjs tests/visual/reminder-list-style.spec.ts tests/visual/reminder-list-style-webkit.spec.ts --workers=2`
-checks the shared list presentation and animated mouse reordering in both hosts.
-The drag surface lifts while row geometry stays unchanged, releasing commits the
-order without opening a reminder, and the next click still opens it. This replaces
-source checks for Motion props and drag wrappers.
-
-`node tests/browser/plugin/activity-empty-layout-test.mjs` mounts the production activity and
-conflict modals against synthetic Obsidian host CSS. Chromium and WebKit check
-header alignment, viewport fit, centered empty states, disabled sync actions and
-matching primary controls in light/dark themes at desktop, mobile and short sizes.
-It is included in `npm run test:activity-browser`; native Obsidian window behavior
-still needs manual acceptance.
-
-## File history browser checks
-
-Run `npm run build && npm run test:file-history-browser` for the production file-history renderer in Chromium and WebKit, at desktop/mobile widths in light and dark themes. The harness covers chronological history, direct file access including deleted files and files with no earlier versions, desktop/mobile version navigation, keyboard selection, compact no-difference previews, saved text escaping, local comparisons, deletion filtering, preview retry, and restore confirmation/cancellation. Screenshots are written to `.generated/file-history/`. Obsidian supplies the real modal focus shell; verify native focus/dismissal and physical-device navigation separately.
-
-## Pasted links and page titles
-
-Run `npm run test:page-titles` for the production build, lookup/transport unit tests,
-authenticated Worker-runtime tests, and Chromium/WebKit editor tests. The browser
-cases run the shared editor in both PWA and plugin hosts; plugin title/description
-fixtures use Shadow DOM. The browser suite is also included in `test:visual` and
-`test:lexical`, while unit and Worker cases join their normal test commands.
-
-Coverage includes automatic lookup without preferences or browser storage; title and description
-pastes; selected labels; Unicode/entity/Markdown handling; caret and focus retention;
-undo/redo; concurrent and out-of-order responses; external loads, remounts, read-only
-state, and composition while a request is pending. Failure cases cover
-network errors, unsupported servers, malformed responses, empty titles, and deadlines.
-Worker tests cover authentication, expired/revoked sessions, rate limits, public URL
-validation on every redirect, request/body size bounds, stream cancellation, and
-ignoring title-like text in scripts, comments, attributes, and other raw-text elements.
-Outbound page responses are controlled fixtures; these tests do not contact websites
-or establish physical-device, installed-PWA, or hosted-network acceptance.
-
-Playwright starts a private static gallery for each visual run. It snapshots the
-built plugin stylesheet before bundling the gallery, chooses an available loopback
-port, and never reuses the live preview. Rebuilding or removing `dist/` after that
-snapshot cannot reload or break active fixtures. Build the plugin before starting
-tests; a missing stylesheet fails with an actionable error. Source changes made
-after the snapshot require a new run.
-
-A run writes its gallery snapshot to `.generated/visual-runs/<run-id>/`, results to
-`test-results/visual-<run-id>/` and the HTML report to
-`playwright-report/visual-<run-id>/`. The launcher deletes that run's directories when
-a local run passes. Failed runs keep them for diagnosis, and CI keeps them for artifact
-upload. `npm run clean` removes accumulated output (`dist/`, `.generated/visual-runs/`,
-`playwright-report/` and `test-results/`), refusing any path Git tracks.
-`npm run preview:ui` remains the live editing server on port 8790.
-`npm run test:ci` checks that concurrent gallery snapshots retain their own styles
-even after the input stylesheet changes or disappears.
-
-Whole-vault history restore is covered by `src/sync/history/restore.test.ts`,
-`src/sync/runtime/history-restore.test.ts`, and
-`src/cloudflare/worker/sync/history-state-restore.integration.ts`. The file-history browser
-harness also checks the checkpoint action, per-file preview, cancellation, busy
-controls, unavailable versions, and retry in both engines and viewport sizes.
-History rows show second-level timestamps; restore-point IDs appear in the confirmation. Browser checks
-cover selecting same-minute points, exact-point text diffs, addition/removal
-previews, escaped text, and ignoring stale previews when switching files.
-The History tab retains expandable sync entries and per-file history actions. One
-**Browse vault history** button opens the dedicated three-pane screen. The harness
-checks file actions, expanded rows and focus across refresh, lazy loading,
-stacked dialog dismissal and focus return to the preserved activity list, desktop
-columns, mobile pane navigation, selected restore targets,
-current-vault comparisons even for the oldest checkpoint, matching-state messages,
-explicit comparison refresh, load retry, stale sync requests, and selection
-stability during refresh. `engine/history.test.ts`,
-`history-comparison.test.ts`, and `runtime/history-comparison.test.ts` cover
-complete-inventory comparisons, unsynced edits, hidden configuration, exclusions,
-incomplete reads, missing saved states, byte verification, preview limits, and
-connection changes.
-`file-history-preview.test.ts`, `pending-diff.test.ts`, `history-comparison.test.ts`
-and `conflict/review.test.ts` protect each flow's BOM behavior and rejection of
-binary or invalid UTF-8 text alongside storage, size and integrity checks.
-Restore opens a compact confirmation directly from Vault history. Browser checks
-cover transparent footer actions, current-file counts, cancellation during preflight,
-unavailable versions, unchanged states, busy dismissal guards, and failed-restore
-retry with a fresh preflight. No extra diff review or second confirmation appears.
-For native Obsidian acceptance, verify dismissal is blocked while restoring,
-restore an edit/deletion/rename/addition checkpoint in a disposable synced vault,
-and confirm another device converges. Interrupt a restore and restart Obsidian to
-verify automatic sync stays off and the local recovery copies remain available.
-
-Shared-checkpoint coverage also exercises a second device discovering and restoring
-another device's checkpoint without its local history, retained attachments over
-256 KB, concurrent publication, lost index-write responses, page-generation races,
-20-entry limits, expiry, metadata cleanup, and vault-token authorization. Run
-`npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/history-state-restore.integration.ts`
-for those real D1/R2/DO checks. Hosted and physical-device acceptance still requires
-updating the server and plugin on both devices and restoring from the second one.
-
-## Connection recovery
-
-In **Crate → Account and devices**, select **Reconnect** to check Cloudflare
-access and the device credential together. With a valid device credential, verify
-that reconnect preserves it and does not transfer files or publish a server update.
-With a rejected credential, verify that reconnect registers and checks a replacement
-without requiring **Disconnect this device**. Expired Cloudflare authorization
-should open sign-in and resume reconnect after the callback. Network or verification
-failures must not show success. Self-hosted reconnect should accept a new pairing
-code at the saved address and keep the existing local connection on failure.
-
-Focused coverage: `src/cloudflare/plugin-integration.test.ts`,
-`src/cloudflare/deployment/service.test.ts`,
-`src/plugin/self-hosted-connection.test.ts`, and the affected settings tests.
-`self-hosted-pairing.test.ts` and `ui/settings/infrastructure/self-hosted-errors.test.ts` check
-typed setup failures, including address-update guidance and pairing status handling
-that does not depend on server error wording.
-Browser OAuth handoff and real hosted credentials still require manual acceptance.
-
-## Saved YouTube videos
-
-For YouTube video capture, run the focused `youtube`, `desktop-capture`, and
-Reading extraction transport unit tests plus `reading/captures.integration.ts`
-in the Worker runtime. After building the plugin, run
-`node scripts/visual-test-run.mjs tests/visual/reading-video.spec.ts --workers=2`
-for Chromium/WebKit coverage in both plugin and PWA hosts at phone and desktop
-widths. It checks loaded and failed thumbnails, metadata failure/pending states,
-timestamp-preserving watch links, retained note text, tags, favorites, and watched
-state. Screenshots use synthetic thumbnail fixtures; physical-device playback
-handoff and hosted YouTube availability need separate verification.
-
-## Reading touch feedback
-
-Run `node tests/browser/pwa/pwa-project-transition-test.mjs` for project navigation and
-card feedback in Chromium/WebKit. It checks resting card styles at the history
-push after held presses and native taps, including grouped and nested projects
-in both themes. Verify the browser-owned swipe-back preview on an installed
-iPhone separately.
-
-Run `node tests/browser/reading/reading-touch-test.mjs` for Chromium/WebKit checks of article
-open/Back cycles in both themes, retained hover, and keyboard focus restoration.
-Chromium also exercises native touch cancellation and scrolling, plus a forced
-stale `:active` state. The test uses the built PWA with synthetic Reading APIs
-and is included in `npm run test:pwa-browser`. Installed iPhone behavior still
-requires device verification.
-
-Run `node tests/browser/plugin/shared-press-feedback-test.mjs` for the shared controls’ press
-contract in Chromium and WebKit, in both document and Shadow DOM hosts. It covers
-release outside an inert control, cancellation, movement into scrolling, window
-blur, keyboard activation, disabled controls, persistent toggle selection, and
-native input editing. It is included in `npm run test:pwa-browser`.
-
-## Motion continuity
-
-Use `node scripts/visual-test-run.mjs [Playwright arguments]` for gallery tests.
-The launcher assigns an isolated output directory and port before starting Playwright;
-the configuration itself performs no network work, so static analysis and
-`npx playwright test --list` can read it directly. Preview build/serve lifecycle
-remains in `scripts/visual-preview.mjs`.
-
-`node tests/browser/pwa/pwa-feature-switcher-test.mjs` checks opaque feature dissolves,
-mid-fade reversals, delayed animation cleanup, lazy-loading surfaces, immediate
-reduced-motion switching and focus in Chromium/WebKit. Build the Worker first,
-or let its preview harness build it.
-
-After `npm run build:plugin`, run
-`node scripts/visual-test-run.mjs tests/visual/motion.spec.ts tests/visual/motion-webkit.spec.ts --workers=1`
-for shared empty/list reversals, immediate input, stable list geometry, progress
-fill geometry, restrained checkmarks and reduced motion. The plugin fixture uses
-Shadow DOM and also checks stationary centered dialogs. Actual installed iPhone
-and Obsidian rendering still requires device verification.
-
-## Reading fetching consent
-
-After `npm run build:worker`, run
-`node --test tests/browser/reading/reading-consent.browser.test.mjs` for Chromium and WebKit
-coverage of the full article save disclosure, automatic extraction,
-and library access after fetching is disabled. Light/dark phone screenshots are
-written to `test-results/reading-consent/`. This uses a real local Worker; physical
-iPhone keyboard and VoiceOver checks remain separate.
-
-Shared feature regression coverage: `src/plugin/feature-settings.test.ts` checks
-server-first updates, offline failures, and cross-device reconciliation;
-`src/cloudflare/worker/feature-policy.integration.ts` checks stale edits, scoped
-access, blocked Reading publication, retained jobs, and reminder resume without
-repeat delivery. The Reading capture browser test also pauses and resumes from a
-second client and verifies the current browser hides and restores Reading.
-
-## Plugin navigation parity
-
-After building the plugin, run
-`node scripts/visual-test-run.mjs tests/visual/plugin-navigation.spec.ts tests/visual/plugin-navigation-webkit.spec.ts --workers=2`.
-The Shadow DOM fixture covers the production plugin navigation shell at narrow and
-wide widths, Today/Upcoming selection, project Back and retained scroll/focus,
-Reading search and article return, keyboard/held dock expansion, disabled features,
-rapid switching, reduced motion, and compact project sheets. Run `node tests/browser/pwa/pwa-dock-test.mjs` and
-`node tests/browser/pwa/pwa-schedule-test.mjs` after rebuilding the Worker for the shared
-components’ PWA adapters. Actual Obsidian panes, popout windows and mobile navbar
-insets still require host/device acceptance.
-
-## Encryption acceptance
-
-Turning encryption on runs through the production runtime and local Worker bindings in `encryption/reset-runtime.integration.ts`. It checks that the device syncs first so a server-only change survives, that the server then holds only this device's files under tagged names, sealed with the new keys, with no retained plaintext history or other credentials, and that ordinary encrypted sync continues afterwards. Setup interrupted before the begin request, after a lost begin response or after a failed settings save resumes with the keys saved for it; a refused start leaves the plaintext server and credential untouched. `encryption/reset.integration.ts` checks the server side: the wipe and activation, rejected configurations, refusal while saved links are downloading or an initial import is running, and refusal of a new configuration for an encrypted vault. The setup browser harness covers the dedicated progress, retry and completion screens without server requests.
-
-Folder changes need no re-encryption. `encryption/sync-engine.integration.ts` also covers tagged server paths: a remote delete on a restarted device, a new file that differs only in letter case from a synced one, and a shortcut note that keeps its random server name through edits and is deleted after a restart. It syncs a renamed reminders folder through ordinary encrypted sync and republishes unchanged notes so a newly chosen reminders folder gets its schedules, and `encryption/source-rebuild.integration.ts` checks that a reminders note uploaded without schedules is reported as an issue instead of losing its reminders silently.
-
-`node tests/browser/pwa/pwa-encryption-storage-test.mjs` exercises native Chromium/WebKit CryptoKey storage with the production session hook and a delayed cache-cleanup boundary. It covers cross-tab re-enrollment during logout, preservation of new drafts and immutable attempts after reload, rollback when authority changes during deletion, normal logout erasure, repair of partially damaged keys, and preservation of unsupported or unrecoverable records. The full encryption browser test also exercises damaged-key recovery through the unlock UI and turning encryption on over plaintext shared settings, including the first encrypted settings write.
-
-The storage test also runs the production push listener and decryption bundle in a
-real service worker, reading keys persisted by the page. It simulates both Safari's
-declarative `event.notification` (with null `event.data`) and ordinary push data,
-checks decrypted text and navigation, and verifies generic fallback after key
-removal or payload substitution. Push transport and native notification display
-are simulated; background delivery and lock-screen previews still require an iPhone.
-
-The storage harness also queues real database opens behind blocked native deletions: bootstrap, key enrollment, attempt access and logout cleanup must reject promptly, push decryption must fall back, failed operations must preserve bytes, and abandoned opens must not create stores or write after unblocking. It checks successful retry and future-format preservation in both engines. Unit tests run the production service-worker push handler through the generic-notification deadline and fence late open/upgrade events. Worker `encryption/settings.integration.ts` stores and updates encrypted settings at the former failure size and the full plaintext request limit, and preserves committed settings after oversized writes. The full encryption browser test uses a 2,000-entry exclusion list for encrypted settings writes.
-
-`node tests/browser/pwa/pwa-encryption-test.mjs` exercises both Chromium and WebKit against a disposable production self-hosted runtime. It covers active, locked and resetting encryption status and native IndexedDB cleanup, including expired acknowledgments, pending references from older sessions, drafts, damaged/unknown entries, other vaults' entries, and stale-session fences. It belongs to `test:pwa-browser`. Recovery-verification and settings tests check that setup is gated on decrypting the saved key and that editing the input or changing the connection invalidates verification. Worker `maintenance/encryption-metadata.integration.ts` checks bounded descriptor cleanup and references from files, history, receipts, changelog and upload leases. Run the encryption unit tests, Worker `encryption.integration.ts`, the full sync/notification regressions, and paired backup tests before enabling encryption in a release. Physical iOS/Android background push, browser storage eviction, hosted Worker limits and an independent security review remain separate acceptance checks; see [encryption](e2ee-implementation.md).
-
-`CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-encryption-regressions-test.mjs` checks long reminder completion, a large reminder acknowledgment stored in bounded chunks, plaintext that resembles ciphertext, setup resumed after a lost reply, tagged server paths, and interrupted save retries against the production local server in Chromium and WebKit. Run `npm run build:worker` first, or omit `CRATE_PWA_PREBUILT` to build automatically.
-
-Worker `encryption/source-rebuild.integration.ts` covers atomic chunked scheduling for 2,000 reminders with rollback and stable command tokens, and coordinator query budgets while rebuilding dense encrypted sources.
-
-Worker `encryption/sync-engine.integration.ts` runs the production sync engines against D1/R2/DO bindings with persistent mock vaults: three-device offline merges, deletion and rename races, upload-response loss across restart, binary conflict preservation, and a 25 MiB attachment round trip. `encryption.integration.ts` checks atomic publication of ciphertext, descriptors and encrypted schedules, rejects plaintext publication prepared before encryption began, and fences old and scoped clients.
-
-`encryption/upload-validation.integration.ts` exercises authenticated single and batch uploads against real D1/R2/DO bindings. It rejects plaintext, mixed batches and malformed encrypted framing before any staging lease or R2 write, verifies the content guard with an explicit encryption snapshot, rejects valid ciphertext at a readable path, and checks valid ciphertext receipt replay. Reset/upload regressions cover both the public transfer boundary and delayed publication inside the transfer executor.
-
-`upload-publication.integration.ts` rejects Markdown publication at the coordinator
-for single, batch and bulk-new uploads. It checks that bytes remain staged without
-file metadata, changelog or receipts being committed, while binary uploads retain
-their direct publication path.
-
-After `npm run build:plugin`, run `node tests/browser/plugin/encryption-setup-test.mjs` for the
-Obsidian encryption setup UI. It uses production key verification with a synthetic
-Obsidian host in Chromium and WebKit, at desktop, phone and small-screen sizes in
-both themes. It checks that loading and setup keep the same bounds and
-header/footer positions, including reduced motion and touch-sized screens. It
-also checks full recovery-key visibility, a compact field with Copy above it,
-centered checkbox alignment, native settings-row spacing, keyboard acknowledgment, disabling the
-action when unchecked, the visible footer, expanded details, clipboard success and
-fallback, setup progress, retry and connection changes without
-contacting a server. Set `CRATE_OBSIDIAN_CSS_PATH` to an extracted installed
-Obsidian `app.css` to repeat the checks with the actual host stylesheet; it is
-used only locally and is not committed. The synthetic host also includes the
-modal settings-row selector that previously overrode the key field’s spacing.
-Physical Obsidian mobile and keyboard behavior still need
-manual verification. Unit tests in `src/ui/settings/encryption/encryption-section.test.ts`
-cover automatic key-verification failure before setup, retrying an interrupted
-setup with the same keys, and resuming a saved setup from the settings row. The optional saved-key
-check retains wrong-key, edit and stale-result coverage.
-
-### Reading encryption acceptance
-
-- `reading/encryption.integration.ts` covers ciphertext-only capture/edit/replay, blocked plaintext paths, captures named after their title and site, and renaming a link-named note when a retry finds its title.
-- `reading/sealed-captures.integration.ts` checks that a Shortcut note is sealed under a random server name in the tagged Reading folder, that the vault opens it under its titled name, and that the server cannot read it.
-- `encryption/reset.integration.ts` seeds all seven Reading tables and checks immediate/final deletion and old-grant rejection.
-- `tests/browser/pwa/pwa-reading-encryption-test.mjs` runs the production PWA against disposable local bindings. Chromium covers offline edits/reload and exact ciphertext retry after response loss. Both browser engines cover enrollment, article access, logout key removal and a Shortcut arriving before folder unlock. It also checks that the production nonce-based CSP blocks injected inline and same-origin scripts while the app and deferred Reading code load, and that hostile encrypted article content remains inert after opening (and offline reopening in Chromium). Use `CRATE_TEST_BROWSER=webkit` for WebKit.
-- `node tests/browser/reading/reading-content-security-test.mjs` mounts the production reader and reminder card in Chromium/WebKit document and Shadow DOM hosts with CSP disabled. It covers hostile HTML, malformed mixed namespaces, event handlers, active URLs, DOM clobbering, code-highlighter output and resource requests, while preserving benign Markdown and code. It runs in `test:pwa-browser`. This is regression coverage, not a substitute for an independent security review.
-- `tests/browser/pwa/pwa-reading-encryption-storage-test.mjs` covers atomic plaintext-to-encrypted migration/rollback, vault-key recovery, preserving unrelated sessions, locked reads and cleanup racing a new sign-in in both engines.
-- `node tests/browser/pwa/pwa-web-app-unlock-test.mjs`: shared recovery-key unlock for Reading/Reminders in Chromium and WebKit, wrong-vault rejection, session changes during import, native key persistence and offline draft recovery after reimport/reload.
-- Native iOS Shortcut signing/import and physical iOS/Android offline/push delivery remain manual acceptance. Test encrypted Android after reinstalling its changed manifest. Hosted quota validation must use an explicitly budgeted disposable deployment; do not run local test fixtures against hosted D1.
-
-## Encrypted iPhone onboarding
-
-`node tests/browser/pwa/pwa-encryption-onboarding-test.mjs` checks the production PWA against fixture HTTP responses in Chromium and WebKit: Safari installation guidance, isolated installed-app storage, Reading and Reminders first unlock, wrong-key feedback, pending controls, remembered keys after reload, recovery after key loss, desktop copy and a 320px viewport. These contexts model iOS storage separation; physical Add to Home Screen and background push still require device acceptance.
-
-Mobile setup links first offer **Continue to web** and **Install Crate**. The
-script verifies that installation instructions leave vault screens unmounted,
-reload keeps the choice, continuing opens the browser app and remembers that
-choice, iOS/Android guidance differs, and standalone launches skip the chooser.
-
-The same script starts each destination with one app credential and verifies that
-one unlock opens both sections. It simulates offline API failures while serving
-app assets, restores an encrypted Reading draft after reload, and expires an
-encrypted Reading data request to verify app-wide reconnect without deleting the
-draft. `pwa-sync-coordinator-test.mjs` also covers independent background delivery,
-feature failures and shared logout before delayed/failed remote revocation.
-
-### Copy-free encrypted app approval
-
-`node tests/browser/pwa/pwa-pairing-test.mjs` runs the production PWA and approval modal in
-separate Chromium/WebKit contexts with real WebCrypto and native IndexedDB. The Obsidian DOM host and HTTP relay are fixtures; service workers are blocked
-so requests stay in that fixture. The full encryption suites cover the real worker. It checks both feature entry
-points, matching codes, no key persistence until both sides confirm (even after receiving a packet), no plaintext secrets in requests,
-cancellation, expiry/restart, transient retry, both feature entry points, non-extractable stored
-keys, reload and 320px light/dark layouts. It runs in `test:pwa-browser`.
-
-Worker `encryption/pairing.integration.ts` checks the actual authenticated relay
-with local D1, including vault/generation checks, concurrent claims, replay,
-cancellation, expiry, revocation, generation/reset fences and attempt limits.
-`encryption/pairing/protocol.test.ts`, `plugin/web-app-pairing.test.ts`, and
-`pwa/encryption/web-app-unlock.test.ts` cover cryptographic binding, vault/session guards,
-whole-bundle transfer and storage validation. These tests write no hosted D1 rows.
-
-On a physical iPhone, install from Safari, open the Home Screen app, select
-**Connect with Obsidian**, compare the codes in **Manage encryption → Connect web
-app**, and approve. Select **Confirm and unlock** in the app after comparing its code. Verify both sections and relaunch. Repeat after backgrounding
-either screen and after a network interruption. Desktop WebKit does not establish
-native installation, storage-eviction or background-push acceptance.
-
-The full Reading/Reminders encryption browser suites retain real service workers
-and native storage. Their headless WebKit context disables the native push manager:
-`getSubscription()` freezes the page on the current macOS test host, reproducible
-on an empty page without Crate. Chromium keeps its native provider. These suites
-do not establish physical-device push acceptance.
-
-## Plugin dialog consistency
-
-After building the plugin, run `npm run test:plugin-dialogs`. It compares computed
-header, body, footer, row and button geometry across native dialogs,
-and exercises reminder deletion in Shadow DOM. Coverage includes Chromium/WebKit,
-light/dark themes, desktop/phone/short screens, narrow dialog containers,
-clipboard actions, expanded disclosures and pending-delete dismissal. The encryption
-suite also checks stable loading/progress/completion geometry and recovery-key
-acknowledgment. Screenshots are saved under `.generated/plugin-dialog-review/` and
-`.generated/encryption-ui-review/`. CI runs it in the third editor shard.
-
-Set `CRATE_PLUGIN_CSS_PATH` to an isolated plugin build's stylesheet when another
-build is using `dist/`. `CRATE_OBSIDIAN_CSS_PATH` optionally overlays a locally
-extracted Obsidian `app.css` in both dialog harnesses. These fixtures do not replace
-manual acceptance in Obsidian, community themes, or physical iOS/Android devices.

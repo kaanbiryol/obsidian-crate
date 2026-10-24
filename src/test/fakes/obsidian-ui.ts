@@ -69,6 +69,13 @@ export class FakeElement {
 		return child;
 	}
 
+	prepend(child: FakeElement): void {
+		child.remove();
+		child.parentElement = this;
+		child.isConnected = true;
+		this.children.unshift(child);
+	}
+
 	empty(): void {
 		this.children.length = 0;
 		this.textContent = '';

@@ -1,4 +1,4 @@
-import { capturePwaSession } from '../../session-generation';
+import { capturePwaSession } from '../../connection/session-generation';
 import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue } from '../types';
 import { AUTH_TOKEN_KEY } from '../../config';
 import { CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME, deleteCacheDatabase, openCacheDatabase, reminderCacheHealth, reportCacheProblem } from './reminder-cache-database';

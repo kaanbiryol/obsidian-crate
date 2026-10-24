@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
 
 // Use the built production app. Only the reminder API is replaced with local,
 // deterministic data; all list, navigation, editor and cache code is real.

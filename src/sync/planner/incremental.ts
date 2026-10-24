@@ -2,14 +2,15 @@ import { pendingChangeKey } from '../pending/pending-change';
 import { recordSyncError, skippedFileIssue } from '../issues';
 import { uploadPipelined } from '../transfer/upload-pipeline';
 import { applyDiffs } from '../transfer/process';
+import { createDeleteCandidates, deleteRemoteFiles } from '../transfer/delete';
 import { isAbortError } from "../abort";
 import { fileFailure, isTransientSyncFailure } from "../failures";
 import type { IncrementalSyncPlannerContext } from "./types";
 import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "../sync-result";
-import { createLogger, errorMessage } from "../logger";
+import { createLogger } from "../logger";
+import { errorMessage } from "../../platform/logger";
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
-import { applyIncrementalLocalDeletes } from './incremental-local-deletes';
 import { reconcileIncrementalRemoteChanges } from './incremental-remote-reconciliation';
 import { createPathRecord } from '../../protocol/path-record';
 import { readIncrementalChangelog } from './incremental-changelog';
@@ -32,7 +33,7 @@ export async function runIncrementalSync(
   const result = createEmptySyncResult();
   try {
     context.reportWork?.('server');
-    const changelog = await readIncrementalChangelog(context.api, context.settings.lastSeq, () => context.throwIfDestroyed());
+    const changelog = await readIncrementalChangelog(context.files, context.settings.lastSeq, () => context.throwIfDestroyed());
     if (!changelog) {
       logger.warn("Changelog cursor expired - pruned entries detected, falling back to full sync");
       return null;
@@ -190,4 +191,21 @@ export async function runIncrementalSync(
     logger.warn("Incremental sync failed, falling back to full sync:", errorMessage(error));
     return null;
   }
+}
+
+/** Plan from the acknowledged baseline; all transfer policy lives in the shared executor. */
+async function applyIncrementalLocalDeletes(
+  context: Pick<IncrementalSyncPlannerContext, 'files' | 'vault' | 'localManifest' | 'reconcileVersionConflicts' | 'reportWork'>,
+  paths: readonly string[],
+  result: SyncResult,
+  onProcessed?: (count: number) => void,
+): Promise<MutationFailure[]> {
+  const files = createDeleteCandidates(paths.map(path => {
+    const entry = context.localManifest.getEntry(path);
+    return { path, hash: entry?.hash, revision: entry?.revision };
+  }), result);
+  return deleteRemoteFiles({ ...context, reportWork: work => context.reportWork?.(work.phase, work.current, work.total) }, files, result, {
+    onProcessed,
+    onVersionConflicts: context.reconcileVersionConflicts,
+  });
 }

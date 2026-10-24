@@ -96,7 +96,7 @@ describe('runIncrementalSync', () => {
 					readBinary: vi.fn(),
 				},
 			} as never,
-			api: {
+			files: {
 				getChanges: vi.fn(async () => ({
 					changes: [
 						{
@@ -172,7 +172,7 @@ describe('runIncrementalSync', () => {
 					readBinary: vi.fn(),
 				},
 			} as never,
-			api: {
+			files: {
 				getChanges: vi.fn(async () => ({ changes: [], lastSeq: 8, hasMore: false })),
 				downloadFile: vi.fn(),
 				deleteFile: vi.fn(),
@@ -270,7 +270,7 @@ describe('runIncrementalSync', () => {
 					readBinary: vi.fn(),
 				},
 			} as never,
-			api: {
+			files: {
 				getChanges: vi.fn(async () => ({
 					changes: [
 						{

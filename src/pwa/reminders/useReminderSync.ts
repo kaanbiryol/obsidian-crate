@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { capturePwaSession } from '../session-generation';
+import { capturePwaSession } from '../connection/session-generation';
 import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
-import { fetchReadyReminderList, readReminderListBody, type ReminderIndexingProgress } from './reminder-api';
+import { fetchReadyReminderList, type ReminderIndexingProgress } from './reminder-api';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from './cache/reminder-cache';
 import { createReminderRequestCoordinator } from './outbox/reminder-request-coordinator';
 import { createReminderListCursor } from './reminder-list-cursor';
+import { decideReminderListFailure, decideReminderListResponse, needsDiskFallback } from './reminder-list-response';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import type { ApiFetch, DataMode, StoredConfig } from '../types';
 import type { CachedReminderSnapshot, LoadReminders, ReminderRecord, ReminderSourceIssue } from './types';
-import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 
 export interface ConfirmedReminderSnapshot {
 	reminders: ReminderRecord[];
@@ -163,8 +163,12 @@ export function useReminderSync({
 						}
 					},
 				);
-				if (response.status === 304) {
-					if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				if (response.status !== 304 && !response.ok) throw new Error(await response.text());
+				const body: unknown = response.status === 304 ? undefined : await response.json().catch(() => null);
+				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				const outcome = decideReminderListResponse({ status: response.status, headers: response.headers, body },
+					{ folderPath: config.folderPath, confirmed: snapshotRef.current.reminders, since, lastCheckedAt: cursor.lastCheckedAt });
+				if (outcome.kind === 'not-modified') {
 					const savedAt = Date.now();
 					cursor.notModified(response.headers, savedAt);
 					setLastUpdatedAt(savedAt);
@@ -177,42 +181,25 @@ export function useReminderSync({
 					);
 					return;
 				}
-				if (!response.ok) throw new Error(await response.text());
-				const body: unknown = await response.json().catch(() => null);
-				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
-				const { result, dropDeltaBase } = readReminderListBody(body, config.folderPath, snapshotRef.current.reminders, since);
-				if (dropDeltaBase) cursor.dropDeltaBase();
-				if (!result) {
-					// A contract failure cannot replace a valid revision or its ETag,
-					// including with an older disk snapshot after a recent acknowledgement.
-					setError('The server returned invalid reminder data. Refresh reminders.');
-					if (cursor.lastCheckedAt === null) setDataMode('error');
+				if (outcome.dropDeltaBase) cursor.dropDeltaBase();
+				if (outcome.kind === 'invalid') {
+					setError(outcome.message);
+					if (outcome.showErrorState) setDataMode('error');
 					return;
 				}
 				setError(null);
-				issuesRef.current = result.issues;
-				setIssues(result.issues);
-				void commitConfirmedSnapshot(result.reminders, result.projects, {
-					etag: response.headers.get('ETag') ?? undefined, deltaBase: response.headers.get(DELTA_BASE_HEADER) ?? undefined,
-				});
+				issuesRef.current = outcome.result.issues;
+				setIssues(outcome.result.issues);
+				void commitConfirmedSnapshot(outcome.result.reminders, outcome.result.projects, { etag: outcome.etag, deltaBase: outcome.deltaBase });
 			} catch (loadError) {
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
-				const message = loadError instanceof Error ? loadError.message : String(loadError);
-				// A loaded snapshot is at least as new as the disk copy; keep it and mark it stale.
-				if (cursor.lastCheckedAt !== null) {
-					setDataMode('cached');
-					setError(message);
-					return;
-				}
-				const cached = await loadCachedReminderSnapshot(config.folderPath);
+				const cached = needsDiskFallback(cursor.lastCheckedAt) ? await loadCachedReminderSnapshot(config.folderPath) : undefined;
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
-				if (cached) {
-					hydrateCachedSnapshot(cached);
-					setError(message);
-				} else {
-					setDataMode('error');
-					setError(message);
-				}
+				const outcome = decideReminderListFailure(loadError, { lastCheckedAt: cursor.lastCheckedAt, cached });
+				if (outcome.kind === 'keep-stale') setDataMode('cached');
+				else if (outcome.kind === 'hydrate-cache') hydrateCachedSnapshot(outcome.cached);
+				else setDataMode('error');
+				setError(outcome.message);
 			} finally {
 				if (sessionCurrent() && requestCoordinatorRef.current.isLatestRead(readToken)) {
 					setIndexingProgress(null);

@@ -3,7 +3,7 @@ import { createDevelopmentBuild } from './development-build.mjs';
 import { developmentShortcut } from './development-shortcut.mjs';
 import { builtinModules } from 'node:module';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rawTextPlugin } from './raw-text-plugin.mjs';
@@ -84,6 +84,29 @@ async function buildPwaClientBundle(serviceWorkerRuntime, shortcut) {
 	});
 	console.log('PWA client bundle written to .generated/cloudflare/pwa-client.json');
 	return { assets, version, startupAssets, onDemandAssets, metafile };
+}
+
+// Release gates build once, then set CRATE_WORKER_PREBUILT=1 so nested build:worker
+// calls reuse that output. Missing output or an input edited after the build fails.
+function assertPrebuiltWorker(rootDir) {
+	const generated = resolve(rootDir, '.generated/cloudflare');
+	let identity, inputs, builtAt;
+	try {
+		identity = JSON.parse(readFileSync(resolve(generated, 'build-identity.json'), 'utf8'));
+		inputs = JSON.parse(readFileSync(resolve(generated, 'server-inputs.json'), 'utf8'));
+		builtAt = Math.min(...['worker.mjs', 'pwa-client.json', 'build-identity.json'].map(name => statSync(resolve(generated, name)).mtimeMs));
+	} catch (error) {
+		throw new Error(`CRATE_WORKER_PREBUILT=1 requires a completed npm run build:worker: ${error.message}`, { cause: error });
+	}
+	if (identity.development !== null) throw new Error('CRATE_WORKER_PREBUILT=1 found a development Worker build; run npm run build:worker.');
+	const stale = inputs.filter(path => !existsSync(resolve(rootDir, path)) || statSync(resolve(rootDir, path)).mtimeMs > builtAt);
+	if (stale.length) throw new Error(`CRATE_WORKER_PREBUILT=1 found Worker inputs changed after the build; run npm run build:worker:\n${stale.map(path => `  ${path}`).join('\n')}`);
+}
+
+if (process.env.CRATE_WORKER_PREBUILT === '1' && !development) {
+	assertPrebuiltWorker(root);
+	console.log('Reusing the prebuilt Worker in .generated/cloudflare (CRATE_WORKER_PREBUILT=1)');
+	process.exit(0);
 }
 
 const serviceWorkerRuntime = await bundleServiceWorkerRuntime(root);

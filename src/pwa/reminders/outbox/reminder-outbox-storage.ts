@@ -1,10 +1,9 @@
 import * as v from 'valibot';
 import { isStoredReminderChange, storedChangeSchema } from './reminder-outbox-validation';
 import type { PendingReminderChange } from './reminder-outbox-types';
-import { privateStorage } from '../private-storage';
+import { privateStorage, REMINDER_OUTBOX_PREFIX } from '../private-storage';
 import { isSha256Hex } from '../../../platform/validation';
 import { isReminderOperationId } from '../../../protocol/reminder-operation';
-import { REMINDER_OUTBOX_PREFIX } from './reminder-storage-keys';
 import { sha256Hex } from '../../../platform/sha256';
 
 const STORAGE_ERROR = 'Could not access pending changes on this device. Free up storage and try again.';

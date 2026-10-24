@@ -2,8 +2,8 @@
 @use 'plugin/settings';
 @use 'plugin/dialogs';
 @use 'plugin/encryption';
-@use 'plugin/activity';
-@use 'plugin/history-browser';
-@use 'plugin/pending-diff';
-@use 'plugin/pending-browser';
-@use 'plugin/settings-extras';
+@use '../ui/activity/styles/activity';
+@use '../ui/activity/styles/history-browser';
+@use '../ui/activity/styles/pending-diff';
+@use '../ui/activity/styles/pending-browser';
+@use 'plugin/settings-sections';

@@ -1,10 +1,10 @@
-import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../sync/staged-upload-dispatch';
+import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../sync/staging/staged-upload-dispatch';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { handleAuthenticatedRoute } from '../router';
 import { runMaintenanceEpisode } from '../maintenance/lifecycle';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
-vi.mock('../sync/staged-upload-dispatch', () => ({ prepareCoordinatedUpload: vi.fn(), commitCoordinatedUpload: vi.fn(), coordinatedUpload: vi.fn() }));
+vi.mock('../sync/staging/staged-upload-dispatch', () => ({ prepareCoordinatedUpload: vi.fn(), commitCoordinatedUpload: vi.fn(), coordinatedUpload: vi.fn() }));
 vi.mock('../router', () => ({ handleAuthenticatedRoute: vi.fn(), isAuthenticatedRouteAllowed: () => true, handlePublicRoute: vi.fn(async () => null) }));
 vi.mock('../auth/index', () => ({ authenticateWorkerRequest: vi.fn(async () => ({ principal: { id: 'device', scope: 'vault' } })) }));
 vi.mock('../request-diagnostics', () => ({ logMutation: vi.fn() }));

@@ -40,7 +40,7 @@ it('falls back to full sync when cursor is expired', async () => {
 					readBinary: vi.fn(),
 				},
 			} as never,
-			api: {
+			files: {
 				getChanges: vi.fn(async () => ({
 					changes: [],
 					lastSeq: 20,
@@ -118,7 +118,7 @@ it('falls back to full sync when cursor is expired', async () => {
 					readBinary: vi.fn(async () => newLocalContent),
 				},
 			} as never,
-			api: {
+			files: {
 				getChanges: vi.fn(async () => ({
 					changes: [
 						{
@@ -197,7 +197,7 @@ it('falls back to full sync when cursor is expired', async () => {
 					readBinary: vi.fn(async () => localContent),
 				},
 			} as never,
-			api: {
+			files: {
 				getChanges: vi.fn(async () => ({
 					changes: [
 						{
@@ -256,7 +256,7 @@ it('falls back to full sync when cursor is expired', async () => {
 					readBinary: vi.fn(),
 				},
 			} as never,
-			api: {
+			files: {
 				getChanges: vi.fn(async () => {
 					throw new Error('network down');
 				}),
@@ -300,7 +300,7 @@ it('falls back to full sync when cursor is expired', async () => {
 					readBinary: vi.fn(),
 				},
 			} as never,
-			api: {
+			files: {
 				getChanges: vi.fn(async () => {
 					throw new SyncTransportError('Request timed out after 30000ms');
 				}),
@@ -346,7 +346,7 @@ it('falls back to full sync when cursor is expired', async () => {
 					readBinary: vi.fn(),
 				},
 			} as never,
-			api: {
+			files: {
 				getChanges: vi.fn(async () => {
 					throw new HttpError('Service unavailable', 503);
 				}),

@@ -3,7 +3,8 @@ import type { CachedDevicesState } from './settings-ui-state';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { openConfirmationModal } from '../confirmation-modal';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
-import { createLogger, errorMessage } from '../../sync/logger';
+import { createLogger } from '../../sync/logger';
+import { errorMessage } from '../../platform/logger';
 import type { SettingsSectionContext } from './section-helpers';
 
 const log = createLogger('DeviceSettings');

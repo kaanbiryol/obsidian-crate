@@ -42,3 +42,19 @@ it('re-renders a reminders block only when its options change, not when text abo
   new RemindersBlockWidget(plugin, options, 'Note.md', view, 4, 4 + block(true).length).updateDOM(host, view);
   expect(render).toHaveBeenCalledTimes(2);
 });
+
+it('compares widgets without changing either one', () => {
+  const plugin = {} as CratePlugin;
+  const options = { projectFilter: 'Work', showCompleted: false };
+  const { view } = editor(`${block(false)}\n`);
+  const current = new RemindersBlockWidget(plugin, options, 'Note.md', view, 0, block(false).length);
+  const toggled = new RemindersBlockWidget(plugin, { ...options, showCompleted: true }, 'Note.md', view, 0, block(false).length);
+  const grown = new RemindersBlockWidget(plugin, options, 'Note.md', view, 0, block(true).length);
+
+  // Only showCompleted differs: keep the DOM.
+  expect(current.eq(toggled)).toBe(true);
+  // A changed range goes through updateDOM on the new widget instead.
+  expect(current.eq(grown)).toBe(false);
+  expect(current.eq(grown)).toBe(false);
+  expect(current.eq(toggled)).toBe(true);
+});

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
 import { checkPwaScreenGestures, checkPwaTextField } from './pwa-screen-interaction-checks.mjs';
 
 const assets = await buildPwaPreviewAssets();

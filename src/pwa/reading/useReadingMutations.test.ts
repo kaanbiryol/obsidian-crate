@@ -3,11 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import { renderHook } from '../../test/react-hooks';
 import { queueReading } from './outbox';
-import type { ReadingSession } from './storage';
+import type { ReadingSession } from './session/session';
 import { useReadingMutations } from './useReadingMutations';
 
 vi.mock('./outbox', () => ({ queueReading: vi.fn() }));
-vi.mock('./storage', () => ({ assertReadingSession: vi.fn(), removeReadingShare: vi.fn() }));
+vi.mock('./storage/storage', () => ({ removeReadingShare: vi.fn() }));
+vi.mock('./session/session', () => ({ assertReadingSession: vi.fn() }));
 
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const item = (index: number, url = `https://example.com/${index}`): ReadingItem => ({

@@ -9,7 +9,7 @@ import { pendingChangeKey } from '../pending/pending-change';
 import type { SyncResult, SyncWork } from '../types';
 
 interface DeleteContext {
-	api: ConditionalDeleteApi;
+	files: ConditionalDeleteApi;
 	vault: Vault;
 	localManifest: { removeEntry(path: string): void; save(): Promise<void> };
 	reportWork?(work: SyncWork): void;
@@ -41,7 +41,7 @@ export async function deleteRemoteFiles(context: DeleteContext, files: Condition
 	context.reportWork?.({ phase: 'deleting', current: processed, total: files.length });
 	const response = result.errors.length
 		? { outcome: 'failed' as const, deleted: [], errors: files.map((file): MutationFailure => ({ path: file.path, error: 'Remote deletion deferred until uploads and reconciliation finish successfully' })) }
-		: await deleteFilesInBatches(context.api, files, path => assertLocalFileAbsent(context.vault, path), count => {
+		: await deleteFilesInBatches(context.files, files, path => assertLocalFileAbsent(context.vault, path), count => {
 			processed += count;
 			context.reportWork?.({ phase: 'deleting', current: processed, total: files.length });
 			options.onProcessed?.(count);

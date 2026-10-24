@@ -7,7 +7,7 @@ import {
   normalizeReminderProjectPath,
 } from "../../core/reminderProjectPath";
 
-const log = createLogger("MarkdownWriter");
+export const markdownWriterLog = createLogger("MarkdownWriter");
 
 function isTFileLike(value: unknown): value is TFile {
   return typeof value === "object"
@@ -33,7 +33,7 @@ async function ensureFolderPath(app: App, folderPath: string): Promise<void> {
     currentPath = currentPath ? `${currentPath}/${segment}` : segment;
     if (!await app.vault.adapter.exists(currentPath)) {
       await app.vault.createFolder(currentPath);
-      log.info(` Created folder: ${currentPath}`);
+      markdownWriterLog.info(` Created folder: ${currentPath}`);
     }
   }
 }
@@ -57,7 +57,7 @@ export async function getOrCreateProjectFile(
   if (!file) {
     await app.vault.create(filePath, getInitialProjectFileContent(normalizedProject));
     file = await getFile(app, filePath);
-    log.info(` Created project file: ${filePath}`);
+    markdownWriterLog.info(` Created project file: ${filePath}`);
   }
 
   if (!file) {

@@ -1,5 +1,5 @@
 import { useRef, type FocusEvent, type MouseEvent, type PointerEvent } from 'react';
-import { moveCursorToEnd } from '@/reminders/ui/reminder-editor/cursorPosition';
+import { moveCursorToEnd } from '@/ui/shared/cursorPosition';
 
 function editorField(target: EventTarget | null): HTMLElement | null {
 	return target instanceof Element ? target.closest<HTMLElement>('textarea, [contenteditable="true"]') : null;

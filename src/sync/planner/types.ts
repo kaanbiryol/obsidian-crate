@@ -6,7 +6,7 @@ import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { VaultFile } from '../local/file-discovery';
-import type { InitialConfigPull } from './initial-config-pull';
+import type { InitialConfigPull } from '../manifest/initial-config-pull';
 import type { LocalManifestView } from '../manifest/manifest';
 import type { SyncSettings } from '../settings';
 
@@ -44,7 +44,7 @@ export interface LocalChangeScan {
 
 export interface LocalDiffPlannerContext {
   throwIfDestroyed(): void;
-  pendingPaths?: ReadonlySet<string>;
+  pendingKeys?: ReadonlySet<string>;
   plannedContent?: PlannedContent;
   vault: Vault;
   localManifest: PlannerManifest;
@@ -62,7 +62,8 @@ export interface IncrementalSyncPlannerContext {
   fileManager: {
     trashFile(file: TAbstractFile): Promise<void>;
   };
-  api: PlannerApi;
+  /** The engine's journaled file operations. */
+  files: PlannerApi;
   localManifest: PlannerManifest;
   shouldIgnore(path: string): boolean;
   getLocalChanges(onUnchanged?: (path: string) => void): Promise<LocalChangeScan>;

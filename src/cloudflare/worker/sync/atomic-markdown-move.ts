@@ -2,7 +2,7 @@ import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
 import { publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
 import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
-import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
+import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import type { CommitEffects } from '../commit-effects';
 import { changedRows } from '../db';

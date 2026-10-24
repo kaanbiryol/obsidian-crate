@@ -71,3 +71,36 @@ export function createMockAppWithVault(initialFiles: Record<string, string> = {}
 
 	return { app: { vault } as unknown as App, files, folders, vault };
 }
+
+/** Node-only link created by `FakeDocumentFragment.createEl`; `click()` runs its click listener. */
+export class FakeLink {
+	private clickHandler?: () => void;
+
+	constructor(readonly text: string) {}
+
+	addEventListener(type: string, listener: () => void): void {
+		if (type === 'click') {
+			this.clickHandler = listener;
+		}
+	}
+
+	click(): void {
+		this.clickHandler?.();
+	}
+}
+
+/** Stand-in for the `DocumentFragment` global that notices build; records spans and links. */
+export class FakeDocumentFragment {
+	readonly spans: string[] = [];
+	readonly links: FakeLink[] = [];
+
+	createSpan(options: { text: string }): void {
+		this.spans.push(options.text);
+	}
+
+	createEl(_tag: string, options: { text: string }): FakeLink {
+		const link = new FakeLink(options.text);
+		this.links.push(link);
+		return link;
+	}
+}

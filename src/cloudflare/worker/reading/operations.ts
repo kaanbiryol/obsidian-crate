@@ -1,5 +1,5 @@
 import { reminderOperationDay } from '@/protocol/reminder-operation';
-import { OPERATION_VALID } from '../operation-expiry';
+import { OPERATION_VALID, isRetryableOperationDay } from '../operation-receipts';
 import { fileRevisionsGuard } from '../sync/file-identity';
 import { ReadingError, readingResponse } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
@@ -18,7 +18,7 @@ export async function beginOperation(db: D1Database, principal: AuthPrincipal, c
     if (saved.principal_id !== principal.tokenId || saved.generation !== current.generation || saved.request_hash !== hash) throw new ReadingError('This operation ID belongs to a different save.', 409, 'operation_mismatch');
     return readingResponse(JSON.parse(saved.response_json));
   }
-  if (day === null || !await db.prepare(`SELECT 1 WHERE ${OPERATION_VALID}`).bind(day, day).first()) {
+  if (day === null || !await isRetryableOperationDay(db, day)) {
     throw new ReadingError('This change is too old to retry safely. Compare your library before saving it again.', 410, 'operation_expired');
   }
   return { id: body.operationId, principal: principal.tokenId, generation: current.generation, hash, day };

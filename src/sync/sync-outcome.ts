@@ -1,8 +1,8 @@
 import { Notice } from 'obsidian';
 import { getSyncIssues, recordSyncError } from './issues';
-import { errorMessage, type Logger } from './logger';
+import type { Logger } from './logger';
+import { errorMessage } from '../platform/logger';
 import type { SyncResult, SyncState } from './types';
-import type { FileEntry } from '../protocol/sync-types';
 import { isAuthError, isAuthFailure } from './failures';
 import {
 	cancelSyncResult,
@@ -17,21 +17,17 @@ export const AUTH_ERROR_MESSAGE = 'This device’s sync access is no longer vali
 
 export type SyncStatus = SyncState['status'];
 
-export interface RemoteManifest {
-	files: Record<string, FileEntry>;
-	lastSeq?: number;
-}
-
-export function getStartFailureResult(context: {
-	apiConfigured(): boolean;
-	getStatus(): SyncStatus;
-}): SyncResult | null {
-	if (!context.apiConfigured()) {
-		return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
-	}
-	if (context.getStatus() === 'syncing') {
-		return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
-	}
+/** Starts every sync entry the same way: refuses an unconfigured or busy engine,
+ * otherwise publishes `syncing`. `enter` runs after the guard passes and before
+ * that transition, and returns state to publish with it. Returns the refusal, or
+ * null once the attempt has started. */
+export function beginSyncAttempt(
+	context: { apiConfigured(): boolean; getStatus(): SyncStatus; updateState(updates: Partial<SyncState>): void },
+	enter?: () => Partial<SyncState>,
+): SyncResult | null {
+	if (!context.apiConfigured()) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
+	if (context.getStatus() === 'syncing') return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
+	context.updateState({ ...enter?.(), status: 'syncing' });
 	return null;
 }
 

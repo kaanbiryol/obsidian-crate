@@ -19,7 +19,7 @@ export * from './src/pwa/reminders/encrypted-reminder-attempts';
 export * from './src/encryption/reminder-projection';
 export * from './src/pwa/encryption/encrypted-push';
 export * from './src/pwa/reminders/encryption-session';
-export * from './src/pwa/session-generation';
+export * from './src/pwa/connection/session-generation';
 export { unlockPrivateStorage } from './src/pwa/reminders/private-storage';
 export { AUTH_TOKEN_KEY } from './src/pwa/config';
 import React from 'react';

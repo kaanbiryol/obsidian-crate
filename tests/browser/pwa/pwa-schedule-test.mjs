@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdir } from 'node:fs/promises';
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
-import { previewEnrollmentToken } from '../../../scripts/pwa-preview-fixtures.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { previewEnrollmentToken } from '../support/preview/pwa-preview-fixtures.mjs';
 
 const reminders = [
 	{ id: 'today', content: 'Send the draft', description: 'Review the detailed notes and include the final changes before sending the draft to the team.', dueDate: '2026-09-26' },

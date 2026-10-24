@@ -7,7 +7,7 @@ import { newReminderOperationId } from './outbox/reminder-operation-id';
 import { createSettingsStore } from '../settings/settings-store';
 import { SettingsContext, useFeatureSettings } from '../settings/settings-context';
 import { pwaSyncState } from '../sync/state';
-import { invalidatePwaSession } from '../session-generation';
+import { invalidatePwaSession } from '../connection/session-generation';
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';
 import type { ReminderRecord } from './types';
 

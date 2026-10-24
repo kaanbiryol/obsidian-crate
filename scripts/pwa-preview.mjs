@@ -1,6 +1,6 @@
-import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
-import { previewEnrollmentToken } from './pwa-preview-fixtures.mjs';
-import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../tests/browser/support/preview/pwa-preview-assets.mjs';
+import { previewEnrollmentToken } from '../tests/browser/support/preview/pwa-preview-fixtures.mjs';
+import { listenPwaPreviewServer } from '../tests/browser/support/preview/pwa-preview-server.mjs';
 
 const port = Number.parseInt(process.env.PORT || '8789', 10);
 

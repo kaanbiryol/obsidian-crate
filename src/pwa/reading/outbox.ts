@@ -2,9 +2,10 @@ import { assertReadingUpdateBase, coalesceReadingUpdate } from './coalesce-updat
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingUrl, type ReadingChanges } from '@/reading/core/model';
 import { loadReading, readingRequest } from './api';
-import { ReadingApiError } from './api-error';
-import { assertReadingSession, readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, savePendingReading, type ReadingSession, type ReadingCache } from './storage';
-import { isReadingCommand } from './storage-validation';
+import { ReadingApiError } from './session/api-error';
+import { readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, savePendingReading, type ReadingCache } from './storage/storage';
+import { assertReadingSession, type ReadingSession } from './session/session';
+import { isReadingCommand } from './storage/storage-validation';
 import { hasAutomaticRetry, automaticRetryDelayMs } from '@/pwa/sync/retry-policy';
 
 export interface ReadingUpdateIntent { id: string; changes: ReadingChanges; before: ReadingChanges }

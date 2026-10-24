@@ -8,9 +8,9 @@ import worker from './index';
 import { handleSubscribe, handleUnsubscribe } from './notifications/subscription-handlers';
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { writeCommittedMarkdownFile } from './storage';
-import { makeApiFetch } from '@/pwa/reminders/api-fetch';
+import { makeApiFetch } from '@/pwa/connection/api-fetch';
 import { performPwaLogout } from '@/pwa/connection/usePwaSessionLifecycle';
-import { invalidatePwaSession } from '@/pwa/session-generation';
+import { invalidatePwaSession } from '@/pwa/connection/session-generation';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { sha256Hex } from '@/platform/sha256';
 

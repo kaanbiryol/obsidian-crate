@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { webkit, expect } from '@playwright/test';
 import sharp from 'sharp';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
 
 // Settled iOS list screens scroll the document so the status-bar tap reaches
 // them. Desktop WebKit cannot tap the status bar; these checks cover the

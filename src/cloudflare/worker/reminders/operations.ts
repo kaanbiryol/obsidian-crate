@@ -4,8 +4,11 @@ import { reminderRequestHash } from '../../../encryption/reminder-receipt';
 import { corsResponse } from '../cors';
 import type { CommitEffects } from '../commit-effects';
 import { reminderOperationDay, isReminderOperationId } from '@/protocol/reminder-operation';
-import { expiredReminderOperation } from './operation-expiry';
-import { OPERATION_VALID } from '../operation-expiry';
+import { OPERATION_VALID, isRetryableOperationDay } from '../operation-receipts';
+
+function expiredReminderOperation(): Response {
+	return corsResponse({ code: 'operation_expired', error: 'This change is outside the server’s retry window. An earlier attempt may have synced. Export it and compare your current reminders before restoring missing work.' }, 410);
+}
 
 export interface ReminderOperation { id: string; requestHash: string; day: number }
 export async function beginReminderOperation(db: D1Database, body: Record<string, unknown>, action: string): Promise<ReminderOperation | Response> {
@@ -14,7 +17,7 @@ export async function beginReminderOperation(db: D1Database, body: Record<string
 	const receipt = await readReminderReceipt(db, { id: body.operationId, requestHash });
 	if (receipt) return receipt;
 	const day = reminderOperationDay(body.operationId);
-	if (day === null || !await db.prepare(`SELECT 1 AS valid WHERE ${OPERATION_VALID}`).bind(day, day).first()) return expiredReminderOperation();
+	if (day === null || !await isRetryableOperationDay(db, day)) return expiredReminderOperation();
 	return { id: body.operationId, requestHash, day };
 }
 async function readReminderReceipt(db: D1Database, operation: Pick<ReminderOperation, 'id' | 'requestHash'>): Promise<Response | null> {

@@ -1,15 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
-import { makeApiFetch } from '../reminders/api-fetch';
+import { makeApiFetch } from './api-fetch';
 import { onConnectionExpired } from './expiration';
 import type { ConnectionIssue } from './issues';
-import { READING_SESSION_KEY, readingSession } from '../reading/storage';
+import { READING_SESSION_KEY, readingSession } from '../reading/session/session';
 import { AUTH_TOKEN_KEY, PWA_FOLDER_CHANGED_EVENT, loadStoredConfig } from '../config';
 import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../reminders/encryption-session';
 import { usePwaBootstrap } from './usePwaBootstrap';
 import { usePwaSessionLifecycle } from './usePwaSessionLifecycle';
 import { usePwaPreferences } from '../settings/usePwaPreferences';
-import { useReadingConnection } from '../reading/useReadingConnection';
+import { useReadingConnection } from '../reading/session/useReadingConnection';
 import { useSettingsOpen } from '../settings/settings-context';
 import { useSharedFeatures } from '../shared-features';
 import { useSyncFeedback } from '../sync/SyncFeedback';

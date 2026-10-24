@@ -1,14 +1,14 @@
 import { setSharedFeature } from '../../../plugin/feature-settings';
 import { captureServerConnection } from '../../../plugin/server-request';
 import { Notice, Setting } from 'obsidian';
-import type CratePlugin from '../../../plugin/CratePlugin';
 import { createSettingsDisclosure } from '../../../ui/plugin/settings-disclosure';
 import { FolderSuggest } from '../../../ui/settings/folder-suggest';
 import { bindCommittedText } from '../../../ui/settings/input-helpers';
+import type { SettingsSectionContext } from '../../../ui/settings/section-helpers';
 import { readReadingPolicy, writeReadingPolicy } from '../../server';
 import { restartReading, validateReadingConfiguration } from '../../runtime';
 
-export function renderReadingSettings(container: HTMLElement, plugin: CratePlugin, rerender: () => void): () => void {
+export function renderReadingSettings({ containerEl: container, plugin, rerender }: SettingsSectionContext): () => void {
 	let folderSuggest: FolderSuggest | undefined;
 	createSettingsDisclosure(container, 'Reading', { summary: plugin.settings.reading.enabled ? `Folder: ${plugin.settings.reading.folderPath}` : 'Paused', onOpen: options => {
 		new Setting(options).setName('Enable reading')

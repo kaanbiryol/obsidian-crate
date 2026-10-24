@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { expect } from '@playwright/test';
-import { previewEnrollmentToken } from '../../../scripts/pwa-preview-fixtures.mjs';
+import { previewEnrollmentToken } from '../support/preview/pwa-preview-fixtures.mjs';
 
 export async function dockAppearance(page) {
  return page.evaluate(() => {

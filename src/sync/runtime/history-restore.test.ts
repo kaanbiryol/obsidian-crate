@@ -20,7 +20,7 @@ function harness(automaticSync = true) {
     const engine = {
         sync: vi.fn(async () => createEmptySyncResult()),
         updateSettings: vi.fn(),
-        getPendingPaths: vi.fn(() => [] as string[]),
+        getPendingKeys: vi.fn(() => [] as string[]),
         syncSelected: vi.fn(async (_keys: string[]) => createEmptySyncResult()),
         createHistoryRestore: vi.fn(async (_id: string, beforeApply: () => Promise<void>) => ({
             items: [{ path: 'note.md', action: 'revert' as const }], unchangedCount: 2,

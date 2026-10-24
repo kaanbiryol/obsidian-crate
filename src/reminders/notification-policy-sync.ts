@@ -1,6 +1,7 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import type { SyncApiClient } from '../sync/worker-api/client';
+import type { NotificationPolicy } from '../protocol/notification-policy';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { normalizeRemindersFolderPath } from './settings';
 import { createLogger } from './logger';
@@ -16,11 +17,36 @@ interface PolicySyncState {
 }
 const states = new WeakMap<CratePlugin, PolicySyncState>();
 
-function policySettings(plugin: CratePlugin) {
+/** The notification policy this device's settings describe. */
+export function policySettings(plugin: CratePlugin) {
 	return { enabled: plugin.settings.pushEnabled,
 		folderPath: plugin.remindersSettings.remindersFolderPath,
 		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 		allDayTime: plugin.remindersSettings.allDayNotificationTime };
+}
+
+/**
+ * Apply an explicit policy edit. Without a known policy, this device's settings
+ * create one first. `onPolicy` receives each policy the server returns, so a
+ * failed update still keeps the created policy for the next attempt.
+ */
+export async function saveNotificationPolicy(
+	api: Pick<SyncApiClient, 'ensureNotificationPolicy' | 'updateNotificationPolicy'>,
+	plugin: CratePlugin,
+	current: NotificationPolicy | null,
+	patch: Partial<NotificationPolicy>,
+	onPolicy: (policy: NotificationPolicy) => void = () => {},
+): Promise<NotificationPolicy> {
+	let policy = current;
+	if (!policy) {
+		policy = (await api.ensureNotificationPolicy(policySettings(plugin))).policy;
+		onPolicy(policy);
+	}
+	// Even initialization can race another device. Apply explicit changes using
+	// the server's returned revision and retain its timezone and folder.
+	policy = (await api.updateNotificationPolicy({ ...policy, ...patch })).policy;
+	onPolicy(policy);
+	return policy;
 }
 
 function pendingFolder(plugin: CratePlugin, workerUrl: string) {

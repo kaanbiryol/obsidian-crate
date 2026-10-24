@@ -3,7 +3,7 @@ import type { IncrementalSyncPlannerContext } from './types';
 
 /** Read one deduplicated changelog snapshot without advancing the saved cursor. */
 export async function readIncrementalChangelog(
-  api: Pick<IncrementalSyncPlannerContext['api'], 'getChanges'>,
+  api: Pick<IncrementalSyncPlannerContext['files'], 'getChanges'>,
   lastSeq: number,
   assertActive?: () => void,
 ) {

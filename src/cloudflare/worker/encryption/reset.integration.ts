@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { commitStagedFile } from '../sync/mutations';
-import { commitNewFiles } from '../sync/bulk-new-file-commit';
+import { commitNewFiles } from '../sync/staging/bulk-new-file-commit';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';

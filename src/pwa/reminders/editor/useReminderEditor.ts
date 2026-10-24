@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { buildModalDraft } from './reminder-modal-draft';
+import { buildModalDraft } from './reminder-drafts';
 import type { ModalMode, ModalState, ReminderRecord } from '../types';
 import { useSheetTransition } from '../../hooks/useSheetTransition';
 

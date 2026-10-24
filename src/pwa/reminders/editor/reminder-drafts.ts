@@ -1,7 +1,35 @@
-import type { ModalState } from '../types';
+import { useCallback, useState } from 'react';
+import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
+import { buildInitialReminderContent } from '@/reminders/core/reminderDraft';
+import { DEFAULT_PROJECT } from '@/reminders/core/constants';
+import type { ModalDraft, ModalState, ReminderRecord } from '../types';
 import { isStoredReminderModal } from './reminder-draft-validation';
-import { privateStorage } from '../private-storage';
-import { REMINDER_DRAFT_PREFIX } from '../outbox/reminder-storage-keys';
+import { privateStorage, REMINDER_DRAFT_PREFIX } from '../private-storage';
+
+export function buildModalDraft(reminder: ReminderRecord | null, selectedProject: string | null): ModalDraft {
+	const parsedDate = reminder?.dueDatetime
+		? new Date(reminder.dueDatetime)
+		: reminder?.dueDate
+			? parseReminderDateValue(reminder.dueDate, false) ?? null
+			: null;
+	const defaultProject = selectedProject ?? DEFAULT_PROJECT;
+
+	return {
+    originalDueDatetime: reminder?.dueDatetime,
+		content: buildInitialReminderContent(reminder ?? undefined, defaultProject),
+		description: reminder?.description ?? '',
+		project: reminder?.project ?? defaultProject,
+		defaultProject,
+		priority: reminder?.priority ?? 4,
+		dueDate: parsedDate ? formatLocalDateKey(parsedDate) : '',
+		dueTime: reminder?.dueDatetime
+			? `${String(parsedDate?.getHours() ?? 0).padStart(2, '0')}:${String(parsedDate?.getMinutes() ?? 0).padStart(2, '0')}`
+			: '',
+		recurrence: reminder?.recurrence,
+		activePicker: null,
+		deleteConfirm: false,
+	};
+}
 
 const draftStorage = () => privateStorage(sessionStorage);
 
@@ -48,4 +76,18 @@ export function clearReminderDrafts(): boolean {
 		for (const entry of Object.keys(sessionStorage)) if (entry.startsWith(REMINDER_DRAFT_PREFIX)) sessionStorage.removeItem(entry);
 		return true;
 	} catch { return false; }
+}
+
+/** Editor state that survives reloads: every edit is saved for this folder until the editor discards it. */
+export function usePersistedReminderDraft(initialModal: ModalState, folderPath: string) {
+	const [modal, setModal] = useState(() => restoreReminderDraft(initialModal, folderPath));
+	const patchDraft = useCallback((patch: Partial<ModalDraft>) => {
+		setModal(current => {
+			const next = { ...current, draft: { ...current.draft, ...patch } };
+			saveReminderDraft(next, folderPath);
+			return next;
+		});
+	}, [folderPath]);
+	const discardDraft = useCallback(() => discardReminderDraft(modal, folderPath), [modal, folderPath]);
+	return { modal, patchDraft, discardDraft };
 }

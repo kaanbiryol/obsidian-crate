@@ -1,13 +1,26 @@
 import { processVaultMarkdown } from '../vault-markdown';
-import { createReminderId } from "../../core/reminderIdentity";
+import { createReminderId, extractReminderId } from "../../core/reminderIdentity";
+import { markdownTaskContexts } from "../../core/markdownTaskContext";
 import type { IndexedReminder } from "../reminder-index";
 import {
   appendCreatedReminderBlock,
   buildCreatedReminderBlock,
+  reminderBlockFields,
 } from "../../core/markdownReminderMutation";
 import { requireReminderProjectPath } from "../../core/reminderProjectPath";
 import type { CreateReminderInput, MarkdownWriterContext } from "./types";
-import { markdownWriterLog } from "./operation-shared";
+import { markdownWriterLog } from "./helpers";
+
+/** Checks the task lines the scanner reads, so a marker quoted in a code fence
+ * is not an existing reminder. Any marked task line counts, even one the
+ * scanner cannot parse yet, so a retry never appends a second copy. */
+function containsReminderId(content: string, id: string): boolean {
+  const lines = content.split("\n");
+  for (const index of markdownTaskContexts(lines).keys()) {
+    if (extractReminderId(lines[index]!) === id) return true;
+  }
+  return false;
+}
 
 export async function createReminderInMarkdown(
   context: MarkdownWriterContext,
@@ -29,14 +42,9 @@ export async function createReminderInMarkdown(
 
   const optimisticReminder: IndexedReminder = {
     id: stableReminderId,
-    content,
-    description: mutation.description,
-    dueDate: mutation.dueDateKey,
-    dueDatetime: mutation.dueDatetime,
-    priority,
+    ...reminderBlockFields(mutation),
     completed: false,
     project: normalizedProject,
-    recurrence: mutation.recurrence,
     filePath: file.path,
     lineNumber: -1,
     rawLine: mutation.checkboxLine,
@@ -48,7 +56,7 @@ export async function createReminderInMarkdown(
     await processVaultMarkdown(context.app, file, (fileContent) => {
       context.moveJournal?.assertActive();
       // A lost local write acknowledgement must not append the same identity twice.
-      if (fileContent.includes(`<!-- crate-id:${stableReminderId} -->`)) {
+      if (containsReminderId(fileContent, stableReminderId)) {
         throw new Error('This reminder already exists. Close the draft and refresh to see its saved state.');
       }
       return appendCreatedReminderBlock(fileContent, mutation);

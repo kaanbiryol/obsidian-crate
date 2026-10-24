@@ -44,7 +44,7 @@ it.each(['vault', 'selected'] as const)('batches ordinary Markdown line edits th
 	}
 	if (mode === 'selected') {
 		expect(device.settings.lastSeq).toBe(lastSeq);
-		expect(device.engine.getPendingPaths()).toEqual(['unselected.md']);
+		expect(device.engine.getPendingKeys()).toEqual(['unselected.md']);
 		expect(new TextDecoder().decode((await device.api.downloadFile('unselected.md')).content)).toBe(original);
 	}
 	for (const path of paths) {
@@ -71,7 +71,7 @@ it('does not transfer a Markdown line added and removed before selected sync', a
 	device.requests.length = 0;
 	expect(await device.engine.syncSelected([path])).toMatchObject({ success: true, uploaded: 0, downloaded: 0, merged: 0 });
 	expect(device.requests.filter(route => /upload|download/.test(route))).toEqual([]);
-	expect(device.engine.getPendingPaths()).toEqual([]);
+	expect(device.engine.getPendingKeys()).toEqual([]);
 });
 
 it('keeps a newer local edit pending while the selected batch is in flight', async () => {
@@ -90,10 +90,10 @@ it('keeps a newer local edit pending while the selected batch is in flight', asy
 	}
 	expect((await syncing).success).toBe(true);
 	expect(device.disk.text('note.md')).toBe('Newer edit.\n');
-	expect(device.engine.getPendingPaths()).toEqual(['note.md']);
+	expect(device.engine.getPendingKeys()).toEqual(['note.md']);
 	expect(new TextDecoder().decode((await device.api.downloadFile('note.md')).content)).toBe('First edit.\n');
 	expect((await device.engine.syncSelected(['note.md'])).success).toBe(true);
-	expect(device.engine.getPendingPaths()).toEqual([]);
+	expect(device.engine.getPendingKeys()).toEqual([]);
 	expect(new TextDecoder().decode((await device.api.downloadFile('note.md')).content)).toBe('Newer edit.\n');
 });
 
@@ -119,7 +119,7 @@ it('reconciles a server edit arriving after selected-file metadata was read', as
 		const merged = original.replace('Alpha.', 'Local alpha.').replace('Beta.', 'Remote beta.');
 		expect(device.disk.text('note.md')).toBe(merged);
 		expect(new TextDecoder().decode((await device.api.downloadFile('note.md')).content)).toBe(merged);
-		expect(device.engine.getPendingPaths()).toEqual([]);
+		expect(device.engine.getPendingKeys()).toEqual([]);
 	} finally {
 		rival.close();
 	}

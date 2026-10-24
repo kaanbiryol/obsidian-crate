@@ -1,4 +1,4 @@
-import { clearReadingData } from '../reading/storage';
+import { clearReadingData } from '../reading/storage/storage';
 import { clearReminderDrafts } from '../reminders/editor/reminder-drafts';
 import { clearReminderOutbox } from '../reminders/outbox/reminder-outbox-storage';
 import { clearCachedReminderSnapshots } from '../reminders/cache/reminder-cache';

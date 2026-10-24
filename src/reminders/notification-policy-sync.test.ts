@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import CratePlugin from '../plugin/CratePlugin';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from './settings';
-import { changeReminderFolder, ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from './notification-policy-sync';
+import { changeReminderFolder, ensureReminderNotificationPolicy, policySettings, refreshReminderNotificationPolicy, saveNotificationPolicy } from './notification-policy-sync';
 import { beginPluginLifecycle } from '../plugin/lifecycle-state';
 import { reinitializeWithFolder } from './plugin-integration';
 
@@ -188,4 +188,15 @@ it('acknowledges a lost successful update without creating another server revisi
 	await ensureReminderNotificationPolicy(h.plugin, true);
 	expect(h.updateNotificationPolicy).not.toHaveBeenCalled();
 	expect(h.plugin.remindersSettings.pendingServerFolder).toBeUndefined();
+});
+
+it('creates a missing policy from device settings, then merges an explicit edit over the server revision', async () => {
+	const h = harness(), seen: string[] = [];
+	const saved = await saveNotificationPolicy(h.api, h.plugin, null, { allDayTime: null }, policy => seen.push(policy.revision));
+	expect(h.ensureNotificationPolicy).toHaveBeenCalledWith(policySettings(h.plugin));
+	expect(h.updateNotificationPolicy).toHaveBeenCalledWith({ folderPath: 'Reminders', enabled: false, timezone: 'Europe/Berlin', allDayTime: null, revision: 'first' });
+	expect(seen).toEqual(['first', saved.revision]);
+	h.ensureNotificationPolicy.mockClear(); h.setOnline(false);
+	await expect(saveNotificationPolicy(h.api, h.plugin, saved, { enabled: true })).rejects.toThrow('offline');
+	expect(h.ensureNotificationPolicy).not.toHaveBeenCalled();
 });

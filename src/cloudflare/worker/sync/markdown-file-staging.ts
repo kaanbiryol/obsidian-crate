@@ -1,4 +1,4 @@
-import { trackStagedUpload } from './staged-uploads';
+import { trackStagedUpload } from './staging/staged-uploads';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../../encryption/file-format';
 import { createManagedObjectKey } from '../../../protocol/storage-keys';
 import { sha256Hex } from '../../../platform/sha256';

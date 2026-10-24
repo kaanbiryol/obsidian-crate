@@ -86,17 +86,18 @@ jobs:
       - name: Test the server revision check
         if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm run test:server-revision
-      - name: Check the server revision
-        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: npm run check:server-revision
       - name: Test recovery tooling
         if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm run test:recovery
       - name: Run unit tests
         if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm test
+      # Not part of check:source: it needs full Git history and gh. release:check runs it too.
+      - name: Check the server revision
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run check:server-revision
       - name: Recheck the completed push verification
         if: inputs.reuse-run-id != ''
         env:

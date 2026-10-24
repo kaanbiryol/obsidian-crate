@@ -9,7 +9,7 @@ import { handleAuthenticatedRoute, handlePublicRoute } from '../router';
 import { updatePolicy } from '../reading/access';
 import { policy } from '../reading/common';
 import { commitStagedFile } from '../sync/mutations';
-import { commitNewFiles } from '../sync/bulk-new-file-commit';
+import { commitNewFiles } from '../sync/staging/bulk-new-file-commit';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';

@@ -1,0 +1,63 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from '../mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import { applySchema } from '../../test-support/schema-test-harness';
+import { createReminderOperationId } from '@/protocol/reminder-operation';
+import { handleBatchUpload } from '../batch/upload';
+import type { BatchUploadResponse } from '@/protocol/sync-types';
+import { meterD1Writes } from '../../test-support/d1-write-meter-test-harness';
+import { drainNotificationProjections } from '../../notifications/projection';
+
+beforeEach(async () => {
+  await applySchema(env.DB);
+});
+afterEach(async () => { vi.restoreAllMocks(); await reset(); });
+
+// Server-side comparison in local workerd + D1 + R2, not an internet speed claim.
+it('compares 8000 new Markdown files at four concurrent requests', { timeout: 900_000 }, async () => {
+  const measurements: Array<{ mode: string; files: number; requests: number; statements: number; transactions: number; writes: number; wallMs: number }> = [];
+  await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Notes', 'UTC', 'benchmark')").run();
+  for (const bulkNewFiles of [false, true]) {
+    const mode = bulkNewFiles ? 'bulk' : 'previous';
+    const files = Array.from({ length: 8000 }, (_, index) => ({
+      path: `Notes/${mode}/group-${index % 100}/note-${index}.md`, content: btoa(`# Note ${index}\n${'Ordinary Markdown content. '.repeat(40)}`),
+      expectedHash: null, operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)),
+    }));
+    const prepare = vi.spyOn(env.DB, 'prepare'); const batch = vi.spyOn(env.DB, 'batch');
+    const meter = meterD1Writes(env.DB);
+    const chunkSize = bulkNewFiles ? 8 : 3;
+    let next = 0; let requests = 0; let completed = 0;
+    const started = performance.now();
+    await Promise.all(Array.from({ length: 4 }, async () => {
+      while (next < files.length) {
+        const offset = next; next += chunkSize;
+        const chunk = files.slice(offset, offset + chunkSize);
+        const response = await handleBatchUpload(new Request('https://test/sync/batch-upload', {
+          method: 'POST', body: JSON.stringify({ files: chunk, bulkNewFiles }),
+        }), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles });
+        const body = await response.json() as BatchUploadResponse;
+        expect(body.success, JSON.stringify(body)).toBe(true);
+        expect(body.results).toHaveLength(chunk.length);
+        requests++; completed += chunk.length;
+        if (completed % 1000 < chunkSize) console.info(`${mode}: ${completed}/8000 files`);
+      }
+    }));
+    while (await env.DB.prepare('SELECT 1 FROM notification_projection_jobs LIMIT 1').first()) {
+      await drainNotificationProjections({ ...env, DB: meter.db }, 8);
+    }
+    measurements.push({ mode, files: files.length, requests, statements: prepare.mock.calls.length,
+      transactions: batch.mock.calls.length, writes: meter.writes(), wallMs: Math.round(performance.now() - started) });
+    prepare.mockRestore(); batch.mockRestore();
+    expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM files WHERE path LIKE ?').bind(`Notes/${mode}/%`).first()).toEqual({ n: 8000 });
+    expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_source_state WHERE file_path LIKE ? AND verified = 1').bind(`Notes/${mode}/%`).first()).toEqual({ n: 8000 });
+  }
+  console.info('BULK_UPLOAD_BENCHMARK', JSON.stringify(measurements));
+  expect(measurements[1]!.statements).toBeLessThan(measurements[0]!.statements);
+  expect(measurements[1]!.transactions).toBe(1000);
+  // Leave at least 20% of the free daily allowance for setup and other activity.
+  expect(measurements[1]!.writes).toBeLessThanOrEqual(80_000);
+  expect(measurements[1]!.writes).toBe(52_000);
+});

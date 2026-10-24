@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../config';
-import { capturePwaSession } from '../session-generation';
+import { capturePwaSession } from '../connection/session-generation';
 import type { ApiFetch, ShowToast } from '../types';
 import type { PushState } from './types';
 import { getPwaPushManager, urlBase64ToUint8Array } from '../service-worker-registration';

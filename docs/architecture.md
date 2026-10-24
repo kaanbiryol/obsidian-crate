@@ -144,7 +144,8 @@ Queue revision tracking and settlement snapshots are required dependencies, so
 settling an earlier upload cannot silently bypass the guard for a newer local edit.
 `sync/runtime/history-workflow.ts` keeps pause, persistence, application, sync,
 verification and resumption together; the runtime supplies connection identity checks
-and the ordinary sync-operation wrapper.
+and the ordinary sync-operation wrapper. `sync/runtime/startup-sync.ts` runs the startup
+sync and its single recovery pass; the runtime keeps initialization revision checks.
 
 `sync/history/preview-format.ts` owns text decoding and binary control-character rejection.
 `protocol/sync-limits.ts` owns the 256 KB preview limit shared with the Worker's version
@@ -187,13 +188,15 @@ saves and cursor advancement. `incremental-changelog.ts` reads a deduplicated
 snapshot without changing the saved cursor. `incremental-remote-reconciliation.ts`
 checks current local bytes and applies guarded local deletes together; it returns
 newly discovered local edits rather than mutating the scan inventory.
-`incremental-local-deletes.ts` applies remote deletes after the preceding phases
+`incremental.ts` applies remote deletes only after the preceding phases
 succeed. These helpers do not own engine cancellation or runtime lifecycle state.
 
 `reminders/data/reminder-index/index.ts` owns reminder record changes, including
 file renames. Its `lookup-store.ts` maintains derived lookup maps: the owner removes
 old keys before changing records, then adds the updated records before notifying
 subscribers. Scan failure retains the last published records and lookups together.
+`file-scan-result.ts` applies one file's scan result to that state; queueing,
+invalidation and deferral stay in `index.ts`.
 
 `reminders/core/reminderDescription.ts` owns description encoding and attached comment
 parsing. `markdownReminderFile.ts` retains reminder lookup, guarded replacement,
@@ -234,7 +237,7 @@ coordinator forwarding remain explicit choices without fallback defaults.
 explicit JSON metadata. Direct `commitStagedFile` callers retain transaction-local
 effects for atomic domain receipts.
 
-`cloudflare/worker/operation-expiry.ts` owns the shared retry floor used by
+`cloudflare/worker/operation-receipts.ts` owns the shared retry floor and window check used by
 Reminders, Reading, uploads and encryption recovery. Its persisted
 `reminder_operation_floor` key remains unchanged. `maintenance/operation-receipts.ts`
 publishes that floor and prunes receipts in the same transaction, and coordinates
@@ -256,8 +259,8 @@ and distinguishes a deleted server from a deployed server with a URL. OAuth sess
 contain a request; saved authorization runs that request directly.
 `cloudflare/deployment/target.ts` owns account selection, discovery and server reuse
 policy. The service owns authorization, cancellation, target verification and the
-ordered provisioning workflow. `cloudflare/plugin-integration.ts` coordinates
-the operation and device connection; `ui/cloudflare/operation-presentation.ts`
+ordered provisioning workflow. `plugin/cloudflare-operations.ts` coordinates
+the operation in prepare-device, run-deployment and connect-device steps; `ui/cloudflare/operation-presentation.ts`
 owns modal copy and recovery actions supplied by that coordinator.
 `plugin/cloudflare-connection.ts` and `plugin/self-hosted-connection.ts` connect a
 device across the plugin's runtime, settings and deployment state; `sync/connection/`
@@ -276,9 +279,12 @@ queued resets, address changes, connection changes and encryption setup even whe
 caller supplies no cancellation signal. `sync/connection/connection-errors.ts` defines stable
 codes for owned setup failures; settings presentation uses those codes to preserve
 recovery guidance while redacting unknown transport failures.
-`sync/engine/contexts.ts` binds planners and transfers directly to their dependencies.
-The engine supplies live state, pending paths, lifecycle guards and reconciliation;
-planner and transfer calls do not round-trip through engine forwarding methods.
+`sync/engine/contexts.ts` builds the transfer and workflow contexts once, binding planners
+and transfers directly to their dependencies; only the planners that snapshot settings are
+built per sync. The engine supplies live state, pending paths, lifecycle guards and
+reconciliation; planner and transfer calls do not round-trip through engine forwarding methods.
+Every sync entry (standard, forced, queue flush and queue reconciliation) starts through
+`beginSyncAttempt` in `sync/sync-outcome.ts`.
 The ordered completion of the initial configuration pull and reminder setup lives in `sync/engine/initial-setup.ts`.
 `sync()` runs an unfinished server initial import (`sync/engine/initial-import.ts`) before
 reconciliation; the engine has no separate initial-sync mode.
@@ -326,7 +332,7 @@ and pending changes, while explicit logout clears both features' local data.
 Connection boundaries publish typed issues from `connection/issues.ts`; recovery
 screens choose cleanup, reconnect or retry actions from the issue kind, independently
 of its display message.
-`reading/useReadingConnection.ts` handles Reading connection readiness, and
+`reading/session/useReadingConnection.ts` handles Reading connection readiness, and
 `reading/useReadingSession.ts` hydrates its articles, drafts and pending changes.
 This shared lifecycle does not transfer browser storage into an installed iOS app.
 Mobile enrollment links first show `connection/BrowserSetup`: **Continue to web**
@@ -370,18 +376,18 @@ explicit refresh can retry uncertain commands. Rejected commands remain for revi
 Settings deadlines and failure announcements use the same outbox policy: transient
 errors remain visible, while toasts wait until automatic recovery stops or review
 is required.
-`pwa/reading/cache.ts` owns `commitReadingCache`, keeping uncertain-source
+`pwa/reading/storage/cache.ts` owns `commitReadingCache`, keeping uncertain-source
 preservation, article pruning, encrypted records and list persistence in one guarded
-transaction. `reading/database.ts` owns database lifetime and raw encrypted values;
+transaction. `reading/storage/database.ts` owns database lifetime and raw encrypted values;
 `pwa/storage/single-store-database.ts` shares bounded opening, schema validation and late
 request fencing with the encryption databases. Reading retains its cached
 connection, and each feature retains its own records and transactions.
-`reading/session.ts` owns session authority. The storage facade exposes specific
+`reading/session/session.ts` owns session authority. The storage facade exposes specific
 draft, pending-command, share and immutable-attempt operations, keeping raw keys
 inside persistence and migration code. Export and logout retain their recovery guards.
 `pwa/reading/api.ts` retains pagination and response validation, including
 `loadReadingArticle`. Network and cache reads share item/article validation in
-`reading/record-validation.ts`; live articles must match the requested identity and
+`reading/storage/record-validation.ts`; live articles must match the requested identity and
 enrolled folder before the reader or offline cache receives them.
 List pages are validated before accumulation. The loader rejects repeated cursors
 and bounds page, item and issue counts before committing a complete cache revision;
@@ -439,7 +445,7 @@ The reminders web app uses a separate short-lived web enrollment token in the `/
 
 ## Desktop Reading capture
 
-`reading/obsidian-vault.ts` binds snapshots to Obsidian file identities and owns
+`reading/data/obsidian-vault.ts` binds snapshots to Obsidian file identities and owns
 discovery, guarded reads/writes, and file-event revisions. `reading/runtime.ts`
 owns configuration, policy refresh, scheduling and lifecycle cleanup.
 `ReadingLibrary.close()` closes admission and drains its accepted mutation and
@@ -545,7 +551,9 @@ Its screen-facing contract groups connection, sync, mutations, editor, status an
 presentation models. The always-mounted provider retains hydration, recovery and
 update-readiness registration when the reminders screen is hidden.
 `useReminderSync` owns the confirmed snapshot, hydrates it from the offline copy
-after startup and exposes reads and explicit commit/reset operations. Indexing progress is separate from failure state, so an
+after startup and exposes reads and explicit commit/reset operations.
+`reminder-list-response.ts` decides what a list response or failure means (304, invalid
+body, disk fallback); the hook applies that outcome. Indexing progress is separate from failure state, so an
 HTTP 202 preparation response remains a syncing status without recovery attention.
 Outbox consumers cannot independently replace its refs or React state. `useReminderEditor`
 owns editor presentation, synchronous tap opening, close transitions, recovered
@@ -586,12 +594,17 @@ Reading adds its own capability requirements; shared feature settings require
 only their own capability.
 
 `worker/coordinator/` holds the Durable Object. `ReminderAlarm` retains the class,
-storage identities, and mutation lock. `coordinator.ts` names every role instance
+storage identities, and mutation lock; `worker/notifications/reminder-schedule.ts`
+owns the per-reminder schedule, cancellation, delivery and retry state. `coordinator.ts` names every role instance
 (coordinator, notification dispatcher, maintenance, Reading, transfer pools and
 one instance per reminder) and owns the internal endpoint paths behind typed
 helpers. `coordinator-requests.ts` dispatches those endpoints with that lock,
 keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
-maintenance, and projection roles; reminder delivery stays in `ReminderAlarm`.
+maintenance, and projection roles; other alarms deliver the instance's reminder.
+
+`worker/sync/import/` holds the server side of the initial import and its reminder
+readiness. `worker/sync/staging/` holds staged uploads, bulk new-file commits and
+the upload committers that publish them.
 
 `worker/sync/batch/upload-validation.ts` decodes and validates upload candidates and
 request budgets before storage work. `worker/sync/batch/upload.ts` retains receipt
@@ -683,7 +696,7 @@ Sync deletes require both the acknowledged content hash and opaque file revision
 
 See [the protocol contract](protocol.md) and [backup and recovery](recovery.md).
 
-Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extraction and Markdown edits. `pwa/reading/encrypted-api.ts` owns the conditional ciphertext transport; `pwa/connection/` owns app enrollment and shared verification, while `pwa/reading/encryption-session.ts` and `private-storage.ts` adapt that readiness to Reading's protected local storage. The Worker stores ciphertext and public key/policy metadata; its plaintext Reading projector/extractor remains only for unencrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
+Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extraction and Markdown edits. `pwa/reading/encrypted-api.ts` owns the conditional ciphertext transport; `pwa/connection/` owns app enrollment and shared verification, while `pwa/reading/session/encryption-session.ts` and `storage/private-storage.ts` adapt that readiness to Reading's protected local storage. The Worker stores ciphertext and public key/policy metadata; its plaintext Reading projector/extractor remains only for unencrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
 
 `encryption/file-inventory.ts` validates shared encrypted inventory pages and bounds
 traversal independently of file counts. Reading and Reminders retain their own file

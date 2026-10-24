@@ -1,20 +1,22 @@
 import type { PendingReading } from './outbox';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ReadingSession } from './storage';
+import type { ReadingSession } from './session/session';
 import { drainReading, queueReading } from './outbox';
-import { pendingReading, savePendingReading } from './storage';
+import { pendingReading, savePendingReading } from './storage/storage';
 
 const storage = vi.hoisted(() => ({ values: new Map<string, unknown>(), current: true }));
-vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
-vi.mock('./storage', () => ({
+vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
+vi.mock('./session/session', () => ({
 	READING_SESSION_KEY: 'reading-session',
-  pruneReadingAttempts: vi.fn(async () => {}),
 	assertReadingSession: () => { if (!storage.current) throw new Error('Reading sign-in changed.'); },
+}));
+vi.mock('./storage/storage', () => ({
+  pruneReadingAttempts: vi.fn(async () => {}),
 	readingLock: async <T>(action: () => Promise<T>) => action(),
 	readingDrainLock: async <T>(action: () => Promise<T>) => action(),
 	pendingReading: async (session: ReadingSession) => structuredClone(storage.values.get(`pending:${session.id}`) ?? []) as PendingReading[],
 	savePendingReading: vi.fn(async (session: ReadingSession, value: PendingReading[]) => { storage.values.set(`pending:${session.id}`, structuredClone(value)); }),
-	commitReadingCache: async (_session: ReadingSession, cache: import('./cache').ReadingCache) => cache,
+	commitReadingCache: async (_session: ReadingSession, cache: import('./storage/cache').ReadingCache) => cache,
 }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });

@@ -4,7 +4,7 @@
 
 import { renderAppearanceSettings } from './settings/appearance-section';
 import { createSettingsDisclosure } from './plugin/settings-disclosure';
-import { createSettingsSectionHeading } from './settings/section-helpers';
+import { createSettingsSectionHeading, type SettingsSection } from './settings/section-helpers';
 import { renderUsageSection } from './settings/infrastructure/usage-section';
 import { renderConnectionStatus } from './settings/infrastructure/connection-status';
 import { App, PluginSettingTab, Setting } from 'obsidian';
@@ -14,7 +14,7 @@ import { renderConfigSection, renderServerSection, renderServerUpdateNotice } fr
 import { renderDevicesSection } from './settings/devices-section';
 import { renderInfrastructureSection, renderServerActions } from './settings/infrastructure/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
-import { renderRemindersSection } from './settings/reminders-section';
+import { renderRemindersSettings } from '../reminders/ui/plugin/settings-section';
 import { renderNotificationsSection } from './settings/notifications-section';
 import { renderCrateWebApp } from './settings/reminders-web-app';
 import { renderReadingSettings } from '../reading/ui/plugin/settings-section';
@@ -48,29 +48,25 @@ export class CrateSettingTab extends PluginSettingTab {
 			hasDeployment: Boolean(this.plugin.settings.cloudflareDeployment?.d1DatabaseId),
 		});
 
-		renderServerUpdateNotice({ containerEl, plugin: this.plugin, rerender: () => this.update() });
+		this.renderSection(renderServerUpdateNotice, containerEl);
 
 		if (!isConfigured) {
 			new Setting(containerEl).setName('Plugin version').setDesc(this.plugin.manifest.version);
-			renderConfigSection({ containerEl, plugin: this.plugin, rerender: () => this.update() });
-			renderForgetServerSetting({ containerEl, plugin: this.plugin, rerender: () => this.update() });
+			this.renderSection(renderConfigSection, containerEl);
+			this.renderSection(renderForgetServerSetting, containerEl);
 		}
 		if (isConfigured) {
 			createSettingsSectionHeading(containerEl, 'Sync');
-			this.cleanupFns.push(renderConnectionStatus(containerEl, this.plugin));
+			this.renderSection(renderConnectionStatus, containerEl);
 		}
 
 		if (sections.showSync) {
-			this.cleanupFns.push(renderSyncSection({
-				containerEl,
-				plugin: this.plugin,
-				rerender: () => this.update(),
-			}));
+			this.renderSection(renderSyncSection, containerEl);
 		}
 
 		if (isConfigured) {
-			renderCrateWebApp(containerEl, this.plugin);
-			renderAppearanceSettings({ containerEl, plugin: this.plugin, rerender: () => this.update() });
+			this.renderSection(renderCrateWebApp, containerEl);
+			this.renderSection(renderAppearanceSettings, containerEl);
 		}
 
 		if (sections.showReminders || sections.showReading || sections.showNotifications) {
@@ -78,24 +74,15 @@ export class CrateSettingTab extends PluginSettingTab {
 		}
 
 		if (sections.showReminders) {
-			const remindersEl = containerEl.createDiv({ cls: 'crate-reminders-settings' });
-			this.cleanupFns.push(renderRemindersSection({
-				containerEl: remindersEl,
-				plugin: this.plugin,
-				rerender: () => this.update(),
-			}));
+			this.renderSection(renderRemindersSettings, containerEl.createDiv({ cls: 'crate-reminders-settings' }));
 		}
 
 		if (sections.showReading) {
-			this.cleanupFns.push(renderReadingSettings(containerEl, this.plugin, () => this.update()));
+			this.renderSection(renderReadingSettings, containerEl);
 		}
 
 		if (sections.showNotifications) {
-			this.cleanupFns.push(renderNotificationsSection({
-				containerEl,
-				plugin: this.plugin,
-				rerender: () => this.update(),
-			}));
+			this.renderSection(renderNotificationsSection, containerEl);
 		}
 
 		if (isConfigured || sections.showInfrastructure) {
@@ -106,23 +93,23 @@ export class CrateSettingTab extends PluginSettingTab {
 			createSettingsDisclosure(containerEl, 'Account and devices', {
 				summary: this.plugin.settings.cloudflareDeployment?.accountName ?? 'Connection and sessions',
 				onOpen: accountEl => {
-					renderConfigSection({ containerEl: accountEl, plugin: this.plugin, rerender: () => this.update() }, false);
-					this.cleanupFns.push(renderDevicesSection({ containerEl: accountEl, plugin: this.plugin }));
+					this.renderSection(context => renderConfigSection(context, false), accountEl);
+					this.renderSection(renderDevicesSection, accountEl);
 				},
 			});
 			if (this.plugin.settings.cloudflareDeployment?.accountId) {
 				createSettingsDisclosure(containerEl, 'Usage', {
 					summary: 'Cloudflare account usage and allowances',
 					onOpen: content => {
-						this.cleanupFns.push(renderUsageSection(content, this.plugin));
+						this.renderSection(renderUsageSection, content);
 					},
 				});
 			}
 			const serverEl = createSettingsDisclosure(containerEl, 'Server', {
 				summary: 'Versions, backups, and management',
 				onOpen: content => {
-					renderServerSection({ containerEl: content, plugin: this.plugin, rerender: () => this.update() });
-					renderServerActions({ containerEl: content, plugin: this.plugin, isConfigured, rerender: () => this.update() });
+					this.renderSection(renderServerSection, content);
+					this.renderSection(context => renderServerActions({ ...context, isConfigured }), content);
 				},
 			});
 			if (this.plugin.settings.cloudflareDeployment?.reset || this.plugin.settings.cloudflareRestore && this.plugin.settings.cloudflareRestore.phase !== 'complete') {
@@ -139,15 +126,15 @@ export class CrateSettingTab extends PluginSettingTab {
 		}
 
 		if (sections.showInfrastructure) {
-			renderInfrastructureSection({
-				containerEl,
-				plugin: this.plugin,
-				isConfigured,
-				rerender: () => this.update(),
-			});
+			this.renderSection(context => renderInfrastructureSection({ ...context, isConfigured }), containerEl);
 		}
 		restoreSettingsView(containerEl, viewState);
 
+	}
+
+	private renderSection(section: SettingsSection, containerEl: HTMLElement): void {
+		const cleanup = section({ containerEl, plugin: this.plugin, rerender: () => this.update() });
+		if (cleanup) this.cleanupFns.push(cleanup);
 	}
 
 	hide(): void {

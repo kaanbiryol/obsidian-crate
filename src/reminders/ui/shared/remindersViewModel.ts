@@ -6,6 +6,7 @@ import { getUpcomingReminders, selectTodayReminders } from "@/reminders/core/rem
 import { isReminderOverdue } from "@/reminders/core/dates/reminderDate";
 import type { Reminder } from "@/reminders/types/reminder";
 import type { TabId } from "@/reminders/ui/shared/layoutConstants";
+import { reminderProject } from "@/reminders/core/reminderProjectPath";
 
 export type ViewMode = TabId;
 
@@ -26,7 +27,7 @@ export interface CurrentHeaderData extends RemindersHeaderStats {
 }
 
 export function getReminderProjects(reminders: Reminder[]): string[] {
-  return Array.from(new Set(reminders.map((reminder) => reminder.project || DEFAULT_PROJECT))).sort(compareProjects);
+  return Array.from(new Set(reminders.map(reminderProject))).sort(compareProjects);
 }
 
 export function getRemindersHeaderData(
@@ -37,7 +38,7 @@ export function getRemindersHeaderData(
 ): RemindersHeaderData {
   const activeReminders = reminders.filter((reminder) => !reminder.completed);
   const inboxReminders = activeReminders.filter(
-    (reminder) => (reminder.project || DEFAULT_PROJECT) === DEFAULT_PROJECT,
+    (reminder) => reminderProject(reminder) === DEFAULT_PROJECT,
   );
   const uniqueTodayReminders = selectTodayReminders(activeReminders, now, false);
   const upcomingReminders = getUpcomingReminders(activeReminders, upcomingDays, now);

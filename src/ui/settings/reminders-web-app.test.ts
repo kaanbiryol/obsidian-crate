@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 import { createVaultKeyBundle, generateRecoveryCode } from '../../encryption/key-bundle';
 import { SECRET_KEYS } from '../../platform/secret-keys';
+import { fakeWithCurrentApi } from '../../test/fakes/sync-runtime';
 
 const openExternalBrowserModal = vi.fn<(app: unknown, url: string, options: { linkText: string }) => void>();
 
@@ -23,10 +24,13 @@ async function setup(encrypted = true, isMobile = false) {
     settings: { pushEnabled: false, reading: { folderPath: 'Reading' } },
     remindersSettings: { remindersFolderPath: 'Reminders' },
     secretStorage: { get: (key: string) => secrets.get(key) ?? null },
-    syncRuntime: { getApiClient: vi.fn(() => api) },
+    syncRuntime: {
+      getApiClient: vi.fn(() => api),
+      withCurrentApi: fakeWithCurrentApi((): typeof api => plugin.syncRuntime.getApiClient()),
+    },
   };
   const { renderCrateWebApp } = await import('./reminders-web-app');
-  renderCrateWebApp(new FakeElement('div') as never, plugin as never);
+  renderCrateWebApp({ containerEl: new FakeElement('div') as never, plugin: plugin as never });
   return { recovery, secrets, api, open, plugin, button: MockSetting.instances.at(-1)!.buttons[0]! };
 }
 

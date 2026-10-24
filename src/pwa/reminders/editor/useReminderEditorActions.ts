@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef } from 'react';
 import { discardReminderDraft } from './reminder-drafts';
-import { capturePwaSession } from '../../session-generation';
+import { capturePwaSession } from '../../connection/session-generation';
 import type { ShowToast } from '../../types';
 import type { ModalMode, ModalState } from '../types';
 import type { useReminderEditor } from './useReminderEditor';

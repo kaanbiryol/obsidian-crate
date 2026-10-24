@@ -18,7 +18,7 @@ const { outputFiles } = await build({
     let lastSync = null;
     const deps = {
       getState: () => ({ status, initializing, lastSync, lastError: null, pendingChanges: 0, conflictCount: 0 }),
-      getPendingPaths: () => [], getActiveConflicts: () => [],
+      getPendingKeys: () => [], getActiveConflicts: () => [],
       sync: async () => window.setSyncing(true),
       addStateChangeListener: fn => listeners.add(fn), removeStateChangeListener: fn => listeners.delete(fn),
     };

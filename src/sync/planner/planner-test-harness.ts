@@ -60,7 +60,7 @@ export function createIncrementalHarness(overrides: Partial<{
 		setLastSeq: lastSeq => updateSyncProgress(settings, { lastSeq }),
 		vault: vault as never,
 		fileManager,
-		api,
+		files: api,
 		localManifest,
 		throwIfDestroyed: vi.fn(),
 		shouldIgnore: vi.fn(overrides.shouldIgnore ?? (() => false)),

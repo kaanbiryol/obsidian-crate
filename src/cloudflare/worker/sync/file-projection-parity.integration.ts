@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
-import { commitNewFiles } from './bulk-new-file-commit';
+import { commitNewFiles } from './staging/bulk-new-file-commit';
 import { commitStagedFile } from './mutations';
 import { handleBatchUpload } from './batch/upload';
 import { writeCommittedMarkdownFile } from '../storage';

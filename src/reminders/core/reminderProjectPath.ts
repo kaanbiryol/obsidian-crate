@@ -1,3 +1,5 @@
+import { DEFAULT_PROJECT } from './constants';
+
 const MAX_PROJECT_PATH_LENGTH = 256;
 
 function containsControlCharacters(value: string): boolean {
@@ -49,4 +51,9 @@ export function requireReminderProjectPath(value: unknown): string {
 export function getReminderProjectFilePath(folderPath: string, project: unknown): string {
 	const normalizedProject = requireReminderProjectPath(project);
 	return `${folderPath}/${normalizedProject}.md`;
+}
+
+/** A reminder's project, with a missing or empty project shown as the default. */
+export function reminderProject(reminder: { project?: string | null }): string {
+	return reminder.project || DEFAULT_PROJECT;
 }

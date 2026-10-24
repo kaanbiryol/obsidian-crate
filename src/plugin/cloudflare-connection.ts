@@ -4,7 +4,8 @@ import { getPluginLifecycleSignal } from './lifecycle-state';
 import { SyncApiClient } from '../sync/worker-api/client';
 import { applySharedSettings, buildSharedSettings } from '../sync/connection/shared-settings';
 import type { SharedSettings } from '../protocol/shared-settings';
-import { createLogger, errorMessage } from '../sync/logger';
+import { createLogger } from '../sync/logger';
+import { errorMessage } from '../platform/logger';
 
 const logger = createLogger('CloudflareConnection');
 

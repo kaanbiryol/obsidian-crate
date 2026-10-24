@@ -29,7 +29,7 @@ const { outputFiles } = await build({ write: false, bundle: true, format: 'iife'
     });
   `,
 } });
-const css = compileString("@use 'src/styles/plugin/activity'; @use 'src/ui/shared/styles/tokens'; .crate-reminders-ui { @include tokens.styles; }", { loadPaths: [process.cwd()] }).css;
+const css = compileString("@use 'src/ui/activity/styles/activity'; @use 'src/ui/shared/styles/tokens'; .crate-reminders-ui { @include tokens.styles; }", { loadPaths: [process.cwd()] }).css;
 await mkdir('.generated/activity-errors', { recursive: true });
 for (const browserType of [chromium, webkit]) {
   const browser = await browserType.launch();

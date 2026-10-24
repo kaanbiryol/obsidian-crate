@@ -98,7 +98,7 @@ old source records and cancels old projections without reading those files.
 Run the initial-import regression with:
 
 ```sh
-npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/initial-import.integration.ts --reporter=verbose
+npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/import/initial-import.integration.ts --reporter=verbose
 ```
 
 The normal eight-file upload path retains per-file receipts and changelog entries.
@@ -116,7 +116,7 @@ are not predictions of hosted completion times.
 Run the benchmark with:
 
 ```sh
-npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/bulk-new-upload-benchmark.integration.ts --reporter=verbose
+npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/staging/bulk-new-upload-benchmark.integration.ts --reporter=verbose
 ```
 
 Recovery tests cover response loss, interrupted R2 staging, failed transactions,

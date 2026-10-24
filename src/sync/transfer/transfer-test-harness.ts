@@ -60,7 +60,7 @@ export function createTransferHarness() {
 			context: {
 				vault: vault as never,
 				fileManager,
-				api,
+				files: api,
 				localManifest,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				retryWithBackoff: retryWithBackoffTyped,

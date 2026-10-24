@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
-import { switchFeature } from './pwa-feature-navigation.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { switchFeature } from '../support/pwa-feature-navigation.mjs';
 
 // Real PWA UI, recovery cryptography and IndexedDB; only HTTP data is a fixture.
 // Separate browser contexts model iOS storage separation, not OS installation.

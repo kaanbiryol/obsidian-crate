@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { newReminderOperationId } from './reminder-operation-id';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
-import { invalidatePwaSession } from '../../session-generation';
+import { invalidatePwaSession } from '../../connection/session-generation';
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 function info(day?: number) {

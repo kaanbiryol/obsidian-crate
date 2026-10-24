@@ -2,7 +2,7 @@ import type { Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../../../plugin/settings-types';
 import { SyncApiClient } from '../../../sync/worker-api/client';
 import { SyncEngine } from '../../../sync/engine/engine';
-import type { EngineFileOperations } from '../../../sync/engine/file-operations';
+import { createEngineFileOperations, type EngineFileOperations } from '../../../sync/engine/file-operations';
 import type { ApiHttpTransport } from '../../../sync/worker-api/http';
 import type { FileManifest } from '../../../protocol/sync-types';
 import { parseCheckpoint, type ManifestCheckpoint } from '../../../sync/manifest/manifest-checkpoint';
@@ -39,13 +39,13 @@ export class SyncTestDevice {
 
 	async open(): Promise<void> {
 		this.api = new SyncApiClient(this.settings.workerUrl, this.id, this.transport);
-		// Retain the real engine boundary for scenario fault injection, without private-field casts.
-		const createFiles = this.api.createFileOperations.bind(this.api);
-		this.api.createFileOperations = (...args) => (this.files = createFiles(...args));
 		this.engine = new SyncEngine({
 			manifest: { dir: TEST_PLUGIN_DIR },
 			app: { vault: this.disk.vault, fileManager: {}, workspace: { onLayoutReady: () => {} } },
-		} as unknown as Plugin, this.api, this.settings);
+		} as unknown as Plugin, this.api, this.settings, {
+			// Retain the real engine boundary for scenario fault injection, without private-field casts.
+			createFiles: (...args) => (this.files = createEngineFileOperations(...args)),
+		});
 		await this.engine.initialize();
 	}
 

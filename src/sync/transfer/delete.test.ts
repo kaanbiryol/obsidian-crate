@@ -9,7 +9,7 @@ const files = (count: number) => Array.from({ length: count }, (_, i) => ({ path
 
 function harness(batchDelete: ConditionalDeleteApi['batchDelete']) {
 	const context = {
-		api: { batchDelete: vi.fn(batchDelete) },
+		files: { batchDelete: vi.fn(batchDelete) },
 		vault: { getAbstractFileByPath: () => null, adapter: { exists: async () => false } } as never,
 		localManifest: { removeEntry: vi.fn(), save: vi.fn(async () => {}) },
 		reportWork: vi.fn(),
@@ -29,15 +29,15 @@ describe('shared remote deletion', () => {
 		});
 		const result = createEmptySyncResult();
 		const pending = deleteRemoteFiles(h, files(13), result);
-		await vi.waitFor(() => expect(h.api.batchDelete).toHaveBeenCalledTimes(2));
+		await vi.waitFor(() => expect(h.files.batchDelete).toHaveBeenCalledTimes(2));
 		gates[0]!.resolve();
-		await vi.waitFor(() => expect(h.api.batchDelete).toHaveBeenCalledTimes(3));
+		await vi.waitFor(() => expect(h.files.batchDelete).toHaveBeenCalledTimes(3));
 		gates[1]!.resolve();
-		await vi.waitFor(() => expect(h.api.batchDelete).toHaveBeenCalledTimes(4));
+		await vi.waitFor(() => expect(h.files.batchDelete).toHaveBeenCalledTimes(4));
 		gates[2]!.resolve(); gates[3]!.resolve();
 		expect(await pending).toEqual([]);
 		expect(peak).toBe(2);
-		expect(h.api.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([4, 4, 4, 1]);
+		expect(h.files.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([4, 4, 4, 1]);
 		expect(result.deletedPaths).toEqual(files(13).map(file => file.path));
 		expect(h.reportWork).toHaveBeenLastCalledWith({ phase: 'deleting', current: 13, total: 13 });
 	});
@@ -53,12 +53,12 @@ describe('shared remote deletion', () => {
 		const result = createEmptySyncResult();
 		const pending = deleteRemoteFiles(h, files(12), result);
 		const assertion = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
-		await vi.waitFor(() => expect(h.api.batchDelete).toHaveBeenCalledTimes(2));
+		await vi.waitFor(() => expect(h.files.batchDelete).toHaveBeenCalledTimes(2));
 		cancelled.resolve();
 		await Promise.resolve();
 		accepted.resolve();
 		await assertion;
-		expect(h.api.batchDelete).toHaveBeenCalledTimes(2);
+		expect(h.files.batchDelete).toHaveBeenCalledTimes(2);
 		expect(result.deletedPaths).toEqual(files(4).map(file => file.path));
 		expect(h.localManifest.removeEntry).toHaveBeenCalledTimes(4);
 		expect(h.localManifest.save).toHaveBeenCalledOnce();
@@ -69,7 +69,7 @@ describe('shared remote deletion', () => {
 		const result = createEmptySyncResult();
 		result.errors.push('Upload failed');
 		expect(await deleteRemoteFiles(h, files(5), result)).toHaveLength(5);
-		expect(h.api.batchDelete).not.toHaveBeenCalled();
+		expect(h.files.batchDelete).not.toHaveBeenCalled();
 		expect(h.localManifest.removeEntry).not.toHaveBeenCalled();
 	});
 
@@ -78,10 +78,10 @@ describe('shared remote deletion', () => {
 		const h = harness(async () => { await gate.promise; throw new HttpError('Access denied', 401); });
 		const result = createEmptySyncResult();
 		const pending = deleteRemoteFiles(h, files(13), result);
-		await vi.waitFor(() => expect(h.api.batchDelete).toHaveBeenCalledTimes(2));
+		await vi.waitFor(() => expect(h.files.batchDelete).toHaveBeenCalledTimes(2));
 		gate.resolve();
 		const failures = await pending;
-		expect(h.api.batchDelete).toHaveBeenCalledTimes(2);
+		expect(h.files.batchDelete).toHaveBeenCalledTimes(2);
 		expect(failures).toHaveLength(13);
 		expect(new Set(failures.map(failure => failure.path)).size).toBe(13);
 		expect(h.localManifest.removeEntry).not.toHaveBeenCalled();
@@ -115,7 +115,7 @@ describe('shared remote deletion', () => {
 		const result = createEmptySyncResult();
 		const failures = await deleteRemoteFiles(h, files(1), result, { onVersionConflicts });
 		expect(failures).toMatchObject([{ path: 'old-0.md', code: 'version_conflict' }]);
-		expect(h.api.batchDelete).not.toHaveBeenCalled();
+		expect(h.files.batchDelete).not.toHaveBeenCalled();
 		expect(onVersionConflicts).toHaveBeenCalledOnce();
 		expect(result.errors).toEqual([]);
 	});

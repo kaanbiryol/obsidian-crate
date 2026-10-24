@@ -6,9 +6,9 @@ import { checkSettingsNavigation } from './pwa-settings-navigation-checks.mjs';
 import { checkInstallSettings } from './pwa-settings-install-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
-import { switchFeature, installFeatureNavigation } from './pwa-feature-navigation.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { switchFeature, installFeatureNavigation } from '../support/pwa-feature-navigation.mjs';
 
 async function expectTheme(page, scheme, preference) {
 	await expect(page.locator('html')).toHaveAttribute('data-pwa-color-scheme', scheme);
@@ -258,6 +258,7 @@ try {
 				tx.objectStore('values').put([{ id: 'settings-pending', sessionId: session.id, action: 'capture',
 					intent: { url: 'https://example.com/pending', title: 'Keep this pending link' }, review: true, error: 'Saved Reading change needs review.' }], 'pending:' + session.id);
 				await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+				// READING_CHANGED_EVENT in src/pwa/reading/session/session.ts.
 				db.close(); window.dispatchEvent(new Event('crate-reading-change'));
 			});
 			await gear.click();

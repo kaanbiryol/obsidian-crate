@@ -1,8 +1,9 @@
 import { Notice, Setting, type TextComponent, type ToggleComponent, type ButtonComponent } from 'obsidian';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import type CratePlugin from '../../plugin/CratePlugin';
-import { errorMessage } from '../../sync/logger';
+import { errorMessage } from '../../platform/logger';
 import { normalizeTimeString } from '../../reminders/settings';
+import { saveNotificationPolicy } from '../../reminders/notification-policy-sync';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import type { SyncApiClient } from '../../sync/worker-api/client';
 import type { SettingsSectionContext } from './section-helpers';
@@ -21,13 +22,7 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
     await openedPolicy;
     if (loadError) throw new Error(errorMessage(loadError));
     if (!policyApi) throw new Error('Connect to the sync server before changing notifications');
-    const initial = { folderPath: plugin.remindersSettings.remindersFolderPath,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      allDayTime: plugin.remindersSettings.allDayNotificationTime, enabled: plugin.settings.pushEnabled };
-    if (!policy) policy = (await policyApi.ensureNotificationPolicy(initial)).policy;
-    // Even initialization can race another device. Apply explicit changes using
-    // the server's returned revision and retain its timezone and folder.
-    policy = (await policyApi.updateNotificationPolicy({ ...policy, ...patch })).policy;
+    await saveNotificationPolicy(policyApi, plugin, policy, patch, saved => { policy = saved; });
   };
   const content = createSettingsDisclosure(containerEl, 'Notifications', {
     summary: plugin.settings.pushEnabled ? 'On · schedule, timezone, and devices' : 'Off',

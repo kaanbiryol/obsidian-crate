@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ReadingConnection } from './useReadingConnection';
+import type { ReadingConnection } from './session/useReadingConnection';
 import type { PendingReading } from './outbox';
-import { assertReadingSession, hasEarlierReadingChanges, pendingReading, readReadingCache, readReadingDraft, readReadingShare, saveReadingDraft, type ReadingCache, type ReadingSession } from './storage';
-import { sameReadingSession } from './session';
+import { hasEarlierReadingChanges, pendingReading, readReadingCache, readReadingDraft, readReadingShare, saveReadingDraft, type ReadingCache } from './storage/storage';
+import { assertReadingSession, type ReadingSession } from './session/session';
+import { sameReadingSession } from './session/session';
 
 interface ReadingSyncPublication {
   pending: PendingReading[];

@@ -4,7 +4,7 @@ import { rebuildCheckboxLine, parseCheckboxLine } from './grammar/checkboxParser
 import { scanReminderMarkdownContent } from './markdownScan';
 import { buildCreatedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent } from './markdownReminderFile';
-import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
+import { buildModalDraft } from '@/pwa/reminders/editor/reminder-drafts';
 import { deriveDraftPatchFromContent } from '@/pwa/reminders/editor/editor-draft';
 import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';

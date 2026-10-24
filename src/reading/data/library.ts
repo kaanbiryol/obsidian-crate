@@ -1,12 +1,13 @@
 import { youtubeVideoId } from '../core/youtube';
 import { enrichReadingBookmark } from '../core/duplicates';
+import { filterUniqueReadingIds, findSavedReadingLink } from '../core/inventory';
 import { applyLocalArticle } from '../core/article';
 import { isEmptyReadingCapture, readingUpdateIssue } from '../core/mutation-policy';
 import type { CapturedArticle } from '../extraction/types';
 import { isGeneratedCapturePath, readingCapturePath } from '../core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { adoptReadingClip, createReadingNote, parseReadingNote, recordMarkdownHighlights, updateReadingNote } from '../core/notes';
-import { MAX_READING_BYTES, readingUrlIdentity, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
+import { MAX_READING_BYTES, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontmatter';
 
 export interface ReadingFile { path: string; size: number; modifiedAt: number; revision?: string }
@@ -135,13 +136,8 @@ export class ReadingLibrary {
 					issues.push({ path: file.path, message: error instanceof Error ? error.message : 'Could not read this note.' });
 				}
 			}
-			const counts = new Map<string, number>();
-			for (const item of items) counts.set(item.crate_reading_id, (counts.get(item.crate_reading_id) ?? 0) + 1);
-			const unique = items.filter(item => {
-				if (counts.get(item.crate_reading_id) === 1) return true;
-				issues.push({ path: item.path, message: 'Another note has the same reading ID. Resolve the duplicate before editing here.' });
-				return false;
-			});
+			const { unique, duplicates } = filterUniqueReadingIds(items);
+			for (const item of duplicates) issues.push({ path: item.path, message: 'Another note has the same reading ID. Resolve the duplicate before editing here.' });
 			unique.sort((a, b) => b.saved_at.localeCompare(a.saved_at) || a.crate_reading_id.localeCompare(b.crate_reading_id));
 			// Rescans after unrelated changes find the same notes; keep listeners quiet.
 			const previous = this.snapshot;
@@ -159,11 +155,9 @@ export class ReadingLibrary {
 	add(url: string, title?: string, fetchArticle = true): Promise<{ item: ReadingItem; duplicate: boolean }> {
 		return this.enqueue(async () => {
 			await this.scan();
-			const identity = readingUrlIdentity(url);
-			const matches = this.snapshot.items.filter(item => item.source_url && readingUrlIdentity(item.source_url) === identity);
-			if (matches.length > 1) throw new Error('Multiple notes already save this link. Open reading to choose one.');
-			const existing = matches[0];
-			if (existing) return { item: existing, duplicate: true };
+			const saved = findSavedReadingLink(this.snapshot.items, url);
+			if (saved.kind === 'many') throw new Error('Multiple notes already save this link. Open reading to choose one.');
+			if (saved.kind === 'one') return { item: saved.item, duplicate: true };
 			const id = crypto.randomUUID();
 			const note = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
 			const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });

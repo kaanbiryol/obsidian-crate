@@ -98,7 +98,7 @@ describe('multiple real sync engines across Worker and storage boundaries', () =
 				beforeBinaryReplace: path => second.engine.prepareRecoverableReplacement(path), beforeKeepLocal: () => second.engine.acceptIncomingConflictBaseline(record),
 			});
 		await second.engine.runConflictResolution(() => review.resolve(choice));
-		expect(second.engine.getPendingPaths()).toContain('image.bin');
+		expect(second.engine.getPendingKeys()).toContain('image.bin');
 		second.close();
 		await second.open();
 		await sync(second);

@@ -1,6 +1,6 @@
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
 import { checkSaveLinkKeyboard } from './pwa-sheet-field-checks.mjs';
 import { checkSheetDragPosition } from './pwa-sheet-drag-checks.mjs';
 

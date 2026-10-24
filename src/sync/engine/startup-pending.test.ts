@@ -40,7 +40,7 @@ async function setup() {
 async function restore(h: Awaited<ReturnType<typeof setup>>) {
 	await h.engine.initialize();
 	expect(h.engine.getState().initializing).toBe(true);
-	expect(h.engine.getPendingPaths()).toEqual([]);
+	expect(h.engine.getPendingKeys()).toEqual([]);
 	h.workspace.runLayoutReady();
 	await h.engine.waitForIdle();
 	expect(h.engine.getState().initializing).toBe(false);
@@ -55,8 +55,8 @@ describe('pending changes after restart with automatic sync off', () => {
 		h.vault.getFiles.mockReturnValue([...files, { path: 'delete:note.md', extension: 'md', stat: { size: original.byteLength, mtime: 1000 } }]);
 		try {
 			await restore(h);
-			expect(h.engine.getPendingPaths()).toContain('delete:note.md');
-			expect(h.engine.getPendingPaths()).toContain(pendingChangeKey('delete', 'note.md'));
+			expect(h.engine.getPendingKeys()).toContain('delete:note.md');
+			expect(h.engine.getPendingKeys()).toContain(pendingChangeKey('delete', 'note.md'));
 		} finally { h.engine.destroy(); }
 	});
 
@@ -77,7 +77,7 @@ describe('pending changes after restart with automatic sync off', () => {
 			await h.engine.waitForIdle();
 			await runPeriodicCheck(h.engine);
 
-			expect(h.engine.getPendingPaths().sort()).toEqual(['edited.md', 'existing.md']);
+			expect(h.engine.getPendingKeys().sort()).toEqual(['edited.md', 'existing.md']);
 			expect(h.engine.getState()).toMatchObject({ status: 'idle', lastSync: null, pendingChanges: 2 });
 			for (const call of [h.api.checkForChanges, h.api.getChanges, h.api.getManifest, h.api.uploadFile, h.api.batchUpload, h.api.batchDownload, h.api.batchDelete, h.api.recoverUploads]) {
 				expect(call).not.toHaveBeenCalled();
@@ -93,7 +93,7 @@ describe('pending changes after restart with automatic sync off', () => {
 		const h = await setup();
 		try {
 			await restore(h);
-			expect(h.engine.getPendingPaths().sort()).toEqual([
+			expect(h.engine.getPendingKeys().sort()).toEqual([
 				'.hidden.md', 'added.md', pendingChangeKey('delete', 'deleted.md'), pendingChangeKey('delete', 'old-name.md'), 'edited.md', 'new-name.md',
 			].sort());
 			expect(h.engine.getState()).toMatchObject({ status: 'idle', pendingChanges: 6, lastSync: h.settings.lastSync });
@@ -114,8 +114,8 @@ describe('pending changes after restart with automatic sync off', () => {
 			h.engine.onFileDelete({ path: 'edited.md' } as never);
 			reading.resolve(toArrayBuffer('modified'));
 			await h.engine.waitForIdle();
-			expect(h.engine.getPendingPaths()).toContain(pendingChangeKey('delete', 'edited.md'));
-			expect(h.engine.getPendingPaths()).not.toContain('edited.md');
+			expect(h.engine.getPendingKeys()).toContain(pendingChangeKey('delete', 'edited.md'));
+			expect(h.engine.getPendingKeys()).not.toContain('edited.md');
 		} finally { h.engine.destroy(); }
 	});
 
@@ -130,7 +130,7 @@ describe('pending changes after restart with automatic sync off', () => {
 			await h.engine.sync();
 			reading.resolve(toArrayBuffer('modified'));
 			await h.engine.waitForIdle();
-			expect(h.engine.getPendingPaths()).toEqual([]);
+			expect(h.engine.getPendingKeys()).toEqual([]);
 		} finally { h.engine.destroy(); }
 	});
 
@@ -150,7 +150,7 @@ describe('pending changes after restart with automatic sync off', () => {
 		h.engine.destroy();
 		h.workspace.runLayoutReady();
 		await h.engine.waitForIdle();
-		expect(h.engine.getPendingPaths()).toEqual([]);
+		expect(h.engine.getPendingKeys()).toEqual([]);
 	});
 });
 
@@ -188,7 +188,7 @@ describe('startup pending scan cost', () => {
 		mtimes.set(paths[150]!, 2000);
 		try {
 			await restore(h);
-			expect(h.engine.getPendingPaths()).toEqual([paths[150]]);
+			expect(h.engine.getPendingKeys()).toEqual([paths[150]]);
 			// Before: 200 reads. Now: 32 rotated checks plus the one edited file.
 			expect(reads()).toBe(VERIFICATION_FILE_BUDGET + 1);
 		} finally { h.engine.destroy(); recovery.mockRestore(); }
@@ -201,14 +201,14 @@ describe('startup pending scan cost', () => {
 		disk.set(paths[39]!, toArrayBuffer('changed!'));
 		try {
 			await restore(h);
-			expect(h.engine.getPendingPaths()).toEqual([]);
+			expect(h.engine.getPendingKeys()).toEqual([]);
 			const listings = h.vault.adapter.list.mock.calls.length;
 			const before = reads();
 
 			await vi.advanceTimersByTimeAsync(LOCAL_CONTENT_CHECK_INTERVAL_MS);
 			await h.engine.waitForIdle();
 
-			expect(h.engine.getPendingPaths()).toEqual([paths[39]]);
+			expect(h.engine.getPendingKeys()).toEqual([paths[39]]);
 			expect(reads() - before).toBe(VERIFICATION_FILE_BUDGET);
 			expect(h.vault.adapter.list.mock.calls.length).toBe(listings);
 			for (const call of [h.api.checkForChanges, h.api.getChanges, h.api.getManifest, h.api.batchUpload, h.api.uploadFile]) {

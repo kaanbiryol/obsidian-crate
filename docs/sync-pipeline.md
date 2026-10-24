@@ -59,8 +59,8 @@ Entry point: `planner/incremental.ts:runIncrementalSync()`.
 The coordinator retains phase ordering, progress, manifest saves and cursor
 advancement. `incremental-changelog.ts` handles pagination and path deduplication;
 `incremental-remote-reconciliation.ts` keeps fresh local reads and guarded deletes
-together and returns edits discovered after the scan. `incremental-local-deletes.ts`
-propagates local deletions only after earlier uploads and reconciliation succeed.
+together and returns edits discovered after the scan. The coordinator propagates
+local deletions only after earlier uploads and reconciliation succeed.
 
 ### 4. Full Sync (Fallback)
 
@@ -232,8 +232,8 @@ Release and transfer values are also checked against source in [current contract
 | `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
 | `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
 | `UPLOAD_CONCURRENCY` | 2 | `transfer/constants.ts` |
-| `DOWNLOAD_CONCURRENCY` | 2 | `engine/constants.ts` |
-| `PREPARE_CONCURRENCY` | 2 | `engine/constants.ts` |
+| `DOWNLOAD_CONCURRENCY` | 2 | `transfer/constants.ts` |
+| `PREPARE_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer/budget.ts` |
 | `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
 | `BATCH_DELETE_CONCURRENCY` | 2 | `transfer/constants.ts` |
@@ -271,9 +271,9 @@ Implementation: `transfer/upload.ts`, `transfer/upload-pipeline.ts`, `transfer/p
 
 File events (create, modify, delete, rename) are debounced before syncing:
 
-1. Events collected into `pendingPaths` Set on `SyncEngine`
-2. Delete events use `delete:` prefix convention (e.g. `delete:notes/old.md`)
-3. Rename events emit both a `delete:` for old path and an add for new path
+1. Events collected into the `pendingKeys` Set on `SyncQueueController` (`src/sync/queue/controller.ts`)
+2. Delete events are keyed with a `\0delete:` prefix (e.g. `\0delete:notes/old.md`). NUL cannot occur in a sync path, so delete keys never collide with a file literally named `delete:...`. Only `src/sync/pending/pending-change.ts` builds or parses these keys
+3. Rename events emit both a delete key for the old path and an upload key for the new path
 4. Debounce timer (default 5s) resets with each new event, with a 30s maximum wait
 5. After the quiet period or maximum wait, `processPendingChanges()` flushes the queue
 6. Each event receives a revision so reconciliation cannot clear a newer edit that arrived while the sync was running; opposite upload/delete events for one path are coalesced
@@ -359,7 +359,7 @@ Implementation: `manifest.ts:LocalManifest`
 - **Startup event recovery:** event capture resumes before a post-startup metadata probe; if the startup sync missed a local edit, one recovery sync runs without opening another event blind window
 - **Conflict recovery:** the durable conflict registry recovers from `.tmp` and discovers visible or hidden conflict copies that were created before their metadata was committed
 - **Revoked access:** a 401 shows the reconnect message in the status bar and Activity on every sync path. Full, incremental and forced syncs, queue flushes and queue reconciliation treat a 401 reported for one downloaded, uploaded or deleted file the same way. Its notice appears once until a sync succeeds or the connection changes, so background flushes that keep failing do not repeat it
-- **Queue retry:** retryable flush failures are re-added to `pendingPaths`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts
+- **Queue retry:** retryable flush failures are re-added to `pendingKeys`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts
 - **Large files:** local files > 25 MB are reported as skipped issues, not failures. They never become pending changes or local deletes, settle in the queue without failing their batch, and do not hold back the changelog cursor. A remote change to such a path still fails until the local file is reduced
 - **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap
 - **Ignored remote cleanup:** changing ignore patterns never deletes data implicitly; settings provide an explicit preview-and-confirm purge action

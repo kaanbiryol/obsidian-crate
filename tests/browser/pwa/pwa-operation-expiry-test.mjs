@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
-import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { previewAuthToken } from '../support/preview/pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'operation-expiry-regression' });
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });

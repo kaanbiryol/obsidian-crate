@@ -1,7 +1,7 @@
 import type { ReadingItem } from '@/reading/core/model';
 import { loadReadingArticle } from './api';
-import { cacheReadingArticle, readingArticlesToPrefetch } from './cache';
-import type { ReadingSession } from './session';
+import { cacheReadingArticle, readingArticlesToPrefetch } from './storage/cache';
+import type { ReadingSession } from './session/session';
 
 // Each refresh saves a few more, so a large inbox fills in without a burst of requests.
 const PREFETCH_PER_REFRESH = 10;

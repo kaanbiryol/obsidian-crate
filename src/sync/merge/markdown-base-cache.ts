@@ -1,5 +1,6 @@
 import type { App, PluginManifest } from 'obsidian';
-import { createLogger, errorMessage } from '../logger';
+import { createLogger } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';

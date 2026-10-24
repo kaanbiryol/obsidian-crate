@@ -46,7 +46,8 @@ export interface TransferContext {
   fileManager: {
     trashFile(file: TAbstractFile): Promise<void>;
   };
-  api: TransferApi;
+  /** The engine's journaled file operations. */
+  files: TransferApi;
   localManifest: TransferManifest;
   markdownBaseCache?: TransferMarkdownBaseCache;
   conflictStore?: TransferConflictStore;

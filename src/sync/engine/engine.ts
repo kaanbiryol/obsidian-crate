@@ -1,6 +1,6 @@
 import { pendingChangeKey } from '../pending/pending-change';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import type { EngineFileOperations } from './file-operations';
+import { createEngineFileOperations, type EngineFileOperations } from './file-operations';
 import { createEngineHistory } from './history';
 import { createEnginePendingChanges } from './pending-changes';
 import { getSyncIssues, syncErrorIssues } from '../issues';
@@ -20,11 +20,12 @@ import { isHiddenPath, type VaultFile } from '../local/file-discovery';
 import { assertLocalSyncPath } from '../local/local-path-safety';
 import { SyncQueueController } from '../queue/controller';
 import { createAbortError, isAbortError } from '../abort';
-import { createLogger, errorMessage } from '../logger';
+import { createLogger } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import type { SyncState, SyncResult, ConflictRecord } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';
-import { PREPARE_CONCURRENCY } from './constants';
+import { PREPARE_CONCURRENCY } from '../transfer/constants';
 import { isAuthError } from '../failures';
 import {
 	createIgnoreMatcherContext,
@@ -36,12 +37,12 @@ import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';
 import { runSyncWorkflow } from './standard-sync-workflow';
-import { AUTH_ERROR_MESSAGE, completeTransferResult, handleWorkflowError, ReconnectNotice } from '../sync-outcome';
+import { AUTH_ERROR_MESSAGE, beginSyncAttempt, completeTransferResult, handleWorkflowError, ReconnectNotice } from '../sync-outcome';
 import { SyncEngineContexts } from './contexts';
 import { SyncEngineLifecycle } from './lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './full-sync-upload';
-import { createEmptySyncResult, createSyncFailureResult, finalizeSyncResult } from '../sync-result';
+import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import { mergeSyncResults } from '../sync-result';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { LocalContentVerifier } from './content-verifier';
@@ -84,8 +85,8 @@ export class SyncEngine {
 		plugin: Plugin,
 		api: SyncApiClient,
 		settings: SyncSettings,
-		/** Tests pass a manifest they observe; production lets the engine create it. */
-		stores: { localManifest?: LocalManifest } = {},
+		/** Tests pass a manifest they observe or wrap the file operations; production lets the engine create both. */
+		stores: { localManifest?: LocalManifest; createFiles?: typeof createEngineFileOperations } = {},
 	) {
 		this.plugin = plugin;
 		this.vault = plugin.app.vault;
@@ -98,7 +99,8 @@ export class SyncEngine {
 			authority: getCheckpointAuthority(settings) || 'unconfigured',
 		});
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
-		this.files = this.api.createFileOperations(this.localManifest, this.vault, this.markdownBaseCache);
+		const { transport, clientSession } = this.api.getFileTransport(this.localManifest);
+		this.files = (stores.createFiles ?? createEngineFileOperations)(transport, this.localManifest, this.vault, this.markdownBaseCache, clientSession);
 		const latestAttempt = settings.syncHistory[0];
 		const lastError = latestAttempt && !latestAttempt.success
 			? latestAttempt.errors?.[0] || 'The last sync failed. Open sync activity for details, then retry.'
@@ -145,33 +147,6 @@ export class SyncEngine {
 			},
 		});
 		this.api.setAbortSignal(this.lifecycle.abortSignal);
-		this.queueController = new SyncQueueController({
-			finishInitialSetup: () => this.contexts.finishInitialSetup(),
-			uploadPreparedFiles: (...args) => this.contexts.uploadPreparedFiles(...args),
-			deleteRemoteFiles: (...args) => this.contexts.deleteRemoteFiles(...args),
-			automaticSyncEnabled: () => this.settings.automaticSync,
-			recoverUploads: async () => {
-				void this.retryReminderScope();
-				await this.contexts.recoverUploads();
-				this.updateState({ work: { phase: 'applying' } });
-			},
-			api: {
-				isConfigured: () => this.api.isConfigured(),
-			},
-			getLocalManifest: () => this.localManifest,
-			shouldIgnore: this.shouldIgnore.bind(this),
-			updateState: this.updateState.bind(this),
-			setLastSync: value => this.contexts.setLastSync(value),
-			reconnectNotice: this.reconnectNotice,
-			isDestroyed: () => this.lifecycle.isDestroyed,
-			currentStatus: () => this.state.status,
-			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
-			prepareUploadFromPath: (path: string) => this.contexts.prepareUploadFromPath(path),
-			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
-			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
-			reconcile: (queueKeys) => this.reconcileFromQueue(queueKeys),
-			onFlushResult: (result) => this.onAutomaticSyncResult?.(result),
-		});
 		this.contexts = new SyncEngineContexts({
 			prepareReminderScope: async () => { await this.prepareReminderScope?.(); },
 			vault: this.vault,
@@ -187,12 +162,39 @@ export class SyncEngine {
 			runConcurrent: this.runConcurrent.bind(this),
 			retryWithBackoff: this.retryWithBackoff.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
-			getPendingPaths: () => this.queueController.getPendingPaths(),
+			getPendingKeys: () => this.queueController.getPendingKeys(),
 			verifyContent: files => this.verifyContent(files),
 			reconcileVersionConflicts: (paths, result) => this.reconcileVersionConflicts(paths, result),
 			updateState: this.updateState.bind(this),
 			reconnectNotice: this.reconnectNotice,
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
+		});
+		this.queueController = new SyncQueueController({
+			finishInitialSetup: this.contexts.finishInitialSetup,
+			uploadPreparedFiles: this.contexts.uploadPreparedFiles,
+			deleteRemoteFiles: this.contexts.deleteRemoteFiles,
+			automaticSyncEnabled: () => this.settings.automaticSync,
+			recoverUploads: async () => {
+				void this.retryReminderScope();
+				await this.contexts.recoverUploads();
+				this.updateState({ work: { phase: 'applying' } });
+			},
+			api: {
+				isConfigured: () => this.api.isConfigured(),
+			},
+			localManifest: this.localManifest,
+			shouldIgnore: this.shouldIgnore.bind(this),
+			updateState: this.updateState.bind(this),
+			setLastSync: this.contexts.setLastSync,
+			reconnectNotice: this.reconnectNotice,
+			isDestroyed: () => this.lifecycle.isDestroyed,
+			currentStatus: () => this.state.status,
+			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
+			prepareUploadFromPath: this.contexts.prepareUploadFromPath,
+			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
+			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
+			reconcile: (queueKeys) => this.reconcileFromQueue(queueKeys),
+			onFlushResult: (result) => this.onAutomaticSyncResult?.(result),
 		});
 	}
 
@@ -276,16 +278,16 @@ export class SyncEngine {
 		return this.pendingChanges().loadDiff(path, deleted);
 	}
 
-	getPendingPaths(): string[] {
-		return this.queueController.getPendingPaths();
+	getPendingKeys(): string[] {
+		return this.queueController.getPendingKeys();
 	}
 
 	getPendingChangeCount(): number {
 		return this.queueController.getPendingChangeCount();
 	}
 
-	hasPendingPath(key: string): boolean {
-		return this.queueController.hasPendingPath(key);
+	hasPendingKey(key: string): boolean {
+		return this.queueController.hasPendingKey(key);
 	}
 
 	private history() {
@@ -356,7 +358,7 @@ export class SyncEngine {
 		if (!this.api.isConfigured()) throw new Error('Sync is not configured.');
 		if (this.state.status === 'syncing') throw new Error('Wait for the current sync to finish.');
 		if (this.localManifest.uploadJournal.pending().length > 0) throw new Error('Run Sync now to recover interrupted uploads before changing individual files.');
-		const pending = new Set(this.getPendingPaths());
+		const pending = new Set(this.getPendingKeys());
 		if (!keys.length || keys.some(key => !pending.has(key))) throw new Error('Pending files changed. Review the current selection and try again.');
 	}
 
@@ -566,7 +568,7 @@ export class SyncEngine {
 			const stat = await this.vault.adapter.stat(path);
 			if (!isCurrent()) return;
 			if (stat?.type === 'file' && this.localManifest.hasFile(path)
-				&& this.state.status !== 'syncing' && !this.hasPendingPath(path)) {
+				&& this.state.status !== 'syncing' && !this.hasPendingKey(pendingChangeKey('upload', path))) {
 				// Obsidian and iCloud can touch settings without changing their bytes.
 				// Check before publishing a pending entry; serialize reads to bound memory.
 				const activityRevision = this.syncActivityRevision;
@@ -661,10 +663,9 @@ export class SyncEngine {
 
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		return this.runTrackedWorkflow(async () => {
-			const workflow = this.contexts.syncWorkflow();
 			this.contexts.clearPlannedContent();
 			try {
-				return await runSyncWorkflow(workflow, progressCallback);
+				return await runSyncWorkflow(this.contexts.syncWorkflow, progressCallback);
 			} finally {
 				this.contexts.clearPlannedContent();
 			}
@@ -673,11 +674,15 @@ export class SyncEngine {
 
 
 	private async reconcileFromQueue(queueKeys: string[], selectedOnly = false): Promise<SyncResult> {
-		if (this.state.status === 'syncing') return createSyncFailureResult('Sync already in progress');
 		return this.trackWork(async () => {
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
+			const startFailure = beginSyncAttempt({
+				apiConfigured: () => this.api.isConfigured(),
+				getStatus: () => this.state.status,
+				updateState: updates => this.updateState(updates),
+			});
+			if (startFailure) return startFailure;
 			const outcome = { updateState: this.updateState.bind(this), setLastSync: this.contexts.setLastSync, reconnectNotice: this.reconnectNotice };
-			this.updateState({ status: 'syncing' });
 			let result = createEmptySyncResult();
 			const failures: MutationFailure[] = [];
 			try {
@@ -720,7 +725,7 @@ export class SyncEngine {
 			uploadDiffs: async (diffs, result) => {
 				const retryPaths: string[] = [];
 				const failures = await uploadFullSyncPlan({
-					...this.contexts.syncWorkflow(),
+					...this.contexts.syncWorkflow,
 					uploadPreparedFiles: (prepared, syncResult, options) => this.contexts.uploadPreparedFiles(prepared, syncResult, {
 						...options,
 						onVersionConflicts: async paths => { retryPaths.push(...paths); },
@@ -729,14 +734,13 @@ export class SyncEngine {
 				for (const failure of failures) onFailure?.(failure);
 				return retryPaths;
 			},
-			processDiff: (diff, localFiles, syncResult) =>
-				this.contexts.processDiff(diff, localFiles, syncResult),
+			processDiff: this.contexts.processDiff,
 			onFailure,
 		}, queueKeys);
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		return this.runTrackedWorkflow(() => runForceFullSyncWorkflow(this.contexts.forceSyncWorkflow(), progressCallback));
+		return this.runTrackedWorkflow(() => runForceFullSyncWorkflow(this.contexts.forceSyncWorkflow, progressCallback));
 	}
 
 	private async runTrackedWorkflow(run: () => Promise<SyncResult>): Promise<SyncResult> {

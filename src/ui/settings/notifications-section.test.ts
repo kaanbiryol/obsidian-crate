@@ -7,6 +7,7 @@ import {
 	noticeMessages,
 	resetObsidianUiMocks,
 } from '../../test/fakes/obsidian-ui';
+import { fakeWithCurrentApi } from '../../test/fakes/sync-runtime';
 
 let lastQrCodeData: string | null = null;
 const openExternalBrowserModal = vi.fn();
@@ -251,7 +252,7 @@ describe('renderNotificationsSection', () => {
 
 	it('shows the Worker error when an app code cannot be created', async () => {
 		const { renderCrateWebApp } = await loadNotificationsSectionModule();
-		renderCrateWebApp(new FakeElement('div') as never, createPlugin({
+		renderCrateWebApp({ containerEl: new FakeElement('div') as never, plugin: createPlugin({
 				serverFolder: async (folderPath: string) => ({ folderPath }),
 				createRemindersEnrollmentToken: vi.fn(async () => {
 					throw new Error('Invalid token');
@@ -259,7 +260,7 @@ describe('renderNotificationsSection', () => {
 				getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
 				deletePushSubscription: vi.fn(),
 				testPush: vi.fn(async () => ({ sent: 0, failed: 0, pruned: 0, errors: [] })),
-			}));
+			}) });
 		await flushMicrotasks();
 
 		const showCodeButton = getSettingByName('Crate web app').buttons[1];
@@ -282,7 +283,7 @@ describe('renderNotificationsSection', () => {
 		plugin.settings.workerUrl = '';
 		plugin.settings.pushEnabled = false;
 
-		renderCrateWebApp(new FakeElement('div') as never, plugin as never);
+		renderCrateWebApp({ containerEl: new FakeElement('div') as never, plugin: plugin as never });
 		await flushMicrotasks();
 
 		getSettingByName('Crate web app').buttons[1]?.click();
@@ -298,7 +299,7 @@ describe('renderNotificationsSection', () => {
 		const open = vi.fn();
 		vi.stubGlobal('window', { open });
 		const plugin = createPlugin({}) as unknown as { app: unknown };
-		renderCrateWebApp(new FakeElement('div') as never, plugin as never);
+		renderCrateWebApp({ containerEl: new FakeElement('div') as never, plugin: plugin as never });
 		getSettingByName('Crate web app').buttons[0]?.click();
 		await vi.waitFor(() => expect(open).toHaveBeenCalledOnce());
 		expect(open).toHaveBeenCalledWith(
@@ -313,7 +314,7 @@ const updateNotificationPolicy = vi.fn(async (policy: Record<string, unknown>) =
 
 function createPlugin(apiClient: Record<string, unknown>): never {
 	let stableApi: Record<string, unknown> | undefined;
-	return {
+	const plugin = {
 		secretStorage: { get: vi.fn(() => null) },
 		app: {},
 		settings: {
@@ -345,6 +346,8 @@ function createPlugin(apiClient: Record<string, unknown>): never {
 				})),
 				...apiClient,
 			}),
+			withCurrentApi: fakeWithCurrentApi((): Record<string, unknown> => plugin.syncRuntime.getApiClient()),
 		},
-	} as never;
+	};
+	return plugin as never;
 }

@@ -3,7 +3,7 @@ import { shortcutLaunchResponse, shortcutTransport } from './reading/shortcut-tr
 import { captureSealedReading } from './reading/sealed-capture';
 import { ReadingError, readingResponse } from './reading/common';
 import { isD1DailyLimitError, withD1Usage } from './d1-usage';
-import { coordinatedNewFiles } from './sync/bulk-upload-dispatch';
+import { coordinatedNewFiles } from './sync/staging/bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { ReminderFileSizeError } from './reminders/limits';
@@ -11,7 +11,7 @@ import { ReminderIdentityConflictError } from './reminders/source-identity';
 import { logMutation } from './request-diagnostics';
 import { limitNotificationRequest } from './rate-limit';
 import { rememberAuthenticatedRequest } from './auth/admission-state';
-import { coordinatedUpload } from './sync/staged-upload-dispatch';
+import { coordinatedUpload } from './sync/staging/staged-upload-dispatch';
 import { apiRoutePolicy } from './routes/policy';
 import { armNotificationCoordinator } from './notifications/lifecycle';
 import { isCrateMutation } from '../../protocol/server-info';
@@ -28,8 +28,8 @@ import { assertRequestEncryption, checkRequestProtocol } from './request-guards'
 import { forwardTransferRequest } from './sync/transfer-dispatch';
 import { scheduleMaintenance } from './maintenance/schedule';
 import { commitStagedFile } from './sync/mutations';
-import { commitNewFiles } from './sync/bulk-new-file-commit';
-import type { UploadCommitters } from './sync/upload-committers';
+import { commitNewFiles } from './sync/staging/bulk-new-file-commit';
+import type { UploadCommitters } from './sync/staging/upload-committers';
 import { ensureProjection, forwardToCoordinator } from '@/cloudflare/worker/coordinator/coordinator';
 import { REQUEST_ID_HEADER } from '../../protocol/http-headers';
 

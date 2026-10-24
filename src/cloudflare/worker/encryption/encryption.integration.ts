@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { commitStagedFile } from '../sync/mutations';
-import { commitNewFiles } from '../sync/bulk-new-file-commit';
+import { commitNewFiles } from '../sync/staging/bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -13,7 +13,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { ENCRYPTION_FILE_PREFIX } from './state';
 import { handleUpload } from '../sync/file-handlers';
 import { getStoredFileRow } from '../sync/storage';
-import { trackStagedUpload } from '../sync/staged-uploads';
+import { trackStagedUpload } from '../sync/staging/staged-uploads';
 import { uploadMutation } from '../sync/mutations';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';

@@ -1,7 +1,7 @@
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
-import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { previewAuthToken } from '../support/preview/pwa-preview-fixtures.mjs';
 
 // Browser/provider and registration responses are controlled here. Real Worker
 // authentication, endpoint ownership and D1 upserts have separate runtime tests.
@@ -16,12 +16,17 @@ const provider = (page, patch) => page.evaluate(({ providerKey, patch }) => {
   localStorage.setItem(providerKey, JSON.stringify({ ...value, ...patch }));
 }, { providerKey, patch });
 const providerState = page => page.evaluate(key => JSON.parse(localStorage.getItem(key)), providerKey);
-const resume = page => page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+// Foreground push refreshes within 5 minutes of the last one are skipped.
+const resume = async page => {
+  await page.clock.fastForward(5 * 60_000 + 1_000);
+  await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+};
 const on = page => page.locator('.settings-status.is-success');
 const retry = page => page.getByRole('button', { name: 'Retry', exact: true });
 
 async function harness(browser, existing = false, standalone = false) {
   const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 } });
+  await context.clock.install();
   const sessions = new Set([previewAuthToken]);
   const rows = new Map();
   const attempts = [];
@@ -254,6 +259,7 @@ async function stableListOnResume(browser) {
     const list = page.locator('.reminders-view-scroll').filter({ visible: true }).first();
     await expect(list).toBeVisible();
     const before = await list.boundingBox();
+    await page.clock.fastForward(5 * 60_000 + 1_000);
     await page.evaluate(() => {
       window.heldPushRead = new Promise(resolve => { window.releasePushRead = resolve; });
       window.pushReads = 0;

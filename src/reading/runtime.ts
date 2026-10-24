@@ -5,7 +5,7 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { shouldIgnoreSyncPath, createIgnoreMatcherContext } from '../sync/local/ignore';
 import { ReadingLibrary } from './data/library';
-import { createObsidianReadingVault } from './obsidian-vault';
+import { createObsidianReadingVault } from './data/obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
 
 export const READING_VIEW_TYPE = 'crate-reading';

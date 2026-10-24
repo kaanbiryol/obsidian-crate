@@ -3,7 +3,7 @@ import { checkAndRecoverUpdate } from '../../cloudflare/recovery-ui';
 import { Notice, Platform, Setting, type ButtonComponent } from 'obsidian';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../../cloudflare/deployment/embedded-artifacts';
 import { isCloudflareServerUpdateAvailable } from '../../../cloudflare/deployment/update';
-import { startCloudflareDeployment } from '../../../cloudflare/plugin-integration';
+import { startCloudflareDeployment } from '../../../plugin/cloudflare-operations';
 import { openConfirmationModal } from '../../confirmation-modal';
 import { createSettingsSectionHeading, type SettingsSectionContext } from '../section-helpers';
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';

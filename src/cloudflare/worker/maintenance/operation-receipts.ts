@@ -1,5 +1,5 @@
 import { changedRows } from '../db';
-import { OPERATION_FLOOR } from '../operation-expiry';
+import { OPERATION_FLOOR } from '../operation-receipts';
 import { pruneEncryptionPairings } from '../encryption/pairing';
 
 /** Publish the retry floor and prune receipts in the same transaction. */

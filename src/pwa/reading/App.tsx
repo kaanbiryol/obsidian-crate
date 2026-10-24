@@ -25,7 +25,7 @@ import { ReadingOpening } from './ReadingOpening';
 import { useReadingRuntime } from './ReadingRuntime';
 import { useReadingAppearance } from './appearance';
 import { presentReadingItems } from './pending-view';
-import { exportReadingData } from './storage';
+import { exportReadingData } from './storage/storage';
 import { useDocumentReaderScroll } from './useDocumentReaderScroll';
 import { useReadingArticle } from './useReadingArticle';
 

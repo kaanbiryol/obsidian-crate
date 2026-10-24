@@ -14,7 +14,7 @@ import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { assertLocalFileAbsent, LocalFilePresentError } from '../local/local-absence';
 import { sha256Hex } from '../../platform/sha256';
 import { recordSyncError } from '../issues';
-import { errorMessage } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import { isAbortError } from '../abort';
 import { fileFailure } from '../failures';
 
@@ -38,7 +38,7 @@ export async function processDiff(
         };
       }
 
-      const uploadResult = await context.api.uploadFile(
+      const uploadResult = await context.files.uploadFile(
         uploadFile.path,
         uploadFile.content,
         uploadFile.hash,
@@ -92,7 +92,7 @@ export async function processDiff(
     }
 
     case "conflict": {
-      const response = await context.api.downloadFile(diff.path);
+      const response = await context.files.downloadFile(diff.path);
       const remoteContent = response.content;
       if (remoteContent.byteLength > MAX_FILE_SIZE_BYTES) {
         throw new Error("Skipped remote file larger than 25MB");
@@ -157,7 +157,7 @@ export async function processDiff(
         if (error instanceof LocalFilePresentError) return { status: 'deferred', reason: error.message };
         throw error;
       }
-      await context.api.deleteFile(diff.path, diff.remoteHash, diff.remoteRevision);
+      await context.files.deleteFile(diff.path, diff.remoteHash, diff.remoteRevision);
       delete localFiles[diff.path];
       context.localManifest.removeEntry(diff.path);
       result.deleted++;
@@ -215,7 +215,7 @@ async function tryAutoMergeMarkdownConflict(
 
   const mergedContent = mergeResult.content;
   const mergedHash = await sha256Hex(mergedContent);
-  const uploadResult = await context.api.uploadFile(
+  const uploadResult = await context.files.uploadFile(
     diff.path,
     mergedContent,
     mergedHash,
@@ -241,11 +241,11 @@ async function tryAutoMergeMarkdownConflict(
     mergedContent,
     plannedLocalHash,
   ).catch(async (error: unknown) => {
-    await context.api.recordMergeApplication?.(diff.path, mergedHash, 'local-apply-failed');
+    await context.files.recordMergeApplication?.(diff.path, mergedHash, 'local-apply-failed');
     throw error;
   });
   if (localApplyOutcome.status === "deferred") {
-    await context.api.recordMergeApplication?.(diff.path, mergedHash, 'local-deferred');
+    await context.files.recordMergeApplication?.(diff.path, mergedHash, 'local-deferred');
     // The uploaded merge already contains this local snapshot. Keep that
     // snapshot as a virtual common ancestor so the next reconciliation can
     // merge only the newer local edits into the remote merge without

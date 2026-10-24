@@ -50,7 +50,7 @@ it.each(['note.md', '.obsidian/plugins/obsidian-minimal-settings/data.json'])('l
  expect(h.remote.getFileMetadata).toHaveBeenCalledWith([path]);
  expect(h.api.downloadFile).toHaveBeenCalledWith(path);
  expect(h.remote.listFileVersions).not.toHaveBeenCalled();
- expect(h.engine.getPendingPaths()).toEqual([path]);
+ expect(h.engine.getPendingKeys()).toEqual([path]);
  expect(h.localManifest.setEntry).not.toHaveBeenCalled();
  expect(h.localManifest.save).not.toHaveBeenCalled();
  expect(h.api.uploadFile).not.toHaveBeenCalled();
@@ -104,7 +104,7 @@ it('discards a local deletion offline and preserves the last-synced revision', a
  await review.discard();
  expect(restored).toBe(true);
  expect(h.localManifest.getEntry('note.md')).toMatchObject({ hash, revision: baseline.revision });
- expect(h.engine.getPendingPaths()).not.toContain(pendingChangeKey('delete', 'note.md'));
+ expect(h.engine.getPendingKeys()).not.toContain(pendingChangeKey('delete', 'note.md'));
  for (const [name, method] of Object.entries(h.api)) {
   if (name !== 'isConfigured' && vi.isMockFunction(method)) expect(method).not.toHaveBeenCalled();
  }

@@ -2,8 +2,8 @@ import { drainReading, readingRetryAt, type ReadingRetryMode } from './outbox';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY } from '../config';
 import { connectReadingFromReminders, loadReading } from './api';
-import { assertReadingSession, pendingReading, readingLock, readingSession, readReadingCache, READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
-import { sameReadingSession } from './session';
+import { pendingReading, readingLock, readReadingCache, type ReadingCache } from './storage/storage';
+import { assertReadingSession, READING_CHANGED_EVENT, readingSession, READING_SESSION_KEY, sameReadingSession, type ReadingSession } from './session/session';
 import { prefetchReadingArticles } from './prefetch';
 import type { useReadingSession } from './useReadingSession';
 import { requestSharedFeaturesRefresh } from '../shared-features';
@@ -121,8 +121,8 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
     };
     reload();
     // Refresh on open, foreground, reconnect and explicit refresh; never on a timer.
-    window.addEventListener('online', reload); window.addEventListener('storage', storageChanged); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', foreground);
-    return () => { window.removeEventListener('online', reload); window.removeEventListener('storage', storageChanged); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', foreground); };
+    window.addEventListener('online', reload); window.addEventListener('storage', storageChanged); window.addEventListener(READING_CHANGED_EVENT, changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', foreground);
+    return () => { window.removeEventListener('online', reload); window.removeEventListener('storage', storageChanged); window.removeEventListener(READING_CHANGED_EVENT, changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', foreground); };
   }, [enabled, session, ready, refresh, run, resetSession]);
   const refreshManually = useCallback(() => refresh(session, 'manual'), [refresh, session]);
   return { refresh, refreshManually, syncing, syncedSession, isOffline };

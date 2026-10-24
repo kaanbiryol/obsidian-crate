@@ -91,9 +91,9 @@ describe('SyncRuntime startup event handling', () => {
 		const { runtime } = createRuntimeHarness({ automaticSync: false });
 		await runtime.initialize();
 		runtime.onFileChange({ path: 'edited.md' } as never);
-		expect(runtime.hasPendingPath('edited.md')).toBe(true);
-		expect(runtime.hasPendingPath('other.md')).toBe(false);
-		const copy = vi.spyOn(SyncEngine.prototype, 'getPendingPaths');
+		expect(runtime.hasPendingKey('edited.md')).toBe(true);
+		expect(runtime.hasPendingKey('other.md')).toBe(false);
+		const copy = vi.spyOn(SyncEngine.prototype, 'getPendingKeys');
 		const preview = { kind: 'modified', before: 'a', after: 'b' } as never;
 		vi.spyOn(SyncEngine.prototype, 'loadPendingDiff').mockResolvedValue(preview);
 		await expect(runtime.loadPendingDiff('edited.md', false)).resolves.toBe(preview);
@@ -110,10 +110,10 @@ describe('SyncRuntime startup event handling', () => {
 		runtime.onFileChange({ path: 'existing.md' } as never);
 		runtime.onFileDelete({ path: 'removed.md' } as never);
 		runtime.onFileRename({ path: 'renamed.md' } as never, 'old.md');
-		expect(runtime.getPendingPaths()).toEqual([]);
+		expect(runtime.getPendingKeys()).toEqual([]);
 		plugin.app.workspace.layoutReady = true;
 		runtime.onFileChange({ path: 'edited.md' } as never);
-		expect(runtime.getPendingPaths()).toEqual(['edited.md']);
+		expect(runtime.getPendingKeys()).toEqual(['edited.md']);
 		startupSync.resolve(createEmptySyncResult());
 		await runtime.sync();
 		expect(sync).toHaveBeenCalledOnce();
@@ -148,7 +148,7 @@ describe('SyncRuntime startup event handling', () => {
 
 		invoke(runtime);
 
-		expect(runtime.getPendingPaths()).toEqual([]);
+		expect(runtime.getPendingKeys()).toEqual([]);
 	});
 
 	it('starts accepting events after startup sync finishes', async () => {
@@ -173,7 +173,7 @@ describe('SyncRuntime startup event handling', () => {
 		runtime.onFileChange({ path: 'notes/existing.md' } as never);
 		runtime.onFileChange({ path: 'notes/existing.md' } as never);
 
-		expect(runtime.getPendingPaths()).toEqual(['notes/existing.md']);
+		expect(runtime.getPendingKeys()).toEqual(['notes/existing.md']);
 	});
 
 	it('still forwards conflict-copy deletes while startup sync is in flight', async () => {

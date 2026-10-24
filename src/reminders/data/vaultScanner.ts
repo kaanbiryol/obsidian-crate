@@ -19,7 +19,7 @@ import { normalizeReminderIds } from "@/reminders/core/normalizeReminderIds";
 import { compareProjects } from "@/reminders/core/reminder-list";
 import { createLogger } from "@/reminders/logger";
 import type { IndexedReminder } from "./reminder-index";
-import { addReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
+import { addReminderIdentityOwners, releaseReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
 import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from './vault-markdown';
 import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
 import { isConflictFile } from '@/sync/conflict/conflict';
@@ -216,7 +216,7 @@ export async function scanVault(
   }: ScanVaultOptions = {},
 ): Promise<ScanResult> {
   const startTime = Date.now();
-  const allReminders: IndexedReminder[] = [];
+  let allReminders: IndexedReminder[] = [];
   const issues: ReminderSourceIssue[] = [];
   let filesScanned = 0;
   let totalLines = 0;
@@ -254,11 +254,7 @@ export async function scanVault(
       continue;
     }
     filesScanned++;
-    for (const released of result.releasedOwners ?? []) {
-      const stale = allReminders.findIndex(reminder => reminder.id === released.id && reminder.filePath === released.filePath);
-      if (stale !== -1) allReminders.splice(stale, 1);
-      identityOwners.get(released.id)?.delete(released.filePath);
-    }
+    if (result.releasedOwners) allReminders = releaseReminderIdentityOwners(identityOwners, allReminders, result.releasedOwners);
     allReminders.push(...result.reminders);
     totalLines += result.lineCount;
     addReminderIdentityOwners(identityOwners, result.reminders);

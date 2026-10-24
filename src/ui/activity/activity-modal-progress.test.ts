@@ -21,7 +21,7 @@ describe('activity modal completion progress', () => {
         const deps = {
             getState: () => ({ status } as SyncState),
             getActivityProgress: () => null,
-            getPendingPaths: () => [], getActiveConflicts: () => [],
+            getPendingKeys: () => [], getActiveConflicts: () => [],
             sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
         };
         const modal = new ActivityModal({} as never, settings, deps);
@@ -53,7 +53,7 @@ it('shows the reachability warning without treating it as a failed sync', () => 
         pendingChanges: 0, conflictCount: 0,
     };
     const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
-        getState: () => state, getPendingPaths: () => [], getActiveConflicts: () => [],
+        getState: () => state, getPendingKeys: () => [], getActiveConflicts: () => [],
         sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
     });
     const internal = modal as unknown as { createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader };
@@ -66,9 +66,9 @@ it('shows the reachability warning without treating it as a failed sync', () => 
 it('updates progress without copying the pending list or rebuilding the empty conflicts panel', async () => {
     const pending = Array.from({ length: 5000 }, (_, index) => `note-${index}.md`);
     const state = { status: 'syncing', lastSync: null, lastError: null, pendingChanges: pending.length, conflictCount: 0 } as SyncState;
-    const getPendingPaths = vi.fn(() => [...pending]);
+    const getPendingKeys = vi.fn(() => [...pending]);
     const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
-        getState: () => state, getActivityProgress: () => null, getPendingPaths, getPendingChangeCount: () => pending.length,
+        getState: () => state, getActivityProgress: () => null, getPendingKeys, getPendingChangeCount: () => pending.length,
         getActiveConflicts: () => [], sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
     });
     const internal = modal as unknown as {
@@ -85,7 +85,7 @@ it('updates progress without copying the pending list or rebuilding the empty co
     for (let tick = 0; tick < 100; tick++) { internal.onProgress(); await Promise.resolve(); }
 
     // Before: about 4 full copies per tick and a conflicts rebuild on every tick.
-    expect(getPendingPaths).not.toHaveBeenCalled();
+    expect(getPendingKeys).not.toHaveBeenCalled();
     expect(renderConflicts).toHaveBeenCalledOnce();
     expect(header.querySelector('.crate-activity-subtitle-label')?.textContent).toBe('Syncing…');
 });
@@ -93,7 +93,7 @@ it('updates progress without copying the pending list or rebuilding the empty co
 it('applies a state change and progress tick from the same event once', async () => {
     const state = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 } as SyncState;
     const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
-        getState: () => state, getActivityProgress: () => null, getPendingPaths: () => [], getActiveConflicts: () => [],
+        getState: () => state, getActivityProgress: () => null, getPendingKeys: () => [], getActiveConflicts: () => [],
         sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
     });
     const internal = modal as unknown as { pendingPanel: FakeElement; onProgress(): void; onStateChange(): void; refresh(): void };
@@ -112,7 +112,7 @@ it('keeps the pending file browser and its comparisons while the pending set is 
     const state = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 2, conflictCount: 0 } as SyncState;
     const loadPendingDiff = vi.fn(() => new Promise<never>(() => {}));
     const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
-        getState: () => state, getActivityProgress: () => null, getPendingPaths: () => [...pending], getActiveConflicts: () => [],
+        getState: () => state, getActivityProgress: () => null, getPendingKeys: () => [...pending], getActiveConflicts: () => [],
         loadPendingDiff, sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
     });
     const internal = modal as unknown as {

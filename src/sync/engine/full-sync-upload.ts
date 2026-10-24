@@ -1,5 +1,5 @@
 import { recordSyncError } from '../issues';
-import { errorMessage } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import { uploadPipelined } from '../transfer/upload-pipeline';

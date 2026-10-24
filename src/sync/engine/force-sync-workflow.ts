@@ -5,17 +5,17 @@ import {
 	createEmptySyncResult,
 	finalizeSyncResult,
 } from '../sync-result';
-import { createLogger, errorMessage } from '../logger';
+import { createLogger } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import type { LocalManifestView } from '../manifest/manifest';
 import { getPathEntry } from '../../protocol/path-record';
-import type { PreparedUpload, SyncResult, SyncState } from '../types';
+import type { PreparedUpload, RemoteManifest, SyncResult, SyncState } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
 import {
+	beginSyncAttempt,
 	completeTransferResult,
-	getStartFailureResult,
 	handleWorkflowError,
 	type ReconnectNotice,
-	type RemoteManifest,
 	type SyncStatus,
 } from '../sync-outcome';
 
@@ -54,10 +54,8 @@ export async function runForceFullSyncWorkflow(
 	context: ForceSyncWorkflowContext,
 	progressCallback?: (current: number, total: number) => void
 ): Promise<SyncResult> {
-	const startFailure = getStartFailureResult(context);
+	const startFailure = beginSyncAttempt(context);
 	if (startFailure) return startFailure;
-
-	context.updateState({ status: 'syncing' });
 	const result = createEmptySyncResult();
 	let previousLocalManifest = context.snapshotLocalManifest();
 	let manifestCommitted = false;

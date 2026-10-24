@@ -57,7 +57,7 @@ function createProcessHarness() {
 	const context: TransferContext = {
 		vault: vault as never,
 		fileManager,
-		api,
+		files: api,
 		localManifest,
 		markdownBaseCache,
 		runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),

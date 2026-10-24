@@ -5,7 +5,7 @@ import { calculateFirstOccurrence, calculateNextOccurrence } from './recurrenceC
 import { buildCreatedReminderBlock, buildReminderCompletionPlan } from '../markdownReminderMutation';
 import { buildInitialReminderContent, applyReminderDraftContentUpdate } from '../reminderDraft';
 import { buildReminderSubmission } from '../../ui/plugin/reminder-modal/reminderMutation';
-import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
+import { buildModalDraft } from '@/pwa/reminders/editor/reminder-drafts';
 import { applyReminderTextUpdate, deriveDraftPatchFromContent } from '@/pwa/reminders/editor/editor-draft';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { buildRecurrencePickerState, recurrenceRuleFromPickerState } from '../../ui/reminder-editor/recurrencePickerShared';

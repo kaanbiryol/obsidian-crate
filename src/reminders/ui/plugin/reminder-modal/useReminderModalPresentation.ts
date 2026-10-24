@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { isObsidianOverlayActive } from '../../../../ui/shared/useObsidianOverlayActive';
 import type { RichTextInputHandle } from '../../shared/RichTextInput';
 import { getReminderTitleCaret } from '../../reminder-editor/reminderEditorEdits';
-import { saveCursorPosition } from '../../reminder-editor/cursorPosition';
+import { saveCursorPosition } from '../../../../ui/shared/cursorPosition';
 
 interface UseReminderModalPresentationOptions {
 	focusDelayMs: number;

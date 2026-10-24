@@ -116,7 +116,7 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		expectFileEventsAccepted(runtime, false);
 
 		runtime.onFileChange({ path: 'notes/still-blocked.md' } as never);
-		expect(runtime.getPendingPaths()).toEqual([]);
+		expect(runtime.getPendingKeys()).toEqual([]);
 
 		startupSyncs[1]?.resolve(createEmptySyncResult());
 		await vi.waitFor(() => {
@@ -124,7 +124,7 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		});
 
 		runtime.onFileChange({ path: 'notes/active.md' } as never);
-		expect(runtime.getPendingPaths()).toEqual(['notes/active.md']);
+		expect(runtime.getPendingKeys()).toEqual(['notes/active.md']);
 	});
 
 	it('does not re-enable events after destroy while startup sync is in flight', async () => {
@@ -140,7 +140,7 @@ describe('SyncRuntime teardown and reinitialization', () => {
 
 		expectFileEventsAccepted(runtime, false);
 		runtime.onFileChange({ path: 'notes/after-destroy.md' } as never);
-		expect(runtime.getPendingPaths()).toEqual([]);
+		expect(runtime.getPendingKeys()).toEqual([]);
 	});
 
 	it('stops immediately, drains old work, and leaves manual sync available without restarting automatic sync', async () => {

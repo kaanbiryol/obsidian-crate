@@ -1,14 +1,9 @@
 import { Notice, Setting } from 'obsidian';
-import type CratePlugin from '../../plugin/CratePlugin';
-import { errorMessage } from '../../sync/logger';
+import { errorMessage } from '../../platform/logger';
 import { normalizeListStyle } from '../shared/list-style';
-import { createSettingsSectionHeading } from './section-helpers';
+import { createSettingsSectionHeading, type SettingsSectionContext } from './section-helpers';
 
-export function renderAppearanceSettings({ containerEl, plugin, rerender }: {
-	containerEl: HTMLElement;
-	plugin: CratePlugin;
-	rerender: () => void;
-}): void {
+export function renderAppearanceSettings({ containerEl, plugin, rerender }: SettingsSectionContext): void {
 	createSettingsSectionHeading(containerEl, 'Appearance');
 	new Setting(containerEl)
 		.setName('List style')

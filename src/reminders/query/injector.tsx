@@ -4,7 +4,7 @@ import type React from "react";
 import type { Root } from "react-dom/client";
 
 import type CratePlugin from "@/main";
-import { errorMessage } from "@/sync/logger";
+import { errorMessage } from "@/platform/logger";
 import {
   createShadowReactRoot,
   createShadowRootMount,
@@ -94,12 +94,8 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
 
   onload(): void {
     const mount = createShadowRootMount(this.containerEl, {
+      // The mount syncs the theme class itself.
       configureMountPoint: (mountPoint) => {
-        // Sync dark mode
-        if (document.body.classList.contains("theme-dark")) {
-          mountPoint.classList.add("dark");
-        }
-
         // Add mobile class for responsive styles
         if (Platform.isMobile) {
           mountPoint.classList.add("is-mobile");

@@ -2,7 +2,7 @@ import { processVaultMarkdown } from '../vault-markdown';
 import { deleteReminderBlockFromContent } from "../../core/markdownReminderFile";
 import type { IndexedReminder } from "../reminder-index";
 import type { MarkdownWriterContext } from "./types";
-import { markdownWriterLog } from "./operation-shared";
+import { markdownWriterLog } from "./helpers";
 
 export async function deleteReminderInMarkdown(
   context: MarkdownWriterContext,

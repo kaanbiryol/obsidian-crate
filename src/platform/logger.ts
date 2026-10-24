@@ -69,3 +69,7 @@ export function createScopedLogger(scope: string, component: string): Logger {
 		error: (...args) => log('error', args),
 	};
 }
+
+export function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}

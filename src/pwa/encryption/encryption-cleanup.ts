@@ -1,6 +1,6 @@
-import { resetReadingEncryption } from '../reading/encryption-lifecycle';
+import { resetReadingEncryption } from '../reading/session/encryption-lifecycle';
 import { AUTH_TOKEN_KEY } from '../config';
-import { READING_SESSION_KEY } from '../reading/storage';
+import { READING_SESSION_KEY } from '../reading/session/session';
 import { clearEncryptedReminderAttempts } from '../reminders/encrypted-reminder-attempts';
 import { clearVaultKeys } from './encryption-keys';
 

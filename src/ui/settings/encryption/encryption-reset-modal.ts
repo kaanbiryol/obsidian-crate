@@ -3,7 +3,7 @@ import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
-import { errorMessage } from '../../../sync/logger';
+import { errorMessage } from '../../../platform/logger';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 import { loadEncryptionReset, type EncryptionReset } from '../../../sync/encryption/reset';
 

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
-import { checkEditorOpeningGeometry } from './pwa-editor-opening-geometry.mjs';
-import { checkPickerReturnTiming } from './pwa-picker-return-timing.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { checkEditorOpeningGeometry } from './pwa-editor-opening-geometry-checks.mjs';
+import { checkPickerReturnTiming } from './pwa-picker-return-timing-checks.mjs';
 
 async function trackOpening(page, content, animated) {
 	await page.evaluate(({ content, animated }) => {

@@ -3,7 +3,6 @@ import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vaul
 import type { FileEntry } from '../../protocol/sync-types';
 import { LocalManifest } from '../manifest/manifest';
 import { createFullSyncPlan } from './full';
-import { parseInitialConfigPull } from './initial-config-pull';
 import { sha256Hex } from '@/platform/sha256';
 
 const settingsPath = '.obsidian/appearance.json';
@@ -105,9 +104,4 @@ it('uses the active custom configuration directory', async () => {
 	const plan = await createFullSyncPlan(h.context, { 'custom-settings/appearance.json': await entry(remote) }, 2);
 	expect(plan.downloadDiffs.map(diff => diff.path)).toEqual(['custom-settings/appearance.json']);
 	expect(plan.remainingDiffs).toEqual([]);
-});
-
-it.each([null, {}, { configDir: '../outside', files: {} }, { configDir: '.obsidian', files: { 'note.md': 'a'.repeat(64) } },
-	{ configDir: '.obsidian', files: { [settingsPath]: 'invalid' } }])('rejects malformed initial pull authority: %j', value => {
-	expect(() => parseInitialConfigPull(value)).toThrow('Invalid initial settings pull checkpoint');
 });

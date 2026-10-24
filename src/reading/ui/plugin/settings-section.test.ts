@@ -35,7 +35,7 @@ async function setup(connected = true, enabled = true) {
 	const container = Object.assign(new FakeElement('div'), { isConnected: true });
 	const rerender = vi.fn();
 	const { renderReadingSettings } = await import('./settings-section');
-	renderReadingSettings(container as never, plugin as never, rerender);
+	renderReadingSettings({ containerEl: container as never, plugin: plugin as never, rerender });
 	expect(request).not.toHaveBeenCalled();
 	openSettingsDisclosures(container);
 	await new Promise(resolve => setTimeout(resolve, 0));

@@ -215,7 +215,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 		await vi.advanceTimersByTimeAsync(60_000);
 
 		expect(harness.api.batchUpload).toHaveBeenCalledOnce();
-		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getPendingKeys()).toEqual([]);
 	});
 });
 

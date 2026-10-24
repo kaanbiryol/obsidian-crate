@@ -1,7 +1,7 @@
 import { getSyncPathIssue } from '../protocol/portable-path';
 import { isSyncIssueCode } from '../protocol/sync-issues';
 import { isRecord } from '../platform/validation';
-import { errorMessage } from './logger';
+import { errorMessage } from '../platform/logger';
 import { isAbortError } from './abort';
 import type { SyncIssue, SyncResult } from './types';
 

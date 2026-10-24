@@ -28,3 +28,16 @@ An interrupted reminder move retains its journal while either source is unreadab
 All reminder rewrites validate raw bytes and compare the resulting text inside Obsidian's atomic `Vault.process` callback. Concurrent text changes cause a retry instead of an overwrite. Obsidian does not provide an atomic binary processing callback: an external raw-byte writer that changes a valid literal replacement character into malformed bytes with exactly the same lossy text during that final interval cannot be distinguished by the host callback. Avoid simultaneous raw-byte conversion by external tools while reminder edits are running.
 
 Remote deletions recheck the target's file type and host identity after reading its hash. Adapter-only paths also recheck their type and timestamps. A replacement folder or changed file stops the operation without settling its checkpoint. Deletion always uses local trash; a final edit arriving after validation remains recoverable there. The host does not expose an atomic compare-and-delete operation.
+
+## Testing notes
+
+Choosing and running suites is covered in [testing](testing.md).
+
+### Reminder descriptions and diagnostics
+
+`reminderDescription.test.ts` and `markdownReminderFile.test.ts` cover the description
+format and guarded edits. `vaultScanner.test.ts` and
+`reminder-source-issue-presentation.test.ts` check structured categories and source
+lines through the index and UI, including compatibility with reason-only diagnostics.
+Worker `reminders/input-contract.integration.ts` verifies the shared format across
+plugin-created notes and PWA mutations with local D1/R2/DO bindings.

@@ -20,7 +20,7 @@ import { handleEncryptedFolderFiles } from './encryption/encrypted-folder-files'
 import { handleEncryptionReset } from './encryption/reset';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { REMINDERS_FOLDER_CHANGED } from '../../protocol/web-session';
-import type { UploadCommitters } from './sync/upload-committers';
+import type { UploadCommitters } from './sync/staging/upload-committers';
 
 
 export { handlePublicRoute };

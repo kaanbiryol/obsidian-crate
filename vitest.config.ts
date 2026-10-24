@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import { rawCssPlugin } from './scripts/raw-css-vite-plugin.mjs';
+import { rawCssPlugin } from './scripts/vite/raw-css-vite-plugin.mjs';
 import { bundleServiceWorkerRuntime } from './scripts/service-worker-build.mjs';
 
 const srcPath = new URL('./src', import.meta.url).pathname;

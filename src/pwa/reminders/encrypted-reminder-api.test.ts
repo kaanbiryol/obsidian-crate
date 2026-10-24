@@ -5,7 +5,7 @@ import { sha256Hex } from '@/platform/sha256';
 import { importNotificationFingerprintKey } from '@/encryption/reminder-projection';
 import { importSealPrivateKey } from '@/encryption/seal-key';
 import { EncryptedReminderApi } from './encrypted-reminder-api';
-import { invalidatePwaSession } from '../session-generation';
+import { invalidatePwaSession } from '../connection/session-generation';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { openFile, sealFile } from '@/encryption/file-codec';
 import type { ReminderRecord } from './types';

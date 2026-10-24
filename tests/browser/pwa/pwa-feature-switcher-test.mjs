@@ -1,11 +1,11 @@
 import { checkWarmTabDestinations } from './pwa-cold-tab-checks.mjs';
-import { switchFeature, featureNavigationTarget, installFeatureNavigation } from './pwa-feature-navigation.mjs';
+import { switchFeature, featureNavigationTarget, installFeatureNavigation } from '../support/pwa-feature-navigation.mjs';
 import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
 const assets = await buildPwaPreviewAssets();
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const headerGeometry = page => page.locator('.crate-feature-panel[data-active="true"] .view-header').evaluate(header => {

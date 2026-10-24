@@ -5,8 +5,8 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { listStoredMarkdownFileMetadataByPrefix } from '../storage';
-import { beginInitialImport } from './initial-import';
-import { pruneInitialImport } from './initial-import-prune';
+import { beginInitialImport } from './import/initial-import';
+import { pruneInitialImport } from './import/initial-import-prune';
 import { meterD1Usage } from '../d1-usage';
 
 async function initialize() {

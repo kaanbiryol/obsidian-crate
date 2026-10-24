@@ -1,10 +1,10 @@
 import http from 'node:http';
 import { test } from 'node:test';
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { createPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
-import { readJson, sendJson, sendText } from '../../../scripts/pwa-preview-http.mjs';
-import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { createPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { readJson, sendJson, sendText } from '../support/preview/pwa-preview-http.mjs';
+import { previewAuthToken } from '../support/preview/pwa-preview-fixtures.mjs';
 
 const beforeVersion = 'install-before-update';
 const afterVersion = 'install-after-update';

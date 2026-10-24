@@ -1,16 +1,17 @@
 import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
-import { onReadingEncryptionReset } from './encryption-lifecycle';
-import { prepareReadingEncryption, readingEncryptionHeaders, readingKeys } from './encryption-session';
-import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingIndex, writeReadingAttempt } from './storage';
+import { onReadingEncryptionReset } from './session/encryption-lifecycle';
+import { prepareReadingEncryption, readingEncryptionHeaders, readingKeys } from './session/encryption-session';
+import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingIndex, writeReadingAttempt } from './storage/storage';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { AUTH_TOKEN_KEY } from '../config';
-import { capturePwaSession } from '../session-generation';
-import { READING_SESSION_KEY, assertReadingSession, commitReadingCache, readingSession, type ReadingSession, type ReadingCache } from './storage';
-import { ReadingApiError } from './api-error';
+import { capturePwaSession } from '../connection/session-generation';
+import { commitReadingCache, type ReadingCache } from './storage/storage';
+import { READING_CHANGED_EVENT, READING_SESSION_KEY, assertReadingSession, readingSession, type ReadingSession } from './session/session';
+import { ReadingApiError } from './session/api-error';
 import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
-export { ReadingApiError } from './api-error';
-import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './record-validation';
+export { ReadingApiError } from './session/api-error';
+import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './storage/record-validation';
 import { EncryptionStateChangedError } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 
@@ -38,7 +39,7 @@ export async function connectReadingFromReminders(): Promise<ReadingSession | nu
   const next: ReadingSession = { token, id: `reminders:${data.id}:${data.generation}`, folderPath: data.folderPath,
     generation: data.generation, expiresAt: data.expiresAt, source: 'reminders' };
   localStorage.setItem(READING_SESSION_KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event('crate-reading-change'));
+  window.dispatchEvent(new Event(READING_CHANGED_EVENT));
   return next;
 }
 let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;

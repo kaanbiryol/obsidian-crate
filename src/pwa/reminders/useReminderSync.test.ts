@@ -2,7 +2,7 @@ import { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { useReminderSync } from './useReminderSync';
-import { invalidatePwaSession } from '../session-generation';
+import { invalidatePwaSession } from '../connection/session-generation';
 import { loadCachedReminderSnapshot, saveCachedReminderSnapshot } from './cache/reminder-cache';
 import type { ApiFetch } from '../types';
 import type { ReminderRecord } from './types';

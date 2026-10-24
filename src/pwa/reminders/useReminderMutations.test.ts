@@ -4,12 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useReminderMutations } from './useReminderMutations';
 import { useReminderEditorActions } from './editor/useReminderEditorActions';
 import { useReminderOutbox } from './useReminderOutbox';
-import { invalidatePwaSession } from '../session-generation';
+import { invalidatePwaSession } from '../connection/session-generation';
 import { restoreReminderDraft, saveReminderDraft } from './editor/reminder-drafts';
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';
 import type { ModalState, ReminderRecord } from './types';
 
-vi.mock('../server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));
+vi.mock('../connection/server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));
 vi.mock('./useReminderOutbox', () => ({ useReminderOutbox: vi.fn() }));
 afterEach(() => { vi.restoreAllMocks(); });
 

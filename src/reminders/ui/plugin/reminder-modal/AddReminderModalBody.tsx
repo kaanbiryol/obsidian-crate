@@ -41,11 +41,9 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     onTogglePriority,
 }) => {
     const plugin = PluginContext.use();
-    const resolvePageTitle = useCallback(async (url: string) => {
-        const api = plugin.syncRuntime.getApiClient();
-        const title = await api?.fetchPageTitle(url) ?? null;
-        return api === plugin.syncRuntime.getApiClient() ? title : null;
-    }, [plugin]);
+    // A replaced connection rejects, which the editor treats as no title.
+    const resolvePageTitle = useCallback((url: string) =>
+        plugin.syncRuntime.withCurrentApi(api => api.fetchPageTitle(url), 'Sync connection changed.'), [plugin]);
     const projectColor = getProjectColor(draft.project || defaultProject)[isDark ? 'dark' : 'light'].accent;
 
     return (

@@ -8,8 +8,8 @@ import { loadStoredFileRows } from './storage';
 import { handleGetManifest, handleGetFileMetadata } from './metadata-handlers';
 import { meterD1Usage } from '../d1-usage';
 import { findReferencedStorageKeys } from '../storage-references';
-import { beginInitialImport } from './initial-import';
-import { trackStagedBatch } from './staged-upload-batches';
+import { beginInitialImport } from './import/initial-import';
+import { trackStagedBatch } from './staging/staged-upload-batches';
 import { cleanStagedBatches } from '../maintenance/staged-batch-cleanup';
 
 afterEach(reset);

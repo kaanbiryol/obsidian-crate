@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FakeDocumentFragment } from '../test/factories/obsidian';
 
 const noticeMessages: Array<string | object> = [];
 type ProtocolHandler = (params: Record<string, string>) => void;
@@ -26,25 +27,6 @@ const createCloudflareDeploymentService = vi.fn(() => ({
 }));
 const secretStorageHas = vi.fn(() => false);
 
-class FakeDocumentFragment {
-	readonly spans: string[] = [];
-	readonly links: Array<{ text: string; addEventListener: ReturnType<typeof vi.fn> }> = [];
-
-	createSpan(options: { text: string }): void {
-		this.spans.push(options.text);
-	}
-
-	createEl(tag: string, options: { text: string }) {
-		const link = {
-			tag,
-			text: options.text,
-			addEventListener: vi.fn(),
-		};
-		this.links.push(link);
-		return link;
-	}
-}
-
 async function loadLifecycleModule() {
 	vi.doMock('./feature-settings', () => ({ refreshSharedFeatures: vi.fn(async () => {}), registerSharedFeatures: vi.fn() }));
 	vi.doMock('../reading/register-integrations', () => ({ registerReading: vi.fn() }));
@@ -71,7 +53,6 @@ async function loadLifecycleModule() {
 			warn: vi.fn(),
 			error: vi.fn(),
 		})),
-		errorMessage: vi.fn((error: unknown) => String(error)),
 	}));
 	vi.doMock('../ui/settings-tab', () => ({
 		CrateSettingTab: class CrateSettingTab {
@@ -93,7 +74,7 @@ async function loadLifecycleModule() {
 	vi.doMock('./deviceId', () => ({
 		ensurePluginDeviceId,
 	}));
-	vi.doMock('../cloudflare/plugin-integration', () => ({
+	vi.doMock('./cloudflare-operations', () => ({
 		createCloudflareDeploymentService,
 		createCloudflareUsageConnection: vi.fn(() => ({})),
 		handleCloudflareOAuthProtocol,
@@ -157,7 +138,7 @@ afterEach(() => {
 	vi.doUnmock('../reminders/plugin-integration');
 	vi.doUnmock('../sync/plugin-integration');
 	vi.doUnmock('./deviceId');
-	vi.doUnmock('../cloudflare/plugin-integration');
+	vi.doUnmock('./cloudflare-operations');
 	vi.doUnmock('../cloudflare/update-notice');
 });
 
@@ -387,7 +368,7 @@ describe('bootstrapPlugin', () => {
 		expect(registerSyncCommands).not.toHaveBeenCalled();
 		expect(initializeReminders).not.toHaveBeenCalled();
 		expect(showCloudflareServerUpdateNotice).not.toHaveBeenCalled();
-		expect(noticeMessages).toContain('Crate failed to initialize: Error: settings unavailable');
+		expect(noticeMessages).toContain('Crate failed to initialize: settings unavailable');
 	});
 });
 

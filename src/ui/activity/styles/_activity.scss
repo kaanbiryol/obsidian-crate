@@ -1,0 +1,986 @@
+@use "../../shared/styles/sync-review";
+@use "../../shared/styles/action";
+/* Shared modal vocabulary, aligned with the reminder editor. */
+.crate-activity-modal {
+	--crate-activity-control-bg: var(--background-modifier-form-field, var(--interactive-normal));
+	--crate-activity-control-hover-bg: var(--background-modifier-hover);
+	--crate-activity-control-active-bg: var(--background-modifier-active-hover, var(--background-modifier-hover));
+	--crate-activity-divider: var(--background-modifier-border);
+	--crate-activity-divider-strong: var(--background-modifier-border-hover, var(--background-modifier-border));
+	--crate-activity-focus-ring: var(--background-modifier-border-focus, var(--interactive-accent));
+	--crate-activity-radius-control: var(--input-radius, var(--radius-s, 4px));
+	--crate-activity-radius-card: var(--radius-m, 10px);
+	--crate-activity-motion-fast: var(--anim-duration-fast, 160ms);
+	--crate-activity-motion-moderate: var(--anim-duration-moderate, 250ms);
+	--crate-activity-motion-easing: var(--anim-motion-baseline, ease);
+	--crate-activity-space-inline: var(--size-4-4, 16px);
+}
+
+.crate-reminders-ui .crate-activity-surface {
+    // The surface receives initial focus; controls retain their own focus rings.
+    outline: none;
+    display: flex;
+    height: min(560px, calc(100dvh - 48px));
+    max-height: calc(100dvh - 48px);
+    min-height: 0;
+    flex-direction: column;
+
+    &.is-centered {
+        width: min(800px, calc(100vw - 48px));
+        max-width: 800px;
+        padding-bottom: 0;
+    }
+
+    // Obsidian mobile keeps the page full height and reports the keyboard separately.
+    &.is-bottom-sheet {
+        height: calc(85dvh - var(--keyboard-height, 0px));
+        max-height: calc(90dvh - var(--keyboard-height, 0px));
+        margin-bottom: var(--keyboard-height, 0px);
+        min-height: 0;
+    }
+}
+
+.crate-activity-modal {
+    container-type: inline-size;
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.crate-activity-tab-bar,
+.crate-sync-error-notice {
+    flex-shrink: 0;
+}
+
+.crate-activity-body {
+    container-type: size;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    overscroll-behavior: contain;
+}
+
+.crate-activity-modal > .crate-modal-header-host { flex-shrink: 0; }
+
+.crate-activity-subtitle {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    align-self: center;
+    flex: 0 0 220px;
+    width: 220px;
+    min-width: 0;
+    margin-left: 0;
+    position: relative;
+    padding: 0 12px 0 0;
+    text-align: right;
+    border-right: 1px solid var(--crate-activity-divider-strong);
+    font-size: var(--font-ui-smaller, 12px);
+    line-height: 1.4;
+    font-weight: 400;
+    color: var(--text-normal);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.crate-activity-subtitle-indicator {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.crate-activity-subtitle-label {
+    min-width: 0;
+    // Match the other header labels: center the font's cap-to-baseline box.
+    text-box: trim-both cap alphabetic;
+    // Preserve accents and descenders when long labels are clipped for ellipsis.
+    padding-block: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.modal.crate-conflict-review-modal .crate-reminders-ui .crate-conflict-choices label {
+    height: 28px;
+    min-height: 28px;
+    white-space: nowrap;
+    padding: 0 8px;
+    flex-shrink: 0;
+    font-size: var(--font-ui-smaller, 12px);
+    font-weight: 400;
+    border: 1px solid var(--crate-choice-border, color-mix(in srgb, var(--background-modifier-border) 90%, transparent)) !important;
+    color: color-mix(in srgb, var(--text-normal) 92%, var(--text-muted));
+    border-radius: var(--input-radius, var(--radius-s, 4px));
+}
+
+.crate-reminders-ui .crate-activity-modal button.crate-activity-action,
+.crate-reminders-ui button.crate-sync-primary-action,
+.modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action,
+.modal.crate-vault-history-modal .crate-reminders-ui button.crate-activity-action,
+.crate-reminders-ui .crate-activity-modal button.crate-conflict-review-button,
+.modal.crate-conflict-review-modal .crate-reminders-ui button.crate-conflict-action {
+    @include action.styles;
+}
+.crate-reminders-ui .crate-activity-modal .crate-sync-now-btn { width: 11ch; min-width: 11ch; }
+
+.crate-activity-subtitle:empty { display: none; }
+
+.crate-sync-error-notice {
+	display: flex;
+	align-items: flex-start;
+	max-height: min(45vh, 420px);
+	overflow-y: auto;
+	gap: 10px;
+	margin: 8px var(--crate-activity-space-inline) 16px;
+	padding: 12px 14px;
+	border: 1px solid color-mix(in srgb, var(--text-error) 18%, var(--background-modifier-border));
+	border-radius: var(--radius-m, 8px);
+	background: color-mix(in srgb, var(--text-error) 3%, var(--background-primary));
+}
+
+.crate-sync-error-icon {
+	display: flex;
+	flex: 0 0 auto;
+	margin-top: 1px;
+	color: var(--text-error);
+
+	svg {
+		width: var(--icon-s, 16px);
+		height: var(--icon-s, 16px);
+		stroke-width: var(--icon-s-stroke-width, 2px);
+	}
+}
+
+.crate-sync-error-copy {
+	display: flex;
+	min-width: 0;
+	width: 100%;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.crate-sync-error-title {
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	color: var(--text-error);
+}
+
+.crate-sync-error-message {
+	font-size: var(--font-ui-smaller);
+	line-height: 1.45;
+	color: var(--text-muted);
+	overflow-wrap: anywhere;
+	user-select: text;
+}
+
+.crate-sync-issues {
+	display: grid;
+	gap: 12px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-size: var(--font-ui-smaller);
+	line-height: 1.45;
+	overflow-wrap: anywhere;
+	user-select: text;
+}
+.crate-sync-issue { min-width: 0; margin: 0; padding: 0; }
+.crate-sync-issue + .crate-sync-issue { border-top: 1px solid var(--background-modifier-border); padding-top: 12px; }
+.crate-sync-issue-path { display: block; color: var(--text-normal); margin-bottom: 3px; font-weight: var(--font-semibold, 600); }
+.crate-sync-issue-summary { color: var(--text-normal); }
+.crate-sync-issue-recovery { color: var(--text-muted); margin-top: 3px; }
+.crate-sync-issue-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.crate-reminders-ui .crate-activity-modal .crate-sync-issue-actions button {
+    @include action.control;
+    height: auto;
+    min-height: 28px;
+    @media (pointer: coarse) { min-height: 44px; }
+}
+.crate-sync-issue-copy { min-width: 11ch; }
+.crate-sync-issue-toggle {
+    gap: 6px;
+    &::after {
+        content: '';
+        width: 5px;
+        height: 5px;
+        margin-top: -3px;
+        border-right: 1px solid currentColor;
+        border-bottom: 1px solid currentColor;
+        transform: rotate(45deg);
+    }
+    &[aria-expanded="true"]::after { transform: rotate(225deg); margin-top: 3px; }
+}
+.crate-sync-issue-details {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--background-modifier-border);
+    color: var(--text-muted);
+    &[hidden] { display: none; }
+    pre {
+        margin: 4px 0 0;
+        padding: 8px 10px;
+        border-radius: var(--radius-s, 4px);
+        background: var(--background-secondary);
+        font-family: var(--font-monospace, monospace);
+        font-size: var(--font-ui-smaller, 12px);
+        line-height: 1.5;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        user-select: text;
+    }
+}
+.crate-sync-issue-detail-label { color: var(--text-normal); font-weight: var(--font-medium, 500); }
+.crate-sync-issue-repair { margin: 4px 0 10px; max-width: 80ch; }
+.crate-sync-issues-more {
+    margin-top: 8px;
+    color: var(--text-muted);
+    > summary { cursor: pointer; min-height: 28px; padding-block: 4px; }
+    @media (pointer: coarse) { > summary { min-height: 44px; padding-block: 12px; } }
+}
+.crate-sync-issue-feedback {
+    color: var(--text-muted);
+    &:not(:empty):not(.is-status-only) { margin-top: 6px; }
+    &.is-status-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
+/* Underline tabs */
+.crate-activity-tab-bar {
+	position: relative;
+	display: flex;
+	margin: 0;
+	padding-inline: var(--crate-activity-space-inline);
+	border-bottom: 0;
+}
+
+.crate-activity-tabs {
+	position: relative;
+	display: flex;
+	gap: 0;
+	flex: 0 0 auto;
+	min-width: 0;
+}
+
+.crate-activity-tabs-host, .crate-activity-tabs-layout { display: contents; }
+.crate-activity-panel[hidden] { display: none; }
+
+.crate-activity-tab-indicator {
+    left: calc(var(--active-tab-left) + 12px);
+    width: calc(var(--active-tab-width) - 24px);
+	position: absolute;
+	bottom: -1px;
+	height: 1px;
+	border-radius: 0;
+	background: var(--text-normal);
+	transition: left var(--crate-activity-motion-moderate) var(--crate-activity-motion-easing), width var(--crate-activity-motion-moderate) var(--crate-activity-motion-easing);
+	pointer-events: none;
+}
+
+.crate-activity-modal .crate-activity-tab {
+	position: relative;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	margin: 0;
+	min-height: 36px;
+	padding: 8px 12px;
+	border: 0 !important;
+	outline: none !important;
+	border-radius: 0;
+	appearance: none;
+	background: transparent !important;
+	box-shadow: none !important;
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-medium);
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color var(--crate-activity-motion-moderate) var(--crate-activity-motion-easing);
+	white-space: nowrap;
+	font-family: var(--font-interface);
+
+	&::before,
+	&::after {
+		display: none !important;
+		content: none !important;
+	}
+
+	@media (hover: hover) and (pointer: fine) {
+		&:hover {
+			color: var(--text-muted);
+		}
+	}
+
+	&:focus-visible {
+		text-decoration: underline;
+		text-decoration-color: var(--crate-activity-focus-ring);
+		text-decoration-thickness: 2px;
+		text-underline-offset: 5px;
+	}
+
+	&.crate-activity-tab-active {
+		color: var(--text-normal);
+		font-weight: 500;
+	}
+}
+
+.crate-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 0;
+    background: transparent;
+	font-variant-numeric: tabular-nums;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.crate-tab-count:empty { display: none; }
+
+.crate-tab-count-warning {
+	color: var(--text-warning);
+}
+
+/* Content panels */
+.crate-activity-panel {
+	flex: 1 1 0;
+	min-height: 0;
+	overflow-y: auto;
+	scrollbar-gutter: stable both-edges;
+    overscroll-behavior: contain;
+	padding: 0 var(--crate-activity-space-inline) 20px;
+	scrollbar-width: thin;
+	scrollbar-color: var(--crate-activity-divider) transparent;
+
+	&::-webkit-scrollbar {
+		width: 6px;
+		background: transparent;
+	}
+
+	&::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	&::-webkit-scrollbar-thumb {
+		background: var(--crate-activity-divider);
+		border-radius: 3px;
+	}
+
+	&::-webkit-scrollbar-thumb:hover {
+		background: var(--text-faint);
+	}
+}
+
+/* File rows */
+.crate-activity-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.crate-activity-file-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    @include sync-review.row;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.crate-file-icon {
+    display: flex;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+
+    svg {
+        width: var(--icon-s, 16px);
+        height: var(--icon-s, 16px);
+        stroke-width: var(--icon-s-stroke-width, 2px);
+    }
+}
+
+.crate-file-icon-conflict {
+    color: var(--text-warning);
+}
+
+.crate-file-info {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.crate-file-name {
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-medium);
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.crate-file-path {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Empty states */
+.crate-activity-panel:not([hidden]):has(.crate-activity-empty-state) {
+	display: flex;
+	flex-direction: column;
+	padding-block: 0;
+}
+
+// History has a toolbar and a separate content wrapper. Give that wrapper
+// the remaining panel space so its empty state has a real centering area.
+.crate-history-timeline-content:has(> .crate-activity-empty-state) {
+	display: flex;
+	flex-direction: column;
+	flex: 1 0 auto;
+}
+
+.crate-activity-empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	flex: 1 0 auto;
+	gap: 14px;
+	padding: 32px 20px;
+	box-sizing: border-box;
+}
+
+.crate-empty-icon {
+	display: flex;
+	width: 44px;
+	height: 44px;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	margin-bottom: 0;
+	color: var(--text-muted);
+	opacity: 1;
+
+	svg {
+		width: var(--icon-m, 18px);
+		height: var(--icon-m, 18px);
+		stroke-width: var(--icon-m-stroke-width, 1.75px);
+	}
+}
+
+.crate-empty-icon-success {
+	color: var(--text-success);
+}
+
+.crate-empty-text {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	min-width: 0;
+	max-width: 320px;
+	gap: 6px;
+	text-align: center;
+	overflow-wrap: anywhere;
+}
+
+.crate-empty-title {
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+}
+
+.crate-empty-desc {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+/* Each sync is one disclosure group; files stay inside that surface. */
+.crate-activity-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.crate-history-day-label {
+    margin: sync-review.$section-heading-gap 10px 6px;
+    line-height: 1.4;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-medium);
+}
+.crate-history-separator { color: var(--text-faint); }
+
+.crate-history-entry {
+    overflow: hidden;
+    border-bottom: 1px solid sync-review.$row-divider;
+    background: transparent;
+
+    &:last-child { border-bottom: 0; }
+}
+
+.crate-history-card {
+    margin: 0;
+    min-height: 44px;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: var(--crate-activity-radius-control);
+    background: transparent;
+    box-shadow: none;
+}
+
+.crate-history-header {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 26px;
+    gap: 4px 10px;
+}
+
+.crate-history-meta {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: baseline;
+    gap: 2px;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.crate-history-type {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.crate-history-time {
+    font-size: 10px;
+    font-weight: var(--font-normal, 400);
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.crate-history-summary {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-width: 0;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.crate-history-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.crate-history-count {
+    color: var(--text-normal);
+}
+
+.crate-history-unchanged { color: var(--text-muted); }
+
+.crate-history-error {
+    color: var(--text-muted);
+    border-left: 2px solid color-mix(in srgb, var(--text-error) 55%, transparent);
+    padding-left: 12px;
+}
+
+.crate-history-files > .crate-history-error {
+    margin: 8px 0;
+    padding: 0 0 0 12px;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+.crate-history-summary-error {
+    color: var(--text-error);
+}
+
+.crate-history-details > summary {
+    list-style: none;
+    cursor: pointer;
+
+    &::marker,
+    &::-webkit-details-marker {
+        display: none;
+        content: '';
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        &:hover {
+            background: var(--crate-activity-control-hover-bg);
+            .crate-history-chevron { color: var(--text-normal); }
+        }
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--crate-activity-focus-ring);
+        outline-offset: -2px;
+    }
+}
+
+.crate-history-chevron {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    transition: transform var(--crate-activity-motion-fast) var(--crate-activity-motion-easing);
+
+    svg {
+        width: 12px;
+        height: 12px;
+        stroke-width: var(--icon-s-stroke-width, 2px);
+    }
+}
+
+.crate-history-details[open] .crate-history-chevron {
+    transform: rotate(90deg);
+}
+
+.crate-history-files {
+    margin: 8px 10px 0 32px;
+    padding: 0 0 12px;
+    border-top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .crate-activity-file-card {
+        @include sync-review.row;
+        gap: 10px;
+    }
+}
+
+.crate-history-details:not([open]) > .crate-history-files {
+    display: none;
+}
+
+// Respond to the sheet's width, including narrow desktop windows.
+@container (max-width: #{sync-review.$compact-width}) {
+    .crate-activity-subtitle { display: none; }
+
+    .crate-history-header {
+        grid-template-columns: 12px minmax(0, 1fr);
+    }
+
+    .crate-history-meta {
+        grid-column: 2;
+        grid-row: 2;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        white-space: normal;
+    }
+
+}
+
+@media (max-width: 480px) {
+	.crate-activity-modal {
+		--crate-activity-space-inline: 14px;
+	}
+
+
+}
+
+body.reduce-motion .crate-activity-modal {
+    --crate-activity-motion-fast: 0ms;
+    --crate-activity-motion-moderate: 0ms;
+
+    .crate-activity-spinner {
+        animation: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .crate-activity-modal {
+        --crate-activity-motion-fast: 0ms;
+        --crate-activity-motion-moderate: 0ms;
+
+        .crate-activity-spinner {
+            animation: none;
+        }
+    }
+}
+
+.notice .crate-sync-error-link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+
+    &:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 3px;
+    }
+}
+
+.crate-activity-loading {
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.crate-activity-loading-label {
+    // Keep the label centered without wrapping or moving the spinner.
+    width: min(34ch, 100%);
+    min-width: 0;
+    height: 1.5em;
+    line-height: 1.5;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.crate-activity-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--crate-activity-divider);
+    border-top-color: var(--interactive-accent);
+    border-radius: 50%;
+    animation: crate-spin 1s linear infinite;
+}
+
+.crate-activity-list:has(> .crate-conflict-row) {
+    // File cards already contribute 5px of top padding.
+    padding-top: sync-review.$section-heading-gap - 5px;
+}
+.crate-conflict-row-folder { color: var(--text-muted); font-weight: normal; }
+.crate-conflict-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid sync-review.$row-divider;
+    padding-bottom: 8px;
+    &:last-child { border-bottom: 0; }
+    .crate-activity-file-card { flex: 1; min-width: 0; }
+    > button { flex-shrink: 0; }
+}
+.modal.crate-shared-modal.crate-conflict-review-modal {
+    width: min(800px, calc(100vw - 48px));
+    max-width: 800px;
+    height: min(560px, calc(100dvh - 48px));
+    max-height: calc(100dvh - 48px);
+    box-sizing: border-box;
+    &.is-mobile { width: 100%; max-width: none; height: calc(85dvh - var(--keyboard-height, 0px)); max-height: calc(90dvh - var(--keyboard-height, 0px)); margin-bottom: var(--keyboard-height, 0px); }
+    .modal-content {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+        max-height: none;
+        overflow: hidden;
+    }
+    .crate-modal-header-host { flex-shrink: 0; }
+    .crate-modal-body {
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        flex: 1;
+        padding: var(--crate-dialog-padding);
+    }
+}
+.crate-conflict-intro { display: flex; align-items: center; gap: 12px; }
+.crate-conflict-file-heading { min-width: 0; }
+.crate-conflict-review-path { margin: 0; @include sync-review.title; overflow-wrap: anywhere; }
+.crate-conflict-review-folder { color: var(--text-muted); font-weight: normal; }
+.crate-conflict-review-help { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; overflow-wrap: anywhere; }
+.crate-conflict-load-error {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    h3, p { margin: 0; }
+    h3 { font-size: var(--font-ui-medium); }
+    button { max-width: 100%; white-space: normal; }
+}
+.crate-conflict-retry { margin-top: 12px; }
+.crate-conflict-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+
+}
+.crate-conflict-compare {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0;
+    border: 0; border-radius: 0; overflow: hidden; @include sync-review.diff-colors;
+}
+.crate-conflict-version {
+    min-width: 0;
+    + .crate-conflict-version { border-left: 1px solid sync-review.$pane-divider; }
+    h3 { margin: 0; padding: 8px 12px; border: 0; background: transparent; @include sync-review.title; }
+    p { padding: 16px; color: var(--text-muted); font-size: var(--font-ui-small); }
+    h3 > button {
+        display: flex; align-items: center; justify-content: space-between;
+        width: 100%; height: auto; padding: 2px 0;
+        background: transparent; box-shadow: none; font-weight: var(--font-semibold); color: var(--text-normal);
+        cursor: pointer;
+        &:disabled { cursor: default; }
+        @media (hover: hover) and (pointer: fine) { &:hover { color: var(--text-normal); } }
+        svg { width: 14px; height: 14px; color: var(--text-faint); }
+    }
+}
+.crate-conflict-code {
+    margin: 0; padding: 12px 0; min-height: 260px; max-height: 44dvh;
+    overflow: auto; font-size: var(--font-ui-smaller); line-height: 1.6;
+    background: var(--background-primary); white-space: pre; user-select: text;
+}
+.crate-conflict-line {
+    display: flex;
+    min-width: 100%;
+    width: max-content;
+    min-height: 1.6em;
+    border-left: 2px solid transparent;
+    padding-right: 12px;
+    &.is-removed { --conflict-diff-color: var(--crate-diff-removed); }
+    &.is-added { --conflict-diff-color: var(--crate-diff-added); }
+    &.is-removed, &.is-added {
+        background: color-mix(in srgb, var(--conflict-diff-color) var(--crate-diff-row-tint), transparent);
+        border-left-color: var(--conflict-diff-color);
+    }
+    &.is-empty { background: transparent; }
+}
+.crate-conflict-line-number { width: 3ch; flex-shrink: 0; text-align: right; color: var(--text-faint); user-select: none; }
+.crate-conflict-line-sign { width: 2ch; flex-shrink: 0; text-align: center; color: var(--conflict-diff-color, var(--text-faint)); user-select: none; }
+.crate-conflict-line .crate-diff-word { background: color-mix(in srgb, var(--conflict-diff-color) var(--crate-diff-word-tint), transparent); border-radius: 2px; }
+
+.crate-conflict-actions {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px;
+    flex-shrink: 0;
+    align-items: end; margin-top: 0; background: var(--background-primary);
+    > .crate-conflict-primary-action { grid-column: 2; grid-row: 3; justify-self: end; }
+}
+.crate-conflict-resolution-help { grid-column: 1 / -1; grid-row: 2; margin: 0; min-height: 1.5em; }
+.crate-conflict-choices {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    min-width: 0;
+    legend {
+        padding: 0;
+        font-size: var(--font-ui-smaller);
+        color: var(--text-muted);
+        margin-bottom: 10px;
+    }
+    label {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        line-height: 1.4;
+        background: transparent;
+        transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+        @media (hover: hover) and (pointer: fine) { &:not(:has(input:disabled)):hover { background: var(--crate-control-hover-bg); } }
+        &:not(:has(input:disabled)):active { background: var(--crate-control-active-bg); }
+        gap: 5px;
+        &:has(input:checked) {
+            background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+            --crate-choice-border: var(--interactive-accent);
+        }
+        &:has(input:focus-visible) { outline: 2px solid var(--crate-focus-ring); outline-offset: 1px; }
+        &:has(input:disabled) { opacity: 0.5; cursor: default; }
+    }
+
+    input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+}
+.crate-conflict-manual {
+    min-width: 0;
+    margin-top: 16px;
+    font-size: var(--font-ui-small);
+    h3 { margin: 0; @include sync-review.title; }
+    p { margin: 8px 0 12px; }
+    label { display: block; }
+}
+.crate-conflict-editor { display: block; width: 100%; min-height: 260px; margin-top: 8px; padding: 12px; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); line-height: 1.6; resize: vertical; }
+@media (max-width: sync-review.$compact-width) {
+    .crate-conflict-intro { flex-wrap: wrap; }
+    .crate-conflict-toolbar { width: 100%; margin-left: 0; }
+    .crate-conflict-compare { grid-template-columns: 1fr; }
+    .crate-conflict-version + .crate-conflict-version { border: 0; margin-top: 20px; }
+    .crate-conflict-code { min-height: 120px; max-height: 28dvh; }
+    .crate-conflict-actions { grid-template-columns: 1fr; > .crate-conflict-primary-action { grid-column: 1; grid-row: 3; width: 100%; } }
+}
+
+@container (max-width: #{sync-review.$compact-width}) {
+    .crate-activity-modal .crate-activity-tab { min-height: 44px; }
+}
+
+.modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action-danger {
+    background: var(--crate-danger);
+    color: var(--crate-on-accent);
+    @media (hover: hover) and (pointer: fine) { &:not(:disabled):hover { background: color-mix(in srgb, var(--crate-danger) 88%, black); } }
+    &:not(:disabled):active { background: color-mix(in srgb, var(--crate-danger) 88%, black); }
+}
+
+.crate-conflict-choice-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    border: 1px solid var(--text-faint);
+    border-radius: 50%;
+    &::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0; }
+}
+.crate-conflict-choices label:has(input:checked) .crate-conflict-choice-check {
+    border-color: var(--text-normal);
+    &::after { opacity: 1; }
+}
+
+.crate-reminders-ui .crate-activity-modal .crate-conflict-review-button,
+.crate-reminders-ui .crate-file-history .crate-history-restore.reminder-modal-header-action,
+.modal.crate-conflict-review-modal .crate-reminders-ui button.crate-conflict-action { @include sync-review.action; }
+
+.crate-reminders-ui button.crate-sync-primary-action {
+    @include action.styles;
+}
+.crate-conflict-row .crate-file-info { @include sync-review.metadata; }
+.crate-conflict-row .crate-conflict-explanation { white-space: normal; overflow-wrap: anywhere; margin: 4px 0 0; }
+.crate-file-name { @include sync-review.title; }
+.crate-file-path { @include sync-review.metadata; }

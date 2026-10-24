@@ -556,3 +556,13 @@ it('does not duplicate a local create after a lost disk acknowledgement', async 
   await expect(writer.createReminder({ project: 'Inbox', content: 'Task', priority: 4, hasTime: false, reminderId: 'retry-id' })).rejects.toThrow('already exists');
   expect(files.get('Reminders/Inbox.md')?.match(/crate-id:retry-id/g)).toHaveLength(1);
 });
+
+it('creates a reminder whose identity only appears inside a code fence', async () => {
+  const quoted = '# Inbox\n\n```md\n- [ ] Example <!-- crate-id:fenced-id -->\n```\n';
+  const { app, files } = createMockAppWithVault({ 'Reminders/Inbox.md': quoted });
+  const writer = createMarkdownWriter(app, createMockIndex());
+  await writer.createReminder({ project: 'Inbox', content: 'Task', priority: 4, hasTime: false, reminderId: 'fenced-id' });
+  const content = files.get('Reminders/Inbox.md')!;
+  expect(content.startsWith(quoted)).toBe(true);
+  expect(content.match(/crate-id:fenced-id/g)).toHaveLength(2);
+});

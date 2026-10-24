@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetLocalTimeZone } from '@internationalized/date';
-import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
+import { buildModalDraft } from '@/pwa/reminders/editor/reminder-drafts';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { buildCreatedReminderBlock } from '../core/markdownReminderMutation';
 import { scanReminderMarkdownContent } from '../core/markdownScan';

@@ -53,7 +53,7 @@ describe('pending events from remote application', () => {
 			expect(result.mergedPaths).toEqual([path]);
 			expect(h.text()).toBe(merged);
 			expect(h.api.uploadFile.mock.calls[0]?.[1]).toEqual(toArrayBuffer(merged));
-			expect(h.engine.getPendingPaths()).toEqual([]);
+			expect(h.engine.getPendingKeys()).toEqual([]);
 			expect(h.engine.getState().pendingChanges).toBe(0);
 		} finally { h.engine.destroy(); }
 	});
@@ -63,7 +63,7 @@ describe('pending events from remote application', () => {
 		try {
 			const result = await h.engine.sync();
 			expect(result.errors).toEqual([]);
-			expect(h.engine.getPendingPaths()).toEqual([]);
+			expect(h.engine.getPendingKeys()).toEqual([]);
 			expect(h.api.uploadFile).not.toHaveBeenCalled();
 		} finally { h.engine.destroy(); }
 	});
@@ -75,7 +75,7 @@ describe('pending events from remote application', () => {
 			expect(result.errors).toEqual([]);
 			expect(result.downloadedPaths).toEqual([path]);
 			expect(h.text()).toBe(remote);
-			expect(h.engine.getPendingPaths()).toEqual([]);
+			expect(h.engine.getPendingKeys()).toEqual([]);
 		} finally { h.engine.destroy(); }
 	});
 
@@ -86,7 +86,7 @@ describe('pending events from remote application', () => {
 			const result = await h.engine.sync();
 			expect(result.errors).toEqual([]);
 			expect(h.text()).toBe(`${merged}new edit\n`);
-			expect(h.engine.getPendingPaths()).toEqual([path]);
+			expect(h.engine.getPendingKeys()).toEqual([path]);
 		} finally { h.engine.destroy(); }
 	});
 
@@ -104,7 +104,7 @@ describe('pending events from remote application', () => {
 			});
 			const result = await h.engine.sync();
 			expect(result.errors).toEqual([]);
-			expect(h.engine.getPendingPaths()).toEqual([path]);
+			expect(h.engine.getPendingKeys()).toEqual([path]);
 		} finally { h.engine.destroy(); }
 	});
 });
@@ -149,7 +149,7 @@ describe('downloaded file verification cost', () => {
 			await h.engine.waitForIdle();
 			expect(result.errors).toEqual([]);
 			expect(result.downloadedPaths).toHaveLength(50);
-			expect(h.engine.getPendingPaths()).toEqual([]);
+			expect(h.engine.getPendingKeys()).toEqual([]);
 			// Per file: the pre-write check and post-write verification, plus one
 			// rotating content check. Reconciliation and settling no longer reread (was 4 per file).
 			const reads = h.vault.adapter.readBinary.mock.calls.filter(([candidate]) => candidate.startsWith('notes/'));

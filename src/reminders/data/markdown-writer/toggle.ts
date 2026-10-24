@@ -7,7 +7,7 @@ import {
 } from '../../core/markdownReminderMutation';
 import type { IndexedReminder } from '../reminder-index';
 import type { MarkdownWriterContext } from './types';
-import { markdownWriterLog } from './operation-shared';
+import { markdownWriterLog } from './helpers';
 
 export async function toggleReminderCompletionInMarkdown(
 	context: MarkdownWriterContext,

@@ -1,20 +1,21 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
-import { useReadingConnection } from './useReadingConnection';
+import { useReadingConnection } from './session/useReadingConnection';
 import { useReadingSession } from './useReadingSession';
 import { AUTH_TOKEN_KEY } from '../config';
-import { READING_SESSION_KEY, readReadingCache, readReadingDraft, saveReadingDraft, type ReadingSession } from './storage';
+import { readReadingCache, readReadingDraft, saveReadingDraft } from './storage/storage';
+import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { connectReadingFromReminders } from './api';
-import { prepareReadingEncryption } from './encryption-session';
+import { prepareReadingEncryption } from './session/encryption-session';
 
-vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
+vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('../service-worker-registration', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
 vi.mock('./api', async importOriginal => ({
   ...await importOriginal<typeof import('./api')>(), connectReadingFromReminders: vi.fn(async () => null),
 }));
-vi.mock('./storage', async importOriginal => ({
-  ...await importOriginal<typeof import('./storage')>(),
+vi.mock('./storage/storage', async importOriginal => ({
+  ...await importOriginal<typeof import('./storage/storage')>(),
   readReadingCache: vi.fn(async () => undefined), pendingReading: vi.fn(async () => []),
   readReadingDraft: vi.fn(async () => undefined), readReadingShare: vi.fn(async () => undefined), hasEarlierReadingChanges: vi.fn(async () => false),
   saveReadingDraft: vi.fn(async () => {}),

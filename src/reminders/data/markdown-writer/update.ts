@@ -9,14 +9,14 @@ import {
 import {
   buildMovedReminderBlock,
   buildUpdatedReminderBlock,
+  reminderBlockFields,
   replaceUpdatedReminderBlock,
 } from "../../core/markdownReminderMutation";
-import { normalizeReminderProjectPath } from "../../core/reminderProjectPath";
+import { normalizeReminderProjectPath, reminderProject } from "../../core/reminderProjectPath";
 import type {
   MarkdownWriterContext,
 } from "./types";
-import { markdownWriterLog } from "./operation-shared";
-import { DEFAULT_PROJECT } from '../../core/constants';
+import { markdownWriterLog } from "./helpers";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -52,7 +52,7 @@ export async function updateReminderInMarkdown(
   if (requestedProject && !newProject) {
     throw new Error(`Invalid reminder project: ${requestedProject}`);
   }
-  const oldProject = reminder.project || DEFAULT_PROJECT;
+  const oldProject = reminderProject(reminder);
 
   if (newProject && newProject !== oldProject) {
     markdownWriterLog.info(`Moving reminder from ${oldProject} to ${newProject}`);
@@ -66,14 +66,9 @@ export async function updateReminderInMarkdown(
     const newFile = await context.getOrCreateProjectFile(newProject);
     const movedReminder: IndexedReminder = {
       ...reminder,
-      content: movedMutation.content,
-      description: movedMutation.description,
-      dueDate: movedMutation.dueDateKey,
-      dueDatetime: movedMutation.dueDatetime,
-      priority: movedMutation.priority,
+      ...reminderBlockFields(movedMutation),
       completed: reminder.completed,
       project: newProject,
-      recurrence: movedMutation.recurrence,
       filePath: newFile.path,
       lineNumber: -1,
       rawLine: movedMutation.checkboxLine,
@@ -152,14 +147,7 @@ export async function updateReminderInMarkdown(
     throw new Error(`File not found: ${reminder.filePath}`);
   }
 
-  context.index.applyOptimisticUpdate(reminder.id, {
-    content: mutation.content,
-    description: mutation.description,
-    dueDate: mutation.dueDateKey,
-    dueDatetime: mutation.dueDatetime,
-    priority: mutation.priority,
-    recurrence: mutation.recurrence,
-  });
+  context.index.applyOptimisticUpdate(reminder.id, reminderBlockFields(mutation));
 
   try {
     let replacementLineNumber = -1;

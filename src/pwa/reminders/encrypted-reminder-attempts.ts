@@ -1,11 +1,10 @@
 import type { DBSchema } from 'idb';
 import { reminderOperationDay, REMINDER_RETRY_DAYS } from '../../protocol/reminder-operation';
-import { sealPrivateValue, openPrivateValue } from './private-storage';
+import { sealPrivateValue, openPrivateValue, REMINDER_OUTBOX_PREFIX, REMINDER_DRAFT_PREFIX } from './private-storage';
 import { clearSessionStore } from '../storage/clear-session-store';
 import { abortTransaction } from '../storage/abort-transaction';
 import { openEncryptedDatabase } from '../storage/encrypted-storage-database';
 import { isSha256Hex } from '../../platform/validation';
-import { REMINDER_OUTBOX_PREFIX, REMINDER_DRAFT_PREFIX } from './outbox/reminder-storage-keys';
 
 export interface EncryptedReminderAttempt { semanticHash: string; body: string; generation: number; rejected?: boolean; acknowledgment?: string }
 interface AttemptDatabase extends DBSchema { attempts: { key: string; value: string } }

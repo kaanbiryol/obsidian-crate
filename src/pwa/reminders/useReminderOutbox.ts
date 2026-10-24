@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSyncFailureToast } from '../hooks/useSyncFailureToast';
 import { reminderNeedsAttention, reminderRetryAt, type createReminderOutbox } from './outbox/reminder-outbox';
 import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from './outbox/reminder-outbox-storage';
-import { capturePwaSession } from '../session-generation';
+import { capturePwaSession } from '../connection/session-generation';
 import { createReminderSettlementChannel } from './outbox/reminder-settlement';
 import { createReminderOutboxSession } from './outbox/reminder-outbox-session';
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';

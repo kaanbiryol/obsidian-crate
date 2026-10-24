@@ -1,6 +1,6 @@
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { capturePwaSession } from '../session-generation';
+import { capturePwaSession } from '../connection/session-generation';
 import { newReminderOperationId } from './outbox/reminder-operation-id';
 import { applyReminderChanges, predictReminderCompletion } from './outbox/reminder-optimistic-state';
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';

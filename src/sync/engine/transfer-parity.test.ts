@@ -82,7 +82,7 @@ it.each(['selected', 'full', 'incremental', 'automatic', 'force'] as const)('sha
 	}
 	expect(uploadBatches.map(batch => batch.length).sort()).toEqual([1, 3, 3, 3]);
 	expect(deleteBatches.map(batch => batch.length).sort()).toEqual([1, 4, 4]);
-	expect(h.engine.getPendingPaths()).toEqual([]);
+	expect(h.engine.getPendingKeys()).toEqual([]);
 	expect(h.localManifest.uploadJournal.pending()).toEqual([]);
 	expect(h.localManifest.getAllPaths().sort()).toEqual([...uploads].sort());
 	expect(labels).toContain('Deleting 9 of 9 files');

@@ -1,7 +1,7 @@
 import { CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { ConnectionError } from './issues';
-import { detectWebSessionName } from '../session-label';
-import { requireCompatibleProtocol } from '../server-compatibility';
+import { detectWebSessionName } from './session-label';
+import { requireCompatibleProtocol } from './server-compatibility';
 
 export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
 	const protocol = await requireCompatibleProtocol();

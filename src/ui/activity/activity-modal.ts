@@ -36,10 +36,10 @@ export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
     syncSelected?(keys: string[]): Promise<unknown>;
     createPendingDiscard?(keys: string[]): Promise<PendingDiscardReview>;
 	createConflictReview?(record: ConflictRecord): Promise<ConflictReview>;
-	getPendingPaths(): string[];
+	getPendingKeys(): string[];
 	/** Pending count without copying the pending list on every progress tick. */
 	getPendingChangeCount?(): number;
-	hasPendingPath?(key: string): boolean;
+	hasPendingKey?(key: string): boolean;
 	getActiveConflicts(): ConflictRecord[];
 	getState(): SyncState;
 	getActivityProgress?(): SyncActivityProgress | null;
@@ -116,7 +116,7 @@ export class ActivityModal extends BaseUiModal {
             loadingLabel.setAttribute('title', text);
             return;
         }
-        const paths = this.deps.getPendingPaths();
+        const paths = this.deps.getPendingKeys();
         // Rebuilding the file browser discards its comparisons; keep it while the pending set is unchanged.
         const showsBrowser = !!this.deps.loadPendingDiff && paths.length > 0 && state.status !== 'syncing' && !progress
             && !(state.initializing && state.status !== 'error' && state.status !== 'offline');
@@ -235,13 +235,13 @@ export class ActivityModal extends BaseUiModal {
 	}
 
     private pendingPathFilter(): (key: string) => boolean {
-        if (this.deps.hasPendingPath) return key => this.deps.hasPendingPath!(key);
-        const pending = new Set(this.deps.getPendingPaths());
+        if (this.deps.hasPendingKey) return key => this.deps.hasPendingKey!(key);
+        const pending = new Set(this.deps.getPendingKeys());
         return key => pending.has(key);
     }
 
     private pendingChangeCount(): number {
-        return this.deps.getPendingChangeCount?.() ?? this.deps.getPendingPaths().length;
+        return this.deps.getPendingChangeCount?.() ?? this.deps.getPendingKeys().length;
     }
 
     private getActivityStatus() {

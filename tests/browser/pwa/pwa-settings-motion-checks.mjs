@@ -1,7 +1,7 @@
 import { checkSheetDragPosition } from './pwa-sheet-drag-checks.mjs';
 import { trackSheetDismissal } from './pwa-sheet-motion-checks.mjs';
 import { swipe } from '../support/browser-touch-swipe.mjs';
-import { switchFeature } from './pwa-feature-navigation.mjs';
+import { switchFeature } from '../support/pwa-feature-navigation.mjs';
 import { expect } from '@playwright/test';
 import { checkSettingsClose } from './pwa-settings-close-checks.mjs';
 

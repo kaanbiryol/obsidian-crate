@@ -2,8 +2,8 @@ import net from 'node:net';
 import { bundleBudgets } from './bundle-budgets.mjs';
 import { readFile } from 'node:fs/promises';
 import { Script } from 'node:vm';
-import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../tests/browser/support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../tests/browser/support/preview/pwa-preview-server.mjs';
 
 async function getFreePort() {
 	return new Promise((resolve, reject) => {

@@ -35,7 +35,7 @@ export async function prepareUploadsFromVaultFiles(
 }
 
 type UploadTransferContext = Pick<TransferContext, 'runConcurrent' | 'retryWithBackoff' | 'getModifiedIso'> & {
-  api: Pick<TransferContext['api'], 'uploadFile' | 'batchUpload'>;
+  files: Pick<TransferContext['files'], 'uploadFile' | 'batchUpload'>;
   localManifest: Pick<TransferContext['localManifest'], 'setEntry'>;
   markdownBaseCache?: Pick<NonNullable<TransferContext['markdownBaseCache']>, 'putBase'>;
 };
@@ -69,7 +69,7 @@ export async function uploadPreparedFiles(
           expectedHash: upload.expectedHash ?? null,
         }));
 
-        const doBatch = () => context.api.batchUpload(files);
+        const doBatch = () => context.files.batchUpload(files);
         const response = options.retry
           ? await context.retryWithBackoff(doBatch)
           : await doBatch();
@@ -165,7 +165,7 @@ async function uploadPreparedFilesIndividually(
 ): Promise<string[]> {
   const tasks = prepared.map((upload) => async () => {
     try {
-      const doUpload = () => context.api.uploadFile(
+      const doUpload = () => context.files.uploadFile(
         upload.path,
         upload.content,
         upload.hash,

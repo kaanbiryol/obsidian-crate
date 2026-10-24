@@ -1,8 +1,8 @@
-import type { UploadCommitters } from '../upload-committers';
+import type { UploadCommitters } from '../staging/upload-committers';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../../encryption/file-format';
-import { trackStagedUploads } from '../staged-uploads';
-import { trackStagedBatch } from '../staged-upload-batches';
+import { trackStagedUploads } from '../staging/staged-uploads';
+import { trackStagedBatch } from '../staging/staged-upload-batches';
 import { beginUploadOperation } from '../upload-operations';
 import { corsResponse } from '../../cors';
 import { FileNamespaceConflictError } from '../file-namespace';

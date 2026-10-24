@@ -26,7 +26,7 @@ import {
 import type { ModalDraft, ModalPickerId, ModalState } from '../types';
 import { DEFAULT_PROJECT } from '@/reminders/core/constants';
 import { getReminderTitleCaret } from '@/reminders/ui/reminder-editor/reminderEditorEdits';
-import { saveCursorPosition } from '@/reminders/ui/reminder-editor/cursorPosition';
+import { saveCursorPosition } from '@/ui/shared/cursorPosition';
 
 export interface ReminderEditorScreenHandle {
 	dismissKeyboard(): void;

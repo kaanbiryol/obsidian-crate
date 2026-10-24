@@ -1,7 +1,7 @@
 import { cancelDetailHistoryOpen, installDetailHistory } from './detail-history';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dismissProjectHistory, openProjectHistory } from './project-history';
-import { dismissReadingArticleHistory, openReadingArticleHistory } from '../reading/article-history';
+import { dismissReadingArticleHistory, openReadingArticleHistory } from '../reading/storage/article-history';
 
 interface Entry { state: unknown; url: string; snapshot?: string }
 let entries: Entry[], index: number;

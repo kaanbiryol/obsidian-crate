@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
-import { invalidatePwaSession } from '../session-generation';
+import { invalidatePwaSession } from '../connection/session-generation';
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';
 import type { ApiFetch } from '../types';
 import type { ReminderRecord } from './types';

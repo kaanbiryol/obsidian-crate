@@ -3,7 +3,7 @@ import type React from 'react';
 
 import { filterProjects, extractHashtagQuery } from './projectSearch';
 import { getPlainText } from './richTextPlainText';
-import { saveCursorPosition } from './cursorPosition';
+import { saveCursorPosition } from '../../../ui/shared/cursorPosition';
 import { replaceReminderProject, toReminderTextOffset, toReminderCursorOffset } from './reminderEditorEdits';
 import type { RichTextInputHandle } from '../shared/RichTextInput';
 

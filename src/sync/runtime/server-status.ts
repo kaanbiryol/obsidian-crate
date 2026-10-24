@@ -1,8 +1,9 @@
 import type { CrateServerInfo } from '../../protocol/server-info';
-import { createLogger, errorMessage } from '../logger';
+import { createLogger } from '../logger';
+import { errorMessage } from '../../platform/logger';
 import type { SyncApiClient } from '../worker-api/client';
 import { checkServerReachability, SERVER_CHECK_TIMEOUT_MS } from '../connection/server-reachability';
-import type { CrateSettings } from '../../plugin/settings-types';
+import type { SyncRuntimeSettings } from '../settings';
 
 const logger = createLogger('RuntimeServerStatus');
 const SERVER_CHECK_DELAY_MS = 2_000;
@@ -18,7 +19,7 @@ export class RuntimeServerStatus {
 	private connectionIssue: string | null = null;
 
 	constructor(private readonly options: {
-		settings: Pick<CrateSettings, 'workerUrl' | 'cloudflareDeployment'>;
+		settings: Pick<SyncRuntimeSettings,'workerUrl' | 'cloudflareDeployment'>;
 		getClient: () => SyncApiClient | null;
 		/** Capture the idle engine generation; reject observations after sync or replacement. */
 		captureIdleState: () => (() => boolean) | null;

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { buildPersistedCrateSettings, DEFAULT_SETTINGS, normalizeCrateSettings } from './settings';
-import { MAX_SYNC_HISTORY_PATHS } from '../sync/settings';
 
 describe('normalizeCrateSettings', () => {
 	it.each(['.obsidian', '/custom-config/'])(
@@ -103,20 +102,6 @@ describe('normalizeCrateSettings', () => {
 			deviceId: ' device-1 ',
 			ignorePatterns: [' .git/ ', '', 'vault-config/workspace*', '.git/', 42 as never],
 			syncInterval: -30,
-			syncHistory: [
-				{
-					timestamp: ' 2026-01-01T00:00:00.000Z ',
-					type: 'sync',
-					success: true,
-					uploaded: 1,
-					downloaded: 2,
-					deleted: 3,
-					errorCount: 0,
-					conflictCount: 0,
-					uploadedPaths: [' notes/a.md ', 'notes/a.md'],
-				},
-				{ timestamp: '2026-01-01T00:00:00.000Z', type: 'invalid' },
-			] as never,
 			pushEnabled: true,
 		}, 'vault-config');
 
@@ -126,20 +111,6 @@ describe('normalizeCrateSettings', () => {
 		expect(settings.deviceId).toBe(DEFAULT_SETTINGS.deviceId);
 		expect(settings.ignorePatterns).toEqual(['.git/', 'vault-config/workspace*']);
 		expect(settings.syncInterval).toBe(DEFAULT_SETTINGS.syncInterval);
-		expect(settings.syncHistory).toEqual([
-			{
-				timestamp: '2026-01-01T00:00:00.000Z',
-				type: 'sync',
-				success: true,
-				uploaded: 1,
-				downloaded: 2,
-				merged: 0,
-				deleted: 3,
-				errorCount: 0,
-				conflictCount: 0,
-				uploadedPaths: ['notes/a.md'],
-			},
-		]);
 		expect(settings.pushEnabled).toBe(true);
 		expect(settings.debugLogging).toBe(DEFAULT_SETTINGS.debugLogging);
 		expect(settings.debounceDelay).toBe(DEFAULT_SETTINGS.debounceDelay);
@@ -177,31 +148,6 @@ describe('normalizeCrateSettings', () => {
 		expect(normalizeCrateSettings({ workerUrl: 'https://worker.example?token=1' }, configDir).workerUrl).toBe('');
 		expect(normalizeCrateSettings({ workerUrl: 'https://worker.example/#frag' }, configDir).workerUrl).toBe('');
 		expect(normalizeCrateSettings({ workerUrl: 'https://worker.example/api/' }, configDir).workerUrl).toBe('https://worker.example/api');
-	});
-
-	it('caps persisted sync history file lists to avoid oversized settings payloads', () => {
-		const uploadedPaths = Array.from({ length: MAX_SYNC_HISTORY_PATHS + 10 }, (_, index) => `notes/${index}.md`);
-
-		const settings = normalizeCrateSettings({
-			syncHistory: [
-				{
-					timestamp: '2026-01-01T00:00:00.000Z',
-					type: 'sync',
-					success: true,
-					uploaded: uploadedPaths.length,
-					downloaded: 0,
-					merged: 0,
-					deleted: 0,
-					errorCount: 0,
-					conflictCount: 0,
-					uploadedPaths,
-				},
-			],
-		}, 'vault-config');
-
-		expect(settings.syncHistory[0]?.uploadedPaths).toHaveLength(MAX_SYNC_HISTORY_PATHS);
-		expect(settings.syncHistory[0]?.uploadedPaths?.[0]).toBe('notes/0.md');
-		expect(settings.syncHistory[0]?.uploadedPaths?.at(-1)).toBe(`notes/${MAX_SYNC_HISTORY_PATHS - 1}.md`);
 	});
 
 	it('omits deviceId from persisted settings so device identity stays local', () => {

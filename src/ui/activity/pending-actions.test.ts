@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FakeElement } from '../../test/fakes/obsidian-ui';
 
 const obsidian = vi.hoisted(() => ({ isMobile: false, shown: [] as Array<{ x: number; y: number; titles: string[] }> }));
 
@@ -25,25 +26,6 @@ vi.mock('obsidian', () => {
 
 const { createPendingActions } = await import('./pending-actions');
 
-class FakeElement {
-    readonly children: FakeElement[] = [];
-    readonly listeners = new Map<string, Array<(event: Event) => void>>();
-    className = '';
-    textContent = '';
-    checked = false;
-    indeterminate = false;
-    disabled = false;
-    constructor(readonly tag: string, options: { cls?: string } = {}) { this.className = options.cls ?? ''; }
-    createEl(tag: string, options: { cls?: string } = {}) { const child = new FakeElement(tag, options); this.children.push(child); return child; }
-    createDiv(options: { cls?: string } = {}) { return this.createEl('div', options); }
-    createSpan(options: { cls?: string } = {}) { return this.createEl('span', options); }
-    prepend(child: FakeElement) { this.children.unshift(child); }
-    setAttribute() {}
-    addEventListener(type: string, listener: (event: Event) => void) { this.listeners.set(type, [...this.listeners.get(type) ?? [], listener]); }
-    getBoundingClientRect() { return { right: 300, bottom: 120 }; }
-    click() { for (const listener of this.listeners.get('click') ?? []) listener({ stopPropagation() {} } as Event); }
-}
-
 function setup() {
     const key = 'Notes/Today.md';
     const rows = { contextTargets: vi.fn(() => [key]) };
@@ -62,10 +44,11 @@ describe('pending change actions', () => {
     it('opens the row menu from a visible button on mobile', () => {
         obsidian.isMobile = true;
         const { row } = setup();
-        const button = row.children.find(child => child.className === 'crate-browser-file-menu');
+        const button = row.children.find(child => child.classNames.has('crate-browser-file-menu'));
         expect(button).toBeDefined();
+        Object.assign(button!, { getBoundingClientRect: () => ({ right: 300, bottom: 120 }) });
 
-        button!.click();
+        button!.dispatchEvent(new Event('click'));
 
         expect(obsidian.shown).toEqual([{ x: 300, y: 120, titles: ['Discard 1 item…'] }]);
     });

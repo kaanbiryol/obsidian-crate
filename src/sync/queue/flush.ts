@@ -4,13 +4,13 @@ import { createAbortError } from '../abort';
 import { createLogger } from '../logger';
 import { isAbortError } from '../abort';
 import { isQueueTerminalFailure, isRetryableSyncError, isVersionConflict } from '../failures';
-import type { QueueDeleteCandidate, QueueDeleteFailure, QueueFlushContext, QueueUploadFailure } from './flush-types';
+import type { QueueDeleteCandidate, QueueDeleteFailure, QueueFlushBatch, QueueFlushContext, QueueUploadFailure } from './flush-types';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import type { SyncResult } from '../types';
 import { syncErrorIssues, formatSyncIssue, SkippedFileError, skippedFileIssue, withSyncFileContext } from '../issues';
 import type { SyncIssue } from '../types';
 import { HttpError } from '../worker-api/http';
-import { completeTransferResult, completeWorkflowResult, handleWorkflowError } from '../sync-outcome';
+import { beginSyncAttempt, completeTransferResult, completeWorkflowResult, handleWorkflowError } from '../sync-outcome';
 
 export type { QueueFlushContext } from './flush-types';
 
@@ -78,17 +78,23 @@ export async function processPendingChanges(
 		context.updateState({ pendingChanges: 0 });
 		return;
 	}
-	if (context.currentStatus() === 'syncing') {
+
+	let batch!: QueueFlushBatch;
+	const startFailure = beginSyncAttempt({
+		apiConfigured: () => context.api.isConfigured(),
+		getStatus: () => context.currentStatus(),
+		updateState: updates => context.updateState(updates),
+	}, () => {
+		batch = context.beginBatch();
+		logger.info(`Processing ${batch.paths.length} pending changes`);
+		return { pendingChanges: context.getPendingPathCount() };
+	});
+	if (startFailure) {
 		context.updateState({ pendingChanges: context.getPendingPathCount() });
-		context.triggerDebouncedSync();
-		return;
-	}
-	if (!context.api.isConfigured()) {
-		context.updateState({ pendingChanges: context.getPendingPathCount() });
+		if (context.currentStatus() === 'syncing') context.triggerDebouncedSync();
 		return;
 	}
 
-	const batch = context.beginBatch();
 	const { paths } = batch;
 	const changes = paths.map(decodePendingChange);
 	const uploadPaths = changes.filter(change => change.kind === 'upload').map(change => change.path);
@@ -98,9 +104,6 @@ export async function processPendingChanges(
 	const skipped: SyncIssue[] = [];
 	let hasTerminalFailure = false;
 	let flushFailed = false;
-
-	logger.info(`Processing ${paths.length} pending changes`);
-	context.updateState({ status: 'syncing', pendingChanges: context.getPendingPathCount() });
 
 	try {
 		await context.recoverUploads();

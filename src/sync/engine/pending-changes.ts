@@ -19,7 +19,7 @@ interface EnginePendingChangesContext {
     api: Pick<SyncApiClient, 'getFileMetadata' | 'downloadFile' | 'listFileVersions' | 'previewFileVersion'>;
     manifest: Pick<LocalManifest, 'getEntry' | 'setEntry' | 'removeEntry' | 'save'>;
     cache: Pick<MarkdownBaseCache, 'readBase'>;
-    queue: Pick<SyncQueueController, 'getPendingPaths' | 'snapshotPendingRevisions' | 'clearSyncedPendingPaths'>;
+    queue: Pick<SyncQueueController, 'getPendingKeys' | 'snapshotPendingRevisions' | 'clearSyncedPendingPaths'>;
     backupRoot: string;
     assertActive(): void;
     isDestroyed(): boolean;
@@ -89,7 +89,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
             ]);
             const snapshot = context.queue.snapshotPendingRevisions();
             const settled = createEmptySyncResult();
-            for (const key of context.queue.getPendingPaths()) {
+            for (const key of context.queue.getPendingKeys()) {
                 if (context.isDestroyed()) return;
                 const path = decodePendingChange(key).path;
                 if (!applied.has(path)) continue;

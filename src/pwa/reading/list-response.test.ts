@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import { loadReading, MAX_READING_LIST_ISSUES, MAX_READING_LIST_ITEMS, MAX_READING_LIST_PAGES } from './api';
-import { commitReadingCache, type ReadingCache, type ReadingSession } from './storage';
+import { commitReadingCache, type ReadingCache } from './storage/storage';
+import { type ReadingSession } from './session/session';
 
-vi.mock('./encryption-session', () => ({
+vi.mock('./session/encryption-session', () => ({
   prepareReadingEncryption: async () => null,
   readingEncryptionHeaders: () => ({}),
   readingKeys: () => null,
 }));
-vi.mock('./storage', () => ({
-  assertReadingSession: vi.fn(),
+vi.mock('./session/session', async importOriginal => ({ ...await importOriginal<typeof import('./session/session')>(), assertReadingSession: vi.fn() }));
+vi.mock('./storage/storage', () => ({
   commitReadingCache: vi.fn(async (_session: ReadingSession, cache: ReadingCache) => cache),
 }));
 

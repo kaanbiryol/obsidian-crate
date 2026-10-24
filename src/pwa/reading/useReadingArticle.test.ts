@@ -3,15 +3,16 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import { renderHook } from '../../test/react-hooks';
 import { loadReadingArticle } from './api';
-import { cacheReadingArticle, readReadingArticle, READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
+import { cacheReadingArticle, readReadingArticle, type ReadingCache } from './storage/storage';
+import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { useReadingArticle } from './useReadingArticle';
 
-vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, readingEncryptionHeaders: () => ({}) }));
-vi.mock('./storage', async importOriginal => ({
-  ...await importOriginal<typeof import('./storage')>(),
+vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, readingEncryptionHeaders: () => ({}) }));
+vi.mock('./storage/storage', async importOriginal => ({
+  ...await importOriginal<typeof import('./storage/storage')>(),
   readReadingArticle: vi.fn(), cacheReadingArticle: vi.fn(async () => {}),
 }));
-vi.mock('./article-history', () => ({
+vi.mock('./storage/article-history', () => ({
   openReadingArticleHistory: async (id: string) => {
     location.href = `https://example.test/notifications?section=reading&item=${id}`;
     return 'article-stack';

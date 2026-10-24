@@ -3,7 +3,7 @@ import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { createSaveReminderChange } from './save-reminder-command';
 import type { ModalState } from '../types';
 
-vi.mock('../../server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));
+vi.mock('../../connection/server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));
 
 it.each(['create', 'edit'] as const)('builds a durable %s command and snapshots its draft', async mode => {
 	const modal: ModalState = { mode, operationId: crypto.randomUUID(), reminderId: mode === 'edit' ? 'existing' : undefined,

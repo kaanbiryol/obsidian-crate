@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { checkNativeEditorGestures } from './pwa-editor-gesture-checks.mjs';
 import { checkCheckboxHoverAfterDismissal } from './pwa-checkbox-hover-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
-import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
-import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
 
 async function tapBackdropAbove(page, dialog) {
 	// The library container is taller than the visible reminder sheet. Tap the

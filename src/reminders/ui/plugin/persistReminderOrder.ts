@@ -1,5 +1,5 @@
 import { Notice } from "obsidian";
-import { errorMessage } from "@/sync/logger";
+import { errorMessage } from "@/platform/logger";
 import type { ReminderRepository } from "@/reminders/data/reminder-repository";
 
 export async function persistReminderOrder(

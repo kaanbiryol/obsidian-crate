@@ -198,6 +198,9 @@ test('CI mirrors check:source step by step and the local release gate runs the p
 	const steps = verify.jobs.checks.steps.filter(step => commands.includes(step.run));
 	assert.deepEqual(steps.map(step => step.run), commands);
 	for (const step of steps) assert.equal(step.if, "${{ !cancelled() && inputs.reuse-run-id == '' }}", step.name);
+	// The server revision check needs Git history and gh, so it runs beside check:source.
+	assert.ok(verify.jobs.checks.steps.some(step => step.run === 'npm run check:server-revision' && step.if === "${{ !cancelled() && inputs.reuse-run-id == '' }}"));
+	assert.ok(scripts['release:check'].split(' && ').includes('npm run check:server-revision'));
 	assert.ok(verify.jobs.worker.steps.some(step => step.run === 'npm run test:server-package'));
 	assert.ok(scripts['release:check'].split(' && ').includes('npm run test:server-package'));
 });

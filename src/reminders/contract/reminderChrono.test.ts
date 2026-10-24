@@ -3,7 +3,7 @@ import * as chrono from 'chrono-node';
 import { buildRichTextSegments } from '../ui/reminder-editor/richTextRenderer';
 import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
-import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
+import { buildModalDraft } from '@/pwa/reminders/editor/reminder-drafts';
 import { buildCreatedReminderBlock } from '../core/markdownReminderMutation';
 import { buildInitialReminderContent } from '../core/reminderDraft';
 import { parseCheckboxLine } from '../core/grammar/checkboxParser';

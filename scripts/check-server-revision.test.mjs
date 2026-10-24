@@ -131,7 +131,7 @@ test('collects transitive deployment/build imports plus runtime graph and raw Sa
 	h.write('src/cloudflare/server-reset/delete.ts', 'export const deletion = true;');
 	h.write('scripts/build-worker.mjs', 'import "./helper.mjs";');
 	h.write('scripts/helper.mjs', 'export const config = true;');
-	h.write('scripts/cloudflare-artifacts-vite-plugin.mjs', 'export const artifacts = true;');
+	h.write('scripts/vite/cloudflare-artifacts-vite-plugin.mjs', 'export const artifacts = true;');
 	const inputs = await collectServerInputs(h.root, [{ inputs: { 'src/pwa/main.tsx': {}, 'src/reminders/shared.ts': {}, 'node_modules/dependency/index.js': {}, '<define:assets>': {} } }], new Set([join(h.root, 'src/styles/shared.scss')]));
 	for (const file of ['src/shared.ts', 'scripts/helper.mjs', 'src/pwa/main.tsx', 'src/reminders/shared.ts', 'src/styles/shared.scss']) assert.ok(inputs.includes(file), file);
 	assert.ok(!inputs.some(path => path.startsWith('node_modules/') || path.startsWith('<')));

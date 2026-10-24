@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ReadingApiError } from '../reading/api-error';
+import { ReadingApiError } from '../reading/session/api-error';
 import { ConnectionError, connectionIssue } from './issues';
 
 describe('connection recovery boundary', () => {

@@ -6,7 +6,7 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { SyncRuntime } from './runtime/runtime';
 import { notifyConflicts } from './conflict/conflict';
 import { ActivityModal } from '../ui/activity/activity-modal';
-import { errorMessage } from './logger';
+import { errorMessage } from '../platform/logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-state';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/notification-policy-sync';
 import type { ForegroundSyncReason } from './runtime/foreground-sync';

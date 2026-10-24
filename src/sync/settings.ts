@@ -1,4 +1,8 @@
-import type { SyncHistoryEntry } from './types';
+import { isRecord, isSha256Hex, normalizeNonNegativeInteger, normalizeNullableString, normalizeStringArray } from '../platform/validation';
+import { normalizeSyncTimings } from './diagnostics/timings';
+import { normalizeRequestDiagnostics } from './diagnostics/request-diagnostics';
+import { normalizeSyncIssues } from './issues';
+import type { ResolvedSyncRace, SyncHistoryEntry } from './types';
 
 /** Persisted plugin settings that sync owns; plugin settings compose this slice. */
 export interface PersistedSyncSettings {
@@ -21,6 +25,18 @@ export interface SyncSettings extends PersistedSyncSettings {
 	deviceId: string;
 }
 
+/** Identity fields sync reads from a Crate-managed Cloudflare deployment. */
+interface ManagedServerIdentity {
+	accountId: string | null;
+	workerName: string;
+	d1DatabaseId: string | null;
+}
+
+/** The runtime's view of plugin settings: sync fields plus whether Crate manages the server. */
+export interface SyncRuntimeSettings extends SyncSettings {
+	cloudflareDeployment: ManagedServerIdentity | null;
+}
+
 export const MAX_SYNC_HISTORY = 20;
 export const MAX_SYNC_HISTORY_PATHS = 50;
 export const MAX_DEBOUNCE_WAIT_MS = 30_000;
@@ -36,4 +52,85 @@ export function updateSyncProgress(settings: SyncSettings, update: SyncProgressU
 	if (update.lastSeq !== undefined) settings.lastSeq = update.lastSeq;
 	if (update.lastSync !== undefined) settings.lastSync = update.lastSync;
 	if (update.syncHistory) settings.syncHistory = update.syncHistory.slice(0, MAX_SYNC_HISTORY);
+}
+
+function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
+	if (!isRecord(value)) {
+		return null;
+	}
+
+	const type = value.type;
+	if (type !== 'sync' && type !== 'initial' && type !== 'force') {
+		return null;
+	}
+
+	const timestamp = normalizeNullableString(value.timestamp);
+	if (timestamp === null || typeof value.success !== 'boolean') {
+		return null;
+	}
+	const requestDiagnostics = normalizeRequestDiagnostics(value.requestDiagnostics);
+	const timings = normalizeSyncTimings(value.timings);
+
+	return {
+		timestamp,
+		type,
+		success: value.success,
+		uploaded: normalizeNonNegativeInteger(value.uploaded, 0),
+		downloaded: normalizeNonNegativeInteger(value.downloaded, 0),
+		merged: normalizeNonNegativeInteger(value.merged, 0),
+		deleted: normalizeNonNegativeInteger(value.deleted, 0),
+		errorCount: normalizeNonNegativeInteger(value.errorCount, 0),
+		...(Array.isArray(value.issues) ? { issues: normalizeSyncIssues(value.issues, MAX_SYNC_HISTORY_PATHS) } : {}),
+		...(Array.isArray(value.errors) ? {
+			errors: value.errors.filter((error): error is string => typeof error === 'string').slice(0, MAX_SYNC_HISTORY_PATHS),
+		} : {}),
+		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
+        ...(typeof value.sharedCheckpoint === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value.sharedCheckpoint) ? { sharedCheckpoint: value.sharedCheckpoint } : {}),
+		...(isSha256Hex(value.historyCheckpoint)
+			? { historyCheckpoint: value.historyCheckpoint } : {}),
+		...(requestDiagnostics ? { requestDiagnostics } : {}),
+		...(timings ? { timings } : {}),
+		...(typeof value.resolvedRaceCount === 'number' ? {
+			resolvedRaceCount: normalizeNonNegativeInteger(value.resolvedRaceCount, 0),
+		} : {}),
+		...(Array.isArray(value.conflictPaths) ? {
+			conflictPaths: normalizeStringArray(value.conflictPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS),
+		} : {}),
+		...(Array.isArray(value.resolvedRaces) ? {
+			resolvedRaces: value.resolvedRaces
+				.map(normalizeResolvedSyncRace)
+				.filter((race): race is ResolvedSyncRace => race !== null)
+				.slice(0, MAX_SYNC_HISTORY_PATHS),
+		} : {}),
+		uploadedPaths: Array.isArray(value.uploadedPaths)
+			? normalizeStringArray(value.uploadedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
+			: undefined,
+		downloadedPaths: Array.isArray(value.downloadedPaths)
+			? normalizeStringArray(value.downloadedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
+			: undefined,
+		mergedPaths: Array.isArray(value.mergedPaths)
+			? normalizeStringArray(value.mergedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
+			: undefined,
+		deletedPaths: Array.isArray(value.deletedPaths)
+			? normalizeStringArray(value.deletedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
+			: undefined,
+	};
+}
+
+function normalizeResolvedSyncRace(value: unknown): ResolvedSyncRace | null {
+	if (!isRecord(value) || typeof value.path !== 'string') return null;
+	if (value.resolution !== 'kept-local-edit' && value.resolution !== 'kept-remote-edit') return null;
+	return { path: value.path, resolution: value.resolution };
+}
+
+/** Drops malformed entries and caps persisted history so settings payloads stay small. */
+export function normalizeSyncHistory(value: unknown): SyncHistoryEntry[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	return value
+		.map(normalizeSyncHistoryEntry)
+		.filter((entry): entry is SyncHistoryEntry => entry !== null)
+		.slice(0, MAX_SYNC_HISTORY);
 }

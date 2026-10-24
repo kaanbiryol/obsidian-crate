@@ -16,7 +16,7 @@ import { Reminder } from '../../../types';
 import { DEFAULT_PROJECT } from '../../../core/constants';
 import { parseReminderContent } from '../../../core/grammar/reminderParser';
 import { getReminderTitleCaret } from '../../reminder-editor/reminderEditorEdits';
-import { saveCursorPosition } from '../../reminder-editor/cursorPosition';
+import { saveCursorPosition } from '../../../../ui/shared/cursorPosition';
 
 interface AddReminderModalProps {
     onClose: () => void;

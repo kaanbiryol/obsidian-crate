@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
-import { rawCssPlugin } from './scripts/raw-css-vite-plugin.mjs';
+import { rawCssPlugin } from './scripts/vite/raw-css-vite-plugin.mjs';
 
 export default defineConfig({
   root: resolve('tests/visual/gallery'),

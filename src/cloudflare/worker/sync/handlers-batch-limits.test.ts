@@ -1,4 +1,4 @@
-import { commitNewFiles } from './bulk-new-file-commit';
+import { commitNewFiles } from './staging/bulk-new-file-commit';
 import { commitStagedFile } from './mutations';
 import { describe, expect, it } from 'vitest';
 import {

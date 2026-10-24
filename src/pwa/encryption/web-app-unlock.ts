@@ -2,8 +2,8 @@ import { openRecoveryBundle, validateVaultKeyBundle, type VaultKeyBundle } from 
 import { assertEncryptionKeys, type EncryptionServerState } from '../../encryption/server-state';
 import { rememberVaultKeys } from './encryption-keys';
 import { loadStoredConfig } from '../config';
-import { READING_SESSION_KEY } from '../reading/storage';
-import { capturePwaSession } from '../session-generation';
+import { READING_SESSION_KEY } from '../reading/session/session';
+import { capturePwaSession } from '../connection/session-generation';
 
 function connectionGuard(sessionCurrent: () => boolean) {
   const remindersCurrent = capturePwaSession();

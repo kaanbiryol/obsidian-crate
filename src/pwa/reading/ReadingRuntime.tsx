@@ -7,12 +7,13 @@ import { useSyncFeedback } from '../sync/SyncFeedback';
 import { useFeatureSettings, useSettingsOpen } from '../settings/settings-context';
 import { readingSyncStatus } from '../sync/reading-status';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
-import { assertReadingSession, exportReadingData } from './storage';
-import { sameReadingSession } from './session';
+import { exportReadingData } from './storage/storage';
+import { assertReadingSession } from './session/session';
+import { sameReadingSession } from './session/session';
 import { useReadingSession } from './useReadingSession';
 import { useReadingSync } from './useReadingSync';
 import { useReadingMutations } from './useReadingMutations';
-import { readingKeys } from './encryption-session';
+import { readingKeys } from './session/encryption-session';
 import { readingNeedsAttention, readingRetryAt } from './outbox';
 import { ShortcutSetup } from './ShortcutSetup';
 

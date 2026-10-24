@@ -7,6 +7,7 @@ import { isReminderOverdue } from "@/reminders/core/dates/reminderDate";
 import type { ReminderRepository } from "@/reminders/data/reminder-repository";
 import type { Reminder } from "@/reminders/types/reminder";
 import { DEFAULT_PROJECT } from "../../../core/constants";
+import { reminderProject } from "@/reminders/core/reminderProjectPath";
 
 export interface RemindersListLoadOptions {
   repository: ReminderRepository;
@@ -73,7 +74,7 @@ export function buildRemindersListPresentation(
   const effectiveProject = projectFilter?.trim() || DEFAULT_PROJECT;
   const normalizedProject = projectFilter?.toLowerCase().trim();
   const filteredReminders = normalizedProject
-    ? rawReminders.filter((reminder) => (reminder.project || DEFAULT_PROJECT).toLowerCase() === normalizedProject)
+    ? rawReminders.filter((reminder) => reminderProject(reminder).toLowerCase() === normalizedProject)
     : [...rawReminders];
   const reminders = supportsReorder
     ? sortRemindersByFileOrder(filteredReminders)

@@ -3,7 +3,8 @@ import { createAbortError, isAbortError } from '../abort';
 import { LOCAL_CONTENT_CHECK_INTERVAL_MS, MAX_CHECK_BACKOFF_MULTIPLIER, MAX_RETRIES, RETRY_BASE_DELAY_MS } from './constants';
 import { notifyConflicts } from '../conflict/conflict';
 import { retryWithBackoff, runConcurrentTasks } from '../concurrency';
-import { createLogger, errorMessage } from '../logger';
+import { createLogger } from '../logger';
+import { errorMessage } from '../../platform/logger';
 
 const logger = createLogger('SyncEngine');
 

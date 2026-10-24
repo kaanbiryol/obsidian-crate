@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { readingUrl, readingUrlIdentity, validateReadingMetadata, type ReadingChanges, type ReadingItem } from '@/reading/core/model';
+import { findSavedReadingLink } from '@/reading/core/inventory';
+import { readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingItem } from '@/reading/core/model';
 import { youtubeVideoId } from '@/reading/core/youtube';
 import { queueReading, type ReadingCommand } from './outbox';
 import { presentReadingItems } from './pending-view';
-import { assertReadingSession, removeReadingShare, type ReadingSession } from './storage';
+import { removeReadingShare } from './storage/storage';
+import { assertReadingSession, type ReadingSession } from './session/session';
 import type { useReadingSession } from './useReadingSession';
 
 type ReadingMutationSession = Pick<ReturnType<typeof useReadingSession>,
@@ -68,11 +70,10 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
     const link = readingUrl(url);
     savingRef.current = true; setSaving(true); reportSessionError(session, null);
     try {
-      const matches = presentReadingItems(cache?.items ?? [], pending)
-        .filter(item => item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(link));
-      if (matches.length > 1) throw new Error('Several notes save this link. Review duplicates in Reading.');
-      if (matches[0]) {
-        await openSaved(matches[0]);
+      const saved = findSavedReadingLink(presentReadingItems(cache?.items ?? [], pending), link);
+      if (saved.kind === 'many') throw new Error('Several notes save this link. Review duplicates in Reading.');
+      if (saved.kind === 'one') {
+        await openSaved(saved.item);
         assertReadingSession(session);
         if (share) await removeReadingShare(session, share);
         if (!finishCapture(session)) return false;

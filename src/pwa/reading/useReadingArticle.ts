@@ -4,9 +4,10 @@ import { flushSync } from 'react-dom';
 import { readingUrlIdentity, type ReadingItem } from '@/reading/core/model';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
 import { loadReadingArticle } from './api';
-import { assertReadingSession, readReadingArticle, cacheReadingArticle, type ReadingSession, type ReadingCache } from './storage';
+import { readReadingArticle, cacheReadingArticle, type ReadingCache } from './storage/storage';
+import { assertReadingSession, type ReadingSession } from './session/session';
 import { presentReadingItems } from './pending-view';
-import { dismissReadingArticleHistory, hasReadingArticleHistory, openReadingArticleHistory } from './article-history';
+import { dismissReadingArticleHistory, hasReadingArticleHistory, openReadingArticleHistory } from './storage/article-history';
 
 interface OpenReadingArticle { item: ReadingItem; markdown: string | null; availableOffline: boolean; error?: string; sourceHighlights?: string; sourceExtractionStatus?: ReadingItem['extraction_status'] }
 interface ReadingArticleOptions {

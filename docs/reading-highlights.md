@@ -78,7 +78,7 @@ already-used htmlparser2 dependency is declared directly for the text/source
 mapping pass; no browser extension or full DOM runtime is bundled into the reader.
 
 Verification: `npx vitest run src/reading src/pwa/reading`, the Worker Reading
-integration suite, and `node --test tests/browser/reading/reading-highlights.browser.test.mjs`
+integration suite, and `node --test tests/browser/reading/reading-highlights-test.mjs`
 after building the Worker. Browser tests use Chromium and WebKit against actual
 local vault files, D1/R2 commits, offline replay, touch handles, annotations,
 global search, and passage navigation. They also cover automatic highlighting, menu copying,
@@ -127,7 +127,7 @@ pinning must never change the geometry used to decide whether it fits.
 The pinned background spans the reader pane at every video size, covering and
 blocking pointer access to transcript lines that scroll behind the player and controls.
 
-Run `node tests/browser/reading/reading-video.browser.test.mjs` after building the plugin for
+Run `node tests/browser/reading/reading-video-test.mjs` after building the plugin for
 Chromium/WebKit tests in document and Shadow DOM hosts. The player transport is
 simulated; actual playback, fullscreen, app backgrounding and installed iOS/Android
 selection require manual checks. Transcript fetching has separate bounded-transport

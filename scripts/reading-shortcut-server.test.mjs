@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
 import { readingShortcutWithFirstRunSetup } from './reading-shortcut-first-run.mjs';
-import { shortcutTemplate, shortcutIdentifier, shortcutRequest } from './reading-shortcut-fixture.mjs';
+import { shortcutTemplate, shortcutIdentifier, shortcutRequest } from '../tests/browser/support/reading-shortcut-fixture.mjs';
 import contract from '../src/reading/shortcut-contract.json' with { type: 'json' };
 
 const hash = value => createHash('sha256').update(value).digest('hex');

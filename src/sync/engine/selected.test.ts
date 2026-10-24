@@ -60,7 +60,7 @@ describe('selected sync with durable file operations', () => {
         const h = await harness();
         h.remote.metadata.mockRejectedValue(new DOMException('Request cancelled', 'AbortError'));
         expect(await h.engine.syncSelected(['a.md'])).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
-        expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
+        expect(h.engine.getPendingKeys()).toEqual(['a.md', 'b.md']);
         expect(h.settings.lastSeq).toBe(42);
         expect(h.settings.lastSync).toBeNull();
         expect(h.engine.getState().status).toBe('idle');
@@ -75,7 +75,7 @@ describe('selected sync with durable file operations', () => {
         expect(await h.engine.syncSelected(['a.md'])).toMatchObject({ outcome: 'failed', success: false, errors: [AUTH_ERROR_MESSAGE] });
         expect(h.engine.getState()).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
         expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
-        expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
+        expect(h.engine.getPendingKeys()).toEqual(['a.md', 'b.md']);
         expect(h.settings.lastSync).toBeNull();
     });
 
@@ -91,7 +91,7 @@ describe('selected sync with durable file operations', () => {
         expect(result.errors).toContain(AUTH_ERROR_MESSAGE);
         expect(h.engine.getState()).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
         expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
-        expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
+        expect(h.engine.getPendingKeys()).toEqual(['a.md', 'b.md']);
         expect(h.settings.lastSync).toBeNull();
     });
 
@@ -105,13 +105,13 @@ describe('selected sync with durable file operations', () => {
         expect(uploaded.uploadedPaths).toEqual(['delete:note.md']);
         expect(h.remote.metadata).toHaveBeenCalledExactlyOnceWith(['delete:note.md']);
         expect(h.remote.delete).not.toHaveBeenCalled();
-        expect(h.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', 'note.md')]);
+        expect(h.engine.getPendingKeys()).toEqual([pendingChangeKey('delete', 'note.md')]);
         const deleted = await h.engine.syncSelected([pendingChangeKey('delete', 'note.md')]);
         expect(deleted.success, deleted.errors.join('\n')).toBe(true);
         expect(deleted.deletedPaths).toEqual(['note.md']);
         expect(h.remote.delete).toHaveBeenCalledWith({ path: 'note.md', expectedHash: h.entry.hash, expectedRevision: 'v1' });
         expect(h.disk.text('delete:note.md')).toBe('local');
-        expect(h.engine.getPendingPaths()).toEqual([]);
+        expect(h.engine.getPendingKeys()).toEqual([]);
     });
 
     it('shows checking, per-file progress, and saving during selected uploads', async () => {
@@ -151,7 +151,7 @@ describe('selected sync with durable file operations', () => {
         expect(result.settledPaths).toEqual(['a.md']);
         expect(h.remote.metadata).toHaveBeenCalledWith(['a.md']);
         expect(h.transport).toHaveBeenCalledTimes(1);
-        expect(h.engine.getPendingPaths()).toEqual(['b.md']);
+        expect(h.engine.getPendingKeys()).toEqual(['b.md']);
         expect(h.settings.lastSeq).toBe(42);
         const restarted = await h.restart();
         expect(restarted.localManifest.getEntry('a.md')).toMatchObject({ hash: h.entry.hash, revision: 'v1' });
@@ -162,7 +162,7 @@ describe('selected sync with durable file operations', () => {
         const result = await h.engine.syncSelected(['a.md']);
         expect(result.success, result.errors.join('\n')).toBe(true);
         expect(result.uploadedPaths).toEqual(['a.md']);
-        expect(h.engine.getPendingPaths()).toEqual(['b.md']);
+        expect(h.engine.getPendingKeys()).toEqual(['b.md']);
         const restarted = await h.restart();
         expect(restarted.localManifest.getEntry('a.md')).toMatchObject({ hash: h.entry.hash, revision: 'uploaded' });
         expect(restarted.localManifest.uploadJournal.pending()).toEqual([]);
@@ -176,7 +176,7 @@ describe('selected sync with durable file operations', () => {
         expect(result.success, result.errors.join('\n')).toBe(true);
         expect(result.deletedPaths).toEqual(['a.md']);
         expect(h.remote.delete).toHaveBeenCalledWith({ path: 'a.md', expectedHash: h.entry.hash, expectedRevision: 'v1' });
-        expect(h.engine.getPendingPaths()).toEqual(['b.md']);
+        expect(h.engine.getPendingKeys()).toEqual(['b.md']);
         expect((await h.restart()).localManifest.hasFile('a.md')).toBe(false);
         expect(h.disk.text('b.md')).toBe('local');
     });
@@ -187,7 +187,7 @@ describe('selected sync with durable file operations', () => {
             return metadata(paths);
         });
         expect((await h.engine.syncSelected(['a.md'])).success).toBe(true);
-        expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
+        expect(h.engine.getPendingKeys()).toEqual(['a.md', 'b.md']);
     });
     it('does not recover unselected journal uploads as a side effect, including after restart', async () => {
         const h = await harness();
@@ -203,7 +203,7 @@ describe('selected sync with durable file operations', () => {
         const h = await harness();
         await expect(h.engine.syncSelected(keys)).rejects.toThrow('Pending files changed');
         expect(h.transport).not.toHaveBeenCalled();
-        expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
+        expect(h.engine.getPendingKeys()).toEqual(['a.md', 'b.md']);
     });
     it('refuses to start while another sync is running', async () => {
         const h = await harness();
