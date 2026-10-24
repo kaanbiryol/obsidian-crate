@@ -1,9 +1,9 @@
 @use "glass";
 
 @mixin styles {
-	// Toasts float over content in the chrome glass, denser so their text stays legible.
+	// Toasts float over content on the chrome surface.
 	.toast {
-		@include glass.surface($fill: 82%);
+		@include glass.surface;
 		color: var(--text-normal);
 	}
 

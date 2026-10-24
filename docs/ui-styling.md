@@ -209,7 +209,7 @@ Dock morphs use the shared collapsed height.
 - `src/pwa/components/PwaToast.tsx` renders feedback from `useToast` in either
   feature. Errors use assertive alerts; other feedback uses polite status messages.
   Both features share bottom-center positioning above the dock and safe area.
-  Toasts use the chrome glass with a denser fill so their text stays legible.
+  Toasts use the flat chrome surface.
   Toasts fade in and out over 160ms without moving; reduced motion skips the fade.
   Replacing feedback updates the current toast instead of stacking another one.
   Reading confirms explicit link, tag, and highlight-note saves after local
@@ -418,9 +418,8 @@ the destination icon without shifting it or adding a badge background. The cache
 launch shell uses the same order, visibility, and selection before React starts.
 
 Both hosts’ **Reminders** screens contain a compact **Today / Upcoming** segmented
-control with a translucent track and sliding selection. The PWA track uses the
-chrome glass, keeping its rim without a floating shadow because it sits in the
-list flow; Obsidian uses an opaque track with the same rim. It uses 13px labels and a
+control with a flat, opaque track and sliding selection. The PWA track uses the
+flat chrome surface; Obsidian uses the theme's raised background. It uses 13px labels and a
 32px visible track within 44px touch targets.
 `ScheduleSwitcher` in `src/ui/shared/navigation/` keeps the controls mounted while the shared reminder panels
 change. Their content reuses the shared `TabTransition` for the same stationary dissolve
@@ -671,7 +670,7 @@ loading state. The same controls remain
 available while reading, so returning to a reminder view takes one tap.
 The pill expands with a heavily damped spring, maintaining its height and velocity
 when opening is interrupted or reversed. Its corner radius follows the same
-progress. The translucent surface has a restrained edge highlight. The spring also
+progress. The surface is flat, with no edge highlight. The spring also
 controls the tab icons' opacity and reveals the choices along the surface's painted
 edge, so text stays inside the material and held-finger targets remain stationary.
 A short, reversible popup fade handles dismissal without delaying input. Reduced
@@ -735,26 +734,22 @@ The separate circular add action uses the existing editor/capture flow, includin
 on Projects. Insets reserve the home indicator once. Loading shells use matching
 dock geometry.
 The dock overlaps the full-height list viewport. In Obsidian, its pill and add
-button use an opaque, raised theme surface with bright icons and a quiet selection
-fill. They take the PWA glass's depth without its blur: a top rim and the same
-compact shadow, colored by the theme's `--background-modifier-box-shadow`, so
-community themes keep control of the palette. A shared backdrop layer gently dissolves rows
-into the host background from the pill's top edge through the bottom safe area,
-with only slight softening, so rows recede instead of remaining readable through
-the controls.
-The PWA uses one glass material for all floating chrome: the dock pill, add
+button use a flat, opaque theme surface with a hairline border, bright icons and a
+quiet selection fill, with no blur, rim or shadow, so community themes keep control
+of the palette. A shared backdrop layer fades rows into the host background from
+the pill's top edge through the bottom safe area, so rows recede instead of
+remaining readable around the controls.
+The PWA uses one flat material for all floating chrome: the dock pill, add
 button, back button, header actions, article reader controls, sheet header
 buttons, the **Today / Upcoming** track, and toasts.
 `src/pwa/styles/_glass.scss` defines it; the theme files set its `--pwa-glass-*`
-fill, sheen, border, rim, and shadow. A translucent fill blurs and saturates the
-content behind it, with a bright top rim and a soft shadow small enough to stay
-inside headers that clip their controls. The PWA backdrop layer starts below the
-pill's top edge and stays partly transparent, so rows soften and show through the
-glass. Content above the pill remains clear.
+fill, hover fill, border, and shadow (none). Surfaces are opaque with a hairline
+border and no blur, sheen, or rim. The PWA backdrop layer starts below the
+pill's top edge and stays partly transparent, so rows soften beneath the pill.
+Content above the pill remains clear.
 The layer spans the PWA viewport or Obsidian pane, even when the pill reaches its
-maximum width. Reduced transparency and increased contrast remove this layer and
-make the controls opaque without blur; increased contrast also strengthens the
-glass border. Scroll containers reserve dock height plus a small gap at
+maximum width. Reduced transparency and increased contrast remove this layer;
+increased contrast also strengthens the chrome border. Scroll containers reserve dock height plus a small gap at
 the end, keeping the final item reachable above the controls. Space around the pill and add button
 passes gestures through to the list; the expanded picker still blocks the backdrop.
 The Reading panel accepts a host navigation renderer; the Obsidian panel keeps
@@ -897,8 +892,7 @@ The PWA article reader keeps its actions visible in their existing positions.
 Back uses a circular surface, archive/favorite share a capsule, and the secondary
 actions use individual rounded surfaces beside the offline status. Article and
 Highlights use a rounded segmented control. These PWA-only styles use the dock's
-glass material, retain 44px targets, and fall back to opaque surfaces without
-backdrop filtering or when reduced transparency or increased contrast is requested. The iOS 27 opaque header
+flat material and retain 44px targets. The iOS 27 opaque header
 workaround remains in place.
 
 The PWA article opens directly into its text without Article / Highlights tabs.
@@ -945,7 +939,7 @@ there are no footer actions. Saving includes unfinished input and removes
 duplicate tags. Chip colors match the rich-text editor's accent treatment; the
 compound field owns its focus outline and retains 44px touch targets.
 
-All PWA sheet header buttons use the chrome glass through
+All PWA sheet header buttons use the flat chrome surface through
 `_rounded-sheet-control.scss`, applied in `_sheet-headers.scss` to close/back
 controls, destructive actions, and secondary icon actions. Plain text actions
 and the tonal submit circle keep their own treatment. Save and destructive actions

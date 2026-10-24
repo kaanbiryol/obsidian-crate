@@ -33,10 +33,9 @@
 	--interactive-hover:rgba(24,24,27,.07);
 	--pwa-sheet-surface:#f7f7f8;
 	--pwa-glass-fill:#ffffff;
-	--pwa-glass-sheen:rgba(255,255,255,.6);
-	--pwa-glass-border:rgba(24,24,27,.07);
-	--pwa-glass-rim:inset 0 1px 0 #ffffff;
-	--pwa-glass-shadow:0 4px 12px rgba(24,24,27,.1),0 1px 2px rgba(24,24,27,.06);
+	--pwa-glass-hover-fill:#f4f4f5;
+	--pwa-glass-border:rgba(24,24,27,.1);
+	--pwa-glass-shadow:none;
 	--pwa-light-surface:var(--background-primary-alt);
 	--pwa-light-surface-soft:rgba(255,255,255,.78);
 	--pwa-light-surface-subtle:rgba(24,24,27,.035);

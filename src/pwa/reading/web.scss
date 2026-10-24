@@ -103,10 +103,9 @@ html.pwa-document-reader {
   }
 }
 
-// Keep reader actions visible, with the same glass as the dock.
+// Keep reader actions visible, with the same surface as the dock.
 .crate-reminders-ui.pwa-reading-root .crate-reading-reader {
   --reader-control-border: color-mix(in srgb, var(--text-normal) 10%, transparent);
-  --reader-control-shadow: 0 3px 12px #00000014, inset 0 1px 0 #ffffff08;
 
   &__quick-actions, & .crate-reading-reader__tools > button[data-variant], & .crate-reading-reader__highlights-button[data-variant] {
     @include glass.surface;
@@ -129,7 +128,7 @@ html.pwa-document-reader {
     color: var(--text-normal);
     background: color-mix(in srgb, var(--background-primary-alt) 88%, var(--text-normal));
     border-color: var(--reader-control-border);
-    box-shadow: var(--reader-control-shadow);
+    box-shadow: none;
   }
 }
 

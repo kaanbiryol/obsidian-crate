@@ -29,14 +29,12 @@
 
 .crate-reminders-ui:is(.pwa-shadow-root, .pwa-reading-root) {
   @include app-density.dock;
-  // Obsidian keeps the shared, nearly opaque dock; the PWA uses its chrome glass.
-  .pwa-dock { --dock-surface-hover: color-mix(in srgb, var(--pwa-glass-fill) 82%, transparent); }
+  // Obsidian keeps the shared, nearly opaque dock; the PWA uses its flat chrome surface.
+  .pwa-dock { --dock-surface-hover: var(--pwa-glass-hover-fill); }
   .pwa-dock__surface, .pwa-dock__add { @include glass.surface; }
-  // Rows soften beneath the pill instead of vanishing, so they show through the glass.
-  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .pwa-dock::before {
-      -webkit-mask-image: linear-gradient(to bottom, transparent 20px, #0004 60px, #0009);
-      mask-image: linear-gradient(to bottom, transparent 20px, #0004 60px, #0009);
-    }
+  // Rows soften beneath the pill instead of vanishing.
+  .pwa-dock::before {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 20px, #0004 60px, #0009);
+    mask-image: linear-gradient(to bottom, transparent 20px, #0004 60px, #0009);
   }
 }

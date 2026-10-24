@@ -1,23 +1,15 @@
-// One glass material for the PWA's floating chrome: dock, add button, back
+// One flat material for the PWA's floating chrome: dock, add button, back
 // button, header actions, reader controls, sheet header buttons, the schedule
-// switcher and toasts. Theme files set the --pwa-glass-* tokens. Content stays
-// visible, softened, through the fill. $fill raises opacity where text sits on
-// the glass; $important outranks shared rules that force their own surface.
-@mixin surface($fill: 56%, $important: false) {
+// switcher and toasts. Theme files set the --pwa-glass-* tokens: an opaque
+// fill and a hairline border, with no blur, sheen or rim. $important outranks
+// shared rules that force their own surface.
+@mixin surface($important: false) {
   $flag: null;
   @if $important { $flag: !important; }
   border: 1px solid var(--pwa-glass-border) $flag;
-  background: linear-gradient(180deg, var(--pwa-glass-sheen), transparent 55%) var(--pwa-glass-fill) $flag;
-  box-shadow: var(--pwa-glass-rim), var(--pwa-glass-shadow) $flag;
-  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    background-color: color-mix(in srgb, var(--pwa-glass-fill) $fill, transparent) $flag;
-    -webkit-backdrop-filter: blur(14px) saturate(1.8) $flag;
-    backdrop-filter: blur(14px) saturate(1.8) $flag;
-  }
-  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-    background-color: var(--pwa-glass-fill) $flag;
-    -webkit-backdrop-filter: none $flag;
-    backdrop-filter: none $flag;
-  }
+  background: var(--pwa-glass-fill) $flag;
+  box-shadow: var(--pwa-glass-shadow) $flag;
+  -webkit-backdrop-filter: none $flag;
+  backdrop-filter: none $flag;
   @media (prefers-contrast: more) { border-color: var(--text-muted) $flag; }
 }
