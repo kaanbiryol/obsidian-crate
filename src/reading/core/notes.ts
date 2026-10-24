@@ -42,14 +42,35 @@ export function updateReadingNote(markdown: string, id: string, changes: Reading
 	return patchReadingFrontmatter(markdown, allowed);
 }
 
-/** A versioned, content-derived UUID; once persisted it is never recalculated on rename. */
-export async function readingImportId(path: string, original: string): Promise<string> {
-	const source = JSON.stringify(['crate:reading:clipper-import:v1', path.normalize('NFC'), original]);
+async function contentUuid(source: string): Promise<string> {
 	const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source)));
 	bytes[6] = (bytes[6]! & 15) | 128; // UUIDv8, application-defined SHA-256 namespace.
 	bytes[8] = (bytes[8]! & 63) | 128;
 	const hex = [...bytes.slice(0, 16)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** A versioned, content-derived UUID; once persisted it is never recalculated on rename. */
+export function readingImportId(path: string, original: string): Promise<string> {
+	return contentUuid(JSON.stringify(['crate:reading:clipper-import:v1', path.normalize('NFC'), original]));
+}
+
+/**
+ * Persists markers added outside Crate, such as `==text==` typed in Obsidian.
+ * IDs derive from the note's bytes, so devices recording the same note write
+ * identical files. No creation date is stored because the true one is unknown.
+ */
+export async function recordMarkdownHighlights(markdown: string): Promise<string> {
+	const metadata = parseReadingNote(markdown);
+	if (!metadata?.highlights) return markdown;
+	const stored = new Set((validateReadingMetadata(readReadingFrontmatter(markdown)!.value).highlights ?? []).map(highlight => highlight.id));
+	const unrecorded = metadata.highlights.filter(highlight => highlight.id?.startsWith('markdown-') && !stored.has(highlight.id));
+	if (!unrecorded.length) return markdown;
+	const highlights = await Promise.all(metadata.highlights.map(async highlight => !unrecorded.includes(highlight) ? highlight : {
+		...highlight, id: await contentUuid(JSON.stringify(['crate:reading:markdown-highlight:v1', metadata.crate_reading_id, highlight.start, highlight.text, highlight.prefix ?? '', highlight.suffix ?? ''])),
+	}));
+	return patchReadingFrontmatter(markdown, { highlights, highlight_format: 'markdown-v1',
+		...(metadata.highlight_recovery?.length ? { highlight_recovery: metadata.highlight_recovery } : {}) });
 }
 
 /** Called only for Markdown inside the configured Reading folder. */

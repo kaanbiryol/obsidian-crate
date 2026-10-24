@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { adoptReadingClip, createReadingNote, parseReadingNote, readingImportId, updateReadingNote } from './notes';
+import { adoptReadingClip, createReadingNote, parseReadingNote, readingImportId, recordMarkdownHighlights, updateReadingNote } from './notes';
 import { readingFaviconUrl, readingUrl, readingUrlIdentity } from './model';
 import { validateReadingFolder } from '../settings';
 import { readReadingFrontmatter } from './frontmatter';
+import { readingDocument } from './markdown';
 
 const savedAt = '2026-09-21T12:00:00Z';
 const id = 'c700b5b4-006c-4d2a-8efb-a99b838d9224';
@@ -11,6 +12,26 @@ const note = () => createReadingNote({ id, url: 'https://example.com/read?a=1#se
 const clip = (body = '\n# A captured excerpt\n\n==My highlight==\n') => `---\ncrate_reading_import: web-clipper-v1\ntitle: Article\nsource_url: https://example.com\nsaved_at: 2026-09-21T14:00:00+02:00\ncustom: { "preserve": 'exactly' } # user comment\n---\n${body}`;
 
 describe('reading Markdown', () => {
+	it('records markers typed in Obsidian with deterministic IDs and keeps stored annotations', async () => {
+		const note = createReadingNote({ id: '00000000-0000-4000-8000-000000000001', url: 'https://example.com', savedAt: '2026-09-21T12:00:00Z' });
+		const article = note.replace('<!-- crate:article:end -->', 'Hello world. Second line.\n<!-- crate:article:end -->');
+		const text = readingDocument(readReadingFrontmatter(article)!.body).text, at = (excerpt: string) => ({ start: text.indexOf(excerpt), end: text.indexOf(excerpt) + excerpt.length, text: excerpt });
+		const noted = updateReadingNote(article, '00000000-0000-4000-8000-000000000001',
+			{ highlights: [{ ...at('world'), note: 'Keep' }, { ...at('Second'), note: 'Removed' }] });
+		const edited = noted.replace('==Second== line.', 'Second ==line==.');
+		const recorded = await recordMarkdownHighlights(edited);
+		expect(readReadingFrontmatter(recorded)!.body).toBe(readReadingFrontmatter(edited)!.body);
+		expect(await recordMarkdownHighlights(edited)).toBe(recorded);
+		expect(await recordMarkdownHighlights(recorded)).toBe(recorded);
+		const metadata = parseReadingNote(recorded)!;
+		expect(metadata.highlights?.map(({ text, note }) => ({ text, note }))).toEqual([{ text: 'world', note: 'Keep' }, { text: 'line', note: undefined }]);
+		const manual = metadata.highlights![1]!;
+		expect(manual.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+		expect(manual.createdAt).toBeUndefined();
+		expect(metadata.highlight_recovery?.map(highlight => highlight.note)).toEqual(['Removed']);
+		expect(await recordMarkdownHighlights(note)).toBe(note);
+	});
+
 	it('imports default Clipper properties without a Crate template', async () => {
 		const body = '\n# Saved selection\n\n==Highlight==\n\nMy additions.\n';
 		const source = '---\ntitle: A clip\nsource: https://example.com/article\nauthor: ["[[Alex]]", "[[Sam]]"]\ncreated: 2026-09-20\ntags: [clippings]\ncustom: { keep: true } # unchanged\n---\n' + body;

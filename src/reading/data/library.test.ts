@@ -57,6 +57,24 @@ describe('local Reading library', () => {
 		expect(reads).toHaveBeenCalledTimes(2); expect(h.library.getSnapshot().items[0]?.favorite).toBe(true);
 		h.files.delete(item.path); await h.library.refresh(); expect(h.library.getSnapshot().items).toEqual([]);
 	});
+	it('records markers typed in Obsidian once the note is no longer open in an editor', async () => {
+		const h = harness(); const { item } = await h.library.add('https://example.com', undefined, false);
+		const manual = h.files.get(item.path)!.replace('<!-- crate:article:end -->', 'Read ==this passage==.\n<!-- crate:article:end -->');
+		h.files.set(item.path, manual);
+		let open = true; h.vault.editing = path => open && path === item.path;
+		h.library.invalidate(item.path); await h.library.refresh();
+		expect(h.files.get(item.path)).toBe(manual);
+		expect(h.library.getSnapshot().items[0]?.highlights?.[0]?.id).toMatch(/^markdown-/);
+		open = false; h.defer(); await h.library.refresh();
+		expect(h.files.get(item.path)).toBe(manual);
+		h.resume(); await h.library.refresh();
+		const recorded = readReadingFrontmatter(h.files.get(item.path)!)!;
+		expect(recorded.body).toBe(readReadingFrontmatter(manual)!.body);
+		expect(recorded.value.highlights).toEqual([expect.objectContaining({ text: 'this passage', id: h.library.getSnapshot().items[0]?.highlights?.[0]?.id })]);
+		expect(h.library.getSnapshot().items[0]?.highlights?.[0]?.id).not.toMatch(/^markdown-/);
+		const writes = h.process.mock.calls.length; await h.library.refresh();
+		expect(h.process).toHaveBeenCalledTimes(writes);
+	});
 	it('defers adoption during sync and imports every Markdown note only within the reading folder', async () => {
 		const h = harness(); h.files.set('Reading/Clip.md', clip); h.files.set('Reading/Personal.md', '# Personal notes'); h.files.set('Outside/Private.md', '# Private'); h.files.set('Reading/image.png', 'image'); h.files.set('ReadingElsewhere/Private.md', '# Private');
 		h.defer(); await h.library.refresh(); expect(h.process).not.toHaveBeenCalled();

@@ -28,7 +28,7 @@ function harness() {
 			if (!events.has(name)) events.set(name, new Set()); events.get(name)!.add(callback); return { name, callback };
 		}, offref: (ref: { name: string; callback: (file: TFile, oldPath?: string) => void }) => { events.get(ref.name)!.delete(ref.callback); },
 	};
-	const workspace = { layoutReady: false, onLayoutReady: (callback: () => void) => { callbacks.push(callback); if (workspace.layoutReady) callback(); } };
+	const workspace = { layoutReady: false, on: () => ({}), offref: vi.fn(), getLeavesOfType: () => [], onLayoutReady: (callback: () => void) => { callbacks.push(callback); if (workspace.layoutReady) callback(); } };
 	const plugin = { secretStorage: { get: () => null }, settings: normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading' } }, '.obsidian'),
 		remindersSettings: { remindersFolderPath: 'Reminders' }, app: { vault, workspace }, registerEvent: vi.fn(),
 		syncRuntime: { getState: () => ({ status }), addStateChangeListener: (listener: () => void) => { syncListeners.add(listener); }, removeStateChangeListener: (listener: () => void) => { syncListeners.delete(listener); } },

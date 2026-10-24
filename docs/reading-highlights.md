@@ -28,6 +28,12 @@ in the article's `highlights` frontmatter. Offsets remain UTF-16 offsets in read
 text, preserving the queued mutation contract. Context helps reattach metadata
 after preceding text changes. Ambiguous matches are not guessed.
 
+Markers typed directly in Obsidian appear as highlights right away. The plugin
+then records them in `highlights` during its next Reading scan, once sync is idle
+and no editor tab has the note open. Their IDs derive from the note's content, so
+devices that record the same note write identical bytes. They have no creation
+date because the true one is unknown.
+
 `highlight_format: markdown-v1` marks notes that use this format. Unmatched
 excerpts and annotations whose passage was removed or
 changed are retained in `highlight_recovery`, shown under **Highlights** in the

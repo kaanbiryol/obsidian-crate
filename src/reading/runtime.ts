@@ -73,6 +73,8 @@ export function startReading(plugin: CratePlugin): void {
 	const canAdopt = () => policyChecked && plugin.app.workspace.layoutReady && !['syncing', 'error', 'offline'].includes(plugin.syncRuntime.getState().status);
 	// Keep replacement views synchronous, but start their vault work after the old library drains.
 	const library = new ReadingLibrary({ ...readingVault, privateFilenames: () => Boolean(loadEncryptionKeys(plugin.secretStorage)),
+		// Background tabs count too: their editor reloads the note when selected.
+		editing: path => plugin.app.workspace.getLeavesOfType('markdown').some(leaf => leaf.getViewState().state?.file === path),
 		...{ captureArticle: async (url: string, signal: AbortSignal) => {
 			const { captureDesktopArticle } = await import('./desktop-capture');
 			return captureDesktopArticle(url, signal);
@@ -122,11 +124,14 @@ export function startReading(plugin: CratePlugin): void {
 		vault.on('delete', file => { changed(file.path); }),
 		vault.on('rename', (file, oldPath) => { changed(oldPath); changed(file.path); }),
 	];
-	for (const ref of refs) plugin.registerEvent(ref);
+	// Closing an editor lets deferred highlight records proceed.
+	const layoutRef = plugin.app.workspace.on('layout-change', schedule);
+	for (const ref of [...refs, layoutRef]) plugin.registerEvent(ref);
 	plugin.syncRuntime.addStateChangeListener(schedule);
 	const stop = () => {
 		controller.abort(); window.clearTimeout(timer);
 		for (const ref of refs) vault.offref(ref);
+		plugin.app.workspace.offref(layoutRef);
 		plugin.syncRuntime.removeStateChangeListener(schedule);
 		lifetime.removeEventListener('abort', onAbort);
     return Promise.allSettled([library.close(), ...refreshes]).then(() => {});

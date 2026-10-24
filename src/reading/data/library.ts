@@ -5,7 +5,7 @@ import { isEmptyReadingCapture, readingUpdateIssue } from '../core/mutation-poli
 import type { CapturedArticle } from '../extraction/types';
 import { readingCapturePath } from '../core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
-import { adoptReadingClip, createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
+import { adoptReadingClip, createReadingNote, parseReadingNote, recordMarkdownHighlights, updateReadingNote } from '../core/notes';
 import { MAX_READING_BYTES, readingUrlIdentity, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontmatter';
 
@@ -14,6 +14,8 @@ export interface ReadingVault {
 	privateFilenames?(): boolean;
 	captureArticle?: (url: string, signal: AbortSignal) => Promise<CapturedArticle>;
 	occupied?(path: string): boolean;
+	/** True while an editor has the note open; background writes wait until it closes. */
+	editing?(path: string): boolean;
 	files(): ReadingFile[];
 	read(file: ReadingFile): Promise<string>;
 	/** Must apply synchronously to current bytes and reject deleted/replaced files. */
@@ -90,7 +92,7 @@ export class ReadingLibrary {
 					continue;
 				}
 				try {
-					const original = await this.vault.read(file);
+					let original = await this.vault.read(file);
 					// Versioned notes need no adoption, so parse them only once.
 					let metadata = this.parse(original);
 					if (!metadata && this.canAdopt()) {
@@ -102,11 +104,28 @@ export class ReadingLibrary {
 							return adopted;
 						});
 						metadata = this.parse(content);
+						original = content;
+					}
+					// Markers typed in Obsidian get stable IDs once nobody is editing the note.
+					let deferred = false;
+					if (metadata?.highlights?.some(highlight => highlight.id?.startsWith('markdown-')) && this.canAdopt()) {
+						const recorded = await recordMarkdownHighlights(original);
+						this.assertActive();
+						if (recorded !== original && this.vault.editing?.(file.path)) deferred = true;
+						else if (recorded !== original) {
+							const content = await this.vault.process(file, current => {
+								this.assertActive();
+								return current === original ? recorded : current;
+							});
+							metadata = this.parse(content);
+							// A concurrent edit wins; its own change event schedules another scan.
+							deferred = content !== recorded;
+						}
 					}
 					if (metadata) {
 						const item = { ...metadata, path: file.path };
 						items.push(item);
-						if (file.revision) this.cache.set(file.path, { revision: file.revision, metadata, item });
+						if (file.revision && !deferred) this.cache.set(file.path, { revision: file.revision, metadata, item });
 					}
 					else issues.push({ path: file.path, message: 'Note is waiting for import after sync.' });
 				} catch (error) {
