@@ -16,8 +16,12 @@ it.each(['2000-01-01', '2099-01-01'])('uses server dates when the device clock i
 	expect(await newReminderOperationId()).not.toBe(first);
 });
 it('refuses missing server dates and session changes instead of inventing a retry deadline', async () => {
+	// Step past the window where one save shares its server info read.
+	let clock = performance.now() + 10_000;
+	vi.spyOn(performance, 'now').mockImplementation(() => clock);
 	vi.stubGlobal('fetch', vi.fn(async () => info()));
 	await expect(newReminderOperationId()).rejects.toThrow('Update');
+	clock += 10_000;
 	vi.stubGlobal('fetch', vi.fn(async () => { invalidatePwaSession(); return info(20_000); }));
 	await expect(newReminderOperationId()).rejects.toThrow('Session changed');
 });
