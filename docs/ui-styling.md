@@ -420,7 +420,7 @@ launch shell uses the same order, visibility, and selection before React starts.
 Both hosts’ **Reminders** screens contain a compact **Today / Upcoming** segmented
 control with a translucent track and sliding selection. The PWA track uses the
 chrome glass, keeping its rim without a floating shadow because it sits in the
-list flow; Obsidian keeps the shared frosted track. It uses 13px labels and a
+list flow; Obsidian uses an opaque track with the same rim. It uses 13px labels and a
 32px visible track within 44px touch targets.
 `ScheduleSwitcher` in `src/ui/shared/navigation/` keeps the controls mounted while the shared reminder panels
 change. Their content reuses the shared `TabTransition` for the same stationary dissolve
@@ -735,8 +735,10 @@ The separate circular add action uses the existing editor/capture flow, includin
 on Projects. Insets reserve the home indicator once. Loading shells use matching
 dock geometry.
 The dock overlaps the full-height list viewport. In Obsidian, its pill and add
-button use a nearly opaque, raised theme surface with a fine highlight, bright
-icons, and a quiet selection fill. A shared backdrop layer gently dissolves rows
+button use an opaque, raised theme surface with bright icons and a quiet selection
+fill. They take the PWA glass's depth without its blur: a top rim and the same
+compact shadow, colored by the theme's `--background-modifier-box-shadow`, so
+community themes keep control of the palette. A shared backdrop layer gently dissolves rows
 into the host background from the pill's top edge through the bottom safe area,
 with only slight softening, so rows recede instead of remaining readable through
 the controls.

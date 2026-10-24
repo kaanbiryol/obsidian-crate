@@ -64,6 +64,29 @@
     .reminders-empty-state { height: auto; }
     &.is-compact .pwa-navigation-viewport .reminders-view-scroll { padding-bottom: 16px; }
   }
+  // The PWA glass's depth, kept opaque and unblurred so the dock follows the
+  // user's theme: a top rim plus the PWA's compact shadow in the theme's shadow
+  // color. It stays inside the 10px gap above the pane edge.
+  &[data-ui-host="plugin"] {
+    --plugin-chrome-rim: inset 0 1px 0 color-mix(in srgb, white 7%, transparent);
+    --plugin-chrome-shadow-color: var(--background-modifier-box-shadow, rgba(0, 0, 0, .15));
+    .pwa-dock { --dock-surface: var(--dock-material); --dock-surface-hover: var(--dock-material); }
+    .pwa-dock__surface, .pwa-dock__add {
+      box-shadow: var(--plugin-chrome-rim), 0 4px 12px var(--plugin-chrome-shadow-color), 0 1px 2px var(--plugin-chrome-shadow-color);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    // The track sits in the list flow, so it keeps the rim without a shadow.
+    .pwa-schedule-control::before {
+      background: var(--background-primary-alt);
+      box-shadow: var(--plugin-chrome-rim);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    @media (prefers-contrast: more) {
+      .pwa-dock__surface, .pwa-dock__add { box-shadow: none; }
+    }
+  }
   @container (max-width: 360px) {
     .pwa-dock { padding-inline: 12px; gap: 8px; }
     .pwa-dock__add { flex-basis: 52px; height: 52px; }
