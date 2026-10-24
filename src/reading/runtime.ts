@@ -67,6 +67,7 @@ export function startReading(plugin: CratePlugin): void {
 		signal: controller.signal,
 		allowed: path => allowedReadingPath(plugin, path),
 		validate: () => { validateReadingConfiguration(plugin, plugin.settings.reading); },
+		fileManager: plugin.app.fileManager,
 	});
 	let policyChecked = !plugin.settings.workerUrl;
  let checkedAt = 0;

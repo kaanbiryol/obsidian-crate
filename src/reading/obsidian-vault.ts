@@ -1,4 +1,4 @@
-import { TFile, TFolder, type TAbstractFile, type Vault } from 'obsidian';
+import { TFile, TFolder, type FileManager, type TAbstractFile, type Vault } from 'obsidian';
 import { portablePathKey } from '@/protocol/portable-path';
 import { isCurrentVaultFile } from '@/sync/local/vault-file-identity';
 import type { ReadingFile, ReadingVault } from './data/library';
@@ -8,8 +8,9 @@ export function createObsidianReadingVault(vault: Vault, folder: string, options
 	signal: AbortSignal;
 	allowed: (path: string) => boolean;
 	validate: () => void;
-}): Pick<ReadingVault, 'files' | 'occupied' | 'read' | 'process' | 'create'> & { changed(path: string): void } {
-	const { signal, allowed, validate } = options;
+	fileManager: Pick<FileManager, 'renameFile'>;
+}): Pick<ReadingVault, 'files' | 'occupied' | 'read' | 'process' | 'create' | 'rename'> & { changed(path: string): void } {
+	const { signal, allowed, validate, fileManager } = options;
 	const fileRefs = new WeakMap<ReadingFile, TFile>();
 	const fileIds = new WeakMap<TFile, number>();
 	const fileEvents = new WeakMap<TFile, number>();
@@ -57,6 +58,11 @@ export function createObsidianReadingVault(vault: Vault, folder: string, options
 			signal.throwIfAborted();
 			if (!allowed(path)) throw new Error('Reading folder is excluded from sync.');
 			await vault.create(path, content);
+		},
+		rename: async (file, path) => {
+			const ref = resolve(file);
+			if (!allowed(path)) throw new Error('Reading folder is excluded from sync.');
+			await fileManager.renameFile(ref, path);
 		},
 	};
 }

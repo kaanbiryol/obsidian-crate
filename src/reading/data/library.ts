@@ -3,7 +3,7 @@ import { enrichReadingBookmark } from '../core/duplicates';
 import { applyLocalArticle } from '../core/article';
 import { isEmptyReadingCapture, readingUpdateIssue } from '../core/mutation-policy';
 import type { CapturedArticle } from '../extraction/types';
-import { readingCapturePath } from '../core/filename';
+import { isGeneratedCapturePath, readingCapturePath } from '../core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { adoptReadingClip, createReadingNote, parseReadingNote, recordMarkdownHighlights, updateReadingNote } from '../core/notes';
 import { MAX_READING_BYTES, readingUrlIdentity, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
@@ -21,6 +21,8 @@ export interface ReadingVault {
 	/** Must apply synchronously to current bytes and reject deleted/replaced files. */
 	process(file: ReadingFile, update: (current: string) => string): Promise<string>;
 	create(path: string, content: string): Promise<void>;
+	/** Renames through the host so links to the note follow it. */
+	rename?(file: ReadingFile, path: string): Promise<void>;
 }
 interface ReadingIssue { path: string; message: string }
 export interface ReadingSnapshot { items: ReadingItem[]; issues: ReadingIssue[]; loading: boolean; error: string | null }
@@ -31,7 +33,7 @@ export class ReadingLibrary {
 	private queue: Promise<void>;
 	private closed = false;
 	private closing: Promise<void> | undefined;
-	private captures = new Map<string, Promise<void>>();
+	private captures = new Map<string, Promise<ReadingItem>>();
 	private captureErrors = new Map<string, string>();
 	private captureQueue: Promise<void> = Promise.resolve();
 	// The cached item keeps its identity while the note is unchanged.
@@ -167,7 +169,7 @@ export class ReadingLibrary {
 			const note = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
 			const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
 			const metadata = parseReadingNote(content)!;
-			const path = await readingCapturePath(this.folder, this.vault.privateFilenames?.() ? null : { title: metadata.title, url: metadata.source_url }, id, candidate => this.vault.occupied?.(candidate) ?? this.vault.files().some(file => portablePathKey(file.path) === portablePathKey(candidate)));
+			const path = await readingCapturePath(this.folder, this.vault.privateFilenames?.() ? null : { title: metadata.title, url: metadata.source_url }, id, candidate => this.occupied(candidate));
 			this.assertActive();
 			await this.vault.create(path, content);
 			await this.scan();
@@ -177,6 +179,9 @@ export class ReadingLibrary {
 		});
 	}
 	get canCaptureLocally(): boolean { return Boolean(this.vault.captureArticle); }
+	private occupied(path: string): boolean {
+		return this.vault.occupied?.(path) ?? this.vault.files().some(file => portablePathKey(file.path) === portablePathKey(path));
+	}
 	enrich(target: ReadingItem, clip: ReadingItem): Promise<void> {
 		return this.enqueue(async () => {
 			await this.scan();
@@ -195,7 +200,8 @@ export class ReadingLibrary {
 		});
 	}
 	isCapturing(item: ReadingItem): boolean { return this.captures.has(item.crate_reading_id); }
-	retryCapture(item: ReadingItem): Promise<void> {
+	/** Resolves with the note as saved, which may have a new path once its title is known. */
+	retryCapture(item: ReadingItem): Promise<ReadingItem> {
 		try { this.assertActive(); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error('Reading library is stopped.')); }
 		const existing = this.captures.get(item.crate_reading_id);
 		if (existing) return existing;
@@ -216,15 +222,29 @@ export class ReadingLibrary {
 			});
 			this.assertActive();
 			const article = await capture(item.source_url, this.signal);
-			await this.enqueue(async () => {
+			return this.enqueue(async () => {
 				await this.scan();
 				if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error('This note moved or has an identity conflict.');
-				await this.vault.process(file, content => {
+				const written: { before?: ReadingMetadata | null } = {};
+				const saved = parseReadingNote(await this.vault.process(file, content => {
 					this.assertActive();
+					written.before = parseReadingNote(content);
 					return applyLocalArticle(content, item, article);
-				});
+				}))!;
 				this.invalidate(item.path);
+				let path = item.path;
+				// A note still named after its link takes the downloaded title; a user rename is kept.
+				const previous = written.before;
+				if (this.vault.rename && !this.vault.privateFilenames?.() && previous && saved.title !== previous.title
+					&& isGeneratedCapturePath(item.path, this.folder, { title: previous.title, url: previous.source_url }, item.crate_reading_id)) {
+					path = await readingCapturePath(this.folder, { title: saved.title, url: saved.source_url }, item.crate_reading_id,
+						candidate => portablePathKey(candidate) !== portablePathKey(item.path) && this.occupied(candidate));
+					this.assertActive();
+					// The article is saved either way; a failed rename only keeps the old name.
+					if (path !== item.path) await this.vault.rename(file, path).catch(() => { path = item.path; });
+				}
 				await this.scan();
+				return { ...saved, path };
 			});
 		}).catch((error: unknown) => {
 			if (!this.closed && !this.signal.aborted) this.captureErrors.set(item.path, `Link saved. ${error instanceof Error ? error.message : 'Article download failed.'}`);
@@ -234,7 +254,7 @@ export class ReadingLibrary {
 			if (!this.closed && !this.signal.aborted) void this.refresh().catch(() => { /* Refresh already publishes its error. */ });
 		});
 		this.captures.set(item.crate_reading_id, work);
-		this.captureQueue = work.catch(() => undefined);
+		this.captureQueue = work.then(() => undefined, () => undefined);
 		this.publish({ ...this.snapshot });
 		return work;
 	}
