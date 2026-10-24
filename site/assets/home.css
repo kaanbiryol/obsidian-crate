@@ -22,10 +22,6 @@
 .hosting-overview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:48px; align-items:center; }
 .hosting-overview .sync-map { padding:0; }
 @media(max-width:700px) { .hosting-overview { grid-template-columns:1fr; gap:28px; } }
-.faq-accordion details { border-bottom:1px solid var(--line); }
-.faq-accordion summary { cursor:pointer; padding:20px 28px 20px 0; font-size:15px; line-height:1.5; }
-.faq-accordion p { padding:0 0 24px; color:var(--muted); font-size:14px; line-height:1.8; }
-.faq-accordion a { color:var(--accent-text); }
 @media(max-width:850px) {
  .mobile-gallery > .feature-preview { flex-basis:calc((100% - 24px)/2); }
  .overview-grid { --gallery-media-height:170px; }

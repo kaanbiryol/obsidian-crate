@@ -39,20 +39,13 @@
 .install-steps li + li { border-top:1px solid var(--line); padding-top:24px; }
 .install-steps .install-help { margin-top:8px; font-size:14px; }
 .install-steps h3 { font-size:16px; font-weight:550; margin:4px 0 10px; }.install-steps p { font-size:14px; line-height:1.85; color:var(--muted); }.install-steps a { color:var(--accent-text); text-decoration:underline; text-underline-offset:3px; }.install-steps b { font-weight:500; color:var(--text); }.install-steps code { overflow-wrap:anywhere; font-size:13px; background:#ffffff08; padding:3px 5px; border-radius:4px; }
-.faq-section { border-top:1px solid var(--line); display:grid; grid-template-columns:.85fr 1.2fr; gap:70px; }
-.faq-intro { margin-top:20px; max-width:300px; color:var(--muted); font-size:14px; line-height:1.8; }
-.faq-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; gap:32px; margin:0; }
-.faq-list > div { padding-top:20px; border-top:1px solid var(--line); }
-.faq-list dt { margin-bottom:12px; font-size:15px; font-weight:500; line-height:1.5; }
-.faq-list dd { margin:0; color:var(--muted); font-size:14px; line-height:1.8; }
-.faq-list a { color:var(--accent-text); text-decoration:underline; text-underline-offset:3px; }
 .closing-section { border-top:1px solid var(--line); padding-block:70px; text-align:center; }
 .closing-section .actions { justify-content:center; }
 .closing-source { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:var(--muted); font-size:14px; }
 .closing-source:hover { color:var(--text); }
-@media(max-width:850px) { .install-section { gap:32px; }.faq-section { gap:30px; } }
+@media(max-width:850px) { .install-section { gap:32px; } }
 @media(max-width:700px) { .install-section { grid-template-columns:minmax(0,1fr); gap:32px; }.install-intro .body-copy { max-width:440px; } }
-@media(max-width:600px) { .showcase-grid,.faq-section { grid-template-columns:1fr; gap:32px; }.closing-section { padding-block:50px; } }
+@media(max-width:600px) { .showcase-grid { grid-template-columns:1fr; gap:32px; }.closing-section { padding-block:50px; } }
 
 
 .sync-showcase { border-top:1px solid var(--line); }
@@ -286,8 +279,6 @@
 
 #installation-steps { scroll-margin-top:100px; }
 #crate-repository { scroll-margin-top:120px; }
-@media(max-width:1000px) { .faq-section { grid-template-columns:1fr; gap:28px; }.faq-intro { max-width:none; } }
-@media(max-width:600px) { .faq-list { grid-template-columns:1fr; gap:24px; } }
 
 .reminders-mobile > .feature-group { max-width:1000px; margin-inline:auto; }
 
