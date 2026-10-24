@@ -40,6 +40,12 @@ Pages requiring a login, restricting automated downloads, or relying heavily on 
 
 Keep the saved link, retry when connected, or [use Web Clipper](/docs/features/reading/#use-obsidian-web-clipper) to save text you can access in your browser.
 
+## Cloudflare's free daily limits
+
+On Cloudflare's Free plan, D1 allows 100,000 row writes and 5 million row reads a day. A first upload of a very large vault, or turning on encryption for one, can reach the write limit. Sync then stops with **Cloudflare’s free daily database limit stopped this sync**. Your changes stay on the device; sync again after 00:00 UTC, and a first upload continues where it stopped.
+
+**Settings → Crate → Server and usage → Cloudflare usage** compares your usage, including storage, with the free allowances. R2 storage beyond its free allowance is billed rather than stopped.
+
 ## Privacy and backups
 
 Without [end-to-end encryption](/docs/features/encryption/), your server can read synced content. With it, content is encrypted, but file paths, approximate sizes, and some scheduling information remain visible. Keep the recovery key outside your vault; Crate cannot replace a lost key.

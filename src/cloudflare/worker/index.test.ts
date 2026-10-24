@@ -393,6 +393,14 @@ describe('worker entrypoint', () => {
 		expect(await response.json()).toEqual({ error: 'Authentication service unavailable' });
 	});
 
+	it('explains a D1 daily limit instead of hiding it as a server error', async () => {
+		const DB = { prepare: () => { throw new Error('D1_ERROR: Exceeded daily rows written limit'); } };
+		const response = await worker.fetch(new Request('https://worker.test/notifications/vapid-public-key'), createEnv({ DB: DB as never }));
+		expect(response.status).toBe(429);
+		expect(response.headers.get('Retry-After')).toBeNull();
+		expect(await response.json()).toEqual({ error: 'Cloudflare’s free daily database limit was reached. Sync can continue after 00:00 UTC.', code: 'd1_daily_limit' });
+	});
+
 	it('returns a controlled 500 when a public route throws', async () => {
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 		try {

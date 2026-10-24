@@ -1,6 +1,16 @@
 import { D1_USAGE_HEADER, parseD1Usage, type D1Usage } from '@/protocol/d1-usage';
 import type { Env } from './types';
 
+/**
+ * Free-plan accounts can't query D1 after the daily read or write allowance
+ * until 00:00 UTC. Cloudflare does not document the exact wording, so match
+ * its parts rather than one phrase.
+ */
+export function isD1DailyLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : '';
+  return /\bdaily\b/i.test(message) && /\blimit\b/i.test(message) && /\b(?:rows?|reads?|writes?|written)\b/i.test(message);
+}
+
 /** In-memory accounting of returned billing metadata; never queries or writes a log table. */
 export function meterD1Usage(database: D1Database) {
   const usage: D1Usage = { rowsRead: 0, rowsWritten: 0, complete: true };

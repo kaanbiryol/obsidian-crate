@@ -108,7 +108,7 @@ Crate creates its own bucket, database, Worker, and reminder resources. You do n
 
 R2 Standard currently includes 10 GB-month of storage, 1 million Class A operations (such as writes and listings), and 10 million Class B operations (such as reads) per month, with free outbound data transfer. The free allowance is shared across the account; it is not a separate allowance for every vault or bucket. Infrequent Access storage is excluded from the free tier. Usage above the allowance is billed, so free usage does not remove the payment-method requirement. Check [Cloudflare's current R2 pricing](https://developers.cloudflare.com/r2/pricing/) before activating it.
 
-Stored data includes retained file versions as well as current vault files. Other Cloudflare services have their own limits and pricing. Crate's **Cloudflare usage** panel provides estimates, not a spending cap. The current server cannot complete setup without R2 activation.
+Stored data includes retained file versions as well as current vault files. Other Cloudflare services have their own limits and pricing. Crate's **Cloudflare usage** panel provides estimates, not a spending cap. It compares requests, operations and storage with the free allowances and flags each metric from 80% of its allowance. The current server cannot complete setup without R2 activation.
 
 ### R2 activation error
 

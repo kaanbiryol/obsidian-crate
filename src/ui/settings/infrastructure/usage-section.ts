@@ -64,29 +64,37 @@ export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin
 	}
 	renderSnapshot(connection.snapshot);
 	const notes = createSettingsDisclosure(container, 'About these estimates');
-	notes.createEl('p', { cls: 'setting-item-description', text: 'Usage is compared with free allowances and is an estimate; paid plans may differ. Analytics can be delayed. Daily limits reset at midnight (UTC). R2 operations use the calendar month, which may differ from your billing period.' });
+	notes.createEl('p', { cls: 'setting-item-description', text: 'Usage is compared with free allowances and is an estimate; paid plans may differ. Analytics can be delayed. Daily limits reset at midnight (UTC); Workers and D1 stop until then, while R2 bills usage beyond its allowance. R2 operations use the calendar month, which may differ from your billing period.' });
 	notes.createEl('p', { cls: 'setting-item-description', text: 'Storage shows reported daily peaks, not monthly billed storage. R2 includes 10 gigabyte-months of standard storage; D1 includes 5 gigabytes. Infrequent access and other Cloudflare services are not covered.' });
 	return () => { active = false; };
 }
 
+// From this share of an allowance, the metric is flagged before it runs out.
+const NEAR_ALLOWANCE_PERCENT = 80;
+
 function renderMetric(container: HTMLElement, metric: UsageMetric): void {
-	const used = metric.bytes ? `${(metric.used / 1_000_000_000).toLocaleString(undefined, { maximumFractionDigits: 3 })} GB` : metric.used.toLocaleString();
+	const format = (value: number) => metric.bytes ? `${(value / 1_000_000_000).toLocaleString(undefined, { maximumFractionDigits: 3 })} GB` : value.toLocaleString();
+	const used = format(metric.used);
 	const row = container.createDiv({ cls: 'crate-usage-metric' });
 	const heading = row.createDiv({ cls: 'crate-usage-metric-header' });
 	heading.createSpan({ text: metric.label, cls: 'crate-usage-label' });
 	const value = heading.createDiv({ cls: 'crate-usage-value' });
 	value.createSpan({ text: used, cls: 'crate-usage-used' });
 	if (metric.allowance === undefined) return;
-	value.createSpan({ text: ` / ${metric.allowance.toLocaleString()}`, cls: 'crate-usage-allowance' });
+	value.createSpan({ text: ` / ${format(metric.allowance)}`, cls: 'crate-usage-allowance' });
 	const exceeded = metric.used > metric.allowance;
 	if (exceeded) row.addClass('crate-usage-metric--exceeded');
 	const progress = row.createEl('progress', { cls: 'crate-usage-progress' });
 	progress.max = Math.max(1, metric.allowance);
 	progress.value = Math.min(metric.used, progress.max);
-	progress.setAttribute('aria-label', `${metric.label}: reported usage ${used} of ${metric.allowance.toLocaleString()} free allowance`);
+	progress.setAttribute('aria-label', `${metric.label}: reported usage ${used} of ${format(metric.allowance)} free allowance`);
 	const footer = row.createDiv({ cls: 'crate-usage-metric-footer' });
 	const percent = metric.allowance > 0 ? metric.used / metric.allowance * 100 : null;
 	const percentLabel = percent === null ? 'No free allowance' : percent > 0 && percent < 0.1 ? '<0.1% used' : `${percent.toLocaleString(undefined, { maximumFractionDigits: 1 })}% used`;
 	footer.createSpan({ text: percentLabel });
 	if (exceeded) footer.createSpan({ text: 'Free allowance exceeded' });
+	else if (percent !== null && percent >= NEAR_ALLOWANCE_PERCENT) {
+		row.addClass('crate-usage-metric--near');
+		footer.createSpan({ text: 'Close to the free allowance' });
+	}
 }

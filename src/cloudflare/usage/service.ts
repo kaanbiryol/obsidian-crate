@@ -17,6 +17,8 @@ const CLASS_A = new Set(['ListBuckets', 'PutBucket', 'ListObjects', 'ListBucket'
 const CLASS_B = new Set(['HeadBucket', 'HeadObject', 'GetObject', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
 const FREE = new Set(['DeleteObject', 'DeleteObjects', 'DeleteBucket', 'AbortMultipartUpload']);
 const LIMIT = 10000;
+// Free storage: D1 includes 5 GB; R2 includes 10 GB-months, compared here with today's peak.
+const STORAGE_ALLOWANCES = [5_000_000_000, 10_000_000_000];
 
 type Row = { sum?: Record<string, unknown>; max?: Record<string, unknown>; dimensions?: Record<string, unknown> };
 
@@ -93,7 +95,7 @@ export async function fetchCloudflareUsage(
 			return results.map((result, i) => {
 				if (result.status === 'rejected') throw new Error('Storage metrics are unavailable. Try again later.');
 				if (!result.value.length) throw new Error('No storage samples available yet.');
-				return { label: i === 0 ? 'D1 storage' : 'R2 storage', bytes: true,
+				return { label: i === 0 ? 'D1 storage' : 'R2 storage', bytes: true, allowance: STORAGE_ALLOWANCES[i],
 					used: result.value.reduce((total, row) => total + (i === 0 ? number(row.max?.databaseSizeBytes) : number(row.max?.payloadSize) + number(row.max?.metadataSize)), 0) };
 			});
 		} },

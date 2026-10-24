@@ -194,6 +194,11 @@ body.reduce-motion .crate-action-progress {
 		&::-webkit-progress-value { background: var(--text-accent); border-radius: 4px; }
 		&::-moz-progress-bar { background: var(--text-accent); border-radius: 4px; }
 	}
+	.crate-usage-metric--near {
+		.crate-usage-metric-footer { color: var(--text-warning); }
+		.crate-usage-progress::-webkit-progress-value { background: var(--text-warning); }
+		.crate-usage-progress::-moz-progress-bar { background: var(--text-warning); }
+	}
 	.crate-usage-metric--exceeded {
 		.crate-usage-metric-footer { color: var(--text-error); }
 		.crate-usage-progress::-webkit-progress-value { background: var(--text-error); }

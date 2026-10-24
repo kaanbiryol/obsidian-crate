@@ -79,6 +79,9 @@ const MESSAGE_RULES: Array<[RegExp, IssueExplanation]> = [
 	[/\bENOSPC\b|disk.*full|no space left/i, {
 		summary: 'This device has run out of storage space.',
 		recovery: 'Free space on the device, then select Sync vault to resume.' }],
+	[/free daily database limit/i, {
+		summary: 'Cloudflare’s free daily database limit stopped this sync.',
+		recovery: 'Your changes stay on this device. Sync again after the limit resets at 00:00 UTC. Cloudflare usage in Crate settings shows today’s totals; a Workers Paid plan removes the daily limit.' }],
 	[/quota|storage limit|D1.*limit|too many (?:SQL|subrequests)/i, {
 		summary: 'A storage or server limit stopped this sync.',
 		recovery: 'Check available device storage and the server’s usage limits in Crate settings. After freeing space or resolving the limit, sync again.' }],

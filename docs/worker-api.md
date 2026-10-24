@@ -551,6 +551,10 @@ still checks token validity, expiry and authorization against D1; an authenticat
 failure removes the hint. This is not an authentication cache. Action/day limits
 remain enforced after authentication. Denial returns 429 with Retry-After: 60.
 
+When a Cloudflare Free plan account has used its daily D1 read or write allowance,
+any route that reaches D1 returns 429 with `code: "d1_daily_limit"`. It sends no
+Retry-After: the allowance resets at 00:00 UTC, beyond the clients' retry delays.
+
 Without the edge binding, the restrictive budget also runs in bounded isolate
 memory keyed by the original D1 binding, before request-local metering wrappers.
 The authenticated sync budget and fallback are per isolate, not global quotas;

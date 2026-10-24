@@ -77,6 +77,24 @@ it('retains monthly periods and unavailable data without implying zero usage', (
 	expect(root.querySelector('progress')).toBeNull();
 });
 
+it('compares storage with its free allowance and flags usage close to it', () => {
+	const { root } = setup({ accountId: 'account-a', updatedAt: Date.UTC(2026, 0, 2), groups: [
+		{ label: 'Storage · sum of today’s resource peaks', metrics: [
+			{ label: 'D1 storage', used: 1_000_000_000, bytes: true, allowance: 5_000_000_000 },
+			{ label: 'R2 storage', used: 8_500_000_000, bytes: true, allowance: 10_000_000_000 },
+		] },
+	] });
+	const metrics = (element: FakeElement): FakeElement[] => element.classNames.has('crate-usage-metric') ? [element] : element.children.flatMap(metrics);
+	const [d1, r2] = metrics(root);
+	expect(d1?.collectText()).toMatch(/1 GB +\/ 5 GB/);
+	expect(d1?.classNames.has('crate-usage-metric--near')).toBe(false);
+	expect(r2?.collectText()).toMatch(/8.5 GB +\/ 10 GB/);
+	expect(r2?.collectText()).toContain('85% used');
+	expect(r2?.collectText()).toContain('Close to the free allowance');
+	expect(r2?.classNames.has('crate-usage-metric--near')).toBe(true);
+	expect(r2?.querySelector('progress')?.getAttribute('aria-label')).toBe('R2 storage: reported usage 8.5 GB of 10 GB free allowance');
+});
+
 it('uses today only for the current UTC day and preserves the year for older months', () => {
 	vi.useFakeTimers();
 	vi.setSystemTime(new Date('2026-10-03T12:00:00Z'));

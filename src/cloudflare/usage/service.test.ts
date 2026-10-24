@@ -14,6 +14,7 @@ describe('Cloudflare usage', () => {
 		expect(result[1]?.metrics.map(m => m.used)).toEqual([456, 10]);
 		expect(result[2]?.metrics.map(m => m.used)).toEqual([0, 120]);
 		expect(result[3]?.metrics.map(m => m.used)).toEqual([100, 205]);
+		expect(result[3]?.metrics.map(m => m.allowance)).toEqual([5_000_000_000, 10_000_000_000]);
 		const requests = JSON.stringify(transport.mock.calls);
 		// Queries must never filter down to only Crate's share of account-wide allowances.
 		expect(requests).not.toContain('scriptName');

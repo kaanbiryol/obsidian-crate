@@ -2,7 +2,7 @@ import { handleReadingRoute } from './reading/routes';
 import { shortcutLaunchResponse, shortcutTransport } from './reading/shortcut-transport';
 import { captureSealedReading } from './reading/sealed-capture';
 import { ReadingError, readingResponse } from './reading/common';
-import { withD1Usage } from './d1-usage';
+import { isD1DailyLimitError, withD1Usage } from './d1-usage';
 import { coordinatedNewFiles } from './sync/bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
@@ -171,6 +171,10 @@ function errorResponse(error: unknown, request: Request, requestId: string): Res
 			path: error.path,
 			currentHash: error.currentHash,
 		}, 409);
+	}
+	// No Retry-After: clients would wait out their capped delays for a limit that resets at 00:00 UTC.
+	if (isD1DailyLimitError(error)) {
+		return corsResponse({ error: 'Cloudflare’s free daily database limit was reached. Sync can continue after 00:00 UTC.', code: 'd1_daily_limit' }, 429);
 	}
 	console.error('Unhandled worker request error', {
 		method: request.method,

@@ -11,6 +11,7 @@ it.each([
   ['Invalid reminder description encoding on line 2', 'could not be read', 'Source mode'],
   ['Skipped local file larger than 25MB', 'size limit', 'exclude'],
   ['ENOSPC', 'storage space', 'Free space'],
+  ['Cloudflare’s free daily database limit was reached. Sync can continue after 00:00 UTC.', 'free daily database limit', '00:00 UTC'],
   ['EACCES', 'could not access', 'permissions'],
   ['ERR_NAME_NOT_RESOLVED', 'reach the sync server', 'server address'],
   ['Sync connection changed during reminder setup', 'server could not complete', 'connection'],
