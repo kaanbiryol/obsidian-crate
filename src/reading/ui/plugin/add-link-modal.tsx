@@ -43,6 +43,6 @@ function LocalCapture({ plugin, onClose, onExisting }: { plugin: CratePlugin; on
 		} catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save this link.'); }
 		finally { pending.current = false; setSaving(false); }
 	};
-	return <SaveLinkDialog captureOnDevice variant={Platform.isMobile ? 'bottom-sheet' : 'centered'} showBackdrop={Platform.isMobile}
+	return <SaveLinkDialog variant={Platform.isMobile ? 'bottom-sheet' : 'centered'} showBackdrop={Platform.isMobile}
 		url={url} onUrl={setUrl} saving={saving} error={error} onClose={onClose} onSave={() => void save()} />;
 }

@@ -19,7 +19,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       await page.getByRole('button', { name: 'Save a link', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: 'Save a link', exact: true });
       await expect(dialog.getByRole('checkbox')).toHaveCount(0);
-      await expect(dialog.getByText('Your server downloads article text from links you save.')).toBeVisible();
+      await expect(dialog.getByLabel('Link', { exact: true })).toBeVisible();
       await mkdir('test-results/reading-consent', { recursive: true });
       for (const theme of ['light', 'dark']) {
         await page.emulateMedia({ colorScheme: theme });

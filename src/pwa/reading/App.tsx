@@ -1,6 +1,5 @@
 import { youtubeVideoId } from '@/reading/core/youtube';
 import { usePwaPreferences } from '../settings/usePwaPreferences';
-import { readingKeys } from './encryption-session';
 
 import type { ReadingHighlight } from '@/reading/core/highlights';
 import { readingUrl } from '@/reading/core/model';
@@ -84,7 +83,7 @@ function ReadingAppContent() {
         beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
         headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
         reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)} onBack={closeReader} onUpdate={changes => updateItem(visibleReader, changes, reader)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={() => retryArticle(reader.item)} />} />
-      {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={closeCapture}>{close => <SaveLinkForm id={captureFormId} encrypted={Boolean(readingKeys())} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { if (await saveLink(open)) close(); })} />}</ReadingDialog>}
+      {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={closeCapture}>{close => <SaveLinkForm id={captureFormId} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { if (await saveLink(open)) close(); })} />}</ReadingDialog>}
 
     </>}
   </main>;

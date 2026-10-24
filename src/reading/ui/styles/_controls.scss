@@ -12,7 +12,8 @@
 	.crate-reading__notice ul { max-height: 150px; overflow-y: auto; padding-left: 20px; }
 	.crate-reading__notice summary { cursor: pointer; min-height: 32px; align-content: center; }
 	.crate-reading__capture { display: grid; gap: 20px; }
-	.crate-reading__capture > p { color: var(--text-muted); margin: 0; font-size: 14px; }
+	// Matches the highlight note sheet: a bare inline field.
+	.crate-reading__capture .crate-text-input { padding-inline: 0; border: 0; border-radius: 0; background: transparent; }
 	.crate-reading-dialog__actions { padding-top: 8px; }
 }
 .crate-reminders-ui .crate-reading-dialog {
