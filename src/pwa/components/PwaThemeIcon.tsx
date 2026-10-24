@@ -54,9 +54,9 @@ import type { ThemeIconProps, ThemeIconSize } from '@/ui/shared/ThemeIcon';
 const ICONS: Record<string, LucideIcon> = {
   archive: Archive,
   'archive-restore': ArchiveRestore,
+  'arrow-up': ArrowUp,
   'arrow-up-right': ArrowUpRight,
   'play': Play,
-  'arrow-up': ArrowUp,
   pin: Pin,
   'pin-off': PinOff,
   'file-text': FileText,
