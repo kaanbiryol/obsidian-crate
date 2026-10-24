@@ -36,8 +36,22 @@ header?.addEventListener('focusout', (event) => {
 });
 window.matchMedia('(min-width: 1001px)').addEventListener('change', closeMenu);
 
+// One underline slides to the current section's link; it appears in place
+// rather than flying in from the edge, and measures again after resizing.
+let indicatorLink;
+navigation?.classList.add('uses-indicator');
+function moveIndicator(link, remeasure) {
+  if (!navigation || (link === indicatorLink && !remeasure)) return;
+  navigation.classList.toggle('is-indicator-sliding', Boolean(link && indicatorLink && !remeasure));
+  navigation.classList.toggle('has-indicator', Boolean(link));
+  indicatorLink = link;
+  if (!link) return;
+  navigation.style.setProperty('--indicator-x', `${link.offsetLeft}px`);
+  navigation.style.setProperty('--indicator-width', `${link.offsetWidth}px`);
+}
+
 let scrollPending = false;
-function updateNavigation() {
+function updateNavigation(remeasure = false) {
   const threshold = (header?.getBoundingClientRect().height ?? 76) + 50;
   let active = -1;
   sections.forEach((section, index) => {
@@ -47,15 +61,16 @@ function updateNavigation() {
     if (index === active) link.setAttribute('aria-current', 'location');
     else link.removeAttribute('aria-current');
   });
+  moveIndicator(navLinks[active], remeasure);
   header?.classList.toggle('is-scrolled', window.scrollY > 12);
   scrollPending = false;
 }
 window.addEventListener('scroll', () => {
   if (scrollPending) return;
   scrollPending = true;
-  window.requestAnimationFrame(updateNavigation);
+  window.requestAnimationFrame(() => updateNavigation());
 }, { passive: true });
-window.addEventListener('resize', updateNavigation);
+window.addEventListener('resize', () => updateNavigation(true));
 updateNavigation();
 
 // Hold the last frame, then fade the video over its stationary phone backdrop.
@@ -165,4 +180,49 @@ document.querySelectorAll('.notify-stage').forEach((stage) => {
     observer.disconnect();
   }, { threshold: 0.35 });
   observer.observe(stage);
+});
+
+// Rise sections into view as they scroll in. Content already on screen at load
+// stays as it is, so nothing flashes or stays hidden if this never runs.
+(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return;
+  const variants = {
+    text: '.changelog-hero > *, .reminder-recording figcaption > *, .encryption-copy > *, .notify-intro > *, .reading-intro > *, .hosting-intro > *, .save-sources-title, .install-intro > *',
+    media: '.recording-media',
+    card: '.changelog-entry, .save-source, .feature-preview, .encryption-diagram, .encryption-flow > li, .notification-preview, .sync-map-hub, .sync-map-devices > div, .hosting-option, .install-steps > li',
+    draw: '.sync-map-branches',
+  };
+  // Items entering together arrive one after another, in reading order.
+  const observer = new IntersectionObserver((entries) => {
+    entries.filter((entry) => entry.isIntersecting).forEach((entry, index) => {
+      observer.unobserve(entry.target);
+      entry.target.style.setProperty('--reveal-delay', `${Math.min(index, 6) * 90}ms`);
+      entry.target.classList.add('is-revealed');
+    });
+  }, { rootMargin: '0px 0px -8% 0px' });
+
+  const targets = Array.from(document.querySelectorAll(Object.values(variants).join(',')))
+    .filter((target) => target.getBoundingClientRect().top >= window.innerHeight);
+  targets.forEach((target) => {
+    target.dataset.reveal = Object.keys(variants).find((variant) => target.matches(variants[variant]));
+    // Hand the element back to its own styles once it has settled.
+    target.addEventListener('animationend', function settle(event) {
+      if (event.target !== target || event.pseudoElement) return;
+      target.removeEventListener('animationend', settle);
+      target.classList.remove('is-revealed');
+      target.removeAttribute('data-reveal');
+      target.style.removeProperty('--reveal-delay');
+    });
+    observer.observe(target);
+  });
+})();
+
+// Track the pointer so card highlights follow it.
+document.querySelectorAll('.hosting-option, .encryption-diagram').forEach((card) => {
+  card.addEventListener('pointermove', (event) => {
+    if (event.pointerType !== 'mouse') return;
+    const bounds = card.getBoundingClientRect();
+    card.style.setProperty('--glow-x', `${event.clientX - bounds.left}px`);
+    card.style.setProperty('--glow-y', `${event.clientY - bounds.top}px`);
+  });
 });

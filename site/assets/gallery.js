@@ -10,6 +10,9 @@
   }, true);
   document.addEventListener('keydown', (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey || ['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return;
+    // Escape closes the gallery without changing how it was used, so a gallery
+    // opened with the pointer returns focus to its preview without a ring.
+    if (dialog.open && event.key === 'Escape') return;
     document.documentElement.dataset.galleryInput = dialog.open && ['ArrowLeft', 'ArrowRight'].includes(event.key)
       ? 'arrows' : 'keyboard';
   }, true);

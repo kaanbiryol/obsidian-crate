@@ -23,10 +23,10 @@
   <link rel="stylesheet" href="/website-options/canvas/style.css?v=grouped-actions-1">
   <link rel="stylesheet" href="/website-options/canvas/sections.css?v=steady-video-1">
   <link rel="stylesheet" href="/website-options/canvas/gallery.css?v=dialog-focus-2">
-  <script src="/assets/canvas.js?v=notify-spotlight-1" defer></script>
-  <script src="/assets/gallery.js?v=phone-frame-1" defer></script>
+  <script src="/assets/canvas.js?v=home-refresh-1" defer></script>
+  <script src="/assets/gallery.js?v=escape-focus-1" defer></script>
   <script src="/assets/home-images.js?v=smooth-images-1" defer></script>
-  <link rel="stylesheet" href="/assets/home.css?v=install-1">
+  <link rel="stylesheet" href="/assets/home.css?v=home-refresh-1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -40,15 +40,16 @@
 <main id="main">
 <section class="hero-band"><div class="hero-grid wrap">
 <div class="hero-copy">
+<a class="beta-pill" href="/changelog/"><span class="beta-pill-tag">Beta</span>See what’s new <span aria-hidden="true">→</span></a>
 <h1><span>Sync. Reminders.</span> <span>Read it later.</span></h1>
-<p class="body-copy">Sync your vault, plan reminders, and save articles to read later, all in Obsidian. Runs on your own Cloudflare account or server.</p>
+<p class="body-copy">Sync your vault, plan reminders, and save articles to read later, all as plain Markdown in Obsidian. Runs on your own Cloudflare account or server.</p>
 <div class="actions"><a class="button" href="#setup"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#download" /></svg> Install beta</a><a class="button button--secondary" href="/docs/">Read the docs <span aria-hidden="true">→</span></a></div>
 <p class="release-note">Free and open source. Runs on Cloudflare’s free tier.</p>
 
 </div>
 <figure class="hero-visual hero-devices" id="markdown-example">
 
-<div class="product-image hero-screenshot"><img decoding="sync" id="hero-screenshot" src="/assets/screenshots/lossless/plugin-today.webp?v=20261004-4" width="3714" height="2324" fetchpriority="high" alt="Crate’s Today note with seven active reminders and two overdue, beside the Upcoming reminders sidebar in Obsidian."></div><div class="product-image hero-phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="sync" src="/assets/screenshots/lossless/pwa-reminders-today.webp?v=7cd9dde81678" width="1179" height="2556" alt="Crate’s mobile Today view with seven reminders and two overdue."></div></figure>
+<div class="product-image hero-screenshot"><picture><source media="(max-width: 600px)" srcset="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><img decoding="sync" id="hero-screenshot" src="/assets/screenshots/lossless/plugin-today.webp?v=20261004-4" width="3714" height="2324" fetchpriority="high" alt="Crate’s Today note with seven active reminders and two overdue, beside the Upcoming reminders sidebar in Obsidian."></picture></div><div class="product-image hero-phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="sync" src="/assets/screenshots/lossless/pwa-reminders-today.webp?v=7cd9dde81678" width="1179" height="2556" alt="Crate’s mobile Today view with seven reminders and two overdue."></div></figure>
 </div></section>
 <section class="section sync-showcase wrap" id="sync" aria-label="Sync"><span id="sync-activity"></span>
 <figure class="reminder-recording"><figcaption><p class="feature-label">Sync</p><h2>Your vault, wherever you use Obsidian.</h2><p>Every note and attachment, on desktop and mobile. Conflicts are saved as copies, never silently overwritten.</p><a class="section-guide intro-guide" href="/docs/features/sync/">How sync works <span aria-hidden="true">→</span></a></figcaption><div class="recording-media"><a class="gallery-video-trigger" href="/assets/videos/plugin-sync.mp4?v=20261004-5s" data-gallery="sync" data-gallery-video="crate-note-sync" aria-haspopup="dialog" aria-label="Play video: Sync your vault across Obsidian devices"><video aria-hidden="true" controlslist="nofullscreen noremoteplayback" disablepictureinpicture="" disableremoteplayback="" id="crate-note-sync" muted playsinline preload="none" width="4048" height="2658" poster="/assets/screenshots/lossless/plugin-sync-poster.webp?v=20261004-133957" aria-label="Your notes sync automatically."><source src="/assets/videos/plugin-sync.mp4?v=20261004-5s" type="video/mp4"></video></a>
@@ -95,7 +96,7 @@
 </section></section>
 
 <section class="section sync-showcase wrap" id="reminders" aria-labelledby="reminders-title">
-<figure class="reminder-recording"><figcaption><p class="feature-label">Reminders</p><h2 id="reminders-title">Reminders, in your own words.</h2><p>Create reminders with natural language. Type “tomorrow at 10” and Crate sets the date and time.</p><a class="section-guide intro-guide" href="/docs/features/reminders/">Reminders guide <span aria-hidden="true">→</span></a></figcaption><div class="recording-media"><a class="gallery-video-trigger" href="/assets/videos/plugin-reminders-natural-language.mp4?v=20261004-cut6428" data-gallery="reminders" data-gallery-video="crate-reminder-entry" aria-haspopup="dialog" aria-label="Play video: Create a reminder in Obsidian"><video aria-hidden="true" controlslist="nofullscreen noremoteplayback" disablepictureinpicture="" disableremoteplayback="" id="crate-reminder-entry" muted playsinline preload="none" width="3490" height="2100" poster="/assets/screenshots/lossless/plugin-reminders-natural-language-poster.webp?v=20261004" aria-label="Create a reminder with a date, project, and priority in Obsidian."><source src="/assets/videos/plugin-reminders-natural-language.mp4?v=20261004-cut6428" type="video/mp4"></video></a>
+<figure class="reminder-recording"><figcaption><p class="feature-label">Reminders</p><h2 id="reminders-title">Reminders, in your own words.</h2><p>Create reminders with natural language. Type “tomorrow at 10” and Crate sets the date and time. Each reminder is a Markdown task in your vault.</p><a class="section-guide intro-guide" href="/docs/features/reminders/">Reminders guide <span aria-hidden="true">→</span></a></figcaption><div class="recording-media"><a class="gallery-video-trigger" href="/assets/videos/plugin-reminders-natural-language.mp4?v=20261004-cut6428" data-gallery="reminders" data-gallery-video="crate-reminder-entry" aria-haspopup="dialog" aria-label="Play video: Create a reminder in Obsidian"><video aria-hidden="true" controlslist="nofullscreen noremoteplayback" disablepictureinpicture="" disableremoteplayback="" id="crate-reminder-entry" muted playsinline preload="none" width="3490" height="2100" poster="/assets/screenshots/lossless/plugin-reminders-natural-language-poster.webp?v=20261004" aria-label="Create a reminder with a date, project, and priority in Obsidian."><source src="/assets/videos/plugin-reminders-natural-language.mp4?v=20261004-cut6428" type="video/mp4"></video></a>
 </div></figure>
 
 
@@ -165,6 +166,17 @@
 <figcaption><h3>Find it again</h3><p>Search highlights across your articles.</p></figcaption>
 </figure>
 </div>
+<section class="save-sources" aria-labelledby="save-sources-title">
+<h3 class="save-sources-title" id="save-sources-title">Save from anywhere.</h3>
+<ul class="save-sources-grid">
+<li class="save-source"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#command" /></svg><h4>Obsidian</h4><p>Add a link from the command palette. The article downloads on your device.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg><h4>Web app</h4><p>Paste a link into your library from any browser.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13" /></svg><h4>iPhone share sheet</h4><p>Share → Save to Crate with the iPhone shortcut, even with encryption on.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13" /></svg><h4>Android share sheet</h4><p>Share → Crate from the installed web app. With encryption on, paste the link instead.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12" /></svg><h4>Obsidian Web Clipper</h4><p>Clip into your Reading folder and the note joins your library.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4" /><path d="m10 9 5 3-5 3z" /></svg><h4>YouTube</h4><p>Save videos with their transcripts when captions exist, then highlight passages.</p></li>
+</ul>
+</section>
 
 
 </section>
@@ -215,7 +227,14 @@
 
 
 
-</main><footer class="site-footer wrap"><a class="wordmark" href="#main"><span class="brand-tile"><img src="/assets/logo.png" width="25" height="25" alt=""></span>Crate</a><span>Sync, reminders and reading for Obsidian.</span><nav aria-label="Footer"><a href="/docs/">Docs</a><a href="/privacy/">Privacy</a><a href="https://github.com/kaanbiryol/obsidian-crate">GitHub</a></nav></footer>
+</main><footer class="site-footer site-footer--columns wrap">
+<div class="footer-brand"><a class="wordmark" href="#main"><span class="brand-tile"><img src="/assets/logo.png" width="25" height="25" alt=""></span>Crate</a><p>Sync, reminders and reading for Obsidian.</p><p class="footer-meta">Public beta · MIT license</p></div>
+<nav class="footer-columns" aria-label="Footer">
+<div><h2>Product</h2><ul><li><a href="#sync">Sync</a></li><li><a href="#reminders">Reminders</a></li><li><a href="#reading">Reading</a></li><li><a href="#end-to-end-encryption">Encryption</a></li></ul></div>
+<div><h2>Guides</h2><ul><li><a href="/docs/getting-started/installation/">Installation</a></li><li><a href="/docs/getting-started/hosting/">Choose your hosting</a></li><li><a href="/docs/getting-started/limits/">Limits</a></li><li><a href="/docs/troubleshooting/recovery/">History and recovery</a></li></ul></div>
+<div><h2>Project</h2><ul><li><a href="/changelog/">Changelog</a></li><li><a href="https://github.com/kaanbiryol/obsidian-crate">GitHub <span aria-hidden="true">↗</span></a></li><li><a href="https://github.com/kaanbiryol/obsidian-crate/blob/master/LICENSE">License <span aria-hidden="true">↗</span></a></li><li><a href="/privacy/">Privacy</a></li></ul></div>
+</nav>
+</footer>
 
 <dialog class="media-viewer" id="media-viewer" aria-labelledby="media-viewer-title" aria-describedby="media-viewer-caption">
   <div class="media-viewer-layout">
