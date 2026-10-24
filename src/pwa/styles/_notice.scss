@@ -1,9 +1,12 @@
 @use "glass";
 
 @mixin styles {
-	// Toasts float over content on the chrome surface.
+	// Toasts float over content on a raised chrome surface so they stand out from cards.
 	.toast {
 		@include glass.surface;
+		border-color: var(--pwa-toast-border);
+		background: var(--pwa-toast-fill);
+		box-shadow: var(--pwa-toast-shadow);
 		color: var(--text-normal);
 	}
 

@@ -40,6 +40,10 @@
 	--pwa-glass-hover-fill:#1f1f23;
 	--pwa-glass-border:rgba(255,255,255,.08);
 	--pwa-glass-shadow:none;
+	/* Toasts float over cards that share the glass fill, so they sit one step lighter and cast a shadow. */
+	--pwa-toast-fill:#2a2a2f;
+	--pwa-toast-border:rgba(255,255,255,.16);
+	--pwa-toast-shadow:0 8px 24px rgba(0,0,0,.6);
 	/* Keep content below translucent native chrome, while backdrops fill the viewport. */
 	--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px));
 	/* Follow the current viewport. Its static maximum can reserve space that

@@ -36,6 +36,9 @@
 	--pwa-glass-hover-fill:#f4f4f5;
 	--pwa-glass-border:rgba(24,24,27,.1);
 	--pwa-glass-shadow:none;
+	--pwa-toast-fill:#ffffff;
+	--pwa-toast-border:rgba(24,24,27,.18);
+	--pwa-toast-shadow:0 1px 3px rgba(24,24,27,.08),0 6px 18px rgba(24,24,27,.14);
 	--pwa-light-surface:var(--background-primary-alt);
 	--pwa-light-surface-soft:rgba(255,255,255,.78);
 	--pwa-light-surface-subtle:rgba(24,24,27,.035);
