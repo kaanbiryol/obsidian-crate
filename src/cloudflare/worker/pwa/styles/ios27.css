@@ -27,10 +27,12 @@ html[data-pwa-ios27-standalone="true"] {
 }
 /* The app may start below the status bar or, for older installs, under it. In
    the latter mode, fixed insets and percentages can use the shortened layout
-   viewport too. Recover its top inset, capped at the full CSS viewport. */
+   viewport too. Recover its top inset, capped at the full CSS viewport. The
+   update curtain matches #app so its screen centers in the visible area. */
 html[data-pwa-ios27-standalone="true"],
 html[data-pwa-ios27-standalone="true"] body,
-html[data-pwa-ios27-standalone="true"] #app {
+html[data-pwa-ios27-standalone="true"] #app,
+html[data-pwa-ios27-standalone="true"] #pwa-update-transition {
 	height:min(100vh,calc(100dvh + env(safe-area-inset-top)));
 	min-height:0;
 }
