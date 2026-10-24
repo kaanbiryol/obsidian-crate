@@ -12,6 +12,7 @@ import { parseJsonObject } from '../request-validation';
 import { policy, authority, readingResponse, ReadingError } from './common';
 import { prepareHandoff, updatePolicy, handoffAuthority } from './access';
 import { mutateReading } from './mutations';
+import { extractForEncryptedReading } from './encrypted-extract';
 import { projectReading } from './projection';
 import { readingItem, readingList, readingListEtag } from './queries';
 import { corsHeaders } from '../cors';
@@ -26,6 +27,10 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
       if (!principal || principal.scope === 'reading_capture') throw new ReadingError('Library access is required.', 403);
       const current = await authority(env.DB, principal);
       const limited = await limitNotificationAction(request, env.DB, principal.tokenId); if (limited) return limited;
+      if (path === '/reading/encrypted-extract' && request.method === 'POST') {
+        if (!encryption) throw new ReadingError('Article downloads here are only for encrypted Reading folders.', 409);
+        return await extractForEncryptedReading(request, env);
+      }
       if (path === '/reading/encrypted-receipt' && request.method === 'GET') {
         const id = url.searchParams.get('operationId') ?? '';
         const receipt = url.searchParams.get('wire') === '1' ? { kind: 'reminder' as const } : { kind: 'reading' as const, generation: current.generation };

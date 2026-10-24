@@ -8,7 +8,7 @@ import { capturePwaSession } from '../session-generation';
 import { READING_SESSION_KEY, assertReadingSession, commitReadingCache, readingSession, type ReadingSession, type ReadingCache } from './storage';
 import { ReadingApiError } from './api-error';
 import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
-import { captureBrowserArticle } from './capture-article';
+import { captureServerArticle } from './capture-article';
 export { ReadingApiError } from './api-error';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './record-validation';
 import { EncryptionScopeChangedError, routeFolderPath } from '../encryption/encryption-folder-routing';
@@ -66,7 +66,7 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
       const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.scopeId, keys.generation]);
       const indexIdentity = JSON.stringify([keys.vaultId, keys.scopeId, keys.generation, keys.folderPath]);
       if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
-        captureArticle: captureBrowserArticle,
+        captureArticle: url => captureServerArticle(url, body => rawReadingRequest('/reading/encrypted-extract', session, body)),
         folderPath: keys.folderPath, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data },
         request: (route, wire) => rawReadingRequest(route, session, wire),
         readAttempt: id => readReadingAttempt(session, id),

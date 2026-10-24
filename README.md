@@ -50,7 +50,7 @@ Automatic sync is off by default on each device. After connecting, run **Crate: 
 
 - Vault files go to your own server and storage. Crate has no hidden telemetry, fetches no remote code at runtime, and needs no Crate account.
 - Secrets and Cloudflare credentials are kept in Obsidian's secret storage.
-- Reading downloads saved links from the original site. For X, Reddit, Bilibili and C2 wiki links it may also call a fixed list of public APIs, including the third-party FxTwitter API, with the saved link only.
+- Reading downloads saved links from the original site. Obsidian downloads on your device; the web app asks your server, which doesn't store the link when encryption is on. For X, Reddit, Bilibili and C2 wiki links it may also call a fixed list of public APIs, including the third-party FxTwitter API, with the saved link only.
 - Push notifications are optional. Payloads are encrypted, and the push provider sees only delivery metadata.
 - Optional [end-to-end encryption](docs/e2ee-implementation.md) hides note content from the server operator. Without it, the operator can read synced content.
 - Sync is not a backup. Keep an independent backup of any vault you use with Crate.

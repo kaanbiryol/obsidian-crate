@@ -21,7 +21,7 @@ The save form tells you which device downloads the article:
 | --- | --- |
 | Obsidian | This device downloads the article and writes a Markdown note. Normal vault sync carries it to your other devices. |
 | Web app without encryption | Your Crate server downloads it. Obsidian can be closed. |
-| Web app with encryption | The browser tries a direct download. If the website blocks it, the save waits for an unlocked Obsidian device to extract it. |
+| Web app with encryption | Your Crate server downloads it without keeping the link, and the web app encrypts the article. If the website blocks the server, the save waits for an unlocked Obsidian device to extract it. |
 
 Pages requiring a login, blocking downloads, or relying on scripts may remain saved links. Server downloads do not use your browser cookies or Crate credentials. Use **Try again**, open the original page, or use [Web Clipper](#use-obsidian-web-clipper) for content you can access in your browser.
 

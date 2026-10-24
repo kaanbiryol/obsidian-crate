@@ -1,28 +1,24 @@
-import { afterEach, expect, it, vi } from 'vitest';
-import { captureBrowserArticle } from './capture-article';
+import { expect, it, vi } from 'vitest';
+import { captureServerArticle } from './capture-article';
 
-afterEach(() => { vi.unstubAllGlobals(); });
-
-it('fetches video metadata directly without credentials, referrers or a Crate proxy', async () => {
-  const fetch = vi.fn(async () => Response.json({ type: 'video', title: 'A video', author_name: 'A channel', html: '<iframe>ignored</iframe>' }));
-  vi.stubGlobal('fetch', fetch);
-  expect(await captureBrowserArticle('https://youtu.be/jNQXAC9IVRw?t=42')).toEqual({ markdown: '', title: 'A video', author: 'A channel', deferTranscript: true });
-  expect(fetch).toHaveBeenNthCalledWith(1, 'https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DjNQXAC9IVRw&format=json', expect.objectContaining({ credentials: 'omit', referrerPolicy: 'no-referrer', mode: 'cors', headers: { Accept: 'application/json' } }));
-  expect(fetch).toHaveBeenCalledTimes(2);
-  expect((fetch.mock.calls[1] as unknown as [Request])[0]).toMatchObject({ credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error' });
+it('sends only the link in the request body and keeps validated article fields', async () => {
+  const request = vi.fn(async () => Response.json({ article: { markdown: 'Body', title: 'Title', author: 'Author', faviconUrl: 'https://example.com/icon.png', extra: 'ignored' } }));
+  expect(await captureServerArticle('https://example.com/a', request)).toEqual({ markdown: 'Body', title: 'Title', author: 'Author', faviconUrl: 'https://example.com/icon.png' });
+  expect(request).toHaveBeenCalledWith(JSON.stringify({ url: 'https://example.com/a' }));
 });
 
-it('leaves a CORS-blocked capture for the existing encrypted pending-bookmark flow', async () => {
-  const fetch = vi.fn(async () => { throw new TypeError('Failed to fetch'); });
-  vi.stubGlobal('fetch', fetch);
-  await expect(captureBrowserArticle('https://youtu.be/jNQXAC9IVRw')).rejects.toThrow('Failed to fetch');
-  expect(fetch).toHaveBeenCalledTimes(1);
+it('leaves a video without captions for Obsidian to finish', async () => {
+  const request = vi.fn(async () => Response.json({ article: { markdown: '', title: 'A video', author: 'A channel' } }));
+  expect(await captureServerArticle('https://youtu.be/jNQXAC9IVRw?t=42', request)).toEqual({ markdown: '', title: 'A video', author: 'A channel', deferTranscript: true });
+  request.mockImplementation(async () => Response.json({ article: { markdown: '**0:02** Hello', transcript: { source: 'youtube', language: 'en' } } }));
+  expect(await captureServerArticle('https://youtu.be/jNQXAC9IVRw', request)).toEqual({ markdown: '**0:02** Hello', transcript: { source: 'youtube', language: 'en' } });
 });
 
-it('bounds metadata downloads and rejects HTML responses', async () => {
-  const fetch = vi.fn(async () => new Response('x'.repeat(65537), { headers: { 'Content-Type': 'application/json' } }));
-  vi.stubGlobal('fetch', fetch);
-  await expect(captureBrowserArticle('https://youtu.be/jNQXAC9IVRw')).rejects.toThrow('download limit');
-  fetch.mockImplementation(async () => new Response('<p>Sign in</p>', { headers: { 'Content-Type': 'text/html' } }));
-  await expect(captureBrowserArticle('https://youtu.be/jNQXAC9IVRw')).rejects.toThrow('Video details');
+it('rejects failed downloads and malformed articles so the encrypted bookmark remains', async () => {
+  const request = vi.fn(async () => Response.json({ error: 'This article could not be downloaded.' }, { status: 422 }));
+  await expect(captureServerArticle('https://example.com/a', request)).rejects.toThrow('Article download unavailable.');
+  for (const article of [undefined, { markdown: 1 }, { markdown: '', title: 2 }, { markdown: '', transcript: { source: 'vimeo' } }]) {
+    request.mockImplementation(async () => Response.json({ article }));
+    await expect(captureServerArticle('https://example.com/a', request)).rejects.toThrow('Article download unavailable.');
+  }
 });

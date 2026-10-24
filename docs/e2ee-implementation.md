@@ -2,7 +2,7 @@
 
 Crate can encrypt synced content on the client before it reaches either a Cloudflare deployment or the self-hosted server. Encryption is opt-in, and enabling it converts existing remote data. Updating Crate alone does not enable encryption.
 
-**Reading:** article content, URLs, tags, highlights, browser storage and queued changes use a separate Reading folder key. Capture and extraction run on trusted clients. See [Reading encryption](reading-e2ee-assessment.md) for browser download restrictions, scope upgrades and sharing behavior.
+**Reading:** article content, URLs, tags, highlights, browser storage and queued changes use a separate Reading folder key. Obsidian extracts articles on the device. An unlocked web app asks the server to download a link without storing it, then encrypts the article itself. See [Reading encryption](reading-e2ee-assessment.md) for browser download restrictions, scope upgrades and sharing behavior.
 
 ## Enable and recover
 

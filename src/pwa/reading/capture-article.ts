@@ -1,25 +1,22 @@
-import { extractionUrl } from '@/reading/extraction/url';
 import type { CapturedArticle } from '@/reading/extraction/types';
 import { youtubeVideoId } from '@/reading/core/youtube';
-import { youtubeMetadata, youtubeMetadataUrl, YOUTUBE_METADATA_MAX_BYTES } from '@/reading/extraction/youtube';
-import { withYoutubeTranscript } from '@/reading/extraction/youtube-transcript';
-import { extractDocument } from '@/reading/extraction/document';
-/** Direct, credential-free download. CORS failures leave an encrypted bookmark
- * for an unlocked Obsidian device; URLs never go through the Crate server. */
-export async function captureBrowserArticle(source: string): Promise<CapturedArticle> {
-  const url = extractionUrl(source).href, videoId = youtubeVideoId(url);
-  const response = await fetch(videoId ? youtubeMetadataUrl(videoId) : url, { credentials: 'omit', referrerPolicy: 'no-referrer', mode: 'cors', signal: AbortSignal.timeout(15_000), ...(videoId ? { headers: { Accept: 'application/json' } } : {}) });
-  if (!response.ok || !(videoId ? /^application\/json\b/i : /^(text\/html|application\/xhtml\+xml)\b/i).test(response.headers.get('Content-Type') ?? '')) throw new Error(videoId ? 'Video details are unavailable.' : 'Article download unavailable.');
-  const reader = response.body?.getReader(); if (!reader) throw new Error('Article download unavailable.');
-  const chunks: Uint8Array[] = []; let length = 0;
-  try {
-    for (;;) { const { value, done } = await reader.read(); if (done) break; length += value.length; if (length > (videoId ? YOUTUBE_METADATA_MAX_BYTES : 2 * 1024 * 1024)) throw new Error('Reading content exceeds the download limit.'); chunks.push(value); }
-  } finally { await reader.cancel(); }
-  const bytes = new Uint8Array(length); let at = 0; for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.length; }
-  if (videoId) {
-    const article = youtubeMetadata(new TextDecoder().decode(bytes));
-    const captured = await withYoutubeTranscript(article, videoId, request => fetch(request));
-    return { ...captured, ...(!captured.markdown ? { deferTranscript: true as const } : {}) };
-  }
-  return extractDocument(new TextDecoder().decode(bytes), response.url || source);
+
+const text = (value: unknown) => value === undefined || typeof value === 'string';
+
+/** Browsers cannot read most sites across origins, so the server downloads the page
+ * without storing the link. The article is encrypted on this device before upload.
+ * A failure leaves an encrypted bookmark for an unlocked Obsidian device. */
+export async function captureServerArticle(url: string, request: (body: string) => Promise<Response>): Promise<CapturedArticle> {
+  const response = await request(JSON.stringify({ url }));
+  if (!response.ok) throw new Error('Article download unavailable.');
+  const article = ((await response.json()) as { article?: unknown }).article as Record<string, unknown> | undefined;
+  const transcript = article?.transcript as Record<string, unknown> | undefined;
+  if (!article || typeof article.markdown !== 'string' || ![article.title, article.author, article.faviconUrl].every(text)
+    || (transcript !== undefined && (transcript?.source !== 'youtube' || !text(transcript.language)))) throw new Error('Article download unavailable.');
+  const captured: CapturedArticle = { markdown: article.markdown,
+    ...(article.title ? { title: article.title as string } : {}), ...(article.author ? { author: article.author as string } : {}),
+    ...(article.faviconUrl ? { faviconUrl: article.faviconUrl as string } : {}),
+    ...(transcript ? { transcript: { source: 'youtube' as const, ...(transcript.language ? { language: transcript.language as string } : {}) } } : {}) };
+  // A video without captions stays open for Obsidian to fetch its transcript later.
+  return youtubeVideoId(url) && !captured.markdown ? { ...captured, deferTranscript: true } : captured;
 }

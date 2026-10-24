@@ -12,7 +12,7 @@ import { verifyReadingPlaintextTransition } from './pwa-reading-plaintext-transi
 
 const dataDir = await mkdtemp(join(tmpdir(), 'crate-reading-e2ee-'));
 let runtime, server, browser, loseReply = false, injectShell = false;
-const commits = [];
+const commits = [], extracts = [];
 try {
   const modulePath = join(dataDir, 'crypto.mjs');
   const compiled = await build({ stdin: { contents: `export * from './src/encryption/key-bundle'; export * from './src/encryption/server-state'; export * from './src/encryption/file-authority'; export * from './src/encryption/file-codec';  export * from './src/reading/core/notes'; export * from './src/sync/encryption/conversion'; export * from './src/sync/worker-api/http'; export * from './src/sync/worker-api/client';`, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', alias: { obsidian: join(process.cwd(), 'src/test/mocks/obsidian.ts') } });
@@ -35,6 +35,11 @@ try {
       const response = await runtime.mf.dispatchFetch(url, init);
       const html = (await response.text()).replace('</body>', '<script src="/notifications/csp-probe.js"></script><script>window.cspProbe=true</script><img src="/notifications/missing-probe" onerror="window.cspProbe=true"></body>');
       return new Response(html, response);
+    }
+    // The Worker integration test covers the real download; supply its result here.
+    if (pathname === '/reading/encrypted-extract') {
+      extracts.push(await new Response(init.body).text());
+      return Response.json({ article: { title: 'Private server extraction', markdown: '# Private server extraction\n\nThe article is downloaded by the server and encrypted on this device before its note is committed.' } }, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (pathname !== '/reading/encrypted-commit') return runtime.mf.dispatchFetch(url, init);
     const body = await new Response(init.body).text(); commits.push(body);
@@ -126,30 +131,15 @@ try {
     await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
   }
   const external = []; page.on('request', request => { if ((request.url() + (request.postData() ?? '')).includes(recovery)) recoverySent = true; if (new URL(request.url()).origin !== origin) external.push(request.url()); });
-  const articleHtml = '<!doctype html><html><head><title>Private browser extraction</title></head><body><article><h1>Private browser extraction</h1><p>A private article with enough original prose to verify trusted browser extraction without sending its source URL to the Crate server.</p><p>The complete article is converted to Markdown and encrypted before its note is committed.</p><img src="https://tracker.example.invalid/private-image"><iframe src="https://tracker.example.invalid/frame"></iframe></article></body></html>';
-  if (type === chromium) await page.route('https://capture.example.com/article-private', route => route.fulfill({ status: 200, contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: articleHtml }));
-  else {
-    // Playwright WebKit cannot reliably route requests from a controlled page.
-    // Supply only this external fixture at fetch; keep the real extractor,
-    // encrypted commits, service worker and all other requests unchanged.
-    await page.evaluate(html => {
-      const fetch = window.fetch.bind(window);
-      window.fetch = (input, init) => {
-        if (input === 'https://capture.example.com/article-private') {
-          if (init?.credentials !== 'omit' || init?.referrerPolicy !== 'no-referrer' || init?.mode !== 'cors') throw new Error('Unsafe article request');
-          return Promise.resolve(new Response(html, { headers: { 'Content-Type': 'text/html' } }));
-        }
-        return fetch(input, init);
-      };
-    }, articleHtml);
-  }
   await page.getByRole('button', { name: 'Save a link', exact: true }).click();
   await page.getByLabel('Link', { exact: true }).fill('https://capture.example.com/article-private');
   await page.getByRole('button', { name: 'Save link', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByText('Private browser extraction', { exact: true })).toBeVisible({ timeout: 20000 });
-  assert.ok(!external.some(url => url.includes('tracker.example')));
-  assert.ok(!commits.some(body => body.includes('article-private') || body.includes('Private browser extraction')));
+  await expect(page.getByText('Private server extraction', { exact: true })).toBeVisible({ timeout: 20000 });
+  // Only the server downloads the page; the link reaches it in a request body.
+  assert.deepEqual(extracts.map(body => JSON.parse(body)), [{ url: 'https://capture.example.com/article-private' }]);
+  assert.ok(!external.some(url => url.includes('capture.example.com')));
+  assert.ok(!commits.some(body => body.includes('article-private') || body.includes('Private server extraction')));
   await page.getByRole('button', { name: 'Open settings', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Encryption', exact: true }).locator('.settings-row').filter({ has: page.getByText('Reading', { exact: true }) }).getByText('Unlocked', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
@@ -188,7 +178,7 @@ try {
   assert.equal(recoverySent, false, 'Recovery key must never be sent to the server');
   assert.deepEqual(errors, []);
   assert.ok(!requests.some(request => request.body.includes('private-reading')));
-  console.log(`Reading plaintext-to-encrypted transition, encrypted enrollment, private cache, article access, browser extraction, locked Shortcut recovery, folder move with retained credentials,${type === chromium ? ' offline edits, exact replay after a lost reply,' : ''} and logout cleanup passed (${type.name()})`);
+  console.log(`Reading plaintext-to-encrypted transition, encrypted enrollment, private cache, article access, server extraction, locked Shortcut recovery, folder move with retained credentials,${type === chromium ? ' offline edits, exact replay after a lost reply,' : ''} and logout cleanup passed (${type.name()})`);
 } finally {
   await browser?.close();
   await new Promise(resolve => server ? server.close(resolve) : resolve());

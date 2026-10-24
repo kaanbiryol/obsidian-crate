@@ -471,8 +471,9 @@ HTML extraction lives in `src/reading/extraction/` and is shared with the Worker
 Generic article extraction uses inert parsing and disables extractor network requests.
 The YouTube-specific enrichment adapter grants bundled Defuddle bounded access
 to an allowlist of YouTube watch/player/caption endpoints; failed captions preserve
-video metadata. Encrypted PWA captures leave missing transcripts pending for a
-trusted Obsidian device. Plugin capture on desktop and mobile
+video metadata. Encrypted PWA captures ask the Worker's stateless
+`POST /reading/encrypted-extract` route to download the page, then encrypt the
+result on the device; missing transcripts stay pending for a trusted Obsidian device. Plugin capture on desktop and mobile
 loads it on demand; all executable code is bundled with the plugin. Unencrypted
 PWA captures retain the durable server queue. Previously queued desktop
 server captures still drain through their original path.

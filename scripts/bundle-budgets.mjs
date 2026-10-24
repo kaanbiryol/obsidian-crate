@@ -22,8 +22,10 @@ export const bundleBudgets = {
 		// The 2026-10 performance pass measures 5.632 MB raw / 2.831 MB gzip.
 		// Quantized PWA icons bring it to 5.292 MB raw / 2.587 MB gzip.
 		// 2026-10 dependency updates measure 5.361 MB raw / 2.625 MB gzip; retain about 1% margin.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5420000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2650000', 10),
+		// Server-side extraction for encrypted Reading drops Defuddle from the embedded PWA:
+		// 4.922 MB raw / 2.292 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '4972000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2316000', 10),
 	},
 	{
 		path: 'dist/styles.css',
@@ -51,16 +53,19 @@ export const bundleBudgets = {
 		// The 2026-10 performance pass measures 5.417 MB raw / 1.849 MB gzip.
 		// Quantized PWA icons bring it to 5.105 MB raw / 1.614 MB gzip.
 		// 2026-10 dependency updates measure 5.135 MB raw / 1.629 MB gzip; retain about 1% margin.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5185000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1645000', 10),
+		// Server-side extraction for encrypted Reading drops Defuddle from the embedded PWA:
+		// 4.043 MB raw / 1.294 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '4085000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1307000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
 		// Includes React DOM, shared controls and encryption bootstrap: 355 KB raw / 112 KB gzip.
 		// Loading every feature at startup measures 2.192 MB raw / 695.7 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '2250000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '720000', 10),
+		// Server-side extraction for encrypted Reading removes Defuddle: 1.143 MB raw / 372.5 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '1160000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '380000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
@@ -79,8 +84,9 @@ export const bundleBudgets = {
 		// loading states: 967.7 KB raw / 326.1 KB gzip.
 		// Loading every feature at startup, including encryption and article extraction,
 		// makes startup equal to all assets: 2.912 MB raw / 936.1 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '3000000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '990000', 10),
+		// Server-side extraction for encrypted Reading removes Defuddle: 1.864 MB raw / 613.0 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1890000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '622000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
@@ -94,7 +100,8 @@ export const bundleBudgets = {
 		// 0.6.0 transcript playback and shared UI: 2.897 MB raw / 951.1 KB gzip.
 		// Raised to 3 MB raw / 990 KB gzip after the 2026-10 performance pass
 		// measured 2.916 MB raw / 960.1 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '3000000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '990000', 10),
+		// Server-side extraction for encrypted Reading removes Defuddle: 1.864 MB raw / 613.0 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1890000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '622000', 10),
 	}],
 };
