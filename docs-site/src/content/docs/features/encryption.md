@@ -29,7 +29,7 @@ An empty server starts encrypted without uploading local files. Unsynced local c
 2. On an unlocked Obsidian device, open **Settings → Crate → Sync → Manage encryption → Connect web app** and select **Connect**.
 3. Compare all three groups of numbers on both screens. Select **Approve** in Obsidian only if they match, then **Confirm and unlock** in the web app after checking the same code.
 
-This transfers the keys for the connected Reading and Reminders folders without copying your recovery key. Existing drafts and queued changes are kept. If an unlocked Obsidian device is unavailable, select **Use recovery key instead**.
+This transfers your vault keys, which unlock both Reading and Reminders, without copying your recovery key. Existing drafts and queued changes are kept. If an unlocked Obsidian device is unavailable, select **Use recovery key instead**.
 
 Safari and the installed iPhone app have separate key storage. Open the Home Screen app after installation and complete the same pairing flow if it asks to unlock.
 

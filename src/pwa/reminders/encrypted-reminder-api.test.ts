@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { addReminderScope, createVaultKeyBundle } from '@/encryption/key-bundle';
+import { createVaultKeyBundle } from '@/encryption/key-bundle';
 import { encryptJson, importEncryptionSecret } from '@/encryption/envelope';
 import { sha256Hex } from '@/platform/sha256';
 import { importNotificationFingerprintKey } from '@/encryption/reminder-projection';
+import { importSealPrivateKey } from '@/encryption/seal-key';
 import { EncryptedReminderApi } from './encrypted-reminder-api';
 import { invalidatePwaSession } from '../session-generation';
-import type { StoredReminderKeys } from '../encryption/encryption-keys';
+import type { FeatureKeys } from '../encryption/encryption-keys';
 import { openFile, sealFile } from '@/encryption/file-codec';
 import type { ReminderRecord } from './types';
 
@@ -15,19 +16,20 @@ vi.mock('./encrypted-reminder-attempts', () => ({
   saveEncryptedReminderAttempt: async (id: string, value: unknown) => { attempts.set(id, value); },
 }));
 
-let keys: StoredReminderKeys;
+let keys: FeatureKeys;
 beforeEach(async () => {
   attempts.clear();
   vi.stubGlobal('localStorage', { getItem: () => 'session-token' });
   vi.stubGlobal('navigator', {});
-  const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders'), scope = bundle.scopes[0]!;
-  keys = { version: 1, vaultId: bundle.vaultId, scopeId: scope.id, folderPath: scope.folderPath,
-    generation: bundle.generation, data: await importEncryptionSecret(scope.data),
-    notifications: await importEncryptionSecret(scope.notifications),
-    notificationFingerprint: await importNotificationFingerprintKey(bundle.vaultId, scope), localState: 'unused' };
+  const bundle = await createVaultKeyBundle();
+  keys = { version: 1, vaultId: bundle.vaultId, folderPath: 'Reminders',
+    generation: bundle.generation, vault: await importEncryptionSecret(bundle.vault),
+    notifications: await importEncryptionSecret(bundle.notifications),
+    notificationFingerprint: await importNotificationFingerprintKey(bundle.vaultId, bundle.notifications),
+    seal: { keyId: bundle.seal.id, publicKey: bundle.seal.publicKey, privateKey: await importSealPrivateKey(bundle.seal) }, localState: 'unused' };
 });
 afterEach(() => vi.unstubAllGlobals());
-const etag = (sequence: number) => `"e2ee-${keys.vaultId}-${keys.scopeId}-${keys.generation}-${sequence}"`;
+const etag = (sequence: number) => `"e2ee-${keys.vaultId}-${keys.generation}-${sequence}"`;
 const page = (sequence: number, nextCursor: string | null = null) => ({ files: [], sequence, generation: keys.generation, nextCursor });
 
 it('checks only the first inventory page when a complete cached snapshot is unchanged', async () => {
@@ -104,7 +106,7 @@ it('retains bounded retries when a sequence changes between pages', async () => 
 });
 
 it('publishes decrypted cache entries only after the complete inventory is confirmed', async () => {
-  const path = 'Reminders/Inbox.md', authority = { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data };
+  const path = 'Reminders/Inbox.md', authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
   const seal = (text: string) => sealFile({ path, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority);
   const original = await seal('- [ ] Original <!-- crate-id:task -->\n'), changed = await seal('- [ ] Changed <!-- crate-id:task -->\n');
   const inventory = (sealed: typeof original) => ({ ...page(7), files: [{ path, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }] });
@@ -125,34 +127,29 @@ it('publishes decrypted cache entries only after the complete inventory is confi
   expect(fetch.mock.calls.filter(([route]) => route.startsWith('/reminders/encrypted-file?'))).toHaveLength(1);
 });
 
-it('preserves queued semantic revisions across a folder rename while committing to the new path', async () => {
+it('commits a semantic revision to the listed note sealed with the vault key', async () => {
   const text = '- [ ] Queued task <!-- crate-id:task -->\n';
-  const authority = { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data };
-  let livePath = 'Reminders/Inbox.md';
-  let sealed = await sealFile({ path: livePath, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority);
-  let generation = keys.generation;
+  const authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
+  const livePath = 'Reminders/Inbox.md';
+  const sealed = await sealFile({ path: livePath, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority);
   const commits: Array<{ files: Array<{ path: string; content: string }> }> = [];
   const fetch = async (path: string, init?: RequestInit) => {
-    if (path.startsWith('/reminders/encrypted-files?')) return Response.json({ files: [{ path: livePath, hash: sealed.hash, size: sealed.bytes.length, revision: 'live' }], sequence: 1, generation, nextCursor: null });
+    if (path.startsWith('/reminders/encrypted-files?')) return Response.json({ files: [{ path: livePath, hash: sealed.hash, size: sealed.bytes.length, revision: 'live' }], sequence: 1, generation: keys.generation, nextCursor: null });
     if (path.startsWith('/reminders/encrypted-file?')) return new Response(sealed.bytes);
     if (path.startsWith('/reminders/encrypted-receipt?')) return Response.json({ envelope: null });
     const body = JSON.parse(init!.body as string) as { acknowledgment: string; files: Array<{ path: string; content: string }> }; commits.push(body);
     return Response.json({ encrypted: body.acknowledgment });
   };
-  const original = await (await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: ReminderRecord[] };
+  const api = new EncryptedReminderApi(keys, fetch);
+  const original = await (await api.handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: ReminderRecord[] };
   const reminder = original.reminders[0]!;
   expect(reminder).toBeDefined();
-  livePath = 'Work/Tasks/Inbox.md'; generation++;
-  sealed = await sealFile({ path: livePath, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority);
-  const moved = new EncryptedReminderApi({ ...keys, generation, folderPath: 'Work/Tasks', localFolderPath: 'Reminders' }, fetch);
-  const listed = await (await moved.handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: ReminderRecord[] };
-  expect(listed.reminders[0]!.revision).toBe(reminder.revision);
-  const response = await moved.handle('/reminders/set-completed', { method: 'POST', body: JSON.stringify({
+  const response = await api.handle('/reminders/set-completed', { method: 'POST', body: JSON.stringify({
     operationId: crypto.randomUUID(), folderPath: 'Reminders', id: reminder.id, filePath: reminder.filePath,
     expectedRevision: reminder.revision, completed: true,
   }) });
   expect(response!.status).toBe(200);
-  expect((await response!.json() as { reminder: ReminderRecord }).reminder.filePath).toBe('Reminders/Inbox.md');
+  expect((await response!.json() as { reminder: ReminderRecord }).reminder.filePath).toBe(livePath);
   expect(commits).toHaveLength(1);
   expect(commits[0]!.files[0]!.path).toBe(livePath);
   const opened = await openFile(new TextEncoder().encode(commits[0]!.files[0]!.content), livePath, authority);
@@ -160,7 +157,7 @@ it('preserves queued semantic revisions across a folder rename while committing 
 });
 
 it('downloads only changed notes even when the folder exceeds the content cache', async () => {
-  const authority = { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data };
+  const authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
   const count = 1050;
   const notes = await Promise.all(Array.from({ length: count }, async (_, index) => {
     const path = `Reminders/N${String(index).padStart(4, '0')}.md`;
@@ -188,7 +185,7 @@ it('downloads only changed notes even when the folder exceeds the content cache'
 }, 60_000);
 
 it('downloads cold notes with bounded concurrency while keeping note order and issues', async () => {
-  const authority = { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data };
+  const authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
   const notes = await Promise.all(Array.from({ length: 20 }, async (_, index) => {
     const path = `Reminders/N${String(index).padStart(2, '0')}.md`;
     const content = index === 3 ? new Uint8Array([0xff, 0xfe, 0xfd]) : new TextEncoder().encode(`- [ ] Task ${index} <!-- crate-id:t${index} -->\n`);
@@ -246,7 +243,7 @@ it('rejects a title that would hide the reminder as invalid input without saving
 });
 
 it('keeps an unresolved encrypted save from being replaced by different content', async () => {
-  attempts.set(`${keys.vaultId}:${keys.scopeId}:${operationId}`, { semanticHash: 'different', generation: keys.generation, body: '{}' });
+  attempts.set(`${keys.vaultId}:vault:${operationId}`, { semanticHash: 'different', generation: keys.generation, body: '{}' });
   const fetch = vi.fn();
   await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/update', { method: 'POST', body: updateBody() }))
     .rejects.toThrow('original encrypted save is still unresolved');
@@ -255,8 +252,8 @@ it('keeps an unresolved encrypted save from being replaced by different content'
 
 it('answers a retried save from its encrypted acknowledgment without contacting the server', async () => {
   const body = updateBody();
-  const acknowledgment = await encryptJson({ reminder: { id: 'one' } }, keys.data, { vaultId: keys.vaultId, scopeId: keys.scopeId, objectId: operationId, purpose: 'reminder' });
-  attempts.set(`${keys.vaultId}:${keys.scopeId}:${operationId}`, { semanticHash: await semanticHash('update', body), generation: keys.generation, body: '{}', acknowledgment });
+  const acknowledgment = await encryptJson({ reminder: { id: 'one' } }, keys.vault, { vaultId: keys.vaultId, scopeId: 'vault', objectId: operationId, purpose: 'reminder' });
+  attempts.set(`${keys.vaultId}:vault:${operationId}`, { semanticHash: await semanticHash('update', body), generation: keys.generation, body: '{}', acknowledgment });
   const fetch = vi.fn();
   const response = await new EncryptedReminderApi(keys, fetch).handle('/reminders/update', { method: 'POST', body });
   expect(await response?.json()).toEqual({ reminder: { id: 'one' } });

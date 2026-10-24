@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
 
 /** Native IndexedDB transactions and Web Locks, using the production storage code. */
-export async function verifyEncryptedAttemptCleanup(page, grant, serverDay) {
-	const result = await page.evaluate(async ({ grant, serverDay }) => {
+export async function verifyEncryptedAttemptCleanup(page, vaultId, serverDay) {
+	const result = await page.evaluate(async ({ vaultId, serverDay }) => {
 		const t = window.crateEncryptionTest;
-		const scope = grant;
-		const keys = await t.readReminderKeys(scope.vaultId, scope.scope.id);
-		t.unlockPrivateStorage(await t.unlockLocalState(keys), keys.folderPath, localStorage, sessionStorage);
-		const prefix = `${keys.vaultId}:${keys.scopeId}:`;
+		const keys = { ...await t.readVaultKeys(vaultId), folderPath: 'Reminders' };
+		t.unlockPrivateStorage(await t.unlockLocalState(keys, 'reminders'), keys.folderPath, localStorage, sessionStorage);
+		const prefix = `${keys.vaultId}:vault:`;
 		const old = serverDay - 180;
 		const operation = (label, day = old) => `e1_${String(day).padStart(8, '0')}_${label.padEnd(20, '_')}`;
 		const ids = Object.fromEntries(['settled', 'pending', 'uncertain', 'rejected', 'damaged', 'future', 'boundary'].map(label => [label, operation(label, label === 'boundary' ? serverDay - 179 : old)]));
@@ -18,7 +17,7 @@ export async function verifyEncryptedAttemptCleanup(page, grant, serverDay) {
 					: label === 'future' ? { ...attempt, futureField: true } : attempt;
 			await t.saveEncryptedReminderAttempt(prefix + id, value, undefined, () => true);
 		}
-		const other = `${keys.vaultId}:other-scope:${operation('other')}`;
+		const other = `other-vault:vault:${operation('other')}`;
 		await t.saveEncryptedReminderAttempt(other, attempt, undefined, () => true);
 		const db = await new Promise((resolve, reject) => { const request = indexedDB.open('crate-encrypted-reminder-attempts'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
 		const corrupt = db.transaction('attempts', 'readwrite'); corrupt.objectStore('attempts').put('damaged original bytes', prefix + ids.damaged);
@@ -41,8 +40,8 @@ export async function verifyEncryptedAttemptCleanup(page, grant, serverDay) {
 		// Removing the final queue reference makes the acknowledged, expired record collectible.
 		localStorage.removeItem(pendingKey); await prune(() => true);
 		remaining.pendingAfterSettlement = await readRaw(prefix + ids.pending) !== undefined;
-		const isolated = { ...keys, scopeId: 'cleanup-transaction-test' };
-		const batchPrefix = `${keys.vaultId}:${isolated.scopeId}:`;
+		const isolated = { ...keys, vaultId: 'cleanup-transaction-test' };
+		const batchPrefix = `${isolated.vaultId}:vault:`;
 		const batch = Array.from({ length: 103 }, (_, index) => batchPrefix + operation(`batch${String(index).padStart(3, '0')}`));
 		for (const key of batch) await t.saveEncryptedReminderAttempt(key, attempt, undefined, () => true);
 		let checks = 0;
@@ -57,6 +56,6 @@ export async function verifyEncryptedAttemptCleanup(page, grant, serverDay) {
 		tx.objectStore('attempts').delete(other);
 		await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onabort = reject; }); db.close();
 		return remaining;
-	}, { grant, serverDay });
+	}, { vaultId, serverDay });
 	assert.deepEqual(result, { settled: false, pending: true, uncertain: true, rejected: true, damaged: true, future: true, boundary: true, other: true, pendingAfterSettlement: false });
 }

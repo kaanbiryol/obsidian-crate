@@ -6,13 +6,12 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
-import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
-import { createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
+import type { EncryptionServerState } from '../../../encryption/server-state';
 import { readEncryptionState } from './state';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { handleUpload } from '../sync/file-handlers';
 import { getStoredFileRow } from '../sync/storage';
-import { FileKeyAuthority } from '../../../encryption/file-authority';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
@@ -23,9 +22,8 @@ const id = 'reset-operation', nextToken = 'b'.repeat(64);
 let state: EncryptionServerState;
 beforeEach(async () => {
 	await applySchema(env.DB);
-	const bundle = createVaultKeyBundle();
-	state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' };
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('e2ee:state', ?)").bind(JSON.stringify(state)).run();
+	state = (await createEncryptionFixture('active')).state;
+	await storeEncryptionState(env.DB, state);
 	for (const [token, scope] of [['original', 'vault'], ['other', 'vault'], ['web', 'reminders']]) {
 		await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope, folder_path) VALUES (?, ?, ?, 'Reminders')").bind(token!, await sha256Hex(token!), scope!).run();
 	}
@@ -101,10 +99,10 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 });
 
 it('rejects an encrypted upload authorized before reset, even if staging starts after completion', async () => {
-	const bundle = createVaultKeyBundle();
-	state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' };
+	const fixture = await createEncryptionFixture('active');
+	state = fixture.state;
 	await env.DB.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify(state)).run();
-	const keys = await FileKeyAuthority.fromVault(bundle);
+	const { keys } = fixture;
 	const content = await sealFile({ path: 'late.md', content: new TextEncoder().encode('old secret'), contentType: 'text/markdown', publicData: null }, keys.forPath('late.md'));
 	const upload = () => new Request('https://test/sync/upload?path=late.md', { method: 'PUT', body: content.bytes, headers: {
 		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-Crate-Expected-Hash': 'absent',

@@ -2,8 +2,7 @@ import { scanReminderMarkdownContent } from '../reminders/core/markdownScan';
 import { decodeMarkdownBytes } from '../reminders/core/markdownEncoding';
 import { readableLinkText } from '../reminders/core/grammar/markdownLinks';
 import { MAX_REMINDER_NOTE_BYTES, MAX_REMINDERS_PER_NOTE } from '../reminders/core/constants';
-import { decryptJson, encryptJson, importEncryptionSecret, type EncryptionKey } from './envelope';
-import type { ReminderKeyGrant, VaultKeyBundle, ScopeKeys } from './key-bundle';
+import { decryptJson, encryptJson, importEncryptionSecret, type EncryptionKey, type EncryptionSecret } from './envelope';
 import { validateEncryptedNotification, type EncryptedNotification, type EncryptedSchedules } from './notification-format';
 import { decodeBase64Url, encodeBase64Url } from './encoding';
 import { MAX_ENCRYPTED_PUBLIC_DATA_BYTES } from './file-format';
@@ -25,32 +24,21 @@ function trimDisplay(value: string, budget: number): string {
 	return result + '…';
 }
 
-/** Publish only the current occurrence; recurrence advances on client completion.
- * Invalid Markdown preserves the server's existing schedules via quarantine. */
-export async function createReminderProjection(bundle: VaultKeyBundle | ReminderKeyGrant, path: string, bytes: ArrayBuffer): Promise<EncryptedSchedules | null> {
-	const scopes = 'scopes' in bundle ? bundle.scopes : [bundle.scope];
-	const scope = scopes.filter(scope => path.startsWith(`${scope.folderPath}/`))
-		.sort((left, right) => right.folderPath.length - left.folderPath.length)[0];
-	if (!scope || scope.purpose === 'reading' || !path.toLowerCase().endsWith('.md')) return null;
-	let keys = projectionKeys.get(scope);
-	if (!keys) {
-		keys = Promise.all([importEncryptionSecret(scope.notifications), importNotificationFingerprintKey(bundle.vaultId, scope)]);
-		projectionKeys.set(scope, keys);
-		keys.catch(() => projectionKeys.delete(scope));
-	}
-	const [key, fingerprintKey] = await keys;
-	return createReminderProjectionWithKeys(bundle.vaultId, scope, key, fingerprintKey, path, bytes);
+/** Notification keys share the vault-level `'vault'` scope used by every envelope. */
+const NOTIFICATION_SCOPE = 'vault';
+
+export interface NotificationKeys { vaultId: string; key: EncryptionKey; fingerprint: CryptoKey }
+
+export async function importNotificationKeys(vaultId: string, secret: EncryptionSecret): Promise<NotificationKeys> {
+	return { vaultId, key: await importEncryptionSecret(secret), fingerprint: await importNotificationFingerprintKey(vaultId, secret) };
 }
 
-/** Bundles are immutable, so each scope's imported keys serve every file it projects. */
-const projectionKeys = new WeakMap<ScopeKeys, Promise<[EncryptionKey, CryptoKey]>>();
-
-export async function importNotificationFingerprintKey(vaultId: string, scope: ScopeKeys): Promise<CryptoKey> {
-	const raw = decodeBase64Url(scope.notifications.secret, 32);
+export async function importNotificationFingerprintKey(vaultId: string, secret: EncryptionSecret): Promise<CryptoKey> {
+	const raw = decodeBase64Url(secret.secret, 32);
 	const material = await crypto.subtle.importKey('raw', raw, 'HKDF', false, ['deriveKey']);
 	raw.fill(0);
 	return crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256',
-		salt: new TextEncoder().encode(vaultId), info: new TextEncoder().encode(`crate-e2ee-v1/notification-fingerprint/${scope.id}`) },
+		salt: new TextEncoder().encode(vaultId), info: new TextEncoder().encode(`crate-e2ee-v1/notification-fingerprint/${NOTIFICATION_SCOPE}`) },
 		material, { name: 'HMAC', hash: 'SHA-256', length: 256 }, false, ['sign']);
 }
 
@@ -61,9 +49,9 @@ const MAX_CACHED_ENVELOPES = 4096;
  * identical display text reveals nothing new and skips re-encrypting it. */
 const notificationEnvelopes = new WeakMap<EncryptionKey, Map<string, string>>();
 
-async function sealNotification(vaultId: string, scopeId: string, key: EncryptionKey, fingerprintKey: CryptoKey,
+async function sealNotification(vaultId: string, key: EncryptionKey, fingerprintKey: CryptoKey,
 	reminder: { id: string; content: string; project: string }): Promise<EncryptedNotification> {
-	const notice: EncryptedNotification = { version: 1, vaultId, scopeId,
+	const notice: EncryptedNotification = { version: 1, vaultId, scopeId: NOTIFICATION_SCOPE,
 		keyId: key.id, reminderId: reminder.id, fingerprint: '', envelope: '' };
 	const display = { title: trimDisplay(readableLinkText(reminder.content), 800),
 		body: trimDisplay(readableLinkText(reminder.project), 160) };
@@ -72,7 +60,7 @@ async function sealNotification(vaultId: string, scopeId: string, key: Encryptio
 		new TextEncoder().encode(JSON.stringify([reminder.id, display])))));
 	let envelopes = notificationEnvelopes.get(key);
 	if (!envelopes) notificationEnvelopes.set(key, envelopes = new Map<string, string>());
-	const cacheKey = JSON.stringify([vaultId, scopeId, reminder.id, notice.fingerprint]);
+	const cacheKey = JSON.stringify([vaultId, reminder.id, notice.fingerprint]);
 	const cached = envelopes.get(cacheKey);
 	if (cached !== undefined) {
 		envelopes.delete(cacheKey);
@@ -86,19 +74,22 @@ async function sealNotification(vaultId: string, scopeId: string, key: Encryptio
 	return notice;
 }
 
-export async function createReminderProjectionWithKeys(vaultId: string, scope: Pick<ScopeKeys, 'id' | 'folderPath'>,
-	key: EncryptionKey, fingerprintKey: CryptoKey, path: string, bytes: ArrayBuffer): Promise<EncryptedSchedules | null> {
-	if (!path.startsWith(`${scope.folderPath}/`) || !path.toLowerCase().endsWith('.md')) return null;
+/** Publish only the current occurrence; recurrence advances on client completion.
+ * Only notes inside a reminders folder carry schedules. Invalid Markdown
+ * preserves the server's existing schedules via quarantine. */
+export async function createReminderProjection(keys: NotificationKeys, folders: readonly string[], path: string, bytes: ArrayBuffer): Promise<EncryptedSchedules | null> {
+	const folder = folders.filter(folder => folder && path.startsWith(`${folder}/`)).sort((left, right) => right.length - left.length)[0];
+	if (!folder || !path.toLowerCase().endsWith('.md')) return null;
 	if (bytes.byteLength > MAX_REMINDER_NOTE_BYTES) return { version: 1, reminders: [], issue: 'size' };
 	let scanned;
-	try { scanned = scanReminderMarkdownContent(path, decodeMarkdownBytes(bytes), scope.folderPath).reminders; }
+	try { scanned = scanReminderMarkdownContent(path, decodeMarkdownBytes(bytes), folder).reminders; }
 	catch { return { version: 1, reminders: [], issue: 'invalid-reminders' }; }
 	if (scanned.length > MAX_REMINDERS_PER_NOTE) return { version: 1, reminders: [], issue: 'scheduling-capacity' };
 	const reminders: EncryptedSchedules['reminders'] = [];
 	let projectionBytes = new TextEncoder().encode(JSON.stringify({ version: 1, reminders: [] })).byteLength;
 	for (let offset = 0; offset < scanned.length; offset += NOTIFICATION_CONCURRENCY) {
 		const chunk = scanned.slice(offset, offset + NOTIFICATION_CONCURRENCY);
-		const notices = await Promise.all(chunk.map(reminder => sealNotification(vaultId, scope.id, key, fingerprintKey, reminder)));
+		const notices = await Promise.all(chunk.map(reminder => sealNotification(keys.vaultId, keys.key, keys.fingerprint, reminder)));
 		for (const [index, reminder] of chunk.entries()) {
 			const schedule = { id: reminder.id, completed: reminder.completed,
 				...(reminder.dueDate ? { dueDate: reminder.dueDate } : {}),
@@ -113,9 +104,9 @@ export async function createReminderProjectionWithKeys(vaultId: string, scope: P
 	return { version: 1, reminders };
 }
 
-export async function openNotification(notice: EncryptedNotification, key: EncryptionKey, vaultId: string, scopeId: string): Promise<{ title: string; body: string }> {
+export async function openNotification(notice: EncryptedNotification, key: EncryptionKey, vaultId: string): Promise<{ title: string; body: string }> {
 	validateEncryptedNotification(notice);
-	if (notice.vaultId !== vaultId || notice.scopeId !== scopeId || notice.keyId !== key.id) throw new Error('Notification belongs to another enrollment');
+	if (notice.vaultId !== vaultId || notice.scopeId !== NOTIFICATION_SCOPE || notice.keyId !== key.id) throw new Error('Notification belongs to another enrollment');
 	const display = await decryptJson(notice.envelope, key, context(notice));
 	if (!display || typeof display !== 'object' || !('title' in display) || !('body' in display)
 		|| typeof display.title !== 'string' || typeof display.body !== 'string') throw new Error('Invalid encrypted notification display');

@@ -8,7 +8,6 @@ import { shouldIgnoreSyncPath, createIgnoreMatcherContext } from '../sync/local/
 import { ReadingLibrary } from './data/library';
 import { createObsidianReadingVault } from './obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
-import { SECRET_KEYS } from '../platform/secret-keys';
 
 export const READING_VIEW_TYPE = 'crate-reading';
 
@@ -47,7 +46,7 @@ export function validateReadingConfiguration(plugin: CratePlugin, settings: Read
 
 export function startReading(plugin: CratePlugin): void {
 	stopReading(plugin);
-	if (!plugin.settings.reading.enabled || plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) return;
+	if (!plugin.settings.reading.enabled) return;
 	const lifetime = getPluginLifecycleSignal(plugin);
 	lifetime.throwIfAborted();
 	const folder = validateReadingConfiguration(plugin, plugin.settings.reading);

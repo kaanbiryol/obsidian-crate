@@ -1,29 +1,16 @@
 import { decodeBase64Url, encodeBase64Url, isEncryptionId } from './encoding';
 import { decryptJson, encryptJson, generateEncryptionSecret, importEncryptionSecret, type EncryptionSecret } from './envelope';
-
-export interface ScopeKeys {
-	purpose?: 'reading';
-	/** Changes only when selecting a different folder, never for a filesystem move. */
-	accessId?: string;
-	id: string;
-	folderPath: string;
-	data: EncryptionSecret;
-	notifications: EncryptionSecret;
-}
+import { generateSealKeyPair, validateSealKeyPair, type SealKeyPair } from './seal-key';
 
 export interface VaultKeyBundle {
 	version: 1;
 	vaultId: string;
 	generation: number;
+	/** Encrypts every file, setting and receipt in the vault. */
 	vault: EncryptionSecret;
-	scopes: ScopeKeys[];
-}
-
-export interface ReminderKeyGrant {
-	version: 1;
-	vaultId: string;
-	generation: number;
-	scope: ScopeKeys;
+	/** Encrypts push notification text so the service worker can show it. */
+	notifications: EncryptionSecret;
+	seal: SealKeyPair;
 }
 
 export interface RecoveryEnvelope {
@@ -32,51 +19,12 @@ export interface RecoveryEnvelope {
 	envelope: string;
 }
 
-export function createVaultKeyBundle(): VaultKeyBundle {
-	return { version: 1, vaultId: crypto.randomUUID(), generation: 1, vault: generateEncryptionSecret(), scopes: [] };
-}
-
-export function addReminderScope(bundle: VaultKeyBundle, folderPath: string, purpose?: 'reading'): VaultKeyBundle {
-	validateVaultKeyBundle(bundle);
-	if (!isEncryptionFolderPath(folderPath)) throw new Error('Invalid reminders folder');
-	const existing = bundle.scopes.find(scope => scope.folderPath === folderPath);
-	if (existing) { if (existing.purpose !== purpose) throw new Error('Reading and reminders require separate encrypted folders'); return bundle; }
-	if (bundle.scopes.some(scope => scope.folderPath.startsWith(folderPath + '/') || folderPath.startsWith(scope.folderPath + '/'))) throw new Error('Encrypted reminders folders must not overlap. Revoke overlapping folder enrollments before enabling encryption.');
-	if (bundle.scopes.length >= 128) throw new Error('Too many encryption scopes');
-	return { ...bundle, generation: bundle.generation + 1, scopes: [...bundle.scopes, {
-		id: crypto.randomUUID(), folderPath, ...(purpose ? { purpose } : {}), data: generateEncryptionSecret(), notifications: generateEncryptionSecret(),
-	}] };
-}
-
-/** Retain key identities when an enrolled folder or one of its parents moves. */
-export function moveEncryptionScopes(bundle: VaultKeyBundle, from: string, to: string, accessId?: string): VaultKeyBundle {
-	validateVaultKeyBundle(bundle);
-	if (!isEncryptionFolderPath(from) || !isEncryptionFolderPath(to)) throw new Error('Choose valid folder paths');
-	const scopes = bundle.scopes.map(scope => scope.folderPath === from || scope.folderPath.startsWith(from + '/')
-		? { ...scope, folderPath: to + scope.folderPath.slice(from.length), ...(accessId ? { accessId } : {}) } : scope);
-	if (scopes.every((scope, index) => scope.folderPath === bundle.scopes[index]!.folderPath)) return bundle;
-	const next = { ...bundle, generation: bundle.generation + 1, scopes };
-	validateVaultKeyBundle(next);
-	return next;
-}
-
-/** Copy only the folder keys needed by a browser feature. */
-export function createReminderKeyGrant(bundle: VaultKeyBundle, folderPath: string): ReminderKeyGrant {
-	validateVaultKeyBundle(bundle);
-	const scope = bundle.scopes.find(candidate => candidate.folderPath === folderPath);
-	if (!scope) throw new Error('No encryption keys for this reminders folder');
-	return { version: 1, vaultId: bundle.vaultId, generation: bundle.generation,
-		scope: { id: scope.id, folderPath: scope.folderPath, ...(scope.accessId ? { accessId: scope.accessId } : {}), ...(scope.purpose ? { purpose: scope.purpose } : {}), data: { ...scope.data }, notifications: { ...scope.notifications } } };
+export async function createVaultKeyBundle(): Promise<VaultKeyBundle> {
+	return { version: 1, vaultId: crypto.randomUUID(), generation: 1, vault: generateEncryptionSecret(), notifications: generateEncryptionSecret(), seal: await generateSealKeyPair() };
 }
 
 function record(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-export function isEncryptionFolderPath(value: unknown): value is string {
-	return typeof value === 'string' && value.length > 0 && value.length <= 1024
-		&& !value.includes('\\') && !Array.from(value).some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
-		&& value.split('/').every(part => part.trim().length > 0 && part !== '.' && part !== '..');
 }
 
 function validateSecret(value: unknown): asserts value is EncryptionSecret {
@@ -85,60 +33,24 @@ function validateSecret(value: unknown): asserts value is EncryptionSecret {
 		|| decodeBase64Url(value.secret, 32).length !== 32) throw new Error('Invalid encryption key bundle');
 }
 
-function validateScope(value: unknown): asserts value is ScopeKeys {
-	if (!record(value) || !isEncryptionId(value.id) || !isEncryptionFolderPath(value.folderPath)) throw new Error('Invalid encryption scope');
-	if (Object.keys(value).some(key => !['id', 'folderPath', 'purpose', 'accessId', 'data', 'notifications'].includes(key))) throw new Error('Unexpected encryption scope field');
-	if (value.accessId !== undefined && !isEncryptionId(value.accessId)) throw new Error('Invalid folder access identity');
-	if (value.purpose !== undefined && value.purpose !== 'reading') throw new Error('Invalid encryption scope purpose');
-	validateSecret(value.data);
-	validateSecret(value.notifications);
-	if (value.data.id === value.notifications.id || value.data.secret === value.notifications.secret) throw new Error('Encryption scopes must use separate notification keys');
-}
-
-function validateBundleHeader(value: unknown): asserts value is Record<string, unknown> & { version: 1; vaultId: string; generation: number } {
+export function validateVaultKeyBundle(value: unknown): asserts value is VaultKeyBundle {
 	if (!record(value) || value.version !== 1 || !isEncryptionId(value.vaultId)
 		|| typeof value.generation !== 'number' || !Number.isSafeInteger(value.generation) || value.generation < 1) {
 		throw new Error('Unsupported or damaged encryption key bundle');
 	}
-}
-
-export function validateReminderKeyGrant(value: unknown): asserts value is ReminderKeyGrant {
-	validateBundleHeader(value);
-	if (Object.keys(value).some(key => !['version', 'vaultId', 'generation', 'scope'].includes(key))) throw new Error('Unexpected key material in reminders grant');
-	validateScope(value.scope);
-}
-
-export function validateVaultKeyBundle(value: unknown): asserts value is VaultKeyBundle {
-	validateBundleHeader(value);
-	if (Object.keys(value).some(key => !['version', 'vaultId', 'generation', 'vault', 'scopes'].includes(key))) throw new Error('Unexpected encryption key bundle field');
+	if (Object.keys(value).some(key => !['version', 'vaultId', 'generation', 'vault', 'notifications', 'seal'].includes(key))) throw new Error('Unexpected encryption key bundle field');
 	validateSecret(value.vault);
-	if (!Array.isArray(value.scopes) || value.scopes.length > 128) throw new Error('Invalid encryption scopes');
-	const ids = new Set([value.vault.id]);
-	const secrets = new Set([value.vault.secret]);
-	const folders = new Set<string>();
-	for (const scope of value.scopes) {
-		validateScope(scope);
-		if (ids.has(scope.id) || folders.has(scope.folderPath)) throw new Error('Duplicate encryption scope');
-		if ([...folders].some(folder => folder.startsWith(scope.folderPath + '/') || scope.folderPath.startsWith(folder + '/'))) throw new Error('Encrypted reminders folders must not overlap');
-		ids.add(scope.id);
-		folders.add(scope.folderPath);
-		for (const key of [scope.data, scope.notifications]) {
-			if (ids.has(key.id) || secrets.has(key.secret)) throw new Error('Duplicate encryption key');
-			ids.add(key.id);
-			secrets.add(key.secret);
-		}
-	}
+	validateSecret(value.notifications);
+	validateSealKeyPair(value.seal);
+	if (new Set([value.vault.id, value.notifications.id, value.seal.id]).size !== 3 || value.vault.secret === value.notifications.secret) throw new Error('Duplicate encryption key');
 }
 
 /** Compare validated bundles by identity and secret, independently of JSON order. */
 export function sameVaultKeyBundle(left: VaultKeyBundle, right: VaultKeyBundle): boolean {
 	const sameKey = (a: EncryptionSecret, b: EncryptionSecret) => a.id === b.id && a.secret === b.secret;
 	return left.vaultId === right.vaultId && left.generation === right.generation && sameKey(left.vault, right.vault)
-		&& left.scopes.length === right.scopes.length && left.scopes.every(scope => {
-			const other = right.scopes.find(item => item.id === scope.id);
-			return !!other && other.folderPath === scope.folderPath && other.purpose === scope.purpose && other.accessId === scope.accessId
-				&& sameKey(other.data, scope.data) && sameKey(other.notifications, scope.notifications);
-		});
+		&& sameKey(left.notifications, right.notifications)
+		&& left.seal.id === right.seal.id && left.seal.publicKey === right.seal.publicKey && left.seal.privateKey === right.seal.privateKey;
 }
 
 const RECOVERY_PREFIX = 'crate-recovery-v1.';

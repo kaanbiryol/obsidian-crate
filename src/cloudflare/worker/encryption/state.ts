@@ -1,4 +1,4 @@
-import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER, validateEncryptionState, encryptionScopeForPath, type EncryptionServerState } from '../../../encryption/server-state';
+import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER, validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { ENCRYPTED_FILE_CONTENT_TYPE, isEncryptedFile, parseEncryptedFile, type EncryptedFileDescriptor } from '../../../encryption/file-format';
 import { fileRevisionGuard } from '../sync/file-identity';
 import { validateEncryptedSchedules } from '../../../encryption/notification-format';
@@ -16,14 +16,6 @@ export async function readEncryptionState(db: D1Database): Promise<EncryptionSer
 	const state: unknown = JSON.parse(row.value);
 	validateEncryptionState(state);
 	return state;
-}
-
-/** What a folder-scoped session may see: public settings, the encrypted recovery
- * bundle and its own folder's scope, without the vault key ID or other folders' scopes. */
-export function scopedEncryptionState(state: EncryptionServerState, folderPath: string | undefined):
-	Pick<EncryptionServerState, 'version' | 'vaultId' | 'generation' | 'mode' | 'recovery'> & { scope: EncryptionServerState['scopes'][number] | null } {
-	return { version: state.version, vaultId: state.vaultId, generation: state.generation,
-		mode: state.mode, recovery: state.recovery, scope: state.scopes.find(scope => scope.folderPath === folderPath) ?? null };
 }
 
 /** Whether the request was made with this vault's current encryption keys. */
@@ -76,18 +68,18 @@ export function validateEncryptedContent(state: EncryptionServerState, path: str
 	const bytes = typeof content === 'string' || content instanceof Uint8Array ? content : new Uint8Array(content);
 	if (!isEncryptedFile(bytes)) throw new EncryptionStateError('This vault requires encrypted file content', 428);
 	const { descriptor, publicData } = parseEncryptedFile(bytes);
-	const scope = encryptionScopeForPath(state, path);
-	if (descriptor.vaultId !== state.vaultId || descriptor.scopeId !== scope.id || descriptor.keyId !== scope.keyId) {
-		throw new EncryptionStateError('File encryption keys do not match this vault or folder', 428);
+	if (descriptor.vaultId !== state.vaultId || descriptor.scopeId !== 'vault' || descriptor.keyId !== state.keyId) {
+		throw new EncryptionStateError('File encryption keys do not match this vault', 428);
 	}
-	if (scope.id !== 'vault' && state.scopes.find(item => item.id === scope.id)?.purpose !== 'reading' && path.toLowerCase().endsWith('.md')) {
-		validateEncryptedSchedules(publicData);
-		const notificationKey = state.scopes.find(item => item.id === scope.id)!.notificationKeyId;
-		for (const reminder of publicData.reminders) {
-			if (reminder.notification.vaultId !== state.vaultId || reminder.notification.scopeId !== scope.id
-				|| reminder.notification.keyId !== notificationKey) throw new EncryptionStateError('Notification encryption keys do not match this folder');
-		}
-	} else if (publicData !== null) throw new EncryptionStateError('This file must not publish reminder scheduling metadata');
+	// Devices decide which notes are reminders. The server only checks that any
+	// published schedules use this vault's notification key.
+	if (publicData === null) return descriptor;
+	if (!path.toLowerCase().endsWith('.md')) throw new EncryptionStateError('This file must not publish reminder scheduling metadata');
+	validateEncryptedSchedules(publicData);
+	for (const reminder of publicData.reminders) {
+		if (reminder.notification.vaultId !== state.vaultId || reminder.notification.scopeId !== 'vault'
+			|| reminder.notification.keyId !== state.notificationKeyId) throw new EncryptionStateError('Notification encryption keys do not match this vault');
+	}
 	return descriptor;
 }
 

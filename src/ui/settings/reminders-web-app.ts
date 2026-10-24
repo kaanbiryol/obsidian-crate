@@ -81,9 +81,8 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 	assertCurrent();
 	const subscribeUrl = new URL('notifications', `${apiClient.getWorkerUrl()}/`);
 	if (keys && recovery) {
-		const fragment = new URLSearchParams({ crateKey: recovery });
-		if (keys.scopes.some(scope => scope.folderPath === readingFolder)) fragment.set('crateReadingKey', recovery);
-		subscribeUrl.hash = fragment.toString();
+		// Reminders and Reading unlock independently at launch, from the same recovery key.
+		subscribeUrl.hash = new URLSearchParams({ crateKey: recovery, crateReadingKey: recovery }).toString();
 	}
 	subscribeUrl.searchParams.set('token', token);
 	if (browserToken) subscribeUrl.searchParams.set('browserToken', browserToken);

@@ -87,14 +87,6 @@ describe('Reading runtime lifecycle', () => {
     stopReading(h.plugin);
     await waitForStoppedReading(h.plugin);
   });
-  it('waits for a pending encrypted folder move before starting policy or capture work', () => {
-    const h = harness(); h.workspace.layoutReady = true;
-    Object.assign(h.plugin.secretStorage, { get: (key: string) => key === SECRET_KEYS.ENCRYPTION_FOLDER_MOVES ? 'pending' : null });
-    startReading(h.plugin);
-    expect(getReadingLibrary(h.plugin)).toBeUndefined();
-    expect(readReadingPolicy).not.toHaveBeenCalled();
-    expect(h.events.size).toBe(0);
-  });
   it.each(['missing', 'different folder'])('discards an old server’s %s policy before mutation or local save', async kind => {
     const h = harness();
     h.plugin.settings.workerUrl = 'https://original.example';

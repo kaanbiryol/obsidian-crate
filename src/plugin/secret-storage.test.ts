@@ -59,7 +59,7 @@ describe('SecretStorageService', () => {
 	it('isolates encryption keys and recovery codes from separately stored device credentials', async () => {
 		let scope = 'https://first.example';
 		const { service } = createSecretStorage(() => scope);
-		const first = createVaultKeyBundle(), second = createVaultKeyBundle();
+		const first = await createVaultKeyBundle(), second = await createVaultKeyBundle();
 		const firstCode = await generateRecoveryCode(), secondCode = await generateRecoveryCode();
 		saveEncryptionKeys(service, first, firstCode);
 		service.delete(SECRET_KEYS.AUTH_TOKEN);
@@ -76,7 +76,7 @@ describe('SecretStorageService', () => {
 	});
 
 	it('fails before conversion if secret storage does not retain the key bundle', async () => {
-		const bundle = createVaultKeyBundle(), code = await generateRecoveryCode();
+		const bundle = await createVaultKeyBundle(), code = await generateRecoveryCode();
 		const broken = { set: vi.fn(), get: () => null } as unknown as SecretStorageService;
 		expect(() => saveEncryptionKeys(broken, bundle, code)).toThrow('Could not verify saved encryption keys');
 		const { service } = createSecretStorage();
@@ -86,7 +86,7 @@ describe('SecretStorageService', () => {
 });
 
 
-it.each([SECRET_KEYS.ENCRYPTION_RESET, SECRET_KEYS.ENCRYPTION_FOLDER_MOVES])('keeps %s checkpoints isolated to the original deployment', key => {
+it.each([SECRET_KEYS.ENCRYPTION_RESET])('keeps %s checkpoints isolated to the original deployment', key => {
 	let scope = 'first';
 	const { service } = createSecretStorage(() => scope);
 	service.set(key, 'first checkpoint');

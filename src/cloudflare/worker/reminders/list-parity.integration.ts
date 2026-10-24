@@ -5,9 +5,10 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleListReminders } from './routes/list';
 import { writeCommittedMarkdownFile } from '../storage';
-import { addReminderScope, createVaultKeyBundle } from '@/encryption/key-bundle';
+import { createVaultKeyBundle } from '@/encryption/key-bundle';
 import { importEncryptionSecret } from '@/encryption/envelope';
 import { importNotificationFingerprintKey } from '@/encryption/reminder-projection';
+import { importSealPrivateKey } from '@/encryption/seal-key';
 import { sealFile } from '@/encryption/file-codec';
 import { EncryptedReminderApi } from '@/pwa/reminders/encrypted-reminder-api';
 import { REMINDER_IDENTITY_CONFLICT_ISSUE } from '@/reminders/core/reminder-list';
@@ -32,14 +33,15 @@ async function listPlaintext(): Promise<unknown> {
 	return response.json();
 }
 
-async function listEncrypted(remoteFolder: string): Promise<unknown> {
-	const bundle = addReminderScope(createVaultKeyBundle(), remoteFolder), scope = bundle.scopes[0]!;
-	const keys = { version: 1 as const, vaultId: bundle.vaultId, scopeId: scope.id, folderPath: scope.folderPath, localFolderPath: 'Reminders',
-		generation: bundle.generation, data: await importEncryptionSecret(scope.data), notifications: await importEncryptionSecret(scope.notifications),
-		notificationFingerprint: await importNotificationFingerprintKey(bundle.vaultId, scope), localState: 'unused' };
-	const authority = { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data };
+async function listEncrypted(): Promise<unknown> {
+	const bundle = await createVaultKeyBundle();
+	const keys = { version: 1 as const, vaultId: bundle.vaultId, generation: bundle.generation, folderPath: 'Reminders',
+		vault: await importEncryptionSecret(bundle.vault), notifications: await importEncryptionSecret(bundle.notifications),
+		notificationFingerprint: await importNotificationFingerprintKey(bundle.vaultId, bundle.notifications),
+		seal: { keyId: bundle.seal.id, publicKey: bundle.seal.publicKey, privateKey: await importSealPrivateKey(bundle.seal) }, localState: 'unused' };
+	const authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
 	const sealed = await Promise.all(Object.entries(notes).map(async ([name, content]) => {
-		const path = `${remoteFolder}/${name}`;
+		const path = `Reminders/${name}`;
 		return { path, sealed: await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
 	}));
 	const files = sealed.map(({ path, sealed }) => ({ path, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }));
@@ -53,7 +55,7 @@ async function listEncrypted(remoteFolder: string): Promise<unknown> {
 	return response!.json();
 }
 
-it.each(['Reminders', 'Vault/Tasks'])('lists the same reminders, projects and issues as the encrypted web app (remote folder %s)', async remoteFolder => {
+it('lists the same reminders, projects and issues as the encrypted web app', async () => {
 	const plaintext = await listPlaintext();
 	expect(plaintext).toMatchObject({
 		reminders: ['first', 'done', 'work', 'summer'].map(id => ({ id })),
@@ -63,5 +65,5 @@ it.each(['Reminders', 'Vault/Tasks'])('lists the same reminders, projects and is
 			{ path: 'Reminders/work.md', reason: REMINDER_IDENTITY_CONFLICT_ISSUE },
 		],
 	});
-	expect(await listEncrypted(remoteFolder)).toEqual(plaintext);
+	expect(await listEncrypted()).toEqual(plaintext);
 });

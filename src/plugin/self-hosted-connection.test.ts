@@ -68,9 +68,9 @@ describe('self-hosted server connection', () => {
 	it('moves encryption authority with a verified self-hosted tunnel address before restarting sync', async () => {
 		const owner = plugin();
 		owner.syncRuntime.isConfigured.mockReturnValue(true);
-		const bundle = createVaultKeyBundle();
+		const bundle = await createVaultKeyBundle();
 		owner.secretStorage.get.mockImplementation(key => key === SECRET_KEYS.AUTH_TOKEN ? token
-			: key === SECRET_KEYS.ENCRYPTION_KEYS ? JSON.stringify(bundle) : key === SECRET_KEYS.ENCRYPTION_FOLDER_MOVES ? 'pending move' : null);
+			: key === SECRET_KEYS.ENCRYPTION_KEYS ? JSON.stringify(bundle) : null);
 		await updateSelfHostedServerAddress(owner as unknown as CratePlugin, 'https://next.trycloudflare.com');
 		expect(owner.syncRuntime.updateEncryptedServerAddress).toHaveBeenCalledWith(
 			'https://next.trycloudflare.com', expect.any(AbortSignal),

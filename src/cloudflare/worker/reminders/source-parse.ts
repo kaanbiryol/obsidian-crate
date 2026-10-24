@@ -45,6 +45,8 @@ export function parseReminderSource(path: string, content: string | ArrayBuffer,
 	if (encrypted) {
 		try {
 			const packet = parseEncryptedFile(typeof content === 'string' ? content : new Uint8Array(content));
+			// Uploaded before this folder held reminders, for example after a folder change.
+			if (packet.publicData === null) return { reminders: [], issue: 'Edit this note in Obsidian to schedule its reminders.' };
 			validateEncryptedSchedules(packet.publicData);
 			if (packet.publicData.issue) return { reminders: [], issue: packet.publicData.issue === 'size' ? REMINDER_SOURCE_SIZE_ISSUE
 				: packet.publicData.issue === 'scheduling-capacity' ? ENCRYPTED_SCHEDULING_CAPACITY_ISSUE : 'Repair the reminder metadata on an unlocked device to resume notifications.' };

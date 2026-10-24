@@ -5,9 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
-import { createEncryptionState } from '../../../encryption/server-state';
-import { FileKeyAuthority } from '../../../encryption/file-authority';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import { createReminderProjection } from '../../../encryption/reminder-projection';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
@@ -25,22 +23,20 @@ beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 
 async function fixture(padding: number, count = 1) {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
-	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
-	state.mode = 'active';
-	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_STATE_KEY, JSON.stringify(state)).run();
+	const { state, keys, notifications } = await createEncryptionFixture('active');
+	await storeEncryptionState(env.DB, state);
 	await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
-	const keys = await FileKeyAuthority.fromVault(bundle), path = 'Reminders/Inbox.md';
+	const path = 'Reminders/Inbox.md';
 	const content = new TextEncoder().encode('x'.repeat(padding) + '\n\n' + Array.from({ length: count }, (_, index) =>
 		`- [ ] Important appointment 2099-01-02T10:00:00.000Z <!-- crate-id:r${index} -->`).join('\n'));
 	expect(content.byteLength).toBeLessThanOrEqual(1024 * 1024);
-	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(bundle, path, content.buffer) }, keys.forPath(path));
+	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
 	const response = await handleUpload(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes, headers: {
 		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 		'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),
 	} }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
 	expect(response.status, await response.clone().text()).toBe(200);
-	return { state, file, path, bundle, keys };
+	return { state, file, path, keys, notifications };
 }
 
 it.each([64, 800_000])('rebuilds previously indexed notification sources after conversion (%i bytes)', async padding => {
@@ -83,6 +79,22 @@ it.each(['quarantined', 'missing'])('repairs already-active vaults with %s sourc
 	expect(await env.DB.prepare("SELECT operation FROM notification_jobs WHERE reminder_id = 'r0'").first()).toEqual({ operation: 'schedule' });
 });
 
+it('reports a reminders-folder note uploaded without schedules instead of scheduling it', async () => {
+	const { keys } = await fixture(0);
+	const path = 'Reminders/Later.md', content = new TextEncoder().encode('- [ ] Unscheduled appointment 2099-01-02T10:00:00.000Z <!-- crate-id:later -->');
+	// For example, a device that did not yet treat this folder as a reminders folder.
+	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: null }, keys.forPath(path));
+	const uploaded = await handleUpload(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes, headers: {
+		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
+		'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),
+	} }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
+	expect(uploaded.status, await uploaded.clone().text()).toBe(200);
+	await drainNotificationProjections(env);
+	expect(await env.DB.prepare('SELECT error FROM notification_file_retries WHERE path = ?').bind(path).first()).toEqual({ error: 'Edit this note in Obsidian to schedule its reminders.' });
+	expect(await env.DB.prepare("SELECT 1 FROM notification_jobs WHERE reminder_id = 'later'").first()).toBeNull();
+	expect(await env.DB.prepare("SELECT operation FROM notification_jobs WHERE reminder_id = 'r0'").first()).toEqual({ operation: 'schedule' });
+});
+
 it.each([1200, 2000])('rebuilds a valid encrypted source larger than the old byte budget (%i reminders)', async count => {
 	const { path, file } = await fixture(800_000, count);
 	expect(file.bytes.length).toBeGreaterThan(2 * 1024 * 1024);
@@ -117,11 +129,11 @@ it('rolls back every scheduling chunk on failure and retries without replacing u
 });
 
 it('keeps coordinator passes within their query budget while rebuilding two dense encrypted sources', async () => {
-	const { bundle, keys } = await fixture(0, 2000);
+	const { keys, notifications } = await fixture(0, 2000);
 	const path = 'Reminders/Second.md';
 	const content = new TextEncoder().encode(Array.from({ length: 2000 }, (_, index) =>
 		`- [ ] Another appointment 2099-01-02T10:00:00.000Z <!-- crate-id:second-${index} -->`).join('\n'));
-	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(bundle, path, content.buffer) }, keys.forPath(path));
+	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
 	const uploaded = await handleUpload(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes, headers: {
 		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 		'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),

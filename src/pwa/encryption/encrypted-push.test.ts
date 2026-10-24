@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Script } from 'node:vm';
 import { build } from 'esbuild';
-import { addReminderScope, createVaultKeyBundle } from '../../encryption/key-bundle';
-import { createReminderProjection } from '../../encryption/reminder-projection';
+import { createVaultKeyBundle } from '../../encryption/key-bundle';
+import { createReminderProjection, importNotificationKeys } from '../../encryption/reminder-projection';
 import { importEncryptionSecret } from '../../encryption/envelope';
-import { readReminderKeys, type StoredReminderKeys } from './encryption-keys';
+import { readVaultKeys, type StoredVaultKeys } from './encryption-keys';
 import { decryptPushDisplay } from './encrypted-push';
 
 // Keep the key-read seam while exercising the compiled production event handler.
@@ -19,20 +19,21 @@ const runtime = await build({
 });
 const SERVICE_WORKER_JS = `${runtime.outputFiles[0]!.text}\ncrateServiceWorker.initialize(self, { version: 'test', chunkUrls: [] });`;
 
-vi.mock('./encryption-keys', () => ({ readReminderKeys: vi.fn() }));
+vi.mock('./encryption-keys', () => ({ readVaultKeys: vi.fn() }));
 afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
 
 async function fixture() {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
-	const projection = await createReminderProjection(bundle, 'Reminders/Inbox.md', new TextEncoder().encode('- [ ] Private push 2099-01-02 <!-- crate-id:one -->').buffer);
+	const bundle = await createVaultKeyBundle();
+	const projection = await createReminderProjection(await importNotificationKeys(bundle.vaultId, bundle.notifications), ['Reminders'],
+		'Reminders/Inbox.md', new TextEncoder().encode('- [ ] Private push 2099-01-02 <!-- crate-id:one -->').buffer);
 	const notice = projection!.reminders[0]!.notification;
-	const keys = { vaultId: bundle.vaultId, scopeId: bundle.scopes[0]!.id, notifications: await importEncryptionSecret(bundle.scopes[0]!.notifications) } as StoredReminderKeys;
+	const keys = { vaultId: bundle.vaultId, notifications: await importEncryptionSecret(bundle.notifications) } as StoredVaultKeys;
 	return { notice, keys };
 }
 
 it.each(['declarative', 'legacy'] as const)('decrypts %s pushes and preserves the notification navigation URL', async delivery => {
 	const { notice, keys } = await fixture();
-	vi.mocked(readReminderKeys).mockResolvedValue(keys);
+	vi.mocked(readVaultKeys).mockResolvedValue(keys);
 	const payload = { notification: { title: 'Crate reminder', body: 'Open Crate to view your reminder.',
 		navigate: `https://crate.test/notifications?reminderId=${notice.reminderId}`,
 		data: { encrypted: notice, project: '', reminderId: notice.reminderId } } };
@@ -61,7 +62,7 @@ it.each(['declarative', 'legacy'] as const)('decrypts %s pushes and preserves th
 
 it.each(['declarative', 'legacy'] as const)('falls back when reading notification keys never settles for a %s push', async delivery => {
 	const { notice } = await fixture();
-	vi.mocked(readReminderKeys).mockReturnValue(new Promise(() => {}));
+	vi.mocked(readVaultKeys).mockReturnValue(new Promise(() => {}));
 	vi.useFakeTimers();
 	const handlers = new Map<string, (event: unknown) => void>();
 	const showNotification = vi.fn(async () => {});
@@ -81,8 +82,8 @@ it.each(['declarative', 'legacy'] as const)('falls back when reading notificatio
 
 it.each(['success', 'failure'])('ignores late key-read %s after the generic fallback deadline', async outcome => {
 	const { notice, keys } = await fixture();
-	let resolve!: (keys: StoredReminderKeys) => void, reject!: (error: Error) => void;
-	vi.mocked(readReminderKeys).mockReturnValue(new Promise((yes, no) => { resolve = yes; reject = no; }));
+	let resolve!: (keys: StoredVaultKeys) => void, reject!: (error: Error) => void;
+	vi.mocked(readVaultKeys).mockReturnValue(new Promise((yes, no) => { resolve = yes; reject = no; }));
 	vi.useFakeTimers();
 	const display = decryptPushDisplay(notice);
 	await vi.advanceTimersByTimeAsync(3000);
@@ -93,7 +94,7 @@ it.each(['success', 'failure'])('ignores late key-read %s after the generic fall
 
 it('still decrypts notifications and clears the deadline after a successful read', async () => {
 	const { notice, keys } = await fixture();
-	vi.mocked(readReminderKeys).mockResolvedValue(keys);
+	vi.mocked(readVaultKeys).mockResolvedValue(keys);
 	vi.useFakeTimers();
 	await expect(decryptPushDisplay(notice)).resolves.toMatchObject({ title: 'Private push' });
 	expect(vi.getTimerCount()).toBe(0);

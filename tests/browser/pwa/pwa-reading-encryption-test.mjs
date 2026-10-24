@@ -7,7 +7,6 @@ import { build } from 'esbuild';
 import { chromium, webkit, expect } from '@playwright/test';
 import { openLocalRuntime, issueLocalDevice } from '../../../packages/server/src/local-server-runtime.mjs';
 import { listenLocalServer } from '../../../packages/server/src/local-server-http.mjs';
-import { verifyReadingFolderMove } from './pwa-reading-folder-move-checks.mjs';
 import { verifyReadingPlaintextTransition } from './pwa-reading-plaintext-transition-checks.mjs';
 
 const dataDir = await mkdtemp(join(tmpdir(), 'crate-reading-e2ee-'));
@@ -20,8 +19,8 @@ try {
   const t = await import(pathToFileURL(modulePath).href);
   runtime = await openLocalRuntime({ dataDir: join(dataDir, 'server') });
   const owner = await issueLocalDevice(runtime.db, 'Reading encryption test');
-  const bundle = t.addReminderScope(t.addReminderScope(t.createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading');
-  const keys = await t.FileKeyAuthority.fromVault(bundle);
+  const bundle = await t.createVaultKeyBundle();
+  const keys = await t.FileKeyAuthority.fromBundle(bundle);
   const recovery = await t.generateRecoveryCode();
   await runtime.db.batch([
     runtime.db.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-test','revision')"),
@@ -171,14 +170,13 @@ try {
     const db = await new Promise((resolve, reject) => { const r = indexedDB.open('crate-encryption-keys'); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
     const ids = await new Promise((resolve, reject) => { const r = db.transaction('keys').objectStore('keys').getAllKeys(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); }); db.close(); return ids;
   });
-  assert.deepEqual(remembered.sort(), bundle.scopes.map(scope => `${bundle.vaultId}:${scope.id}`).sort());
+  assert.deepEqual(remembered, [bundle.vaultId]);
   assert.ok(!wire.some(request => request.includes(privateUrl) || request.includes(encodeURIComponent(privateUrl))));
   await lockedContext.close();
-  await verifyReadingFolderMove({ t, page, origin, owner, bundle, recovery });
   assert.equal(recoverySent, false, 'Recovery key must never be sent to the server');
   assert.deepEqual(errors, []);
   assert.ok(!requests.some(request => request.body.includes('private-reading')));
-  console.log(`Reading plaintext-to-encrypted transition, encrypted enrollment, private cache, article access, server extraction, locked Shortcut recovery, folder move with retained credentials,${type === chromium ? ' offline edits, exact replay after a lost reply,' : ''} and logout cleanup passed (${type.name()})`);
+  console.log(`Reading plaintext-to-encrypted transition, encrypted enrollment, private cache, article access, server extraction, locked Shortcut recovery,${type === chromium ? ' offline edits, exact replay after a lost reply,' : ''} and logout cleanup passed (${type.name()})`);
 } finally {
   await browser?.close();
   await new Promise(resolve => server ? server.close(resolve) : resolve());

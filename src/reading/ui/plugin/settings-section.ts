@@ -32,8 +32,6 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 						const { assertCurrent } = captureServerConnection(plugin);
 						const reading = { enabled: true, folderPath };
 						validateReadingConfiguration(plugin, reading);
-						const { changeEncryptedFolder } = await import('../../../plugin/encryption-folder-moves');
-						if (await changeEncryptedFolder(plugin, plugin.settings.reading.folderPath, folderPath)) { rerender(); return; }
 						if (plugin.settings.workerUrl) {
 							const policy = await readReadingPolicy(plugin);
 							assertCurrent();

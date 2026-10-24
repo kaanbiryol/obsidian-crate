@@ -1,13 +1,13 @@
 # Reading and end-to-end encryption
 
-Reading now uses a separate folder key when vault encryption is enabled. The same implementation runs on Cloudflare and self-hosted servers. This document describes the implemented boundary.
+When vault encryption is enabled, Reading notes are encrypted with the vault key like every other note. The same implementation runs on Cloudflare and self-hosted servers. This document describes the implemented boundary.
 
 ## Supported workflow
 
 - Obsidian keeps ordinary local Markdown notes. Sync encrypts their contents, including article text, source URLs, tags, reading status and highlights.
-- The PWA uses the same recovery code as Obsidian to open the encrypted key bundle locally, remembers its Reading folder keys, decrypts and indexes notes locally, and publishes conditional encrypted note replacements. It supports article viewing, search, favorites, archive, tags, highlights, offline article caching and queued offline edits.
+- The PWA uses the same recovery code as Obsidian to open the encrypted key bundle locally, remembers the vault keys, decrypts and indexes notes locally, and publishes conditional encrypted note replacements. It supports article viewing, search, favorites, archive, tags, highlights, offline article caching and queued offline edits.
 - Browser library, article, draft, outbox and immutable retry records are encrypted. Queued edits retain their exact encrypted requests after a lost response. Recovery preserves damaged records and exports wrapped local-key metadata; explicit logout clears both Reading and Reminders keys and data, while fencing newer enrollments.
-- Existing unencrypted Reading notes, queued captures and operation receipts convert before activation. Derived server indexes, extraction jobs and outstanding plaintext handoffs are removed. Already encrypted vaults can select **Manage encryption → Add encrypted reading** to introduce the Reading scope without deleting their data. Conversion is resumable and also converts retained Reading versions.
+- Existing unencrypted Reading notes, queued captures and operation receipts convert before activation. Derived server indexes, extraction jobs and outstanding plaintext handoffs are removed. Conversion is resumable and also converts retained Reading versions.
 - Destructive encryption reset deletes all seven Reading tables, including enrollment and handoff grants, at the start and completion of the reset.
 
 ## Saving articles
@@ -24,7 +24,7 @@ Paths, sizes, revisions, timing, feature policy and account/session metadata rem
 
 The browser accepts at most 10,000 Reading files and 12 MiB of indexed metadata. It retains at most 100 decrypted source notes within a 16 MiB in-memory budget; unchanged metadata is reused without downloading every note on refresh. Persistent opened-article storage remains bounded by the existing 50-article / 20 MiB policy. Unreadable or duplicate-ID notes are shown as issues and block mutations that could overwrite uncertain data. Damaged or future-format offline records stay exportable without blocking healthy articles. If the saved library cannot be decoded, a verified live refresh remains usable with a recovery notice, while the original library and its cached articles remain unchanged.
 
-Reading folders and Reminders scopes must be separate. A Reading scope can be added to an existing encrypted vault. Moving or renaming an enrolled folder, or changing its setting, uses the [resumable folder conversion](e2ee-implementation.md#moving-files-and-folders). Folder and notification keys stay the same; other devices recover the updated bundle and browsers open fresh setup links. Content-key rotation is not included.
+The Reading and Reminders folders must be separate. Changing either folder needs no re-encryption, because every note uses the vault key; see [moving files and folders](e2ee-implementation.md#moving-files-and-folders). Content-key rotation is not included.
 
 ## Verification boundary
 

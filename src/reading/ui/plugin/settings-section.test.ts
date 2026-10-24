@@ -6,9 +6,6 @@ const validate = vi.fn();
 const policy = { enabled: 1, folder_path: 'Articles', generation: 'g', revision: 'r' };
 
 beforeEach(() => {
-	// These cases exercise plaintext policy changes; encrypted folder moves have
-	// their own runtime tests and should not delay this test's async assertions.
-	vi.doMock('../../../plugin/encryption-folder-moves', () => ({ changeEncryptedFolder: vi.fn(async () => false) }));
 	vi.doMock('../../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isDesktopApp: true } }));
 	vi.doMock('../../../plugin/server-request', async () => ({ ...await vi.importActual<typeof import('../../../plugin/server-request')>('../../../plugin/server-request'), serverRequest: request }));
@@ -22,7 +19,6 @@ afterEach(() => {
 	vi.doUnmock('../../ui/settings/folder-suggest');
 	vi.doUnmock('../../../plugin/server-request');
 	vi.doUnmock('../runtime');
-	vi.doUnmock('../../plugin/encryption-folder-moves');
 	request.mockReset();
 	validate.mockReset();
 });

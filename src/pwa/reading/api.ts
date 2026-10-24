@@ -11,7 +11,7 @@ import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
 export { ReadingApiError } from './api-error';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './record-validation';
-import { EncryptionScopeChangedError, routeFolderPath } from '../encryption/encryption-folder-routing';
+import { EncryptionStateChangedError } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
@@ -49,25 +49,25 @@ async function rawReadingRequest(path: string, session: ReadingSession | null, b
     reportExpiredConnection(session.token);
     throw new ReadingApiError(SESSION_RECOVERY_MESSAGE, 401);
   }
-  if (response.status === 428 && path !== '/reading/encryption') throw new EncryptionScopeChangedError('The encrypted Reading folder changed.');
+  if (response.status === 428 && path !== '/reading/encryption') throw new EncryptionStateChangedError('The encrypted Reading folder changed.');
   if (response.status === 423) requestSharedFeaturesRefresh(true);
   return response;
 }
 export async function readingRequest<T>(path: string, session: ReadingSession | null, body?: string): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try { return await preparedReadingRequest<T>(path, session, body, attempt > 0); }
-    catch (error) { if (!(error instanceof EncryptionScopeChangedError) || attempt > 0) throw error; }
+    catch (error) { if (!(error instanceof EncryptionStateChangedError) || attempt > 0) throw error; }
   }
 }
 async function preparedReadingRequest<T>(path: string, session: ReadingSession | null, body?: string, refresh = false): Promise<T> {
   if (session) {
     const keys = await prepareReadingEncryption(session, refresh);
     if (keys && /^\/reading\/(list|item|capture|update|retry)(?:\?|$)/.test(path)) {
-      const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.scopeId, keys.generation]);
-      const indexIdentity = JSON.stringify([keys.vaultId, keys.scopeId, keys.generation, keys.folderPath]);
+      const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.generation]);
+      const indexIdentity = JSON.stringify([keys.vaultId, keys.generation, keys.folderPath]);
       if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
         captureArticle: url => captureServerArticle(url, body => rawReadingRequest('/reading/encrypted-extract', session, body)),
-        folderPath: keys.folderPath, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data },
+        folderPath: keys.folderPath, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault },
         request: (route, wire) => rawReadingRequest(route, session, wire),
         readAttempt: id => readReadingAttempt(session, id),
         writeAttempt: (id, attempt) => writeReadingAttempt(session, id, attempt),
@@ -76,14 +76,6 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
         error: (message, status, code) => new ReadingApiError(message, status, code),
       }) };
       const value = await encryptedClient.api.request(path, body); assertReadingSession(session);
-      // Keep saved articles and requests in their original browser namespace.
-      // The encrypted API always authenticates the actual current server path.
-      if (value && typeof value === 'object' && keys.folderPath !== session.folderPath) {
-        const result = value as { item?: { path: string }; items?: Array<{ path: string }>; issues?: Array<{ path: string }> };
-        const local = <V extends { path: string }>(item: V): V => ({ ...item, path: routeFolderPath(item.path, keys.folderPath, session.folderPath) });
-        return { ...result, ...(result.item ? { item: local(result.item) } : {}), ...(result.items ? { items: result.items.map(local) } : {}),
-          ...(result.issues ? { issues: result.issues.map(local) } : {}) } as T;
-      }
       return value as T;
     }
     if (!keys) encryptedClient = undefined;
@@ -112,7 +104,7 @@ async function firstReadingListPage(session: ReadingSession, previous?: ReadingC
   }
   let response: Response;
   try { response = await rawReadingRequest('/reading/list', session, undefined, previous?.revision ? { 'If-None-Match': previous.revision } : {}); }
-  catch (error) { if (error instanceof EncryptionScopeChangedError) return unconditional(); throw error; }
+  catch (error) { if (error instanceof EncryptionStateChangedError) return unconditional(); throw error; }
   if (response.status === 304 && previous) return { unchanged: true };
   const data = await response.json() as { error?: string; code?: string };
   assertReadingSession(session);

@@ -5,8 +5,8 @@ import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '@/protocol/http-headers';
 import { detectWebSessionName } from '../session-label';
 import { prepareReminderEncryption } from './encryption-session';
-import type { StoredReminderKeys } from '../encryption/encryption-keys';
-import { EncryptionScopeChangedError, routeFolderRequest } from '../encryption/encryption-folder-routing';
+import type { FeatureKeys } from '../encryption/encryption-keys';
+import { EncryptionStateChangedError } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
 import { requireCompatibleProtocol } from '../server-compatibility';
@@ -15,7 +15,7 @@ import { EncryptedReminderApi } from './encrypted-reminder-api';
 export function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {
 	const sessionCurrent = capturePwaSession();
 	const clientSession = crypto.randomUUID();
-	let keys: StoredReminderKeys | null = null;
+	let keys: FeatureKeys | null = null;
 	let encrypted: EncryptedReminderApi | null = null;
 	let preparing: Promise<void> | undefined;
 	// The server's last response said this vault is not encrypted.
@@ -56,7 +56,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		const encryptionState = response.headers.get(ENCRYPTION_STATE_HEADER);
 		if (encryptionState === 'off' || encryptionState === 'on') encryptionOff = encryptionState === 'off';
 		// Without keys, a 428 from a newly encrypted vault retries after a fresh probe.
-		if ((keys || encryptionState === 'on') && response.status === 428 && path !== '/encryption') throw new EncryptionScopeChangedError('The encrypted folder changed.');
+		if ((keys || encryptionState === 'on') && response.status === 428 && path !== '/encryption') throw new EncryptionStateChangedError('The vault encryption changed.');
 		if (response.status === 423) requestSharedFeaturesRefresh(true);
 		return response;
 	}
@@ -81,9 +81,8 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 					const response = await encrypted.handle(path, init);
 					if (response) return response;
 				}
-				const routed = keys ? routeFolderRequest(path, init, keys.localFolderPath ?? keys.folderPath, keys.folderPath) : { path, init };
-				return await rawFetch(routed.path, routed.init);
-			} catch (error) { if (!(error instanceof EncryptionScopeChangedError) || attempt > 0) throw error; }
+				return await rawFetch(path, init);
+			} catch (error) { if (!(error instanceof EncryptionStateChangedError) || attempt > 0) throw error; }
 		}
 	}
 	return Object.assign(apiFetch, { ready });

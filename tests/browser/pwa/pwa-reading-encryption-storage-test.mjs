@@ -5,7 +5,7 @@ import { chromium, webkit, expect } from '@playwright/test';
 
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
-
+export * from './src/encryption/server-state';
 export * from './src/pwa/reading/storage';
 export { readingDatabase } from './src/pwa/reading/database';
 export * from './src/pwa/reading/encryption-session';
@@ -40,11 +40,11 @@ for (const engine of [chromium, webkit]) {
     await page.addScriptTag({ content: harness });
     const result = await page.evaluate(async () => {
       const t = readingEncryption;
-      const bundle = t.addReminderScope(t.createVaultKeyBundle(), 'Reading', 'reading'), scope = bundle.scopes[0];
+      const bundle = await t.createVaultKeyBundle();
       const recovery = await t.generateRecoveryCode();
       const session = { id: 'reader', token: 'token', folderPath: 'Reading', generation: 'policy', expiresAt: Date.now() + 100000 };
       localStorage.setItem(t.READING_SESSION_KEY, JSON.stringify(session));
-      const state = { version: 1, vaultId: bundle.vaultId, generation: bundle.generation, mode: 'active', recovery: await t.sealRecoveryBundle(bundle, recovery), scope: { id: scope.id, folderPath: scope.folderPath, keyId: scope.data.id, notificationKeyId: scope.notifications.id, purpose: 'reading' } };
+      const state = { ...t.createEncryptionState(bundle, await t.sealRecoveryBundle(bundle, recovery)), mode: 'active' };
       window.fetch = async path => Response.json(String(path).startsWith('/reading/encrypted-files')
         ? { files: [], sequence: 1, generation: bundle.generation, nextCursor: null } : { encryption: state });
       location.hash = 'crateReadingKey=' + encodeURIComponent(recovery);
@@ -60,10 +60,10 @@ for (const engine of [chromium, webkit]) {
       if (raw.includes('private.example') || raw.includes('private queued edit')) throw new Error('Migration left plaintext');
       const opened = await t.readReadingDraft(session);
       const unrelated = await db.get('values', 'draft:reader-other');
-      const keys = await t.readReminderKeys(bundle.vaultId, scope.id);
-      if (keys.data.key.extractable || keys.data.secret) throw new Error('Persisted extractable key');
+      const keys = await t.readVaultKeys(bundle.vaultId);
+      if (keys.vault.key.extractable || keys.vault.secret) throw new Error('Persisted extractable key');
       const wrappedKeys = await t.exportWrappedLocalKeys();
-      if (!wrappedKeys[0].localState || JSON.stringify(wrappedKeys).includes(scope.data.secret)) throw new Error('Recovery key export is invalid');
+      if (!wrappedKeys[0].localState || JSON.stringify(wrappedKeys).includes(bundle.vault.secret)) throw new Error('Recovery key export is invalid');
 
       const item = { ...t.parseReadingNote(t.createReadingNote({ id: crypto.randomUUID(), url: 'https://private.example/article', savedAt: new Date().toISOString() })), path: 'Reading/Article.md' };
       const damaged = { encryptedReading: 1, content: 'unreadable ciphertext' };
@@ -85,7 +85,7 @@ for (const engine of [chromium, webkit]) {
       const preservedList = JSON.stringify(await db.get('values', 'list:reader')) === JSON.stringify(damaged);
 
       // Re-enrollment with a damaged native key retains the same local data key.
-      await t.rememberReminderKeys(t.createReminderKeyGrant(bundle, 'Reading'));
+      await t.rememberVaultKeys(bundle);
       t.resetReadingEncryption();
       await t.prepareReadingEncryption(session);
       const recovered = await t.readReadingDraft(session);

@@ -1,11 +1,12 @@
 import { decodeBase64Url, encodeBase64Url, isEncryptionId } from '../encoding';
+import { deriveP256Secret, generateEphemeralP256, validateP256PublicKey } from '../p256';
 
 export const PAIRING_CAPABILITY = 'web-pairing-v1';
 export const PAIRING_PATH = '/encryption/pairing';
 export const PAIRING_LIFETIME = 5 * 60_000;
 export class PairingEndedError extends Error {}
 export interface PairingContext {
-  version: 1; id: string; origin: string; vaultId: string; generation: number; scopeId: string;
+  version: 1; id: string; origin: string; vaultId: string; generation: number;
 }
 export interface PairingRequest { context: PairingContext; commitment: string }
 export interface PairingRecord extends PairingRequest {
@@ -16,11 +17,11 @@ export interface PairingTransport {
   write(body: Record<string, unknown>): Promise<{ request: PairingRecord }>;
 }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
-const contextValues = (c: PairingContext) => [c.version, c.id, c.origin, c.vaultId, c.generation, c.scopeId];
+const contextValues = (c: PairingContext) => [c.version, c.id, c.origin, c.vaultId, c.generation];
 
 export function validatePairingContext(value: unknown): asserts value is PairingContext {
   const c = value as Partial<PairingContext> | null;
-  if (!c || c.version !== 1 || !isEncryptionId(c.id) || !isEncryptionId(c.vaultId) || !isEncryptionId(c.scopeId)
+  if (!c || c.version !== 1 || !isEncryptionId(c.id) || !isEncryptionId(c.vaultId)
     || !Number.isSafeInteger(c.generation) || c.generation! < 1 || typeof c.origin !== 'string' || c.origin.length > 2048
     || !/^https?:\/\//.test(c.origin) || new URL(c.origin).origin !== c.origin) throw new Error('Invalid app pairing request.');
 }
@@ -28,7 +29,7 @@ export function samePairingContext(a: PairingContext, b: PairingContext): boolea
   return JSON.stringify(contextValues(a)) === JSON.stringify(contextValues(b));
 }
 export function validatePairingKey(value: unknown): asserts value is string {
-  if (typeof value !== 'string' || decodeBase64Url(value, 65).length !== 65 || decodeBase64Url(value, 65)[0] !== 4) throw new Error('Invalid pairing public key.');
+  try { validateP256PublicKey(value); } catch { throw new Error('Invalid pairing public key.'); }
 }
 export function validatePairingRecord(value: unknown): asserts value is PairingRecord {
   const r = value as PairingRecord | null;
@@ -45,19 +46,13 @@ export function assertPairingCurrent(record: PairingRecord, expected: PairingReq
   if (!samePairingContext(record.context, expected.context) || record.commitment !== expected.commitment
     || record.closed || record.expiresAt > deadline || record.expiresAt <= Date.now()) throw new PairingEndedError('This pairing ended or changed. Start again.');
 }
-const algorithm = { name: 'ECDH', namedCurve: 'P-256' };
-async function ephemeral() {
-  const pair = await crypto.subtle.generateKey(algorithm, false, ['deriveBits']);
-  return { privateKey: pair.privateKey, publicKey: encodeBase64Url(new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey))) };
-}
 export async function pairingCommitment(context: PairingContext, publicKey: string): Promise<string> {
   return encodeBase64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes(['crate-web-pairing-v1', ...contextValues(context), publicKey]))));
 }
 
 async function channel(privateKey: CryptoKey, peer: string, request: PairingRequest, requesterKey: string, responderKey: string) {
   validatePairingKey(peer);
-  const publicKey = await crypto.subtle.importKey('raw', decodeBase64Url(peer, 65), algorithm, false, []);
-  const secret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: publicKey }, privateKey, 256));
+  const secret = await deriveP256Secret(privateKey, peer);
   const transcript = bytes(['crate-web-pairing-v1', ...contextValues(request.context), request.commitment, requesterKey, responderKey]);
   try {
     const material = await crypto.subtle.importKey('raw', secret, 'HKDF', false, ['deriveKey', 'deriveBits']);
@@ -92,7 +87,7 @@ async function channel(privateKey: CryptoKey, peer: string, request: PairingRequ
  * responder before revealing; never reuse an attempt with another responder. */
 export async function createPairingRequester(context: PairingContext) {
   validatePairingContext(context);
-  const keys = await ephemeral();
+  const keys = await generateEphemeralP256();
   const request = { context, commitment: await pairingCommitment(context, keys.publicKey) };
   let pinned: string | undefined;
   return { request, async accept(responderKey: string) {
@@ -104,7 +99,7 @@ export async function createPairingRequester(context: PairingContext) {
 }
 export async function createPairingResponder(request: PairingRequest) {
   validatePairingContext(request.context);
-  const keys = await ephemeral();
+  const keys = await generateEphemeralP256();
   let pinned: string | undefined;
   return { publicKey: keys.publicKey, async accept(requesterKey: string) {
     if (pinned && pinned !== requesterKey || await pairingCommitment(request.context, requesterKey) !== request.commitment) throw new Error('Pairing verification failed. Start again.');

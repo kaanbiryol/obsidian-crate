@@ -50,7 +50,7 @@ const transport: ApiHttpTransport = async input => {
 };
 
 async function enableAndReset(token: string, cycle: number) {
-	await convertEncryptedVault(new WorkerApiHttpClient('https://test', token, transport), createVaultKeyBundle(), await generateRecoveryCode(), () => {});
+	await convertEncryptedVault(new WorkerApiHttpClient('https://test', token, transport), await createVaultKeyBundle(), await generateRecoveryCode(), () => {}, []);
 	const state = (await readEncryptionState(env.DB))!;
 	expect(state.mode).toBe('active');
 	const id = `reset-cycle-${cycle}`, replacement = String(cycle).repeat(64);

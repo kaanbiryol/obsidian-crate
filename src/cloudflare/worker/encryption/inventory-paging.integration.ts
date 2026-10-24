@@ -3,11 +3,9 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
-import { createEncryptionState } from '../../../encryption/server-state';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import { ENCRYPTED_INVENTORY_PAGE } from '../../../encryption/file-inventory';
 import { portablePathKey } from '../../../protocol/portable-path';
-import { ENCRYPTION_STATE_KEY } from './state';
 import { handleEncryptedFolderFiles } from './encrypted-folder-files';
 import { meterD1Usage } from '../d1-usage';
 
@@ -17,10 +15,7 @@ beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });
 
 async function seed(): Promise<string[]> {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
-	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
-	state.mode = 'active';
-	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_STATE_KEY, JSON.stringify(state)).run();
+	await storeEncryptionState(env.DB, (await createEncryptionFixture('active')).state);
 	// Mixed case makes original-path order differ from the stored key order.
 	const paths = Array.from({ length: FILES }, (_, i) => `Reminders/${i % 2 ? 'note' : 'Note'}-${String(i).padStart(4, '0')}.md`);
 	const rows = [...paths, 'Reminders/attachment.png', 'Private/Other.md'];

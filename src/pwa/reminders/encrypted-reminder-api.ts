@@ -1,6 +1,6 @@
 import { sealFile } from '../../encryption/file-codec';
 import { decryptJson, encryptJson } from '../../encryption/envelope';
-import { createReminderProjectionWithKeys } from '../../encryption/reminder-projection';
+import { createReminderProjection } from '../../encryption/reminder-projection';
 import { scanReminderMarkdownContent, getProjectFromPath } from '../../reminders/core/markdownScan';
 import { decodeMarkdownBytes } from '../../reminders/core/markdownEncoding';
 import { buildReminderList } from '../../reminders/core/reminder-list';
@@ -14,9 +14,8 @@ import { validateEncryptedSchedules, ENCRYPTED_SCHEDULING_CAPACITY_ISSUE } from 
 import { capturePwaSession } from '../session-generation';
 import { loadEncryptedReminderAttempt, saveEncryptedReminderAttempt, pruneEncryptedReminderAttempts, type EncryptedReminderAttempt as Attempt } from './encrypted-reminder-attempts';
 import { requireCompatibleServer } from '../server-compatibility';
-import type { StoredReminderKeys } from '../encryption/encryption-keys';
+import type { FeatureKeys } from '../encryption/encryption-keys';
 import type { ApiFetch } from '../types';
-import { routeFolderPath } from '../encryption/encryption-folder-routing';
 import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '../../encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { isReminderOperationId } from '@/protocol/reminder-operation';
@@ -44,15 +43,15 @@ export class EncryptedReminderApi {
 	// Parsed reminders per immutable revision. Unlike the bounded content cache,
 	// this keeps every current note, so a change re-downloads only changed notes.
 	private scanned = new Map<string, ScannedNote>();
-	constructor(private readonly keys: StoredReminderKeys, private readonly fetch: ApiFetch) {}
-	private get localFolder() { return this.keys.localFolderPath ?? this.keys.folderPath; }
+	constructor(private readonly keys: FeatureKeys, private readonly fetch: ApiFetch) {}
+	private get localFolder() { return this.keys.folderPath; }
 	private authority(path: string) {
 		if (!path.startsWith(`${this.keys.folderPath}/`) || !isSyncPath(path)) throw new ReminderCommandError('File is outside this enrollment', 403, 'scope_mismatch');
-		return { vaultId: this.keys.vaultId, scopeId: this.keys.scopeId, key: this.keys.data };
+		return { vaultId: this.keys.vaultId, scopeId: 'vault', key: this.keys.vault };
 	}
 	private assertCurrent(): void { if (!this.current()) throw new Error('Session changed. Reopen Crate before saving.'); }
-	private context(operationId: string) { return { vaultId: this.keys.vaultId, scopeId: this.keys.scopeId, objectId: operationId, purpose: 'reminder' as const }; }
-	private attemptKey(operationId: string) { return `${this.keys.vaultId}:${this.keys.scopeId}:${operationId}`; }
+	private context(operationId: string) { return { vaultId: this.keys.vaultId, scopeId: 'vault', objectId: operationId, purpose: 'reminder' as const }; }
+	private attemptKey(operationId: string) { return `${this.keys.vaultId}:vault:${operationId}`; }
 
 	async handle(path: string, init: RequestInit = {}): Promise<Response | null> {
 		// Fetching a page title would reveal a URL from an encrypted reminder to the server.
@@ -119,7 +118,7 @@ export class EncryptedReminderApi {
 				const first = await this.page();
 				this.assertCurrent();
 				this.cleanup();
-				const etag = `"e2ee-${this.keys.vaultId}-${this.keys.scopeId}-${this.keys.generation}-${first.sequence}"`;
+				const etag = `"e2ee-${this.keys.vaultId}-${this.keys.generation}-${first.sequence}"`;
 				if (etag === previousEtag) return new Response(null, { status: 304, headers: { ETag: etag } });
 				const inventory = await this.inventory(first);
 				const nextCache = new Map(this.cached);
@@ -130,7 +129,7 @@ export class EncryptedReminderApi {
 						const known = this.scanned.get(file.revision);
 						if (known && known.file.path === file.path && known.file.hash === file.hash && known.file.size === file.size) return known;
 						const note = await this.readNote(file, nextCache);
-						const scanned = scanReminderMarkdownContent(routeFolderPath(file.path, this.keys.folderPath, this.localFolder), note.content, this.localFolder).reminders;
+						const scanned = scanReminderMarkdownContent(file.path, note.content, this.localFolder).reminders;
 						return { file, reminders: await Promise.all(scanned.map(reminder => reminderCommandPayload(reminder))), issue: note.issue };
 					} catch (error) {
 						if (!(error instanceof MarkdownEncodingError) && !(error instanceof ReminderCommandError && error.status === 413)) throw error;
@@ -139,7 +138,7 @@ export class EncryptedReminderApi {
 				});
 				for (const entry of loaded) {
 					const { file } = entry;
-					const source = { path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), project: getProjectFromPath(file.path, this.keys.folderPath) };
+					const source = { path: file.path, project: getProjectFromPath(file.path, this.keys.folderPath) };
 					if ('error' in entry) {
 						sources.push({ ...source, reminders: [], issue: entry.error instanceof Error ? entry.error.message : 'This note could not be decrypted' });
 						continue;
@@ -184,16 +183,16 @@ export class EncryptedReminderApi {
 		let attempt = await loadEncryptedReminderAttempt(key);
 		if (attempt && attempt.semanticHash !== semanticHash && !attempt.rejected) throw new Error('The original encrypted save is still unresolved. Retry it before changing the request.');
 		const movedAttempt = attempt && attempt.generation !== this.keys.generation;
-		if (attempt?.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.data, this.context(body.operationId)));
+		if (attempt?.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.vault, this.context(body.operationId)));
 		if (!attempt || movedAttempt) {
 			const query = new URLSearchParams({ folderPath: this.keys.folderPath, operationId: body.operationId });
 			const receipt = await json<{ envelope: string | null }>(await this.fetch(`/reminders/encrypted-receipt?${query}`));
 			if (receipt.envelope) {
-				const converted = await decryptJson(receipt.envelope, this.keys.data, this.context(body.operationId)) as { requestHash: string; response: unknown };
+				const converted = await decryptJson(receipt.envelope, this.keys.vault, this.context(body.operationId)) as { requestHash: string; response: unknown };
 				if (converted.requestHash !== await reminderRequestHash(attempt ? 'encrypted-files' : action === 'set-completed' ? 'complete' : action,
 					attempt ? JSON.parse(attempt.body) as Record<string, unknown> : original)) throw new ReminderCommandError('The original reminder operation has different saved content. Preserve it before recovery.', 409, 'operation_mismatch');
 				const encrypted = (converted.response as { encrypted?: unknown })?.encrypted;
-				return Response.json(typeof encrypted === 'string' ? await decryptJson(encrypted, this.keys.data, this.context(body.operationId)) : converted.response);
+				return Response.json(typeof encrypted === 'string' ? await decryptJson(encrypted, this.keys.vault, this.context(body.operationId)) : converted.response);
 			}
 			if (attempt) {
 				// The old generation can no longer publish. An absent converted receipt
@@ -207,26 +206,26 @@ export class EncryptedReminderApi {
 				const inventory = await this.inventory();
 				const files = new Map(inventory.files.map(file => [file.path, file]));
 				const command = await applyReminderFileCommand(action, body, this.localFolder, async path => {
-					const file = files.get(routeFolderPath(path, this.localFolder, this.keys.folderPath));
+					const file = files.get(path);
 					return file ? this.read(file) : null;
 				});
 				const replacements = [];
 				for (const change of command.files) {
-					const path = routeFolderPath(change.path, this.localFolder, this.keys.folderPath);
+					const path = change.path;
 					const content = new TextEncoder().encode(change.content);
-					const projection = await createReminderProjectionWithKeys(this.keys.vaultId, { id: this.keys.scopeId, folderPath: this.keys.folderPath },
-						this.keys.notifications, this.keys.notificationFingerprint, path, content.buffer);
+					const projection = await createReminderProjection({ vaultId: this.keys.vaultId, key: this.keys.notifications, fingerprint: this.keys.notificationFingerprint },
+						[this.keys.folderPath], path, content.buffer);
 					const sealed = await sealFile({ path, content, contentType: 'text/markdown; charset=utf-8', publicData: projection }, this.authority(path));
 					replacements.push({ path, content: new TextDecoder().decode(sealed.bytes),
 						expectedHash: files.get(path)?.hash ?? null, expectedRevision: files.get(path)?.revision });
 				}
-				const acknowledgment = await encryptJson(command.response, this.keys.data, this.context(body.operationId));
+				const acknowledgment = await encryptJson(command.response, this.keys.vault, this.context(body.operationId));
 				const next: Attempt = { semanticHash, generation: this.keys.generation, body: JSON.stringify({ folderPath: this.keys.folderPath, operationId: body.operationId,
 					files: replacements, acknowledgment, ...(command.createdId ? { createdId: command.createdId } : {}) }) };
 				await saveEncryptedReminderAttempt(key, next, attempt, this.current); attempt = next;
 			}
 			this.assertCurrent();
-			if (attempt.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.data, this.context(body.operationId)));
+			if (attempt.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.vault, this.context(body.operationId)));
 			const response = await this.fetch('/reminders/encrypted-commit', { method: 'POST', body: attempt.body });
 			if (response.status === 409) {
 				const details = await response.clone().json() as { code?: string };
@@ -239,7 +238,7 @@ export class EncryptedReminderApi {
 			if (!response.ok) return response;
 			const ack = await response.json() as { encrypted?: string };
 			if (typeof ack.encrypted !== 'string') throw new Error('The server did not confirm the encrypted save');
-			const result = await decryptJson(ack.encrypted, this.keys.data, this.context(body.operationId));
+			const result = await decryptJson(ack.encrypted, this.keys.vault, this.context(body.operationId));
 			await saveEncryptedReminderAttempt(key, { ...attempt, acknowledgment: ack.encrypted }, attempt, this.current);
 			return Response.json(result);
 		}

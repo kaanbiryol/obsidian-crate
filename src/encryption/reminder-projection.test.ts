@@ -1,17 +1,23 @@
 import { expect, it, vi } from 'vitest';
-import { addReminderScope, createVaultKeyBundle } from './key-bundle';
-import { createReminderProjection, openNotification } from './reminder-projection';
+import { createVaultKeyBundle } from './key-bundle';
+import { createReminderProjection, importNotificationKeys, openNotification } from './reminder-projection';
 import { importEncryptionSecret } from './envelope';
 import { validateEncryptedSchedules } from './notification-format';
 import { FileKeyAuthority } from './file-authority';
 import { openFile, sealFile } from './file-codec';
 
-it('publishes scheduling facts without reminder text and decrypts only with the notification grant', async () => {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
-	const scope = bundle.scopes[0]!;
+const folders = ['Reminders'];
+
+async function notificationKeys() {
+	const bundle = await createVaultKeyBundle();
+	return { bundle, keys: await importNotificationKeys(bundle.vaultId, bundle.notifications) };
+}
+
+it('publishes scheduling facts without reminder text and decrypts only with the notification key', async () => {
+	const { bundle, keys } = await notificationKeys();
 	const bytes = new TextEncoder().encode('- [ ] Secret appointment 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->').buffer;
-	const first = await createReminderProjection(bundle, 'Reminders/Personal.md', bytes);
-	const second = await createReminderProjection(bundle, 'Reminders/Personal.md', bytes);
+	const first = await createReminderProjection(keys, folders, 'Reminders/Personal.md', bytes);
+	const second = await createReminderProjection(keys, folders, 'Reminders/Personal.md', bytes);
 	validateEncryptedSchedules(first);
 	expect(first.reminders).toHaveLength(1);
 	expect(JSON.stringify(first)).not.toContain('Secret appointment');
@@ -21,25 +27,25 @@ it('publishes scheduling facts without reminder text and decrypts only with the 
 	// An unchanged fingerprint reuses its envelope instead of encrypting again.
 	expect(notice.envelope).toBe(second!.reminders[0]!.notification.envelope);
 	expect(notice.fingerprint).toBe(second!.reminders[0]!.notification.fingerprint);
-	const edited = await createReminderProjection(bundle, 'Reminders/Personal.md',
+	const edited = await createReminderProjection(keys, folders, 'Reminders/Personal.md',
 		new TextEncoder().encode('- [ ] Secret meeting 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->').buffer);
 	expect(edited!.reminders[0]!.notification.fingerprint).not.toBe(notice.fingerprint);
 	expect(edited!.reminders[0]!.notification.envelope).not.toBe(notice.envelope);
-	expect(await openNotification(notice, await importEncryptionSecret(scope.notifications), bundle.vaultId, scope.id))
+	expect(await openNotification(notice, await importEncryptionSecret(bundle.notifications), bundle.vaultId))
 		.toEqual({ title: 'Secret appointment', body: 'Personal' });
-	await expect(openNotification(notice, await importEncryptionSecret(scope.data), bundle.vaultId, scope.id)).rejects.toThrow();
-	await expect(openNotification(notice, await importEncryptionSecret(scope.notifications), 'different', scope.id)).rejects.toThrow();
+	await expect(openNotification(notice, await importEncryptionSecret(bundle.vault), bundle.vaultId)).rejects.toThrow();
+	await expect(openNotification(notice, await importEncryptionSecret(bundle.notifications), 'different')).rejects.toThrow();
 	expect(notice.envelope.length).toBeLessThanOrEqual(2800);
 });
 
 it('re-encrypts only reminders whose notification fingerprint changed', async () => {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
+	const { keys } = await notificationKeys();
 	const note = (changed: string) => new TextEncoder().encode(Array.from({ length: 20 }, (_, index) =>
 		`- [ ] ${index === 0 ? changed : `Task ${index}`} @2099-01-02 <!-- crate-id:r${index} -->`).join('\n')).buffer;
-	const before = await createReminderProjection(bundle, 'Reminders/Inbox.md', note('First'));
+	const before = await createReminderProjection(keys, folders, 'Reminders/Inbox.md', note('First'));
 	const importKey = vi.spyOn(crypto.subtle, 'importKey');
 	try {
-		const after = await createReminderProjection(bundle, 'Reminders/Inbox.md', note('Edited'));
+		const after = await createReminderProjection(keys, folders, 'Reminders/Inbox.md', note('Edited'));
 		// One envelope (two key imports). Before: 40, all 20 were encrypted again.
 		expect(importKey).toHaveBeenCalledTimes(2);
 		expect(after!.reminders.map(reminder => reminder.id)).toEqual(before!.reminders.map(reminder => reminder.id));
@@ -48,37 +54,48 @@ it('re-encrypts only reminders whose notification fingerprint changed', async ()
 });
 
 it('quarantines invalid and oversize notes instead of cancelling their existing schedules', async () => {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
+	const { keys } = await notificationKeys();
 	const invalid = new TextEncoder().encode('- [ ] Private task tomorrow <!-- crate-id:r1 -->').buffer;
-	expect(await createReminderProjection(bundle, 'Reminders/Inbox.md', invalid)).toEqual({ version: 1, reminders: [], issue: 'invalid-reminders' });
-	expect(await createReminderProjection(bundle, 'Reminders/Large.md', new ArrayBuffer(1024 * 1024 + 1))).toEqual({ version: 1, reminders: [], issue: 'size' });
-	expect(await createReminderProjection(bundle, 'Outside.md', invalid)).toBeNull();
+	expect(await createReminderProjection(keys, folders, 'Reminders/Inbox.md', invalid)).toEqual({ version: 1, reminders: [], issue: 'invalid-reminders' });
+	expect(await createReminderProjection(keys, folders, 'Reminders/Large.md', new ArrayBuffer(1024 * 1024 + 1))).toEqual({ version: 1, reminders: [], issue: 'size' });
+	expect(await createReminderProjection(keys, folders, 'Outside.md', invalid)).toBeNull();
+});
+
+it('schedules only notes inside a reminders folder', async () => {
+	const { keys } = await notificationKeys();
+	const bytes = new TextEncoder().encode('- [ ] Task @2099-01-02 <!-- crate-id:r1 -->').buffer;
+	expect(await createReminderProjection(keys, folders, 'Notes/Inbox.md', bytes)).toBeNull();
+	expect(await createReminderProjection(keys, folders, 'RemindersArchive/Inbox.md', bytes)).toBeNull();
+	expect(await createReminderProjection(keys, [], 'Reminders/Inbox.md', bytes)).toBeNull();
+	expect(await createReminderProjection(keys, folders, 'Reminders/Inbox.txt', bytes)).toBeNull();
+	expect((await createReminderProjection(keys, ['Work', 'Reminders'], 'Reminders/Inbox.md', bytes))!.reminders).toHaveLength(1);
 });
 
 it.each([3000, 10001])('keeps a %i-reminder note convertible when notification metadata exceeds its budget', async count => {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
+	const { bundle, keys } = await notificationKeys();
 	const path = 'Reminders/Inbox.md';
 	const content = new TextEncoder().encode(Array.from({ length: count }, (_, index) => `- [ ] Private task ${index} @2099-01-02 <!-- crate-id:r${index} -->`).join('\n'));
 	expect(content.byteLength).toBeLessThan(1024 * 1024);
-	const publicData = await createReminderProjection(bundle, path, content.buffer);
+	const publicData = await createReminderProjection(keys, folders, path, content.buffer);
 	expect(publicData).toEqual({ version: 1, reminders: [], issue: 'scheduling-capacity' });
 	validateEncryptedSchedules(publicData);
-	const authority = (await FileKeyAuthority.fromVault(bundle)).forPath(path);
+	const authority = (await FileKeyAuthority.fromBundle(bundle)).forPath(path);
 	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData }, authority);
 	const opened = await openFile(file.bytes, path, authority);
 	expect(opened.content).toEqual(content);
 	expect(opened.publicData).toEqual(publicData);
 }, 15000);
 
-it('imports a scope\'s notification keys once for many projected files', async () => {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
+it('imports the notification keys once for many projected files', async () => {
+	const bundle = await createVaultKeyBundle();
 	const importKey = vi.spyOn(crypto.subtle, 'importKey');
 	try {
+		const keys = await importNotificationKeys(bundle.vaultId, bundle.notifications);
 		for (let file = 0; file < 5; file++) {
-			await createReminderProjection(bundle, `Reminders/Note ${file}.md`, new TextEncoder().encode(`- [ ] Task ${file} <!-- crate-id:task-${file} -->`).buffer);
+			await createReminderProjection(keys, folders, `Reminders/Note ${file}.md`, new TextEncoder().encode(`- [ ] Task ${file} <!-- crate-id:task-${file} -->`).buffer);
 		}
 		// Each notice envelope still derives its own key (two imports per file).
-		// Before: 20, because the scope keys were imported again for every file.
+		// Before: 20, because the notification keys were imported again for every file.
 		expect(importKey).toHaveBeenCalledTimes(2 + 5 * 2);
 	} finally { importKey.mockRestore(); }
 });

@@ -2,9 +2,9 @@ import { rememberEncryptionUnlock } from '../encryption/encryption-onboarding';
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
-import { loadEncryptionState, loadScopeKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../connection/encryption';
-import type { ScopedEncryptionState } from '../encryption/encryption-scope';
-import { unlockLocalState, type StoredReminderKeys } from '../encryption/encryption-keys';
+import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../connection/encryption';
+import type { EncryptionServerState } from '@/encryption/server-state';
+import { unlockLocalState, type FeatureKeys } from '../encryption/encryption-keys';
 import { pendingReadingKey, forgetReadingKey, forgetReadingCapture } from '../encryption/encryption-fragments';
 import { abortTransaction } from '../storage/abort-transaction';
 import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from './private-storage';
@@ -13,10 +13,9 @@ import { readingDatabase } from './database';
 import { isSessionReadingKey } from '@/pwa/reading/storage-keys';
 import { rememberRecoveryKey } from '../encryption/web-app-unlock';
 
-type ReadingEncryptionState = ScopedEncryptionState;
-let pending: { identity: string; promise: Promise<StoredReminderKeys | null> } | undefined;
-let currentKeys: StoredReminderKeys | null = null;
-let expected: ReadingEncryptionState | null = null;
+let pending: { identity: string; promise: Promise<FeatureKeys | null> } | undefined;
+let currentKeys: FeatureKeys | null = null;
+let expected: EncryptionServerState | null = null;
 let verifiedIdentity: string | undefined;
 onReadingEncryptionReset(discardKeys => {
   pending = undefined; currentKeys = null; expected = null; verifiedIdentity = undefined;
@@ -26,7 +25,7 @@ onReadingEncryptionReset(discardKeys => {
 export function readingEncryptionHeaders(): Record<string, string> {
   return expected ? { [ENCRYPTION_VAULT_HEADER]: expected.vaultId, [ENCRYPTION_GENERATION_HEADER]: String(expected.generation) } : {};
 }
-export function prepareReadingEncryption(session: ReadingSession, refresh = false): Promise<StoredReminderKeys | null> {
+export function prepareReadingEncryption(session: ReadingSession, refresh = false): Promise<FeatureKeys | null> {
   assertReadingSession(session);
   if (refresh) pending = undefined;
   const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath]);
@@ -39,9 +38,9 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
     if (!state) { verifiedIdentity = identity; currentKeys = null; lockReadingStorage(false); return null; }
     if (!currentKeys) lockReadingStorage();
     assertEncryptionActive(state);
-    const keys = await loadScopeKeys(state, session.folderPath, current, pendingReadingKey());
+    const keys = await loadVaultKeys(state, session.folderPath, current, pendingReadingKey());
     forgetReadingKey();
-    const local = await unlockLocalState(keys);
+    const local = await unlockLocalState(keys, 'reading');
     if (!current()) { local.destroy(); throw new Error('Reading sign-in changed.'); }
     unlockReadingStorage(local);
     // All this session's plaintext records migrate atomically before hydration. Never
@@ -60,7 +59,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
     if (!current()) throw new Error('Reading sign-in changed.');
     rememberEncryptionUnlock(state.vaultId);
     verifiedIdentity = identity;
-    currentKeys = { ...keys, localFolderPath: session.folderPath };
+    currentKeys = keys;
     return currentKeys;
   })().catch(error => {
     if (current()) {
@@ -83,7 +82,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 export async function unlockReadingWithCode(code: string, session: ReadingSession): Promise<void> {
   if (!expected) throw new Error('Verify the Reading connection first.');
   const state = expected;
-  await rememberRecoveryKey(code, state, session.folderPath, () => { try { assertReadingSession(session); return expected === state; } catch { return false; } });
+  await rememberRecoveryKey(code, state, () => { try { assertReadingSession(session); return expected === state; } catch { return false; } });
   location.reload();
 }
-export function readingKeys(): StoredReminderKeys | null { return currentKeys; }
+export function readingKeys(): FeatureKeys | null { return currentKeys; }

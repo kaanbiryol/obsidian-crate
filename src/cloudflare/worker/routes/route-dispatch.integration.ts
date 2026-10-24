@@ -11,9 +11,7 @@ import { policy } from '../reading/common';
 import { commitStagedFile } from '../sync/mutations';
 import { commitNewFiles } from '../sync/bulk-new-file-commit';
 import type { AuthPrincipal } from '../auth/authenticate';
-import { ENCRYPTION_STATE_KEY } from '../encryption/state';
-import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '@/encryption/key-bundle';
-import { createEncryptionState } from '@/encryption/server-state';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 
 beforeEach(async () => {
@@ -66,9 +64,7 @@ it('serves shared settings from the store that matches the vault encryption', as
 	// An unreadable plaintext record still reports its R2 version.
 	const plaintext = (await env.BUCKET.put('__crate__/settings.json', 'unreadable'))!;
 	expect(await read()).toEqual({ settings: null, settingsVersion: plaintext.etag });
-	const bundle = createVaultKeyBundle();
-	const state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' };
-	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_STATE_KEY, JSON.stringify(state)).run();
+	await storeEncryptionState(env.DB, (await createEncryptionFixture('active')).state);
 	expect(await read()).toEqual({ settings: null, settingsVersion: null });
 });
 

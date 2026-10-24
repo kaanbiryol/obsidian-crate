@@ -13,7 +13,7 @@ import { corsResponse } from './cors';
 import { INITIAL_IMPORT_CAPABILITY } from '@/protocol/initial-import';
 import { READING_SHORTCUT_CONTRACT } from '@/reading/shortcut';
 import { readEncryptionState } from './encryption/state';
-import { ENCRYPTION_CAPABILITY, READING_ENCRYPTION_CAPABILITY, ENCRYPTION_FOLDER_MOVES_CAPABILITY } from '../../encryption/server-state';
+import { ENCRYPTION_CAPABILITY } from '../../encryption/server-state';
 
 declare const __CRATE_SERVER_VERSION__: string | undefined;
 
@@ -30,8 +30,6 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 	capabilities: Object.freeze([
     'web-pairing-v1',
 		ENCRYPTION_CAPABILITY,
-		READING_ENCRYPTION_CAPABILITY,
-		ENCRYPTION_FOLDER_MOVES_CAPABILITY,
 		'e2ee-reset-v1',
         SHARED_CHECKPOINT_CAPABILITY,
     INITIAL_IMPORT_CAPABILITY,

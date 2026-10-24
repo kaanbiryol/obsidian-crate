@@ -10,7 +10,6 @@ import { openLocalRuntime, issueLocalDevice } from '../../../packages/server/src
 import { listenLocalServer } from '../../../packages/server/src/local-server-http.mjs';
 import { verifyEncryptionReset } from './pwa-encryption-reset-checks.mjs';
 import { verifyEncryptedAttemptCleanup } from './pwa-encryption-cleanup-checks.mjs';
-import { verifyReminderFolderMove } from './pwa-reminder-folder-move-checks.mjs';
 
 if (process.env.CRATE_PWA_PREBUILT !== '1') {
 	const result = spawnSync(process.execPath, ['scripts/build-worker.mjs'], { stdio: 'inherit' });
@@ -44,8 +43,7 @@ async function verify(type) {
 	// Inject faults at the HTTP boundary: WebKit does not reliably route requests
 	// owned by an installed service worker through Playwright's route handlers.
 	const server = await listenLocalServer({ origin: runtime.origin, mf: { dispatchFetch: async (url, init) => {
-		// Only the app is offline; its Obsidian peer must still be able to move
-		// folders on the server before the app reconnects.
+		// Only the app is offline; its Obsidian peer keeps its connection.
 		if (offlineApis && new Headers(init.headers).get('Authorization') !== `Bearer ${owner.token}`
 			&& /^\/(encryption|reminders|sync|settings|\.well-known)(\/|$)/.test(new URL(url).pathname)) return Response.json({ error: 'Injected offline API' }, { status: 503 });
 		if (new URL(url).pathname === '/test-encryption-harness.js') return new Response(harness, { headers: { 'Content-Type': 'application/javascript' } });
@@ -101,7 +99,7 @@ async function verify(type) {
 		await admin.addScriptTag({ content: harness });
 		const enrolled = await admin.evaluate(async ({ origin, token, checkpointId, legacyUploads, initialSettings, seedSettings }) => {
 			const t = window.crateEncryptionTest;
-			const bundle = t.addReminderScope(t.createVaultKeyBundle(), 'Reminders');
+			const bundle = await t.createVaultKeyBundle();
 			const recovery = await t.generateRecoveryCode();
 			let loseResponse = true, loseRestoreResponse = false;
 			const restoreBodies = [];
@@ -114,16 +112,16 @@ async function verify(type) {
 				return { status: response.status, headers: Object.fromEntries(response.headers), arrayBuffer: buffer, text: new TextDecoder().decode(buffer) };
 			};
 			const http = new t.WorkerApiHttpClient(origin, token, transport);
-			try { await t.convertEncryptedVault(http, bundle, recovery, () => {}); throw new Error('Expected injected response loss'); }
+			try { await t.convertEncryptedVault(http, bundle, recovery, () => {}, ['Reminders']); throw new Error('Expected injected response loss'); }
 			catch (error) { if (!error.message.includes('Injected lost')) throw error; }
 			if ((await t.readServerEncryption(http)).mode !== 'converting') throw new Error('Interrupted conversion was not retained');
-			await t.convertEncryptedVault(http, bundle, recovery, () => {});
+			await t.convertEncryptedVault(http, bundle, recovery, () => {}, ['Reminders']);
 			const recovered = await t.openRecoveryBundle((await t.readServerEncryption(http)).recovery, recovery);
 			if (JSON.stringify(recovered) !== JSON.stringify(bundle)) throw new Error('Vault recovery failed');
-			const api = new t.SyncApiClient(origin, token, transport); await api.configureEncryption(bundle);
+			const api = new t.SyncApiClient(origin, token, transport); await api.configureEncryption(bundle, () => ['Reminders']);
 			if (JSON.stringify((await api.getSharedSettings()).settings) !== JSON.stringify(initialSettings)) throw new Error('Converted shared settings did not round-trip');
 			// A new client must obtain the converted version even when no settings existed.
-			const settingsWriter = new t.SyncApiClient(origin, token, transport); await settingsWriter.configureEncryption(bundle);
+			const settingsWriter = new t.SyncApiClient(origin, token, transport); await settingsWriter.configureEncryption(bundle, () => ['Reminders']);
 			await settingsWriter.putSharedSettings(seedSettings);
 			if (JSON.stringify((await api.getSharedSettings()).settings) !== JSON.stringify(seedSettings)) throw new Error('First encrypted settings write failed');
 			const files = await t.EncryptedFiles.create(http, bundle, async () => null);
@@ -154,7 +152,7 @@ async function verify(type) {
 			window.encryptedTestApi = api;
 			window.encryptedTestKeys = bundle;
 			window.encryptedTestRecovery = recovery;
-			return { ...(await api.createRemindersEnrollmentToken('Reminders')), grant: recovery, scope: t.createReminderKeyGrant(bundle, 'Reminders') };
+			return { ...(await api.createRemindersEnrollmentToken('Reminders')), grant: recovery, vaultId: bundle.vaultId };
 		}, { origin, token: owner.token, checkpointId, legacyUploads, initialSettings, seedSettings });
 		const rows = await runtime.db.prepare('SELECT storage_key FROM files UNION SELECT storage_key FROM file_versions').all();
 		for (const row of rows.results) {
@@ -249,16 +247,16 @@ async function verify(type) {
 			return response.json();
 		}, legacyCreate);
 		assert.deepEqual(replayedLegacy, oldCreateReceipt);
-		await verifyEncryptedAttemptCleanup(page, enrolled.scope, info.reminderOperationDay);
+		await verifyEncryptedAttemptCleanup(page, enrolled.vaultId, info.reminderOperationDay);
 		const notification = await admin.evaluate(async () => {
 			const t = window.crateEncryptionTest, bundle = window.encryptedTestKeys;
-			const projection = await t.createReminderProjection(bundle, 'Reminders/Inbox.md', new TextEncoder().encode('- [ ] Private push title 2099-01-02 <!-- crate-id:push-test -->').buffer);
+			const projection = await t.createReminderProjection(await t.importNotificationKeys(bundle.vaultId, bundle.notifications), ['Reminders'], 'Reminders/Inbox.md', new TextEncoder().encode('- [ ] Private push title 2099-01-02 <!-- crate-id:push-test -->').buffer);
 			return projection.reminders[0].notification;
 		});
 		await page.evaluate(async notice => {
 			const t = window.crateEncryptionTest;
-			const keys = await t.readReminderKeys(notice.vaultId, notice.scopeId);
-			if (keys.data.key.extractable || keys.notifications.key.extractable || keys.data.secret || keys.notifications.secret) throw new Error('Browser persisted extractable keys');
+			const keys = await t.readVaultKeys(notice.vaultId);
+			if (keys.vault.key.extractable || keys.notifications.key.extractable || keys.seal.privateKey.extractable || keys.vault.secret || keys.notifications.secret) throw new Error('Browser persisted extractable keys');
 			if ((await t.decryptPushDisplay(notice))?.title !== 'Private push title') throw new Error('Remembered keys cannot decrypt notifications');
 			if (await t.decryptPushDisplay({ ...notice, reminderId: 'substitution' }) !== null) throw new Error('Notification context substitution accepted');
 		}, notification);
@@ -322,7 +320,6 @@ async function verify(type) {
 			await locked.reload();
 			await expect(locked.getByText('Private browser task', { exact: true })).toBeVisible();
 		} finally { await lockedContext.close(); }
-		await verifyReminderFolderMove({ admin, page, origin, owner, setOffline, setFault: value => { faultPhase = value; }, getFault: () => faultPhase, replays, notification });
 		await verifyEncryptionReset({ admin, page, origin, owner, runtime });
 		assert.equal(recoverySent, false, 'Recovery key must never be sent to the server');
 		assert.deepEqual(errors, []);

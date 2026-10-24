@@ -38,8 +38,8 @@ it.each(['protocol', 'authentication', 'scope', 'encryption reset'] as const)(
 		if (failure === 'scope') vi.mocked(isAuthenticatedRouteAllowed).mockReturnValue(false);
 		if (failure === 'encryption reset') vi.mocked(authenticateWorkerRequest).mockResolvedValue({
 			...authorized, encryption: {
-				version: 1, vaultId: 'vault', keyId: 'key', generation: 1, mode: 'resetting', scopes: [],
-				recovery: { version: 1, vaultId: 'vault', envelope: '' },
+				version: 1, vaultId: 'vault', keyId: 'key', notificationKeyId: 'notifications', generation: 1, mode: 'resetting',
+				seal: { keyId: 'seal', publicKey: '' }, recovery: { version: 1, vaultId: 'vault', envelope: '' },
 			} satisfies EncryptionServerState,
 		});
 		const response = await fetchWorkerRequest(upload(failure === 'protocol' ? 'invalid' : undefined), env);

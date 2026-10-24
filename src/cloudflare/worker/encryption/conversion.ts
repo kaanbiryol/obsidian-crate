@@ -1,6 +1,5 @@
 import { convertedCapturePath, convertReadingCapture } from './conversion-reading';
-import { isReadingScopeExtension, isEncryptionScopeMove, validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
-import { prepareEncryptionScopeMove } from './scope-move';
+import { validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES, MAX_SHARED_SETTINGS_BYTES, validateEncryptedSettings } from '../../../encryption/settings-format';
 import { ENCRYPTION_STATE_KEY, ENCRYPTION_FILE_PREFIX, hasEncryptionAuthority, readEncryptionState } from './state';
 import { ENCRYPTED_SETTINGS_KEY } from './settings';
@@ -69,8 +68,7 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 		// Each page advances indexed key cursors, so a pass reads each row once.
 		const pending = (table: string) => `SELECT * FROM (SELECT path, storage_key AS revision, hash, size FROM ${table} WHERE storage_key > ?
 			AND NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? || storage_key) ORDER BY storage_key LIMIT ${CONVERSION_PAGE_SIZE})`;
-		const files = await env.DB.prepare(`SELECT f.*, (SELECT value FROM maintenance_state WHERE key = 'e2ee:prior-file:' || f.revision) AS previous_descriptor
-			FROM (${pending('files')} UNION ${pending('file_versions')}) f ORDER BY revision LIMIT ${CONVERSION_PAGE_SIZE}`)
+		const files = await env.DB.prepare(`SELECT f.* FROM (${pending('files')} UNION ${pending('file_versions')}) f ORDER BY revision LIMIT ${CONVERSION_PAGE_SIZE}`)
 			.bind(cursor.file, ENCRYPTION_FILE_PREFIX, cursor.file, ENCRYPTION_FILE_PREFIX).all<{ revision: string }>();
 		const unconverted = (table: string, after: string) => env.DB.prepare(`SELECT operation_id, request_hash, response_json FROM ${table}
 			WHERE operation_id > ? AND json_type(response_json, '$.e2eeLegacy') IS NULL ORDER BY operation_id LIMIT ${CONVERSION_PAGE_SIZE}`).bind(after).all<{ operation_id: string }>();
@@ -111,14 +109,14 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 	if (path === '/encryption/conversion/receipt' && request.method === 'PUT') {
 		const body = await parseJsonObject(request, MAX_CONVERTED_RECEIPT_BYTES);
 		if (!body.ok) return body.response;
-		const { operationId, vault, scopes, kind = 'reminder' } = body.value;
+		const { operationId, vault, kind = 'reminder' } = body.value;
 		if (kind !== 'reminder' && kind !== 'upload' && kind !== 'reading') return corsResponse({ error: 'Invalid receipt kind' }, 400);
-		if (!isEncryptionId(operationId) || !isReceiptEnvelope(vault) || !Array.isArray(scopes) || scopes.length > state.scopes.length
-			|| scopes.some((item: unknown) => !item || typeof item !== 'object' || !('id' in item) || !('envelope' in item) || !isReceiptEnvelope(item.envelope) || !state.scopes.some(scope => scope.id === item.id))) return corsResponse({ error: 'Invalid encrypted receipt' }, 400);
+		if (Object.keys(body.value).some(key => !['operationId', 'vault', 'kind'].includes(key))
+			|| !isEncryptionId(operationId) || !isReceiptEnvelope(vault)) return corsResponse({ error: 'Invalid encrypted receipt' }, 400);
 		const table = kind === 'upload' ? 'upload_operations' : kind === 'reading' ? 'reading_operations' : 'reminder_operations';
 		// `e2eeLegacy` and 'e2ee-legacy' are stored markers for converted pre-encryption receipts; keep them.
 		const predicate = "operation_id = ? AND json_type(response_json, '$.e2eeLegacy') IS NULL";
-		const receipt = prepareEncryptedReceipt(env.DB, kind, operationId, { e2eeLegacy: { vault, scopes } },
+		const receipt = prepareEncryptedReceipt(env.DB, kind, operationId, { e2eeLegacy: { vault } },
 			{ sql: `EXISTS (SELECT 1 FROM ${table} WHERE ${predicate})`, args: [operationId] });
 		await env.DB.batch([...receipt.statements, env.DB.prepare(`UPDATE ${table} SET request_hash = 'e2ee-legacy', response_json = ? WHERE ${predicate}`)
 			.bind(receipt.json, operationId)]);
@@ -155,9 +153,7 @@ async function beginConversion(request: Request, env: Env, state: EncryptionServ
 	}
 	const configuration = body.value;
 	if (configuration.mode !== 'converting') return corsResponse({ error: 'Start with a conversion configuration' }, 400);
-	const extendingReading = state && isReadingScopeExtension(state, configuration);
-	const movingScopes = state && isEncryptionScopeMove(state, configuration);
-	if (state && !extendingReading && !movingScopes) {
+	if (state) {
 		if (JSON.stringify(state) === JSON.stringify(configuration)) return corsResponse({ encryption: state });
 		return corsResponse({ error: 'This vault already has a different encryption configuration. Recover its keys first.' }, 409);
 	}
@@ -170,30 +166,7 @@ async function beginConversion(request: Request, env: Env, state: EncryptionServ
 	if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) {
 		return corsResponse({ error: 'Finish the initial sync before enabling encryption' }, 409);
 	}
-	const folders = await env.DB.prepare(`
-		SELECT folder_path FROM reading_policy
-		UNION SELECT folder_path FROM notification_policy
-		UNION SELECT folder_path FROM auth_tokens WHERE scope = 'reminders' AND (expires_at IS NULL OR expires_at > ?)
-		UNION SELECT folder_path FROM web_enrollment_tokens WHERE expires_at > ?`)
-		.bind(Date.now(), Date.now()).all<{ folder_path: string | null }>();
-	const missingFolder = folders.results.some(row => row.folder_path && !configuration.scopes.some(scope => scope.folderPath === row.folder_path));
-	if (!movingScopes && missingFolder) {
-		return corsResponse({ error: 'Include every enrolled reminders folder before enabling encryption' }, 409);
-	}
-	const added = extendingReading ? configuration.scopes.find(scope => !state.scopes.some(old => old.id === scope.id))! : null;
-	const affected = added ? [added.folderPath] : movingScopes ? state.scopes.flatMap(scope => {
-		const target = configuration.scopes.find(candidate => candidate.id === scope.id)!;
-		return target.folderPath === scope.folderPath ? [] : [scope.folderPath, target.folderPath];
-	}) : [];
-	const scopeVersions = `SELECT f.revision FROM (${CONVERSION_FILES}) f WHERE EXISTS
-		(SELECT 1 FROM json_each(?) WHERE f.path >= value || '/' AND f.path < value || '0')`;
 	await env.DB.batch([
-		...(affected.length ? [
-			env.DB.prepare(`INSERT INTO maintenance_state(key,value) SELECT 'e2ee:prior-file:' || f.revision, m.value FROM (${CONVERSION_FILES}) f JOIN maintenance_state m ON m.key = ? || f.revision WHERE f.revision IN (${scopeVersions})`).bind(ENCRYPTION_FILE_PREFIX, JSON.stringify(affected)),
-			env.DB.prepare(`DELETE FROM maintenance_state WHERE key IN (SELECT ? || revision FROM (${scopeVersions}))`).bind(ENCRYPTION_FILE_PREFIX, JSON.stringify(affected)),
-			env.DB.prepare("DELETE FROM maintenance_state WHERE key = 'e2ee:cleanup-cursor'"),
-		] : []),
-		...(movingScopes ? prepareEncryptionScopeMove(env.DB, state, configuration) : []),
 		// Conversion looks files up by revision. Ordinary sync matches the primary
 		// key, so this index exists only until activation and adds no upload writes.
 		env.DB.prepare(`CREATE INDEX IF NOT EXISTS ${CONVERSION_INDEX} ON files(storage_key)`),
@@ -253,7 +226,7 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 		...['reading_sources', 'reading_jobs', 'reading_handoffs', 'reading_enrollments', 'reminder_file_cache', 'reminder_projections', 'reminder_sources', 'reminder_source_state', 'notification_projection_jobs', 'notification_file_retries', 'file_deletion_receipts'].map(table => env.DB.prepare(`DELETE FROM ${table}`)),
 		// Verification rows and their scan progress are one rebuildable state.
 		// A retained completed cursor would otherwise skip every converted note.
-		env.DB.prepare("DELETE FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%' OR key LIKE 'e2ee:prior-file:%'"),
+		env.DB.prepare("DELETE FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'"),
 		// Keep old upload leases: a timed-out R2 put can become visible later.
 		// Reference-aware maintenance must retain authority to reclaim it.
 		// Drop old content fingerprints from obsolete changelog rows and force all

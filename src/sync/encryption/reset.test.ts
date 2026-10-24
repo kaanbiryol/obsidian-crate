@@ -6,7 +6,7 @@ import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 
 async function checkpoint() {
-	const bundle = createVaultKeyBundle();
+	const bundle = await createVaultKeyBundle();
 	const state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' as const };
 	return createEncryptionReset('https://server.test', 'old-token', state, true);
 }
@@ -106,7 +106,7 @@ it.each(['remote', 'local', 'upload'] as const)('verifies relocation using the e
 it('allows relocation before begin only if the original credential identifies the active encrypted vault', async () => {
 	const reset = await checkpoint();
 	// Only the identity fields are relevant here; readServerEncryption validates the full state.
-	const bundle = createVaultKeyBundle();
+	const bundle = await createVaultKeyBundle();
 	const active = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' as const };
 	reset.vaultId = active.vaultId; reset.generation = active.generation;
 	const create = (token: string) => ({ requestJson: async () => {

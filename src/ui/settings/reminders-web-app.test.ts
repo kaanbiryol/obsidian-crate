@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../../encryption/key-bundle';
+import { createVaultKeyBundle, generateRecoveryCode } from '../../encryption/key-bundle';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 
 const openExternalBrowserModal = vi.fn<(app: unknown, url: string, options: { linkText: string }) => void>();
@@ -10,7 +10,7 @@ async function setup(encrypted = true, isMobile = false) {
   vi.doMock('../qr-modal', () => ({ QRModal: class {} }));
   vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
   const recovery = await generateRecoveryCode();
-  const bundle = addReminderScope(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading');
+  const bundle = await createVaultKeyBundle();
   const secrets = new Map<string, string>([[SECRET_KEYS.AUTH_TOKEN, 'device-token']]);
   if (encrypted) { secrets.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(bundle)); secrets.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery); }
   const api = {

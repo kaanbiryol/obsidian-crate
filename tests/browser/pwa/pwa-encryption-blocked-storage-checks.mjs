@@ -3,17 +3,16 @@ import assert from 'node:assert/strict';
 export async function verifyBlockedEncryptionStorage(page) {
 	const result = await page.evaluate(async () => {
 		const t = window.encryptionStorageTest;
-		const bundle = t.addReminderScope(t.createVaultKeyBundle(), 'Reminders');
-		const grant = t.createReminderKeyGrant(bundle, 'Reminders');
-		const keys = await t.rememberReminderKeys(grant);
-		const cipher = await t.unlockLocalState(keys);
+		const bundle = await t.createVaultKeyBundle();
+		const keys = await t.rememberVaultKeys(bundle);
+		const cipher = await t.unlockLocalState(keys, 'reminders');
 		t.unlockPrivateStorage(cipher, 'Reminders', localStorage, sessionStorage);
-		const key = `${grant.vaultId}:${grant.scope.id}`, attemptKey = `${key}:blocked-attempt`;
+		const key = bundle.vaultId, attemptKey = `${key}:vault:blocked-attempt`;
 		const attempt = { semanticHash: 'a'.repeat(64), body: 'Preserve this exact request', generation: 1 };
 		await t.saveEncryptedReminderAttempt(attemptKey, attempt, undefined, () => true);
 		const draft = cipher.seal('Preserve this draft', 'blocked-draft');
 		sessionStorage.setItem('crate-reminder-draft:Reminders:blocked', draft);
-		const notice = (await t.createReminderProjection(bundle, 'Reminders/Inbox.md', new TextEncoder().encode('- [ ] Private push 2099-01-02 <!-- crate-id:blocked -->').buffer)).reminders[0].notification;
+		const notice = (await t.createReminderProjection(await t.importNotificationKeys(bundle.vaultId, bundle.notifications), ['Reminders'], 'Reminders/Inbox.md', new TextEncoder().encode('- [ ] Private push 2099-01-02 <!-- crate-id:blocked -->').buffer)).reminders[0].notification;
 		const databases = [['crate-encryption-keys', 'keys'], ['crate-encrypted-reminder-attempts', 'attempts']];
 		const open = (name, version, upgrade) => new Promise((resolve, reject) => {
 			const request = indexedDB.open(name, version);
@@ -37,9 +36,7 @@ export async function verifyBlockedEncryptionStorage(page) {
 			}
 			localStorage.setItem(t.AUTH_TOKEN_KEY, 'blocked-session');
 			// Servers always include the recovery bundle; its shape is all this check needs.
-			const scoped = { version: 1, vaultId: grant.vaultId, generation: grant.generation, mode: 'active', recovery: { version: 1, vaultId: grant.vaultId, envelope: 'a.b.c.d.e' }, scope: {
-				id: grant.scope.id, folderPath: 'Reminders', keyId: grant.scope.data.id, notificationKeyId: grant.scope.notifications.id,
-			} };
+			const active = { ...t.createEncryptionState(bundle, { version: 1, vaultId: bundle.vaultId, envelope: 'a.b.c.d.e' }), mode: 'active' };
 			const rejectBlocked = promise => promise.then(() => { throw new Error('Blocked storage was treated as available or empty'); }, error => {
 				if (!error.message.includes('Close other Crate tabs and retry')) throw error;
 			});
@@ -47,13 +44,13 @@ export async function verifyBlockedEncryptionStorage(page) {
 			try {
 				await Promise.race([
 					Promise.all([
-						rejectBlocked(t.readReminderKeys(grant.vaultId, grant.scope.id)),
-						rejectBlocked(t.rememberReminderKeys(grant)),
-						rejectBlocked(t.clearReminderKeys(() => true)),
+						rejectBlocked(t.readVaultKeys(bundle.vaultId)),
+						rejectBlocked(t.rememberVaultKeys(bundle)),
+						rejectBlocked(t.clearVaultKeys(() => true)),
 						rejectBlocked(t.loadEncryptedReminderAttempt(attemptKey)),
 						rejectBlocked(t.saveEncryptedReminderAttempt(attemptKey, { ...attempt, body: 'Must not commit late' }, attempt, () => true)),
 						rejectBlocked(t.clearEncryptedReminderAttempts(() => true)),
-						rejectBlocked(t.prepareReminderEncryption('blocked-session', async () => Response.json({ encryption: scoped }))),
+						rejectBlocked(t.prepareReminderEncryption('blocked-session', async () => Response.json({ encryption: active }))),
 						t.decryptPushDisplay(notice).then(display => { if (display !== null) throw new Error('Blocked push did not use the generic fallback'); }),
 					]),
 					new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Blocked encrypted storage did not settle')), 6000); }),
@@ -72,7 +69,7 @@ export async function verifyBlockedEncryptionStorage(page) {
 			if (!fresh || await read(db, store, store === 'keys' ? key : attemptKey) !== undefined) throw new Error('An abandoned open created or wrote private storage');
 			db.close();
 		}
-		await t.rememberReminderKeys(grant);
+		await t.rememberVaultKeys(bundle);
 		if ((await t.decryptPushDisplay(notice))?.title !== 'Private push') throw new Error('Push decryption did not recover after unblocking');
 		t.resetReminderEncryption(true);
 		// A newer database must survive attempts to read, enroll, or erase it.
@@ -83,7 +80,7 @@ export async function verifyBlockedEncryptionStorage(page) {
 				if (!error.message.includes('unsupported format')) throw error;
 			});
 			if (store === 'keys') {
-				await rejected(t.rememberReminderKeys(grant)); await rejected(t.clearReminderKeys(() => true));
+				await rejected(t.rememberVaultKeys(bundle)); await rejected(t.clearVaultKeys(() => true));
 			} else {
 				await rejected(t.loadEncryptedReminderAttempt(attemptKey)); await rejected(t.clearEncryptedReminderAttempts(() => true));
 			}

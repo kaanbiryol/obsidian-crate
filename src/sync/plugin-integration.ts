@@ -8,9 +8,7 @@ import { notifyConflicts } from './conflict/conflict';
 import { ActivityModal } from '../ui/activity/activity-modal';
 import { errorMessage } from './logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-state';
-import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from '../plugin/encryption-folder-moves';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/notification-policy-sync';
-import { SECRET_KEYS } from '../platform/secret-keys';
 import type { ForegroundSyncReason } from './runtime/foreground-sync';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
@@ -23,6 +21,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		plugin.secretStorage,
 		update => update ? plugin.writeSettings(update) : plugin.saveSettings(),
     () => ensureReminderNotificationPolicy(plugin, true),
+		() => [plugin.remindersSettings.remindersFolderPath],
 	);
 	registerSyncStatus(plugin, plugin.syncRuntime, () => {
 		new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
@@ -121,14 +120,6 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 		return;
 	}
 	registeredVaultHandlers.add(plugin);
-	const resumeFolders = () => {
-		if (!plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) return;
-		void resumeEncryptedFolderMoves(plugin).then(() => {
-			new Notice('Encrypted folders updated. Open fresh web app links to reconnect reading and reminders.');
-		}).catch(error => new Notice(`Folder move saved on this device. ${errorMessage(error)} Open Manage encryption to resume.`));
-	};
-	plugin.app.workspace.onLayoutReady(resumeFolders);
-
 	plugin.registerEvent(
 		plugin.app.vault.on('create', (file: TAbstractFile) => {
 			plugin.syncRuntime.onFileChange(file);
@@ -149,11 +140,7 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 
 	plugin.registerEvent(
 		plugin.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
-			try {
-				if (queueEncryptedFolderMove(plugin, oldPath, file.path)) resumeFolders();
-				else plugin.syncRuntime.onFileRename(file, oldPath);
-			}
-			catch (error) { plugin.syncRuntime.destroy(); new Notice(`Could not update the encrypted folder: ${errorMessage(error)}`); }
+			plugin.syncRuntime.onFileRename(file, oldPath);
 		}),
 	);
 
@@ -173,7 +160,6 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 	});
 
 	plugin.registerDomEvent(window, 'online', () => {
-		resumeFolders();
 		triggerForegroundSync('online');
 	});
 

@@ -3,9 +3,8 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
-import { createEncryptionState } from '../../../encryption/server-state';
-import { decryptJson, encryptJson, importEncryptionSecret } from '../../../encryption/envelope';
+import { createEncryptionFixture } from '../test-support/encryption-test-harness';
+import { decryptJson, encryptJson } from '../../../encryption/envelope';
 import { MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES, MAX_SHARED_SETTINGS_BYTES } from '../../../encryption/settings-format';
 import { handleEncryptionConversion } from './conversion';
 import { handleEncryptedSettings } from './settings';
@@ -17,9 +16,8 @@ afterEach(async () => { await reset(); });
 
 const preferences = () => ({ ignorePatterns: ['秘密/'], syncInterval: 30, pushEnabled: false });
 async function fixture() {
-	const bundle = createVaultKeyBundle();
-	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
-	const key = await importEncryptionSecret(bundle.vault);
+	const { bundle, state, keys } = await createEncryptionFixture('converting');
+	const key = keys.forVaultMetadata().key;
 	const context = { vaultId: bundle.vaultId, scopeId: 'vault', objectId: 'shared-settings', purpose: 'settings' as const };
 	const control = (path: string, body: unknown) => handleEncryptionConversion(new Request(`https://test${path}`, { method: 'POST', body: JSON.stringify(body), headers: {
 		'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation),

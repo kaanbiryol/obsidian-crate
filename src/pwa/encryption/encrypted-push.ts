@@ -1,6 +1,6 @@
 import { validateEncryptedNotification } from '../../encryption/notification-format';
 import { openNotification } from '../../encryption/reminder-projection';
-import { readReminderKeys } from './encryption-keys';
+import { readVaultKeys } from './encryption-keys';
 
 /** A locked, evicted, or newly rotated device still displays the generic push. */
 export async function decryptPushDisplay(value: unknown): Promise<{ title: string; body: string } | null> {
@@ -11,9 +11,9 @@ export async function decryptPushDisplay(value: unknown): Promise<{ title: strin
 		return await Promise.race([
 			(async () => {
 				validateEncryptedNotification(value);
-				const keys = await readReminderKeys(value.vaultId, value.scopeId);
+				const keys = await readVaultKeys(value.vaultId);
 				if (!keys || keys.notifications.id !== value.keyId) return null;
-				return openNotification(value, keys.notifications, keys.vaultId, keys.scopeId);
+				return openNotification(value, keys.notifications, keys.vaultId);
 			})(),
 			new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 3_000); }),
 		]);

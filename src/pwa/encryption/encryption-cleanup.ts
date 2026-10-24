@@ -2,7 +2,7 @@ import { resetReadingEncryption } from '../reading/encryption-lifecycle';
 import { AUTH_TOKEN_KEY } from '../config';
 import { READING_SESSION_KEY } from '../reading/storage';
 import { clearEncryptedReminderAttempts } from '../reminders/encrypted-reminder-attempts';
-import { clearReminderKeys } from './encryption-keys';
+import { clearVaultKeys } from './encryption-keys';
 
 /** Capture before any cleanup awaits; a new enrollment owns its own saved keys. */
 export function captureEncryptionCleanupAuthority(): () => boolean {
@@ -27,7 +27,7 @@ export function clearEncryptionSessionMarkers(isCurrent: () => boolean): void {
 export async function clearPersistedEncryption(isCurrent: () => boolean): Promise<void> {
 	const results = await Promise.allSettled([
 		Promise.resolve().then(() => clearEncryptedReminderAttempts(isCurrent)),
-		Promise.resolve().then(() => clearReminderKeys(isCurrent)),
+		Promise.resolve().then(() => clearVaultKeys(isCurrent)),
 	]);
 	if (results.some(result => result.status === 'rejected')) throw new Error('Encrypted data or keys could not be removed. Clear this site’s data in browser settings.');
 }

@@ -22,23 +22,20 @@ export async function handleDeletionPrecondition(request: Request, db: D1Databas
 	return corsResponse({ receipt: row });
 }
 
-/** The converted pre-encryption receipt of a reminder operation, for one encrypted folder. */
+/** The converted pre-encryption receipt of a reminder operation. */
 export async function handleReminderReceipt(request: Request, db: D1Database): Promise<Response> {
 	const id = new URL(request.url).searchParams.get('operationId');
-	const folder = new URL(request.url).searchParams.get('folderPath');
-	const state = await readEncryptionState(db);
-	const scope = state?.scopes.find(scope => scope.folderPath === folder);
-	if (!id || !scope) return corsResponse({ error: 'Invalid receipt scope' }, 400);
-	return corsResponse({ envelope: await readConvertedScopeEnvelope(db, { kind: 'reminder' }, id, scope.id) });
+	if (!id || !await readEncryptionState(db)) return corsResponse({ error: 'Invalid receipt scope' }, 400);
+	return corsResponse({ envelope: await readConvertedVaultEnvelope(db, { kind: 'reminder' }, id) });
 }
 
-/** One encryption scope's envelope from a converted pre-encryption reminder or
- * Reading receipt. Reading receipts are read only for the given policy generation. */
-export async function readConvertedScopeEnvelope(db: D1Database, receipt: { kind: 'reminder' } | { kind: 'reading'; generation: string },
-	id: string, scopeId: string | undefined): Promise<string | null> {
+/** The vault-encrypted envelope of a converted pre-encryption reminder or Reading
+ * receipt. Reading receipts are read only for the given policy generation. */
+export async function readConvertedVaultEnvelope(db: D1Database, receipt: { kind: 'reminder' } | { kind: 'reading'; generation: string },
+	id: string): Promise<string | null> {
 	const row = await (receipt.kind === 'reminder'
 		? db.prepare('SELECT response_json FROM reminder_operations WHERE operation_id = ?').bind(id)
 		: db.prepare('SELECT response_json FROM reading_operations WHERE operation_id = ? AND generation = ?').bind(id, receipt.generation)).first<{ response_json: string }>();
-	const converted = row ? (await readEncryptedReceipt(db, receipt.kind, id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
-	return converted?.scopes.find(item => item.id === scopeId)?.envelope ?? null;
+	const converted = row ? (await readEncryptedReceipt(db, receipt.kind, id, row.response_json) as { e2eeLegacy?: { vault?: string } }).e2eeLegacy : undefined;
+	return typeof converted?.vault === 'string' ? converted.vault : null;
 }

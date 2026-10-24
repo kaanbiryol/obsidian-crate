@@ -123,6 +123,8 @@ export class SyncRuntime {
 		private secretStorage: SecretStorageService,
 		private persistSettings: (update?: Partial<CrateSettings>) => Promise<void>,
 	private prepareReminderScope?: () => Promise<void>,
+		/** Notes inside these folders carry encrypted notification schedules. */
+		private reminderFolders: () => readonly string[] = () => [],
 	) {
 		this.initializing = this.isConfigured();
 		this.serverStatus = new RuntimeServerStatus({
@@ -271,12 +273,6 @@ export class SyncRuntime {
 
 		await this.stoppingWork;
 		if (this.initializationRevision !== initializationRevision) return;
-		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) {
-			this.apiClient = null;
-			this.initializationError = 'An encrypted folder move is unfinished. Open Manage encryption to resume on this device.';
-			this.emitCurrentState();
-			return;
-		}
 		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET) && !options.resumeEncryptionReset) {
 			this.apiClient = null;
 			this.initializationError = 'Encryption reset is unfinished. Open Manage encryption to resume on this device.';
@@ -290,7 +286,7 @@ export class SyncRuntime {
 		);
 		try {
 			const keys = loadEncryptionKeys(this.secretStorage);
-			if (keys) await this.apiClient.configureEncryption(keys);
+			if (keys) await this.apiClient.configureEncryption(keys, this.reminderFolders);
 		} catch (error) {
 			if (this.initializationRevision !== initializationRevision) return;
 			this.initializationError = errorMessage(error);
@@ -495,7 +491,6 @@ export class SyncRuntime {
 		this.syncEngine?.onFileDelete(file);
 	}
 
-	getRenameDependencies(): Record<string, string> { return this.syncEngine?.getRenameDependencies() ?? {}; }
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
 		if (this.plugin.app.workspace.layoutReady === false) return;

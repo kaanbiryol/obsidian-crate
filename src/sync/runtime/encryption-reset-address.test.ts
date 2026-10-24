@@ -19,7 +19,7 @@ async function setup(phase: EncryptionReset['phase'] = 'upload') {
 	h.secretStorage.has.mockImplementation(key => storage.has(key as never));
 	h.secretStorage.delete.mockImplementation(key => storage.delete(key as never));
 	Object.assign(h.secretStorage, { forScope: (scope: string) => storage.forScope(scope) });
-	const bundle = createVaultKeyBundle();
+	const bundle = await createVaultKeyBundle();
 	const state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' as const };
 	const reset = { ...createEncryptionReset(oldUrl, 'old-token', state, true), phase };
 	saveEncryptionReset(storage, reset);

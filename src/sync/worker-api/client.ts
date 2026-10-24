@@ -38,15 +38,17 @@ import { InitialImportApi } from './initial-import';
 import { LinksWorkerApi } from './links';
 import { EncryptedFiles } from '../encryption/encrypted-files';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
-import { createReminderProjection } from '../../encryption/reminder-projection';
+import { createReminderProjection, importNotificationKeys } from '../../encryption/reminder-projection';
 import { readServerEncryption } from '../encryption/conversion';
 
 export { HttpError, SyncTransportError } from './http';
 
 export class SyncApiClient {
 	getEncryptionState() { return readServerEncryption(this.http); }
-	async configureEncryption(bundle: VaultKeyBundle): Promise<void> {
-		const encryption = await EncryptedFiles.create(this.http, bundle, (path, bytes) => createReminderProjection(bundle, path, bytes));
+	/** Notes inside `reminderFolders()` carry encrypted notification schedules. */
+	async configureEncryption(bundle: VaultKeyBundle, reminderFolders: () => readonly string[]): Promise<void> {
+		const notifications = await importNotificationKeys(bundle.vaultId, bundle.notifications);
+		const encryption = await EncryptedFiles.create(this.http, bundle, (path, bytes) => createReminderProjection(notifications, reminderFolders(), path, bytes));
 		this.syncApi.setEncryption(encryption);
 		this.sharedHistory.setEncryption(encryption);
 		this.sharedSettingsApi.setEncryption(encryption);

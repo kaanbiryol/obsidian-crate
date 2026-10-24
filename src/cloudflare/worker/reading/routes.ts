@@ -1,5 +1,5 @@
-import { readConvertedScopeEnvelope } from '../encryption/receipts';
-import { readEncryptionState, scopedEncryptionState } from '../encryption/state';
+import { readConvertedVaultEnvelope } from '../encryption/receipts';
+import { readEncryptionState } from '../encryption/state';
 import { handleEncryptedFolderFiles } from '../encryption/encrypted-folder-files';
 import { issueShortcutPairing, exchangeShortcutPairing } from './shortcut-pairing';
 import { shortcutTransport, validateShortcutBody } from './shortcut-transport';
@@ -34,15 +34,14 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
       if (path === '/reading/encrypted-receipt' && request.method === 'GET') {
         const id = url.searchParams.get('operationId') ?? '';
         const receipt = url.searchParams.get('wire') === '1' ? { kind: 'reminder' as const } : { kind: 'reading' as const, generation: current.generation };
-        const scope = encryption?.scopes.find(scope => scope.folderPath === current.folder_path);
-        return readingResponse({ envelope: await readConvertedScopeEnvelope(env.DB, receipt, id, scope?.id) });
+        return readingResponse({ envelope: await readConvertedVaultEnvelope(env.DB, receipt, id) });
       }
       return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path) ?? readingResponse({ error: 'Not found' }, 404);
     }
     if (encryption && (shortcut?.kind === 'prepare' || ['/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
     if (path === '/reading/encryption' && request.method === 'GET' && principal) {
-      const current = await authority(env.DB, principal);
-      return readingResponse({ encryption: encryption ? scopedEncryptionState(encryption, current.folder_path) : null });
+      await authority(env.DB, principal); // Reading access only.
+      return readingResponse({ encryption });
     }
     const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' ? 262_144 : 24_576);
     if (!parsed.ok) return parsed.response;

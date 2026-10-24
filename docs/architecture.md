@@ -674,29 +674,28 @@ Sync deletes require both the acknowledged content hash and opaque file revision
 
 See [the protocol contract](protocol.md) and [backup and recovery](recovery.md).
 
-Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extraction and Markdown edits. `pwa/reading/encrypted-api.ts` owns the conditional ciphertext transport; `pwa/connection/` owns app enrollment and shared verification, while `pwa/reading/encryption-session.ts` and `private-storage.ts` adapt that readiness to Reading's protected local storage. The Worker stores ciphertext and public scope/policy metadata; its plaintext Reading projector/extractor remains only for unencrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
+Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extraction and Markdown edits. `pwa/reading/encrypted-api.ts` owns the conditional ciphertext transport; `pwa/connection/` owns app enrollment and shared verification, while `pwa/reading/encryption-session.ts` and `private-storage.ts` adapt that readiness to Reading's protected local storage. The Worker stores ciphertext and public key/policy metadata; its plaintext Reading projector/extractor remains only for unencrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
 
 `encryption/file-inventory.ts` validates shared encrypted inventory pages and bounds
 traversal independently of file counts. Reading and Reminders retain their own file
 limits, projections and sequence checks; each publishes its derived source cache
 only after a complete, confirmed load.
 
-`encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encryption/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `sync/encryption/folder-move-journal.ts` owns the durable move contract, exact setting destinations and guarded journal-head updates. `encryption-folder-move-workflow.ts` applies one persisted job, keeping target persistence, conversion, both settings saves, capture recovery and journal advancement ordered together. `encryption-folder-moves.ts` retains task deduplication, queue draining and feature restarts through `SyncRuntime`'s existing configuration serialization.
+`encryption/` owns the single-key vault bundle, authenticated formats and identity comparison. Both browser enrollment flows check every key identity against the server's public configuration (`assertEncryptionKeys`) before persisting keys. `sync/encryption/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata.
 
 `sync/encryption/conversion.ts` owns conversion sequencing, progress, server
 acknowledgments and activation. `encryption/conversion-content.ts` authenticates
-original or interrupted file bytes and prepares encrypted receipts with their
-existing folder audience. These transformations run without network or storage
+original or interrupted file bytes and prepares vault-encrypted receipts. These transformations run without network or storage
 access, so integrity failures and receipt isolation can be tested directly.
 
 Self-hosted encrypted address changes authenticate the server recovery bundle in `sync/encryption/encrypted-connection.ts`. A local `checkpointScope` associates the new transport URL with the existing disk authority so pending uploads, rename dependencies and local history survive tunnel changes. It is only retained for that URL, never shared as a preference, and cleared when resetting sync. The runtime owns connection switching and waits for journal I/O; neither the enrollment validator nor the connection verifier starts sync independently.
 
 App key approval separates the cryptographic state machine (`encryption/pairing/`)
 from the relay (`worker/encryption/pairing.ts`). `plugin/web-app-pairing.ts` captures
-one unlocked vault connection and limits approved grants to the browser features;
+one unlocked vault connection and seals its key bundle for an approved app;
 `ui/settings/web-app-pairing-modal.ts` owns the human approval. The shared PWA
 connection gate presents `AppPairing`; `pairing-client.ts` binds requests to the
-current app session, and `web-app-unlock.ts` validates and persists grants while
+current app session, and `web-app-unlock.ts` validates and persists the bundle while
 preserving existing draft encryption secrets. Pairing polls exist only for open
 screens, stop on close, and pause while hidden. They do not belong in startup or
 normal sync loops.

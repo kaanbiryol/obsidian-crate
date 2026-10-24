@@ -29,7 +29,6 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /encryption': { scopes: REMINDERS },
 	'GET /encryption/upload-receipt': { scopes: VAULT },
 	'GET /encryption/deletion-precondition': { scopes: VAULT },
-	'GET /encryption/folders': { scopes: VAULT },
 	'GET /encryption/reset': { scopes: VAULT, execution: COORDINATOR },
 	'GET /encryption/conversion': { scopes: VAULT, execution: COORDINATOR },
 	'GET /encryption/conversion/file': { scopes: VAULT, execution: COORDINATOR },

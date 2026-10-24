@@ -30,7 +30,6 @@ export async function runEncryptionReset(
 ): Promise<void> {
 	const { verify } = transition;
 	signal?.throwIfAborted();
-	if (secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('Resume the encrypted folder move before turning encryption off.');
 	if (expected.workerUrl !== settings.workerUrl || expected.authToken !== secretStorage.get(SECRET_KEYS.AUTH_TOKEN)) {
 		throw new Error('The server connection changed. Reopen Manage encryption.');
 	}

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addReminderScope, createReminderKeyGrant, createVaultKeyBundle, type RecoveryEnvelope } from '../../encryption/key-bundle';
+import { createVaultKeyBundle } from '../../encryption/key-bundle';
+import { createEncryptionState } from '../../encryption/server-state';
 import { onConnectionExpired } from './expiration';
 import { EncryptionVerificationUnavailableError, loadEncryptionState } from './encryption';
 
@@ -15,11 +16,9 @@ function storage(): Storage {
 	}) as unknown as Storage;
 }
 
-function encryptionState() {
-	const grant = createReminderKeyGrant(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Reminders');
-	return { version: 1 as const, vaultId: grant.vaultId, generation: grant.generation, mode: 'active' as const,
-		scope: { id: grant.scope.id, folderPath: grant.scope.folderPath, keyId: grant.scope.data.id, notificationKeyId: grant.scope.notifications.id },
-		recovery: { version: 1, vaultId: grant.vaultId, envelope: 'a.b.c.d.e' } as RecoveryEnvelope };
+async function encryptionState() {
+	const bundle = await createVaultKeyBundle();
+	return { ...createEncryptionState(bundle, { version: 1, vaultId: bundle.vaultId, envelope: 'a.b.c.d.e' }), mode: 'active' as const };
 }
 
 const load = (request: () => Promise<Response>, current = () => true) =>
@@ -33,14 +32,14 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('encryption verification', () => {
 	it('remembers verified encryption and uses it while offline', async () => {
-		const state = encryptionState();
+		const state = await encryptionState();
 		expect(await load(async () => Response.json({ encryption: state }))).toEqual(state);
 		vi.stubGlobal('navigator', { onLine: false });
 		expect(await load(async () => { throw new TypeError('offline'); })).toEqual(state);
 	});
 
 	it('refuses a server that stops reporting known encryption', async () => {
-		await load(async () => Response.json({ encryption: encryptionState() }));
+		await load(async () => Response.json({ encryption: await encryptionState() }));
 		await expect(load(async () => Response.json({ encryption: null }))).rejects.toThrow('no longer reports');
 	});
 
@@ -64,7 +63,7 @@ describe('encryption verification', () => {
 	});
 
 	it('does not remember a state for a connection that changed meanwhile', async () => {
-		await expect(load(async () => Response.json({ encryption: encryptionState() }), () => false)).rejects.toThrow('Connection changed');
+		await expect(load(async () => Response.json({ encryption: await encryptionState() }), () => false)).rejects.toThrow('Connection changed');
 		expect(localStorage.length).toBe(0);
 	});
 });

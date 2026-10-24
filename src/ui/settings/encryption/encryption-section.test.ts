@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createObsidianUiModule, FakeElement, MockSetting, resetObsidianUiMocks } from '../../../test/fakes/obsidian-ui';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle, type VaultKeyBundle } from '../../../encryption/key-bundle';
+import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle, type VaultKeyBundle } from '../../../encryption/key-bundle';
 import { createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import type { EncryptionProgress } from '../../../sync/encryption/conversion';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
@@ -11,7 +11,6 @@ let titles: string[];
 let closeModal: () => void;
 let values: Map<string, string>;
 const read = vi.fn(async (): Promise<EncryptionServerState | null> => state);
-const folders = vi.fn(async () => ({ folders: ['Reminders'] }));
 const convert = vi.fn(async (_http: unknown, keys: VaultKeyBundle, recovery: string, _progress: EncryptionProgress) => {
 	state = { ...createEncryptionState(keys, await sealRecoveryBundle(keys, recovery)), mode: 'active' };
 });
@@ -22,7 +21,6 @@ const setting = (name: string) => [...MockSetting.instances].reverse().find(item
 beforeEach(() => {
 	resetObsidianUiMocks(); convert.mockClear(); sync.mockClear(); turnOff.mockClear();
 	read.mockReset().mockImplementation(async () => state);
-	folders.mockReset().mockImplementation(async () => ({ folders: ['Reminders'] }));
 	state = null; titles = []; values = new Map([[SECRET_KEYS.AUTH_TOKEN, 'token']]);
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../../plugin/shared-modal', async () => ({ ...await vi.importActual<typeof import('../../plugin/shared-modal')>('../../plugin/shared-modal'), SharedModal: class {
@@ -41,7 +39,6 @@ beforeEach(() => {
 		setAbortSignal() {}
 		getWorkerUrl() { return this.url; }
 		getServerInfo() { return Promise.resolve({ capabilities: ['e2ee-reading-v1'] }); }
-		requestJson = folders;
 	} }));
 	vi.doMock('../../../sync/encryption/conversion', async () => ({
 		...await vi.importActual('../../../sync/encryption/conversion'),
@@ -71,7 +68,7 @@ async function open() {
 	return plugin;
 }
 async function configure(mode: 'active' | 'converting') {
-	const keys = addReminderScope(createVaultKeyBundle(), 'Reminders'), recovery = await generateRecoveryCode();
+	const keys = await createVaultKeyBundle(), recovery = await generateRecoveryCode();
 	state = { ...createEncryptionState(keys, await sealRecoveryBundle(keys, recovery)), mode };
 	values.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(keys)); values.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);
 	return recovery;
@@ -195,20 +192,21 @@ it('keeps the loading placeholder until server and recovery preparation finish',
 	const { button } = await renderRow();
 	await vi.waitFor(() => expect(button.buttonEl.textContent).toBe('Enable encryption'));
 	let finishState!: (value: EncryptionServerState | null) => void;
-	let finishFolders!: (value: { folders: string[] }) => void;
+	let finishVerify!: () => void;
 	read.mockImplementationOnce(() => new Promise(resolve => { finishState = resolve; }));
-	folders.mockImplementationOnce(() => new Promise(resolve => { finishFolders = resolve; }));
+	const verify = vi.spyOn(await import('../../../encryption/recovery-verification'), 'verifyRecoveryCode')
+		.mockImplementationOnce(() => new Promise<void>(resolve => { finishVerify = resolve; }));
 	button.click();
 	expect(titles).toEqual(['Enable encryption']);
 	expect(body.getAttribute('aria-busy')).toBe('true');
 	expect(body.collectText()).toContain('Loading encryption settings');
 	finishState(null);
-	await vi.waitFor(() => expect(folders).toHaveBeenCalledOnce());
+	await vi.waitFor(() => expect(verify).toHaveBeenCalledOnce());
 	expect(titles).toEqual(['Enable encryption', 'Enable encryption']);
 	expect(body.getAttribute('aria-busy')).toBe('true');
 	expect(body.querySelector('.crate-encryption-placeholder')).not.toBeNull();
 	expect(body.querySelector('textarea')).toBeNull();
-	finishFolders({ folders: ['Reminders'] });
+	finishVerify();
 	await vi.waitFor(() => expect(body.getAttribute('aria-busy')).toBe('false'));
 	expect(body.querySelector('.crate-encryption-placeholder')).toBeNull();
 	expect(body.querySelector('textarea')).not.toBeNull();
@@ -383,7 +381,7 @@ it('refreshes the row once after turning encryption off', async () => {
 
 
 it('copies one recovery key for Obsidian and the web app and rejects a stale server connection', async () => {
-	const keys = addReminderScope(addReminderScope(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading'), 'Other');
+	const keys = await createVaultKeyBundle();
 	const recovery = await generateRecoveryCode();
 	state = { ...createEncryptionState(keys, await sealRecoveryBundle(keys, recovery)), mode: 'active' };
 	values.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(keys)); values.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);

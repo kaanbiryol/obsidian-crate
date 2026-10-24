@@ -1,5 +1,4 @@
 import { openRecoveryBundle } from '../../encryption/key-bundle';
-import { readFolderMoves } from './folder-move-journal';
 import { loadEncryptionKeys } from './key-storage';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { assertEncryptionKeys, readServerEncryption } from './conversion';
@@ -7,14 +6,12 @@ import type { WorkerApiHttpClient } from '../worker-api/http';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 
 /** Verify the encrypted identity before copying connection-scoped secrets.
- * Folder conversion may have advanced local keys before the server accepted it;
- * the authenticated recovery bundle proves identity independently of generation. */
+ * The authenticated recovery bundle proves identity independently of generation. */
 export async function prepareEncryptedAddressChange(storage: SecretStorageService, http: WorkerApiHttpClient, workerUrl: string) {
   if (storage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before changing this connection.');
   const keys = loadEncryptionKeys(storage), recovery = storage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
   if (!keys || !recovery) throw new Error('Recover this device’s encryption keys before changing the server address.');
-  readFolderMoves(storage);
-  const snapshot = [SECRET_KEYS.AUTH_TOKEN, SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY, SECRET_KEYS.ENCRYPTION_FOLDER_MOVES]
+  const snapshot = [SECRET_KEYS.AUTH_TOKEN, SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]
     .map(key => ({ key, value: storage.get(key) }));
   const assertCurrent = () => {
     if (storage.get(SECRET_KEYS.ENCRYPTION_RESET) || snapshot.some(({ key, value }) => storage.get(key) !== value)) {
@@ -33,8 +30,6 @@ export async function prepareEncryptedAddressChange(storage: SecretStorageServic
     assertCurrent();
     const target = storage.forScope(workerUrl);
     if (target.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('The new address has an unfinished encryption reset');
-    const pending = target.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES);
-    if (pending && pending !== storage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('The new address has a different unfinished folder move');
     const existing = loadEncryptionKeys(target);
     if (existing && (existing.vaultId !== keys.vaultId || existing.vault.id !== keys.vault.id || existing.vault.secret !== keys.vault.secret)) {
       throw new Error('The new address has recovery keys for a different vault');

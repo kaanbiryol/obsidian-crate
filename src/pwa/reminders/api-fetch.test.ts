@@ -27,7 +27,7 @@ it('probes encryption once while server responses confirm the vault is unencrypt
 	// Before: one /encryption probe per request in an unencrypted vault.
 	expect(prepareReminderEncryption).toHaveBeenCalledOnce();
 	enabled = true;
-	await expect(api('/reminders/list?folderPath=Reminders')).rejects.toThrow('encrypted folder changed');
+	await expect(api('/reminders/list?folderPath=Reminders')).rejects.toThrow('vault encryption changed');
 	// The 428 retried once after a fresh probe instead of trusting the cached state.
 	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
 });

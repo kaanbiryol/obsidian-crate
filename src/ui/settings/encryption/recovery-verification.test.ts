@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createObsidianUiModule, FakeElement, MockSetting, resetObsidianUiMocks } from '../../../test/fakes/obsidian-ui';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
+import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
 
 beforeEach(() => { resetObsidianUiMocks(); vi.doMock('obsidian', () => createObsidianUiModule()); });
 afterEach(() => { vi.restoreAllMocks(); vi.resetModules(); vi.doUnmock('obsidian'); });
@@ -8,7 +8,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.resetModules(); vi.doUnmock('obsidian
 async function setup(assertCurrent = () => {}) {
 	const { renderRecoveryVerification } = await import('./recovery-verification');
 	const check = vi.spyOn(await import('../../../encryption/recovery-verification'), 'verifyRecoveryCode');
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders'), code = await generateRecoveryCode();
+	const bundle = await createVaultKeyBundle(), code = await generateRecoveryCode();
 	const container = new FakeElement('div'), verified = vi.fn();
 	const controller = renderRecoveryVerification(container as never, await sealRecoveryBundle(bundle, code), bundle, verified, assertCurrent);
 	const setting = MockSetting.instances.at(-1)!;

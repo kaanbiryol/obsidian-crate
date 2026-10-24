@@ -7,7 +7,7 @@ import worker from '../index';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { WorkerApiHttpClient } from '../../../sync/worker-api/http';
 import { convertEncryptedVault, type EncryptionFileProgress } from '../../../sync/encryption/conversion';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../../../encryption/key-bundle';
+import { createVaultKeyBundle, generateRecoveryCode } from '../../../encryption/key-bundle';
 import { readEncryptionState } from './state';
 import { FileKeyAuthority } from '../../../encryption/file-authority';
 import { openFile } from '../../../encryption/file-codec';
@@ -25,8 +25,9 @@ beforeEach(async () => {
 });
 afterEach(async () => { device.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });
 
+const reminderFolders = ['Reminders'];
 async function fixture() {
-  const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
+  const bundle = await createVaultKeyBundle();
   const recovery = await generateRecoveryCode();
   const requests: string[] = [], progress: EncryptionFileProgress[] = [];
   let interrupt = false;
@@ -42,7 +43,7 @@ async function fixture() {
     return { status: response.status, headers: Object.fromEntries(response.headers.entries()), arrayBuffer, text: new TextDecoder().decode(arrayBuffer) };
   });
   return { bundle, requests, progress, interrupt: () => { interrupt = true; },
-    convert: () => convertEncryptedVault(http, bundle, recovery, (_message, files) => { if (files) progress.push(files); }) };
+    convert: () => convertEncryptedVault(http, bundle, recovery, (_message, files) => { if (files) progress.push(files); }, reminderFolders) };
 }
 
 it('activates an empty remote without uploading local files, then encrypts their first manual sync', async () => {
@@ -56,7 +57,7 @@ it('activates an empty remote without uploading local files, then encrypts their
   expect(device.settings.automaticSync).toBe(false);
   expect(device.disk.text('local.md')).toBe('Never upload this as plaintext');
   device.close(); await device.engine.waitForIdle(); await device.open();
-  await device.api.configureEncryption(f.bundle);
+  await device.api.configureEncryption(f.bundle, () => reminderFolders);
   const result = await device.engine.sync();
   expect(result.errors).toEqual([]); expect(result.uploaded).toBe(1);
   const row = await env.DB.prepare("SELECT storage_key FROM files WHERE path='local.md'").first<{ storage_key: string }>();
@@ -75,7 +76,7 @@ it('converts existing files and retained history while unsynced local edits wait
   expect(f.progress[0]).toEqual({ completed: 0, total: existing.results.length });
   expect(f.progress.at(-1)).toEqual({ completed: existing.results.length, total: existing.results.length });
   expect(f.requests.filter(route => route.includes('includeProgress=1'))).toHaveLength(1);
-  const keys = await FileKeyAuthority.fromVault(f.bundle);
+  const keys = await FileKeyAuthority.fromBundle(f.bundle);
   const contents: string[] = [];
   for (const row of existing.results) {
     const bytes = new Uint8Array(await (await env.BUCKET.get(row.storage_key))!.arrayBuffer());
@@ -86,7 +87,7 @@ it('converts existing files and retained history while unsynced local edits wait
   expect(contents).not.toContain('Local change waiting for encryption');
   expect(device.disk.text('note.md')).toBe('Local change waiting for encryption');
   device.close(); await device.engine.waitForIdle(); await device.open();
-  await device.api.configureEncryption(f.bundle);
+  await device.api.configureEncryption(f.bundle, () => reminderFolders);
   const result = await device.engine.sync();
   expect(result.errors).toEqual([]); expect(result.uploaded).toBe(1);
   expect(new TextDecoder().decode((await device.api.downloadFile('note.md')).content)).toBe('Local change waiting for encryption');
@@ -118,7 +119,7 @@ it.each([false, true])('recovers a pending plaintext upload after conversion wit
   const f = await fixture();
   await f.convert();
   device.close(); await device.engine.waitForIdle(); await device.open();
-  await device.api.configureEncryption(f.bundle);
+  await device.api.configureEncryption(f.bundle, () => reminderFolders);
   const result = await device.engine.sync();
   expect(result.errors).toEqual([]); expect(result.uploaded).toBe(committed ? 0 : 1);
   expect(device.disk.text('pending.md')).toBe('Pending local upload');

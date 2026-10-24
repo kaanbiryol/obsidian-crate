@@ -16,7 +16,7 @@ async function fixture() {
 	const content = new TextEncoder().encode('Private content').buffer;
 	const file = { path: 'note.md', content: arrayBufferToBase64(content), hash: await sha256Hex(content), size: content.byteLength,
 		contentType: 'text/markdown', expectedHash: null };
-	const encryption = await EncryptedFiles.create({} as WorkerApiHttpClient, createVaultKeyBundle(), async () => null);
+	const encryption = await EncryptedFiles.create({} as WorkerApiHttpClient, await createVaultKeyBundle(), async () => null);
 	return { disk, create, file, encryption };
 }
 
@@ -161,7 +161,7 @@ it.each([409, 401, 503])('only handles version conflicts when encrypted batch pr
 it('uses a batch-resolved precondition once instead of asking the server per file', async () => {
 	const { file } = await fixture();
 	const requestJson = vi.fn(async () => { throw new Error('Unexpected precondition request'); });
-	const encryption = await EncryptedFiles.create({ requestJson } as unknown as WorkerApiHttpClient, createVaultKeyBundle(), async () => null);
+	const encryption = await EncryptedFiles.create({ requestJson } as unknown as WorkerApiHttpClient, await createVaultKeyBundle(), async () => null);
 	const journal = { ...file, expectedHash: 'plain-baseline', operationId: crypto.randomUUID() } as unknown as JournalUpload;
 	const cipher = 'c'.repeat(64);
 	const batch = new Map([[file.path, { expected: 'plain-baseline', result: cipher }]]);

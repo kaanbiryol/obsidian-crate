@@ -583,7 +583,6 @@ export class SyncEngine {
 		this.queueController.onFileDelete(file);
 	}
 
-	getRenameDependencies(): Record<string, string> { return this.localManifest.getRenameDependencies(); }
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
 		if (this.lifecycle.isDestroyed) return;

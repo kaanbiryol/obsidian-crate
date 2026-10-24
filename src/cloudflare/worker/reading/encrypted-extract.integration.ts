@@ -4,8 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '@/encryption/key-bundle';
-import { createEncryptionState } from '@/encryption/server-state';
+import { createEncryptionFixture } from '../test-support/encryption-test-harness';
 import { sha256Hex } from '@/platform/sha256';
 
 const link = 'https://private.example/confidential-article';
@@ -14,8 +13,7 @@ beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
 
 async function setup(encrypted = true, scope = 'reading') {
-  const bundle = addReminderScope(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading');
-  const state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' as const };
+  const { state } = await createEncryptionFixture('active');
   await env.DB.batch([
     ...(encrypted ? [env.DB.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?)').bind('e2ee:state', JSON.stringify(state))] : []),
     env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','policy','revision')"),

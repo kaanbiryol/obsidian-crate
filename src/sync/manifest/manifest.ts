@@ -324,18 +324,6 @@ export class LocalManifest {
 	renameDestination(path: string): string | undefined { return this.renames.destination(path); }
 	getRenameDependencies(): Record<string, string> { return this.renames.toRecord(); }
 
-	/** The journal keeps ordered IDs until checkpoint publication succeeds. The
-	 * last receipt is enough to resume a prefix without applying nested moves twice. */
-	applyJournalRenames(moves: Array<{ id: string; from: string; to: string; rename?: boolean; priorRenames?: Record<string, string> }>): void {
-		const start = moves.findIndex(move => move.id === this.appliedRename) + 1;
-		for (const move of moves.slice(start)) {
-			for (const [source, target] of Object.entries(move.priorRenames ?? {})) this.renames.set(source, target);
-			if (move.rename !== false) this.recordRename(move.from, move.to);
-			this.appliedRename = move.id;
-			this.markChanged();
-		}
-	}
-
 	/**
 	 * Obsidian reports a folder move as one event for the folder plus one per
 	 * file. A file moves alone, so only folder events (or callers that cannot

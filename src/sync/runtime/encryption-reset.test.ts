@@ -25,7 +25,7 @@ afterEach(() => vi.restoreAllMocks());
 
 async function setup() {
 	const harness = createRuntimeHarness({ lastSeq: 500, lastSync: '2026-01-01' });
-	const bundle = createVaultKeyBundle();
+	const bundle = await createVaultKeyBundle();
 	const state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' as const };
 	const values = new Map<string, string>([[SECRET_KEYS.AUTH_TOKEN, 'auth-token'], [SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(bundle)], [SECRET_KEYS.ENCRYPTION_RECOVERY, 'old-recovery']]);
 	harness.secretStorage.get.mockImplementation(key => values.get(key) ?? null);

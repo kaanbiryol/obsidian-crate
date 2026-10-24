@@ -59,7 +59,7 @@ async function verify(browser, scenario) {
 		const legacyResponse = await completed.json();
 		const result = await page.evaluate(async ({ origin, token, day, protocol, legacyBody, prefix }) => {
 			const t = window.regression;
-			const bundle = t.addReminderScope(t.createVaultKeyBundle(), 'Reminders');
+			const bundle = await t.createVaultKeyBundle();
 			const code = await t.generateRecoveryCode();
 			let lostConversion = false;
 			const transport = async request => {
@@ -72,12 +72,12 @@ async function verify(browser, scenario) {
 				return { status: response.status, headers: Object.fromEntries(response.headers), arrayBuffer: buffer, text: new TextDecoder().decode(buffer) };
 			};
 			const http = new t.WorkerApiHttpClient(origin, token, transport);
-			try { await t.convertEncryptedVault(http, bundle, code, () => {}); }
+			try { await t.convertEncryptedVault(http, bundle, code, () => {}, ['Reminders']); }
 			catch (error) { if (!error.message.includes('Injected lost conversion response')) throw error; }
-			await t.convertEncryptedVault(http, bundle, code, () => {});
+			await t.convertEncryptedVault(http, bundle, code, () => {}, ['Reminders']);
 			const mode = (await t.readServerEncryption(http)).mode;
-			const keys = await t.rememberReminderKeys(t.createReminderKeyGrant(bundle, 'Reminders'));
-			t.unlockPrivateStorage(await t.unlockLocalState(keys), 'Reminders', localStorage, sessionStorage);
+			const keys = { ...await t.rememberVaultKeys(bundle), folderPath: 'Reminders' };
+			t.unlockPrivateStorage(await t.unlockLocalState(keys, 'reminders'), 'Reminders', localStorage, sessionStorage);
 			let lostSave = false;
 			const requests = [];
 			const apiFetch = async (path, init = {}) => {
@@ -103,7 +103,7 @@ async function verify(browser, scenario) {
 			let preservedPrefix;
 			if (prefix) {
 				const download = await http.requestBinary(`/sync/download?path=${encodeURIComponent(reminder.filePath)}`);
-				const authority = await t.FileKeyAuthority.fromVault(bundle);
+				const authority = await t.FileKeyAuthority.fromBundle(bundle);
 				const opened = await t.openFile(new Uint8Array(download.body), reminder.filePath, authority.forPath(reminder.filePath));
 				preservedPrefix = new TextDecoder().decode(opened.content).startsWith('CRATE-E2EE/1\nThis is a plaintext format example.');
 			}

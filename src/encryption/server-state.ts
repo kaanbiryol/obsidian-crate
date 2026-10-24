@@ -1,25 +1,14 @@
 import { isEncryptionId } from './encoding';
-import { isEncryptionFolderPath, isRecoveryEnvelope, type RecoveryEnvelope, type VaultKeyBundle } from './key-bundle';
+import { isRecoveryEnvelope, type RecoveryEnvelope, type VaultKeyBundle } from './key-bundle';
+import { validateP256PublicKey } from './p256';
 
 export const ENCRYPTION_CAPABILITY = 'e2ee-v1';
-export const READING_ENCRYPTION_CAPABILITY = 'e2ee-reading-v1';
 /** Authenticated responses say whether the vault is encrypted ('on' or 'off'),
  * so clients can skip probing /encryption before plaintext requests. */
 export const ENCRYPTION_STATE_HEADER = 'X-Crate-Encryption-State';
 /** Requests to an encrypted vault name the vault and key generation they use. */
 export const ENCRYPTION_VAULT_HEADER = 'X-Crate-Encryption-Vault';
 export const ENCRYPTION_GENERATION_HEADER = 'X-Crate-Encryption-Generation';
-export const ENCRYPTION_FOLDER_MOVES_CAPABILITY = 'e2ee-folder-moves-v1';
-
-export interface EncryptionScope {
-	purpose?: 'reading';
-	accessId?: string;
-	binding?: string;
-	id: string;
-	folderPath: string;
-	keyId: string;
-	notificationKeyId: string;
-}
 
 /** The server's record of an encryption reset, answered to the device that started it. */
 export interface ResetReceipt { id: string; vaultId: string; generation: number; complete: boolean }
@@ -31,7 +20,9 @@ export interface EncryptionServerState {
 	generation: number;
 	mode: 'converting' | 'active' | 'resetting';
 	keyId: string;
-	scopes: EncryptionScope[];
+	notificationKeyId: string;
+	/** Public half of the vault seal key: the server can create notes it cannot read. */
+	seal: { keyId: string; publicKey: string };
 	recovery: RecoveryEnvelope;
 }
 
@@ -40,37 +31,17 @@ function exactFields(value: Record<string, unknown>, fields: string[]): void {
 	if (Object.keys(value).some(field => !fields.includes(field))) throw new Error('Unexpected encryption configuration field');
 }
 
-/** Checks one scope's own fields. Uniqueness and overlap need the whole configuration. */
-export function assertEncryptionScope(scope: unknown): asserts scope is EncryptionScope {
-	if (!record(scope)) throw new Error('Invalid encryption scope');
-	if (scope.accessId !== undefined && !isEncryptionId(scope.accessId)) throw new Error('Invalid folder access identity');
-	if (scope.binding !== undefined && (typeof scope.binding !== 'string' || scope.binding.length > 8192 || scope.binding.split('.').length !== 5)) throw new Error('Invalid encrypted folder binding');
-	if ((scope.purpose !== undefined && scope.purpose !== 'reading') || ![scope.id, scope.keyId, scope.notificationKeyId].every(isEncryptionId)
-		|| !isEncryptionFolderPath(scope.folderPath)) throw new Error('Invalid encryption scope');
-}
-
 export function validateEncryptionState(value: unknown): asserts value is EncryptionServerState {
 	if (!record(value)) throw new Error('Invalid encryption configuration');
-	exactFields(value, ['version', 'vaultId', 'generation', 'mode', 'keyId', 'scopes', 'recovery']);
-	if (value.version !== 1 || !isEncryptionId(value.vaultId) || !isEncryptionId(value.keyId)
+	exactFields(value, ['version', 'vaultId', 'generation', 'mode', 'keyId', 'notificationKeyId', 'seal', 'recovery']);
+	if (value.version !== 1 || !isEncryptionId(value.vaultId) || !isEncryptionId(value.keyId) || !isEncryptionId(value.notificationKeyId)
 		|| !Number.isSafeInteger(value.generation) || (value.generation as number) < 1
-		|| (value.mode !== 'converting' && value.mode !== 'active' && value.mode !== 'resetting')
-		|| !Array.isArray(value.scopes) || value.scopes.length > 128) throw new Error('Unsupported encryption configuration');
-	const ids = new Set([value.keyId, 'vault']);
-	const folders = new Set<string>();
-	for (const scope of value.scopes) {
-		if (!record(scope)) throw new Error('Invalid encryption scope');
-		exactFields(scope, ['id', 'folderPath', 'purpose', 'accessId', 'binding', 'keyId', 'notificationKeyId']);
-		assertEncryptionScope(scope);
-		if (folders.has(scope.folderPath)) throw new Error('Invalid encryption scope');
-		folders.add(scope.folderPath);
-		const folderPath = scope.folderPath;
-		if ([...folders].some(folder => folder !== folderPath && (folder.startsWith(folderPath + '/') || folderPath.startsWith(folder + '/')))) throw new Error('Encrypted reminders folders must not overlap');
-		for (const id of [scope.id, scope.keyId, scope.notificationKeyId] as string[]) {
-			if (ids.has(id)) throw new Error('Duplicate encryption scope or key');
-			ids.add(id);
-		}
-	}
+		|| (value.mode !== 'converting' && value.mode !== 'active' && value.mode !== 'resetting')) throw new Error('Unsupported encryption configuration');
+	if (!record(value.seal)) throw new Error('Missing vault seal key');
+	exactFields(value.seal, ['keyId', 'publicKey']);
+	if (!isEncryptionId(value.seal.keyId)) throw new Error('Invalid vault seal key');
+	validateP256PublicKey(value.seal.publicKey);
+	if (new Set([value.keyId, value.notificationKeyId, value.seal.keyId, 'vault']).size !== 4) throw new Error('Duplicate encryption key');
 	if (!record(value.recovery)) throw new Error('Missing encrypted recovery bundle');
 	exactFields(value.recovery, ['version', 'vaultId', 'envelope']);
 	if (!isRecoveryEnvelope(value.recovery, value.vaultId)) throw new Error('Invalid encrypted recovery bundle');
@@ -78,34 +49,16 @@ export function validateEncryptionState(value: unknown): asserts value is Encryp
 
 export function createEncryptionState(bundle: VaultKeyBundle, recovery: RecoveryEnvelope): EncryptionServerState {
 	const state: EncryptionServerState = { version: 1, vaultId: bundle.vaultId, generation: bundle.generation,
-		mode: 'converting', keyId: bundle.vault.id, recovery,
-		scopes: bundle.scopes.map(scope => ({ id: scope.id, folderPath: scope.folderPath, ...(scope.accessId ? { accessId: scope.accessId } : {}),
-			...(scope.purpose ? { purpose: scope.purpose } : {}), keyId: scope.data.id, notificationKeyId: scope.notifications.id })) };
+		mode: 'converting', keyId: bundle.vault.id, notificationKeyId: bundle.notifications.id,
+		seal: { keyId: bundle.seal.id, publicKey: bundle.seal.publicKey }, recovery };
 	validateEncryptionState(state);
 	return state;
 }
 
-export function encryptionScopeForPath(state: EncryptionServerState, path: string): { id: string; keyId: string } {
-	return state.scopes.filter(scope => path.startsWith(`${scope.folderPath}/`))
-		.sort((left, right) => right.folderPath.length - left.folderPath.length)[0] ?? { id: 'vault', keyId: state.keyId };
-}
-
-/** A narrowly scoped upgrade for vaults encrypted before Reading support. Existing
- * keys stay unchanged; only a previously vault-scoped Reading folder is split off. */
-export function isReadingScopeExtension(previous: EncryptionServerState, next: EncryptionServerState): boolean {
-  if (previous.mode !== 'active' || next.mode !== 'converting' || next.vaultId !== previous.vaultId || next.keyId !== previous.keyId
-    || next.generation !== previous.generation + 1 || next.scopes.length !== previous.scopes.length + 1) return false;
-  if (previous.scopes.some(scope => !next.scopes.some(candidate => candidate.id === scope.id && candidate.folderPath === scope.folderPath
-    && candidate.keyId === scope.keyId && candidate.notificationKeyId === scope.notificationKeyId && candidate.purpose === scope.purpose && candidate.accessId === scope.accessId))) return false;
-  return next.scopes.filter(scope => !previous.scopes.some(old => old.id === scope.id)).every(scope => scope.purpose === 'reading');
-}
-
-/** Moving a scope never adds authority or changes any encryption key. */
-export function isEncryptionScopeMove(previous: EncryptionServerState, next: EncryptionServerState): boolean {
-	if (previous.mode !== 'active' || next.mode !== 'converting' || next.vaultId !== previous.vaultId || next.keyId !== previous.keyId
-		|| next.generation !== previous.generation + 1 || next.scopes.length !== previous.scopes.length) return false;
-	return previous.scopes.every(scope => next.scopes.some(candidate => candidate.id === scope.id && candidate.keyId === scope.keyId
-		&& candidate.notificationKeyId === scope.notificationKeyId && candidate.purpose === scope.purpose
-		&& (candidate.folderPath !== scope.folderPath || candidate.accessId === scope.accessId)))
-		&& previous.scopes.some(scope => next.scopes.find(candidate => candidate.id === scope.id)!.folderPath !== scope.folderPath);
+/** Keys unlock this server only when every key identity matches its public state. */
+export function assertEncryptionKeys(state: EncryptionServerState, bundle: VaultKeyBundle): void {
+	if (state.vaultId !== bundle.vaultId || state.generation !== bundle.generation || state.keyId !== bundle.vault.id
+		|| state.notificationKeyId !== bundle.notifications.id || state.seal.keyId !== bundle.seal.id || state.seal.publicKey !== bundle.seal.publicKey) {
+		throw new Error('Recover this server’s encryption keys before continuing');
+	}
 }

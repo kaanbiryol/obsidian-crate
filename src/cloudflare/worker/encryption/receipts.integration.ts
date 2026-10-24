@@ -3,11 +3,9 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
-import { createEncryptionState } from '../../../encryption/server-state';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { reminderRequestHash } from '../../../encryption/reminder-receipt';
-import { ENCRYPTION_STATE_KEY } from './state';
 import { handleEncryptionConversion } from './conversion';
 import { handleEncryptionRoute } from '../routes/encryption';
 import { prepareEncryptedReceipt, readEncryptedReceipt, pruneEncryptedReceiptChunks, RECEIPT_CHUNK_PAGE } from './receipt-storage';
@@ -19,26 +17,29 @@ const operationId = () => createReminderOperationId(Math.floor(Date.now() / 8640
 const envelope = (size = 1_100_000) => `header.key.iv.${'a'.repeat(size)}.tag`;
 const chunkCount = async () => (await env.DB.prepare("SELECT COUNT(*) AS count FROM maintenance_state WHERE key GLOB 'e2ee:receipt:*'").first<{ count: number }>())!.count;
 
-it('converts large pre-encryption responses atomically, preserves first ciphertext on retry, and restricts folder receipts', async () => {
-	const bundle = addReminderScope(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Private');
-	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
-	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_STATE_KEY, JSON.stringify(state)).run();
+it('converts large pre-encryption responses atomically, preserves first ciphertext on retry, and serves the vault receipt', async () => {
+	const { bundle, state } = await createEncryptionFixture('converting');
+	await storeEncryptionState(env.DB, state);
 	const id = operationId();
 	await env.DB.prepare('INSERT INTO reminder_operations(operation_id, request_hash, response_json) VALUES (?, ?, ?)').bind(id, 'old-hash', '{"success":true}').run();
-	const body = { operationId: id, vault: envelope(), scopes: [{ id: bundle.scopes[0]!.id, envelope: envelope() }] };
-	const convert = (value: typeof body) => handleEncryptionConversion(new Request('https://test/encryption/conversion/receipt', { method: 'PUT', body: JSON.stringify(value),
+	// Large enough to span several receipt chunks.
+	const body = { operationId: id, vault: envelope(2_200_000) };
+	const convert = (value: Record<string, unknown>) => handleEncryptionConversion(new Request('https://test/encryption/conversion/receipt', { method: 'PUT', body: JSON.stringify(value),
 		headers: { 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) } }), env, '/encryption/conversion/receipt');
+	// Receipts carry one vault envelope; a body with any other field is refused before writing.
+	expect((await convert({ ...body, scopes: [] }))?.status).toBe(400);
+	expect(await chunkCount()).toBe(0);
 	expect((await convert(body))?.status).toBe(200);
 	const count = await chunkCount(); expect(count).toBeGreaterThan(4);
-	expect((await convert({ ...body, vault: 'other.key.iv.cipher.tag', scopes: [] }))?.status).toBe(200);
+	expect((await convert({ ...body, vault: 'other.key.iv.cipher.tag' }))?.status).toBe(200);
 	expect(await chunkCount()).toBe(count);
 	const saved = (await env.DB.prepare('SELECT response_json FROM reminder_operations WHERE operation_id = ?').bind(id).first<{ response_json: string }>())!.response_json;
-	expect(await readEncryptedReceipt(env.DB, 'reminder', id, saved)).toEqual({ e2eeLegacy: { vault: body.vault, scopes: body.scopes } });
-	for (const folder of ['Reminders', 'Private']) {
-		const response = await handleEncryptionRoute(new Request(`https://test/reminders/encrypted-receipt?operationId=${id}&folderPath=${folder}`), env.DB,
-			'/reminders/encrypted-receipt', { scope: 'reminders', tokenId: folder, folderPath: folder });
-		expect(await response!.json()).toEqual({ envelope: folder === 'Reminders' ? body.scopes[0]!.envelope : null });
-	}
+	expect(await readEncryptedReceipt(env.DB, 'reminder', id, saved)).toEqual({ e2eeLegacy: { vault: body.vault } });
+	const receipt = async (query: string) => (await handleEncryptionRoute(new Request(`https://test/reminders/encrypted-receipt?${query}`), env.DB,
+		'/reminders/encrypted-receipt', { scope: 'reminders', tokenId: 'web', folderPath: 'Reminders' }))!;
+	expect(await (await receipt(`operationId=${id}&folderPath=Reminders`)).json()).toEqual({ envelope: body.vault });
+	expect(await (await receipt(`operationId=${operationId()}&folderPath=Reminders`)).json()).toEqual({ envelope: null });
+	expect((await receipt('folderPath=Reminders')).status).toBe(400);
 	await pruneEncryptedReceiptChunks(env.DB);
 	expect(await chunkCount()).toBe(count);
 	await env.DB.prepare('DELETE FROM reminder_operations WHERE operation_id = ?').bind(id).run();
@@ -77,7 +78,7 @@ it('rolls back chunks when an operation expires, and publishes no chunks for a s
 
 it('keeps small responses inline and retains upload chunks until their parent is removed', async () => {
 	expect(prepareEncryptedReceipt(env.DB, 'reminder', operationId(), { encrypted: 'small' }, { sql: '1', args: [] }).statements).toEqual([]);
-	const id = operationId(), value = { e2eeLegacy: { vault: envelope(), scopes: [] } };
+	const id = operationId(), value = { e2eeLegacy: { vault: envelope() } };
 	const receipt = prepareEncryptedReceipt(env.DB, 'upload', id, value, { sql: '1', args: [] });
 	await env.DB.batch([...receipt.statements, env.DB.prepare('INSERT INTO upload_operations(operation_id, request_hash, response_json) VALUES (?, ?, ?)').bind(id, 'hash', receipt.json)]);
 	await pruneEncryptedReceiptChunks(env.DB);

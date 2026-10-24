@@ -4,7 +4,6 @@ export const SECRET_KEYS = {
 	DEVICE_ID: 'crate-device-id',
 	ENCRYPTION_KEYS: 'crate-encryption-keys',
 	ENCRYPTION_RESET: 'crate-encryption-reset',
-	ENCRYPTION_FOLDER_MOVES: 'crate-encryption-folder-moves',
 	ENCRYPTION_RECOVERY: 'crate-encryption-recovery',
 } as const;
 

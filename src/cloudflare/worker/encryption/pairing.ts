@@ -5,7 +5,7 @@ import { ENCRYPTION_STATE_KEY } from './state';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../request-validation';
-import { authority as readingAuthority, ReadingError } from '../reading/common';
+import { ReadingError } from '../reading/common';
 
 const PREFIX = 'crate_web_pairing:', END = 'crate_web_pairing;';
 interface Stored extends PairingRecord { owner: string; approver?: string }
@@ -49,13 +49,7 @@ export async function handleEncryptionPairing(request: Request, db: D1Database, 
       if (vault) return failure('Start pairing in the web app.', 403);
       validatePairingContext(body.context);
       const c = body.context;
-      const scope = state.scopes.find(scope => scope.id === c.scopeId);
-      if (c.vaultId !== state.vaultId || c.generation !== state.generation || !scope) return failure('This app connection changed. Start again.');
-      // A normal Crate app credential is scoped as reminders but also opens
-      // the configured Reading library. Reuse that same authority here.
-      const folder = scope.purpose === 'reading' ? (await readingAuthority(db, principal)).folder_path
-        : principal.scope === 'reminders' ? principal.folderPath : undefined;
-      if (scope.folderPath !== folder) return failure('This app connection changed. Start again.');
+      if (c.vaultId !== state.vaultId || c.generation !== state.generation) return failure('This app connection changed. Start again.');
       if (typeof body.commitment !== 'string' || decodeBase64Url(body.commitment, 32).length !== 32) return failure('Invalid pairing commitment.', 400);
       const existing = await db.prepare('SELECT value FROM maintenance_state WHERE key=?').bind(PREFIX + c.id).first<{ value: string }>();
       if (existing) {

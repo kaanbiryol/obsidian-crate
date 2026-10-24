@@ -4,11 +4,11 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
-import { ENCRYPTION_STATE_KEY } from './state';
 import { trackStagedUploads } from '../sync/staged-uploads';
-import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
-import { createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
-import { FileKeyAuthority } from '../../../encryption/file-authority';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
+import type { EncryptionServerState } from '../../../encryption/server-state';
+import type { FileKeyAuthority } from '../../../encryption/file-authority';
+import { createReminderProjection, type NotificationKeys } from '../../../encryption/reminder-projection';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
@@ -17,16 +17,15 @@ import { sha256Hex } from '../../../platform/sha256';
 
 let state: EncryptionServerState;
 let keys: FileKeyAuthority;
+let notifications: NotificationKeys;
 const operationId = () => createReminderOperationId(Math.floor(Date.now() / 86400000));
 const headers = () => ({ Authorization: 'Bearer owner', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current),
 	'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) });
 
 beforeEach(async () => {
 	await applySchema(env.DB);
-	const bundle = createVaultKeyBundle();
-	state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode())), mode: 'active' };
-	keys = await FileKeyAuthority.fromVault(bundle);
-	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_STATE_KEY, JSON.stringify(state)).run();
+	({ state, keys, notifications } = await createEncryptionFixture('active'));
+	await storeEncryptionState(env.DB, state);
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('owner', ?, 'vault')").bind(await sha256Hex('owner')).run();
 });
 afterEach(reset);
@@ -78,12 +77,28 @@ it('keeps the content guard when a caller supplies the authenticated encryption 
 });
 
 it('rejects ciphertext from another vault before storing it', async () => {
-	const other = await FileKeyAuthority.fromVault(createVaultKeyBundle());
+	const { keys: other } = await createEncryptionFixture('active');
 	const file = await sealFile({ path: 'wrong.bin', content: new Uint8Array([1]), contentType: 'application/octet-stream' }, other.forPath('wrong.bin'));
 	const response = await worker.fetch(new Request('https://test/sync/upload?path=wrong.bin', { method: 'PUT', body: file.bytes,
 		headers: { ...headers(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
 	}), env);
 	expect(response.status, await response.clone().text()).toBe(428);
+	await expectNoPublication();
+});
+
+it.each(['another notification key', 'a non-Markdown file'] as const)('rejects reminder schedules sealed for %s before storing them', async kind => {
+	const path = kind === 'a non-Markdown file' ? 'Reminders/note.bin' : 'Reminders/note.md';
+	const content = new TextEncoder().encode('- [ ] Private reminder 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->');
+	// Same vault identity, but a notification key this vault never published.
+	const projectionKeys = kind === 'another notification key' ? { ...(await createEncryptionFixture('active')).notifications, vaultId: state.vaultId } : notifications;
+	const publicData = await createReminderProjection(projectionKeys, ['Reminders'], 'Reminders/note.md', content.buffer);
+	expect(publicData?.reminders).toHaveLength(1);
+	const file = await sealFile({ path, content, contentType: 'application/octet-stream', publicData }, keys.forPath(path));
+	const response = await worker.fetch(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes,
+		headers: { ...headers(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
+	}), env);
+	expect(response.status, await response.clone().text()).toBe(409);
+	expect(await response.json()).toMatchObject({ code: 'encryption_required' });
 	await expectNoPublication();
 });
 

@@ -6,7 +6,7 @@ import { fileFolderArgs } from '../sync/file-identity';
 import { corsHeaders, corsResponse } from '../cors';
 import { parseJsonObject, sanitizePath } from '../request-validation';
 import { readEncryptionState, prepareEncryptedFileCommit, EncryptionStateError } from './state';
-import { encryptionScopeForPath, type EncryptionServerState } from '../../../encryption/server-state';
+import type { EncryptionServerState } from '../../../encryption/server-state';
 import { getStoredFileRow, storedObjectMatchesMetadata } from '../sync/storage';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
@@ -21,13 +21,13 @@ import { isSha256Hex } from '../../../platform/validation';
 
 interface EncryptedWebFile { path: string; content: string; expectedHash: string | null; expectedRevision?: string }
 
-function scopedPath(value: unknown, folder: string, state: EncryptionServerState): string | null {
+function scopedPath(value: unknown, folder: string): string | null {
 	if (typeof value !== 'string') return null;
 	const path = sanitizePath(value);
-	const scope = state.scopes.find(scope => scope.folderPath === folder);
-	return path && path === value && path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md')
-		&& scope && encryptionScopeForPath(state, path).id === scope.id ? path : null;
+	return path && path === value && path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md') ? path : null;
 }
+
+const isFolder = (value: unknown): value is string => typeof value === 'string' && !!value && sanitizePath(value) === value;
 
 const FEATURE_LABELS = { reminders: 'reminders', reading: 'Reading' } as const;
 
@@ -42,7 +42,7 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 	if (request.method !== 'GET') return null;
 	const params = new URL(request.url).searchParams;
 	const folder = params.get('folderPath');
-	if (!folder || (expectedFolder && folder !== expectedFolder) || !state.scopes.some(scope => scope.folderPath === folder)) return corsResponse({ error: `Unknown encrypted ${label} folder` }, 403);
+	if (!isFolder(folder) || (expectedFolder && folder !== expectedFolder)) return corsResponse({ error: `Unknown encrypted ${label} folder` }, 403);
 	if (path === `${prefix}/encrypted-files`) {
 		const after = params.get('after') ?? '';
 		if (after.length > 1024) return corsResponse({ error: 'Invalid file cursor' }, 400);
@@ -56,12 +56,12 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 			WHERE ${lower} AND portable_path < ? AND path >= ? AND path < ? AND lower(path) LIKE '%.md'
 			ORDER BY portable_path LIMIT ${ENCRYPTED_INVENTORY_PAGE}`)
 			.bind(lowerBound, keyEnd, pathStart, pathEnd).all<{ path: string; portable_path: string; hash: string; size: number; revision: string }>();
-		const files = rows.results.filter(file => scopedPath(file.path, folder, state))
+		const files = rows.results.filter(file => scopedPath(file.path, folder))
 			.map(({ path, hash, size, revision }) => ({ path, hash, size, revision }));
 		return corsResponse({ files, sequence: sequence?.seq ?? 0, generation: state.generation,
 			nextCursor: rows.results.length === ENCRYPTED_INVENTORY_PAGE ? rows.results.at(-1)!.portable_path : null });
 	}
-	const filePath = scopedPath(params.get('path'), folder, state);
+	const filePath = scopedPath(params.get('path'), folder);
 	if (!filePath) return corsResponse({ error: 'File is outside this enrollment' }, 403);
 	const file = await getStoredFileRow(env.DB, filePath);
 	if (!file) return corsResponse({ error: 'Note not found' }, 404);
@@ -78,7 +78,7 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
 	if (Object.keys(body).some(key => !['folderPath', 'operationId', 'files', 'acknowledgment', 'createdId'].includes(key))) return corsResponse({ error: 'Unexpected encrypted mutation field' }, 400);
-	if ((expectedFolder && body.folderPath !== expectedFolder) || typeof body.folderPath !== 'string' || !state.scopes.some(scope => scope.folderPath === body.folderPath)
+	if ((expectedFolder && body.folderPath !== expectedFolder) || !isFolder(body.folderPath)
 		|| !Array.isArray(body.files) || body.files.length < 1 || body.files.length > 2
 		|| !isReceiptEnvelope(body.acknowledgment)) return corsResponse({ error: 'Invalid encrypted mutation' }, 400);
 	const operation = await beginReminderOperation(env.DB, body, 'encrypted-files');
@@ -88,7 +88,7 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 	for (const raw of body.files as unknown[]) {
 		if (!raw || typeof raw !== 'object') return corsResponse({ error: 'Invalid encrypted file' }, 400);
 		const file = raw as Partial<EncryptedWebFile>;
-		const filePath = scopedPath(file.path, body.folderPath, state);
+		const filePath = scopedPath(file.path, body.folderPath);
 		if (Object.keys(file).some(key => !['path', 'content', 'expectedHash', 'expectedRevision'].includes(key)) || !filePath
 			|| typeof file.content !== 'string' || new TextEncoder().encode(file.content).byteLength > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES
 			|| (file.expectedHash !== null && (typeof file.expectedHash !== 'string' || !isSha256Hex(file.expectedHash)))

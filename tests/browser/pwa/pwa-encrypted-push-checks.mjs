@@ -43,10 +43,10 @@ addListener('message', event => {
 export async function verifyEncryptedPushWorker(page, origin) {
   const result = await page.evaluate(async origin => {
     const t = window.encryptionStorageTest;
-    const bundle = t.addReminderScope(t.createVaultKeyBundle(), 'Reminders');
-    const grant = t.createReminderKeyGrant(bundle, 'Reminders');
-    await t.rememberReminderKeys(grant);
-    const projection = await t.createReminderProjection(bundle, 'Reminders/Inbox.md',
+    const bundle = await t.createVaultKeyBundle();
+    await t.rememberVaultKeys(bundle);
+    const notifications = await t.importNotificationKeys(bundle.vaultId, bundle.notifications);
+    const projection = await t.createReminderProjection(notifications, ['Reminders'], 'Reminders/Inbox.md',
       new TextEncoder().encode('- [ ] Private background title 2099-01-02 <!-- crate-id:background-push -->').buffer);
     const notice = projection.reminders[0].notification;
     const registration = await navigator.serviceWorker.register('/encrypted-push-worker.js', { scope: '/' });
@@ -69,7 +69,7 @@ export async function verifyEncryptedPushWorker(page, origin) {
       const legacy = await deliver(false);
       const substituted = await deliver(true, { ...notification, data: { ...notification.data,
         encrypted: { ...notice, reminderId: 'substitution' } } });
-      await t.clearReminderKeys(() => true);
+      await t.clearVaultKeys(() => true);
       const locked = await deliver(true);
       return { declarative, legacy, substituted, locked, navigate: notification.navigate };
     } finally { await registration.unregister(); }

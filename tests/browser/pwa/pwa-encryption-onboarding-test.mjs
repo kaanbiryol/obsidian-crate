@@ -8,16 +8,14 @@ import { switchFeature } from './pwa-feature-navigation.mjs';
 
 // Real PWA UI, recovery cryptography and IndexedDB; only HTTP data is a fixture.
 // Separate browser contexts model iOS storage separation, not OS installation.
-const compiled = await build({ entryPoints: ['src/encryption/key-bundle.ts'], bundle: true, write: false, format: 'esm', platform: 'browser' });
+const compiled = await build({ stdin: { resolveDir: process.cwd(), contents: `
+export * from './src/encryption/key-bundle';
+export * from './src/encryption/server-state';` }, bundle: true, write: false, format: 'esm', platform: 'browser' });
 const keys = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`);
-const bundle = keys.addReminderScope(keys.addReminderScope(keys.createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading');
+const bundle = await keys.createVaultKeyBundle();
 const recovery = await keys.generateRecoveryCode(), wrong = await keys.generateRecoveryCode();
-const envelope = await keys.sealRecoveryBundle(bundle, recovery);
-const state = feature => {
-  const scope = bundle.scopes.find(value => value.folderPath === feature);
-  return { version: 1, vaultId: bundle.vaultId, generation: bundle.generation, mode: 'active', recovery: envelope,
-    scope: { id: scope.id, folderPath: scope.folderPath, purpose: scope.purpose, keyId: scope.data.id, notificationKeyId: scope.notifications.id } };
-};
+// Reminders and Reading both receive the vault's full public state.
+const state = { ...keys.createEncryptionState(bundle, await keys.sealRecoveryBundle(bundle, recovery)), mode: 'active' };
 const assets = await buildPwaPreviewAssets();
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1';
@@ -33,8 +31,8 @@ async function contextFor(browser, { installed = false, reading = false, mobile 
   });
   await context.addCookies(cookies);
   await context.route('**/notifications/preview-session.js', route => route.fulfill({ contentType: 'application/javascript', body: '' }));
-  await context.route('**/encryption', route => route.fulfill({ json: { encryption: state('Reminders') } }));
-  await context.route('**/reading/encryption', route => route.fulfill({ json: { encryption: state('Reading') } }));
+  await context.route('**/encryption', route => route.fulfill({ json: { encryption: state } }));
+  await context.route('**/reading/encryption', route => route.fulfill({ json: { encryption: state } }));
   await context.route('**/*/encrypted-files?*', route => route.fulfill({ json: { files: [], nextCursor: null, generation: bundle.generation, sequence: 1 } }));
   context.on('request', request => assert.ok(!(request.url() + (request.postData() ?? '')).includes(recovery), 'Recovery key must not reach the server'));
   return context;
@@ -143,7 +141,7 @@ try {
           await expect.poll(() => page.evaluate(async () => {
             const db = await new Promise((resolve, reject) => { const r = indexedDB.open('crate-encryption-keys', 1); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
             const count = await new Promise(resolve => { const r = db.transaction('keys').objectStore('keys').count(); r.onsuccess = () => resolve(r.result); }); db.close(); return count;
-          })).toBe(2);
+          })).toBe(1);
           await expect(page.locator('.crate-encryption-unlock')).toHaveCount(0);
           // An established app that loses keys needs recovery, not first-run copy.
           await page.evaluate(async () => {
@@ -170,7 +168,7 @@ try {
       } finally { await android.close(); }
       const converting = await contextFor(browser, { installed: true });
       try {
-        await converting.route('**/encryption', route => route.fulfill({ json: { encryption: { ...state('Reminders'), mode: 'converting' } } }));
+        await converting.route('**/encryption', route => route.fulfill({ json: { encryption: { ...state, mode: 'converting' } } }));
         const page = await converting.newPage();
         await page.goto(`${origin}/notifications?token=converting&folder=Reminders`);
         await expect(page.getByRole('heading', { name: 'Encryption conversion in progress', exact: true })).toBeVisible();

@@ -2,7 +2,7 @@ import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { createModalActions, SharedModal } from '../../plugin/shared-modal';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { addEncryptedReading, encryptVault, loadDeviceEncryptionKeys, prepareEncryptionKeys, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
+import { encryptVault, loadDeviceEncryptionKeys, prepareEncryptionKeys, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
 import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import { WorkerApiHttpClient } from '../../../sync/worker-api/http';
 import { readServerEncryption } from '../../../sync/encryption/conversion';
@@ -12,7 +12,6 @@ import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
 import { normalizeWorkerUrl } from '../../../sync/connection/worker-url';
 import { EncryptionResetModal } from './encryption-reset-modal';
 import { renderRecoveryVerification } from './recovery-verification';
-import { resumeEncryptedFolderMoves, useServerEncryptionFolders } from '../../../plugin/encryption-folder-moves';
 import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-setup-ui';
 import { renderEncryptionManagement } from './encryption-manage-ui';
 import { WebAppPairingModal } from '../web-app-pairing-modal';
@@ -45,10 +44,6 @@ export function renderEncryptionSection(container: HTMLElement, plugin: CratePlu
 		// Reset checkpoints must remain reachable after their old credentials are revoked.
 		if (plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) {
 			show('Reset in progress', 'Finish the sync reset on this device.', 'Resume reset'); return;
-		}
-		if (plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) {
-			modalTitle = 'Resume folder move';
-			show('Folder move pending', 'Finish updating encryption for the moved folder.', 'Resume folder move'); return;
 		}
 		const url = normalizeWorkerUrl(plugin.settings.workerUrl), token = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) ?? '';
 		loading = true;
@@ -134,24 +129,6 @@ class EncryptionModal extends SharedModal {
 		finally { this.bodyEl.setAttribute('aria-busy', 'false'); }
 	}
 	private async loadContent(): Promise<void> {
-		if (this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) {
-			this.clearContent();
-			this.bodyEl.createEl('p', { text: 'A folder move is saved on this device. Resume to update encryption, retained history and folder settings. Keep this device’s Crate data until it finishes. Web apps follow renamed folders automatically; choosing a different folder requires a fresh setup link.' });
-			const progress = this.bodyEl.createEl('p', { attr: { role: 'status' } });
-			new Setting(this.bodyEl).setName('Encrypted folder move').addButton(button => button.setButtonText('Resume folder move').setCta().onClick(async () => {
-				button.setDisabled(true);
-				try { this.assertCurrentConnection(); await resumeEncryptedFolderMoves(this.plugin, text => progress.setText(text)); await this.load(); }
-				catch (error) { progress.setText(errorMessage(error)); }
-				finally { button.setDisabled(false); this.onChanged(); }
-			}));
-			new Setting(this.bodyEl).setName('Another device changed folders?').setDesc('Use the server’s completed folder settings and cancel this device’s pending folder mapping. Local files stay where they are; normal sync reconciles them.').addButton(button => button.setButtonText('Use server folder settings').onClick(async () => {
-				button.setDisabled(true);
-				try { this.assertCurrentConnection(); await useServerEncryptionFolders(this.plugin); await this.load(); }
-				catch (error) { progress.setText(errorMessage(error)); }
-				finally { button.setDisabled(false); this.onChanged(); }
-			}));
-			return;
-		}
 		const state = await readServerEncryption(this.http);
 		this.assertCurrentConnection();
 		this.setLayoutTitle(encryptionModalTitle(state));
@@ -159,7 +136,7 @@ class EncryptionModal extends SharedModal {
 		if (state?.mode === 'resetting') { this.clearContent(); this.bodyEl.createEl('p', { text: 'An encryption reset is in progress. Resume it on the Obsidian device that started it.' }); return; }
 		if (state && !keys) { this.clearContent(); this.status(state, null); this.recover(state); return; }
 		if (state?.mode === 'active' && keys) { this.clearContent(); this.ready(keys, state); return; }
-		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin, this.http, keys);
+		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin, keys);
 		if (!recovery) { this.clearContent(); this.status(state, keys); this.bodyEl.createEl('p', { text: 'Restore the recovery key from your saved copy before resuming encryption.' }); if (state) this.recover(state); return; }
 		try { await verifySetupRecovery(state, bundle, recovery); }
 		catch (error) {
@@ -191,9 +168,7 @@ class EncryptionModal extends SharedModal {
 		if (!state) return vault;
 		const devices = createSettingsDisclosure(overview, keys ? 'This device is unlocked' : 'This device needs a recovery key', { inline: true });
 		new Setting(devices).setName('This device').setDesc(keys ? 'Unlocked · keys saved on this device.' : 'Locked · enter your saved recovery key below.');
-		const scope = keys?.scopes.find(item => item.folderPath === this.plugin.remindersSettings.remindersFolderPath);
 		new Setting(devices).setName('Notification keys').setDesc(!keys ? 'Unavailable until this device is unlocked.'
-			: !scope ? 'This reminders folder was not included in encryption setup. Select an enrolled folder in Reminders settings.'
 			: state.mode === 'converting' ? 'Saved · notifications resume after conversion.'
 			: 'Ready for enrollment · web apps use the same recovery key and need notification permission.');
 		return vault;
@@ -214,17 +189,6 @@ class EncryptionModal extends SharedModal {
 		}));
 	}
 	private ready(keys: VaultKeyBundle, state: EncryptionServerState): void {
-    if (!state.scopes.some(scope => scope.folderPath === this.plugin.settings.reading.folderPath && scope.purpose === 'reading')) {
-      new Setting(this.bodyEl).setName('Encrypt reading for the web app').setDesc('Encrypt your reading folder and its retained notes using your existing recovery key. Sync pauses during setup.').addButton(button => button.setButtonText('Add encrypted reading').onClick(async () => {
-        button.setDisabled(true);
-        const progress = this.bodyEl.createEl('p', { attr: { role: 'status' } });
-        try {
-          await addEncryptedReading(this.plugin, this.http, keys, message => progress.setText(message), () => this.assertCurrentConnection());
-          await this.load();
-        } catch (error) { progress.setText(errorMessage(error) + ' Reopen Manage encryption to resume.'); }
-        finally { button.setDisabled(false); this.onChanged(); }
-      }));
-    }
 		this.disposeContent = renderEncryptionManagement(this.bodyEl, {
       connectApp: () => { this.assertCurrentConnection(); this.close(); new WebAppPairingModal(this.plugin).open(); },
 			copyRecovery: async () => {

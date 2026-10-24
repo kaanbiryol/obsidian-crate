@@ -6,8 +6,8 @@ import { EncryptedFiles } from './encrypted-files';
 import type { WorkerApiHttpClient } from '../worker-api/http';
 
 it('retries a repaired descriptor after authentication fails instead of caching the bad response', async () => {
-  const keys = createVaultKeyBundle(), path = 'note.md';
-  const authority = await FileKeyAuthority.fromVault(keys);
+  const keys = await createVaultKeyBundle(), path = 'note.md';
+  const authority = await FileKeyAuthority.fromBundle(keys);
   const sealed = await sealFile({ path, content: new TextEncoder().encode('Private content'), contentType: 'text/markdown' }, authority.forPath(path));
   const requestJson = vi.fn().mockResolvedValueOnce({ descriptors: { revision: { ...sealed.descriptor, keyId: 'wrong-key' } } })
     .mockResolvedValue({ descriptors: { revision: sealed.descriptor } });

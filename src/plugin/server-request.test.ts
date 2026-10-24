@@ -89,7 +89,7 @@ it('does not dispatch when the plugin is already unloaded', async () => {
 
 it('sends saved encryption authority without exposing any key material', async () => {
 	const { plugin } = harness(['shared-features-v1']);
-	const bundle = createVaultKeyBundle();
+	const bundle = await createVaultKeyBundle();
 	vi.spyOn(plugin.secretStorage, 'get').mockImplementation(key => key === SECRET_KEYS.AUTH_TOKEN ? 'old-token'
 		: key === SECRET_KEYS.ENCRYPTION_KEYS ? JSON.stringify(bundle) : null);
 	await serverRequest(plugin, '/features', { feature: 'reminders', enabled: false });

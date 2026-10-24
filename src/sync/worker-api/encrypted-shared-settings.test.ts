@@ -8,7 +8,7 @@ const settings = { ignorePatterns: [], syncInterval: 30, pushEnabled: false };
 async function fixture(value: unknown) {
 	const requestJson = vi.fn<(path: string, request?: { method: string; body: string }) => Promise<unknown>>();
 	const http = { requestJson } as unknown as WorkerApiHttpClient;
-	const encryption = await EncryptedFiles.create(http, createVaultKeyBundle(), async () => null);
+	const encryption = await EncryptedFiles.create(http, await createVaultKeyBundle(), async () => null);
 	const api = new SharedSettingsWorkerApi(http);
 	api.setEncryption(encryption);
 	const initial = { settings: await encryption.sealSettings(value), settingsVersion: 'converted' };

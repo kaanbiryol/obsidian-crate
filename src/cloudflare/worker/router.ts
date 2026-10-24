@@ -84,7 +84,7 @@ export async function handleAuthenticatedRoute(
 	return await handleEncryptionReset(request, env, path, principal)
 		?? (principal.scope === 'vault' ? await handleEncryptionConversion(request, env, path) : null)
 		?? await handleEncryptionRoute(request, db, path, principal, encryption)
-		?? await handleEncryptedFolderFiles(request, env, path)
+		?? await handleEncryptedFolderFiles(request, env, path, 'reminders', principal.scope === 'reminders' ? principal.folderPath : undefined)
 		?? await handleSyncRoute(request, env, uploadCommitters, path, method, resetGeneration, mutationAuditContext(request, principal, requestId), encryption)
 		?? await handleAuthRoute(request, env, path, method)
 		?? await handleRemindersRoute(request, env, path, method)

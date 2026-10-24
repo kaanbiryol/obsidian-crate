@@ -5,9 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
-import { createEncryptionState } from '../../../encryption/server-state';
-import { FileKeyAuthority } from '../../../encryption/file-authority';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
+import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import { createReminderProjection } from '../../../encryption/reminder-projection';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
@@ -36,20 +35,19 @@ beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 
 async function configure() {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
-	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
-	state.mode = 'active';
-	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_STATE_KEY, JSON.stringify(state)).run();
-	return { bundle, state, keys: await FileKeyAuthority.fromVault(bundle) };
+	const fixture = await createEncryptionFixture('active');
+	await storeEncryptionState(env.DB, fixture.state);
+	return fixture;
 }
+const secrets = (bundle: VaultKeyBundle) => [bundle.vault.secret, bundle.notifications.secret, bundle.seal.privateKey];
 
 it('atomically stores ciphertext, its descriptor and encrypted scheduling projections', async () => {
-	const { bundle, keys } = await configure();
+	const { bundle, state, keys, notifications } = await configure();
 	await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: null }) }), env.DB);
 	const path = 'Reminders/Inbox.md';
 	const text = '- [ ] Secret medical appointment 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->';
 	const content = new TextEncoder().encode(text);
-	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(bundle, path, content.buffer) }, keys.forPath(path));
+	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
 	const request = new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes,
 		headers: { 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)) } });
@@ -65,9 +63,10 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	const alarm = await env.DB.prepare('SELECT content FROM scheduled_reminders WHERE reminder_id = ?').bind('r1').first<{ content: string }>();
 	expect(alarm?.content).not.toContain('Secret medical');
 	expect(parseEncryptedNotification(alarm!.content)).toMatchObject({ vaultId: bundle.vaultId, reminderId: 'r1' });
-	const scoped = await handleEncryptionRoute(new Request('https://test/encryption'), env.DB, '/encryption', { tokenId: 'web', scope: 'reminders', folderPath: 'Reminders' });
-	expect(await scoped!.json()).toMatchObject({ encryption: { scope: { id: bundle.scopes[0]!.id } } });
-	expect(await (await handleEncryptionRoute(new Request('https://test/encryption'), env.DB, '/encryption', { tokenId: 'web', scope: 'reminders', folderPath: 'Reminders' }))!.text()).not.toContain(bundle.vault.secret);
+	// Every session reads the same public configuration; none of it is secret.
+	const scoped = await (await handleEncryptionRoute(new Request('https://test/encryption'), env.DB, '/encryption', { tokenId: 'web', scope: 'reminders', folderPath: 'Reminders' }))!.text();
+	expect(JSON.parse(scoped)).toEqual({ encryption: state });
+	for (const secret of secrets(bundle)) expect(scoped).not.toContain(secret);
 });
 
 it('rejects an in-flight plaintext publication whose SQL was prepared before encryption began', async () => {
@@ -96,9 +95,7 @@ it('keeps the next change visible after converting an empty vault', async () => 
 });
 
 it('resumes an R2 replacement before D1 reconciliation and protects retained history before activation', async () => {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
-	const keys = await FileKeyAuthority.fromVault(bundle);
-	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
+	const { bundle, keys, state, notifications } = await createEncryptionFixture('converting');
 	const path = 'Reminders/Inbox.md', plain = '- [ ] Conversion secret 2099-01-02 <!-- crate-id:r1 -->';
 	for (const [revision, content, current] of [['current-version', plain, true], ['old-version', plain + '\nOld private paragraph', false]] as const) {
 		await env.BUCKET.put(revision, content, { httpMetadata: { contentType: 'text/markdown' } });
@@ -114,11 +111,11 @@ it('resumes an R2 replacement before D1 reconciliation and protects retained his
 	expect((await control('/encryption/conversion/finish', 'POST', '{}'))?.status).toBe(409);
 	for (const [revision, original] of [['current-version', plain], ['old-version', plain + '\nOld private paragraph']]) {
 		const content = new TextEncoder().encode(original);
-		const sealed = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(bundle, path, content.buffer) }, keys.forPath(path));
+		const sealed = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
 		// Simulate process death after replacing the R2 object, before publishing
 		// the descriptor/hash. Resume must retain those exact first ciphertext bytes.
 		await env.BUCKET.put(revision!, sealed.bytes, { httpMetadata: { contentType: ENCRYPTED_FILE_CONTENT_TYPE }, customMetadata: { hash: sealed.hash } });
-		const fresh = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(bundle, path, content.buffer) }, keys.forPath(path));
+		const fresh = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
 		const response = await control(`/encryption/conversion/file?revision=${revision}`, 'PUT', fresh.bytes);
 		expect(response?.status, await response?.clone().text()).toBe(200);
 		expect(await response!.json()).toMatchObject({ hash: sealed.hash });
@@ -137,7 +134,7 @@ it('resumes an R2 replacement before D1 reconciliation and protects retained his
 	expect(await (await handleCheckChanges(new Request('https://test/sync/check?since=1'), env.DB)).json()).toMatchObject({ cursorExpired: true });
 });
 
-it('fences old clients and keeps scoped sessions away from vault keys, history and sibling files', async () => {
+it('fences old clients and keeps scoped sessions away from vault secrets, history and sibling files', async () => {
 	const { bundle, state } = await configure();
 	for (const [id, scope, folder] of [['root', 'vault', null], ['web', 'reminders', 'Reminders']] as const) await env.DB.prepare('INSERT INTO auth_tokens(id, token_hash, scope, folder_path) VALUES (?, ?, ?, ?)').bind(id, await sha256Hex(id), scope, folder).run();
 	const request = (path: string, token: string, encrypted = true, protocol = '1') => worker.fetch(new Request(`https://test${path}`, { headers: {
@@ -148,9 +145,9 @@ it('fences old clients and keeps scoped sessions away from vault keys, history a
 	expect((await request('/encryption/conversion', 'web')).status).toBe(403);
 	expect((await request('/sync/versions', 'web')).status).toBe(403);
 	expect((await request('/reminders/encrypted-files?folderPath=Private', 'web')).status).toBe(403);
-	const publicScope = await (await request('/encryption', 'web')).text();
-	expect(publicScope).not.toContain(bundle.vault.id); expect(publicScope).not.toContain(bundle.vault.secret);
-	expect(JSON.parse(publicScope)).toMatchObject({ encryption: { recovery: state.recovery } });
+	const publicState = await (await request('/encryption', 'web')).text();
+	for (const secret of secrets(bundle)) expect(publicState).not.toContain(secret);
+	expect(JSON.parse(publicState)).toEqual({ encryption: state });
 	expect((await request('/encryption', 'invalid')).status).toBe(401);
 	expect((await request('/sync/manifest', 'web')).status).toBe(403);
 	expect((await request('/settings', 'web')).status).toBe(403);
@@ -190,8 +187,7 @@ it('sweeps full conversion pages within the query budget and preserves live and 
 }, 60000);
 
 it('pages conversion inventory with key cursors and indexed revision lookups', async () => {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
-	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
+	const { state } = await createEncryptionFixture('converting');
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 2000)
 		INSERT INTO files(path, portable_path, hash, size, storage_key) SELECT 'note-'||x||'.md', 'note-'||x||'.md', 'hash', 1, 'key-'||printf('%05d', x) FROM n`).run();
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 500)
@@ -220,9 +216,7 @@ it('pages conversion inventory with key cursors and indexed revision lookups', a
 });
 
 it('resumes file conversion after a D1 limit failure without repeating converted files', async () => {
-	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
-	const keys = await FileKeyAuthority.fromVault(bundle);
-	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
+	const { bundle, keys, state } = await createEncryptionFixture('converting');
 	const headers = { 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) };
 	const control = (path: string, method = 'GET', body?: string | Uint8Array<ArrayBuffer>) => handleEncryptionConversion(new Request(`https://test${path}`, { method, headers, body }), env, path.split('?')[0]!);
 	for (const name of ['a', 'b']) {

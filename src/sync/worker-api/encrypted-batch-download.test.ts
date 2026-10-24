@@ -8,7 +8,7 @@ import { arrayBufferToBase64 } from '../encoding';
 import { sha256Hex } from '../../platform/sha256';
 
 it('decrypts a batch with bounded overlap and returns verified bytes in order', async () => {
-	const encryption = await EncryptedFiles.create({} as WorkerApiHttpClient, createVaultKeyBundle(), async () => null);
+	const encryption = await EncryptedFiles.create({} as WorkerApiHttpClient, await createVaultKeyBundle(), async () => null);
 	const paths = Array.from({ length: 10 }, (_, index) => `n/${index}.md`);
 	const files = await Promise.all(paths.map(async path => {
 		const sealed = await sealFile({ path, content: new TextEncoder().encode(`body ${path}`), contentType: 'text/markdown' }, encryption.keys.forPath(path));

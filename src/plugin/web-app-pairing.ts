@@ -1,7 +1,7 @@
 import type CratePlugin from './CratePlugin';
 import { captureServerConnection } from './server-request';
 import { loadEncryptionKeys } from '../sync/encryption/key-storage';
-import { createReminderKeyGrant, sameVaultKeyBundle } from '../encryption/key-bundle';
+import { sameVaultKeyBundle } from '../encryption/key-bundle';
 import { PAIRING_PATH, type PairingContext, type PairingTransport } from '../encryption/pairing/protocol';
 import { obsidianHttpTransport, WorkerApiHttpClient } from '../sync/worker-api/http';
 import { assertEncryptionKeys, readServerEncryption } from '../sync/encryption/conversion';
@@ -10,11 +10,10 @@ export async function openWebAppPairing(plugin: CratePlugin, signal: AbortSignal
   const connection = captureServerConnection(plugin);
   const keys = loadEncryptionKeys(plugin.secretStorage);
   if (!keys || !connection.origin || !connection.token) throw new Error('Unlock this Obsidian vault before connecting an app.');
-  const folders = { reminders: plugin.remindersSettings.remindersFolderPath, reading: plugin.settings.reading.folderPath };
   const current = () => {
     connection.assertCurrent(); signal.throwIfAborted();
     const latest = loadEncryptionKeys(plugin.secretStorage);
-    if (!latest || !sameVaultKeyBundle(keys, latest) || plugin.remindersSettings.remindersFolderPath !== folders.reminders || plugin.settings.reading.folderPath !== folders.reading) throw new Error('The vault changed. Reopen Connect web app.');
+    if (!latest || !sameVaultKeyBundle(keys, latest)) throw new Error('The vault changed. Reopen Connect web app.');
   };
   const http = new WorkerApiHttpClient(connection.origin, connection.token, async request => {
     current(); try { return await obsidianHttpTransport(request); } finally { current(); }
@@ -27,7 +26,7 @@ export async function openWebAppPairing(plugin: CratePlugin, signal: AbortSignal
   };
   const validate = (context: PairingContext) => {
     current();
-    if (context.origin !== new URL(connection.origin).origin || context.vaultId !== keys.vaultId || context.generation !== keys.generation || !keys.scopes.some(scope => scope.id === context.scopeId)) throw new Error('This app request does not match the unlocked vault.');
+    if (context.origin !== new URL(connection.origin).origin || context.vaultId !== keys.vaultId || context.generation !== keys.generation) throw new Error('This app request does not match the unlocked vault.');
   };
   return { transport, current, validate, async cancel(id: string) {
     connection.assertCurrent();
@@ -40,8 +39,6 @@ export async function openWebAppPairing(plugin: CratePlugin, signal: AbortSignal
     current();
     if (!state || state.mode !== 'active') throw new Error('Finish encryption setup before approving this app.');
     assertEncryptionKeys(state, keys);
-    const primary = keys.scopes.find(scope => scope.id === context.scopeId)!;
-    const sibling = keys.scopes.find(scope => scope.purpose !== primary.purpose && scope.folderPath === (primary.purpose === 'reading' ? folders.reminders : folders.reading));
-    return { grants: [primary, ...(sibling ? [sibling] : [])].map(scope => createReminderKeyGrant(keys, scope.folderPath)) };
+    return { bundle: keys };
   } };
 }

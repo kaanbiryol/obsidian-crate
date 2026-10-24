@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PwaButton as Button } from '../components/PwaButton';
 import { pairingConnection } from './pairing-client';
 import { requestAppPairing } from '../../encryption/pairing/session';
-import { rememberPairingGrants } from '../encryption/web-app-unlock';
+import { rememberPairedBundle } from '../encryption/web-app-unlock';
 import { PairingEndedError } from '../../encryption/pairing/protocol';
 
 export function AppPairing({ feature }: { feature: 'reading' | 'reminders' }) {
@@ -35,7 +35,7 @@ export function AppPairing({ feature }: { feature: 'reading' | 'reminders' }) {
           expected = await connection.encryption();
           connection.current();
           attempt = await requestAppPairing({ version: 1, id: crypto.randomUUID(), origin: location.origin,
-            vaultId: expected.vaultId, generation: expected.generation, scopeId: expected.scope.id }, connection.transport, connection.current);
+            vaultId: expected.vaultId, generation: expected.generation }, connection.transport, connection.current);
         }
         const result = await attempt.poll();
         connection.current();
@@ -50,8 +50,8 @@ export function AppPairing({ feature }: { feature: 'reading' | 'reminders' }) {
           }
           setView({ started: true, code: result.code, importing: true });
           const latest = await connection.encryption();
-          if (latest.vaultId !== expected.vaultId || latest.generation !== expected.generation || latest.scope.id !== expected.scope.id) throw new PairingEndedError('The vault changed. Start again.');
-          await rememberPairingGrants(result.payload, latest, connection.localFolder, () => { connection.current(); return true; });
+          if (latest.vaultId !== expected.vaultId || latest.generation !== expected.generation || latest.keyId !== expected.keyId) throw new PairingEndedError('The vault changed. Start again.');
+          await rememberPairedBundle(result.payload, latest, () => { connection.current(); return true; });
           connection.current();
           // Stored keys are durable first. A lost acknowledgement cannot undo
           // them; the relay packet expires even when cleanup is unreachable.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPairingRequester, createPairingResponder, type PairingContext } from './protocol';
 
-const context = (): PairingContext => ({ version: 1, id: crypto.randomUUID(), origin: 'https://crate.example', vaultId: 'vault', generation: 2, scopeId: 'reminders' });
+const context = (): PairingContext => ({ version: 1, id: crypto.randomUUID(), origin: 'https://crate.example', vaultId: 'vault', generation: 2 });
 async function pair() {
   const requester = await createPairingRequester(context());
   const responder = await createPairingResponder(requester.request);
@@ -34,7 +34,7 @@ describe('committed app key transfer', () => {
     const attacker = await pair();
     await expect(requester.accept(attacker.responder.publicKey)).rejects.toThrow('changed');
   });
-  it.each(['origin', 'vaultId', 'scopeId', 'id', 'generation'] as const)('binds %s into the commitment', async field => {
+  it.each(['origin', 'vaultId', 'id', 'generation'] as const)('binds %s into the commitment', async field => {
     const requester = await createPairingRequester(context());
     const changed = { ...requester.request, context: { ...requester.request.context, [field]: field === 'generation' ? 9 : field === 'origin' ? 'https://evil.example' : 'other' } };
     const responder = await createPairingResponder(changed);

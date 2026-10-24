@@ -40,7 +40,7 @@ export class EncryptedFiles {
 		readonly generation: number, private readonly publicData: PublicDataBuilder) {}
 
 	static async create(http: WorkerApiHttpClient, bundle: VaultKeyBundle, publicData: PublicDataBuilder): Promise<EncryptedFiles> {
-		return new EncryptedFiles(http, await FileKeyAuthority.fromVault(bundle), bundle.generation, publicData);
+		return new EncryptedFiles(http, await FileKeyAuthority.fromBundle(bundle), bundle.generation, publicData);
 	}
 
 	async metadata<T extends WireMetadata>(entries: Array<{ path: string; entry: T }>): Promise<T[]> {

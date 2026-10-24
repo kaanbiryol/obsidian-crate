@@ -1,7 +1,7 @@
 import { EncryptionKeyRequiredError, rememberEncryptionUnlock } from '../encryption/encryption-onboarding';
-import { loadEncryptionState, loadScopeKeys, assertEncryptionActive } from '../connection/encryption';
-import type { ScopedEncryptionState } from '../encryption/encryption-scope';
-import type { StoredReminderKeys } from '../encryption/encryption-keys';
+import { loadEncryptionState, loadVaultKeys, assertEncryptionActive } from '../connection/encryption';
+import type { EncryptionServerState } from '../../encryption/server-state';
+import type { FeatureKeys } from '../encryption/encryption-keys';
 import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from './private-storage';
 import { capturePwaSession } from '../session-generation';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
@@ -10,13 +10,12 @@ import { takeFragmentValues } from '../encryption/encryption-fragments';
 import { unlockLocalState } from '../encryption/encryption-keys';
 import { rememberRecoveryKey } from '../encryption/web-app-unlock';
 
-type ScopeState = ScopedEncryptionState;
 type EncryptionView = { status: 'checking' | 'unencrypted' } | { status: 'ready'; folderPath: string }
 	| { status: 'locked'; message: string; converting: boolean; setupRequired: boolean };
 let view: EncryptionView = { status: 'checking' };
 const listeners = new Set<() => void>();
-let pending: { token: string; promise: Promise<StoredReminderKeys | null> } | undefined;
-let state: ScopeState | undefined;
+let pending: { token: string; promise: Promise<FeatureKeys | null> } | undefined;
+let state: EncryptionServerState | undefined;
 let fragmentCode: string | undefined;
 
 export const subscribeReminderEncryption = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -35,7 +34,7 @@ export function resetReminderEncryption(discardKeys = false): void {
 	publish({ status: 'checking' });
 }
 
-export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, refresh = false): Promise<StoredReminderKeys | null> {
+export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, refresh = false): Promise<FeatureKeys | null> {
 	if (refresh) pending = undefined;
 	if (pending?.token === token) return pending.promise;
 	const sessionCurrent = capturePwaSession();
@@ -55,14 +54,14 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 		if (view.status !== 'ready') requirePrivateStorageUnlock();
 		assertEncryptionActive(expected);
 		const localFolder = loadStoredConfig().folderPath;
-		const keys = await loadScopeKeys(expected, localFolder, current, fragmentCode);
+		const keys = await loadVaultKeys(expected, localFolder, current, fragmentCode);
 		fragmentCode = undefined;
-		const local = await unlockLocalState(keys);
+		const local = await unlockLocalState(keys, 'reminders');
 		if (!current()) { local.destroy(); throw new Error('Session changed before unlocking'); }
 		unlockPrivateStorage(local, localFolder, localStorage, sessionStorage);
 		rememberEncryptionUnlock(expected.vaultId);
 		publish({ status: 'ready', folderPath: keys.folderPath });
-		return { ...keys, localFolderPath: localFolder };
+		return keys;
 	})().catch(error => {
 		if (current()) { requirePrivateStorageUnlock(); publish({ status: 'locked', message: error instanceof Error ? error.message : String(error), converting: !!state && state.mode !== 'active', setupRequired: error instanceof EncryptionKeyRequiredError && error.firstUnlock }); }
 		throw error;
@@ -78,7 +77,7 @@ export async function unlockRemindersWithCode(code: string): Promise<void> {
 	if (!token || !state) throw new Error('Open a fresh enrollment link from Crate first');
 	const expected = state;
 	const current = () => sessionCurrent() && state === expected;
-	await rememberRecoveryKey(code, expected, loadStoredConfig().folderPath, current);
+	await rememberRecoveryKey(code, expected, current);
 	if (!current()) throw new Error('Session changed before unlocking');
 	// Reload into the same durable outbox and drafts after keys are committed.
 	window.location.reload();

@@ -4,9 +4,8 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
-import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle, type VaultKeyBundle } from '../../../encryption/key-bundle';
-import { createEncryptionState } from '../../../encryption/server-state';
-import { ENCRYPTION_STATE_KEY } from './state';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
+import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import { SyncWorkerApi } from '../../../sync/worker-api/sync';
 
 const devices: SyncTestDevice[] = [];
@@ -15,19 +14,19 @@ beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
 	vi.spyOn(console, 'info').mockImplementation(() => {});
 	await applySchema(env.DB);
-	bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
-	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
-	state.mode = 'active';
-	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_STATE_KEY, JSON.stringify(state)).run();
+	const fixture = await createEncryptionFixture('active');
+	bundle = fixture.bundle;
+	await storeEncryptionState(env.DB, fixture.state);
 });
 afterEach(async () => {
 	for (const device of devices.splice(0)) device.close();
 	vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset();
 });
 
+const reminderFolders = () => ['Reminders'];
 async function open(device: SyncTestDevice) {
 	await device.open();
-	await device.api.configureEncryption(bundle);
+	await device.api.configureEncryption(bundle, reminderFolders);
 }
 async function device(id: string) {
 	const result = new SyncTestDevice(id, env); devices.push(result);
@@ -139,7 +138,7 @@ it.each(['delete-first', 'edit-first'])('preserves encrypted offline edits in de
 	await converge(clients, { 'note.md': 'edited offline\n' });
 });
 
-it('renames across vault and reminder key scopes without losing either concurrent copy', async () => {
+it('renames into a reminders folder without losing either concurrent copy', async () => {
 	const clients = await replicas('note.md', 'original\n'), [renaming, editing] = clients;
 	await renaming.disk.vault.createFolder('Reminders');
 	renaming.close(); editing.close(); renaming.disk.rename('note.md', 'Reminders/renamed.md'); editing.disk.write('note.md', 'edited while offline\n');
@@ -186,7 +185,7 @@ it('round-trips an encrypted attachment at the 25 MiB plaintext limit', async ()
 	expect(metadata!.size).toBeGreaterThan(content.length);
 }, 30_000); // Two-device encryption and transfer of 25 MiB is a correctness check, not a 5-second benchmark.
 
-it('preserves encrypted file renames and moves across folder keys on another device', async () => {
+it('preserves encrypted file renames and moves into and out of a reminders folder on another device', async () => {
   const first = await device('move-first'), second = await device('move-second');
   await first.disk.vault.adapter.mkdir('Reminders');
   first.disk.write('Reminders/Original.md', 'Private movable note');
@@ -203,28 +202,15 @@ it('preserves encrypted file renames and moves across folder keys on another dev
   expect(second.disk.text('Reminders/Renamed.md')).toBe('Private movable note');
 });
 
-it('syncs a renamed enrolled folder without resurrecting its old path', async () => {
+it('syncs a renamed reminders folder without resurrecting its old path', async () => {
   const first = await device('folder-first'), second = await device('folder-second');
   await first.disk.vault.adapter.mkdir('Reminders');
   first.disk.write('Reminders/Inbox.md', 'Private moved folder content'); await sync(first); await sync(second);
   await first.disk.vault.adapter.mkdir('Tasks');
   first.disk.rename('Reminders/Inbox.md', 'Tasks/Inbox.md');
   first.engine.onFileRename({ path: 'Tasks' } as never, 'Reminders');
+  // One vault key encrypts every folder, so a folder rename is an ordinary encrypted sync.
   first.close(); await first.engine.waitForIdle();
-  const { moveEncryptionScopes } = await import('../../../encryption/key-bundle');
-  const { convertEncryptedVault } = await import('../../../sync/encryption/conversion');
-  const { WorkerApiHttpClient } = await import('../../../sync/worker-api/http');
-  const worker = (await import('../index')).default;
-  const recovery = await generateRecoveryCode();
-  const http = new WorkerApiHttpClient('https://worker.test', first.id, async input => {
-    const response = await worker.fetch(new Request(input.url, { method: input.method, body: input.body, headers: { ...input.headers,
-      ...(input.contentType ? { 'Content-Type': input.contentType } : {}) } }), env);
-    const bytes = await response.arrayBuffer();
-    return { status: response.status, headers: Object.fromEntries(response.headers), arrayBuffer: bytes, text: new TextDecoder().decode(bytes) };
-  });
-  bundle = moveEncryptionScopes(bundle, 'Reminders', 'Tasks');
-  await convertEncryptedVault(http, bundle, recovery, () => {});
-  await open(first); await sync(first);
-  await second.api.configureEncryption(bundle); await sync(second);
+  await open(first); await sync(first); await sync(second);
   await converge([first, second], { 'Tasks/Inbox.md': 'Private moved folder content' });
 });

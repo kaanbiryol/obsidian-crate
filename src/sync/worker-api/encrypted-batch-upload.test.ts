@@ -9,7 +9,7 @@ import { arrayBufferToBase64 } from '../encoding';
 
 it.each(['version_conflict', 'namespace_conflict'])('preserves per-file %s results when ciphertext outgrows a batch', async code => {
 	const api = new SyncWorkerApi({} as WorkerApiHttpClient);
-	api.setEncryption(await EncryptedFiles.create({} as WorkerApiHttpClient, createVaultKeyBundle(), async () => null));
+	api.setEncryption(await EncryptedFiles.create({} as WorkerApiHttpClient, await createVaultKeyBundle(), async () => null));
 	const upload = vi.spyOn(api, 'uploadFile').mockImplementation(async (path, _bytes, hash) => {
 		if (path === 'stale.md') throw new HttpError('Remote file changed', 409, null, code);
 		return { success: true, path, hash, revision: 'accepted' };

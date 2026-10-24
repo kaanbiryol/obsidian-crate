@@ -27,7 +27,6 @@ export async function changeServerConnection(
 	expected?: ApplyInfrastructureConfigInput,
 ): Promise<void> {
 	transition.verify();
-	if (secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('Resume the encrypted folder move before changing this device’s connection.');
 	if (secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before changing this device’s connection.');
 	if (expected && (settings.workerUrl !== expected.workerUrl || secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== expected.authToken)) {
 		throw new ConnectionSetupError('changed');
@@ -52,7 +51,6 @@ export async function disconnectServerConnection(
 	signal?: AbortSignal,
 ): Promise<void> {
 	transition.verify();
-	if (secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('Resume the encrypted folder move before disconnecting this device.');
 	if (secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before disconnecting this device.');
 	transition.stop();
 	await transition.waitForIdle();

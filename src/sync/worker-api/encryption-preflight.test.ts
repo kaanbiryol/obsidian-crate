@@ -29,7 +29,7 @@ it.each(['/sync/upload?path=private.md', '/sync/batch-upload', '/settings', '/re
 });
 
 it('does not send a private URL while an encrypted device is waiting for key recovery', async () => {
-	const bundle = createVaultKeyBundle();
+	const bundle = await createVaultKeyBundle();
 	const encryption = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
 	const transport = vi.fn<ApiHttpTransport>(async () => response({ encryption }));
 	const api = new SyncApiClient('https://crate.test', 'token', transport);

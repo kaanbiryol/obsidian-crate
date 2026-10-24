@@ -1,15 +1,10 @@
-import { WorkerApiHttpClient } from '@/sync/worker-api/http';
-import { convertEncryptedVault } from '@/sync/encryption/conversion';
-import { handleEncryptionRoute } from '../routes/encryption';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '@/encryption/key-bundle';
-import { createEncryptionState } from '@/encryption/server-state';
-import { FileKeyAuthority } from '@/encryption/file-authority';
+import { createEncryptionFixture } from '../test-support/encryption-test-harness';
 import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { createReadingNote } from '@/reading/core/notes';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
@@ -25,12 +20,8 @@ import { sha256Hex } from '@/platform/sha256';
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
 const operation = () => createReminderOperationId(Math.floor(Date.now() / 86400_000));
-async function setup(mode: 'active' | 'converting' = 'active', readingScope = true) {
-  const base = addReminderScope(createVaultKeyBundle(), 'Reminders');
-  const bundle = readingScope ? addReminderScope(base, 'Reading', 'reading') : base;
-  const keys = await FileKeyAuthority.fromVault(bundle);
-  const recovery = await generateRecoveryCode();
-  const state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, recovery)), mode };
+async function setup(mode: 'active' | 'converting' = 'active') {
+  const { bundle, recovery, keys, state } = await createEncryptionFixture(mode);
   await env.DB.batch([
     env.DB.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?)').bind('e2ee:state', JSON.stringify(state)),
     env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','policy','revision')"),
@@ -110,12 +101,13 @@ it('sends an encrypted Reading edit to review when another device changed the sa
   expect(same.sent()).toHaveLength(1);
   expect((same.h.attempts.get(same.id) as { rejected?: true }).rejected).toBe(true);
 });
-it('allows scoped encryption discovery but rejects plaintext saves and sibling-folder access', async () => {
+it('allows encryption discovery but rejects plaintext saves and sibling-folder access', async () => {
   const h = await setup();
   const response = await worker.fetch(new Request('https://test/reading/encryption', { headers: { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '1' } }), env);
-  expect(response.status).toBe(200); const metadata = await response.text(); expect(metadata).not.toContain(h.bundle.vault.id); expect(metadata).not.toContain(h.bundle.vault.secret);
-  expect(JSON.parse(metadata)).toMatchObject({ encryption: { recovery: h.state.recovery } });
-  expect(Object.keys((JSON.parse(metadata) as { encryption: object }).encryption)).toEqual(['version', 'vaultId', 'generation', 'mode', 'recovery', 'scope']);
+  expect(response.status).toBe(200); const metadata = await response.text();
+  for (const secret of [h.recovery, h.bundle.vault.secret, h.bundle.notifications.secret, h.bundle.seal.privateKey]) expect(metadata).not.toContain(secret);
+  // Reading sessions receive the same public configuration as every other session.
+  expect(JSON.parse(metadata)).toEqual({ encryption: h.state });
   expect((await h.request('/sync/manifest')).status).toBe(403);
   expect((await h.request('/settings')).status).toBe(403);
   expect((await h.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example' }))).status).toBe(428);
@@ -187,12 +179,10 @@ it('replays a converted Reading receipt without resending the private capture', 
   const response = { saved: true, id: crypto.randomUUID() };
   const requestHash = await sha256Hex(JSON.stringify({ action: 'capture', body }));
   await env.DB.prepare('INSERT INTO reading_operations VALUES (?,?,?,?,?,?)').bind(id, 'reader', 'policy', requestHash, JSON.stringify(response), Math.floor(Date.now() / 86400_000)).run();
-  const scope = h.bundle.scopes.find(scope => scope.purpose === 'reading')!;
-  const context = { vaultId: h.bundle.vaultId, scopeId: scope.id, objectId: id, purpose: 'reminder' as const };
+  const context = { vaultId: h.bundle.vaultId, scopeId: 'vault', objectId: id, purpose: 'reminder' as const };
   const value = { requestHash, response };
   const converted = await handleEncryptionConversion(new Request('https://test/encryption/conversion/receipt', { method: 'PUT', headers: h.headers,
-    body: JSON.stringify({ kind: 'reading', operationId: id, vault: await encryptJson(value, h.keys.forVaultMetadata().key, { ...context, scopeId: 'vault' }),
-      scopes: [{ id: scope.id, envelope: await encryptJson(value, h.keys.forPath('Reading/receipt.md').key, context) }] }) }), env, '/encryption/conversion/receipt');
+    body: JSON.stringify({ kind: 'reading', operationId: id, vault: await encryptJson(value, h.keys.forVaultMetadata().key, context) }) }), env, '/encryption/conversion/receipt');
   expect(converted?.status, await converted?.clone().text()).toBe(200);
   await env.DB.prepare("UPDATE maintenance_state SET value=? WHERE key='e2ee:state'").bind(JSON.stringify({ ...h.state, mode: 'active' })).run();
   expect(await h.api().request('/reading/capture', JSON.stringify(body))).toEqual(response);
@@ -201,40 +191,10 @@ it('replays a converted Reading receipt without resending the private capture', 
   expect(JSON.stringify((await env.DB.prepare('SELECT * FROM reading_operations').all()).results)).not.toContain(requestHash);
 });
 
-it('adds a Reading scope to an already encrypted vault and resumes a lost conversion response', async () => {
-  vi.stubGlobal('window', globalThis);
-  const h = await setup('active', false), path = 'Reading/Article.md';
-  const content = new TextEncoder().encode(createReadingNote({ id: crypto.randomUUID(), url: 'https://private.example/upgraded', savedAt: new Date().toISOString() }));
-  const old = await sealFile({ path, content, contentType: 'text/markdown', publicData: null }, h.keys.forPath(path));
-  await env.BUCKET.put('__crate__/files/old-reading', old.bytes, { httpMetadata: { contentType: 'application/vnd.crate.encrypted-file' }, customMetadata: { hash: old.hash } });
-  await env.DB.batch([
-    env.DB.prepare('INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES (?,?,?,?,?)').bind(path, path.toLowerCase(), old.hash, old.bytes.length, '__crate__/files/old-reading'),
-    env.DB.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?)').bind('e2ee:file:__crate__/files/old-reading', JSON.stringify(old.descriptor)),
-  ]);
-  const bundle = addReminderScope(h.bundle, 'Reading', 'reading'), recovery = await generateRecoveryCode();
-  let lose = true;
-  const http = new WorkerApiHttpClient('https://test', 'root', async input => {
-    const request = new Request(input.url, { method: input.method, body: input.body, headers: { ...input.headers, 'Content-Type': input.contentType ?? 'application/json' } });
-    const path = new URL(input.url).pathname;
-    const response = path === '/.well-known/crate' ? await worker.fetch(request, env) : path === '/encryption' ? await handleEncryptionRoute(request, env.DB, path, { tokenId: 'root', scope: 'vault' }) : await handleEncryptionConversion(request, env, path);
-    if (!response) throw new Error(`Unexpected conversion route: ${path}`);
-    const bytes = await response.arrayBuffer();
-    if (lose && path === '/encryption/conversion/file' && input.method === 'PUT') { lose = false; throw new Error('Lost conversion reply'); }
-    return { status: response.status, headers: Object.fromEntries(response.headers), arrayBuffer: bytes, text: new TextDecoder().decode(bytes) };
-  });
-  await expect(convertEncryptedVault(http, bundle, recovery, () => {})).rejects.toThrow('Lost conversion reply');
-  await convertEncryptedVault(http, bundle, recovery, () => {});
-  const converted = new Uint8Array(await (await env.BUCKET.get('__crate__/files/old-reading'))!.arrayBuffer());
-  const keys = await FileKeyAuthority.fromVault(bundle);
-  expect((await openFile(converted, path, keys.forPath(path))).content).toEqual(content);
-  await expect(openFile(converted, path, h.keys.forPath(path))).rejects.toThrow();
-  expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:prior-file:%'").first()).toBeNull();
-});
-
-async function convertReceipts(h: Awaited<ReturnType<typeof setup>>, kind: 'reminder' | 'reading', receipts: Array<{ id: string; scopes: Array<{ id: string; envelope: string }> }>) {
-  for (const { id, scopes } of receipts) {
+async function convertReceipts(h: Awaited<ReturnType<typeof setup>>, kind: 'reminder' | 'reading', receipts: Array<{ id: string; vault: string }>) {
+  for (const { id, vault } of receipts) {
     const converted = await handleEncryptionConversion(new Request('https://test/encryption/conversion/receipt', { method: 'PUT', headers: h.headers,
-      body: JSON.stringify({ kind, operationId: id, vault: 'vault.key.iv.cipher.tag', scopes }) }), env, '/encryption/conversion/receipt');
+      body: JSON.stringify({ kind, operationId: id, vault }) }), env, '/encryption/conversion/receipt');
     expect(converted?.status, await converted?.clone().text()).toBe(200);
   }
   await env.DB.prepare("UPDATE maintenance_state SET value=? WHERE key='e2ee:state'").bind(JSON.stringify({ ...h.state, mode: 'active' })).run();
@@ -245,12 +205,11 @@ async function receiptEnvelope(h: Awaited<ReturnType<typeof setup>>, query: stri
   return (await response.json() as { envelope: string | null }).envelope;
 }
 
-it('recovers a lost encrypted wire attempt from the reminder operation ledger with only the Reading scope envelope', async () => {
+it('recovers a lost encrypted wire attempt from the reminder operation ledger', async () => {
   const h = await setup('converting'), id = operation();
-  const reading = h.bundle.scopes.find(scope => scope.purpose === 'reading')!, reminders = h.bundle.scopes.find(scope => scope.folderPath === 'Reminders')!;
   await env.DB.prepare('INSERT INTO reminder_operations(operation_id, request_hash, response_json) VALUES (?, ?, ?)').bind(id, 'old-hash', '{"encrypted":"old"}').run();
-  await convertReceipts(h, 'reminder', [{ id, scopes: [{ id: reminders.id, envelope: 'reminders.key.iv.cipher.tag' }, { id: reading.id, envelope: 'reading.key.iv.cipher.tag' }] }]);
-  expect(await receiptEnvelope(h, `operationId=${id}&wire=1`)).toBe('reading.key.iv.cipher.tag');
+  await convertReceipts(h, 'reminder', [{ id, vault: 'wire.key.iv.cipher.tag' }]);
+  expect(await receiptEnvelope(h, `operationId=${id}&wire=1`)).toBe('wire.key.iv.cipher.tag');
   // Without `wire=1` the route reads only Reading semantic receipts.
   expect(await receiptEnvelope(h, `operationId=${id}`)).toBeNull();
   expect(await receiptEnvelope(h, `operationId=${operation()}&wire=1`)).toBeNull();
@@ -258,10 +217,10 @@ it('recovers a lost encrypted wire attempt from the reminder operation ledger wi
 
 it('returns a converted Reading receipt only for the current Reading policy generation', async () => {
   const h = await setup('converting'), current = operation(), previous = operation();
-  const reading = h.bundle.scopes.find(scope => scope.purpose === 'reading')!, day = Math.floor(Date.now() / 86400_000);
+  const day = Math.floor(Date.now() / 86400_000);
   await env.DB.batch([current, previous].map(id => env.DB.prepare('INSERT INTO reading_operations VALUES (?,?,?,?,?,?)')
     .bind(id, 'reader', id === current ? 'policy' : 'previous-policy', 'hash', JSON.stringify({ saved: true }), day)));
-  await convertReceipts(h, 'reading', [current, previous].map(id => ({ id, scopes: [{ id: reading.id, envelope: `${id}.key.iv.cipher.tag` }] })));
+  await convertReceipts(h, 'reading', [current, previous].map(id => ({ id, vault: `${id}.key.iv.cipher.tag` })));
   expect(await receiptEnvelope(h, `operationId=${current}`)).toBe(`${current}.key.iv.cipher.tag`);
   expect(await receiptEnvelope(h, `operationId=${previous}`)).toBeNull();
   // Reading semantic receipts are not in the shared wire ledger.

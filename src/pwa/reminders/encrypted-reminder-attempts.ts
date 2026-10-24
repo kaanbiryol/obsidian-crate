@@ -41,10 +41,10 @@ export async function saveEncryptedReminderAttempt(key: string, attempt: Encrypt
 /** Caller holds the outbox Web Lock. Only acknowledged attempts can expire,
  * using the SERVER's retry day, never this device's clock. Unknown/damaged and
  * uncertain entries are preserved. Work is bounded and scoped to unlocked keys. */
-export async function pruneEncryptedReminderAttempts(scope: { vaultId: string; scopeId: string; folderPath: string },
+export async function pruneEncryptedReminderAttempts(scope: { vaultId: string; folderPath: string },
 	serverDay: number, isCurrent: () => boolean, after?: string): Promise<string | undefined> {
 	if (!Number.isSafeInteger(serverDay) || serverDay < 1 || serverDay > 99_999_999 || !isCurrent()) return after;
-	const prefix = `${scope.vaultId}:${scope.scopeId}:`;
+	const prefix = `${scope.vaultId}:vault:`;
 	const db = await openAttempts();
 	try {
 		if (!isCurrent()) return after;

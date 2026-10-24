@@ -8,7 +8,7 @@ vi.mock('../../encryption/file-codec', async original => ({ ...await original<ob
 	openFileMetadata: async (descriptor: { path: string; revision: string }) => ({ path: descriptor.path, hash: `plain-${descriptor.revision}`, size: 1 }),
 	sealFile: async (input: { path: string; content: Uint8Array }) => ({ bytes: input.content, hash: 'sealed',
 		metadata: { path: input.path, hash: 'plain', size: input.content.byteLength } }) }));
-vi.mock('../../encryption/file-authority', () => ({ FileKeyAuthority: { fromVault: async () => ({ forPath: () => ({}) }) } }));
+vi.mock('../../encryption/file-authority', () => ({ FileKeyAuthority: { fromBundle: async () => ({ forPath: () => ({}) }) } }));
 
 it('decrypts large inventories in bounded, overlapping batches and keeps their order', async () => {
 	let active = 0, peak = 0;

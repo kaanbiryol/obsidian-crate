@@ -11,15 +11,13 @@ import { obsidianDomHelpers, obsidianDialogModule } from '../support/obsidian-di
 // Obsidian's DOM host and HTTP relay are fixtures; D1/auth have Worker coverage.
 const compiled = await build({ stdin: { resolveDir: process.cwd(), contents: `
 export * from './src/encryption/key-bundle';
-export * from './src/encryption/server-state';
-export * from './src/encryption/scope-binding';` }, bundle: true, write: false, format: 'esm', platform: 'browser' });
+export * from './src/encryption/server-state';` }, bundle: true, write: false, format: 'esm', platform: 'browser' });
 const keys = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`);
-const bundle = keys.addReminderScope(keys.addReminderScope(keys.createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading');
+const bundle = await keys.createVaultKeyBundle();
 const recovery = await keys.generateRecoveryCode();
-const state = { ...await keys.bindEncryptionScopes(keys.createEncryptionState(bundle, await keys.sealRecoveryBundle(bundle, recovery)), bundle), mode: 'active' };
-const grants = bundle.scopes.map(scope => keys.createReminderKeyGrant(bundle, scope.folderPath));
-const scoped = folder => ({ version: 1, mode: 'active', vaultId: state.vaultId, generation: state.generation, recovery: state.recovery, scope: state.scopes.find(scope => scope.folderPath === folder) });
-const secrets = [recovery, bundle.vault.secret, ...bundle.scopes.flatMap(scope => [scope.data.secret, scope.notifications.secret])];
+// Reminders and Reading both receive the vault's full public state.
+const state = { ...keys.createEncryptionState(bundle, await keys.sealRecoveryBundle(bundle, recovery)), mode: 'active' };
+const secrets = [recovery, bundle.vault.secret, bundle.notifications.secret, bundle.seal.privateKey];
 const host = await build({ stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
 import { WebAppPairingModal } from './src/ui/settings/web-app-pairing-modal';
 ${obsidianDomHelpers}
@@ -31,7 +29,7 @@ window.closePairing = () => window.modal.close();
 export async function openWebAppPairing(plugin,signal) {
  const current=()=>signal.throwIfAborted();
  const request=async(id,body)=>{current(); const r=await fetch('/encryption/pairing'+(id?'?id='+id:''),{method:body?'POST':'GET',headers:{Authorization:'Bearer mac'},body:body?JSON.stringify(body):undefined,signal});current(); if(!r.ok)throw new Error('Connection lost');return r.json();};
- return {current,validate:()=>{},transport:{read:id=>request(id),write:body=>request(null,body)},payload:async()=>window.testGrants,cancel:async id=>{await fetch('/encryption/pairing',{method:'POST',headers:{Authorization:'Bearer mac'},body:JSON.stringify({action:'cancel',id})});}};}
+ return {current,validate:()=>{},transport:{read:id=>request(id),write:body=>request(null,body)},payload:async()=>window.testPayload,cancel:async id=>{await fetch('/encryption/pairing',{method:'POST',headers:{Authorization:'Bearer mac'},body:JSON.stringify({action:'cancel',id})});}};}
 
 ` }));
 } }] });
@@ -54,7 +52,7 @@ async function savedKeys(page) {
     if (!(await indexedDB.databases()).some(db => db.name === 'crate-encryption-keys')) return [];
     const db = await new Promise((resolve, reject) => { const r=indexedDB.open('crate-encryption-keys',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error); });
     const values = await new Promise(resolve => { const r=db.transaction('keys').objectStore('keys').getAll();r.onsuccess=()=>resolve(r.result); });
-    db.close();return values.map(value=>({folder:value.folderPath,extractable:value.data.key.extractable,localState:value.localState}));
+    db.close();return values.map(value=>({vaultId:value.vaultId,extractable:value.vault.key.extractable,localState:value.localState}));
   });
 }
 try {
@@ -93,14 +91,14 @@ try {
         try {
           await phone.addInitScript(()=>Object.defineProperty(navigator,'standalone',{value:true}));
           await phone.route('**/notifications/preview-session.js',route=>route.fulfill({contentType:'application/javascript',body:''}));
-          await phone.route('**/encryption',route=>route.fulfill({json:{encryption:scoped('Reminders')}}));
-          await phone.route('**/reading/encryption',route=>route.fulfill({json:{encryption:scoped('Reading')}}));
+          await phone.route('**/encryption',route=>route.fulfill({json:{encryption:state}}));
+          await phone.route('**/reading/encryption',route=>route.fulfill({json:{encryption:state}}));
           await phone.route('**/reading/session',route=>route.fulfill({json:{id:'paired',folderPath:'Reading',generation:'g1',expiresAt:Date.now()+600000}}));
           await phone.route('**/*/encrypted-files?*',route=>route.fulfill({json:{files:[],nextCursor:null,generation:bundle.generation,sequence:1}}));
           await mac.route('**/pairing-host',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html><head><style>${hostCss}</style><style>${obsidianCss}</style><style>${pluginCss}</style></head><body class="theme-dark"><script>${host.outputFiles[0].text}</script></body></html>`}));
           const p=await phone.newPage(), m=await mac.newPage();
           await m.goto(`${origin}/pairing-host`);
-          await m.evaluate(payload=>{window.testGrants=payload;},{grants});
+          await m.evaluate(payload=>{window.testPayload=payload;},{bundle});
           await p.goto(`${origin}/notifications?token=pairing-${initial}&folder=Reminders&section=${initial}`);
           await expect(p.getByRole('button',{name:'Connect with Obsidian',exact:true})).toBeVisible();
           await expect(p.getByRole('button',{name:'Retry connection',exact:true})).not.toBeVisible();
@@ -168,11 +166,11 @@ try {
           assert.deepEqual(await savedKeys(p),[], 'A relay packet alone must never enroll an unverified responder');
           await expect(p.getByLabel('Verification code',{exact:true})).toHaveText(code);
           await p.getByRole('button',{name:'Confirm and unlock',exact:true}).click();
-          await expect.poll(async()=> (await savedKeys(p)).length,{timeout:15000}).toBe(2);
+          await expect.poll(async()=> (await savedKeys(p)).length,{timeout:15000}).toBe(1);
           await expect(p.locator('.crate-encryption-unlock')).toHaveCount(0);
           await expect.poll(()=>writes.filter(b=>b.action==='finish').length).toBe(1);
           const stored=await savedKeys(p);
-          assert.deepEqual(stored.map(k=>k.folder).sort(),['Reading','Reminders']);
+          assert.deepEqual(stored.map(k=>k.vaultId),[bundle.vaultId]);
           assert.ok(stored.every(k=>!k.extractable));
           // Wait for the automatic post-pairing reload to finish before testing
           // a second reload; overlapping navigations abort WebKit's startup fetches.
@@ -187,7 +185,7 @@ try {
           await expect(p.locator('.crate-encryption-unlock')).toHaveCount(0);
           assert.deepEqual(await savedKeys(p),stored,'Reload preserves local draft encryption keys');
           assert.deepEqual(errors,[]);
-          console.log(`${engine.name()} ${initial}: separate storage, explicit approval, matching codes, cancellation, expiry, retry, both scopes and reload passed`);
+          console.log(`${engine.name()} ${initial}: separate storage, explicit approval, matching codes, cancellation, expiry, retry, one vault key for both features and reload passed`);
         } finally {await phone.close();await mac.close();}
       }
     } finally {await browser.close();}

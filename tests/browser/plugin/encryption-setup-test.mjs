@@ -11,7 +11,7 @@ const { outputFiles } = await build({
     import { renderEncryptionManagement } from './src/ui/settings/encryption/encryption-manage-ui';
     import { verifyRecoveryCode } from './src/encryption/recovery-verification';
     import { mountModalHeader } from './src/ui/plugin/mountModalHeader';
-    import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from './src/encryption/key-bundle';
+    import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from './src/encryption/key-bundle';
     ${obsidianDomHelpers}
     window.mount = async (resuming = false, delayed = false) => {
       window.disposeContent?.(); window.unmountHeader?.(); document.body.replaceChildren();
@@ -25,7 +25,7 @@ const { outputFiles } = await build({
       const body = content.createDiv({cls:'crate-modal-body'});
       renderEncryptionLoading(body);
       if (delayed) await new Promise(resolve=>{window.finishLoading=resolve;});
-      const bundle = addReminderScope(createVaultKeyBundle(),'Reminders');
+      const bundle = await createVaultKeyBundle();
       window.recovery = await generateRecoveryCode();
       const envelope = await sealRecoveryBundle(bundle,window.recovery);
       await verifyRecoveryCode(envelope,window.recovery,bundle);

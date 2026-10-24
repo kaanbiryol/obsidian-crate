@@ -1,6 +1,6 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol/server-info';
 import { PAIRING_PATH, PairingEndedError, type PairingTransport } from '../../encryption/pairing/protocol';
-import { parseScopedEncryptionState, type ScopedEncryptionState } from '../encryption/encryption-scope';
+import { validateEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
 import { READING_SESSION_KEY, readingSession } from '../reading/storage';
 import { capturePwaSession } from '../session-generation';
@@ -37,9 +37,10 @@ export function pairingConnection(feature: 'reading' | 'reminders', signal: Abor
     assertSession();
     await fetch(PAIRING_PATH, { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(5000),
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) }, body: JSON.stringify({ action: 'cancel', id }) });
-  }, async encryption(): Promise<ScopedEncryptionState> {
+  }, async encryption(): Promise<EncryptionServerState> {
     const result = await request<{ encryption: unknown }>(feature === 'reading' ? '/reading/encryption' : '/encryption');
-    const state = parseScopedEncryptionState(result.encryption, feature);
+    const state = result.encryption;
+    try { validateEncryptionState(state); } catch { throw new Error('Invalid encrypted enrollment configuration'); }
     if (state.mode !== 'active') throw new Error('Finish encryption setup in Obsidian first.');
     return state;
   } };

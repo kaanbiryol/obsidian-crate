@@ -17,7 +17,7 @@ export async function verifyReadingPlaintextTransition({ t, browser, origin, own
     await page.getByLabel('Link', { exact: true }).fill(privateUrl);
     // Keep this plaintext tab and its draft open while an Obsidian client
     // enables encryption and changes the enrollment's key requirements.
-    await t.convertEncryptedVault(http, bundle, recovery, () => {});
+    await t.convertEncryptedVault(http, bundle, recovery, () => {}, ['Reminders']);
     await page.getByRole('button', { name: 'Save link', exact: true }).click();
     await expect(page.getByText(/Could not verify encryption|Reconnect Reading|Reading sign-in|Reload Crate to connect with Obsidian/).first()).toBeVisible({ timeout: 15000 });
     assert.ok(!sent.some(body => body.includes(privateUrl)), 'A stale plaintext Reading tab sent a private URL after encryption was enabled');

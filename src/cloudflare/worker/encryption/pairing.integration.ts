@@ -4,8 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
-import { createEncryptionState } from '../../../encryption/server-state';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle, createReminderKeyGrant } from '../../../encryption/key-bundle';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import { requestAppPairing, answerAppPairing } from '../../../encryption/pairing/session';
 import { createPairingRequester, createPairingResponder, type PairingTransport, type PairingContext } from '../../../encryption/pairing/protocol';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
@@ -15,15 +14,13 @@ beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });
 const current = () => {};
 async function configure() {
-  const bundle = addReminderScope(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading');
-  const recovery = await generateRecoveryCode();
-  const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, recovery)); state.mode = 'active';
-  await env.DB.prepare("INSERT INTO maintenance_state(key,value) VALUES ('e2ee:state',?)").bind(JSON.stringify(state)).run();
+  const { bundle, recovery, state } = await createEncryptionFixture('active');
+  await storeEncryptionState(env.DB, state);
   await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-generation','revision')").run();
   for (const [token, scope, folder] of [['vault', 'vault', null], ['other-vault', 'vault', null], ['app', 'reminders', 'Reminders'], ['other-app', 'reminders', 'Reminders'], ['reader','reading','Reading'], ['capture','reading_capture','Reading']] as const) {
     await env.DB.prepare('INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES (?,?,?,?,?)').bind(token, await sha256Hex(token), scope, folder, scope.startsWith('reading') ? 'reading-generation' : null).run();
   }
-  const context = (reading = false): PairingContext => ({ version: 1, id: crypto.randomUUID(), origin: 'https://test', vaultId: bundle.vaultId, generation: bundle.generation, scopeId: bundle.scopes[reading ? 1 : 0]!.id });
+  const context = (): PairingContext => ({ version: 1, id: crypto.randomUUID(), origin: 'https://test', vaultId: bundle.vaultId, generation: bundle.generation });
   return { bundle, recovery, state, context };
 }
 async function send(token: string, body?: Record<string, unknown>, id?: string) {
@@ -36,9 +33,9 @@ const transport = (token: string): PairingTransport => ({
   async write(body) { const r = await send(token, body); const data = await r.json() as { request: never; error?: string }; if (!r.ok) throw new Error(data.error); return data; },
 });
 
-it.each(['reminders', 'reading', 'shared-reading'])('transfers only encrypted browser keys after approval, including retry after a lost response (%s)', async feature => {
+it.each(['reminders', 'reading'])('transfers only encrypted browser keys after approval, including retry after a lost response (%s)', async feature => {
   const f = await configure(); const web = transport(feature === 'reading' ? 'reader' : 'app'), mac = transport('vault');
-  const app = await requestAppPairing(f.context(feature !== 'reminders'), web, current);
+  const app = await requestAppPairing(f.context(), web, current);
   expect(await app.poll()).toEqual({});
   const pending = (await mac.read()).requests[0]!;
   let lost = true;
@@ -50,12 +47,12 @@ it.each(['reminders', 'reading', 'shared-reading'])('transfers only encrypted br
   const appCode = await app.poll(); expect(appCode.payload).toBeUndefined();
   expect(await computer.poll()).toBe(appCode.code);
   expect((await web.read(app.id)).requests[0]!.payload).toBeUndefined();
-  const payload = { grants: f.bundle.scopes.map(scope => createReminderKeyGrant(f.bundle, scope.folderPath)) };
+  const payload = { bundle: f.bundle };
   await expect(computer.approve(payload)).rejects.toThrow('Response lost');
   await computer.approve(payload);
   expect((await app.poll()).payload).toEqual(payload);
   const stored = JSON.stringify((await env.DB.prepare("SELECT value FROM maintenance_state WHERE key LIKE 'crate_web_pairing:%'").all()).results);
-  for (const secret of [f.recovery, f.bundle.vault.secret, ...f.bundle.scopes.flatMap(s => [s.data.secret, s.notifications.secret])]) expect(stored).not.toContain(secret);
+  for (const secret of [f.recovery, f.bundle.vault.secret, f.bundle.notifications.secret, f.bundle.seal.privateKey]) expect(stored).not.toContain(secret);
   expect((await transport('other-app').read(app.id)).requests).toEqual([]);
   expect((await send('other-app', { action: 'cancel', id: app.id })).status).toBe(403);
   await app.close(true);
@@ -63,16 +60,15 @@ it.each(['reminders', 'reading', 'shared-reading'])('transfers only encrypted br
   expect((await mac.read()).requests).toEqual([]);
 });
 
-it('admits only enrolled browser scopes and binds attempts to their current folder', async () => {
+it('admits only enrolled browser sessions and binds attempts to the current vault keys', async () => {
   const f = await configure(); const request = (await createPairingRequester(f.context())).request;
   expect((await send('capture', { action: 'start', ...request })).status).toBe(403);
   expect((await send('vault', { action: 'start', ...request })).status).toBe(403);
-  expect((await send('app', { action: 'start', ...request, context: { ...f.context(), scopeId: crypto.randomUUID() } })).status).toBe(409);
-  expect((await send('reader', { action: 'start', ...request })).status).toBe(409);
+  for (const changed of [{ generation: f.state.generation + 1 }, { vaultId: crypto.randomUUID() }]) {
+    expect((await send('app', { action: 'start', ...(await createPairingRequester({ ...f.context(), ...changed })).request })).status).toBe(409);
+  }
   await env.DB.prepare("UPDATE reading_policy SET generation='new' WHERE id=1").run();
-  expect((await send('reader', { action: 'start', ...(await createPairingRequester(f.context(true))).request })).status).toBe(401);
-  await env.DB.prepare('DELETE FROM reading_policy').run();
-  expect((await send('app', { action: 'start', ...(await createPairingRequester(f.context(true))).request })).status).toBe(403);
+  expect((await send('reader', { action: 'start', ...(await createPairingRequester(f.context())).request })).status).toBe(401);
 });
 
 it('allows only one responder and refuses changed commitments and replayed approvals', async () => {
@@ -96,7 +92,7 @@ it.each(['cancel','expire','revoke','generation','reset'] as const)('fences a pe
   if (reason === 'expire') await env.DB.prepare("UPDATE maintenance_state SET value=json_set(value,'$.expiresAt',1) WHERE key=?").bind('crate_web_pairing:' + app.id).run();
   if (reason === 'revoke') await env.DB.prepare("DELETE FROM auth_tokens WHERE id='app'").run();
   if (reason === 'generation' || reason === 'reset') await env.DB.prepare("UPDATE maintenance_state SET value=? WHERE key='e2ee:state'").bind(JSON.stringify({ ...f.state, ...(reason === 'generation' ? { generation: 9 } : { mode: 'resetting' }) })).run();
-  await expect(computer.approve({ grants: [] })).rejects.toThrow();
+  await expect(computer.approve({ bundle: f.bundle })).rejects.toThrow();
   expect((await env.DB.prepare('SELECT value FROM maintenance_state WHERE key=?').bind('crate_web_pairing:' + app.id).first<{ value: string }>())?.value).not.toContain('payload');
 });
 

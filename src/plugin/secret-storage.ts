@@ -45,7 +45,7 @@ export class SecretStorageService {
 	}
 
 	private storageId(key: SecretKey): string {
-		if (key !== SECRET_KEYS.AUTH_TOKEN && key !== SECRET_KEYS.ENCRYPTION_KEYS && key !== SECRET_KEYS.ENCRYPTION_RECOVERY && key !== SECRET_KEYS.ENCRYPTION_RESET && key !== SECRET_KEYS.ENCRYPTION_FOLDER_MOVES) {
+		if (key !== SECRET_KEYS.AUTH_TOKEN && key !== SECRET_KEYS.ENCRYPTION_KEYS && key !== SECRET_KEYS.ENCRYPTION_RECOVERY && key !== SECRET_KEYS.ENCRYPTION_RESET) {
 			return key;
 		}
 

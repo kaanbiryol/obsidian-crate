@@ -27,7 +27,7 @@ No unsupported database or checkpoint is silently interpreted as empty. Signing 
 
 Encrypted vaults additionally require matching vault/generation headers. Their content envelopes use `crate-e2ee-v1`; browser private records use `crate-local-e2ee-v1`. Existing upload and reminder receipts are converted so accepted pre-encryption work remains recoverable. Encryption cannot be rolled back by deploying an older server. See [encryption](e2ee-implementation.md).
 
-Enrolled folder moves use `e2ee-folder-moves-v1`. Ordinary file moves use existing encrypted sync. Scope moves retain keys but change generation: other Obsidian devices recover the updated bundle using the same recovery key, and web apps need fresh setup links. Encrypted upload journals and saved encrypted attempts always record their key generation; a record from an earlier generation recovers its converted receipt before any retry.
+File and folder moves use existing encrypted sync; every file uses the vault key. Encrypted upload journals and saved encrypted attempts always record their key generation; a record from an earlier generation recovers its converted receipt before any retry.
 
 ## Upgrade order
 
@@ -97,7 +97,7 @@ Reading-folder imports do not require a Clipper marker. Imported notes without a
 The server indexes normalized notes and never adopts or
 extracts arbitrary folder content itself.
 
-Encrypted Reading uses the `e2ee-reading-v1` capability and a separate Reading folder scope. An existing encrypted vault can add Reading without a destructive reset, then enroll web apps again for the new generation. Scope additions preserve the existing root and reminder keys.
+Encrypted Reading uses the vault key and its own encrypted-file routes. It is part of every encrypted vault.
 
 The iPhone Shortcut sends saved URLs only in browser fragments. Publish its signed release asset before distributing the PWA. Encrypted Android manifests omit native share-target POSTs; in-app saving remains supported.
 
