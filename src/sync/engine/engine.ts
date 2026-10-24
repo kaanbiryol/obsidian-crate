@@ -325,6 +325,27 @@ export class SyncEngine {
 		});
 	}
 
+	/** Uploads synced Markdown under `folder` again, unchanged, so the server receives its
+	 * current encrypted metadata, such as reminder schedules after the Reminders folder
+	 * changes. Each upload is conditional; a conflict is left to the next ordinary sync. */
+	async republishMarkdown(folder: string): Promise<number> {
+		return this.runExclusiveOperation(async () => {
+			const paths = this.localManifest.getAllPaths().filter(path => path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md'));
+			const result = createEmptySyncResult();
+			for (let offset = 0; offset < paths.length; offset += 50) {
+				this.lifecycle.throwIfDestroyed();
+				const prepared = [];
+				for (const path of paths.slice(offset, offset + 50)) {
+					const upload = await this.contexts.prepareRepublish(path);
+					if (upload) prepared.push(upload);
+				}
+				if (prepared.length) await this.contexts.uploadPreparedFiles(prepared, result, { retry: true });
+			}
+			await this.localManifest.save();
+			return result.uploaded;
+		});
+	}
+
 	async syncSelected(keys: string[]): Promise<SyncResult> {
 		this.assertPendingSelection(keys);
 		return this.reconcileFromQueue([...new Set(keys)], true);

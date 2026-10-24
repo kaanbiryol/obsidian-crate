@@ -674,6 +674,21 @@ export class SyncRuntime {
 		return this.runSyncOperation('sync', engine => engine.syncSelected(keys));
 	}
 
+	/** In an encrypted vault, notes already inside a newly chosen Reminders folder carry
+	 * no notification schedules until uploaded again. Runs after any sync in progress. */
+	async republishReminderNotes(folder: string): Promise<void> {
+		const engine = this.syncEngine;
+		if (!engine || !loadEncryptionKeys(this.secretStorage)) return;
+		if (engine.getState().status === 'syncing') await new Promise<void>(resolve => {
+			const listener = (state: SyncState) => {
+				if (state.status === 'syncing' && this.syncEngine === engine) return;
+				this.removeStateChangeListener(listener); resolve();
+			};
+			this.addStateChangeListener(listener);
+		});
+		if (this.syncEngine === engine) await engine.republishMarkdown(folder);
+	}
+
 	async createPendingDiscard(keys: string[]) {
 		return this.requireEngine().createPendingDiscard(keys);
 	}

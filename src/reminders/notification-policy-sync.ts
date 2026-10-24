@@ -1,3 +1,4 @@
+import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import type { SyncApiClient } from '../sync/worker-api/client';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
@@ -35,6 +36,9 @@ export async function changeReminderFolder(plugin: CratePlugin, folderPath: stri
 		pendingServerFolder: plugin.settings.workerUrl
 			? { id: crypto.randomUUID(), workerUrl: plugin.settings.workerUrl, folderPath: folder } : undefined });
 	void ensureReminderNotificationPolicy(plugin);
+	void plugin.syncRuntime.republishReminderNotes(folder).catch(error => {
+		new Notice(`Reminders in ${folder} will schedule notifications after their next edit. ${error instanceof Error ? error.message : ''}`.trim());
+	});
 	if (!plugin.remindersSettings.enabled) return;
 	// Loaded on demand: plugin integration also imports this module.
 	const { reinitializeWithFolder } = await import('./plugin-integration');

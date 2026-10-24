@@ -103,7 +103,7 @@ A PWA trusts the JavaScript served by its origin. Non-extractable keys do not pr
 
 File moves and renames use normal encrypted sync, including moves into or out of the Reading or Reminders folder. Every file uses the vault key, so changing folders never re-encrypts anything or needs a new browser enrollment.
 
-Selecting a different Reading or Reminders folder in settings works as in an unencrypted vault: the server's folder policy changes and selecting a folder does not move local files. Web apps whose session belongs to the previous folder need a fresh setup link. Notes already inside a newly selected Reminders folder schedule notifications after their next edit in Obsidian; until then the server reports them in reminder issues.
+Selecting a different Reading or Reminders folder in settings works as in an unencrypted vault: the server's folder policy changes and selecting a folder does not move local files. Web apps whose session belongs to the previous folder need a fresh setup link. After a Reminders folder change, Obsidian uploads the Markdown notes already inside the new folder again, unchanged and conditional on their synced version, so they carry notification schedules. A note it could not republish shows in reminder issues until its next edit.
 
 Plugin requests without local encryption keys check server encryption before sending sync, settings, Reading or Reminders mutation bodies. This also protects queued Reading URLs after another device enables encryption. A fresh PWA link containing an encryption key stays locked if the server reports no encryption; it cannot fall back to submitting plaintext.
 

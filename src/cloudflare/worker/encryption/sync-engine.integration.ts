@@ -214,3 +214,26 @@ it('syncs a renamed reminders folder without resurrecting its old path', async (
   await open(first); await sync(first); await sync(second);
   await converge([first, second], { 'Tasks/Inbox.md': 'Private moved folder content' });
 });
+
+it('republishes unchanged notes so a newly chosen reminders folder gets its schedules', async () => {
+	const { parseEncryptedFile } = await import('../../../encryption/file-format');
+	const publicData = async (path: string) => {
+		const row = await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind(path).first<{ storage_key: string }>();
+		return parseEncryptedFile(await (await env.BUCKET.get(row!.storage_key))!.text()).publicData as { reminders: unknown[] } | null;
+	};
+	let folders = ['Reminders'];
+	const client = new SyncTestDevice('republish', env); devices.push(client);
+	await client.authorize(3600_000); await client.open();
+	await client.api.configureEncryption(bundle, () => folders);
+	await client.disk.vault.adapter.mkdir('Tasks');
+	client.disk.write('Tasks/todo.md', '- [ ] Call the bank 2099-01-02T10:00:00.000Z <!-- crate-id:bank -->\n');
+	await sync(client);
+	expect(await publicData('Tasks/todo.md')).toBeNull();
+	folders = ['Tasks'];
+	expect(await client.engine.republishMarkdown('Tasks')).toBe(1);
+	expect((await publicData('Tasks/todo.md'))?.reminders).toHaveLength(1);
+	// Unchanged content: the next sync has nothing to transfer.
+	const after = await sync(client);
+	expect([after.uploaded, after.downloaded]).toEqual([0, 0]);
+	expect(client.disk.text('Tasks/todo.md')).toBe('- [ ] Call the bank 2099-01-02T10:00:00.000Z <!-- crate-id:bank -->\n');
+});

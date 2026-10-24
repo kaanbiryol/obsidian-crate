@@ -112,6 +112,12 @@ export class SyncEngineContexts {
 		);
 	}
 
+	/** Prepares a synced file even when unchanged, conditioned on its acknowledged hash. */
+	prepareRepublish(path: string): Promise<PreparedUpload | null> {
+		const hash = this.dependencies.localManifest.getEntry(path)?.hash;
+		return hash ? prepareTransferUploadFromPath(this.transfer(), path, { force: true, expectedHash: hash }) : Promise.resolve(null);
+	}
+
 	async uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
