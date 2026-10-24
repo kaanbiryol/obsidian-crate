@@ -444,6 +444,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
 
   await page.getByRole('button',{name:'Save a link',exact:true}).click();
   await checkSaveLinkKeyboard(page);
+  // Only full-screen sheets recede the app behind them.
+  await expect(page.locator('.pwa-modal-sheet[data-recede-canvas]')).toHaveCount(0);
+  await expect(page.locator('.crate-modal-canvas')).toHaveCSS('transform', 'none');
   await checkPwaTextField(page.getByLabel('Link', { exact: true }), { sheet: true });
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);

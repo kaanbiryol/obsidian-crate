@@ -15,7 +15,7 @@ export function ReminderDraftRecoverySheet({ inspection, initial, folderPath, is
 	onRetry: () => void;
 }) {
 	const [error, setError] = useState<string | null>(null);
-	return <PwaModalSheet isOpen={!isClosing} onClose={onClose} onCloseEnd={onClosed} variant="settings" label="Saved draft needs review">
+	return <PwaModalSheet isOpen={!isClosing} onClose={onClose} onCloseEnd={onClosed} variant="settings" label="Saved draft needs review" recedeCanvas={false}>
 		<div className="modal-card" tabIndex={-1}>
 			{inspection.recovery ? <ReminderQuarantineNotice kind="draft" entries={[inspection.recovery]} folderPath={folderPath} onRemove={entries => {
 				try {
