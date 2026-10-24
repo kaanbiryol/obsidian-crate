@@ -20,7 +20,7 @@ The web app and scheduled notifications use your server directly, so Obsidian ca
 | 25 MiB per synced file | Larger files stay on the device and appear as sync errors. Keep large media outside the synced vault or exclude it. |
 | 1 MiB per Reading note | Oversized notes are reported instead of opened in Reading. Keep a shorter note or read the original source. |
 | 1 MiB per reminder note for the web app | Oversized notes, or notes with too much parsed reminder data, are omitted with an explanation. Split them into smaller project notes to restore web editing and scheduling. |
-| 50 opened articles or 20 MiB in the web app's article cache | Open articles before going offline. The entire library is not kept offline. |
+| 200 articles or 50 MiB in the web app's article cache | Articles you open are kept first, then your newest inbox articles. Open the web app online before going offline so it can catch up. |
 | 30 days of replaced or deleted server file versions | Recover promptly. Local-only files may have no server history. |
 | Latest 20 shared checkpoints, for up to 30 days | Checkpoints cover recent synced states, not an unlimited backup archive. |
 

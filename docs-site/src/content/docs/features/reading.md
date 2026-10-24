@@ -75,7 +75,7 @@ On Android browsers that support Web Share Target, use **Share → Crate** after
 
 ## Read offline
 
-In Obsidian, downloaded article text lives in your vault and remains readable offline. The web app caches opened article text, up to 50 articles or 20 MiB. Open the articles you want before going offline; the entire library is not downloaded automatically.
+In Obsidian, downloaded article text lives in your vault and remains readable offline. The web app keeps up to 200 articles or 50 MiB of article text. Articles you open are kept first. While the app is open and online, it also saves your newest inbox articles in the background, a few each time it refreshes, so they can be read offline without opening them first. Archived articles are saved only when you open them, and Data Saver turns background saving off.
 
 Offline reading saves and edits remain pending until the server confirms them. Export pending work before clearing browser data or signing out. If something is stuck, see [Recovery](/docs/troubleshooting/recovery/#pending-work-in-the-web-app).
 

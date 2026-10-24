@@ -33,13 +33,13 @@ To save links from another app, see the [Reading share options](/docs/features/r
 
 ## Before going offline
 
-Open the web app while connected and open the articles you want to read. It keeps a limited offline copy, rather than downloading your entire library.
+Open the web app while connected so it can refresh. It saves your newest inbox articles for offline reading in the background and keeps the articles you open, up to a limit, rather than downloading your entire library.
 
 | Activity | Offline behavior |
 | --- | --- |
 | View reminders | Previously cached reminders remain readable. |
 | Create, edit, or complete a reminder | Reconnect before starting a new change. A previously submitted, unconfirmed change stays pending. |
-| Read articles | Opened article text is cached, up to 50 articles or 20 MiB. Older cached articles can be removed as space is needed. |
+| Read articles | Opened articles and your newest inbox articles are cached, up to 200 articles or 50 MiB. Background copies are removed before articles you opened. |
 | Save Reading links or edit cached Reading items | Changes can wait on this device until it reconnects. Downloading new article text needs a connection. |
 | Play a saved YouTube video | Requires internet access; Crate does not download videos. Cached transcripts remain readable. |
 

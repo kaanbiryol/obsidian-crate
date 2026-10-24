@@ -93,32 +93,45 @@ export async function commitReadingCache(session: ReadingSession, cache: Reading
   }
   return cache;
 }
-interface ArticleUse { id: string; usedAt: number; bytes: number }
-const MAX_CACHED_ARTICLES = 50, MAX_CACHED_ARTICLE_BYTES = 20 * 1024 * 1024;
+/** Background copies carry `prefetched`; their `usedAt` is the article's save time. */
+interface ArticleUse { id: string; usedAt: number; bytes: number; prefetched?: true }
+const MAX_CACHED_ARTICLES = 200, MAX_CACHED_ARTICLE_BYTES = 50 * 1024 * 1024;
+// Articles opened on this device outrank background copies; within each, the newest stays.
+const byRetention = (a: ArticleUse, b: ArticleUse) => Number(Boolean(a.prefetched)) - Number(Boolean(b.prefetched)) || b.usedAt - a.usedAt;
+const savedRank = (item: ReadingItem) => Date.parse(item.saved_at) || 0;
+const backgroundFlag = (prefetched: boolean | undefined) => prefetched ? { prefetched: true as const } : {};
 
 function articleUses(value: unknown): Map<string, ArticleUse> {
   const uses = new Map<string, ArticleUse>();
   if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.entries)) return uses;
   for (const entry of value.entries as unknown[]) {
     if (!isRecord(entry) || typeof entry.id !== 'string' || typeof entry.usedAt !== 'number' || !Number.isFinite(entry.usedAt)
-      || typeof entry.bytes !== 'number' || !Number.isSafeInteger(entry.bytes) || entry.bytes < 0) return new Map();
-    uses.set(entry.id, { id: entry.id, usedAt: entry.usedAt, bytes: entry.bytes });
+      || typeof entry.bytes !== 'number' || !Number.isSafeInteger(entry.bytes) || entry.bytes < 0
+      || (entry.prefetched !== undefined && entry.prefetched !== true)) return new Map();
+    uses.set(entry.id, { id: entry.id, usedAt: entry.usedAt, bytes: entry.bytes, ...backgroundFlag(entry.prefetched === true) });
   }
   return uses;
 }
 
-export async function cacheReadingArticle(session: ReadingSession, item: ReadingItem, markdown: string) {
+/**
+ * Saves an offline copy and evicts beyond the caps. A background copy never
+ * replaces a saved one or displaces an opened article. Resolves to whether the
+ * copy was kept.
+ */
+export async function cacheReadingArticle(session: ReadingSession, item: ReadingItem, markdown: string, { prefetched = false } = {}): Promise<boolean> {
   const db = await readingDatabase(); assertReadingSession(session);
   const tx = db.transaction('values', 'readwrite');
   const prefix = readingKeys.articlePrefix(session.id), key = `${prefix}${item.crate_reading_id}`, indexKey = readingKeys.articleIndex(session.id);
+  let kept: ArticleUse[];
   try {
     // Keep a damaged/newer copy exportable even when this article is opened online.
     const previous = await tx.store.get(key);
+    if (previous !== undefined && prefetched) { await tx.done; return true; }
     if (previous !== undefined && !isReadingArticleCache(decodeReadingValue(key, previous), session.folderPath)) {
       throw new Error('The saved article needs recovery before replacing its offline copy.');
     }
-    const usedAt = Date.now();
-    await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt }), key);
+    const usedAt = prefetched ? savedRank(item) : Date.now();
+    await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt, ...backgroundFlag(prefetched) }), key);
     // A small use index avoids decrypting every cached article to evict a few.
     let indexed: Map<string, ArticleUse>;
     try { indexed = articleUses(decodeReadingValue(indexKey, await tx.store.get(indexKey))); } catch { indexed = new Map(); }
@@ -126,20 +139,43 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
     for (const stored of await tx.store.getAllKeys()) {
       if (!stored.startsWith(prefix)) continue;
       const id = stored.slice(prefix.length);
-      if (id === item.crate_reading_id) { uses.push({ id, usedAt, bytes: new TextEncoder().encode(markdown).byteLength }); continue; }
+      if (id === item.crate_reading_id) { uses.push({ id, usedAt, bytes: new TextEncoder().encode(markdown).byteLength, ...backgroundFlag(prefetched) }); continue; }
       const use = indexed.get(id);
       if (use) { uses.push(use); continue; }
       let value: unknown;
       try { value = decodeReadingValue(stored, await tx.store.get(stored)); } catch { continue; }
       // Preserve unreadable copies for recovery; they must not break a healthy write.
-      if (isReadingArticleCache(value, session.folderPath)) uses.push({ id, usedAt: value.usedAt, bytes: new TextEncoder().encode(value.markdown).byteLength });
+      if (isReadingArticleCache(value, session.folderPath)) uses.push({ id, usedAt: value.usedAt, bytes: new TextEncoder().encode(value.markdown).byteLength, ...backgroundFlag(value.prefetched) });
     }
-    uses.sort((a, b) => b.usedAt - a.usedAt);
+    uses.sort(byRetention);
     let bytes = 0;
-    const kept = uses.filter((use, i) => { bytes += use.bytes; return i < MAX_CACHED_ARTICLES && bytes <= MAX_CACHED_ARTICLE_BYTES; });
+    kept = uses.filter((use, i) => { bytes += use.bytes; return i < MAX_CACHED_ARTICLES && bytes <= MAX_CACHED_ARTICLE_BYTES; });
     for (const use of uses.slice(kept.length)) await tx.store.delete(`${prefix}${use.id}`);
     await tx.store.put(encodeReadingValue(indexKey, { version: 1, entries: kept }), indexKey);
     assertReadingSession(session);
     await tx.done;
   } catch (error) { await abortTransaction(tx); throw error; }
+  return kept.some(use => use.id === item.crate_reading_id);
+}
+
+/**
+ * Inbox articles worth saving in the background, newest first. Opened copies
+ * are never displaced, and an article that would rank below the background
+ * copies already kept is skipped rather than downloaded only to be evicted.
+ */
+export async function readingArticlesToPrefetch(session: ReadingSession, items: ReadingItem[], limit: number): Promise<ReadingItem[]> {
+  const db = await readingDatabase(); assertReadingSession(session);
+  const tx = db.transaction('values', 'readonly');
+  const prefix = readingKeys.articlePrefix(session.id), indexKey = readingKeys.articleIndex(session.id);
+  const saved = new Set((await tx.store.getAllKeys()).filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length)));
+  let indexed: Map<string, ArticleUse>;
+  try { indexed = articleUses(decodeReadingValue(indexKey, await tx.store.get(indexKey))); } catch { indexed = new Map(); }
+  await tx.done;
+  // Copies missing from the index count as opened, so they are never displaced.
+  const background = [...saved].flatMap(id => indexed.get(id)?.prefetched ? [indexed.get(id)!.usedAt] : []);
+  const slots = MAX_CACHED_ARTICLES - (saved.size - background.length);
+  const candidates = items.filter(item => item.path && item.reading_status === 'inbox' && item.extraction_status === 'ready' && !saved.has(item.crate_reading_id));
+  const ranked: Array<{ rank: number; item?: ReadingItem }> = [...background.map(rank => ({ rank })), ...candidates.map(item => ({ rank: savedRank(item), item }))];
+  return ranked.sort((a, b) => b.rank - a.rank).slice(0, Math.max(0, slots))
+    .flatMap(entry => entry.item ? [entry.item] : []).slice(0, limit);
 }

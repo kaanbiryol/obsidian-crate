@@ -7,6 +7,7 @@ import { ReadingApiError, connectReadingFromReminders, loadReading, readingReque
 import { READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
 import type { PendingReading } from './outbox';
 import { useReadingSync } from './useReadingSync';
+import { prefetchReadingArticles } from './prefetch';
 import { useReadingSession } from './useReadingSession';
 import type { ReadingConnection } from './useReadingConnection';
 
@@ -14,6 +15,7 @@ const stored = vi.hoisted(() => ({ queue: [] as PendingReading[], session: null 
 vi.mock('./api', async importOriginal => ({
   ...await importOriginal<typeof import('./api')>(), readingRequest: vi.fn(), loadReading: vi.fn(), connectReadingFromReminders: vi.fn(),
 }));
+vi.mock('./prefetch', () => ({ prefetchReadingArticles: vi.fn(async () => {}) }));
 vi.mock('./storage', async importOriginal => ({
   ...await importOriginal<typeof import('./storage')>(),
   assertReadingSession: (session: ReadingSession) => { if (stored.session !== session) throw new Error('Session changed'); },
@@ -57,6 +59,33 @@ const sent = () => vi.mocked(readingRequest).mock.calls.filter(([path]) => path 
 function storageChanged(key: string | null) {
   window.dispatchEvent(Object.assign(new window.Event('storage'), { key }));
 }
+
+it('saves offline copies after an online refresh, one run at a time', async () => {
+  stored.queue = [];
+  let finish!: () => void;
+  vi.mocked(prefetchReadingArticles).mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+  const rendered = renderSync();
+  await act(async () => {});
+  expect(prefetchReadingArticles).toHaveBeenCalledExactlyOnceWith(session, cache.items, expect.any(Function));
+  await act(async () => { await rendered.current.refresh(); });
+  expect(prefetchReadingArticles).toHaveBeenCalledOnce();
+  await act(async () => { finish(); });
+  await act(async () => { await rendered.current.refresh(); });
+  expect(prefetchReadingArticles).toHaveBeenCalledTimes(2);
+  // The run stops once Reading is paused or the session changes.
+  const isCurrent = vi.mocked(prefetchReadingArticles).mock.calls[0]![2];
+  expect(isCurrent()).toBe(true);
+  stored.session = null;
+  expect(isCurrent()).toBe(false);
+});
+
+it('does not save offline copies from an offline refresh', async () => {
+  stored.queue = [];
+  vi.stubGlobal('navigator', { onLine: false });
+  renderSync();
+  await act(async () => {});
+  expect(prefetchReadingArticles).not.toHaveBeenCalled();
+});
 
 it('ignores unrelated cross-tab preferences and reminder queue changes', async () => {
   const linked = { ...session, source: 'reminders' as const };

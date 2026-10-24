@@ -26,9 +26,11 @@ export function isReadingCache(value: unknown, folder: string): value is Reading
   }) && value.issues.every((issue: unknown) => isRecord(issue) && typeof issue.path === 'string' && typeof issue.message === 'string');
 }
 
-export interface ReadingArticleCache extends ReadingArticle { usedAt: number }
+/** `prefetched` marks a copy saved in the background rather than opened on this device. */
+export interface ReadingArticleCache extends ReadingArticle { usedAt: number; prefetched?: true }
 export function isReadingArticleCache(value: unknown, folder: string): value is ReadingArticleCache {
-  return isReadingArticle(value, folder) && 'usedAt' in value && nonNegativeNumber(value.usedAt);
+  return isReadingArticle(value, folder) && 'usedAt' in value && nonNegativeNumber(value.usedAt)
+    && (!('prefetched' in value) || value.prefetched === true);
 }
 
 export function isReadingDraft(value: unknown): value is { url: string } {

@@ -4,6 +4,7 @@ import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY } from '../confi
 import { connectReadingFromReminders, loadReading } from './api';
 import { assertReadingSession, pendingReading, readingLock, readingSession, readReadingCache, READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
 import { sameReadingSession } from './session';
+import { prefetchReadingArticles } from './prefetch';
 import type { useReadingSession } from './useReadingSession';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 
@@ -21,6 +22,7 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
   // The last confirmed library, so a conditional reload can keep it without decoding storage.
   const confirmedCache = useRef<{ session: ReadingSession; cache: ReadingCache } | null>(null);
   const completedAt = useRef<{ session: ReadingSession; at: number } | null>(null);
+  const prefetching = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -72,6 +74,12 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
           if (!publishSyncResult(current, { pending: work, cache: data, completed })) return;
           if (completed && enabledRef.current && navigator.onLine && data) { setSyncedSession(current); completedAt.current = { session: current, at: Date.now() }; }
         });
+      }
+      if (data && navigator.onLine && !prefetching.current) {
+        // Offline copies fill in after the library is shown; failures wait for the next refresh.
+        prefetching.current = true;
+        void prefetchReadingArticles(current, data.items, () => enabledRef.current && isCurrentSession(current))
+          .catch(() => {}).finally(() => { prefetching.current = false; });
       }
     } finally {
       refreshing.current = false;
