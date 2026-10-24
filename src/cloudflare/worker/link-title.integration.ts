@@ -58,6 +58,23 @@ describe('authenticated page titles in the Worker runtime', () => {
 			expect(await env.DB.prepare(`SELECT COUNT(*) AS count FROM ${table}`).first()).toEqual({ count: 0 });
 		}
 	});
+	it('serves an unlocked encrypted vault without storing the link, and refuses a locked one', async () => {
+		const { createEncryptionFixture, storeEncryptionState } = await import('./test-support/encryption-test-harness');
+		const { state } = await createEncryptionFixture('active');
+		await storeEncryptionState(env.DB, state);
+		const outbound = mockPage();
+		const locked = await worker.fetch(request('reminders-credential'), env);
+		expect(locked.status).toBe(428);
+		expect(outbound).not.toHaveBeenCalled();
+		const unlocked = request('reminders-credential');
+		for (const [name, value] of Object.entries({ 'X-Crate-Protocol': '1', 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) })) unlocked.headers.set(name, value);
+		const response = await worker.fetch(unlocked, env);
+		expect(response.status, await response.clone().text()).toBe(200);
+		expect(await response.json()).toEqual({ title: 'Public article' });
+		for (const table of ['files', 'changelog', 'reminder_operations']) {
+			expect(await env.DB.prepare(`SELECT COUNT(*) AS count FROM ${table}`).first()).toEqual({ count: 0 });
+		}
+	});
 	it.each([undefined, 'unknown-credential'])('denies unauthenticated lookups (%s) without network activity', async token => {
 		const outbound = mockPage();
 		expect((await worker.fetch(request(token), env)).status).toBe(401);

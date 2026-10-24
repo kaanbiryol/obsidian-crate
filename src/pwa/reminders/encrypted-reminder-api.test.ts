@@ -209,10 +209,9 @@ it('downloads cold notes with bounded concurrency while keeping note order and i
   expect(listed.issues.map(issue => issue.path)).toEqual(['Reminders/N03.md']);
 });
 
-it('never sends an encrypted reminder link to the server for a page title', async () => {
+it('leaves page-title lookups to the server, which reads the link without storing it', async () => {
   const fetch = vi.fn();
-  const response = await new EncryptedReminderApi(keys, fetch).handle('/links/title', { method: 'POST', body: JSON.stringify({ url: 'https://private.example' }) });
-  await expect(response?.json()).resolves.toEqual({ title: null });
+  expect(await new EncryptedReminderApi(keys, fetch).handle('/links/title', { method: 'POST', body: JSON.stringify({ url: 'https://private.example' }) })).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
 });
 

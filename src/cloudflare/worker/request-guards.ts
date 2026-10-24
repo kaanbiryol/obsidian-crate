@@ -45,7 +45,7 @@ export function assertRequestEncryption(request: Request, encryption: Encryption
 			throw new EncryptionStateError('Unlock this vault with its current encryption keys before syncing', 428);
 		}
 		if (encryption.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.', 423);
-		if (path === '/links/title' || (path.startsWith('/reminders/') && path !== '/reminders/notification-policy' && !path.startsWith('/reminders/encrypted')) || path.startsWith('/sync/import')) {
+		if ((path.startsWith('/reminders/') && path !== '/reminders/notification-policy' && !path.startsWith('/reminders/encrypted')) || path.startsWith('/sync/import')) {
 			throw new EncryptionStateError('This operation requires the encrypted client workflow', 428);
 		}
 	}

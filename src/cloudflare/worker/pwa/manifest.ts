@@ -1,7 +1,7 @@
 import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR, pwaStartSearchFromUrl } from '../../../pwa/shell/pwa-params';
 
-export function createManifestJson(requestUrl?: string, encrypted = false): string {
+export function createManifestJson(requestUrl?: string): string {
 	return JSON.stringify({
 		id: '/notifications',
 		name: 'Crate',
@@ -22,7 +22,7 @@ export function createManifestJson(requestUrl?: string, encrypted = false): stri
 		launch_handler: {
 			client_mode: 'navigate-existing',
 		},
-		...(!encrypted ? { share_target: { action: '/notifications/share/reading', method: 'POST', enctype: 'application/x-www-form-urlencoded', params: { title: 'title', text: 'text', url: 'url' } } } : {}),
+		share_target: { action: '/notifications/share/reading', method: 'POST', enctype: 'application/x-www-form-urlencoded', params: { title: 'title', text: 'text', url: 'url' } },
 		shortcuts: [
  { name: 'Reading', url: '/notifications?section=reading' },
 			{

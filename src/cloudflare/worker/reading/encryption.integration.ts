@@ -116,7 +116,8 @@ it('allows encryption discovery but rejects plaintext saves and sibling-folder a
   expect(await sibling.json()).toMatchObject({ error: 'Unknown encrypted Reading folder' });
   expect((await h.request('/reminders/encrypted-files?folderPath=Reminders')).status).toBe(403);
   const manifest = await worker.fetch(new Request('https://test/notifications/manifest.json'), env);
-  expect(await manifest.text()).not.toContain('share_target');
+  // Android shares stay on the device; the server only echoes a first-install form back.
+  expect(await manifest.text()).toContain('share_target');
 });
 
 it('keeps article highlights, annotations, tags and archive changes encrypted and readable by another client', async () => {

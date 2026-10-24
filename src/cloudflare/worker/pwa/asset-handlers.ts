@@ -109,8 +109,8 @@ export function handlePwaThemeBootstrap(request: Request): Response {
 	return javascriptAssetResponse(request, PWA_THEME_BOOTSTRAP_JS);
 }
 
-export function handleManifest(request: Request, encrypted = false): Response {
-	return new Response(createManifestJson(request.url, encrypted), {
+export function handleManifest(request: Request): Response {
+	return new Response(createManifestJson(request.url), {
 		headers: {
 			'Content-Type': 'application/manifest+json',
 			...staticAssetHeaders(),

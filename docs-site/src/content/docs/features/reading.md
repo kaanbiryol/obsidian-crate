@@ -71,7 +71,7 @@ You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v
 
 With encryption, the shortcut works the same way: your server downloads the article and saves it locked to your vault, and your devices open it. Sharing the same link twice saves it twice.
 
-On Android browsers that support Web Share Target, unencrypted vaults can use **Share → Crate** after installing the web app. For encrypted vaults, paste the link into Crate’s Reading library.
+On Android browsers that support Web Share Target, use **Share → Crate** after installing the web app. It works with encrypted vaults too.
 
 ## Read offline
 

@@ -7,9 +7,10 @@ export class LinksWorkerApi {
 	private encryption?: EncryptedFiles;
 	setEncryption(encryption: EncryptedFiles): void { this.encryption = encryption; }
 
+	/** The server fetches the title without storing the link, also for encrypted vaults.
+	 * A device that has not unlocked an encrypted vault skips the lookup. */
 	async fetchPageTitle(url: string): Promise<string | null> {
-		if (this.encryption) return null;
-		if (await readServerEncryption(this.http, 7000)) return null;
+		if (!this.encryption && await readServerEncryption(this.http, 7000)) return null;
 		const result = await this.http.requestJson<{ title?: unknown }>('/links/title', {
 			method: 'POST', body: JSON.stringify({ url }),
 		}, 7000);

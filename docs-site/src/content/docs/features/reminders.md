@@ -21,7 +21,7 @@ Paste a webpage URL into a reminder’s title or description to keep an article 
 
 When available, Crate uses the page’s title as the link label. If you paste a URL over selected text, that text stays as the label. Offline, blocked, slow, or untitled pages keep the URL label.
 
-Page titles are fetched through your Crate server, which contacts the linked website without your cookies or authorization headers. With [end-to-end encryption](/docs/features/encryption/) enabled, title lookup is disabled and pasted links keep their URL labels.
+Page titles are fetched through your Crate server, which contacts the linked website without your cookies or authorization headers. This also works with [end-to-end encryption](/docs/features/encryption/): the server sees the link only while fetching its title and doesn't keep it.
 
 ## Organize your day
 
