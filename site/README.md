@@ -29,3 +29,15 @@ verification stop deployment. Do not commit the generated page or signed file.
 
 Publishing a release triggers the Pages workflow to refresh the download. A local
 site build alone does not download release assets or publish the shortcut.
+
+## Changelog
+
+The Pages build writes `changelog/index.html` from published GitHub release notes:
+
+```sh
+node scripts/build-changelog.mjs site/changelog
+```
+
+Run it locally with an authenticated `gh` to preview the page. It reuses the
+homepage's stylesheets, header and footer from `index.html`, so changes there
+apply to the changelog on the next build. Do not commit the generated page.

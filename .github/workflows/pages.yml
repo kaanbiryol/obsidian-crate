@@ -25,6 +25,8 @@ on:
       - "scripts/build-site-images.mjs"
       - "scripts/site-deployment.mjs"
       - "scripts/site-deployment.test.mjs"
+      - "scripts/build-changelog.mjs"
+      - "scripts/build-changelog.test.mjs"
       - "src/reading/shortcut-contract.json"
       - "src/reading/shortcut.ts"
       - "src/cloudflare/server-release.json"
@@ -59,6 +61,8 @@ on:
       - "scripts/build-site-images.mjs"
       - "scripts/site-deployment.mjs"
       - "scripts/site-deployment.test.mjs"
+      - "scripts/build-changelog.mjs"
+      - "scripts/build-changelog.test.mjs"
       - "src/reading/shortcut-contract.json"
       - "src/reading/shortcut.ts"
       - "src/cloudflare/server-release.json"
@@ -120,7 +124,7 @@ jobs:
       - name: Check documentation
         run: npm run check:docs
       - name: Verify shortcut template and website downloads
-        run: node --test scripts/reading-shortcut.test.mjs scripts/shortcut-release.test.mjs scripts/site-deployment.test.mjs
+        run: node --test scripts/reading-shortcut.test.mjs scripts/shortcut-release.test.mjs scripts/site-deployment.test.mjs scripts/build-changelog.test.mjs
       - name: Build shortcut support page
         run: node scripts/build-shortcut-support.mjs
       - name: Download the supported shortcut
@@ -128,6 +132,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node scripts/download-release-shortcut.mjs published site/shortcuts/v1 --install-page
+      - name: Build changelog from published release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node scripts/build-changelog.mjs site/changelog
       # Documentation links include the generated shortcut installation page.
       - name: Build static site and documentation
         run: npm run build:site

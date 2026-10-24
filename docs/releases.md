@@ -86,6 +86,12 @@ and test import, pairing, and saving on iOS 27 or later. Complete the plugin's
 assets. Publish the draft through GitHub only after those checks pass. This remains
 an explicit maintainer action; preparing the release does not publish it.
 
+Replace the draft's generated notes with a summary for users before publishing.
+The notes become the release's entry on the website changelog at `/changelog/`.
+Write them in Markdown; raw HTML is shown as text, and images appear as links.
+The trailing **Full changelog** line becomes a compare link. A release published
+without other notes shows "No notes were written for this release."
+
 Publishing triggers **Deploy GitHub Pages**, which builds the published tag.
 Website-related pushes to `master` only validate the build. Publication compares
 the complete built website against the last successful deployment and skips
@@ -97,6 +103,11 @@ release containing shortcut metadata, including prereleases, verifies the downlo
 and serves it at `shortcuts/v1/Save to Crate.shortcut`.
 Plugin-only releases do not replace that selection. An incomplete or corrupted
 shortcut release fails deployment instead of silently serving another version.
+
+The same build regenerates `changelog/index.html` from every published release,
+newest first, with `scripts/build-changelog.mjs`. Editing notes after publication
+does not deploy on its own; dispatch **Deploy GitHub Pages** with `release_tag`
+set to the latest published tag to refresh the page.
 
 Until a v1 shortcut release is published, Pages generates an unavailable install
 page with a manual-save alternative. Existing releases without shortcut metadata

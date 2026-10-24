@@ -61,6 +61,8 @@ __pycache__/
 /site/shortcuts/**/*.shortcut
 /site/shortcuts/help/
 /site/shortcuts/v1/index.html
+# The changelog page is generated from published release notes by the Pages build.
+/site/changelog/
 
 # Machine-local development server version
 /server-development.local.json

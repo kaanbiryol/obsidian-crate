@@ -1,0 +1,50 @@
+/* Changelog: published releases, newest first, with dates on a timeline rail.
+   scripts/build-changelog.mjs generates the page from GitHub release notes. */
+.changelog-page .changelog-column { width:min(960px,calc(100% - 64px)); }
+.changelog-hero { padding-block:96px 48px; }
+.changelog-hero .feature-label { margin:0 0 12px; }
+.changelog-hero h1 { margin:0 0 20px; font-size:clamp(2.5rem,5vw,4rem); }
+.changelog-hero .body-copy { max-width:520px; }
+.changelog-hero-links { display:flex; flex-wrap:wrap; gap:0 28px; margin-top:16px; }
+
+.changelog-list { position:relative; padding-block:24px 104px; }
+/* The rail fades in and out at the ends so it reads as a timeline, not a border. */
+.changelog-list::before { content:""; position:absolute; top:0; bottom:0; left:188px; width:1px; background:linear-gradient(to bottom,transparent,var(--line-strong) 96px,var(--line) calc(100% - 200px),transparent calc(100% - 80px)); pointer-events:none; }
+.changelog-entry { display:grid; grid-template-columns:160px minmax(0,1fr); gap:56px; padding-block:40px; scroll-margin-top:72px; }
+.changelog-date time { position:sticky; top:104px; display:block; padding-top:9px; color:var(--faint); font-size:14px; line-height:1.6; }
+.changelog-heading { position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:20px; }
+.changelog-heading::before { content:""; position:absolute; top:calc(50% - 4.5px); left:-32.5px; width:9px; height:9px; border:1px solid var(--line-strong); border-radius:50%; background:var(--bg); }
+.changelog-entry:first-child .changelog-heading::before { border-color:var(--accent-text); background:var(--accent); box-shadow:0 0 0 5px #8b5cf626; }
+.changelog-heading h2 { margin-right:4px; font-size:clamp(28px,3vw,36px); letter-spacing:-.035em; }
+.changelog-heading h2 a:hover { color:var(--accent-text); }
+.changelog-badge { padding:3px 9px; border:1px solid var(--line-strong); border-radius:999px; color:var(--muted); font-size:12px; font-weight:500; line-height:1.4; }
+.changelog-badge--latest { border-color:#bca7ef40; background:#8b5cf61f; color:var(--accent-text); }
+
+.changelog-notes { max-width:680px; color:var(--muted); font-size:15px; line-height:1.8; overflow-wrap:anywhere; }
+.changelog-notes > * + * { margin-top:14px; }
+.changelog-notes h3 { margin-top:32px; color:var(--text); font-size:17px; font-weight:550; letter-spacing:-.015em; line-height:1.4; }
+.changelog-notes h4 { margin-top:24px; color:var(--text); font-size:15px; font-weight:550; line-height:1.5; }
+.changelog-notes > h3:first-child,.changelog-notes > h4:first-child { margin-top:0; }
+.changelog-notes ul,.changelog-notes ol { padding-left:20px; }
+.changelog-notes li + li { margin-top:8px; }
+.changelog-notes li::marker { color:var(--faint); }
+.changelog-notes strong { color:var(--text); font-weight:550; }
+.changelog-notes a { color:var(--accent-text); text-decoration:underline; text-underline-offset:3px; }
+.changelog-notes code { padding:2px 5px; border-radius:4px; background:#ffffff0d; font-size:13px; }
+.changelog-notes pre { overflow:auto; padding:14px 16px; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+.changelog-notes pre code { padding:0; background:none; }
+.changelog-notes blockquote { margin:0; padding-left:16px; border-left:2px solid var(--line-strong); }
+.changelog-empty { color:var(--faint); }
+.changelog-links { display:flex; flex-wrap:wrap; gap:0 24px; margin-top:20px; }
+.changelog-links a { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:var(--accent-text); font-size:14px; }
+.changelog-links a:hover { color:var(--text); }
+
+@media(max-width:700px) {
+ .changelog-hero { padding-block:56px 24px; }
+ .changelog-list { padding-bottom:72px; }
+ .changelog-list::before { left:4px; }
+ .changelog-entry { grid-template-columns:minmax(0,1fr); gap:6px; padding:28px 0 28px 28px; }
+ .changelog-date time { position:static; padding-top:0; }
+ .changelog-heading::before { left:-28.5px; }
+}
+@media(max-width:600px) { .changelog-page .changelog-column { width:calc(100% - 40px); } }
