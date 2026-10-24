@@ -1,6 +1,6 @@
 import { readEncryptionState } from '../../encryption/state';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../../sync/file-identity';
-import { publishCapture, runCapture, type CapturePublication } from '../captures';
+import { capturePath, publishCapture, runCapture, type CapturePublication } from '../captures';
 import { featureEnabled } from '../../feature-policy';
 import type { FeaturePolicy } from '../../../../protocol/feature-policy';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
@@ -11,6 +11,8 @@ import { assembleReadingArticle, managedArticle } from '@/reading/core/article';
 import { invalidateReadingProjection, projectReading } from '../projection';
 import { commitStagedFile } from '../../sync/mutations';
 import { stageMarkdownFile } from '../../sync/markdown-file-staging';
+import { writeCommittedMarkdownMove } from '../../sync/atomic-markdown-move';
+import { isGeneratedCapturePath } from '@/reading/core/filename';
 import type { extractDocument } from '@/reading/extraction/document';
 import { publishReading, wakeProjection, wakeReading } from '@/cloudflare/worker/coordinator/coordinator';
 import { sha256Hex } from '@/platform/sha256';
@@ -36,7 +38,13 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
     const source = await readSource(env, job.path), item = parseReadingNote(source.content), block = managedArticle(source.content);
     if (source.file.storageKey !== job.source_revision || item?.crate_reading_id !== job.item_id || item.capture_method !== 'url'
       || item.extraction_status !== 'pending' || item.source_url !== job.url || !block || await sha256Hex(block.text) !== job.block_hash) return;
-    const { content } = assembleReadingArticle(source.content, item, { kind: 'extraction', article: result, block, resolvedUrl: publication.resolvedUrl });
+    const { content, title } = assembleReadingArticle(source.content, item, { kind: 'extraction', article: result, block, resolvedUrl: publication.resolvedUrl });
+    // A note still named after its link takes the extracted title; a user rename is kept.
+    if (title !== item.title && isGeneratedCapturePath(job.path, current.folder_path, { title: item.title, url: item.source_url }, item.crate_reading_id)) {
+      const path = await capturePath(env, current.folder_path, { title, url: item.source_url }, item.crate_reading_id);
+      await writeCommittedMarkdownMove(env.BUCKET, env.DB, { source: { path: job.path, expectedHash: source.file.hash, expectedRevision: source.file.storageKey }, destination: { path, content } });
+      return;
+    }
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, job.path, content, source.file.hash);
     await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: source.file, expectedRevision: source.file.storageKey });
   } finally {
