@@ -14,9 +14,10 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
   const copy = element<HTMLButtonElement>('copy'), copyStatus = element('copy-status'), issue = element<HTMLAnchorElement>('issue');
   const update = element('update'), download = element<HTMLAnchorElement>('download'), reconnect = element<HTMLAnchorElement>('reconnect');
   const reload = element<HTMLButtonElement>('reload'), brand = element('brand'), done = element('done');
-  // iOS cannot hand a link to an installed Home Screen app, so success points there instead.
-  const savedMessage = 'Open Crate from your Home Screen to read it. You can close this window.';
-  const showDone = (isDone: boolean) => { done.hidden = !isDone; brand.hidden = isDone; };
+  const obsidian = element<HTMLAnchorElement>('obsidian');
+  // iOS cannot hand a link to an installed Home Screen app, so success points there or to Obsidian.
+  const savedMessage = 'Read it in Obsidian, or open Crate from your Home Screen.';
+  const showDone = (isDone: boolean) => { done.hidden = !isDone; brand.hidden = isDone; obsidian.hidden = !isDone; };
   const number = (value: unknown): number | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : null;
   const codes = new Set(['reading_error', 'reading_not_configured', 'feature_paused', 'protocol_incompatible',
     'shortcut_update_required', 'shortcut_access_required', 'invalid_shortcut_request', 'invalid_response', 'request_failed',
@@ -39,7 +40,8 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
   const fragment = location.hash.slice(1);
   let token = /^[a-f0-9]{64}$/.test(fragment) && !config.supportOnly ? fragment : '';
   // Encrypted vaults save during the shortcut's request; this page only confirms it.
-  const saved = fragment === 'saved' && !config.supportOnly;
+  const savedReceipt = /^saved(?:=([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}))?$/i.exec(fragment);
+  const saved = Boolean(savedReceipt) && !config.supportOnly;
   // Neither the capability nor error context belongs in browser history.
   history.replaceState(null, '', location.pathname);
   // A browser can reuse this sheet for another share without loading a new
@@ -163,6 +165,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
       title.textContent = data.alreadySaved ? 'Already saved' : 'Saved';
       message.textContent = savedMessage; showDone(true);
       open.href = '/notifications?section=reading&item=' + encodeURIComponent(data.id); open.hidden = false;
+      obsidian.href = 'obsidian://crate-reading?item=' + encodeURIComponent(data.id);
       updateAvailable();
     } catch { failure({ stage: 'handoff', status, requestId, code: 'network_error' }); }
     finally { busy = false; retry.disabled = false; progress.hidden = true; }
@@ -176,6 +179,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
     progress.hidden = true;
     title.textContent = 'Saved';
     message.textContent = savedMessage; showDone(true);
+    if (savedReceipt?.[1]) obsidian.href = 'obsidian://crate-reading?item=' + encodeURIComponent(savedReceipt[1]);
     updateAvailable();
   } else if (!token || config.supportOnly) failure({ stage: config.supportOnly ? 'prepare' : 'handoff', code: config.supportOnly ? 'invalid_response' : 'missing_save_link' });
   else void save();

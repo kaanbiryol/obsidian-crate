@@ -37,5 +37,5 @@ export async function captureSealedReading(request: Request, env: Env, principal
   if (!await commitSealedReading(env, { id, content, folder: current.folder_path, generation: current.generation })) {
     throw new ReadingError('Crate could not save this link. Share it again.', 503, 'reading_save_failed');
   }
-  return readingResponse({ saved: true, id, launchUrl: `${new URL(request.url).origin}/notifications/save-reading#saved` });
+  return readingResponse({ saved: true, id, launchUrl: `${new URL(request.url).origin}/notifications/save-reading#saved=${id}` });
 }

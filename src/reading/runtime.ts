@@ -21,6 +21,17 @@ export function subscribeReadingRuntime(plugin: CratePlugin, listener: () => voi
   return () => { current.delete(listener); };
 }
 function notifyRuntime(plugin: CratePlugin): void { listeners.get(plugin)?.forEach(listener => listener()); }
+// A saved article may arrive by sync after the link opens Obsidian, so the request waits briefly for it.
+const requestedItems = new WeakMap<CratePlugin, { id: string; until: number }>();
+export function requestReadingItem(plugin: CratePlugin, id: string): void {
+  requestedItems.set(plugin, { id, until: Date.now() + 120_000 }); notifyRuntime(plugin);
+}
+export function requestedReadingItem(plugin: CratePlugin): string | undefined {
+  const request = requestedItems.get(plugin);
+  if (request && request.until <= Date.now()) requestedItems.delete(plugin);
+  return requestedItems.get(plugin)?.id;
+}
+export function clearRequestedReadingItem(plugin: CratePlugin): void { requestedItems.delete(plugin); }
 export function getReadingLibrary(plugin: CratePlugin): ReadingLibrary | undefined { return runtimes.get(plugin)?.library; }
 export function stopReading(plugin: CratePlugin): void {
   const runtime = runtimes.get(plugin);

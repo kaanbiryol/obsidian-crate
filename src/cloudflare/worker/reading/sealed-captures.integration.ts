@@ -47,7 +47,7 @@ it('saves a sealed note from the shortcut that the vault opens and the server ca
   const body = await response.json() as { saved: boolean; id: string; launchUrl: string };
   expect(body.saved).toBe(true);
   expect(new URL(body.launchUrl).pathname).toBe('/notifications/save-reading');
-  expect(new URL(body.launchUrl).hash).toBe('#saved');
+  expect(new URL(body.launchUrl).hash).toBe(`#saved=${body.id}`);
   const file = (await env.DB.prepare('SELECT path, storage_key FROM files').first<{ path: string; storage_key: string }>())!;
   expect(file.path).toBe(`Reading/Article - ${body.id.slice(0, 8)}.md`);
   const bytes = new Uint8Array(await (await env.BUCKET.get(file.storage_key))!.arrayBuffer());

@@ -1,10 +1,11 @@
 import { youtubeVideoId } from '../../core/youtube';
 import { useRemindersSettingsStore } from '@/reminders/settings';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
-import React, { useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { Notice } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
 import type { ReadingLibrary } from '../../data/library';
+import { clearRequestedReadingItem, requestedReadingItem, subscribeReadingRuntime } from '../../runtime';
 import { ReadingLibraryPanel, type ReadingLibraryProps } from '../ReadingLibrary';
 import { useLocalReadingArticle } from './useLocalReadingArticle';
 import { ReadingReader } from '../Reader';
@@ -19,6 +20,13 @@ export function LocalReadingLibrary({ plugin, library, renderNavigation }: { plu
 	const reduceMotion = useReducedMotion();
 	const snapshot = useSyncExternalStore(library.subscribe, library.getSnapshot);
 	const { article, item, focusHighlight, open, close, update } = useLocalReadingArticle(library, snapshot.items);
+	const requested = useSyncExternalStore(useCallback(listener => subscribeReadingRuntime(plugin, listener), [plugin]), () => requestedReadingItem(plugin));
+	useEffect(() => {
+		const target = requested && snapshot.items.find(candidate => candidate.crate_reading_id === requested);
+		if (!target) return;
+		clearRequestedReadingItem(plugin);
+		void open(target).catch(() => { new Notice('Could not open the saved article.'); });
+	}, [plugin, requested, snapshot.items, open]);
 	const capturing = Boolean(item && library.isCapturing(item));
 	return <ReadingDialogHost.Provider value={ObsidianReadingDialog}><ReadingLibraryPanel listStyle={listStyle} snapshot={snapshot}
         renderNavigation={renderNavigation}
