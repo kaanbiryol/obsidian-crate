@@ -81,7 +81,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await sheet.goto(saved.launchUrl);
     await expect(sheet.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
     assert.equal(new URL(sheet.url()).hash, '');
-    const openReading = sheet.getByRole('link', { name: 'Open Reading', exact: true });
+    const openReading = sheet.getByRole('link', { name: 'Read it here instead', exact: true });
     const itemId = new URL(await openReading.getAttribute('href'), origin).searchParams.get('item');
     assert.ok(itemId);
     await sheet.reload();
@@ -194,7 +194,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       return JSON.parse(await page.getByLabel('Diagnostics', { exact: true }).inputValue());
     };
     const noSuccess = async () => {
-      await expect(page.getByRole('link', { name: 'Open Reading', exact: true })).toBeHidden();
+      await expect(page.getByRole('link', { name: 'Read it here instead', exact: true })).toBeHidden();
       assert.ok(!await page.getByRole('heading', { name: /^(?:Saved|Already saved)/ }).count());
       assert.equal(new URL(page.url()).hash, '');
     };
@@ -254,11 +254,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       assert.equal(handoffs, 0);
     }
     // Encrypted vaults save during the shortcut request; the page only confirms,
-    // without a handoff, a stale stored capability or an Open Reading link.
+    // without a handoff, a stale stored capability or a Read it here link.
     await page.evaluate(() => sessionStorage.setItem('crate-reading-handoff-v1', JSON.stringify({ token: 'e'.repeat(64), until: Date.now() + 300000 })));
     await page.goto(`${origin}/notifications/save-reading?shortcut=${contract.revision}&contract=${contract.version}#saved`);
     await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Open Reading', exact: true })).toBeHidden();
+    await expect(page.getByRole('link', { name: 'Read it here instead', exact: true })).toBeHidden();
     assert.equal(await page.evaluate(() => sessionStorage.getItem('crate-reading-handoff-v1')), null);
     assert.equal(handoffs, 0);
     const staticError = { stage: 'prepare', code: 'invalid_response', shortcutRevision: contract.revision, shortcutContract: contract.version };
@@ -290,11 +290,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button', { name: 'Retry save', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
     assert.equal(attempts.length, 2); assert.deepEqual(attempts[0], attempts[1]); assert.equal(attempts[0].body, '{}');
-    const savedId = new URL(await page.getByRole('link', { name: 'Open Reading', exact: true }).getAttribute('href'), origin).searchParams.get('item');
+    const savedId = new URL(await page.getByRole('link', { name: 'Read it here instead', exact: true }).getAttribute('href'), origin).searchParams.get('item');
     assert.equal(savedId, firstReceipt.id); assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM files').first()).count, 1);
     await expect(page.getByRole('heading', { name: 'A newer shortcut is available', exact: true })).toBeHidden();
 
-    await expect(page.locator('#message')).toHaveText('You can close this window.');
+    await expect(page.locator('#message')).toHaveText('Open Crate from your Home Screen to read it. You can close this window.');
     await expect(page.locator('#status-label')).toHaveCount(0);
     await expect(page.locator('#support')).toBeHidden();
 

@@ -13,7 +13,10 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
   const details = element<HTMLDetailsElement>('diagnostic-details'), field = element<HTMLTextAreaElement>('diagnostics');
   const copy = element<HTMLButtonElement>('copy'), copyStatus = element('copy-status'), issue = element<HTMLAnchorElement>('issue');
   const update = element('update'), download = element<HTMLAnchorElement>('download'), reconnect = element<HTMLAnchorElement>('reconnect');
-  const reload = element<HTMLButtonElement>('reload');
+  const reload = element<HTMLButtonElement>('reload'), brand = element('brand'), done = element('done');
+  // iOS cannot hand a link to an installed Home Screen app, so success points there instead.
+  const savedMessage = 'Open Crate from your Home Screen to read it. You can close this window.';
+  const showDone = (isDone: boolean) => { done.hidden = !isDone; brand.hidden = isDone; };
   const number = (value: unknown): number | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : null;
   const codes = new Set(['reading_error', 'reading_not_configured', 'feature_paused', 'protocol_incompatible',
     'shortcut_update_required', 'shortcut_access_required', 'invalid_shortcut_request', 'invalid_response', 'request_failed',
@@ -97,7 +100,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
   const failure = (input: Record<string, unknown>) => {
     const clean = normalize({ shortcutRevision, shortcutContract, ...input });
     const status = clean.status, code = clean.code;
-    progress.hidden = true; open.hidden = true; support.hidden = false;
+    progress.hidden = true; open.hidden = true; support.hidden = false; showDone(false);
     retry.hidden = !token || clean.stage !== 'handoff' || [400, 401, 403, 409, 410, 413, 423, 426].includes(Number(status));
     reload.hidden = status !== 428;
     title.textContent = 'Save not confirmed';
@@ -144,7 +147,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
     if (busy) return;
     busy = true; retry.disabled = true; retry.hidden = true; progress.hidden = false;
     message.textContent = 'Keep this window open.';
-    title.textContent = 'Saving…'; support.hidden = true; open.hidden = true;
+    title.textContent = 'Saving…'; support.hidden = true; open.hidden = true; showDone(false);
     let status: number | null = null, requestId: string | null = null;
     try {
       const response = await fetch('/reading/handoff', { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(20000),
@@ -158,7 +161,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
         failure({ stage: 'handoff', status, requestId, code: 'invalid_response' }); return;
       }
       title.textContent = data.alreadySaved ? 'Already saved' : 'Saved';
-      message.textContent = 'You can close this window.';
+      message.textContent = savedMessage; showDone(true);
       open.href = '/notifications?section=reading&item=' + encodeURIComponent(data.id); open.hidden = false;
       updateAvailable();
     } catch { failure({ stage: 'handoff', status, requestId, code: 'network_error' }); }
@@ -172,7 +175,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
   } else if (saved) {
     progress.hidden = true;
     title.textContent = 'Saved';
-    message.textContent = 'It’s in Reading on your devices. You can close this window.';
+    message.textContent = savedMessage; showDone(true);
     updateAvailable();
   } else if (!token || config.supportOnly) failure({ stage: config.supportOnly ? 'prepare' : 'handoff', code: config.supportOnly ? 'invalid_response' : 'missing_save_link' });
   else void save();
