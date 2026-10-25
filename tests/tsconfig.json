@@ -1,0 +1,21 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "noEmit": true
+  },
+  "include": [
+    "visual/**/*.ts",
+    "visual/**/*.tsx",
+    "editor-contract/*.ts",
+    "editor-contract/*.tsx",
+    "editor-contract/*.mts",
+    "../src/cloudflare/worker/pwa/raw-css.d.ts",
+    "../src/cloudflare/virtual-cloudflare-artifacts.d.ts"
+  ],
+  "exclude": []
+}
