@@ -30,8 +30,6 @@ let shuttingDown = false;
 
 const watcher = chokidar.watch(watchedPaths, {
 	ignoreInitial: true,
-	interval: 300,
-	usePolling: true,
 });
 
 watcher.on('all', (_eventName, changedPath) => {
