@@ -8,6 +8,7 @@ import { readReadingCache, readReadingDraft, saveReadingDraft } from './storage/
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { connectReadingFromReminders } from './api';
 import { prepareReadingEncryption } from './session/encryption-session';
+import { EncryptionVerificationUnavailableError } from '../connection/encryption';
 
 vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('../service-worker-registration', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
@@ -111,6 +112,16 @@ describe('Reading session authority', () => {
     await act(async () => encryption.resolve(null));
     expect(h.rendered.current.session).toBeNull();
     expect(readReadingCache).not.toHaveBeenCalled();
+  });
+
+  it('retries an unavailable encryption check when the app comes back online', async () => {
+    vi.mocked(prepareReadingEncryption).mockRejectedValueOnce(new EncryptionVerificationUnavailableError('Could not verify encryption. Check your connection and retry.'));
+    const h = start();
+    await act(async () => { h.release(session); });
+    expect(h.rendered.current).toMatchObject({ session: null, lockedSession: session, verificationUnavailable: true });
+    await act(async () => window.dispatchEvent(new window.Event('online')));
+    expect(h.rendered.current).toMatchObject({ session, lockedSession: null, verificationUnavailable: false });
+    expect(prepareReadingEncryption).toHaveBeenCalledTimes(2);
   });
 
   it('removes connection listeners after enrollment and on unmount', async () => {

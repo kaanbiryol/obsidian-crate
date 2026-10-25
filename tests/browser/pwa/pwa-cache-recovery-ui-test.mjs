@@ -71,6 +71,20 @@ async function verify(browser) {
 			request.onerror = () => reject(request.error);
 		}));
 		await expect.poll(async () => (await rawCache())?.sessionScope).toBe(sessionScope);
+		// An unanswered encryption check is a connection problem, not a locked vault,
+		// and the failing list load must keep the unencrypted offline copy.
+		let checks = 0, checkAvailable = false;
+		await page.route(url => url.pathname === '/encryption', route => {
+			checks++;
+			return checkAvailable ? route.continue() : route.fulfill({ status: 503, body: 'Injected deploy' });
+		});
+		await page.reload();
+		await expect(page.getByRole('heading', { name: 'Unable to connect', exact: true })).toBeVisible();
+		await expect(page.getByText('Unlock Crate')).toHaveCount(0);
+		await expect.poll(() => checks).toBeGreaterThan(1);
+		await page.waitForTimeout(250);
+		expect((await rawCache())?.sessionScope).toBe(sessionScope);
+		// Locked storage cannot write, so the damaged copy below is not overwritten.
 		available = false;
 		await page.evaluate(sessionScope => new Promise((resolve, reject) => {
 			const request = indexedDB.open('crate-reminders', 1);
@@ -84,6 +98,7 @@ async function verify(browser) {
 			request.onerror = () => reject(request.error);
 		}), sessionScope);
 		reads.length = 0;
+		checkAvailable = true;
 		await page.reload();
 		await expect(cacheNotice(page)).toContainText('saved copy is damaged');
 		await page.evaluate(() => window.dispatchEvent(new Event('offline')));
@@ -108,7 +123,7 @@ try {
 		const browser = await browserType.launch();
 		try {
 			await verify(browser);
-			console.log(`${browserType.name()}: built PWA survives blocked startup and damaged offline data; keyboard rebuild and reconnect preserve pending commands and drafts`);
+			console.log(`${browserType.name()}: built PWA survives blocked startup, an unanswered encryption check and damaged offline data; keyboard rebuild and reconnect preserve pending commands and drafts`);
 		} finally { await browser.close(); }
 	}
 } finally { await new Promise(resolve => server.close(resolve)); }

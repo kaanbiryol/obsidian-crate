@@ -14,7 +14,11 @@ function parseEncryptionState(value: unknown): EncryptionServerState {
   try { validateEncryptionState(value); return value; } catch { throw new Error('Invalid encrypted enrollment configuration'); }
 }
 
+/** The check got no answer: the request failed, the server returned an error or
+ * the reply was not an encryption status. It says nothing about encryption. */
 export class EncryptionVerificationUnavailableError extends Error {}
+
+const UNVERIFIED = 'Could not verify encryption. Check your connection and retry.';
 
 /** Common verification policy for every feature; offline never downgrades known encryption. */
 /** The verified configuration, and in an encrypted vault the sealed name of the
@@ -32,11 +36,12 @@ export async function loadEncryptionState({ token, purpose, fragment, request, c
   let folderLabel: string | null = null, folderPath: string | null = null;
   try {
     const response = await request().catch((cause: unknown) => {
-      throw new EncryptionVerificationUnavailableError('Could not verify encryption. Check your connection and retry.', { cause });
+      throw new EncryptionVerificationUnavailableError(UNVERIFIED, { cause });
     });
     if (response.status === 401 && current()) reportExpiredConnection(token);
-    if (!response.ok) throw new Error('Could not verify encryption. Check your connection and retry.');
-    const data = await response.json() as { encryption: unknown; folderLabel?: unknown; folderPath?: unknown };
+    if (!response.ok) throw response.status === 401 ? new Error(UNVERIFIED) : new EncryptionVerificationUnavailableError(UNVERIFIED);
+    const data = await response.json().catch(() => null) as { encryption: unknown; folderLabel?: unknown; folderPath?: unknown } | null;
+    if (!data || typeof data !== 'object' || !('encryption' in data)) throw new EncryptionVerificationUnavailableError(UNVERIFIED);
     expected = data.encryption === null ? null : parseEncryptionState(data.encryption);
     folderLabel = typeof data.folderLabel === 'string' ? data.folderLabel : null;
     folderPath = typeof data.folderPath === 'string' ? data.folderPath : null;
