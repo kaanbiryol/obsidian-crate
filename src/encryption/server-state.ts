@@ -18,7 +18,7 @@ export interface EncryptionServerState {
 	version: 1;
 	vaultId: string;
 	generation: number;
-	mode: 'converting' | 'active' | 'resetting';
+	mode: 'active' | 'resetting';
 	keyId: string;
 	notificationKeyId: string;
 	/** Public half of the vault seal key: the server can create notes it cannot read. */
@@ -36,7 +36,7 @@ export function validateEncryptionState(value: unknown): asserts value is Encryp
 	exactFields(value, ['version', 'vaultId', 'generation', 'mode', 'keyId', 'notificationKeyId', 'seal', 'recovery']);
 	if (value.version !== 1 || !isEncryptionId(value.vaultId) || !isEncryptionId(value.keyId) || !isEncryptionId(value.notificationKeyId)
 		|| !Number.isSafeInteger(value.generation) || (value.generation as number) < 1
-		|| (value.mode !== 'converting' && value.mode !== 'active' && value.mode !== 'resetting')) throw new Error('Unsupported encryption configuration');
+		|| (value.mode !== 'active' && value.mode !== 'resetting')) throw new Error('Unsupported encryption configuration');
 	if (!record(value.seal)) throw new Error('Missing vault seal key');
 	exactFields(value.seal, ['keyId', 'publicKey']);
 	if (!isEncryptionId(value.seal.keyId)) throw new Error('Invalid vault seal key');
@@ -49,7 +49,7 @@ export function validateEncryptionState(value: unknown): asserts value is Encryp
 
 export function createEncryptionState(bundle: VaultKeyBundle, recovery: RecoveryEnvelope): EncryptionServerState {
 	const state: EncryptionServerState = { version: 1, vaultId: bundle.vaultId, generation: bundle.generation,
-		mode: 'converting', keyId: bundle.vault.id, notificationKeyId: bundle.notifications.id,
+		mode: 'active', keyId: bundle.vault.id, notificationKeyId: bundle.notifications.id,
 		seal: { keyId: bundle.seal.id, publicKey: bundle.seal.publicKey }, recovery };
 	validateEncryptionState(state);
 	return state;

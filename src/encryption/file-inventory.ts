@@ -1,6 +1,6 @@
 import { isRecord, isSha256Hex } from '@/platform/validation';
 import { sha256Hex } from '@/platform/sha256';
-import { openFile, type FileEncryptionAuthority } from './file-codec';
+import { openFile, type FileEncryptionAuthority, type PathBinding } from './file-codec';
 import { isSyncPath } from '@/protocol/sync-validation';
 
 export interface EncryptedInventoryFile { path: string; hash: string; size: number; revision: string }
@@ -84,8 +84,9 @@ export async function* encryptedInventoryPages(
  * The Worker applies the same bound to encrypted web app downloads and commits. */
 export const MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES = 4 * 1024 * 1024;
 
-/** Open transferred ciphertext only when it matches its inventory entry byte for byte. */
-export async function openVerifiedInventoryFile(bytes: Uint8Array<ArrayBuffer>, file: EncryptedInventoryFile, authority: FileEncryptionAuthority, integrityError: string) {
+/** Open transferred ciphertext only when it matches its inventory entry byte for byte.
+ * `binding` checks the plaintext path the file claims against its server path. */
+export async function openVerifiedInventoryFile(bytes: Uint8Array<ArrayBuffer>, file: EncryptedInventoryFile, authority: FileEncryptionAuthority, integrityError: string, binding: PathBinding) {
 	if (bytes.byteLength !== file.size || await sha256Hex(bytes) !== file.hash) throw new Error(integrityError);
-	return openFile(bytes, file.path, authority);
+	return openFile(bytes, binding, authority);
 }

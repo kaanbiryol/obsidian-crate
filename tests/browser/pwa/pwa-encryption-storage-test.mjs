@@ -11,6 +11,9 @@ import { buildEncryptedPushWorker, verifyEncryptedPushWorker } from './pwa-encry
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
 export * from './src/encryption/server-state';
+export { PathTags } from './src/encryption/path-tags';
+export { sealFolderLabel } from './src/encryption/folder-label';
+export { importEncryptionSecret } from './src/encryption/envelope';
 export * from './src/pwa/encryption/encryption-keys';
 export * from './src/pwa/reminders/encrypted-reminder-attempts';
 export * from './src/encryption/reminder-projection';
@@ -59,7 +62,7 @@ async function verifyKeyRecovery(page) {
 		const read = () => new Promise((resolve, reject) => { const r = db.transaction('keys').objectStore('keys').get(key); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
 		let repaired = 0, preserved = 0;
 		try {
-			for (const damage of [{ notifications: null }, { notificationFingerprint: null }, { vault: null }, { vault: { id: stored.vault.id, key: { type: 'secret', extractable: false } } }, { seal: null }]) {
+			for (const damage of [{ notifications: null }, { notificationFingerprint: null }, { pathTag: undefined }, { pathTag: { type: 'secret', extractable: false, algorithm: { name: 'HMAC' }, usages: ['verify'] } }, { vault: null }, { vault: { id: stored.vault.id, key: { type: 'secret', extractable: false } } }, { seal: null }]) {
 				await put({ ...stored, ...damage });
 				let locked = false; try { await t.readVaultKeys(bundle.vaultId); } catch { locked = true; }
 				if (!locked) throw new Error('Damaged keys were accepted without recovery');
@@ -90,7 +93,7 @@ async function verifyKeyRecovery(page) {
 		} finally { db.close(); }
 		return { repaired, preserved };
 	});
-	assert.deepEqual(result, { repaired: 5, preserved: 6 });
+	assert.deepEqual(result, { repaired: 7, preserved: 6 });
 }
 
 async function verifyLogout(browser) {

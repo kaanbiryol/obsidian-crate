@@ -33,4 +33,4 @@ Keep the host awake, online, and running Docker for sync and scheduled notificat
 
 Connect copies of the **same vault** to the same server. Create a separate server for an unrelated vault. Local vault names do not separate remote data: connecting different vaults to one server combines their files during sync.
 
-Both hosting options support [optional end-to-end encryption](/docs/features/encryption/). Enable it in Crate settings to protect synced content. File paths, sizes, and notification scheduling metadata remain visible to your server. Without encryption enabled, the server can read synced content.
+Both hosting options support [optional end-to-end encryption](/docs/features/encryption/). Enable it in Crate settings to protect synced content. File and folder names are encrypted too; folder structure, sizes, and notification scheduling metadata remain visible to your server. Without encryption enabled, the server can read synced content.

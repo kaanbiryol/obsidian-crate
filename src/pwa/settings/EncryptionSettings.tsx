@@ -7,7 +7,7 @@ import { SettingsRow } from './SettingsRow';
 export function EncryptionSettings({ reading, remindersConnected }: { reading: SettingsSnapshot['reading']; remindersConnected: boolean }) {
 	const encryption = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot);
 	const reminderStatus = encryption.status === 'ready' ? 'Unlocked' : encryption.status === 'unencrypted' ? 'Not enabled'
-		: encryption.status === 'locked' ? encryption.converting ? 'Converting' : 'Locked' : remindersConnected ? 'Checking…' : 'Not connected';
+		: encryption.status === 'locked' ? encryption.converting ? 'Setting up' : 'Locked' : remindersConnected ? 'Checking…' : 'Not connected';
 	const readingStatus = reading?.encryption?.status === 'ready' ? 'Unlocked' : reading?.encryption?.status === 'unencrypted' ? 'Not enabled'
 		: reading?.encryption?.status === 'locked' ? 'Locked' : reading?.ready ? 'Not connected' : 'Checking…';
 	const reminderDescription = encryption.status === 'locked' ? encryption.message

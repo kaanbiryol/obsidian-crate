@@ -18,8 +18,8 @@ import { apiRoutePolicy } from './routes/policy';
 import { handleEncryptionRoute } from './routes/encryption';
 import { handleEncryptedFolderFiles } from './encryption/encrypted-folder-files';
 import { handleEncryptionReset } from './encryption/reset';
-import { handleEncryptionConversion } from './encryption/conversion';
 import type { EncryptionServerState } from '../../encryption/server-state';
+import { REMINDERS_FOLDER_CHANGED } from '../../protocol/web-session';
 import type { UploadCommitters } from './sync/upload-committers';
 
 
@@ -68,7 +68,9 @@ export async function handleAuthenticatedRoute(
 			if (!parsed.ok) return parsed.response;
 			folder = parsed.value.folderPath;
 		}
-		if (!principal.folderPath || folder !== principal.folderPath) return corsResponse({ error: 'This session is limited to its enrolled reminders folder' }, 403);
+		if (!principal.folderPath) return corsResponse({ error: 'This session is limited to its enrolled reminders folder' }, 403);
+		// Sessions follow reminders folder changes; the web app switches to the folder named here.
+		if (folder !== principal.folderPath) return corsResponse({ error: 'The reminders folder changed', code: REMINDERS_FOLDER_CHANGED, folderPath: principal.folderPath }, 403);
 	}
 	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, undefined, encryption);
 	const db = env.DB;
@@ -82,7 +84,6 @@ export async function handleAuthenticatedRoute(
 	}
 
 	return await handleEncryptionReset(request, env, path, principal)
-		?? (principal.scope === 'vault' ? await handleEncryptionConversion(request, env, path) : null)
 		?? await handleEncryptionRoute(request, db, path, principal, encryption)
 		?? await handleEncryptedFolderFiles(request, env, path, 'reminders', principal.scope === 'reminders' ? principal.folderPath : undefined)
 		?? await handleSyncRoute(request, env, uploadCommitters, path, method, resetGeneration, mutationAuditContext(request, principal, requestId), encryption)

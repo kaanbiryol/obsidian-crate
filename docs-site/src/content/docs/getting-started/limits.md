@@ -26,7 +26,7 @@ The web app and scheduled notifications use your server directly, so Obsidian ca
 
 MiB is a file-size unit: 1 MiB is 1,048,576 bytes, roughly one megabyte. The separate Reading and reminder limits can apply even when a note is small enough for ordinary vault sync.
 
-Updated attachments such as PDFs and images require [conflict review](/docs/troubleshooting/conflicts/#attachments-and-binary-files). New attachments can download automatically. File names also need to work across devices: names differing only by capitalization, Windows-reserved names, and trailing dots or spaces can block sync. Rename files identified in an error and retry.
+Updated attachments such as PDFs and images require [conflict review](/docs/troubleshooting/conflicts/#attachments-and-binary-files). New attachments can download automatically. File names also need to work across devices: names differing only by capitalization, Windows-reserved names, and trailing dots or spaces can block sync. Rename files identified in an error and retry. With [encryption](/docs/features/encryption/), files can be nested at most 36 folders deep.
 
 ## Offline access is different in each app
 
@@ -42,13 +42,13 @@ Keep the saved link, retry when connected, or [use Web Clipper](/docs/features/r
 
 ## Cloudflare's free daily limits
 
-On Cloudflare's Free plan, D1 allows 100,000 row writes and 5 million row reads a day. A first upload of a very large vault, or turning on encryption for one, can reach the write limit. Sync then stops with **Cloudflare’s free daily database limit stopped this sync**. Your changes stay on the device; sync again after 00:00 UTC, and a first upload continues where it stopped.
+On Cloudflare's Free plan, D1 allows 100,000 row writes and 5 million row reads a day. A first upload of a very large vault, or turning on encryption for one (which uploads the whole vault again), can reach the write limit. Sync then stops with **Cloudflare’s free daily database limit stopped this sync**. Your changes stay on the device; after 00:00 UTC, sync again or resume encryption setup, and the upload continues where it stopped.
 
 **Settings → Crate → Server and usage → Cloudflare usage** compares your usage, including storage, with the free allowances. R2 storage beyond its free allowance is billed rather than stopped.
 
 ## Privacy and backups
 
-Without [end-to-end encryption](/docs/features/encryption/), your server can read synced content. With it, content is encrypted, but file paths, approximate sizes, and some scheduling information remain visible. Keep the recovery key outside your vault; Crate cannot replace a lost key.
+Without [end-to-end encryption](/docs/features/encryption/), your server can read synced content. With it, content and file and folder names are encrypted, but folder structure, approximate sizes, and some scheduling information remain visible. Keep the recovery key outside your vault; Crate cannot replace a lost key.
 
 Reading can contact saved websites for article text, favicons, or video playback. [Reading's privacy notes](/docs/features/reading/#privacy-and-availability) explain when that happens.
 

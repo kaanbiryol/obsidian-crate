@@ -1,4 +1,3 @@
-import { readConvertedVaultEnvelope } from '../encryption/receipts';
 import { readEncryptionState } from '../encryption/state';
 import { handleEncryptedFolderFiles } from '../encryption/encrypted-folder-files';
 import { issueShortcutPairing, exchangeShortcutPairing } from './shortcut-pairing';
@@ -10,7 +9,8 @@ import type { AuthPrincipal } from '../auth/authenticate';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { parseJsonObject } from '../request-validation';
 import { policy, authority, readingResponse, ReadingError } from './common';
-import { prepareHandoff, updatePolicy, handoffAuthority } from './access';
+import { prepareHandoff, updatePolicy, handoffAuthority, labelledPolicy } from './access';
+import { readFolderLabel } from '../encryption/folder-labels';
 import { mutateReading } from './mutations';
 import { extractForEncryptedReading } from './encrypted-extract';
 import { projectReading } from './projection';
@@ -31,17 +31,13 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
         if (!encryption) throw new ReadingError('Article downloads here are only for encrypted Reading folders.', 409);
         return await extractForEncryptedReading(request, env);
       }
-      if (path === '/reading/encrypted-receipt' && request.method === 'GET') {
-        const id = url.searchParams.get('operationId') ?? '';
-        const receipt = url.searchParams.get('wire') === '1' ? { kind: 'reminder' as const } : { kind: 'reading' as const, generation: current.generation };
-        return readingResponse({ envelope: await readConvertedVaultEnvelope(env.DB, receipt, id) });
-      }
       return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path) ?? readingResponse({ error: 'Not found' }, 404);
     }
     if (encryption && (shortcut?.kind === 'prepare' || ['/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
     if (path === '/reading/encryption' && request.method === 'GET' && principal) {
-      await authority(env.DB, principal); // Reading access only.
-      return readingResponse({ encryption });
+      const current = await authority(env.DB, principal); // Reading access only.
+      // The web app recovers the plaintext folder name from this label with the vault key.
+      return readingResponse({ encryption, ...(encryption ? { folderLabel: await readFolderLabel(env.DB, current.folder_path) } : {}) });
     }
     const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' ? 262_144 : 24_576);
     if (!parsed.ok) return parsed.response;
@@ -58,7 +54,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     const limited = await limitNotificationAction(request, env.DB, principal.tokenId); if (limited) return limited;
     if (path === '/reading/policy') {
       if (principal.scope !== 'vault') throw new ReadingError('Open Crate settings in Obsidian to change Reading setup.', 403);
-      if (request.method === 'GET') return readingResponse({ policy: await policy(env.DB) });
+      if (request.method === 'GET') return readingResponse({ policy: await labelledPolicy(env.DB, await policy(env.DB)) });
       if (request.method === 'POST') return await updatePolicy(env.DB, body);
     }
     const current = await authority(env.DB, principal);

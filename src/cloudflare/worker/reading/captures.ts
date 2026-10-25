@@ -1,5 +1,5 @@
 import { readEncryptionState } from '../encryption/state';
-import { readingCapturePath } from '@/reading/core/filename';
+import { readingCapturePath, type ReadingNameSource } from '@/reading/core/filename';
 import { parseReadingNote } from '@/reading/core/notes';
 import { portablePathKey } from '@/protocol/portable-path';
 import { namespacePredicate } from '../sync/file-namespace';
@@ -14,8 +14,8 @@ import { publishReading } from '@/cloudflare/worker/coordinator/coordinator';
 
 export interface CapturePublication { captureId: string; generation: string; result: Publication['result']; resolvedUrl?: string }
 export interface PendingCapture { id: string; generation: string; url_identity: string; note: string; attempts: number; available_at: number }
-export async function capturePath(env: Env, folder: string, title: string, id: string): Promise<string> {
-  return readingCapturePath(folder, title, id, async path => {
+export async function capturePath(env: Env, folder: string, source: ReadingNameSource | null, id: string): Promise<string> {
+  return readingCapturePath(folder, source, id, async path => {
     const predicate = namespacePredicate(path);
     // Separate branches keep each lookup on the primary key; a top-level OR scans files.
     return Boolean(await env.DB.prepare(`SELECT 1 FROM files WHERE portable_path=? UNION ALL SELECT 1 FROM files WHERE ${predicate.sql} LIMIT 1`)
@@ -34,7 +34,7 @@ export async function publishCapture(env: Env, id: string, generation: string, r
   // Turning fetching off while a request is in flight still produces a useful bookmark.
   if (!current.enabled) result = null;
   const { content, title } = assembleReadingArticle(capture.note, item, { kind: 'capture', article: result, resolvedUrl });
-  const path = await capturePath(env, current.folder_path, title, id);
+  const path = await capturePath(env, current.folder_path, { title, url: item.source_url }, id);
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
   const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null,
     effects: files => {

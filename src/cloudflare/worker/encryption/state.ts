@@ -2,6 +2,7 @@ import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER, validateEncrypti
 import { ENCRYPTED_FILE_CONTENT_TYPE, isEncryptedFile, parseEncryptedFile, type EncryptedFileDescriptor } from '../../../encryption/file-format';
 import { fileRevisionGuard } from '../sync/file-identity';
 import { validateEncryptedSchedules } from '../../../encryption/notification-format';
+import { isWirePath } from '../../../protocol/encrypted-path';
 
 export const ENCRYPTION_STATE_KEY = 'e2ee:state';
 export const ENCRYPTION_FILE_PREFIX = 'e2ee:file:';
@@ -25,10 +26,10 @@ export function hasEncryptionAuthority(request: Request, state: EncryptionServer
 }
 
 /** Use in the SAME transaction as publishing bytes. A request authorized before
- * conversion starts must not be able to commit a late plaintext upload. */
+ * encryption is turned on must not be able to commit a late plaintext upload. */
 export function encryptionWriteGuard(state: EncryptionServerState | null): { sql: string; args: string[] } {
 	if (!state) return { sql: 'NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = ?)', args: [ENCRYPTION_STATE_KEY] };
-	if (state.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.');
+	if (state.mode !== 'active') throw new EncryptionStateError('An encryption reset is in progress. Resume it on the device that started it.');
 	return { sql: `EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? AND json_extract(value, '$.mode') = 'active'
 		AND json_extract(value, '$.vaultId') = ? AND json_extract(value, '$.generation') = CAST(? AS INTEGER))`,
 		args: [ENCRYPTION_STATE_KEY, state.vaultId, String(state.generation)] };
@@ -40,7 +41,7 @@ export async function prepareEncryptedFileCommit(db: D1Database, path: string, c
 }> {
 	const state = knownState === undefined ? await readEncryptionState(db) : knownState;
 	if (!state) return { state };
-	if (state.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.');
+	if (state.mode !== 'active') throw new EncryptionStateError('An encryption reset is in progress. Resume it on the device that started it.');
 	return { state, descriptor: validateEncryptedContent(state, path, content, sealed) };
 }
 
@@ -51,7 +52,7 @@ export async function validateUploadEncryption(db: D1Database, files: Array<{
 }>, knownState?: EncryptionServerState | null): Promise<EncryptionServerState | null> {
 	const state = knownState === undefined ? await readEncryptionState(db) : knownState;
 	if (!state) return null;
-	if (state.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.');
+	if (state.mode !== 'active') throw new EncryptionStateError('An encryption reset is in progress. Resume it on the device that started it.');
 	for (const file of files) {
 		if (file.contentType !== ENCRYPTED_FILE_CONTENT_TYPE) throw new EncryptionStateError('This vault requires encrypted file content', 428);
 		try {
@@ -67,13 +68,16 @@ export async function validateUploadEncryption(db: D1Database, files: Array<{
 /** The server's own sealed Reading capture, which may use the seal key in this folder. */
 export interface SealedCommit { readingFolder: string }
 
-export function validateEncryptedContent(state: EncryptionServerState, path: string, content: string | ArrayBuffer | Uint8Array, sealed?: SealedCommit): EncryptedFileDescriptor {
+function validateEncryptedContent(state: EncryptionServerState, path: string, content: string | ArrayBuffer | Uint8Array, sealed?: SealedCommit): EncryptedFileDescriptor {
+	// Encrypted vaults store tagged names only; a readable path is never published.
+	if (!isWirePath(path)) throw new EncryptionStateError('Update Crate: this encrypted vault stores encrypted file names', 428);
 	const bytes = typeof content === 'string' || content instanceof Uint8Array ? content : new Uint8Array(content);
 	if (!isEncryptedFile(bytes)) throw new EncryptionStateError('This vault requires encrypted file content', 428);
 	const { descriptor, publicData } = parseEncryptedFile(bytes);
 	if (descriptor.seal || sealed) {
 		if (!descriptor.seal || !sealed || descriptor.vaultId !== state.vaultId || descriptor.scopeId !== 'vault' || descriptor.keyId !== state.seal.keyId
-			|| !path.startsWith(`${sealed.readingFolder}/`) || !path.toLowerCase().endsWith('.md') || publicData !== null) {
+			|| !path.startsWith(`${sealed.readingFolder}/`) || path.slice(sealed.readingFolder.length + 1).includes('/')
+			|| !path.endsWith('.md') || publicData !== null) {
 			throw new EncryptionStateError('Only the server can create sealed Reading notes', 428);
 		}
 		return descriptor;

@@ -13,6 +13,9 @@ export interface FileEntry {
 	revision?: string;
 	size: number;
 	modified: string;
+	/** Local only: an encrypted file's server path, kept where it cannot be recomputed
+	 * from `path`, as for notes with a random server name. */
+	wire?: string;
 }
 
 export interface FileMetadataResponse {
@@ -162,6 +165,8 @@ export interface RegisteredDevice {
 export interface RemoteFileVersion {
 	storage_key: string;
 	path: string;
+	/** Local only: in an encrypted vault, the server path `path` was listed under. */
+	wire?: string;
 	hash: string;
 	revision?: string;
 	size: number;

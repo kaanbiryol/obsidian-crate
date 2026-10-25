@@ -62,7 +62,7 @@ Use **Reading → Reading folder** and **Reminders → Reminders folder** to cho
 
 Changing a folder setting **does not move existing notes**. Move files deliberately in Obsidian if you want them in the new folder, check that they appear, then sync. Let pending Reading saves finish before changing its folder. If encryption reports a pending folder change, finish that flow before making another change.
 
-Folder changes can affect what the server and web app show. Check the folder on your other Obsidian devices and reconnect the web app if it asks for a fresh link.
+Folder changes can affect what the server and web app show. Check the folder on your other Obsidian devices. The web app switches to a new reminders folder on its own; changes it saved for the previous folder are kept for you to export instead of being sent.
 
 ## Make the views your own
 

@@ -252,6 +252,7 @@ describe('renderNotificationsSection', () => {
 	it('shows the Worker error when an app code cannot be created', async () => {
 		const { renderCrateWebApp } = await loadNotificationsSectionModule();
 		renderCrateWebApp(new FakeElement('div') as never, createPlugin({
+				serverFolder: async (folderPath: string) => ({ folderPath }),
 				createRemindersEnrollmentToken: vi.fn(async () => {
 					throw new Error('Invalid token');
 				}),
@@ -336,6 +337,7 @@ function createPlugin(apiClient: Record<string, unknown>): never {
         ensureNotificationPolicy: vi.fn(async (policy: unknown) => ({ policy })),
         updateNotificationPolicy,
         getWorkerUrl: vi.fn(() => 'https://worker.example.com'),
+				serverFolder: async (folderPath: string) => ({ folderPath }),
 				createRemindersEnrollmentToken: vi.fn(async () => ({
 					token: 'install-token',
 					browserToken: 'browser-token',

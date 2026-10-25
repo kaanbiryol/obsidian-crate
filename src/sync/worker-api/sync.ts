@@ -1,7 +1,8 @@
 import type { ConnectionTestResult } from '../types';
 import type { EncryptedFiles, UploadPreconditions } from '../encryption/encrypted-files';
+import type { WireStore } from '../encryption/path-index';
 import type { JournalUpload } from '../durability/upload-intent';
-import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryption/file-format';
+import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';
 import { base64ToArrayBuffer } from '../encoding';
 import type { RestoreIntent } from '../durability/restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
@@ -18,6 +19,7 @@ import type {
 	BatchUploadFile,
 	BatchUploadResponse,
 	BackendDiagnostics,
+	ChangelogEntry,
 	ChangesResponse,
 	CheckResponse,
 	FileManifest,
@@ -35,6 +37,7 @@ import {
 } from '../../protocol/server-info';
 import { assertPortablePathNames, assertPortablePaths } from '../../protocol/portable-path';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
+import { portablePathKey } from '../../protocol/portable-path';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { FILE_HASH_HEADER, FILE_SIZE_HEADER, EXPECTED_HASH_HEADER, UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, REVISION_HEADER } from '../../protocol/http-headers';
 import {
@@ -57,7 +60,16 @@ export interface DownloadedBatch { files: DownloadedBatchFile[] }
 export class SyncWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
 	private encryption?: EncryptedFiles;
-	setEncryption(encryption: EncryptedFiles): void { this.encryption = encryption; }
+	private wireStore?: WireStore;
+	setEncryption(encryption: EncryptedFiles): void {
+		this.encryption = encryption;
+		if (this.wireStore) encryption.paths.useStore(this.wireStore);
+	}
+	/** The local manifest maps server paths back to synced files, whichever is configured first. */
+	useWireStore(store: WireStore): void {
+		this.wireStore = store;
+		this.encryption?.paths.useStore(store);
+	}
 	prepareUploadWire(file: JournalUpload, preconditions?: UploadPreconditions) { return this.encryption?.prepare(file, preconditions) ?? Promise.resolve(undefined); }
 	async preloadUploadPreconditions(files: Array<{ path: string; expectedHash: string | null }>): Promise<UploadPreconditions | undefined> {
 		return this.encryption?.preloadExpected(files.map(file => ({ path: file.path, expected: file.expectedHash })));
@@ -76,11 +88,32 @@ export class SyncWorkerApi {
 			throw new Error('Encrypted uploads must be prepared in the durable upload journal');
 		}
 	}
+	/** Re-key server paths by plaintext path. Two server files claiming one name keep
+	 * both: the one at the name's own tag keeps it, others get a distinct local name. */
 	private async decryptEntries(files: Record<string, FileEntry>): Promise<Record<string, FileEntry>> {
-		if (!this.encryption) return files;
-		const paths = Object.keys(files);
-		const entries = await this.encryption.metadata(paths.map(path => ({ path, entry: files[path]! })));
-		return Object.fromEntries(paths.map((path, index) => [path, entries[index]!]));
+		const encryption = this.encryption;
+		if (!encryption) return files;
+		const wires = Object.keys(files).sort();
+		const entries = await encryption.metadata(wires.map(path => ({ path, entry: files[path]! })));
+		const tagged = await Promise.all(entries.map(async item => await encryption.paths.tags.wire(item.path).catch(() => null) === item.wire));
+		const plain = createPathRecord<FileEntry>(), claimed = new Set<string>();
+		const order = entries.map((_, index) => index).sort((a, b) => Number(tagged[b]) - Number(tagged[a]));
+		for (const index of order) {
+			const { wire, entry } = entries[index]!;
+			let { path } = entries[index]!;
+			if (claimed.has(portablePathKey(path))) {
+				const name = path.lastIndexOf('/') + 1, dot = path.lastIndexOf('.') > name ? path.lastIndexOf('.') : path.length;
+				path = `${path.slice(0, dot)} - ${wire.slice(wire.lastIndexOf('/') + 1, wire.lastIndexOf('/') + 9)}${path.slice(dot)}`;
+				await encryption.paths.learn(path, wire);
+			}
+			claimed.add(portablePathKey(path));
+			plain[path] = tagged[index] && path === entries[index]!.path ? entry : { ...entry, wire };
+		}
+		return plain;
+	}
+
+	private async wireFor(path: string): Promise<string> {
+		return this.encryption ? this.encryption.paths.wireFor(path) : path;
 	}
 
 	async health(): Promise<HealthResponse> {
@@ -165,10 +198,11 @@ export class SyncWorkerApi {
 	}
 
 	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
-		const uniquePaths = [...new Set(paths)];
+		const requested = [...new Set(paths)];
 		// Requested paths may include an old file and its replacement directory;
 		// only returned live state must be a representable namespace.
-		assertPortablePathNames(uniquePaths);
+		assertPortablePathNames(requested);
+		const uniquePaths = [...new Set(await Promise.all(requested.map(path => this.wireFor(path))))];
 		const files = createPathRecord<FileEntry>();
 
 		for (let index = 0; index < uniquePaths.length; index += BATCH_DOWNLOAD_MAX_FILES) {
@@ -183,7 +217,7 @@ export class SyncWorkerApi {
 				if (!(error instanceof HttpError) || error.status !== 404) throw error;
 				const manifest = await this.getManifest();
 				const fallbackFiles = createPathRecord<FileEntry>();
-				for (const path of uniquePaths) {
+				for (const path of requested) {
 					const entry = getPathEntry(manifest.files, path);
 					if (entry) fallbackFiles[path] = entry;
 				}
@@ -226,7 +260,8 @@ export class SyncWorkerApi {
 	}
 
 	async downloadFile(path: string): Promise<DownloadedFile> {
-		const encodedPath = encodeURIComponent(path);
+		const wire = await this.wireFor(path);
+		const encodedPath = encodeURIComponent(wire);
 		const { body, headers } = await this.http.requestBinary(`/sync/download?path=${encodedPath}`, {}, TRANSFER_TIMEOUT_MS);
 		const contentLengthHeader = getHeader(headers, 'Content-Length');
 		const contentLength = contentLengthHeader && /^\d+$/.test(contentLengthHeader)
@@ -240,40 +275,18 @@ export class SyncWorkerApi {
 			revision: getHeader(headers, REVISION_HEADER) || undefined,
 		};
 		if (!this.encryption) return result;
-		const opened = await this.encryption.download(path, body, result);
+		const opened = await this.encryption.download(wire, body, result, path);
 		return { ...result, content: opened.content, ...opened.metadata, verified: true };
 	}
 
 	async deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }> {
 		if (!expectedRevision) throw new HttpError('Missing remote revision; reconcile before deleting', 409, null, 'version_conflict');
 		if (this.encryption) expectedHash = (await this.encryption.expectedHash(path, expectedHash, expectedRevision))!;
-		return this.http.requestJson<{ success: boolean; path: string }>('/sync/delete', {
+		const result = await this.http.requestJson<{ success: boolean; path: string }>('/sync/delete', {
 			method: 'POST',
-			body: JSON.stringify({ path, expectedHash, expectedRevision }),
+			body: JSON.stringify({ path: await this.wireFor(path), expectedHash, expectedRevision }),
 		});
-	}
-	requiresConvertedReceipt(file: JournalUpload): boolean { return !!this.encryption && file.encryptedWire?.generation !== this.encryption.generation; }
-	async resolveConvertedUpload(file: JournalUpload): Promise<UploadResult | null> {
-		if (!this.encryption || file.encryptedWire?.generation === this.encryption.generation) return null;
-		const wire = file.encryptedWire;
-		if (!wire) return this.encryption.resolveConvertedOperation(file.operationId,
-			{ path: file.path, hash: file.hash, size: file.size, contentType: file.contentType, expectedHash: file.expectedHash });
-		if (wire.generation > this.encryption.generation) throw new Error('Unlock the original vault keys before resuming this upload');
-		const descriptor = parseEncryptedFile(new Uint8Array(base64ToArrayBuffer(wire.content))).descriptor;
-		if (descriptor.vaultId !== this.encryption.keys.vaultId) throw new Error('Unlock the original vault keys before resuming this upload');
-		// A generation fence proves that an older in-flight write can no longer
-		// commit. Recover its exact receipt, or reconcile without replaying it.
-		return this.encryption.resolveConvertedOperation(file.operationId,
-			{ path: file.path, hash: wire.hash, size: wire.size, contentType: wire.contentType, expectedHash: wire.expectedHash });
-	}
-	async resolveConvertedRestore(intent: RestoreIntent): Promise<UploadResult | null> {
-		if (!this.encryption || intent.encryptedWire?.generation === this.encryption.generation) return null;
-		if (intent.encryptedWire && (intent.encryptedWire.vaultId !== this.encryption.keys.vaultId || intent.encryptedWire.generation > this.encryption.generation)) throw new Error('Unlock the original vault keys before resuming this restore');
-		const request = intent.request;
-		const result = await this.encryption.resolveConvertedOperation(request.operationId, { kind: 'restore', path: request.path,
-			storageKey: request.storageKey, expectedHash: intent.encryptedWire ? intent.encryptedWire.expectedHash : request.expectedHash, expectedRevision: request.expectedRevision });
-		if (!result.success) throw new HttpError(result.error ?? 'Restore precondition changed', result.status ?? 409, null, result.code);
-		return result;
+		return { ...result, path };
 	}
 
 	async checkForChanges(since: number): Promise<CheckResponse> {
@@ -286,7 +299,14 @@ export class SyncWorkerApi {
 		const puts = response.changes.filter(change => change.action === 'put');
 		const opened = await this.encryption.metadata(puts.map(entry => ({ path: entry.path, entry })));
 		let index = 0;
-		return { ...response, changes: response.changes.map(change => change.action === 'put' ? opened[index++]! : change) };
+		const changes: ChangelogEntry[] = [];
+		for (const change of response.changes) {
+			if (change.action === 'put') { const { path, entry } = opened[index++]!; changes.push({ ...entry, path }); continue; }
+			// A deleted server path this device never synced has no local file to remove.
+			const path = await this.encryption.paths.plainFor(change.path);
+			if (path) changes.push({ ...change, path });
+		}
+		return { ...response, changes };
 	}
 
 	private async getRawChanges(since: number): Promise<ChangesResponse> {
@@ -335,9 +355,11 @@ export class SyncWorkerApi {
 
 	async batchDownload(paths: string[]): Promise<DownloadedBatch> {
 		let response: BatchDownloadResponse;
+		const wires = await Promise.all(paths.map(path => this.wireFor(path)));
+		const plainByWire = new Map(wires.map((wire, index) => [wire, paths[index]!]));
 		try { response = await this.http.requestJson<BatchDownloadResponse>('/sync/batch-download', {
 			method: 'POST',
-			body: JSON.stringify({ paths }),
+			body: JSON.stringify({ paths: wires }),
 		}, TRANSFER_TIMEOUT_MS); }
 		catch (error) {
 			if (!this.encryption || !(error instanceof HttpError) || error.status !== 413) throw error;
@@ -356,9 +378,10 @@ export class SyncWorkerApi {
 			while (next < response.files.length) {
 				const index = next++;
 				const { content, ...file } = response.files[index]!;
-				if (file.error) { files[index] = { ...file, content }; continue; }
-				const opened = await encryption.download(file.path, base64ToArrayBuffer(content), file);
-				files[index] = { ...file, ...opened.metadata, verifiedContent: opened.content };
+				const path = plainByWire.get(file.path) ?? file.path;
+				if (file.error) { files[index] = { ...file, path, content }; continue; }
+				const opened = await encryption.download(file.path, base64ToArrayBuffer(content), file, path);
+				files[index] = { ...file, ...opened.metadata, path, verifiedContent: opened.content };
 			}
 		};
 		await Promise.all(Array.from({ length: Math.min(DECRYPT_CONCURRENCY, response.files.length) }, worker));
@@ -379,20 +402,24 @@ export class SyncWorkerApi {
 			if (!expectedRevision) throw new HttpError('Missing remote revision; reconcile before deleting', 409, null, 'version_conflict');
 			return { path, expectedHash, expectedRevision };
 		});
-		if (this.encryption) {
-			const hashes = await this.encryption.expectedHashes(files.map(file => ({ path: file.path, expected: file.expectedHash, revision: file.expectedRevision })));
-			files.forEach((file, index) => { file.expectedHash = hashes[index]!; });
-		}
-		return this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
+		if (!this.encryption) return this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files }) });
+		const hashes = await this.encryption.expectedHashes(files.map(file => ({ path: file.path, expected: file.expectedHash, revision: file.expectedRevision })));
+		const wires = await Promise.all(files.map(file => this.wireFor(file.path)));
+		const plain = (wire: string) => paths[wires.indexOf(wire)] ?? wire;
+		const response = await this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
 			method: 'POST',
-			body: JSON.stringify({ files }),
+			body: JSON.stringify({ files: files.map((file, index) => ({ ...file, path: wires[index]!, expectedHash: hashes[index]! })) }),
 		});
+		return { ...response, deleted: response.deleted.map(plain),
+			...(response.results ? { results: response.results.map(result => ({ ...result, path: plain(result.path) })) } : {}),
+			...(response.errors ? { errors: response.errors.map(error => ({ ...error, path: plain(error.path) })) } : {}) };
 	}
 
 	async previewFileVersion(version: RemoteFileVersion): Promise<ArrayBuffer> {
-		const params = new URLSearchParams({ path: version.path, storageKey: version.storage_key });
+		const wire = version.wire ?? await this.wireFor(version.path);
+		const params = new URLSearchParams({ path: wire, storageKey: version.storage_key });
 		let { body } = await this.http.requestBinary(`/sync/version-preview?${params}`, {}, TRANSFER_TIMEOUT_MS);
-		if (this.encryption) body = (await this.encryption.download(version.path, body)).content;
+		if (this.encryption) body = (await this.encryption.download(wire, body, undefined, version.path, false)).content;
 		if (body.byteLength > MAX_PREVIEW_BYTES || body.byteLength !== version.size || await sha256Hex(body) !== version.hash) {
 			throw new Error('Saved version failed integrity validation.');
 		}
@@ -401,13 +428,15 @@ export class SyncWorkerApi {
 
 	async listFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
 		const params = new URLSearchParams();
-		if (query.path) params.set('path', query.path);
-		if (query.search) params.set('search', query.search);
+		if (query.path) params.set('path', await this.wireFor(query.path));
+		// Encrypted names cannot be searched on the server.
+		if (query.search && !this.encryption) params.set('search', query.search);
 		if (query.cursor) params.set('cursor', query.cursor);
 		const result = parseFileVersions(await this.http.requestJson<unknown>(`/sync/versions?${params.toString()}`));
 		if (!this.encryption) return result;
-		return { ...result, versions: await this.encryption.metadata(result.versions.map(version => ({ path: version.path,
-			entry: { ...version, revision: version.storage_key } }))) };
+		const versions = await this.encryption.metadata(result.versions.map(version => ({ path: version.path,
+			entry: { ...version, revision: version.storage_key } })), false);
+		return { ...result, versions: versions.map(({ path, wire, entry: { revision: _revision, ...version } }) => ({ ...version, path, wire })) };
 	}
 
 	async restoreFileVersion(request: RestoreFileRequest): Promise<UploadResult> {

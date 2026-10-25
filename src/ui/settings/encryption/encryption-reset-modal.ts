@@ -5,6 +5,7 @@ import type { EncryptionServerState } from '../../../encryption/server-state';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
 import { errorMessage } from '../../../sync/logger';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
+import { loadEncryptionReset, type EncryptionReset } from '../../../sync/encryption/reset';
 
 export class EncryptionResetModal extends SharedModal {
 	private running = false;
@@ -16,6 +17,9 @@ export class EncryptionResetModal extends SharedModal {
 	}
 	onOpen(): void {
 		const resuming = !!this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET);
+		let saved: EncryptionReset | null = null;
+		try { saved = loadEncryptionReset(this.plugin.secretStorage); } catch { /* Resuming reports the invalid checkpoint. */ }
+		if (saved?.target === 'encrypted') { this.resumeSetup(); return; }
 		this.openLayout(resuming ? 'Resume encryption reset' : 'Reset sync and turn off encryption');
 		this.bodyEl.createEl('p', { text: 'Crate will delete all synced server files, retained history, checkpoints and saved sync state. Files that exist only on the server will be lost. This cannot be undone.' });
 		this.bodyEl.createEl('p', { text: 'Files in this device’s local Obsidian vault stay on this device and will be uploaded again using your current sync exclusions. The server will be able to read their contents. Sync and notifications pause during the reset.' });
@@ -40,11 +44,30 @@ export class EncryptionResetModal extends SharedModal {
 					await this.plugin.syncRuntime.turnOffEncryption(this.state, message => status.setText(message), this.expected, getPluginLifecycleSignal(this.plugin));
 					new Notice('Encryption is off. Reconnect your other Obsidian devices and web apps.');
 					this.close();
-				} catch (error) {
-					status.setText(errorMessage(error) + (this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)
-						? ' Reopen Manage encryption to resume. Keep this device’s local vault and saved reset data.' : ''));
-				} finally { this.running = false; this.onChanged(); }
+				} catch (error) { this.failed(status, error); }
+				finally { this.running = false; this.onChanged(); }
 			});
 		});
+	}
+	/** An interrupted setup finishes uploading this device's vault, encrypted. */
+	private resumeSetup(): void {
+		this.openLayout('Resume turning on encryption');
+		this.bodyEl.createEl('p', { text: 'Crate is replacing the server copy with this device’s vault, encrypted. Resume to finish. Sync and notifications stay paused until it completes.' });
+		const status = this.bodyEl.createEl('p', { attr: { role: 'status', 'aria-live': 'polite' } });
+		createModalActions(createModalFooter(this.contentEl)).addButton(button => button.setButtonText('Resume').setCta().onClick(async () => {
+			if (this.running) return;
+			this.running = true; button.setDisabled(true);
+			try {
+				// The saved checkpoint and keys decide what resumes; the request is unused.
+				await this.plugin.syncRuntime.turnOffEncryption(null, message => status.setText(message), this.expected, getPluginLifecycleSignal(this.plugin));
+				new Notice('Encryption is on. Reconnect your other Obsidian devices and web apps.');
+				this.close();
+			} catch (error) { this.failed(status, error); }
+			finally { this.running = false; button.setDisabled(false); this.onChanged(); }
+		}));
+	}
+	private failed(status: HTMLElement, error: unknown): void {
+		status.setText(errorMessage(error) + (this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)
+			? ' Reopen Manage encryption to resume. Keep this device’s local vault and saved reset data.' : ''));
 	}
 }

@@ -7,9 +7,8 @@ import worker from '../index';
 import { fetchWorkerRequest } from '../request-handler';
 import { readEncryptionState } from './state';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
-import { createVaultKeyBundle, generateRecoveryCode } from '../../../encryption/key-bundle';
-import { convertEncryptedVault } from '../../../sync/encryption/conversion';
-import { WorkerApiHttpClient, type ApiHttpTransport } from '../../../sync/worker-api/http';
+import { createEncryptionFixture } from '../test-support/encryption-test-harness';
+import type { EncryptionServerState } from '../../../encryption/server-state';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { sha256Hex } from '../../../platform/sha256';
@@ -42,34 +41,34 @@ function upload(kind: UploadKind, token: string) {
 	return { paths, body, url, init, request: new Request(url, { ...init, body }) };
 }
 
-const transport: ApiHttpTransport = async input => {
-	const response = await worker.fetch(new Request(input.url, { method: input.method, body: input.body, headers: input.headers }), env);
-	const arrayBuffer = await response.arrayBuffer(), responseHeaders: Record<string, string> = {};
-	response.headers.forEach((value, key) => { responseHeaders[key] = value; });
-	return { status: response.status, headers: responseHeaders, arrayBuffer, text: new TextDecoder().decode(arrayBuffer) };
-};
-
-async function enableAndReset(token: string, cycle: number) {
-	await convertEncryptedVault(new WorkerApiHttpClient('https://test', token, transport), await createVaultKeyBundle(), await generateRecoveryCode(), () => {}, []);
-	const state = (await readEncryptionState(env.DB))!;
-	expect(state.mode).toBe('active');
-	const id = `reset-cycle-${cycle}`, replacement = String(cycle).repeat(64);
-	const call = (credential: string) => worker.fetch(new Request(`https://test/encryption/reset?id=${id}`, {
-		method: 'POST', body: JSON.stringify({ confirmation: 'delete-remote-data', replacementToken: replacement }),
-		headers: { ...headers(credential), 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) },
+/** Begin one destructive reset with `credential` and advance it until complete. */
+async function runReset(id: string, credential: string, replacement: string, state: EncryptionServerState, body: Record<string, unknown> = {}) {
+	const call = (token: string, payload: unknown) => worker.fetch(new Request(`https://test/encryption/reset?id=${id}`, {
+		method: 'POST', body: JSON.stringify(payload),
+		headers: { ...headers(token), 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) },
 	}), env);
-	expect((await call(token)).status).toBe(200);
+	const started = await call(credential, { confirmation: 'delete-remote-data', replacementToken: replacement, ...body });
+	expect(started.status, await started.clone().text()).toBe(200);
 	let complete = false;
 	for (let pass = 0; pass < 30 && !complete; pass++) {
-		const response = await call(replacement);
+		const response = await call(replacement, {});
 		expect(response.status, await response.clone().text()).toBe(200);
 		complete = (await response.json() as { complete: boolean }).complete;
 	}
 	expect(complete).toBe(true);
+}
+
+async function enableAndReset(token: string, cycle: number) {
+	const { state } = await createEncryptionFixture('active');
+	const enabled = String(cycle).repeat(64), disabled = String(cycle + 2).repeat(64);
+	await runReset(`enable-cycle-${cycle}`, token, enabled, state, { encryption: state });
+	expect(await readEncryptionState(env.DB)).toEqual(state);
+	const id = `reset-cycle-${cycle}`;
+	await runReset(id, enabled, disabled, state);
 	expect(await readEncryptionState(env.DB)).toBeNull();
 	expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(SYNC_RESET_GENERATION_KEY).first()).toEqual({ value: id });
-	expect((await worker.fetch(new Request('https://test/health', { headers: headers(token) }), env)).status).toBe(401);
-	return replacement;
+	for (const credential of [token, enabled]) expect((await worker.fetch(new Request('https://test/health', { headers: headers(credential) }), env)).status).toBe(401);
+	return disabled;
 }
 
 async function expectFreshUpload(kind: UploadKind, token: string) {

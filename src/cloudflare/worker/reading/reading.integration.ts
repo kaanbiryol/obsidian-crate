@@ -107,6 +107,29 @@ it('publishes extracted text through immutable file versions and ordinary sync c
   expect((await env.DB.prepare('SELECT count(*) AS n FROM changelog WHERE path=?').bind(job.path).first())?.n).toBe(2);
   expect((await env.DB.prepare('SELECT count(*) AS n FROM file_versions').first())?.n).toBe(1);
 });
+it('renames a note still named after its link once extraction finds the title, and keeps user renames', async () => {
+  const itemId = 'a1b2c3d4-5678-4abc-9def-123456789abc';
+  const note = createReadingNote({ id: itemId, url: 'https://www.example.com/article', savedAt: new Date().toISOString() });
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/example.com - a1b2c3d4.md', note, null);
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/An article - example.com - a1b2c3d4.md', 'Occupied', null);
+  await projectReading(env, (await policy(env.DB))!);
+  const job = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
+  await publishExtraction(env, { job, result: { markdown: 'Useful saved article text.', title: 'An article', author: undefined } });
+  const renamed = 'Reading/An article - example.com - a1b2c3d45678.md';
+  expect(await getStoredFileRow(env.DB, job.path)).toBeNull();
+  expect(parseReadingNote((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, renamed))!.content)).toMatchObject({ title: 'An article', extraction_status: 'ready' });
+  expect((await env.DB.prepare('SELECT path, action FROM changelog ORDER BY seq DESC LIMIT 2').all()).results).toEqual([
+    { path: job.path, action: 'delete' }, { path: renamed, action: 'put' }]);
+  expect(await env.DB.prepare('SELECT 1 FROM file_deletion_receipts WHERE path=?').bind(job.path).first()).not.toBeNull();
+  expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
+  // A name the user chose is never replaced.
+  const other = createReadingNote({ id: crypto.randomUUID(), url: 'https://example.com/kept', savedAt: new Date().toISOString() });
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/My pick.md', other, null);
+  await projectReading(env, (await policy(env.DB))!);
+  const kept = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
+  await publishExtraction(env, { job: kept, result: { markdown: 'Text.', title: 'Another title', author: undefined } });
+  expect(parseReadingNote((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/My pick.md'))!.content)?.title).toBe('Another title');
+});
 it('cannot resurrect a deleted source or overwrite text changed during extraction', async () => {
   const job = await capture(), source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))!;
   const changed = source.content + '\nMy personal note.\n';

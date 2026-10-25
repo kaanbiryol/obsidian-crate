@@ -8,7 +8,6 @@ import { isRefusedWrite } from '../failures';
 import type { RestoreIntent } from './restore-intent';
 
 interface RestoreTransport {
-	resolveConvertedRestore?(intent: RestoreIntent): Promise<UploadResult | null>;
 	prepareRestoreWire?(intent: RestoreIntent): Promise<RestoreIntent['encryptedWire']>;
 	assertPreparedRestore?(intent: RestoreIntent): void;
 	getServerInfo(): Promise<CrateServerInfo>;
@@ -46,11 +45,11 @@ export class DurableRestores {
 		// Also retry failed checkpoint writes before dispatching an existing intent.
 		await this.manifest.save();
 		try {
-			const converted = await this.transport.resolveConvertedRestore?.(intent);
-			if (!converted) this.transport.assertPreparedRestore?.(intent);
-			const result = converted ?? await this.transport.restoreFileVersion(intent.encryptedWire
-				? { ...intent.request, expectedHash: intent.encryptedWire.expectedHash } : intent.request);
-			if (!result.success || result.path !== intent.request.path || result.hash !== (intent.encryptedWire?.restoredHash ?? intent.version.hash) || !result.revision) {
+			this.transport.assertPreparedRestore?.(intent);
+			const request = intent.encryptedWire
+				? { ...intent.request, path: intent.encryptedWire.path, expectedHash: intent.encryptedWire.expectedHash } : intent.request;
+			const result = await this.transport.restoreFileVersion(request);
+			if (!result.success || result.path !== request.path || result.hash !== (intent.encryptedWire?.restoredHash ?? intent.version.hash) || !result.revision) {
 				throw new Error('Invalid restore receipt. The original restore is preserved; retry after checking the server.');
 			}
 		} catch (error) {

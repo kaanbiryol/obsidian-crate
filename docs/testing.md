@@ -91,7 +91,7 @@ checks against the built PWA.
 `useReminderEditorActions.test.ts` covers delayed saves, duplicate submissions,
 failed persistence and logout; `useReminderMutations.test.ts` exercises those actions
 with the command hook. `runtime/encryption-setup.test.ts` verifies shutdown before
-queued setup, during draining and during conversion. Server-status tests exercise
+queued setup, during draining and while setup work is pending. Server-status tests exercise
 cache identity, expiry, throttling and cancellation through the public runtime API.
 
 Release runs resolve the tag to one commit before starting verification. Every job checks out that commit. A separate clean-install rebuild starts after the source artifacts are ready and must reproduce their plugin, CSS, Worker/PWA and source metadata hashes. Draft asset attachment waits for all required verification jobs and that rebuild. Source artifacts alone cannot authorize a release, and the original push run is rechecked before reused assets are attached.
@@ -697,7 +697,7 @@ cancellation still need an installed iPhone check. `pushed-screen-history.test.t
 covers preserving an underlying feature, repeated visits and quick reopening.
 Installation checks cover iPhone/Android instructions, narrow light/dark layouts,
 Back/Forward, focus/scroll restoration, and hiding the entry after installation.
-`EncryptionSettings.test.ts` covers unknown, disconnected, mixed, locked/converting,
+`EncryptionSettings.test.ts` covers unknown, disconnected, mixed, locked/setting-up,
 and unlocked states without hiding problems behind the details disclosure.
 Theme checks cover one document update with both features mounted, system-theme
 changes, explicit overrides, settings close/reopen, feature switching, and native
@@ -1013,11 +1013,11 @@ insets still require host/device acceptance.
 
 ## Encryption acceptance
 
-`encryption/setup.integration.ts` exercises both empty and populated remotes through the production conversion client and local Worker bindings. It checks that setup leaves local files unsent, first sync uploads ciphertext, existing history survives conversion, pending edits wait for encrypted sync, and file counts advance only after verified acknowledgments. A lost response resumes with the remaining count. The setup browser harness covers the dedicated progress, retry and completion screens without server requests.
+Turning encryption on runs through the production runtime and local Worker bindings in `encryption/reset-runtime.integration.ts`. It checks that the device syncs first so a server-only change survives, that the server then holds only this device's files under tagged names, sealed with the new keys, with no retained plaintext history or other credentials, and that ordinary encrypted sync continues afterwards. Setup interrupted before the begin request, after a lost begin response or after a failed settings save resumes with the keys saved for it; a refused start leaves the plaintext server and credential untouched. `encryption/reset.integration.ts` checks the server side: the wipe and activation, rejected configurations, refusal while saved links are downloading or an initial import is running, and refusal of a new configuration for an encrypted vault. The setup browser harness covers the dedicated progress, retry and completion screens without server requests.
 
-Folder changes need no encryption conversion. `encryption/sync-engine.integration.ts` syncs a renamed reminders folder through ordinary encrypted sync and republishes unchanged notes so a newly chosen reminders folder gets its schedules, and `encryption/source-rebuild.integration.ts` checks that a reminders note uploaded without schedules is reported as an issue instead of losing its reminders silently.
+Folder changes need no re-encryption. `encryption/sync-engine.integration.ts` also covers tagged server paths: a remote delete on a restarted device, a new file that differs only in letter case from a synced one, and a shortcut note that keeps its random server name through edits and is deleted after a restart. It syncs a renamed reminders folder through ordinary encrypted sync and republishes unchanged notes so a newly chosen reminders folder gets its schedules, and `encryption/source-rebuild.integration.ts` checks that a reminders note uploaded without schedules is reported as an issue instead of losing its reminders silently.
 
-`node tests/browser/pwa/pwa-encryption-storage-test.mjs` exercises native Chromium/WebKit CryptoKey storage with the production session hook and a delayed cache-cleanup boundary. It covers cross-tab re-enrollment during logout, preservation of new drafts and immutable attempts after reload, rollback when authority changes during deletion, normal logout erasure, repair of partially damaged keys, and preservation of unsupported or unrecoverable records. The full encryption browser test also exercises damaged-key recovery through the unlock UI and conversion with absent or populated shared settings, including the first encrypted settings write.
+`node tests/browser/pwa/pwa-encryption-storage-test.mjs` exercises native Chromium/WebKit CryptoKey storage with the production session hook and a delayed cache-cleanup boundary. It covers cross-tab re-enrollment during logout, preservation of new drafts and immutable attempts after reload, rollback when authority changes during deletion, normal logout erasure, repair of partially damaged keys, and preservation of unsupported or unrecoverable records. The full encryption browser test also exercises damaged-key recovery through the unlock UI and turning encryption on over plaintext shared settings, including the first encrypted settings write.
 
 The storage test also runs the production push listener and decryption bundle in a
 real service worker, reading keys persisted by the page. It simulates both Safari's
@@ -1026,17 +1026,17 @@ checks decrypted text and navigation, and verifies generic fallback after key
 removal or payload substitution. Push transport and native notification display
 are simulated; background delivery and lock-screen previews still require an iPhone.
 
-The storage harness also queues real database opens behind blocked native deletions: bootstrap, key enrollment, attempt access and logout cleanup must reject promptly, push decryption must fall back, failed operations must preserve bytes, and abandoned opens must not create stores or write after unblocking. It checks successful retry and future-format preservation in both engines. Unit tests run the production service-worker push handler through the generic-notification deadline and fence late open/upgrade events. Worker `encryption/settings.integration.ts` converts and updates settings at the former failure size and the full plaintext request limit, preserves committed settings after oversized writes, and verifies that preflight rejects unsupported stored settings before freezing sync. The full encryption browser test uses a 2,000-entry exclusion list for conversion and encrypted writes.
+The storage harness also queues real database opens behind blocked native deletions: bootstrap, key enrollment, attempt access and logout cleanup must reject promptly, push decryption must fall back, failed operations must preserve bytes, and abandoned opens must not create stores or write after unblocking. It checks successful retry and future-format preservation in both engines. Unit tests run the production service-worker push handler through the generic-notification deadline and fence late open/upgrade events. Worker `encryption/settings.integration.ts` stores and updates encrypted settings at the former failure size and the full plaintext request limit, and preserves committed settings after oversized writes. The full encryption browser test uses a 2,000-entry exclusion list for encrypted settings writes.
 
-`node tests/browser/pwa/pwa-encryption-test.mjs` exercises both Chromium and WebKit against a disposable production self-hosted runtime. It covers active/locked/converting encryption status and native IndexedDB cleanup, including expired acknowledgments, pending references from older sessions, drafts, damaged/unknown entries, other vaults' entries, and stale-session fences. It belongs to `test:pwa-browser`. Recovery-verification and settings tests check that conversion is gated on decrypting the saved key and that editing the input or changing the connection invalidates verification. Worker `maintenance/encryption-metadata.integration.ts` checks bounded descriptor cleanup and references from files, history, receipts, changelog and upload leases. Run the encryption unit tests, Worker `encryption.integration.ts`, the full sync/notification regressions, and paired backup tests before enabling encryption in a release. Physical iOS/Android background push, browser storage eviction, hosted Worker limits and an independent security review remain separate acceptance checks; see [encryption](e2ee-implementation.md).
+`node tests/browser/pwa/pwa-encryption-test.mjs` exercises both Chromium and WebKit against a disposable production self-hosted runtime. It covers active, locked and resetting encryption status and native IndexedDB cleanup, including expired acknowledgments, pending references from older sessions, drafts, damaged/unknown entries, other vaults' entries, and stale-session fences. It belongs to `test:pwa-browser`. Recovery-verification and settings tests check that setup is gated on decrypting the saved key and that editing the input or changing the connection invalidates verification. Worker `maintenance/encryption-metadata.integration.ts` checks bounded descriptor cleanup and references from files, history, receipts, changelog and upload leases. Run the encryption unit tests, Worker `encryption.integration.ts`, the full sync/notification regressions, and paired backup tests before enabling encryption in a release. Physical iOS/Android background push, browser storage eviction, hosted Worker limits and an independent security review remain separate acceptance checks; see [encryption](e2ee-implementation.md).
 
-`CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-encryption-regressions-test.mjs` checks long reminder completion, large pre-encryption receipt conversion, plaintext that resembles ciphertext, and interrupted conversion/save retries against the production local server in Chromium and WebKit. Run `npm run build:worker` first, or omit `CRATE_PWA_PREBUILT` to build automatically.
+`CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-encryption-regressions-test.mjs` checks long reminder completion, a large reminder acknowledgment stored in bounded chunks, plaintext that resembles ciphertext, setup resumed after a lost reply, tagged server paths, and interrupted save retries against the production local server in Chromium and WebKit. Run `npm run build:worker` first, or omit `CRATE_PWA_PREBUILT` to build automatically.
 
 Worker `encryption/source-rebuild.integration.ts` covers atomic chunked scheduling for 2,000 reminders with rollback and stable command tokens, and coordinator query budgets while rebuilding dense encrypted sources.
 
-Worker `encryption/sync-engine.integration.ts` runs the production sync engines against D1/R2/DO bindings with persistent mock vaults: three-device offline merges, deletion and rename races, upload-response loss across restart, binary conflict preservation, and a 25 MiB attachment round trip. `encryption.integration.ts` also bounds cleanup queries across full conversion pages while preserving live files and retained history.
+Worker `encryption/sync-engine.integration.ts` runs the production sync engines against D1/R2/DO bindings with persistent mock vaults: three-device offline merges, deletion and rename races, upload-response loss across restart, binary conflict preservation, and a 25 MiB attachment round trip. `encryption.integration.ts` checks atomic publication of ciphertext, descriptors and encrypted schedules, rejects plaintext publication prepared before encryption began, and fences old and scoped clients.
 
-`encryption/upload-validation.integration.ts` exercises authenticated single and batch uploads against real D1/R2/DO bindings. It rejects plaintext, mixed batches and malformed encrypted framing before any staging lease or R2 write, verifies the content guard with an explicit encryption snapshot, and checks valid ciphertext receipt replay. Reset/upload regressions cover both the public transfer boundary and delayed publication inside the transfer executor.
+`encryption/upload-validation.integration.ts` exercises authenticated single and batch uploads against real D1/R2/DO bindings. It rejects plaintext, mixed batches and malformed encrypted framing before any staging lease or R2 write, verifies the content guard with an explicit encryption snapshot, rejects valid ciphertext at a readable path, and checks valid ciphertext receipt replay. Reset/upload regressions cover both the public transfer boundary and delayed publication inside the transfer executor.
 
 `upload-publication.integration.ts` rejects Markdown publication at the coordinator
 for single, batch and bulk-new uploads. It checks that bytes remain staged without
@@ -1051,20 +1051,21 @@ header/footer positions, including reduced motion and touch-sized screens. It
 also checks full recovery-key visibility, a compact field with Copy above it,
 centered checkbox alignment, native settings-row spacing, keyboard acknowledgment, disabling the
 action when unchecked, the visible footer, expanded details, clipboard success and
-fallback, conversion progress, retry and connection changes without
+fallback, setup progress, retry and connection changes without
 contacting a server. Set `CRATE_OBSIDIAN_CSS_PATH` to an extracted installed
 Obsidian `app.css` to repeat the checks with the actual host stylesheet; it is
 used only locally and is not committed. The synthetic host also includes the
 modal settings-row selector that previously overrode the key field’s spacing.
 Physical Obsidian mobile and keyboard behavior still need
 manual verification. Unit tests in `src/ui/settings/encryption/encryption-section.test.ts`
-cover automatic key-verification failure before setup and recovery of missing,
-damaged or incorrect local keys before resuming conversion. The optional saved-key
+cover automatic key-verification failure before setup, retrying an interrupted
+setup with the same keys, and resuming a saved setup from the settings row. The optional saved-key
 check retains wrong-key, edit and stale-result coverage.
 
 ### Reading encryption acceptance
 
-- `reading/encryption.integration.ts` covers ciphertext-only capture/edit/replay, blocked plaintext paths, queued captures and converted receipts.
+- `reading/encryption.integration.ts` covers ciphertext-only capture/edit/replay, blocked plaintext paths, captures named after their title and site, and renaming a link-named note when a retry finds its title.
+- `reading/sealed-captures.integration.ts` checks that a Shortcut note is sealed under a random server name in the tagged Reading folder, that the vault opens it under its titled name, and that the server cannot read it.
 - `encryption/reset.integration.ts` seeds all seven Reading tables and checks immediate/final deletion and old-grant rejection.
 - `tests/browser/pwa/pwa-reading-encryption-test.mjs` runs the production PWA against disposable local bindings. Chromium covers offline edits/reload and exact ciphertext retry after response loss. Both browser engines cover enrollment, article access, logout key removal and a Shortcut arriving before folder unlock. It also checks that the production nonce-based CSP blocks injected inline and same-origin scripts while the app and deferred Reading code load, and that hostile encrypted article content remains inert after opening (and offline reopening in Chromium). Use `CRATE_TEST_BROWSER=webkit` for WebKit.
 - `node tests/browser/reading/reading-content-security-test.mjs` mounts the production reader and reminder card in Chromium/WebKit document and Shadow DOM hosts with CSP disabled. It covers hostile HTML, malformed mixed namespaces, event handlers, active URLs, DOM clobbering, code-highlighter output and resource requests, while preserving benign Markdown and code. It runs in `test:pwa-browser`. This is regression coverage, not a substitute for an independent security review.
@@ -1099,7 +1100,7 @@ keys, reload and 320px light/dark layouts. It runs in `test:pwa-browser`.
 
 Worker `encryption/pairing.integration.ts` checks the actual authenticated relay
 with local D1, including vault/generation checks, concurrent claims, replay,
-cancellation, expiry, revocation, conversion/reset fences and attempt limits.
+cancellation, expiry, revocation, generation/reset fences and attempt limits.
 `encryption/pairing/protocol.test.ts`, `plugin/web-app-pairing.test.ts`, and
 `pwa/encryption/web-app-unlock.test.ts` cover cryptographic binding, vault/session guards,
 whole-bundle transfer and storage validation. These tests write no hosted D1 rows.

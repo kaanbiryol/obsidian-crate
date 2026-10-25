@@ -39,7 +39,10 @@ import { LinksWorkerApi } from './links';
 import { EncryptedFiles } from '../encryption/encrypted-files';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { createReminderProjection, importNotificationKeys } from '../../encryption/reminder-projection';
-import { readServerEncryption } from '../encryption/conversion';
+import { readServerEncryption } from '../encryption/server-encryption';
+import { importEncryptionSecret, type EncryptionKey } from '../../encryption/envelope';
+import type { PathTags } from '../../encryption/path-tags';
+import { openFolderLabel, sealFolderLabel } from '../../encryption/folder-label';
 
 export { HttpError, SyncTransportError } from './http';
 
@@ -55,9 +58,32 @@ export class SyncApiClient {
 		this.sharedSettingsApi.setEncryption(encryption);
 		this.http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
 		this.linksApi.setEncryption(encryption);
+		this.folderKeys = { tags: encryption.paths.tags, key: await importEncryptionSecret(bundle.vault), vaultId: bundle.vaultId };
 	}
+	private folderKeys?: { tags: PathTags; key: EncryptionKey; vaultId: string };
+
+	/** A feature folder as the server stores it: in an encrypted vault, its tag and sealed name. */
+	async serverFolder(path: string): Promise<{ folderPath: string; folderLabel?: string }> {
+		if (!this.folderKeys) return { folderPath: path };
+		const { wire, label } = await sealFolderLabel(path, this.folderKeys.tags, this.folderKeys.key, this.folderKeys.vaultId);
+		return { folderPath: wire, folderLabel: label };
+	}
+
+	/** The plaintext folder a server policy names. */
+	async localFolder(folderPath: string, folderLabel: string | undefined): Promise<string> {
+		if (!this.folderKeys) return folderPath;
+		if (!folderLabel) throw new Error('The server did not return this folder\'s encrypted name. Update the Crate server.');
+		return openFolderLabel(folderPath, folderLabel, this.folderKeys.tags, this.folderKeys.key, this.folderKeys.vaultId);
+	}
+
+	private async localPolicy(policy: NotificationPolicy): Promise<NotificationPolicy> {
+		const { folderLabel, ...rest } = policy;
+		return { ...rest, folderPath: await this.localFolder(policy.folderPath, folderLabel) };
+	}
+
 	readonly initialImport: InitialImportApi;
 	createFileOperations(manifest: LocalManifest, vault: Vault, cache: MarkdownBaseCache) {
+		this.syncApi.useWireStore(manifest);
 		return createEngineFileOperations(this.syncApi, manifest, vault, cache, this.http.getRequestDiagnostics().clientSession);
 	}
 	private readonly http: WorkerApiHttpClient;
@@ -183,15 +209,18 @@ export class SyncApiClient {
 	}
 
 	async ensureNotificationPolicy(policy: Omit<NotificationPolicy, 'revision'>): Promise<{ policy: NotificationPolicy }> {
-		return this.notificationsApi.ensureNotificationPolicy(policy);
+		const result = await this.notificationsApi.ensureNotificationPolicy({ ...policy, ...await this.serverFolder(policy.folderPath) });
+		return { policy: await this.localPolicy(result.policy) };
 	}
 
 	async getNotificationPolicy(): Promise<{ policy: NotificationPolicy | null }> {
-		return this.notificationsApi.getNotificationPolicy();
+		const { policy } = await this.notificationsApi.getNotificationPolicy();
+		return { policy: policy && await this.localPolicy(policy) };
 	}
 
 	async updateNotificationPolicy(policy: NotificationPolicy): Promise<{ policy: NotificationPolicy }> {
-		return this.notificationsApi.updateNotificationPolicy(policy);
+		const result = await this.notificationsApi.updateNotificationPolicy({ ...policy, ...await this.serverFolder(policy.folderPath) });
+		return { policy: await this.localPolicy(result.policy) };
 	}
 
 	async getPushSubscriptions(): Promise<PushSubscriptionsResponse> {
@@ -199,7 +228,7 @@ export class SyncApiClient {
 	}
 
 	async createRemindersEnrollmentToken(folderPath: string): Promise<{ token: string; browserToken: string; expiresAt: string }> {
-		return this.notificationsApi.createRemindersEnrollmentToken(folderPath);
+		return this.notificationsApi.createRemindersEnrollmentToken(await this.serverFolder(folderPath));
 	}
 
 	async deletePushSubscription(id: string): Promise<{ success: boolean }> {

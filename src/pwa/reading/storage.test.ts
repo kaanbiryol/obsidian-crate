@@ -128,6 +128,7 @@ it('reuses the encrypted Reading index only for the same encryption identity and
   await writeEncryptedReadingIndex(session, 'identity-a', [entry]);
   await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toEqual([entry]);
   await expect(readEncryptedReadingIndex(session, 'identity-b', 'Reading')).resolves.toBeUndefined();
-  await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, item: { ...entry.item, path: 'Reading/Other.md' } }]);
+  // Entries list server paths, but every note must belong to the plaintext Reading folder.
+  await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, item: { ...entry.item, path: 'Elsewhere/Other.md' } }]);
   await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
 });

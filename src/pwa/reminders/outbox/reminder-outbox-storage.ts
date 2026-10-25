@@ -87,23 +87,30 @@ function quarantineStorage(storage: Storage, keys: () => string[], folderPath: s
 	};
 }
 
+async function credentialScope(authToken: string): Promise<string> {
+	return `${REMINDER_OUTBOX_PREFIX}v1:${await sha256Hex(authToken)}:`;
+}
+
 async function outboxScope(authToken: string, folderPath: string): Promise<string> {
-	const tokenHash = await sha256Hex(authToken);
-	return `${REMINDER_OUTBOX_PREFIX}v1:${tokenHash}:${encodeURIComponent(folderPath)}:`;
+	return `${await credentialScope(authToken)}${encodeURIComponent(folderPath)}:`;
 }
 
 /** One key per command prevents another tab from replacing an unrelated command. */
 export async function createReminderOutboxStorage(authToken: string, folderPath: string): Promise<ReminderOutboxStorage & ReminderOutboxQuarantine> {
 	const scope = await outboxScope(authToken, folderPath);
+	const credential = await credentialScope(authToken);
 	const storage = browserStorage();
 	const keys = () => storageKeys(storage).filter(key => key.startsWith(scope));
+	// Changes saved before this session moved to another reminders folder cannot
+	// be sent here, so they stay quarantined for export.
+	const quarantineKeys = () => storageKeys(storage).filter(key => key.startsWith(credential));
 	const read = (key: string) => {
 		let raw: string | null;
 		try { raw = storage.getItem(key); } catch { throw new Error(STORAGE_ERROR); }
 		return raw === null ? null : readStored(raw, key.slice(scope.length), folderPath);
 	};
 	return {
-		...quarantineStorage(storage, keys, folderPath),
+		...quarantineStorage(storage, quarantineKeys, folderPath),
 		load() {
 			return recoverableEntries(storage, keys(), folderPath).valid.map(entry => entry.stored)
 				.sort((a, b) => a.createdAt - b.createdAt)

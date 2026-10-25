@@ -16,6 +16,7 @@ async function setup(encrypted = true, isMobile = false) {
   const api = {
     getWorkerUrl: () => 'https://crate.example',
     createRemindersEnrollmentToken: vi.fn(async () => ({ token: 'enroll', browserToken: 'browser-enroll' })),
+    serverFolder: async (folderPath: string) => ({ folderPath }),
   };
   const open = vi.fn(); vi.stubGlobal('window', { open });
   const plugin = {

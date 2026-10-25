@@ -215,6 +215,22 @@ describe('local article downloads', () => {
     await resumed.retryCapture(item);
     expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('ready');
   });
+  it('renames a note still named after its link once the title downloads, keeping user renames', async () => {
+    const h = harness();
+    const rename = vi.fn(async (file: ReadingFile, path: string) => { h.files.set(path, h.files.get(file.path)!); h.files.delete(file.path); });
+    h.vault.rename = rename;
+    h.vault.captureArticle = vi.fn().mockResolvedValue(article);
+    const { item } = await h.library.add('https://www.example.com/article', undefined, false);
+    expect(item.path).toMatch(/^Reading\/example\.com - [0-9a-f]{8}\.md$/);
+    const saved = await h.library.retryCapture(item);
+    expect(saved.path).toBe(`Reading/An article - example.com - ${item.crate_reading_id.slice(0, 8)}.md`);
+    expect([...h.files.keys()]).toEqual([saved.path]);
+    expect(parseReadingNote(h.files.get(saved.path)!)).toMatchObject({ title: 'An article', extraction_status: 'ready' });
+    const chosen = await h.library.add('https://example.com/chosen', undefined, false);
+    h.files.set('Reading/My pick.md', h.files.get(chosen.item.path)!); h.files.delete(chosen.item.path); await h.library.refresh();
+    expect((await h.library.retryCapture({ ...chosen.item, path: 'Reading/My pick.md' })).path).toBe('Reading/My pick.md');
+    expect(rename).toHaveBeenCalledTimes(1);
+  });
   it.each(['edited', 'deleted', 'replaced', 'duplicate', 'stopped'])('does not overwrite a %s note after a download', async state => {
     const h = harness(), pending = deferred<typeof article>();
     h.vault.captureArticle = vi.fn(() => pending.promise);

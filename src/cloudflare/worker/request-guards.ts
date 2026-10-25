@@ -33,7 +33,7 @@ export function assertRequestEncryption(request: Request, encryption: Encryption
 	}
 	// The native shortcut holds no keys; the server seals its note to the vault.
 	if (encryption && shortcutTransport(request)?.kind === 'prepare') {
-		if (encryption.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.', 423);
+		if (encryption.mode !== 'active') throw new EncryptionStateError('An encryption reset is in progress. Resume it on the device that started it.', 423);
 		return;
 	}
 	if (encryption && !(KEYLESS_ENCRYPTED_READ_PATHS.includes(path) && method === 'GET') && path !== '/health' && !path.startsWith('/encryption') && !path.startsWith('/auth/')) {
@@ -44,7 +44,7 @@ export function assertRequestEncryption(request: Request, encryption: Encryption
 		if (!hasEncryptionAuthority(request, encryption)) {
 			throw new EncryptionStateError('Unlock this vault with its current encryption keys before syncing', 428);
 		}
-		if (encryption.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.', 423);
+		if (encryption.mode !== 'active') throw new EncryptionStateError('An encryption reset is in progress. Resume it on the device that started it.', 423);
 		if ((path.startsWith('/reminders/') && path !== '/reminders/notification-policy' && !path.startsWith('/reminders/encrypted')) || path.startsWith('/sync/import')) {
 			throw new EncryptionStateError('This operation requires the encrypted client workflow', 428);
 		}

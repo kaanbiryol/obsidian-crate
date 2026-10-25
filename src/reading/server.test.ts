@@ -5,7 +5,7 @@ import { readReadingPolicy, writeReadingPolicy } from './server';
 
 vi.mock('../plugin/server-request', () => ({ serverRequest: vi.fn() }));
 beforeEach(() => vi.resetAllMocks());
-const plugin = {} as CratePlugin;
+const plugin = { syncRuntime: { getApiClient: () => null } } as unknown as CratePlugin;
 const policy = { enabled: 1, folder_path: 'Reading', generation: 'g', revision: 'r' };
 
 it('reads a missing or saved Reading policy', async () => {

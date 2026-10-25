@@ -1,5 +1,5 @@
 import { createModalActions, createModalFooter, SharedModal } from './plugin/shared-modal';
-import { Setting, type App } from 'obsidian';
+import { Setting, type App, type ButtonComponent } from 'obsidian';
 
 export interface ConfirmationModalOptions {
 	title: string;
@@ -9,6 +9,8 @@ export interface ConfirmationModalOptions {
 	cancelText?: string;
 	warning?: boolean;
 	checkbox?: { label: string; description?: string; onChange: (checked: boolean) => void };
+	/** The confirm button stays disabled until this exact word is typed. */
+	typedConfirmation?: string;
 }
 
 class ConfirmationModal extends SharedModal {
@@ -24,7 +26,7 @@ class ConfirmationModal extends SharedModal {
 
 	onOpen(): void {
 		const { modalEl } = this;
-		const { title, message, details, confirmText, cancelText = 'Cancel', warning = false } = this.options;
+		const { title, message, details, confirmText, cancelText = 'Cancel', warning = false, typedConfirmation } = this.options;
 
 		modalEl.addClass('crate-confirmation-modal');
 		this.openLayout(title);
@@ -56,18 +58,32 @@ class ConfirmationModal extends SharedModal {
 				.addToggle(toggle => toggle.setValue(false).onChange(checkbox.onChange));
 		}
 
+		let typed = !typedConfirmation;
+		let confirm: ButtonComponent | undefined;
+		if (typedConfirmation) {
+			new Setting(contentEl)
+				.setClass('crate-confirmation-option')
+				.setName('Confirm data loss')
+				.setDesc(`Type ${typedConfirmation} to continue.`)
+				.addText(text => text.setPlaceholder('Type confirmation').onChange(value => {
+					typed = value.trim() === typedConfirmation;
+					confirm?.setDisabled(!typed);
+				}));
+		}
+
 		createModalActions(createModalFooter(this.contentEl))
 			.addButton(button => button
 				.setButtonText(cancelText)
 				.onClick(() => this.finish(false)))
 			.addButton(button => {
-				button.setButtonText(confirmText);
+				confirm = button;
+				button.setButtonText(confirmText).setDisabled(!typed);
 				if (warning) {
 					button.setDestructive().setCta();
 				} else {
 					button.setCta();
 				}
-				button.onClick(() => this.finish(true));
+				button.onClick(() => { if (typed) this.finish(true); });
 			});
 	}
 

@@ -44,6 +44,22 @@ describe('durable reminder outbox storage', () => {
 		expect(read).not.toHaveBeenCalled();
 	});
 
+	it('quarantines changes this session saved for an earlier reminders folder', async () => {
+		const old = await createReminderOutboxStorage('token', 'Reminders');
+		const pending = change();
+		old.put(pending);
+		const other = await createReminderOutboxStorage('other-token', 'Reminders');
+		other.put(change());
+		const moved = await createReminderOutboxStorage('token', 'Tasks');
+		expect(moved.load()).toEqual([]);
+		const quarantined = moved.quarantined();
+		expect(quarantined).toHaveLength(1);
+		expect(quarantined[0]!.raw).toContain(pending.operationId);
+		moved.removeQuarantined(quarantined);
+		expect(old.load()).toEqual([]);
+		expect(other.load()).toHaveLength(1);
+	});
+
 	it('restores the exact attempted command after reload without storing the token', async () => {
 		const original = change();
 		original.body = original.body.replace(',', ',\n  ');
@@ -249,10 +265,10 @@ describe('durable reminder outbox storage', () => {
 		expect(outbox.quarantined()).toEqual([{ key, raw }]);
 	});
 
-	it('removes only exported damaged bytes still belonging to this exact session and folder', async () => {
+	it('removes only exported damaged bytes still belonging to this exact session', async () => {
 		const outbox = await createReminderOutboxStorage('one', 'Reminders');
-		const other = await createReminderOutboxStorage('one', 'Private');
-		outbox.put(change()); outbox.put(change()); outbox.put(change()); other.put(change(crypto.randomUUID(), 'Private'));
+		const other = await createReminderOutboxStorage('two', 'Reminders');
+		outbox.put(change()); outbox.put(change()); outbox.put(change()); other.put(change());
 		const [removed, repaired, changed, privateKey] = [...values.keys()] as [string, string, string, string];
 		const original = values.get(repaired)!;
 		for (const key of values.keys()) values.set(key, 'broken');

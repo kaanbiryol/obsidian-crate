@@ -32,13 +32,14 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
   if (pending?.identity === identity) return pending.promise;
   const current = () => { try { assertReadingSession(session); return pending?.promise === work; } catch { return false; } };
   const work = (async () => {
-    const state = await loadEncryptionState({ token: session.token, purpose: 'reading', fragment: pendingReadingKey(), current,
+    const verified = await loadEncryptionState({ token: session.token, purpose: 'reading', fragment: pendingReadingKey(), current,
       request: () => fetch('/reading/encryption', { cache: 'no-store', signal: AbortSignal.timeout(20_000), headers: { Authorization: `Bearer ${session.token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } }) });
+    const state = verified?.state ?? null;
     expected = state;
     if (!state) { verifiedIdentity = identity; currentKeys = null; lockReadingStorage(false); return null; }
     if (!currentKeys) lockReadingStorage();
     assertEncryptionActive(state);
-    const keys = await loadVaultKeys(state, session.folderPath, current, pendingReadingKey());
+    const keys = await loadVaultKeys(verified!, session.folderPath, current, pendingReadingKey());
     forgetReadingKey();
     const local = await unlockLocalState(keys, 'reading');
     if (!current()) { local.destroy(); throw new Error('Reading sign-in changed.'); }

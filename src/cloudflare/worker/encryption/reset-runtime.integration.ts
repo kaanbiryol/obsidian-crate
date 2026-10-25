@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RequestUrlParam } from 'obsidian';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -15,6 +15,9 @@ import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vaul
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 import { sha256Hex } from '@/platform/sha256';
+import { loadEncryptionKeys } from '../../../sync/encryption/key-storage';
+import { openFile } from '../../../encryption/file-codec';
+import { readEncryptionState } from './state';
 
 const bridge = vi.hoisted(() => vi.fn());
 vi.mock('obsidian', async importOriginal => ({ ...await importOriginal<typeof import('obsidian')>(), requestUrl: bridge }));
@@ -27,6 +30,7 @@ let state: EncryptionServerState;
 let failSettings = false;
 let disconnectedOrigin: string | undefined;
 let loseBeginResponse = false;
+let dropBeginRequest = false;
 let settings = structuredClone(DEFAULT_SETTINGS);
 beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
@@ -42,11 +46,15 @@ beforeEach(async () => {
 	storage.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(bundle)); storage.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);
 	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('e2ee:state', ?)").bind(JSON.stringify(state)).run();
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('original', ?, 'vault')").bind(await sha256Hex('original')).run();
-	failSettings = false; disconnectedOrigin = undefined; loseBeginResponse = false;
+	failSettings = false; disconnectedOrigin = undefined; loseBeginResponse = false; dropBeginRequest = false;
 	bridge.mockImplementation(async (options: RequestUrlParam) => {
 		const url = new URL(options.url);
 		if (url.origin === disconnectedOrigin) throw new Error('Tunnel is gone');
 		if (failSettings && url.pathname === '/settings' && options.method === 'PUT') throw new Error('Settings response lost');
+		if (dropBeginRequest && url.pathname === '/encryption/reset' && options.method === 'POST' && typeof options.body === 'string' && options.body.includes('delete-remote-data')) {
+			dropBeginRequest = false;
+			throw new Error('Begin request lost');
+		}
 		const response = await worker.fetch(new Request(options.url, { method: options.method, body: options.body,
 			headers: { ...options.headers, ...(options.contentType ? { 'Content-Type': options.contentType } : {}) },
 		}), env);
@@ -132,4 +140,96 @@ it('relocates after begin committed but its response was lost and the original t
 	expect(loadEncryptionReset(storage)).toBeNull();
 	expect(disk.text('note.md')).toBe('keep this vault\n');
 	expect(storage.get(SECRET_KEYS.AUTH_TOKEN)).toBe(checkpoint.replacementToken);
+});
+
+describe('turning encryption on', () => {
+	let setup: Awaited<ReturnType<typeof createEncryptionFixture>>;
+	const messages: string[] = [];
+	beforeEach(async () => {
+		await env.DB.prepare("DELETE FROM maintenance_state WHERE key = 'e2ee:state'").run();
+		storage.delete(SECRET_KEYS.ENCRYPTION_KEYS); storage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
+		setup = await createEncryptionFixture('active');
+		messages.length = 0;
+		await runtime.initialize();
+		// Leave plaintext history on the server.
+		disk.write('note.md', 'first plaintext version\n');
+		expect((await runtime.sync()).success).toBe(true);
+		disk.write('note.md', 'current local version\n');
+		expect((await runtime.sync()).success).toBe(true);
+	});
+	const turnOn = (bundle = setup.bundle, recovery = setup.recovery) => runtime.turnOnEncryption(bundle, recovery,
+		message => { messages.push(message); }, { workerUrl: settings.workerUrl, authToken: storage.get(SECRET_KEYS.AUTH_TOKEN)! });
+	/** The server holds exactly these files under tagged names, each sealed with the setup keys, and no plaintext anywhere. */
+	async function expectEncryptedServer(files: Record<string, string>, retired: string[] = []) {
+		expect(await readEncryptionState(env.DB)).toMatchObject({ mode: 'active', vaultId: setup.state.vaultId, generation: setup.state.generation,
+			keyId: setup.state.keyId, notificationKeyId: setup.state.notificationKeyId, seal: setup.state.seal });
+		const rows = (await env.DB.prepare('SELECT path, storage_key FROM files ORDER BY path').all<{ path: string; storage_key: string }>()).results;
+		const plainByWire = new Map(await Promise.all(Object.keys(files).map(async path => [await setup.paths.wire(path), path] as const)));
+		expect(rows.map(row => row.path).sort()).toEqual([...plainByWire.keys()].sort());
+		for (const row of rows) {
+			const bytes = new Uint8Array(await (await env.BUCKET.get(row.storage_key))!.arrayBuffer()), plain = plainByWire.get(row.path)!;
+			expect(new TextDecoder().decode((await openFile(bytes, plain, setup.keys.forPath(row.path))).content)).toBe(files[plain]);
+		}
+		expect(await env.DB.prepare('SELECT 1 FROM file_versions').first()).toBeNull();
+		const objects = await Promise.all((await env.BUCKET.list()).objects.map(async object => (await env.BUCKET.get(object.key))!.text()));
+		for (const plaintext of [...Object.values(files), ...retired]) for (const object of objects) expect(object).not.toContain(plaintext.trim());
+	}
+
+	it('syncs first, wipes the server and leaves only this device’s vault, encrypted', async () => {
+		const other = await secondDevice();
+		other.disk.write('remote-only.md', 'only on the server\n');
+		expect((await other.engine.sync()).success).toBe(true);
+		disk.write('local-only.md', 'only on this device\n');
+		await turnOn();
+		expect(messages[0]).toBe('Syncing this device before replacing the server copy…');
+		expect(messages.at(-1)).toBe('Encryption is on. Reconnect your other devices and web apps.');
+		expect(loadEncryptionReset(storage)).toBeNull();
+		expect(loadEncryptionKeys(storage)).toEqual(setup.bundle);
+		expect(storage.get(SECRET_KEYS.ENCRYPTION_RECOVERY)).toBe(setup.recovery);
+		expect(storage.get(SECRET_KEYS.AUTH_TOKEN)).not.toBe('original');
+		// The server-only change reached this device before the wipe.
+		expect(disk.text('remote-only.md')).toBe('only on the server\n');
+		const files = { 'local-only.md': 'only on this device\n', 'note.md': 'current local version\n', 'remote-only.md': 'only on the server\n' };
+		await expectEncryptedServer(files, ['first plaintext version\n']);
+		// Only the replacement credential of this device remains.
+		const tokens = (await env.DB.prepare('SELECT token_hash FROM auth_tokens').all<{ token_hash: string }>()).results;
+		expect(tokens).toEqual([{ token_hash: await sha256Hex(storage.get(SECRET_KEYS.AUTH_TOKEN)!) }]);
+		// Ordinary sync continues with the new keys.
+		disk.write('after.md', 'written after setup\n');
+		const result = await runtime.sync();
+		expect(result.errors).toEqual([]); expect(result.uploaded).toBe(1);
+		await expectEncryptedServer({ ...files, 'after.md': 'written after setup\n' }, ['first plaintext version\n']);
+	});
+
+	it.each(['before begin reached the server', 'after begin committed but its response was lost', 'when the shared settings save failed'] as const)(
+		'resumes a setup interrupted %s with the keys saved for it', async point => {
+			if (point === 'before begin reached the server') dropBeginRequest = true;
+			else if (point === 'after begin committed but its response was lost') loseBeginResponse = true;
+			else failSettings = true;
+			await expect(turnOn()).rejects.toThrow();
+			expect(loadEncryptionReset(storage)).toMatchObject({ target: 'encrypted', vaultId: setup.bundle.vaultId,
+				phase: point === 'when the shared settings save failed' ? 'upload' : 'remote' });
+			expect(loadEncryptionKeys(storage)).toEqual(setup.bundle);
+			failSettings = false;
+			// A later request with other keys resumes the saved setup instead of starting another.
+			const later = await createEncryptionFixture('active');
+			await turnOn(later.bundle, later.recovery);
+			expect(loadEncryptionReset(storage)).toBeNull();
+			expect(loadEncryptionKeys(storage)).toEqual(setup.bundle);
+			expect(messages.at(-1)).toBe('Encryption is on. Reconnect your other devices and web apps.');
+			await expectEncryptedServer({ 'note.md': 'current local version\n' }, ['first plaintext version\n']);
+		});
+
+	it('releases a setup the server refuses to start and leaves the plaintext server untouched', async () => {
+		await env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')").run();
+		await env.DB.prepare("INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES ('capture','reading-generation','private url','private note',0)").run();
+		await expect(turnOn()).rejects.toThrow('Wait for saved links to finish downloading');
+		expect(loadEncryptionReset(storage)).toBeNull();
+		expect(await readEncryptionState(env.DB)).toBeNull();
+		expect(storage.get(SECRET_KEYS.AUTH_TOKEN)).toBe('original');
+		expect(await env.DB.prepare("SELECT 1 FROM auth_tokens WHERE id = 'original'").first()).not.toBeNull();
+		expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).not.toBeNull();
+		const row = await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'note.md'").first<{ storage_key: string }>();
+		expect(await (await env.BUCKET.get(row!.storage_key))!.text()).toBe('current local version\n');
+	});
 });

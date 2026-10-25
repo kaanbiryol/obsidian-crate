@@ -7,7 +7,7 @@ import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { SyncRuntime } from '../../../sync/runtime/runtime';
 import type { SyncEngine } from '../../../sync/engine/engine';
 import type { SyncHistoryEntry } from '../../../sync/types';
-import { CHECKPOINT_PAGE_SIZE, createSharedCheckpoint, getSharedCheckpoint, pruneSharedCheckpoints, storeEncryptedCheckpoint } from './history-checkpoints';
+import { CHECKPOINT_PAGE_SIZE, createSharedCheckpoint, getSharedCheckpoint, pruneSharedCheckpoints } from './history-checkpoints';
 import { parseSharedCheckpointDocument } from '../../../protocol/history-checkpoints';
 import worker from '../index';
 import { sha256Hex } from '../../../platform/sha256';
@@ -225,7 +225,7 @@ it.each(['update', 'delete'])('retains checkpoint bytes for thirty days from com
     expect(retained!.expires_at).toBeGreaterThanOrEqual(checkpoint.expiresAt);
 });
 
-it('creates, streams and encrypts a checkpoint above the former 20,000-file limit', async () => {
+it('creates and streams a checkpoint above the former 20,000-file limit', async () => {
     const count = 25_000;
     await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
         INSERT INTO files(path, portable_path, hash, size, storage_key) SELECT 'n/'||x||'.md', 'n/'||x||'.md', ?, x, '__crate__/files/k'||x FROM n`)
@@ -237,10 +237,4 @@ it('creates, streams and encrypts a checkpoint above the former 20,000-file limi
     const document = parseSharedCheckpointDocument(await streamed.json());
     expect(document.checkpoint.fileCount).toBe(count);
     expect(document.files['n/7.md']).toMatchObject({ size: 7, revision: '__crate__/files/k7' });
-    const key = `__crate__/history/checkpoints/${checkpoint.id}.json`;
-    expect((await storeEncryptedCheckpoint(env.BUCKET, key, new TextEncoder().encode('a.b.c.d"'))).status).toBe(400);
-    expect((await storeEncryptedCheckpoint(env.BUCKET, key, new TextEncoder().encode('aa.bb.cc.dd.ee'))).status).toBe(200);
-    const stored = await env.BUCKET.get(key);
-    expect(stored?.customMetadata).toMatchObject({ encrypted: '1' });
-    expect(JSON.parse(await stored!.text())).toMatchObject({ version: 1, checkpoint: { id: checkpoint.id }, encrypted: 'aa.bb.cc.dd.ee' });
 }, 60_000);

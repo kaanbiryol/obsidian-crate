@@ -4,10 +4,18 @@ Automatic sync is off by default on new installs. Connecting a server, restartin
 Obsidian, editing files, and opening Sync activity or History do not start file
 transfers while it is off. Start a manual sync with **Crate: Sync now** or
 enable **Automatic sync** in Crate settings. A manual sync leaves automatic sync
-off. Enabling encryption preserves this setting and does not trigger normal
-sync. Empty remotes activate encryption before the first file upload; existing
-remote files and retained versions are converted on the client. Pending local
-changes and upload receipts reconcile on the next encrypted sync. Explicitly saved preferences are preserved when upgrading or restarting.
+off. Enabling encryption runs its own syncs: it syncs once, replaces the server
+copy, then uploads the vault encrypted, and afterwards restores the previous
+automatic-sync setting. Explicitly saved preferences are preserved when upgrading or restarting.
+
+In an encrypted vault the server stores keyed name tags instead of paths. The
+Worker API layer (`worker-api/sync.ts` with `encryption/encrypted-files.ts` and
+`encryption/path-index.ts`) maps plaintext paths to server paths on every request
+and maps responses back, so planning, conflict detection and the local manifest use
+plaintext paths. Server deletes carry no metadata; the client maps them back through
+paths it has synced and ignores server paths it never knew. If two server files
+claim the same plaintext name, the one stored at that name's own tag keeps it and
+the other syncs locally as `<name> - <first 8 characters of its server name>.<ext>`.
 
 `automaticSync` is the device-local control for startup, foreground, periodic and
 edit-triggered sync. Tests that disable automatic work should set
@@ -332,6 +340,11 @@ stops loading. The log compacts into a new full checkpoint at 8 MiB. Durable upl
 also checkpoint every 64 receipts, removing their journal copies during long syncs.
 
 **Optimization:** recovery full syncs skip re-hashing files whose size and mtime match the manifest entry. Manual and first syncs never trust timestamps.
+
+**Encrypted server names:** entries stay keyed by plaintext path. An entry also
+records its server path as `wire` when that path is not the tag of its name, such as a
+note the server created for the iPhone shortcut under a random name. Edits keep that
+server path; deleting or renaming the file drops it.
 
 Implementation: `manifest.ts:LocalManifest`
 

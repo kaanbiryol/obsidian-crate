@@ -10,7 +10,7 @@ export const INITIAL_IMPORT_VERIFY_PAGE = 2000;
 export type ImportInventoryEntry = [path: string, hash: string, size: number];
 
 /** UTF-8 byte order: surrogate pairs encode code points above every BMP character. */
-function compareCodePoints(a: string, b: string): number {
+export function compareCodePoints(a: string, b: string): number {
   for (let index = 0; index < Math.min(a.length, b.length); index++) {
     const left = a.charCodeAt(index), right = b.charCodeAt(index);
     if (left === right) continue;

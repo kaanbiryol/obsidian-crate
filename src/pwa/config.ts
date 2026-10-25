@@ -5,6 +5,7 @@ import { clearInstallEnrollment, preserveInstallEnrollment, restoreInstallEnroll
 export const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 export const PWA_AUTH_CHANGED_EVENT = 'crate-reminders-auth-change';
 export const PWA_LOGOUT_KEY = 'crate-reminders-logout';
+export const PWA_FOLDER_CHANGED_EVENT = 'crate-reminders-folder-change';
 const CONFIG_KEY = 'crate-reminders-config';
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -47,6 +48,15 @@ export function loadStoredConfig(): StoredConfig {
 
 export function saveConfig(config: StoredConfig): void {
 	localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+}
+
+/** The server moved this session to the vault's current reminders folder. Each tab
+ * adopts it from its own request, so a replaced session's tab never follows. */
+export function adoptReminderFolder(folderPath: string): void {
+	const config = loadStoredConfig();
+	if (config.folderPath === folderPath) return;
+	saveConfig({ ...config, folderPath });
+	window.dispatchEvent(new Event(PWA_FOLDER_CHANGED_EVENT));
 }
 
 function currentQueryParams(): URLSearchParams {
@@ -149,7 +159,8 @@ export function applyConfigFromUrl(config: StoredConfig): {
 		if (manifest) manifest.href = manifestHrefForUrl(window.location.href);
 	}
 	const nextConfig = { ...config };
-	const folderPath = params.get('folder');
+	// Encrypted vaults send the folder's plaintext name only in the fragment.
+	const folderPath = params.get('folder') ?? new URLSearchParams(window.location.hash.slice(1)).get('crateFolder');
 	const upcomingDays = params.get('upcomingDays');
 	const allDayTime = params.get('allDayTime');
 	const reminderId = params.get('reminderId')?.trim() ?? '';

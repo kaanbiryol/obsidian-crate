@@ -6,6 +6,7 @@ import { commitReadingCache, type ReadingCache, type ReadingSession } from './st
 vi.mock('./encryption-session', () => ({
   prepareReadingEncryption: async () => null,
   readingEncryptionHeaders: () => ({}),
+  readingKeys: () => null,
 }));
 vi.mock('./storage', () => ({
   assertReadingSession: vi.fn(),

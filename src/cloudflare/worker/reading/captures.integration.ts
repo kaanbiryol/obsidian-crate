@@ -34,7 +34,7 @@ it('queues durably with a receipt and publishes just one final named file', asyn
 	expect(await (await command('capture', body)).json()).toEqual(response);
 	expect(await (await command('capture', { ...body, operationId: operation() })).json()).toMatchObject({ alreadySaved: true, id: row.id });
 	await publishCapture(env, row.id, row.generation, { markdown: 'Saved article.', title: 'Actual title' });
-	const path = `Reading/Actual title - ${row.id.slice(0, 8)}.md`;
+	const path = `Reading/Actual title - example.com - ${row.id.slice(0, 8)}.md`;
 	const file = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
 	expect(file.content).toContain('Saved article.');
 	expect(parseReadingNote(file.content)).toMatchObject({ crate_reading_id: row.id, title: 'Actual title', extraction_status: 'ready' });
@@ -48,11 +48,11 @@ it('queues durably with a receipt and publishes just one final named file', asyn
 });
 it('preserves occupied filenames and extends the short ID', async () => {
 	const captureId = 'a1b2c3d4-5678-4abc-9def-123456789abc';
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Title - a1b2c3d4.md', 'Keep me', null);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Title - example.com - a1b2c3d4.md', 'Keep me', null);
 	const { row } = await capture({ captureId, title: 'Title' });
 	await publishCapture(env, row.id, row.generation, { markdown: 'Article', title: 'Extracted title' });
-	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/Title - a1b2c3d4.md'))?.content).toBe('Keep me');
-	expect(await getStoredFileRow(env.DB, 'Reading/Title - a1b2c3d45678.md')).not.toBeNull();
+	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/Title - example.com - a1b2c3d4.md'))?.content).toBe('Keep me');
+	expect(await getStoredFileRow(env.DB, 'Reading/Title - example.com - a1b2c3d45678.md')).not.toBeNull();
 });
 it('publishes a fallback bookmark when fetching fails or consent is withdrawn', async () => {
 	const { row } = await capture();
@@ -99,7 +99,7 @@ it('publishes a video with metadata and its timestamp through the normal capture
 	await runCapture({ ...env, READING_FETCH: { fetch } }, { storage: { setAlarm: async () => {} } } as unknown as DurableObjectState, true);
 	expect(fetch).toHaveBeenCalledTimes(1);
 	expect(new URL((fetch.mock.calls[0] as unknown as [Request])[0].url).pathname).toBe('/oembed');
-	const file = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, `Reading/A video - ${row.id.slice(0, 8)}.md`))!;
+	const file = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, `Reading/A video - youtu.be - ${row.id.slice(0, 8)}.md`))!;
 	expect(parseReadingNote(file.content)).toMatchObject({ title: 'A video', author: 'A channel', source_url: url, extraction_status: 'ready' });
 	expect(file.content).not.toContain('<iframe');
 	expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).toBeNull();

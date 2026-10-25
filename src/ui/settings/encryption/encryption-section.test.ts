@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createObsidianUiModule, FakeElement, MockSetting, resetObsidianUiMocks } from '../../../test/fakes/obsidian-ui';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle, type VaultKeyBundle } from '../../../encryption/key-bundle';
 import { createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
-import type { EncryptionProgress } from '../../../sync/encryption/conversion';
+import type { EncryptionProgress } from '../../../sync/encryption/server-encryption';
+import { createEncryptionSetup } from '../../../sync/encryption/reset';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 
 let state: EncryptionServerState | null;
@@ -11,15 +12,18 @@ let titles: string[];
 let closeModal: () => void;
 let values: Map<string, string>;
 const read = vi.fn(async (): Promise<EncryptionServerState | null> => state);
-const convert = vi.fn(async (_http: unknown, keys: VaultKeyBundle, recovery: string, _progress: EncryptionProgress) => {
-	state = { ...createEncryptionState(keys, await sealRecoveryBundle(keys, recovery)), mode: 'active' };
+// The real workflow saves the keys, wipes the server and uploads this device's vault.
+const convert = vi.fn(async (keys: VaultKeyBundle, recovery: string, _progress: EncryptionProgress) => {
+	values.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(keys)); values.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);
+	state = createEncryptionState(keys, await sealRecoveryBundle(keys, recovery));
 });
 const turnOff = vi.fn(async () => {});
+const confirmTurnOn = vi.fn(async (_app: unknown, _options: { typedConfirmation?: string; warning?: boolean }) => true);
 const sync = vi.fn(async () => ({ success: true, conflicts: [] }));
 const setting = (name: string) => [...MockSetting.instances].reverse().find(item => item.nameEl.textContent === name)!;
 
 beforeEach(() => {
-	resetObsidianUiMocks(); convert.mockClear(); sync.mockClear(); turnOff.mockClear();
+	resetObsidianUiMocks(); convert.mockClear(); sync.mockClear(); turnOff.mockClear(); confirmTurnOn.mockClear();
 	read.mockReset().mockImplementation(async () => state);
 	state = null; titles = []; values = new Map([[SECRET_KEYS.AUTH_TOKEN, 'token']]);
 	vi.doMock('obsidian', () => createObsidianUiModule());
@@ -34,28 +38,28 @@ beforeEach(() => {
 		close() { this.onClose(); }
 		open() { closeModal = () => this.close(); this.onOpen(); }
 	} }));
+	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal: confirmTurnOn }));
 	vi.doMock('../../../sync/worker-api/http', () => ({ WorkerApiHttpClient: class {
 		constructor(private readonly url: string) {}
 		setAbortSignal() {}
 		getWorkerUrl() { return this.url; }
 		getServerInfo() { return Promise.resolve({ capabilities: ['e2ee-reading-v1'] }); }
 	} }));
-	vi.doMock('../../../sync/encryption/conversion', async () => ({
-		...await vi.importActual('../../../sync/encryption/conversion'),
+	vi.doMock('../../../sync/encryption/server-encryption', async () => ({
+		...await vi.importActual('../../../sync/encryption/server-encryption'),
 		readServerEncryption: read,
-		convertEncryptedVault: convert,
 	}));
 });
 afterEach(() => {
 	vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.resetModules();
-	for (const name of ['obsidian', '../../plugin/shared-modal', '../../sync/worker-api/http', '../../sync/encryption/conversion']) vi.doUnmock(name);
+	for (const name of ['obsidian', '../../plugin/shared-modal', '../../confirmation-modal', '../../sync/worker-api/http', '../../sync/encryption/server-encryption']) vi.doUnmock(name);
 });
 
 async function renderRow() {
 	const { renderEncryptionSection } = await import('./encryption-section');
 	const plugin = { app: {}, settings: { workerUrl: 'https://server.test', automaticSync: false, reading: { folderPath: 'Reading' } }, remindersSettings: { remindersFolderPath: 'Reminders' },
 		secretStorage: { get: (key: string) => values.get(key) ?? null, set: (key: string, value: string) => values.set(key, value) },
-		syncRuntime: { sync, turnOffEncryption: turnOff, runEncryptionSetup: async (work: () => Promise<void>) => work() } };
+		syncRuntime: { sync, turnOffEncryption: turnOff, turnOnEncryption: convert, runEncryptionSetup: async (work: () => Promise<void>) => work() } };
 	const cleanup = renderEncryptionSection(new FakeElement('div') as never, plugin as never);
 	const row = setting('End-to-end encryption');
 	return { plugin, cleanup, row, button: row.buttons[0]! };
@@ -67,7 +71,7 @@ async function open() {
 	await vi.waitFor(() => expect(body.getAttribute('aria-busy')).toBe('false'));
 	return plugin;
 }
-async function configure(mode: 'active' | 'converting') {
+async function configure(mode: 'active' | 'resetting' = 'active') {
 	const keys = await createVaultKeyBundle(), recovery = await generateRecoveryCode();
 	state = { ...createEncryptionState(keys, await sealRecoveryBundle(keys, recovery)), mode };
 	values.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(keys)); values.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);
@@ -79,10 +83,10 @@ function acknowledge(saved = true) {
 	checkbox.dispatchEvent(new Event('change'));
 }
 
-it.each(['off', 'active', 'converting'] as const)('keeps the settings row unchanged when dismissing the %s dialog', async mode => {
+it.each(['off', 'active'] as const)('keeps the settings row unchanged when dismissing the %s dialog', async mode => {
 	if (mode !== 'off') await configure(mode);
 	await open();
-	const expectedTitle = mode === 'off' ? 'Enable encryption' : mode === 'converting' ? 'Resume encryption' : 'Manage encryption';
+	const expectedTitle = mode === 'off' ? 'Enable encryption' : 'Manage encryption';
 	expect(titles).toEqual([expectedTitle, expectedTitle]);
 	const row = setting('End-to-end encryption'), button = row.buttons[0]!;
 	const description = row.descEl.collectText(), label = button.buttonEl.textContent;
@@ -124,8 +128,15 @@ it('automatically verifies the key and requires acknowledgment before setup', as
 	acknowledge(false); start.click();
 	expect(start.buttonEl.classNames.has('is-disabled')).toBe(true);
 	expect(convert).not.toHaveBeenCalled();
+	confirmTurnOn.mockResolvedValueOnce(false);
 	acknowledge(); start.click();
+	await vi.waitFor(() => expect(confirmTurnOn).toHaveBeenCalledOnce());
+	expect(confirmTurnOn.mock.calls[0]![1]).toMatchObject({ warning: true, typedConfirmation: 'encrypt' });
+	expect(convert).not.toHaveBeenCalled();
+	expect(body.querySelector('textarea')).not.toBeNull();
+	start.click();
 	await vi.waitFor(() => expect(body.collectText()).toContain('Your vault is protected'));
+	expect(confirmTurnOn).toHaveBeenCalledTimes(2);
 	expect(titles.at(-1)).toBe('Encryption enabled');
 	expect(convert).toHaveBeenCalledOnce(); expect(sync).not.toHaveBeenCalled();
 	expect(body.collectText()).toContain('Automatic sync remains off');
@@ -140,10 +151,10 @@ it('automatically verifies the key and requires acknowledgment before setup', as
 it('replaces setup with counted progress, uses indeterminate stages, and preserves automatic sync', async () => {
 	const plugin = await open(); plugin.settings.automaticSync = true;
 	let finish!: () => void, progress!: EncryptionProgress;
-	convert.mockImplementationOnce(async (_http, keys, recovery, update) => {
+	convert.mockImplementationOnce(async (keys, recovery, update) => {
 		progress = update; update('Encrypting files and retained versions', { completed: 0, total: 12 });
 		await new Promise<void>(resolve => { finish = resolve; });
-		state = { ...createEncryptionState(keys, await sealRecoveryBundle(keys, recovery)), mode: 'active' };
+		state = createEncryptionState(keys, await sealRecoveryBundle(keys, recovery));
 	});
 	acknowledge(); setting('Enable encryption').buttons[0]!.click();
 	await vi.waitFor(() => expect(body.collectText()).toContain('0 of 12 files and versions'));
@@ -164,7 +175,7 @@ it('replaces setup with counted progress, uses indeterminate stages, and preserv
 	expect(plugin.settings.automaticSync).toBe(true); expect(sync).not.toHaveBeenCalled();
 });
 
-it('retries an interrupted conversion with the same keys without starting a normal sync', async () => {
+it('retries an interrupted setup with the same keys without starting a normal sync', async () => {
 	await open();
 	convert.mockRejectedValueOnce(new Error('Connection lost'));
 	acknowledge(); setting('Enable encryption').buttons[0]!.click();
@@ -173,12 +184,13 @@ it('retries an interrupted conversion with the same keys without starting a norm
 	expect(body.querySelector('textarea')).toBeNull();
 	MockSetting.instances.at(-1)!.buttons[0]!.click();
 	await vi.waitFor(() => expect(body.collectText()).toContain('Your vault is protected'));
+	expect(convert.mock.calls[1]![0]).toBe(convert.mock.calls[0]![0]);
 	expect(convert.mock.calls[1]![1]).toBe(convert.mock.calls[0]![1]);
-	expect(convert.mock.calls[1]![2]).toBe(convert.mock.calls[0]![2]);
+	expect(confirmTurnOn).toHaveBeenCalledOnce();
 	expect(sync).not.toHaveBeenCalled();
 });
 
-it('does not offer conversion when the automatic key check fails', async () => {
+it('does not offer setup when the automatic key check fails', async () => {
 	vi.spyOn(await import('../../../encryption/recovery-verification'), 'verifyRecoveryCode').mockRejectedValueOnce(new Error('Recovery verification failed'));
 	await open();
 	expect(body.collectText()).toContain('Recovery verification failed');
@@ -226,48 +238,20 @@ it('replaces loading with a retryable error and clears its busy state', async ()
 	expect(body.getAttribute('aria-busy')).toBe('false');
 });
 
-it('resumes using the automatically verified local recovery key after acknowledgment', async () => {
-	const recovery = await configure('converting');
-	await open();
-	const resume = setting('Resume encryption').buttons[0]!;
-	resume.click(); expect(convert).not.toHaveBeenCalled();
-	acknowledge(); resume.click();
-	await vi.waitFor(() => expect(convert).toHaveBeenCalledOnce());
-	await vi.waitFor(() => expect(setting('End-to-end encryption').buttons[0]!.buttonEl.textContent).toBe('Manage encryption'));
-	expect(values.get(SECRET_KEYS.ENCRYPTION_RECOVERY)).toBe(recovery);
-	expect(sync).not.toHaveBeenCalled();
-});
-
-it('refreshes the row after an interrupted conversion so it can be resumed', async () => {
-	await open();
-	convert.mockImplementationOnce(async (_http, keys, recovery) => {
-		state = { ...createEncryptionState(keys, await sealRecoveryBundle(keys, recovery)), mode: 'converting' };
+it('refreshes the row after an interrupted setup so it can be resumed', async () => {
+	const plugin = await open();
+	convert.mockImplementationOnce(async keys => {
+		values.set(SECRET_KEYS.ENCRYPTION_RESET, JSON.stringify(createEncryptionSetup(plugin.settings.workerUrl, 'token', keys, false)));
 		throw new Error('Connection lost');
 	});
 	acknowledge(); setting('Enable encryption').buttons[0]!.click();
-	await vi.waitFor(() => expect(setting('End-to-end encryption').buttons[0]!.buttonEl.textContent).toBe('Resume conversion'));
-	expect(setting('End-to-end encryption').descEl.querySelector('strong')?.textContent).toBe('Converting…');
-	expect(read).toHaveBeenCalledTimes(3);
+	await vi.waitFor(() => expect(setting('End-to-end encryption').buttons[0]!.buttonEl.textContent).toBe('Resume reset'));
+	expect(setting('End-to-end encryption').descEl.querySelector('strong')?.textContent).toBe('Reset in progress');
 	closeModal();
-	expect(read).toHaveBeenCalledTimes(3);
-});
-
-it.each(['missing', 'damaged', 'wrong'] as const)('restores the saved copy when the local recovery key is %s', async kind => {
-	const recovery = await configure('converting');
-	if (kind === 'missing') values.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
-	else values.set(SECRET_KEYS.ENCRYPTION_RECOVERY, kind === 'damaged' ? 'damaged saved copy' : await generateRecoveryCode());
-	await open();
-	expect(body.collectText()).toContain('saved copy before resuming encryption');
-	expect(setting('Resume encryption')).toBeUndefined();
-	expect(convert).not.toHaveBeenCalled();
-	setting('Recovery key').texts[0]!.change(recovery);
+	setting('End-to-end encryption').buttons[0]!.click();
+	expect(titles.at(-1)).toBe('Resume turning on encryption');
 	MockSetting.instances.at(-1)!.buttons[0]!.click();
-	await vi.waitFor(() => expect(setting('Resume encryption')).toBeDefined());
-	expect(values.get(SECRET_KEYS.ENCRYPTION_RECOVERY)).toBe(recovery);
-	acknowledge(); setting('Resume encryption').buttons[0]!.click();
-	await vi.waitFor(() => expect(convert).toHaveBeenCalledOnce());
-	await vi.waitFor(() => expect(setting('End-to-end encryption').buttons[0]!.buttonEl.textContent).toBe('Manage encryption'));
-	expect(sync).not.toHaveBeenCalled();
+	await vi.waitFor(() => expect(turnOff).toHaveBeenCalledWith(null, expect.any(Function), expect.any(Object), expect.any(AbortSignal)));
 });
 
 it('reports active keys and offers recovery when this device has damaged keys', async () => {
@@ -318,13 +302,9 @@ it('opens the saved reset directly without requiring the now-revoked old credent
 it.each([
 	['off', 'Off', 'Enable encryption'],
 	['active', 'On', 'Manage encryption'],
-	['converting', 'Converting…', 'Resume conversion'],
 	['resetting', 'Reset in progress', 'View reset'],
 ] as const)('shows the server’s %s state and its matching action without changing encryption', async (mode, status, action) => {
-	if (mode !== 'off') {
-		await configure('active');
-		state = { ...state!, mode };
-	}
+	if (mode !== 'off') await configure(mode);
 	values.delete(SECRET_KEYS.ENCRYPTION_KEYS);
 	const { row, button } = await renderRow();
 	await vi.waitFor(() => expect(button.buttonEl.textContent).toBe(action));

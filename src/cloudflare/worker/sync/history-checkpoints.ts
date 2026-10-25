@@ -97,7 +97,7 @@ export async function getSharedCheckpoint(request: Request, bucket: R2Bucket): P
     return streamCheckpointObject(bucket, keyFor(id), JSON.stringify(entry));
 }
 
-export async function streamCheckpointObject(bucket: R2Bucket, key: string, expected?: string): Promise<Response> {
+async function streamCheckpointObject(bucket: R2Bucket, key: string, expected?: string): Promise<Response> {
     const object = await bucket.get(key);
     if (!object || object.size > MAX_STORED_CHECKPOINT_BYTES) throw new Error('Shared checkpoint is unavailable');
     const metadata = object.customMetadata?.checkpoint;
@@ -106,29 +106,6 @@ export async function streamCheckpointObject(bucket: R2Bucket, key: string, expe
         throw new Error('Checkpoint metadata does not match its index');
     }
     return new Response(object.body, { headers: { ...corsHeaders(), ...headers, 'Content-Type': 'application/json', 'Content-Length': String(object.size) } });
-}
-
-/** Wraps client ciphertext without parsing either document; the plaintext
- * object is replaced only after the encrypted bytes are validated. */
-export async function storeEncryptedCheckpoint(bucket: R2Bucket, key: string, encrypted: Uint8Array<ArrayBuffer>): Promise<Response> {
-    const object = await bucket.head(key);
-    if (!object) return response({ error: 'Checkpoint is unavailable' }, 404);
-    if (object.customMetadata?.encrypted === '1') return response({ success: true });
-    const checkpoint = object.customMetadata?.checkpoint;
-    if (!checkpoint || !isEnvelopeText(encrypted)) return response({ error: 'Invalid encrypted checkpoint' }, 400);
-    await bucket.put(key, new Blob([`{"version":1,"checkpoint":${checkpoint},"encrypted":"`, encrypted, '"}']), {
-        httpMetadata: { contentType: 'application/json' }, customMetadata: { checkpoint, encrypted: '1' } });
-    return response({ success: true });
-}
-
-/** A five-part base64url envelope needs no JSON escaping. */
-function isEnvelopeText(bytes: Uint8Array): boolean {
-    let dots = 0;
-    for (const byte of bytes) {
-        if (byte === 0x2e) dots++;
-        else if (!(byte >= 0x30 && byte <= 0x39 || byte >= 0x41 && byte <= 0x5a || byte >= 0x61 && byte <= 0x7a || byte === 0x2d || byte === 0x5f)) return false;
-    }
-    return dots === 4 && bytes.byteLength <= MAX_ENCRYPTED_CHECKPOINT_BYTES;
 }
 
 /** Vault-scoped immutable reads; validate the live checkpoint and D1 ownership.

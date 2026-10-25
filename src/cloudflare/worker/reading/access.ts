@@ -5,11 +5,16 @@ import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { isSha256Hex } from '@/platform/validation';
 import { sha256Hex } from '@/platform/sha256';
 import { createRandomHexToken } from '@/platform/random-hex';
+import { readEncryptionState } from '../encryption/state';
+import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';
 
 export async function updatePolicy(db: D1Database, body: Record<string, unknown>) {
   const existing = await policy(db);
   if ((body.revision ?? null) !== (existing?.revision ?? null)) throw new ReadingError('Reading settings changed on another device. Refresh them first.', 409);
   if (typeof body.enabled !== 'boolean' || typeof body.folderPath !== 'string') throw new ReadingError('Choose a Reading folder and enabled state.');
+  const encryption = await readEncryptionState(db);
+  const labelIssue = folderLabelIssue(encryption, body.folderPath, body.folderLabel);
+  if (labelIssue) throw new ReadingError(labelIssue, 428);
   const reminders = await db.prepare('SELECT folder_path FROM notification_policy WHERE id=1').first<{ folder_path: string }>();
   let folder: string;
   try { folder = validateReadingFolder(body.folderPath, reminders?.folder_path); }
@@ -19,10 +24,17 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
   }
   const current: ReadingPolicy = { enabled: Number(body.enabled), folder_path: folder,
     generation: existing && existing.folder_path === folder ? existing.generation : crypto.randomUUID(), revision: crypto.randomUUID() };
-  await db.prepare(`INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, ?, ?, ?, ?)
+  await db.batch([db.prepare(`INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled, folder_path=excluded.folder_path, generation=excluded.generation, revision=excluded.revision`)
-    .bind(current.enabled, folder, current.generation, current.revision).run();
-  return readingResponse({ policy: current });
+    .bind(current.enabled, folder, current.generation, current.revision),
+    ...(encryption ? [saveFolderLabel(db, folder, body.folderLabel as string)] : [])]);
+  return readingResponse({ policy: await labelledPolicy(db, current) });
+}
+
+/** Encrypted vaults store the folder by its tag; the label carries its sealed name. */
+export async function labelledPolicy(db: D1Database, current: ReadingPolicy | null): Promise<ReadingPolicy | null> {
+  const label = current && await readEncryptionState(db) ? await readFolderLabel(db, current.folder_path) : null;
+  return current && label ? { ...current, folder_label: label } : current;
 }
 export async function prepareHandoff(db: D1Database, principal: AuthPrincipal, body: Record<string, unknown>, origin: string) {
   if (!canPrepareReadingHandoff(principal.scope)) throw new ReadingError('Reading access is required.', 403);

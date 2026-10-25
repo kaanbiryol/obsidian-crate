@@ -188,7 +188,7 @@ Dock morphs use the shared collapsed height.
   the saved opening preference; visible instructions explain replacing and reordering tabs.
   **Sync**, **Device storage**, and **About** are always-visible sections. Shortcut setup
   uses these same section surfaces, typography and shared action controls. Encryption
-  uses compact per-feature status rows and one shared setup note; locked/converting
+  uses compact per-feature status rows and one shared setup note; locked and setting-up
   guidance stays visible, while unlocked folder and notification details expand in place.
   **Web app → Add to home screen** pushes a dedicated instructions page with retained
   settings scroll/focus and browser Back/Forward. Installed apps hide this entry.

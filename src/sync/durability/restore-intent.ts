@@ -3,12 +3,14 @@ import { reminderOperationDay } from '../../protocol/reminder-operation';
 import { isSyncRevision } from '../../protocol/sync-validation';
 import type { RemoteFileVersion, RestoreFileRequest } from '../../protocol/sync-types';
 import { parseFileVersions } from '../worker-api/version-contract';
+import { isWirePath } from '../../protocol/encrypted-path';
 
 export interface RestoreIntent {
 	request: RestoreFileRequest;
 	version: RemoteFileVersion;
 	phase: 'pending' | 'committed';
-	encryptedWire?: { vaultId: string; generation: number; expectedHash: string | null; restoredHash: string };
+	/** `path` is the server path the restore request names. */
+	encryptedWire?: { vaultId: string; generation: number; path: string; expectedHash: string | null; restoredHash: string };
 }
 
 export function parseRestoreIntents(value: unknown): RestoreIntent[] {
@@ -29,7 +31,7 @@ export function parseRestoreIntents(value: unknown): RestoreIntent[] {
 		const wire = entry.encryptedWire;
 		if (wire !== undefined && (!isRecord(wire) || typeof wire.vaultId !== 'string' || !wire.vaultId
 			|| typeof wire.generation !== 'number' || !Number.isSafeInteger(wire.generation) || wire.generation < 1
-			|| !isSha256Hex(wire.restoredHash) || (wire.expectedHash !== null && !isSha256Hex(wire.expectedHash))
+			|| typeof wire.path !== 'string' || !isWirePath(wire.path) || !isSha256Hex(wire.restoredHash) || (wire.expectedHash !== null && !isSha256Hex(wire.expectedHash))
 			|| (wire.expectedHash === null) !== (request.expectedHash === null))) throw new Error('Invalid encrypted restore journal');
 		return { version, phase: entry.phase, request: {
 			operationId: request.operationId, path: version.path, storageKey: version.storage_key,

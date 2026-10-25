@@ -8,13 +8,18 @@ import { chromium, webkit, expect } from '@playwright/test';
 import { openLocalRuntime, issueLocalDevice } from '../../../packages/server/src/local-server-runtime.mjs';
 import { listenLocalServer } from '../../../packages/server/src/local-server-http.mjs';
 import { verifyReadingPlaintextTransition } from './pwa-reading-plaintext-transition-checks.mjs';
+import { assertNoPlaintextNames, isWirePath, recordPlaintextNames } from './pwa-encrypted-names-checks.mjs';
+
+// Plaintext names that may exist only inside ciphertext once the vault is encrypted.
+const PLAINTEXT_NAMES = ['Reading/', '"Reading"', 'folder=Reading', 'folderPath=Reading', 'Reminders/', '"Reminders"', 'Article.md',
+  'Encrypted Reading article', 'Private server extraction', 'private-offline-tag', 'private-reading'];
 
 const dataDir = await mkdtemp(join(tmpdir(), 'crate-reading-e2ee-'));
 let runtime, server, browser, loseReply = false, injectShell = false;
 const commits = [], extracts = [];
 try {
   const modulePath = join(dataDir, 'crypto.mjs');
-  const compiled = await build({ stdin: { contents: `export * from './src/encryption/key-bundle'; export * from './src/encryption/server-state'; export * from './src/encryption/file-authority'; export * from './src/encryption/file-codec';  export * from './src/reading/core/notes'; export * from './src/sync/encryption/conversion'; export * from './src/sync/worker-api/http'; export * from './src/sync/worker-api/client';`, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', alias: { obsidian: join(process.cwd(), 'src/test/mocks/obsidian.ts') } });
+  const compiled = await build({ stdin: { contents: `export * from './src/encryption/key-bundle'; export * from './src/encryption/server-state'; export * from './src/encryption/file-authority'; export * from './src/encryption/file-codec';  export * from './src/reading/core/notes'; export * from './src/sync/encryption/reset'; export * from './src/sync/worker-api/http'; export { PathTags } from './src/encryption/path-tags'; export { sealFolderLabel } from './src/encryption/folder-label'; export { importEncryptionSecret } from './src/encryption/envelope';`, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', alias: { obsidian: join(process.cwd(), 'src/test/mocks/obsidian.ts') } });
   await writeFile(modulePath, compiled.outputFiles[0].contents);
   const t = await import(pathToFileURL(modulePath).href);
   runtime = await openLocalRuntime({ dataDir: join(dataDir, 'server') });
@@ -22,6 +27,7 @@ try {
   const bundle = await t.createVaultKeyBundle();
   const keys = await t.FileKeyAuthority.fromBundle(bundle);
   const recovery = await t.generateRecoveryCode();
+  // Reading starts in a plaintext vault; turning encryption on replaces its policy.
   await runtime.db.batch([
     runtime.db.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-test','revision')"),
   ]);
@@ -50,16 +56,26 @@ try {
   const type = process.env.CRATE_TEST_BROWSER === 'webkit' ? webkit : chromium;
   browser = await type.launch();
   await verifyReadingPlaintextTransition({ t, browser, origin, owner, bundle, recovery });
+  // The transition's setup issued the vault's only device credential.
   const headers = { Authorization: `Bearer ${owner.token}`, 'Content-Type': 'application/json', 'X-Crate-Protocol': '1', 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) };
-  const path = 'Reading/Article.md';
+  assert.equal(await runtime.db.prepare('SELECT 1 FROM reading_policy').first(), null);
+  // As the plugin does, name feature folders by tag with their sealed plaintext names.
+  const tags = await t.PathTags.fromSecret(bundle.vaultId, bundle.vault), vaultKey = await t.importEncryptionSecret(bundle.vault);
+  const readingFolder = await t.sealFolderLabel('Reading', tags, vaultKey, bundle.vaultId), remindersFolder = await t.sealFolderLabel('Reminders', tags, vaultKey, bundle.vaultId);
+  const plainPolicy = await fetch(`${origin}/reading/policy`, { method: 'POST', headers, body: JSON.stringify({ enabled: true, folderPath: 'Reading', revision: null }) });
+  assert.equal(plainPolicy.status, 428, 'An encrypted vault refuses a readable Reading folder');
+  const policy = await fetch(`${origin}/reading/policy`, { method: 'POST', headers, body: JSON.stringify({ enabled: true, folderPath: readingFolder.wire, folderLabel: readingFolder.label, revision: null }) });
+  assert.equal(policy.status, 200, await policy.clone().text());
+  const path = 'Reading/Article.md', wire = await tags.wire(path);
+  assert.ok(isWirePath(wire) && wire.startsWith(`${readingFolder.wire}/`));
   const note = t.createReadingNote({ id: '3eecb772-ac6a-4890-9dea-1e989849c920', url: 'https://example.invalid/private-reading', title: 'Encrypted Reading article', savedAt: new Date().toISOString() })
     .replace('extraction_status: "pending"', 'extraction_status: "ready"')
     .replace('<!-- crate:article:end -->', 'Safe encrypted article.\n\n<img src=x onerror="window.articleAttack=true"><svg onload="window.articleAttack=true"></svg><script>window.articleAttack=true</script><a href="javascript:window.articleAttack=true">Unsafe link</a>\n<!-- crate:article:end -->');
-  const sealed = await t.sealFile({ path, content: new TextEncoder().encode(note), contentType: 'text/markdown', publicData: null }, keys.forPath(path));
-  const upload = await fetch(`${origin}/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: sealed.bytes, headers: { ...headers, 'Content-Type': 'application/vnd.crate.encrypted-file', 'X-File-Hash': sealed.hash, 'X-File-Size': String(sealed.bytes.length), 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${crypto.randomUUID()}` } });
+  const sealed = await t.sealFile({ path, content: new TextEncoder().encode(note), contentType: 'text/markdown', publicData: null }, keys.forPath(wire));
+  const upload = await fetch(`${origin}/sync/upload?path=${encodeURIComponent(wire)}`, { method: 'PUT', body: sealed.bytes, headers: { ...headers, 'Content-Type': 'application/vnd.crate.encrypted-file', 'X-File-Hash': sealed.hash, 'X-File-Size': String(sealed.bytes.length), 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${crypto.randomUUID()}` } });
   assert.equal(upload.status, 200, await upload.text());
   const enroll = async () => {
-    const enrollment = await fetch(origin + '/notifications/reminders-enrollment-token', { method: 'POST', headers, body: JSON.stringify({ folderPath: 'Reminders' }) });
+    const enrollment = await fetch(origin + '/notifications/reminders-enrollment-token', { method: 'POST', headers, body: JSON.stringify({ folderPath: remindersFolder.wire, folderLabel: remindersFolder.label }) });
     assert.equal(enrollment.status, 200, await enrollment.clone().text());
     return (await enrollment.json()).browserToken;
   };
@@ -75,6 +91,8 @@ try {
     window.cspBlockedScripts = [];
     document.addEventListener('securitypolicyviolation', event => { window.cspViolations.push(event.effectiveDirective); if (event.effectiveDirective.startsWith('script-src')) window.cspBlockedScripts.push(event.blockedURI); });
   });
+  // Every request the web app sends while the vault is encrypted, URL and body.
+  const sent = recordPlaintextNames(context, origin, PLAINTEXT_NAMES);
   const page = await context.newPage(), errors = [], requests = [];
   let recoverySent = false;
   // Inject via the local server so WebKit keeps its real service-worker path.
@@ -119,9 +137,9 @@ try {
     await expect.poll(() => commits.length, { timeout: 25000 }).toBeGreaterThanOrEqual(2);
     assert.equal(commits[0], commits[1]);
     assert.ok(!commits[0].includes('private-offline-tag'));
-    const file = await runtime.db.prepare('SELECT storage_key FROM files WHERE path=?').bind(path).first();
+    const file = await runtime.db.prepare('SELECT storage_key FROM files WHERE path=?').bind(wire).first();
     const bytes = new Uint8Array(await (await (await runtime.mf.getR2Bucket('BUCKET')).get(file.storage_key)).arrayBuffer());
-    assert.ok(new TextDecoder().decode((await t.openFile(bytes, path, keys.forPath(path))).content).includes('private-offline-tag'));
+    assert.ok(new TextDecoder().decode((await t.openFile(bytes, path, keys.forPath(wire))).content).includes('private-offline-tag'));
     await page.reload();
     await expect(page.getByText('Encrypted Reading article', { exact: true }).first()).toBeVisible();
   }
@@ -152,6 +170,7 @@ try {
   // A fresh Safari/PWA partition unlocks with the recovery key and keeps one vault key record.
   const freshToken = await enroll();
   const lockedContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const lockedSent = recordPlaintextNames(lockedContext, origin, PLAINTEXT_NAMES);
   // This context signs in through Reminders, which checks push subscriptions.
   if (type === webkit) await lockedContext.addInitScript(() => {
     Object.defineProperty(ServiceWorkerRegistration.prototype, 'pushManager', { get: () => undefined });
@@ -172,7 +191,15 @@ try {
   assert.equal(recoverySent, false, 'Recovery key must never be sent to the server');
   assert.deepEqual(errors, []);
   assert.ok(!requests.some(request => request.body.includes('private-reading')));
-  console.log(`Reading plaintext-to-encrypted transition, encrypted enrollment, private cache, article access, server extraction, locked recovery,${type === chromium ? ' offline edits, exact replay after a lost reply,' : ''} and logout cleanup passed (${type.name()})`);
+  assert.deepEqual(sent.leaks, [], 'The Reading app sent a plaintext file or folder name');
+  assert.deepEqual(lockedSent.leaks, [], 'The locked Reading app sent a plaintext file or folder name');
+  assert.ok(sent.count > 0 && lockedSent.count > 0);
+  // Two notes, both stored under the Reading folder's tag with tagged or random names.
+  const stored = (await runtime.db.prepare('SELECT path FROM files').all()).results.map(row => row.path);
+  assert.equal(stored.length, 2);
+  assert.ok(stored.every(file => isWirePath(file) && file.startsWith(`${readingFolder.wire}/`)), stored.join(', '));
+  await assertNoPlaintextNames(runtime.db, PLAINTEXT_NAMES);
+  console.log(`Reading plaintext-to-encrypted transition, encrypted enrollment, tagged paths, private cache, article access, server extraction, locked recovery,${type === chromium ? ' offline edits, exact replay after a lost reply,' : ''} no plaintext names in requests, and logout cleanup passed (${type.name()})`);
 } finally {
   await browser?.close();
   await new Promise(resolve => server ? server.close(resolve) : resolve());

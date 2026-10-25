@@ -2,7 +2,7 @@ import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { createModalActions, createModalFooter } from '../../plugin/shared-modal';
 import { Setting, type ButtonComponent } from 'obsidian';
 import { errorMessage } from '../../../sync/logger';
-import type { EncryptionProgress } from '../../../sync/encryption/conversion';
+import type { EncryptionProgress } from '../../../sync/encryption/server-encryption';
 import { renderEncryptionProgress } from './encryption-progress-ui';
 
 export function renderEncryptionLoading(container: HTMLElement): void {
@@ -17,10 +17,12 @@ export function renderEncryptionLoading(container: HTMLElement): void {
   createModalActions(footer).addButton(button => button.setButtonText('Loading…').setDisabled(true));
 }
 
-/** The owner verifies the recovery key before rendering and retains conversion. */
+/** The owner verifies the recovery key before rendering; an interrupted setup resumes from its checkpoint. */
 export function renderEncryptionSetup(container: HTMLElement, options: {
-  recovery: string; resuming: boolean;
+  recovery: string;
   assertCurrent(): void;
+  /** Asks the user to accept deleting the server copy and its history. */
+  confirm(): Promise<boolean>;
   encrypt(code: string, progress: EncryptionProgress): Promise<void>;
   automaticSync(): boolean;
   setTitle(title: string): void;
@@ -71,21 +73,27 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
   details.parentElement!.addClass('crate-encryption-details', 'crate-encryption-setup__details');
   const changes = details.createEl('ul');
   for (const text of [
-    'Existing synced files and history are encrypted. Local vault files stay readable.',
-    'An empty server starts encrypted. Local changes wait for your next sync; enabling encryption does not upload them.',
+    'This device syncs first. Crate then deletes the server copy, its history and checkpoints, and uploads this device’s vault encrypted. Local vault files stay readable.',
     'Sync and notifications pause while encryption runs. Keep Obsidian open.',
-    'Unlock Reading and Reminders with one recovery key, or open a fresh setup link. Existing drafts and queued edits are kept.',
+    'Other Obsidian devices reconnect and enter the recovery key. Web apps log out and connect again; logging out discards their drafts and pending edits.',
     'Use your recovery key only in web apps you trust. They handle it during unlock and can read entire notes in their connected Reading and Reminders folders.',
-    'Web apps stay connected when you rename or move their folder. Choosing a different folder in settings requires a fresh setup link.',
-    'File and folder names, file sizes and notification times remain visible to the server. Notification titles and text are encrypted.',
+    'File and folder names are encrypted. The server still sees folder structure, which files are notes, file sizes and notification times. Notification titles and text are encrypted.',
     'Pasted links keep their URL labels because private URLs are not sent to the server for title lookup.',
     'Existing backup copies are not changed or retroactively encrypted.',
     'Turning encryption off later deletes remote data and history before uploading this device’s files.',
   ]) changes.createEl('li', { text });
 
-  const label = options.resuming ? 'Resume conversion' : 'Enable encryption';
+  const label = 'Enable encryption';
   const run = async () => {
     if (busy || disposed || !saved.checked) return;
+    busy = true;
+    let confirmed = false;
+    try { confirmed = await options.confirm(); } finally { busy = false; }
+    if (confirmed) await encrypt();
+  };
+  // A retry resumes the confirmed setup.
+  const encrypt = async () => {
+    if (busy || disposed) return;
     busy = true;
     options.setTitle('Encrypting vault');
     const view = renderEncryptionProgress(container);
@@ -99,13 +107,13 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
     } catch (error) {
       if (!disposed) {
         options.setTitle('Encryption needs attention');
-        view.fail(errorMessage(error), () => { void run(); });
+        view.fail(errorMessage(error), () => { void encrypt(); });
       }
     } finally { busy = false; }
   };
   const footer = createModalFooter(container);
   footer.addClass('crate-encryption-footer');
-  createModalActions(footer).setName(options.resuming ? 'Resume encryption' : 'Enable encryption')
+  createModalActions(footer).setName(label)
     .addButton(button => {
       primary = button;
       button.setButtonText(label).setCta().setDisabled(true).onClick(run);

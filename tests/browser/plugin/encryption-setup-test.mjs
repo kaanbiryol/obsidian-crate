@@ -13,7 +13,7 @@ const { outputFiles } = await build({
     import { mountModalHeader } from './src/ui/plugin/mountModalHeader';
     import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from './src/encryption/key-bundle';
     ${obsidianDomHelpers}
-    window.mount = async (resuming = false, delayed = false) => {
+    window.mount = async (delayed = false) => {
       window.disposeContent?.(); window.unmountHeader?.(); document.body.replaceChildren();
       window.calls = []; window.connectionChanged = false;
       Object.defineProperty(navigator, 'clipboard', {configurable:true, value:{writeText:async()=>{throw new Error('Clipboard unavailable');}}});
@@ -21,7 +21,7 @@ const { outputFiles } = await build({
       modal.setAttribute('role','dialog'); modal.setAttribute('aria-label','End-to-end encryption');
       const content = modal.createDiv({cls:'modal-content crate-reminders-ui'});
       const header = content.createDiv({cls:'crate-modal-header-host'});
-      window.unmountHeader = mountModalHeader(header,resuming ? 'Resume encryption' : 'Enable encryption',()=>{});
+      window.unmountHeader = mountModalHeader(header,'Enable encryption',()=>{});
       const body = content.createDiv({cls:'crate-modal-body'});
       renderEncryptionLoading(body);
       if (delayed) await new Promise(resolve=>{window.finishLoading=resolve;});
@@ -30,10 +30,11 @@ const { outputFiles } = await build({
       const envelope = await sealRecoveryBundle(bundle,window.recovery);
       await verifyRecoveryCode(envelope,window.recovery,bundle);
       body.empty();
-      window.unmountHeader.setTitle(resuming ? 'Resume encryption' : 'Enable encryption');
-      window.disposeContent = renderEncryptionSetup(body, {recovery:window.recovery, resuming,
+      window.unmountHeader.setTitle('Enable encryption');
+      window.disposeContent = renderEncryptionSetup(body, {recovery:window.recovery,
         automaticSync:()=>false, setTitle:title=>window.unmountHeader.setTitle(title), manage:()=>{window.manageOpened=true;}, close:()=>{window.closed=true;},
         assertCurrent:()=>{if(window.connectionChanged) throw new Error('The server connection changed.');},
+        confirm:async()=>{window.confirmations=(window.confirmations??0)+1; return true;},
         encrypt:async(code,progress)=>{
           window.calls.push(code); window.progress=progress; progress('Encrypting files and retained versions',{completed:0,total:12});
           await new Promise((resolve,reject)=>{window.finish = resolve; window.fail = ()=>reject(new Error('Connection lost.'));});
@@ -78,7 +79,7 @@ for (const browserType of [chromium,webkit]) {
       await page.route('https://encryption-ui.test/**',route=>route.fulfill({contentType:'text/html',body:`<html class="theme-${theme}"><head><style>${hostStyles}</style><style>${obsidianCss}</style><style>body{display:flex;align-items:center;justify-content:center;height:100dvh}</style><style>${css}</style></head><body class="theme-${theme} ${width<700?'is-mobile is-phone':''}"></body></html>`}));
       await page.goto('https://encryption-ui.test/');
       await page.addScriptTag({content:outputFiles[0].text});
-      await page.evaluate(()=>{window.mounted=window.mount(false,true);});
+      await page.evaluate(()=>{window.mounted=window.mount(true);});
       const modal = page.getByRole('dialog',{name:'End-to-end encryption',exact:true});
       const before = await modal.boundingBox();
       const headerBefore = await page.locator('.crate-modal-header-host').boundingBox();
@@ -138,7 +139,7 @@ for (const browserType of [chromium,webkit]) {
       await expect(content).toContainText('Clipboard access is unavailable');
       await expect(convert).toBeDisabled();
       await expect(saved).not.toBeChecked();
-      assert.deepEqual(await page.evaluate(()=>window.calls),[],'Copying must not start conversion');
+      assert.deepEqual(await page.evaluate(()=>window.calls),[],'Copying must not start encryption');
       const recovery = await page.evaluate(()=>window.recovery);
       await page.evaluate(()=>{navigator.clipboard.writeText=async value=>{window.copied=value;};});
       await copy.click();
@@ -172,6 +173,7 @@ for (const browserType of [chromium,webkit]) {
       await page.screenshot({path:`${output}/${hostName}${browserType.name()}-${width}-${theme}-progress.png`});
       await expect(content).toHaveJSProperty('inert',false); // Keep progress and explanations available to assistive technology.
       assert.deepEqual(await page.evaluate(()=>window.calls),[recovery]);
+      assert.equal(await page.evaluate(()=>window.confirmations),1,'Setup asks for confirmation once');
       await checkLayout();
       await page.evaluate(()=>window.fail());
       await expect(content).toContainText('Connection lost.');
@@ -188,12 +190,11 @@ for (const browserType of [chromium,webkit]) {
       await expect(page.getByRole('button',{name:'Manage encryption',exact:true})).toBeVisible();
       await checkLayout();
       await page.screenshot({path:`${output}/${hostName}${browserType.name()}-${width}-${theme}-complete.png`});
-      await page.evaluate(()=>window.mount(true));
-      const resume = page.getByRole('button',{name:'Resume conversion',exact:true});
-      await expect(page.getByRole('heading',{name:'Resume encryption',exact:true})).toBeVisible();
-      await expect(resume).toBeDisabled();
-      await saved.check(); await expect(resume).toBeEnabled();
-      await page.evaluate(()=>{window.connectionChanged=true;}); await resume.click();
+      // A changed server connection stops setup before it reaches the server.
+      await page.evaluate(()=>window.mount());
+      await expect(page.getByRole('heading',{name:'Enable encryption',exact:true})).toBeVisible();
+      await saved.check(); await expect(convert).toBeEnabled();
+      await page.evaluate(()=>{window.connectionChanged=true;}); await convert.click();
       await expect(content).toContainText('The server connection changed.');
       assert.deepEqual(await page.evaluate(()=>window.calls),[]);
       await page.evaluate(()=>window.mountManage());

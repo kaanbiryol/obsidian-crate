@@ -6,7 +6,7 @@ import { loadReadingArticle } from './api';
 import { cacheReadingArticle, readReadingArticle, READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
 import { useReadingArticle } from './useReadingArticle';
 
-vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingEncryptionHeaders: () => ({}) }));
+vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, readingEncryptionHeaders: () => ({}) }));
 vi.mock('./storage', async importOriginal => ({
   ...await importOriginal<typeof import('./storage')>(),
   readReadingArticle: vi.fn(), cacheReadingArticle: vi.fn(async () => {}),

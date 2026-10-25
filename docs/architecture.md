@@ -266,7 +266,7 @@ retains pairing, address, reachability and shared-settings rules.
 `sync/runtime/connection-workflow.ts` owns connecting and disconnecting, including
 validation, credential revocation, local state cleanup and settings persistence.
 `sync/runtime/encryption-reset-workflow.ts` owns the durable remote reset, local
-invalidation and upload sequence. `sync/runtime/address-workflow.ts` owns verified
+invalidation and upload sequence, whether it turns encryption off or on. `sync/runtime/address-workflow.ts` owns verified
 encrypted connection and reset-address moves. `SyncRuntime` serializes these
 configuration changes and supplies stop, drain, initialize and cancellation checks;
 workflows do not calculate lifecycle generations or register events.
@@ -435,7 +435,7 @@ Authenticated requests carry a Bearer token in the `Authorization` header. The W
 
 Push subscriptions are created with an authenticated session and record that session as their owner.
 
-The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for a 90-day, reminder-only bearer token stored locally by the browser. The token is bound to the exact enrolled reminders folder. Route and folder authorization prevent that token from reading or mutating the vault sync API, shared settings, device list, push administration, or enrollment-token API, so it cannot renew itself. Open a fresh link from the plugin after the session expires.
+The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for a 90-day, reminder-only bearer token stored locally by the browser. The token is bound to the exact enrolled reminders folder; in an encrypted vault that is the folder's tag, and the link carries the plaintext folder only in its fragment (`crateFolder`). Route and folder authorization prevent that token from reading or mutating the vault sync API, shared settings, device list, push administration, or enrollment-token API, so it cannot renew itself. When Obsidian changes the reminders folder, the server moves these tokens, their push subscriptions and unused enrollment links to the new folder, and the web app switches to it on its next request (in an encrypted vault, by opening the new folder's label). Open a fresh link from the plugin after the session expires.
 
 ## Desktop Reading capture
 
@@ -466,6 +466,15 @@ for local downloads, new Worker captures and existing Worker notes. Each caller
 selects its publication policy, preserving the differences in metadata ownership,
 and fallbacks. Source eligibility, revision checks, queue
 leases and storage commits remain with the local library and Worker workflows.
+
+`reading/core/filename.ts` names new captures `<title> - <site> - <id8>.md`, or
+`<site> - <id8>.md` while the title is still the link's hostname, in encrypted and
+unencrypted vaults alike, and recognizes names it generated. When the title arrives
+later, the host that writes the article renames a note that still has its generated
+name: the Worker extraction job through `sync/atomic-markdown-move.ts`, the local
+library through `app.fileManager.renameFile`, and the encrypted web app on
+**Try again** through an encrypted commit with `remove`. A name the user chose is
+never replaced, and existing notes keep their names.
 
 HTML extraction lives in `src/reading/extraction/` and is shared with the Worker.
 Generic article extraction uses inert parsing and disables extractor network requests.
@@ -683,10 +692,23 @@ only after a complete, confirmed load.
 
 `encryption/` owns the single-key vault bundle, authenticated formats and identity comparison. Both browser enrollment flows check every key identity against the server's public configuration (`assertEncryptionKeys`) before persisting keys. `sync/encryption/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata.
 
-`sync/encryption/conversion.ts` owns conversion sequencing, progress, server
-acknowledgments and activation. `encryption/conversion-content.ts` authenticates
-original or interrupted file bytes and prepares vault-encrypted receipts. These transformations run without network or storage
-access, so integrity failures and receipt isolation can be tested directly.
+`encryption/path-tags.ts` derives the path key and turns plaintext names into keyed
+tags; `protocol/encrypted-path.ts` defines the server path format the Worker
+validates without the key. `sync/encryption/path-index.ts` maps plaintext paths to
+server paths and back, remembering in the local manifest only the server names it
+cannot recompute (notes the server created for the iPhone shortcut).
+`encryption/path-binding.ts` checks each file's authenticated path against its
+server path, and `encryption/folder-label.ts` seals and opens feature folder names.
+`sync/worker-api/` (`sync.ts`, `history-checkpoints.ts`) and
+`sync/encryption/encrypted-files.ts` translate between plaintext and server paths;
+encrypted upload journals record the server path with their ciphertext, and sync
+planning uses plaintext paths only.
+
+Turning encryption on reuses the destructive reset in
+`sync/runtime/encryption-reset-workflow.ts` and `sync/encryption/reset.ts`: the
+device syncs first, saves its keys and checkpoint, wipes the server through
+`worker/encryption/reset.ts`, then uploads its vault encrypted. There is no
+in-place conversion.
 
 Self-hosted encrypted address changes authenticate the server recovery bundle in `sync/encryption/encrypted-connection.ts`. A local `checkpointScope` associates the new transport URL with the existing disk authority so pending uploads, rename dependencies and local history survive tunnel changes. It is only retained for that URL, never shared as a preference, and cleared when resetting sync. The runtime owns connection switching and waits for journal I/O; neither the enrollment validator nor the connection verifier starts sync independently.
 

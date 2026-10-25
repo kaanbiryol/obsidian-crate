@@ -50,7 +50,7 @@ for (const engine of [chromium, webkit]) {
 
         await t.rememberRecoveryKey(code, expected, () => true);
         const keys = await t.readVaultKeys(bundle.vaultId);
-        if (keys.vault.key.extractable || keys.notifications.key.extractable || keys.notificationFingerprint.extractable || keys.seal.privateKey.extractable
+        if (keys.vault.key.extractable || keys.notifications.key.extractable || keys.notificationFingerprint.extractable || keys.pathTag.extractable || keys.seal.privateKey.extractable
           || keys.vault.secret || keys.notifications.secret) throw new Error('Raw key persisted');
         if ((await t.exportWrappedLocalKeys()).length !== 1) throw new Error('One vault must keep one key record');
         for (const feature of ['reminders', 'reading']) {

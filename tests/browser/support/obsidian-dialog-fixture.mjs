@@ -57,6 +57,8 @@ export const obsidianDialogModule = `      export function setIcon(el) {
       }
 
       export class Notice { constructor(message) { window.notices ??= []; window.notices.push(message); } }
+      // Dialogs may bundle the sync client; these fixtures never reach a server.
+      export async function requestUrl() { throw new Error('Dialog fixtures make no server requests'); }
       export class Modal {
         constructor(app) {
           this.app = app;

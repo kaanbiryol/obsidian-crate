@@ -1,6 +1,7 @@
 import { isRecord, isSha256Hex } from '../platform/validation';
 import { assertPortablePaths, getSyncPathIssue } from './portable-path';
 import { createPathRecord } from './path-record';
+import { isWirePath } from './encrypted-path';
 import type { FileEntry } from './sync-types';
 
 export const isSyncSequence = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -27,9 +28,11 @@ function parseSyncFileEntry(value: unknown, local = false): FileEntry {
 	if (!isRecord(value) || !isSha256Hex(value.hash) || !isSyncSequence(value.size)
 		|| !(isSyncDate(value.modified) || local && value.modified === 'unverified')
 		|| (value.revision !== undefined && !isSyncRevision(value.revision))
-		|| (!local && !isSyncRevision(value.revision))) throw new Error('Invalid sync file metadata; no changes were applied');
+		|| (!local && !isSyncRevision(value.revision))
+		|| (value.wire !== undefined && !(local && typeof value.wire === 'string' && isWirePath(value.wire)))) throw new Error('Invalid sync file metadata; no changes were applied');
 	return { hash: value.hash, size: value.size, modified: value.modified,
-		...(value.revision === undefined ? {} : { revision: value.revision }) };
+		...(value.revision === undefined ? {} : { revision: value.revision }),
+		...(value.wire === undefined ? {} : { wire: value.wire }) };
 }
 
 export function parseSyncFiles(value: unknown, local = false): Record<string, FileEntry> {

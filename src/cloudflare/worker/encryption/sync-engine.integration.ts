@@ -6,16 +6,21 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import type { VaultKeyBundle } from '../../../encryption/key-bundle';
+import type { PathTags } from '../../../encryption/path-tags';
 import { SyncWorkerApi } from '../../../sync/worker-api/sync';
+import { createReadingNote } from '../../../reading/core/notes';
+import { commitSealedReadingNote } from '../reading/sealed-note';
 
 const devices: SyncTestDevice[] = [];
 let bundle: VaultKeyBundle;
+let paths: PathTags;
+const stored = async (path: string) => env.DB.prepare('SELECT storage_key, size FROM files WHERE path = ?').bind(await paths.wire(path)).first<{ storage_key: string; size: number }>();
 beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
 	vi.spyOn(console, 'info').mockImplementation(() => {});
 	await applySchema(env.DB);
 	const fixture = await createEncryptionFixture('active');
-	bundle = fixture.bundle;
+	bundle = fixture.bundle; paths = fixture.paths;
 	await storeEncryptionState(env.DB, fixture.state);
 });
 afterEach(async () => {
@@ -26,7 +31,7 @@ afterEach(async () => {
 const reminderFolders = () => ['Reminders'];
 async function open(device: SyncTestDevice) {
 	await device.open();
-	await device.api.configureEncryption(bundle, reminderFolders);
+	await device.api.configureEncryption(bundle, reminderFolders, () => 'Reading');
 }
 async function device(id: string) {
 	const result = new SyncTestDevice(id, env); devices.push(result);
@@ -60,8 +65,9 @@ it('merges encrypted offline edits across three restarted clients using plaintex
 		await open(client); await sync(client);
 	}
 	await converge(clients, { 'note.md': '# Shared\n\nAlpha changed\n\nBeta changed\n\nGamma changed\n' });
-	const stored = await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'note.md'").first<{ storage_key: string }>();
-	expect(await (await env.BUCKET.get(stored!.storage_key))!.text()).not.toContain('Alpha changed');
+	expect(await (await env.BUCKET.get((await stored('note.md'))!.storage_key))!.text()).not.toContain('Alpha changed');
+	// The server keeps only tagged names.
+	expect(await env.DB.prepare("SELECT path FROM files WHERE path LIKE '%note%' UNION ALL SELECT path FROM changelog WHERE path LIKE '%note%'").first()).toBeNull();
 });
 
 it.each(['sync', 'selected', 'wire-fallback'])('reconciles encrypted edits made after planning while uploading other files (%s)', async mode => {
@@ -111,8 +117,7 @@ it('adopts encrypted server settings on an empty vault first sync without upload
   expect(pulled.uploaded).toBe(0); expect(pulled.conflicts).toEqual([]);
   expect(second.disk.text(path)).toBe('{"theme":"private-vault-theme"}');
   expect((await first.api.getManifest()).files).toEqual(before.files);
-  const stored = await env.DB.prepare('SELECT storage_key FROM files WHERE path=?').bind(path).first<{ storage_key: string }>();
-  expect(await (await env.BUCKET.get(stored!.storage_key))!.text()).not.toContain('private-vault-theme');
+  expect(await (await env.BUCKET.get((await stored(path))!.storage_key))!.text()).not.toContain('private-vault-theme');
 });
 
 it('decrypts retained baselines and shared history when comparing unsynced local settings', async () => {
@@ -153,9 +158,10 @@ it('settles an encrypted upload committed before restart without publishing fres
 	try {
 		const syncing = interrupted.engine.sync(); await paused.committed; interrupted.close(); await syncing;
 		expect(new TextDecoder().decode((await observer.api.downloadFile('note.md')).content)).toBe('committed before disconnect\n');
-		const before = await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'note.md'").first();
+		const before = await stored('note.md');
+		expect(before).not.toBeNull();
 		await open(interrupted); await sync(interrupted);
-		expect(await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'note.md'").first()).toEqual(before);
+		expect(await stored('note.md')).toEqual(before);
 		paused.release(); await converge(clients, { 'note.md': 'committed before disconnect\n' });
 	} finally { paused.release(); }
 });
@@ -181,8 +187,7 @@ it('round-trips an encrypted attachment at the 25 MiB plaintext limit', async ()
 	first.disk.write('large.bin', content.buffer); await sync(first);
 	const second = await device('large-second'); await sync(second);
 	expect(second.disk.read('large.bin')).toEqual(content.buffer);
-	const metadata = await env.DB.prepare("SELECT size FROM files WHERE path = 'large.bin'").first<{ size: number }>();
-	expect(metadata!.size).toBeGreaterThan(content.length);
+	expect((await stored('large.bin'))!.size).toBeGreaterThan(content.length);
 }, 30_000); // Two-device encryption and transfer of 25 MiB is a correctness check, not a 5-second benchmark.
 
 it('preserves encrypted file renames and moves into and out of a reminders folder on another device', async () => {
@@ -218,7 +223,7 @@ it('syncs a renamed reminders folder without resurrecting its old path', async (
 it('republishes unchanged notes so a newly chosen reminders folder gets its schedules', async () => {
 	const { parseEncryptedFile } = await import('../../../encryption/file-format');
 	const publicData = async (path: string) => {
-		const row = await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind(path).first<{ storage_key: string }>();
+		const row = await stored(path);
 		return parseEncryptedFile(await (await env.BUCKET.get(row!.storage_key))!.text()).publicData as { reminders: unknown[] } | null;
 	};
 	let folders = ['Reminders'];
@@ -236,4 +241,46 @@ it('republishes unchanged notes so a newly chosen reminders folder gets its sche
 	const after = await sync(client);
 	expect([after.uploaded, after.downloaded]).toEqual([0, 0]);
 	expect(client.disk.text('Tasks/todo.md')).toBe('- [ ] Call the bank 2099-01-02T10:00:00.000Z <!-- crate-id:bank -->\n');
+});
+
+it('applies a remote delete on a restarted device that knows the file only by its plaintext path', async () => {
+	const clients = await replicas('delete-me.md', 'gone soon\n'), [first, second] = clients;
+	// A restarted client starts with an empty path index, so it maps the delete from its manifest.
+	first.close(); second.close(); first.disk.remove('delete-me.md');
+	await open(first); await open(second); await sync(first);
+	await converge(clients, {});
+});
+
+it('keeps both copies when a new file differs only in letter case from a synced one', async () => {
+	const first = await device('first'), second = await device('second');
+	first.disk.write('Note.md', 'first device\n'); second.disk.write('note.md', 'second device\n');
+	await sync(first);
+	const result = await second.engine.sync();
+	expect(JSON.stringify(result)).toContain('differs only in letter case');
+	expect(second.disk.text('note.md')).toBe('second device\n');
+	expect(new TextDecoder().decode((await first.api.downloadFile('Note.md')).content)).toBe('first device\n');
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first()).toEqual({ count: 1 });
+});
+
+it('syncs a shortcut note under its random server name, keeps that name through edits and deletes it after a restart', async () => {
+	const folder = await paths.wire('Reading');
+	await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,?,'policy','revision')").bind(folder).run();
+	const id = crypto.randomUUID(), name = `Reading/Shared - private.example - ${id.slice(0, 8)}.md`;
+	const note = createReadingNote({ id, url: 'https://private.example/a', title: 'Shared', savedAt: '2026-10-01T12:00:00Z' });
+	expect(await commitSealedReadingNote(env, { id, content: note, folder, generation: 'policy' })).toBe(true);
+	const server = async () => (await env.DB.prepare('SELECT path FROM files').all<{ path: string }>()).results.map(row => row.path);
+	const [wire] = await server();
+	expect(wire).not.toBe(await paths.wire(name));
+	const first = await device('first'); await sync(first);
+	expect(first.disk.text(name)).toBe(note);
+	// An edit re-saves the note with the vault key under the same server name.
+	first.close(); first.disk.write(name, `${note}\nMy note.\n`); await open(first); await sync(first);
+	expect(await server()).toEqual([wire]);
+	const second = await device('second'); await sync(second);
+	expect(second.disk.text(name)).toContain('My note.');
+	// After a restart the manifest still knows the random server name.
+	second.close(); second.disk.remove(name); await open(second); await sync(second);
+	expect(await server()).toEqual([]);
+	await sync(first);
+	expect(first.disk.paths()).not.toContain(name);
 });

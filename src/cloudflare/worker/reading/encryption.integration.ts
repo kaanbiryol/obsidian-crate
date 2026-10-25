@@ -6,32 +6,35 @@ import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { createEncryptionFixture } from '../test-support/encryption-test-harness';
 import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
-import { createReadingNote } from '@/reading/core/notes';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { openFile, sealFile } from '@/encryption/file-codec';
-import { handleEncryptionConversion } from '../encryption/conversion';
-import { publishCapture } from './captures';
+import { openFile } from '@/encryption/file-codec';
 import { handleReadingRoute } from './routes';
-import { encryptJson } from '@/encryption/envelope';
 import type { CapturedArticle } from '@/reading/extraction/types';
 import type { ReadingItem } from '@/reading/core/model';
 import { sha256Hex } from '@/platform/sha256';
+import { resolveEncryptedPath } from '@/encryption/path-binding';
+import { sealFolderLabel } from '@/encryption/folder-label';
+import { importEncryptionSecret } from '@/encryption/envelope';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
 const operation = () => createReminderOperationId(Math.floor(Date.now() / 86400_000));
-async function setup(mode: 'active' | 'converting' = 'active') {
-  const { bundle, recovery, keys, state } = await createEncryptionFixture(mode);
+async function setup(mode: 'active' | 'resetting' = 'active') {
+  const { bundle, recovery, keys, state, paths } = await createEncryptionFixture(mode);
+  // The server knows the Reading folder only by its tag and sealed label.
+  const folder = await sealFolderLabel('Reading', paths, await importEncryptionSecret(bundle.vault), bundle.vaultId);
+  const reading = { plain: 'Reading', wire: folder.wire };
   await env.DB.batch([
     env.DB.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?)').bind('e2ee:state', JSON.stringify(state)),
-    env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','policy','revision')"),
-    env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES ('reader',?,'reading','Reading','policy')").bind(await sha256Hex('reader-token')),
+    env.DB.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?)').bind(`e2ee:folder:${folder.wire}`, folder.label),
+    env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,?,'policy','revision')").bind(folder.wire),
+    env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES ('reader',?,'reading',?,'policy')").bind(await sha256Hex('reader-token'), folder.wire),
   ]);
   const headers = { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '1', 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) };
   const request = (path: string, body?: string) => worker.fetch(new Request('https://test' + path, { method: body ? 'POST' : 'GET', headers, body }), env);
   const attempts = new Map<string, unknown>(), requests: string[] = [];
   let loseReply = false, beforeCommit: (() => Promise<unknown>) | undefined;
-  const api = (captureArticle?: (url: string) => Promise<CapturedArticle>) => new EncryptedReadingApi({ captureArticle, folderPath: 'Reading', generation: bundle.generation, authority: keys.forPath('Reading/receipt.md'),
+  const api = (captureArticle?: (url: string) => Promise<CapturedArticle>) => new EncryptedReadingApi({ captureArticle, folderPath: 'Reading', wireFolder: folder.wire, paths, generation: bundle.generation, authority: keys.forPath(`${folder.wire}/receipt.md`),
     request: async (path, body) => {
       if (beforeCommit && path.endsWith('encrypted-commit')) { const run = beforeCommit; beforeCommit = undefined; await run(); }
       if (body) requests.push(body); const response = await request(path, body); if (loseReply && path.endsWith('encrypted-commit') && response.ok) { loseReply = false; throw new Error('Lost reply'); } return response;
@@ -39,7 +42,9 @@ async function setup(mode: 'active' | 'converting' = 'active') {
     readAttempt: id => Promise.resolve(attempts.get(id)), writeAttempt: (id, value) => { attempts.set(id, value); return Promise.resolve(); },
     error: (message, status) => new Error(`${status}: ${message}`),
   });
-  return { bundle, recovery, keys, state, headers, request, api, attempts, requests, loseNextReply: () => { loseReply = true; },
+  /** Open a stored note the way a device does, from its server path. */
+  const open = (path: string, bytes: Uint8Array<ArrayBuffer>) => openFile(bytes, (metadataPath, sealed) => resolveEncryptedPath(paths, path, metadataPath, sealed, reading), keys.forPath(path));
+  return { bundle, recovery, keys, state, folder, headers, request, api, open, attempts, requests, loseNextReply: () => { loseReply = true; },
     /** Run another client's change after the next attempt is built but before it commits. */
     beforeNextCommit: (run: () => Promise<unknown>) => { beforeCommit = run; } };
 }
@@ -57,7 +62,12 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
   const file = await env.DB.prepare('SELECT path,storage_key FROM files').first<{ path: string; storage_key: string }>();
   const bytes = new Uint8Array(await (await env.BUCKET.get(file!.storage_key))!.arrayBuffer());
   expect(new TextDecoder().decode(bytes)).not.toContain('confidential-article');
-  expect(new TextDecoder().decode((await openFile(bytes, file!.path, h.keys.forPath(file!.path))).content)).toContain('favorite: true');
+  const opened = await h.open(file!.path, bytes);
+  expect(new TextDecoder().decode(opened.content)).toContain('favorite: true');
+  // Only tags reach the server: the note and folder names stay encrypted.
+  expect(file!.path.startsWith(`${h.folder.wire}/`)).toBe(true);
+  expect(opened.metadata.path.startsWith('Reading/')).toBe(true);
+  expect(h.requests.join()).not.toContain('Reading/');
   expect((await env.DB.prepare('SELECT * FROM reading_sources').all()).results).toHaveLength(0);
   expect((await env.DB.prepare('SELECT * FROM reading_jobs').all()).results).toHaveLength(0);
 });
@@ -107,7 +117,7 @@ it('allows encryption discovery but rejects plaintext saves and sibling-folder a
   expect(response.status).toBe(200); const metadata = await response.text();
   for (const secret of [h.recovery, h.bundle.vault.secret, h.bundle.notifications.secret, h.bundle.seal.privateKey]) expect(metadata).not.toContain(secret);
   // Reading sessions receive the same public configuration as every other session.
-  expect(JSON.parse(metadata)).toEqual({ encryption: h.state });
+  expect(JSON.parse(metadata)).toEqual({ encryption: h.state, folderLabel: h.folder.label });
   expect((await h.request('/sync/manifest')).status).toBe(403);
   expect((await h.request('/settings')).status).toBe(403);
   expect((await h.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example' }))).status).toBe(428);
@@ -144,24 +154,7 @@ it('keeps article highlights, annotations, tags and archive changes encrypted an
     expect(serverBytes).not.toContain(secret); expect(receipts).not.toContain(secret); expect(h.requests.join()).not.toContain(secret);
   }
 });
-it('preserves queued captures during conversion and prevents late plaintext publication or handoffs', async () => {
-  const h = await setup('converting'), id = crypto.randomUUID();
-  const note = createReadingNote({ id, url: 'https://private.example/queued', savedAt: new Date().toISOString() });
-  await env.DB.prepare('INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES (?,?,?,?,0)').bind(id, 'policy', 'private', note).run();
-  await publishCapture(env, id, 'policy', null);
-  expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
-  const control = (path: string, method = 'POST', body = '{}') => handleEncryptionConversion(new Request('https://test' + path, { method, headers: h.headers, body }), env, path);
-  expect((await control('/encryption/conversion/finish'))?.status).toBe(409);
-  const path = `Reading/Article ${id}.md`, sealed = await sealFile({ path, content: new TextEncoder().encode(note), contentType: 'text/markdown', publicData: null }, h.keys.forPath(path));
-  const converted = await control('/encryption/conversion/reading-capture', 'PUT', JSON.stringify({ id, content: new TextDecoder().decode(sealed.bytes) }));
-  expect(converted?.status, await converted?.clone().text()).toBe(200);
-  expect((await control('/encryption/conversion/reading-capture', 'PUT', JSON.stringify({ id, content: new TextDecoder().decode(sealed.bytes) })))?.status).toBe(200);
-  expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).toBeNull();
-  const handoff = await handleReadingRoute(new Request('https://test/reading/handoff', { method: 'POST', body: '{}' }), env);
-  expect(handoff.status).toBe(428);
-});
-
-it.each(['active', 'converting'] as const)('blocks Shortcut preparation before parsing private content while %s', async mode => {
+it.each(['active', 'resetting'] as const)('blocks Shortcut preparation before parsing private content while %s', async mode => {
   await setup(mode);
   for (const path of ['/reading/shortcut/v1/prepare']) {
     const request = new Request('https://test' + path, {
@@ -174,56 +167,21 @@ it.each(['active', 'converting'] as const)('blocks Shortcut preparation before p
   expect(await env.DB.prepare('SELECT 1 FROM reading_handoffs').first()).toBeNull();
 });
 
-it('replays a converted Reading receipt without resending the private capture', async () => {
-  const h = await setup('converting'), id = operation();
-  const body = { operationId: id, url: 'https://private.example/legacy', title: 'Old private capture' };
-  const response = { saved: true, id: crypto.randomUUID() };
-  const requestHash = await sha256Hex(JSON.stringify({ action: 'capture', body }));
-  await env.DB.prepare('INSERT INTO reading_operations VALUES (?,?,?,?,?,?)').bind(id, 'reader', 'policy', requestHash, JSON.stringify(response), Math.floor(Date.now() / 86400_000)).run();
-  const context = { vaultId: h.bundle.vaultId, scopeId: 'vault', objectId: id, purpose: 'reminder' as const };
-  const value = { requestHash, response };
-  const converted = await handleEncryptionConversion(new Request('https://test/encryption/conversion/receipt', { method: 'PUT', headers: h.headers,
-    body: JSON.stringify({ kind: 'reading', operationId: id, vault: await encryptJson(value, h.keys.forVaultMetadata().key, context) }) }), env, '/encryption/conversion/receipt');
-  expect(converted?.status, await converted?.clone().text()).toBe(200);
-  await env.DB.prepare("UPDATE maintenance_state SET value=? WHERE key='e2ee:state'").bind(JSON.stringify({ ...h.state, mode: 'active' })).run();
-  expect(await h.api().request('/reading/capture', JSON.stringify(body))).toEqual(response);
-  expect(h.requests).toHaveLength(0);
-  expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
-  expect(JSON.stringify((await env.DB.prepare('SELECT * FROM reading_operations').all()).results)).not.toContain(requestHash);
-});
-
-async function convertReceipts(h: Awaited<ReturnType<typeof setup>>, kind: 'reminder' | 'reading', receipts: Array<{ id: string; vault: string }>) {
-  for (const { id, vault } of receipts) {
-    const converted = await handleEncryptionConversion(new Request('https://test/encryption/conversion/receipt', { method: 'PUT', headers: h.headers,
-      body: JSON.stringify({ kind, operationId: id, vault }) }), env, '/encryption/conversion/receipt');
-    expect(converted?.status, await converted?.clone().text()).toBe(200);
-  }
-  await env.DB.prepare("UPDATE maintenance_state SET value=? WHERE key='e2ee:state'").bind(JSON.stringify({ ...h.state, mode: 'active' })).run();
-}
-async function receiptEnvelope(h: Awaited<ReturnType<typeof setup>>, query: string) {
-  const response = await h.request(`/reading/encrypted-receipt?${query}`);
-  expect(response.status).toBe(200);
-  return (await response.json() as { envelope: string | null }).envelope;
-}
-
-it('recovers a lost encrypted wire attempt from the reminder operation ledger', async () => {
-  const h = await setup('converting'), id = operation();
-  await env.DB.prepare('INSERT INTO reminder_operations(operation_id, request_hash, response_json) VALUES (?, ?, ?)').bind(id, 'old-hash', '{"encrypted":"old"}').run();
-  await convertReceipts(h, 'reminder', [{ id, vault: 'wire.key.iv.cipher.tag' }]);
-  expect(await receiptEnvelope(h, `operationId=${id}&wire=1`)).toBe('wire.key.iv.cipher.tag');
-  // Without `wire=1` the route reads only Reading semantic receipts.
-  expect(await receiptEnvelope(h, `operationId=${id}`)).toBeNull();
-  expect(await receiptEnvelope(h, `operationId=${operation()}&wire=1`)).toBeNull();
-});
-
-it('returns a converted Reading receipt only for the current Reading policy generation', async () => {
-  const h = await setup('converting'), current = operation(), previous = operation();
-  const day = Math.floor(Date.now() / 86400_000);
-  await env.DB.batch([current, previous].map(id => env.DB.prepare('INSERT INTO reading_operations VALUES (?,?,?,?,?,?)')
-    .bind(id, 'reader', id === current ? 'policy' : 'previous-policy', 'hash', JSON.stringify({ saved: true }), day)));
-  await convertReceipts(h, 'reading', [current, previous].map(id => ({ id, vault: `${id}.key.iv.cipher.tag` })));
-  expect(await receiptEnvelope(h, `operationId=${current}`)).toBe(`${current}.key.iv.cipher.tag`);
-  expect(await receiptEnvelope(h, `operationId=${previous}`)).toBeNull();
-  // Reading semantic receipts are not in the shared wire ledger.
-  expect(await receiptEnvelope(h, `operationId=${current}&wire=1`)).toBeNull();
+it('names captures after their title and renames a link-named note once a retry finds the title', async () => {
+  const h = await setup();
+  const titled = await h.api(async () => ({ markdown: 'Article text.', title: 'Private headline' }))
+    .request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://www.private.example/titled' })) as { id: string };
+  const bare = await h.api().request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/later', fetchArticle: false })) as { id: string };
+  const names = async () => {
+    const rows = (await env.DB.prepare('SELECT path, storage_key FROM files').all<{ path: string; storage_key: string }>()).results;
+    return Promise.all(rows.map(async row => (await h.open(row.path, new Uint8Array(await (await env.BUCKET.get(row.storage_key))!.arrayBuffer()))).metadata.path));
+  };
+  expect((await names()).sort()).toEqual([`Reading/Private headline - private.example - ${titled.id.slice(0, 8)}.md`, `Reading/private.example - ${bare.id.slice(0, 8)}.md`]);
+  // The retry creates the titled note and deletes the old one in one commit.
+  await h.api(async () => ({ markdown: 'Later text.', title: 'Later headline' })).request('/reading/retry', JSON.stringify({ operationId: operation(), id: bare.id }));
+  expect((await names()).sort()).toEqual([`Reading/Later headline - private.example - ${bare.id.slice(0, 8)}.md`, `Reading/Private headline - private.example - ${titled.id.slice(0, 8)}.md`]);
+  expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM file_deletion_receipts').first()).toEqual({ count: 1 });
+  const library = await h.api().request('/reading/list') as { items: ReadingItem[] };
+  expect(library.items.find(item => item.crate_reading_id === bare.id)).toMatchObject({ title: 'Later headline', extraction_status: 'ready' });
+  expect(h.requests.join()).not.toContain('headline');
 });

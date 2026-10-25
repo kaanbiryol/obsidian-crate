@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { commitStagedFile } from '../sync/mutations';
 import { commitNewFiles } from '../sync/bulk-new-file-commit';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
@@ -81,7 +81,7 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	for (const table of readingTables) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 	expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(SYNC_RESET_GENERATION_KEY).first()).toEqual({ value: id });
 	for (const token of ['original', 'other', 'web']) expect((await request('/health', token)).status).toBe(401);
-	for (const path of ['/sync/manifest', '/encryption/conversion', '/auth/tokens']) expect((await request(path, nextToken)).status).toBe(423);
+	for (const path of ['/sync/manifest', '/encryption/pairing', '/auth/tokens']) expect((await request(path, nextToken)).status).toBe(423);
 	expect((await request(`/encryption/reset?id=${id}`, nextToken)).status).toBe(200);
 	expect(await env.DB.prepare('SELECT 1 FROM web_enrollment_tokens UNION SELECT 1 FROM push_subscriptions').first()).toBeNull();
 	await finish();
@@ -102,9 +102,9 @@ it('rejects an encrypted upload authorized before reset, even if staging starts 
 	const fixture = await createEncryptionFixture('active');
 	state = fixture.state;
 	await env.DB.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify(state)).run();
-	const { keys } = fixture;
-	const content = await sealFile({ path: 'late.md', content: new TextEncoder().encode('old secret'), contentType: 'text/markdown', publicData: null }, keys.forPath('late.md'));
-	const upload = () => new Request('https://test/sync/upload?path=late.md', { method: 'PUT', body: content.bytes, headers: {
+	const { keys } = fixture, wire = await fixture.paths.wire('late.md');
+	const content = await sealFile({ path: 'late.md', content: new TextEncoder().encode('old secret'), contentType: 'text/markdown', publicData: null }, keys.forPath(wire));
+	const upload = () => new Request(`https://test/sync/upload?path=${wire}`, { method: 'PUT', body: content.bytes, headers: {
 		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-Crate-Expected-Hash': 'absent',
 		'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),
 	} });
@@ -123,5 +123,87 @@ it('rejects an encrypted upload authorized before reset, even if staging starts 
 	release();
 	expect((await pending).status).not.toBe(200);
 	expect((await handleUpload(upload(), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles }, state)).status).not.toBe(200);
-	expect(await getStoredFileRow(env.DB, 'late.md')).toBeNull();
+	expect(await getStoredFileRow(env.DB, wire)).toBeNull();
+});
+
+describe('turning encryption on', () => {
+	let target: EncryptionServerState;
+	beforeEach(async () => {
+		await env.DB.prepare("DELETE FROM maintenance_state WHERE key = 'e2ee:state'").run();
+		target = (await createEncryptionFixture('active')).state;
+		await env.BUCKET.put('plain-current', 'plaintext note');
+		await env.DB.prepare("INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES ('plain.md', 'plain.md', 'hash', 14, 'plain-current')").run();
+	});
+	const begin = (body: Record<string, unknown>) => request(`/encryption/reset?id=${id}`, 'original', 'POST',
+		{ confirmation: 'delete-remote-data', replacementToken: nextToken, ...body });
+	async function expectUnchanged() {
+		expect(await readEncryptionState(env.DB)).toBeNull();
+		expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'encryption-reset:%'").first()).toBeNull();
+		expect((await env.DB.prepare('SELECT id FROM auth_tokens ORDER BY id').all<{ id: string }>()).results.map(row => row.id)).toEqual(['original', 'other', 'web']);
+		expect(await env.DB.prepare('SELECT path FROM files').first()).toEqual({ path: 'plain.md' });
+		expect(await (await env.BUCKET.get('plain-current'))!.text()).toBe('plaintext note');
+		expect((await request('/health', 'original')).status).toBe(200);
+	}
+
+	it('wipes the plaintext copy, its history and devices, then activates the given encryption', async () => {
+		await env.BUCKET.put('plain-old', 'old plaintext note');
+		await env.BUCKET.put('__crate__/settings.json', '{"ignorePatterns":["private/"]}');
+		await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('plain-old', 'plain.md', 'hash', 18, 'replaced', 9999999999999)").run();
+		await env.DB.prepare("INSERT INTO changelog(path, action, revision, hash, size) VALUES ('plain.md', 'put', 'plain-current', 'hash', 14)").run();
+		await env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')").run();
+		await env.DB.prepare("INSERT INTO push_subscriptions(id, owner_token_id, endpoint, p256dh, auth) VALUES ('push', 'web', 'https://push.test', 'key', 'auth')").run();
+		const started = await begin({ encryption: target });
+		expect(started.status, await started.clone().text()).toBe(200);
+		expect(await started.json()).toEqual({ id, vaultId: target.vaultId, generation: target.generation, complete: false });
+		expect(await readEncryptionState(env.DB)).toEqual({ ...target, mode: 'resetting' });
+		for (const token of ['original', 'other', 'web']) expect((await request('/health', token)).status).toBe(401);
+		state = target;
+		expect((await request('/sync/manifest', nextToken)).status).toBe(423);
+		await finish();
+		expect(await readEncryptionState(env.DB)).toEqual(target);
+		expect((await env.BUCKET.list()).objects).toHaveLength(0);
+		for (const table of ['files', 'file_versions', 'changelog', 'reading_policy', 'push_subscriptions']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
+		expect((await env.DB.prepare('SELECT id FROM auth_tokens').all<{ id: string }>()).results).toEqual([{ id }]);
+		expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(SYNC_RESET_GENERATION_KEY).first()).toEqual({ value: id });
+		// The replacement credential now syncs only with the new encryption identity.
+		const manifest = await request('/sync/manifest', nextToken);
+		expect(manifest.status, await manifest.clone().text()).toBe(200);
+		state = { ...target, vaultId: crypto.randomUUID() };
+		expect((await request('/sync/manifest', nextToken)).status).toBe(428);
+		// A repeated finish replays the receipt without wiping the new encrypted copy.
+		await env.BUCKET.put('new-ciphertext', 'encrypted bytes');
+		await finish();
+		expect(await env.BUCKET.get('new-ciphertext')).not.toBeNull();
+		expect(await readEncryptionState(env.DB)).toEqual(target);
+	});
+
+	it('rejects a missing or unusable encryption configuration without changing anything', async () => {
+		for (const encryption of [undefined, null, 'active', { ...target, mode: 'resetting' }, { ...target, mode: 'converting' },
+			{ ...target, seal: undefined }, { ...target, extra: true }]) {
+			const response = await begin(encryption === undefined ? {} : { encryption });
+			expect(response.status, JSON.stringify(encryption)).toBe(400);
+		}
+		await expectUnchanged();
+	});
+
+	it.each(['a saved link still downloading', 'an unfinished initial sync'])('refuses while the server has %s, without changing anything', async pending => {
+		const queuedLink = pending === 'a saved link still downloading';
+		if (queuedLink) {
+			await env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')").run();
+			await env.DB.prepare("INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES ('capture','reading-generation','private url','private note',0)").run();
+		} else await env.DB.prepare("INSERT INTO initial_import(id, token, state) VALUES (1, 'import-token', 'importing')").run();
+		const response = await begin({ encryption: target });
+		expect(response.status, await response.clone().text()).toBe(409);
+		await expectUnchanged();
+		expect(await env.DB.prepare(queuedLink ? 'SELECT 1 FROM reading_captures' : 'SELECT 1 FROM initial_import').first()).not.toBeNull();
+	});
+
+	it('refuses a new encryption configuration for a vault that is already encrypted', async () => {
+		await storeEncryptionState(env.DB, state);
+		const response = await begin({ encryption: target });
+		expect(response.status, await response.clone().text()).toBe(409);
+		expect(await readEncryptionState(env.DB)).toEqual(state);
+		expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'encryption-reset:%'").first()).toBeNull();
+		expect((await request('/health', 'original')).status).toBe(200);
+	});
 });

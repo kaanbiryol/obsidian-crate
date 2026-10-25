@@ -4,7 +4,7 @@ import type { EncryptionServerState } from '../../encryption/server-state';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from './private-storage';
 import { capturePwaSession } from '../session-generation';
-import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
+import { AUTH_TOKEN_KEY, adoptReminderFolder } from '../config';
 import type { ApiFetch } from '../types';
 import { takeFragmentValues } from '../encryption/encryption-fragments';
 import { unlockLocalState } from '../encryption/encryption-keys';
@@ -43,8 +43,9 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 	// startup and reset already publish checking; changing it here races push
 	// provider selection against an ordinary concurrent reminder-list request.
 	const work = (async () => {
-		const expected = await loadEncryptionState({ token, purpose: 'reminders', fragment: fragmentCode, request: () => rawFetch('/encryption'), current });
-		if (!expected) {
+		const verified = await loadEncryptionState({ token, purpose: 'reminders', fragment: fragmentCode, request: () => rawFetch('/encryption'), current });
+		const expected = verified?.state;
+		if (!verified || !expected) {
 			useUnencryptedStorage();
 			state = undefined;
 			publish({ status: 'unencrypted' });
@@ -53,12 +54,14 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 		state = expected;
 		if (view.status !== 'ready') requirePrivateStorageUnlock();
 		assertEncryptionActive(expected);
-		const localFolder = loadStoredConfig().folderPath;
-		const keys = await loadVaultKeys(expected, localFolder, current, fragmentCode);
+		if (!verified.folderPath) throw new Error('Update the Crate server and reconnect this app from Obsidian.');
+		const keys = await loadVaultKeys(verified, verified.folderPath, current, fragmentCode);
 		fragmentCode = undefined;
 		const local = await unlockLocalState(keys, 'reminders');
 		if (!current()) { local.destroy(); throw new Error('Session changed before unlocking'); }
-		unlockPrivateStorage(local, localFolder, localStorage, sessionStorage);
+		// The session follows reminders folder changes made in Obsidian.
+		adoptReminderFolder(keys.folderPath);
+		unlockPrivateStorage(local, keys.folderPath, localStorage, sessionStorage);
 		rememberEncryptionUnlock(expected.vaultId);
 		publish({ status: 'ready', folderPath: keys.folderPath });
 		return keys;

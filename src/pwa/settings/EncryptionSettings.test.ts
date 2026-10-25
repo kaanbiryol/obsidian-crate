@@ -44,7 +44,7 @@ describe('settings encryption status', () => {
 	it.each([false, true])('keeps lock and conversion problems visible without expanding details (converting=%s)', converting => {
 		vi.mocked(reminderEncryptionSnapshot).mockReturnValue({ status: 'locked', message: 'Finish encryption in Obsidian.', converting, setupRequired: false });
 		const document = render(reading('locked'));
-		expect(statusRows(document)[0]).toContain(converting ? 'Converting' : 'Locked');
+		expect(statusRows(document)[0]).toContain(converting ? 'Setting up' : 'Locked');
 		expect(document.body.textContent).toContain('Finish encryption in Obsidian.');
 		expect(document.body.textContent).toContain('Unlock or verify Reading in the app before using this folder.');
 		expect(document.querySelector('details')).toBeNull();

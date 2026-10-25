@@ -13,6 +13,8 @@ Save articles for later and keep their text in your Obsidian vault. Reading is i
 
 In Obsidian, Crate saves a bookmark first, then downloads the article on that device. This works without a Crate server connection. If downloading fails, the bookmark remains and the reader offers **Try again**.
 
+New notes are named after the article and its site, such as `The Hidden Cost - example.com - a1b2c3d4.md`. While only the link is known, the name uses the site alone. When the title downloads, Crate renames the note to include it, unless you renamed the note yourself. Existing notes keep their names.
+
 ## Where articles are downloaded
 
 The save form tells you which device downloads the article:
@@ -25,7 +27,7 @@ The save form tells you which device downloads the article:
 
 Pages requiring a login, blocking downloads, or relying on scripts may remain saved links. Server downloads do not use your browser cookies or Crate credentials. Use **Try again**, open the original page, or use [Web Clipper](#use-obsidian-web-clipper) for content you can access in your browser.
 
-With [end-to-end encryption](/docs/features/encryption/), article text, URLs, tags, and highlights stay encrypted on the server.
+With [end-to-end encryption](/docs/features/encryption/), article text, URLs, tags, highlights, and note names stay encrypted on the server.
 
 ## Organize your library
 

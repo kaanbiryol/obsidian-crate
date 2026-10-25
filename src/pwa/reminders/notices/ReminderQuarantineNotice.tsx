@@ -34,7 +34,7 @@ export function ReminderQuarantineNotice({ entries, folderPath, onRemove, kind =
 			<BaseButton variant="ghost" size="touch" type="button" onClick={exportEntries}>Export damaged entries</BaseButton>
 			{exported.length > 0 && <BaseButton variant="ghost" size="touch" type="button" disabled={!reviewed || busy} onClick={() => { void remove(); }}>Remove exported copies from device</BaseButton>}
 		</>}>
-		<span role="status">{kind === 'draft' ? 'This saved draft cannot be restored into this editor. Its original text stays on this device until you export and review it.' : 'These entries cannot be read safely and will not be sent. Their original text stays on this device while other changes can sync.'}</span>
+		<span role="status">{kind === 'draft' ? 'This saved draft cannot be restored into this editor. Its original text stays on this device until you export and review it.' : 'These entries are damaged or were saved for an earlier reminders folder, so they will not be sent. Their original text stays on this device while other changes can sync.'}</span>
 		<details><summary>Review damaged entries</summary>
 			<p>Export the full text and compare it with current reminders before restoring any missing edits in Obsidian. An earlier attempt may already have synced.</p>
 			<div className="pwa-reminder-recovery-preview">{entries.map((entry, index) => <div key={entry.key}><strong>Entry {index + 1}</strong><pre>{entry.raw.slice(0, 20_000)}</pre>

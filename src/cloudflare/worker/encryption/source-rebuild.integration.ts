@@ -9,65 +9,46 @@ import { createEncryptionFixture, storeEncryptionState } from '../test-support/e
 import { createReminderProjection } from '../../../encryption/reminder-projection';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
-import { ENCRYPTION_STATE_KEY } from './state';
-import { handleEncryptionConversion } from './conversion';
 import { handleUpload } from '../sync/file-handlers';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import { revalidateReminderSources } from '../reminders/source-migration';
 import { drainNotificationProjections } from '../notifications/projection';
-import { drainNotificationJobs } from '../notifications/outbox';
 import { runNotificationCoordinator } from '../notifications/coordinator';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 
-async function fixture(padding: number, count = 1) {
-	const { state, keys, notifications } = await createEncryptionFixture('active');
-	await storeEncryptionState(env.DB, state);
-	await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
-	const path = 'Reminders/Inbox.md';
-	const content = new TextEncoder().encode('x'.repeat(padding) + '\n\n' + Array.from({ length: count }, (_, index) =>
-		`- [ ] Important appointment 2099-01-02T10:00:00.000Z <!-- crate-id:r${index} -->`).join('\n'));
-	expect(content.byteLength).toBeLessThanOrEqual(1024 * 1024);
-	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
+type Fixture = Awaited<ReturnType<typeof createEncryptionFixture>>;
+
+/** Upload `plain` encrypted, returning the tagged path the server stores. */
+async function upload(fixture: Fixture, plain: string, content: Uint8Array<ArrayBuffer>, scheduled = true) {
+	const { keys, notifications, paths } = fixture;
+	const path = await paths.wire(plain);
+	const file = await sealFile({ path: plain, content, contentType: 'text/markdown',
+		publicData: scheduled ? await createReminderProjection(notifications, ['Reminders'], plain, content.buffer) : null }, keys.forPath(path));
 	const response = await handleUpload(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes, headers: {
 		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 		'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),
 	} }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
 	expect(response.status, await response.clone().text()).toBe(200);
-	return { state, file, path, keys, notifications };
+	return { path, file };
 }
 
-it.each([64, 800_000])('rebuilds previously indexed notification sources after conversion (%i bytes)', async padding => {
-	const { state, file, path } = await fixture(padding);
-	if (padding > 1000) expect(file.bytes.length).toBeGreaterThan(1024 * 1024);
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES (?, '')")
-		.bind(`reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:Reminders`).run();
-	// Resume at activation after bytes and receipts have been converted, while
-	// the plaintext-era scan cursor and derived source rows still exist.
-	await env.DB.prepare('UPDATE maintenance_state SET value = ? WHERE key = ?').bind(JSON.stringify({ ...state, mode: 'converting' }), ENCRYPTION_STATE_KEY).run();
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('e2ee:settings-converted', 'true')").run();
-	await env.DB.prepare('UPDATE upload_operations SET response_json = ?').bind(JSON.stringify({ e2eeLegacy: {} })).run();
-	const finish = () => handleEncryptionConversion(new Request('https://test/encryption/conversion/finish', { method: 'POST', headers: {
-		'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation),
-	} }), env, '/encryption/conversion/finish');
-	expect((await finish())?.status).toBe(200);
-	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'").first()).toBeNull();
-	await revalidateReminderSources(env, 2);
-	await drainNotificationProjections(env);
-	expect(await env.DB.prepare('SELECT verified FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ verified: 1 });
-	expect(await env.DB.prepare("SELECT operation FROM notification_jobs WHERE reminder_id = 'r0'").first()).toEqual({ operation: 'schedule' });
-	await drainNotificationJobs(env);
-	expect(await env.DB.prepare("SELECT 1 FROM scheduled_reminders WHERE reminder_id = 'r0'").first()).not.toBeNull();
-	// A lost activation response must not clear the newly verified source again.
-	expect((await finish())?.status).toBe(200);
-	expect(await env.DB.prepare('SELECT verified FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ verified: 1 });
-});
+async function fixture(padding: number, count = 1) {
+	const encryption = await createEncryptionFixture('active');
+	await storeEncryptionState(env.DB, encryption.state);
+	const folder = await encryption.paths.wire('Reminders');
+	await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, ?, 'UTC', 'policy')").bind(folder).run();
+	const content = new TextEncoder().encode('x'.repeat(padding) + '\n\n' + Array.from({ length: count }, (_, index) =>
+		`- [ ] Important appointment 2099-01-02T10:00:00.000Z <!-- crate-id:r${index} -->`).join('\n'));
+	expect(content.byteLength).toBeLessThanOrEqual(1024 * 1024);
+	return { ...encryption, folder, ...await upload(encryption, 'Reminders/Inbox.md', content) };
+}
 
 it.each(['quarantined', 'missing'])('repairs already-active vaults with %s source verification', async failure => {
-	const { path } = await fixture(800_000);
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES (?, '')").bind(`reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION - 1}:Reminders`).run();
+	const { path, folder } = await fixture(800_000);
+	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES (?, '')").bind(`reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION - 1}:${folder}`).run();
 	if (failure === 'quarantined') await env.DB.prepare('UPDATE reminder_source_state SET parser_version = ?, verified = 0').bind(REMINDER_CACHE_PARSER_VERSION - 1).run();
 	else await env.DB.prepare('DELETE FROM reminder_source_state').run();
 	await env.DB.prepare("INSERT INTO notification_file_retries(path, attempts, available_at, error) VALUES (?, 1, -1, 'old size limit')").bind(path).run();
@@ -80,15 +61,10 @@ it.each(['quarantined', 'missing'])('repairs already-active vaults with %s sourc
 });
 
 it('reports a reminders-folder note uploaded without schedules instead of scheduling it', async () => {
-	const { keys } = await fixture(0);
-	const path = 'Reminders/Later.md', content = new TextEncoder().encode('- [ ] Unscheduled appointment 2099-01-02T10:00:00.000Z <!-- crate-id:later -->');
+	const encryption = await fixture(0);
+	const content = new TextEncoder().encode('- [ ] Unscheduled appointment 2099-01-02T10:00:00.000Z <!-- crate-id:later -->');
 	// For example, a device that did not yet treat this folder as a reminders folder.
-	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: null }, keys.forPath(path));
-	const uploaded = await handleUpload(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes, headers: {
-		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
-		'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),
-	} }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
-	expect(uploaded.status, await uploaded.clone().text()).toBe(200);
+	const { path } = await upload(encryption, 'Reminders/Later.md', content, false);
 	await drainNotificationProjections(env);
 	expect(await env.DB.prepare('SELECT error FROM notification_file_retries WHERE path = ?').bind(path).first()).toEqual({ error: 'Edit this note in Obsidian to schedule its reminders.' });
 	expect(await env.DB.prepare("SELECT 1 FROM notification_jobs WHERE reminder_id = 'later'").first()).toBeNull();
@@ -129,16 +105,10 @@ it('rolls back every scheduling chunk on failure and retries without replacing u
 });
 
 it('keeps coordinator passes within their query budget while rebuilding two dense encrypted sources', async () => {
-	const { keys, notifications } = await fixture(0, 2000);
-	const path = 'Reminders/Second.md';
+	const encryption = await fixture(0, 2000);
 	const content = new TextEncoder().encode(Array.from({ length: 2000 }, (_, index) =>
 		`- [ ] Another appointment 2099-01-02T10:00:00.000Z <!-- crate-id:second-${index} -->`).join('\n'));
-	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
-	const uploaded = await handleUpload(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes, headers: {
-		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
-		'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),
-	} }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
-	expect(uploaded.status).toBe(200);
+	await upload(encryption, 'Reminders/Second.md', content);
 	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0, verified = 0').run();
 	// Revalidation refreshes a job's timestamp. An older, still-unverified job
 	// can therefore run first; make that ordering independent of wall-clock seconds.

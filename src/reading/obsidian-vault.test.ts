@@ -17,8 +17,9 @@ function harness() {
 		create: vi.fn(async () => {}),
 	};
 	const validate = vi.fn();
-	const adapter = createObsidianReadingVault(vault as unknown as Vault, 'Reading', { signal: controller.signal, allowed: () => allowed, validate });
-	return { adapter, vault, file, folder, entries, controller, validate, exclude: () => { allowed = false; }, content: () => content };
+	const fileManager = { renameFile: vi.fn(async (_file: TFile, _path: string) => {}) };
+	const adapter = createObsidianReadingVault(vault as unknown as Vault, 'Reading', { signal: controller.signal, allowed: () => allowed, validate, fileManager });
+	return { adapter, vault, file, folder, entries, controller, validate, fileManager, exclude: () => { allowed = false; }, content: () => content };
 }
 
 it.each(['rename', 'delete', 'replace', 'exclude', 'stop'] as const)('rejects a read that finishes after %s', async change => {
@@ -64,4 +65,13 @@ it('stops creation if shutdown occurs while making the folder', async () => {
 	h.vault.createFolder.mockImplementation(async () => { h.controller.abort(); });
 	await expect(h.adapter.create('Reading/new.md', 'new')).rejects.toThrow();
 	expect(h.vault.create).not.toHaveBeenCalled();
+});
+
+it('renames the current note through the file manager and rejects stale or excluded targets', async () => {
+	const h = harness(), snapshot = h.adapter.files()[0]!;
+	await h.adapter.rename!(snapshot, 'Reading/Title - example.com - a1b2c3d4.md');
+	expect(h.fileManager.renameFile).toHaveBeenCalledWith(h.file, 'Reading/Title - example.com - a1b2c3d4.md');
+	h.exclude();
+	await expect(h.adapter.rename!(snapshot, 'Reading/Other.md')).rejects.toThrow();
+	expect(h.fileManager.renameFile).toHaveBeenCalledTimes(1);
 });

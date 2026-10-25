@@ -50,7 +50,7 @@ it('supports an enrollment for one feature without depending on sibling session 
   expect(rememberVaultKeys).toHaveBeenCalledOnce();
 });
 
-it.each(['wrong key', 'tampered bundle', 'generation', 'data key', 'notification key', 'seal key', 'converting', 'resetting'] as const)('rejects %s before persisting keys', async change => {
+it.each(['wrong key', 'tampered bundle', 'generation', 'data key', 'notification key', 'seal key', 'resetting'] as const)('rejects %s before persisting keys', async change => {
   const f = await fixture();
   if (change === 'wrong key') f.code = await generateRecoveryCode();
   if (change === 'tampered bundle') f.expected.recovery.envelope += 'a';
@@ -58,7 +58,7 @@ it.each(['wrong key', 'tampered bundle', 'generation', 'data key', 'notification
   if (change === 'data key') f.expected.keyId = crypto.randomUUID();
   if (change === 'notification key') f.expected.notificationKeyId = crypto.randomUUID();
   if (change === 'seal key') f.expected.seal.keyId = crypto.randomUUID();
-  if (change === 'converting' || change === 'resetting') f.expected.mode = change;
+  if (change === 'resetting') f.expected.mode = change;
   await expect(rememberRecoveryKey(f.code, f.expected, () => true)).rejects.toThrow();
   expect(rememberVaultKeys).not.toHaveBeenCalled();
 });
@@ -74,7 +74,7 @@ it('imports an approved paired bundle', async () => {
   await rememberPairedBundle({ bundle: f.bundle }, f.expected, () => true);
   expect(rememberVaultKeys).toHaveBeenCalledExactlyOnceWith(f.bundle, expect.any(Function));
 });
-it.each(['damaged secret', 'vault', 'generation', 'data key', 'missing bundle', 'extra field', 'converting', 'stale session'] as const)('rejects a pairing transfer with %s before storing keys', async problem => {
+it.each(['damaged secret', 'vault', 'generation', 'data key', 'missing bundle', 'extra field', 'resetting', 'stale session'] as const)('rejects a pairing transfer with %s before storing keys', async problem => {
   const f = await fixture();
   const packet: { bundle?: typeof f.bundle; vault?: unknown } = { bundle: f.bundle };
   if (problem === 'damaged secret') f.bundle.vault.secret = 'short';
@@ -83,7 +83,7 @@ it.each(['damaged secret', 'vault', 'generation', 'data key', 'missing bundle', 
   if (problem === 'data key') f.bundle.vault.id = crypto.randomUUID();
   if (problem === 'missing bundle') delete packet.bundle;
   if (problem === 'extra field') packet.vault = f.bundle.vault;
-  if (problem === 'converting') f.expected.mode = 'converting';
+  if (problem === 'resetting') f.expected.mode = 'resetting';
   await expect(rememberPairedBundle(packet, f.expected, () => problem !== 'stale session')).rejects.toThrow();
   expect(rememberVaultKeys).not.toHaveBeenCalled();
 });

@@ -1,4 +1,3 @@
-import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { readReadingPolicy, writeReadingPolicy } from './server';
 import { captureServerConnection } from '../plugin/server-request';
 import { Notice, TFolder } from 'obsidian';
@@ -67,12 +66,13 @@ export function startReading(plugin: CratePlugin): void {
 		signal: controller.signal,
 		allowed: path => allowedReadingPath(plugin, path),
 		validate: () => { validateReadingConfiguration(plugin, plugin.settings.reading); },
+		fileManager: plugin.app.fileManager,
 	});
 	let policyChecked = !plugin.settings.workerUrl;
  let checkedAt = 0;
 	const canAdopt = () => policyChecked && plugin.app.workspace.layoutReady && !['syncing', 'error', 'offline'].includes(plugin.syncRuntime.getState().status);
 	// Keep replacement views synchronous, but start their vault work after the old library drains.
-	const library = new ReadingLibrary({ ...readingVault, privateFilenames: () => Boolean(loadEncryptionKeys(plugin.secretStorage)),
+	const library = new ReadingLibrary({ ...readingVault,
 		// Background tabs count too: their editor reloads the note when selected.
 		editing: path => plugin.app.workspace.getLeavesOfType('markdown').some(leaf => leaf.getViewState().state?.file === path),
 		...{ captureArticle: async (url: string, signal: AbortSignal) => {

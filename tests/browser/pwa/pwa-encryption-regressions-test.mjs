@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
 import { chromium, webkit } from '@playwright/test';
 import { openLocalRuntime, issueLocalDevice } from '../../../packages/server/src/local-server-runtime.mjs';
 import { listenLocalServer } from '../../../packages/server/src/local-server-http.mjs';
+import { isWirePath } from './pwa-encrypted-names-checks.mjs';
 
 if (process.env.CRATE_PWA_PREBUILT !== '1') {
 	const result = spawnSync(process.execPath, ['scripts/build-worker.mjs'], { stdio: 'inherit' });
@@ -15,15 +15,16 @@ if (process.env.CRATE_PWA_PREBUILT !== '1') {
 }
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
+export { createEncryptionState } from './src/encryption/server-state';
 export * from './src/encryption/file-authority';
 export * from './src/encryption/file-codec';
-export * from './src/sync/encryption/conversion';
+export { PathTags } from './src/encryption/path-tags';
+export * from './src/encryption/reminder-projection';
+export * from './src/sync/encryption/reset';
 export * from './src/sync/worker-api/http';
 export * from './src/pwa/encryption/encryption-keys';
 export * from './src/pwa/reminders/encrypted-reminder-api';
 export { unlockPrivateStorage } from './src/pwa/reminders/private-storage';
-export { scanReminderMarkdownContent } from './src/reminders/core/markdownScan';
-export { reminderCommandPayload } from './src/reminders/core/reminderFileCommand';
 `, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, write: false, format: 'iife', globalName: 'regression', platform: 'browser', target: 'es2022', alias: { obsidian: resolve('src/test/mocks/obsidian.ts') } })).outputFiles[0].text;
 
 async function verify(browser, scenario) {
@@ -37,53 +38,63 @@ async function verify(browser, scenario) {
 	try {
 		const owner = await issueLocalDevice(runtime.db, 'Encryption regression');
 		const info = await (await fetch(`${origin}/.well-known/crate`)).json();
-		const headers = { Authorization: `Bearer ${owner.token}`, 'X-Crate-Protocol': String(info.protocol.current), 'Content-Type': 'application/json' };
-		const operation = () => `e1_${String(info.reminderOperationDay).padStart(8, '0')}_${randomUUID()}`;
 		const descriptionLength = scenario === 'large-receipt' ? 800000 : 30000;
 		const prefix = scenario === 'plaintext-prefix';
+		// A note that merely looks like the encrypted file format must stay an ordinary note.
 		const text = prefix ? 'CRATE-E2EE/1\nThis is a plaintext format example.\n- [ ] Ordinary task <!-- crate-id:existing-task -->\n'
 			: '- [ ] Review this task <!-- crate-id:existing-task -->\n<!-- crate-desc:v1:' + 'x'.repeat(descriptionLength) + ' -->\n';
-		const path = 'Reminders/Inbox.md', bytes = Buffer.from(text);
-		const upload = await fetch(`${origin}/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: bytes, headers: {
-			...headers, 'Content-Type': prefix ? 'application/vnd.crate.encrypted-file' : 'text/markdown',
-			'X-File-Hash': createHash('sha256').update(bytes).digest('hex'), 'X-File-Size': String(bytes.length),
-			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operation(),
-		} });
-		assert.equal(upload.status, 200, await upload.text());
 		await page.goto(`${origin}/health`);
 		await page.addScriptTag({ url: `${origin}/regression.js` });
-		const reminder = await page.evaluate(async ({ text, path }) => window.regression.reminderCommandPayload(window.regression.scanReminderMarkdownContent(path, text, 'Reminders').reminders[0]), { text, path });
-		const legacyBody = { operationId: operation(), folderPath: 'Reminders', id: reminder.id, filePath: path, expectedRevision: reminder.revision, completed: true };
-		const completed = await fetch(`${origin}/reminders/set-completed`, { method: 'POST', headers, body: JSON.stringify(legacyBody) });
-		assert.equal(completed.status, 200, await completed.clone().text());
-		const legacyResponse = await completed.json();
-		const result = await page.evaluate(async ({ origin, token, day, protocol, legacyBody, prefix }) => {
+		const result = await page.evaluate(async ({ origin, token, day, protocol, text }) => {
 			const t = window.regression;
 			const bundle = await t.createVaultKeyBundle();
 			const code = await t.generateRecoveryCode();
-			let lostConversion = false;
+			let lostSetup = false;
 			const transport = async request => {
 				const response = await fetch(request.url, { method: request.method, body: request.body, headers: { ...request.headers, 'Content-Type': request.contentType ?? 'application/json' } });
-				const buffer = await response.arrayBuffer();
-				if (!lostConversion && request.url.includes('/conversion/receipt') && response.ok) {
-					lostConversion = true;
-					throw new Error('Injected lost conversion response');
+				const buffer = await response.arrayBuffer(), body = new TextDecoder().decode(buffer);
+				// Lose the reply that reports the finished wipe; the saved reset must resume.
+				if (!lostSetup && request.url.includes('/encryption/reset?') && response.ok && JSON.parse(body).complete === true) {
+					lostSetup = true;
+					throw new Error('Injected lost setup response');
 				}
-				return { status: response.status, headers: Object.fromEntries(response.headers), arrayBuffer: buffer, text: new TextDecoder().decode(buffer) };
+				return { status: response.status, headers: Object.fromEntries(response.headers), arrayBuffer: buffer, text: body };
 			};
-			const http = new t.WorkerApiHttpClient(origin, token, transport);
-			try { await t.convertEncryptedVault(http, bundle, code, () => {}, ['Reminders']); }
-			catch (error) { if (!error.message.includes('Injected lost conversion response')) throw error; }
-			await t.convertEncryptedVault(http, bundle, code, () => {}, ['Reminders']);
-			const mode = (await t.readServerEncryption(http)).mode;
-			const keys = { ...await t.rememberVaultKeys(bundle), folderPath: 'Reminders' };
+			const createHttp = token => new t.WorkerApiHttpClient(origin, token, transport);
+			let saved = t.createEncryptionSetup(origin, token, bundle, true);
+			const target = async () => t.createEncryptionState(bundle, await t.sealRecoveryBundle(bundle, code));
+			const persist = reset => { saved = structuredClone(reset); };
+			try { await t.resetRemoteEncryption(saved, () => {}, () => {}, createHttp, persist, target); }
+			catch (error) { if (!error.message.includes('Injected lost setup response')) throw error; }
+			await t.resetRemoteEncryption(structuredClone(saved), () => {}, () => {}, createHttp, persist, target);
+			const vaultToken = saved.replacementToken;
+			const http = createHttp(vaultToken);
+			http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
+			const mode = (await http.requestJson('/encryption')).encryption.mode;
+			// The plugin uploads the note sealed, at its tagged server path.
+			const tags = await t.PathTags.fromSecret(bundle.vaultId, bundle.vault);
+			const path = 'Reminders/Inbox.md', wire = await tags.wire(path);
+			const authority = await t.FileKeyAuthority.fromBundle(bundle);
+			const content = new TextEncoder().encode(text);
+			const publicData = await t.createReminderProjection(await t.importNotificationKeys(bundle.vaultId, bundle.notifications), ['Reminders'], path, content.buffer);
+			const sealed = await t.sealFile({ path, content, contentType: 'text/markdown', publicData }, authority.forPath(wire));
+			const authorityHeaders = { Authorization: `Bearer ${vaultToken}`, 'X-Crate-Protocol': String(protocol),
+				'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) };
+			const plainUpload = await fetch(`/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: sealed.bytes, headers: { ...authorityHeaders,
+				'Content-Type': 'application/vnd.crate.encrypted-file', 'X-File-Hash': sealed.hash, 'X-File-Size': String(sealed.bytes.byteLength),
+				'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': `e1_${String(day).padStart(8, '0')}_${crypto.randomUUID()}` } });
+			const upload = await fetch(`/sync/upload?path=${encodeURIComponent(wire)}`, { method: 'PUT', body: sealed.bytes, headers: { ...authorityHeaders,
+				'Content-Type': 'application/vnd.crate.encrypted-file', 'X-File-Hash': sealed.hash, 'X-File-Size': String(sealed.bytes.byteLength),
+				'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': `e1_${String(day).padStart(8, '0')}_${crypto.randomUUID()}` } });
+			if (!upload.ok) throw new Error(await upload.text());
+			const stored = await t.rememberVaultKeys(bundle);
+			const keys = { ...stored, folderPath: 'Reminders', wireFolder: await tags.wire('Reminders'), paths: new t.PathTags(stored.pathTag) };
 			t.unlockPrivateStorage(await t.unlockLocalState(keys, 'reminders'), 'Reminders', localStorage, sessionStorage);
 			let lostSave = false;
 			const requests = [];
 			const apiFetch = async (path, init = {}) => {
 				if (path === '/reminders/encrypted-commit') requests.push(init.body);
-				const response = await fetch(path, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
-					'X-Crate-Protocol': String(protocol), 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) } });
+				const response = await fetch(path, { ...init, headers: { ...authorityHeaders, 'Content-Type': 'application/json' } });
 				if (!lostSave && path === '/reminders/encrypted-commit' && response.ok) {
 					lostSave = true; await response.arrayBuffer();
 					return Response.json({ error: 'Injected lost save response' }, { status: 503 });
@@ -91,38 +102,40 @@ async function verify(browser, scenario) {
 				return response;
 			};
 			const api = new t.EncryptedReminderApi(keys, apiFetch);
-			const legacyReplay = await (await api.handle('/reminders/set-completed', { method: 'POST', body: JSON.stringify(legacyBody) })).json();
 			const listed = await (await api.handle('/reminders/list?folderPath=Reminders')).json();
 			const reminder = listed.reminders[0];
 			const change = { method: 'POST', body: JSON.stringify({ operationId: `e1_${String(day).padStart(8, '0')}_${crypto.randomUUID()}`,
-				folderPath: 'Reminders', id: reminder.id, filePath: reminder.filePath, expectedRevision: reminder.revision, completed: false }) };
+				folderPath: 'Reminders', id: reminder.id, filePath: reminder.filePath, expectedRevision: reminder.revision, completed: true }) };
 			const first = await api.handle('/reminders/set-completed', change);
 			// A fresh API must settle the committed immutable attempt from the server.
 			const retry = await new t.EncryptedReminderApi(keys, apiFetch).handle('/reminders/set-completed', change);
 			const after = await (await api.handle('/reminders/list?folderPath=Reminders')).json();
-			let preservedPrefix;
-			if (prefix) {
-				const download = await http.requestBinary(`/sync/download?path=${encodeURIComponent(reminder.filePath)}`);
-				const authority = await t.FileKeyAuthority.fromBundle(bundle);
-				const opened = await t.openFile(new Uint8Array(download.body), reminder.filePath, authority.forPath(reminder.filePath));
-				preservedPrefix = new TextDecoder().decode(opened.content).startsWith('CRATE-E2EE/1\nThis is a plaintext format example.');
-			}
-			return { mode, lostConversion, first: first.status, retry: retry.status, legacyReplay,
-				sameRequest: requests.length === 2 && requests[0] === requests[1], ackLength: JSON.parse(requests[0]).acknowledgment.length,
-				completed: after.reminders[0].completed, descriptionLength: after.reminders[0].description?.length, preservedPrefix };
-		}, { origin, token: owner.token, day: info.reminderOperationDay, protocol: info.protocol.current, legacyBody, prefix });
+			const download = await http.requestBinary(`/sync/download?path=${encodeURIComponent(wire)}`);
+			const opened = await t.openFile(new Uint8Array(download.body), path, authority.forPath(wire));
+			return { mode, lostSetup, plainUpload: plainUpload.status, wire, filePath: reminder.filePath, first: first.status, retry: retry.status,
+				sameRequest: requests.length === 2 && requests[0] === requests[1], plaintextNames: requests.some(body => body.includes('Reminders/') || body.includes('Inbox.md')),
+				ackLength: JSON.parse(requests[0]).acknowledgment.length, completed: after.reminders[0].completed, descriptionLength: after.reminders[0].description?.length,
+				preservedPrefix: new TextDecoder().decode(opened.content).startsWith('CRATE-E2EE/1\nThis is a plaintext format example.\n- [x] Ordinary task') };
+		}, { origin, token: owner.token, day: info.reminderOperationDay, protocol: info.protocol.current, text });
 		assert.equal(result.mode, 'active');
-		assert.equal(result.lostConversion, true);
-		assert.deepEqual(result.legacyReplay, legacyResponse);
+		assert.equal(result.lostSetup, true);
+		// Readable names are refused in an encrypted vault.
+		assert.equal(result.plainUpload, 428);
+		assert.ok(isWirePath(result.wire));
+		assert.deepEqual((await runtime.db.prepare('SELECT path FROM files').all()).results.map(row => row.path), [result.wire]);
+		assert.equal(result.filePath, 'Reminders/Inbox.md');
 		assert.equal(result.first, 503); assert.equal(result.retry, 200);
-		assert.equal(result.sameRequest, true); assert.equal(result.completed, false);
+		assert.equal(result.sameRequest, true); assert.equal(result.completed, true);
+		assert.equal(result.plaintextNames, false);
 		if (prefix) assert.equal(result.preservedPrefix, true);
 		else {
 			assert.equal(result.descriptionLength, descriptionLength);
 			assert.ok(result.ackLength > 32 * 1024);
 			if (scenario === 'large-receipt') {
-				const count = await runtime.db.prepare("SELECT COUNT(*) AS count FROM maintenance_state WHERE key GLOB 'e2ee:receipt:*'").first();
-				assert.ok(count.count > 4);
+				// The acknowledgment exceeds one D1 value, so its receipt is stored in bounded chunks.
+				const chunks = await runtime.db.prepare("SELECT COUNT(*) AS count, MAX(LENGTH(value)) AS longest FROM maintenance_state WHERE key GLOB 'e2ee:receipt:reminder:*'").first();
+				assert.ok(chunks.count >= 2, `Expected a chunked receipt, found ${chunks.count} rows`);
+				assert.ok(chunks.longest <= 512 * 1024);
 			}
 		}
 	} finally {
@@ -134,7 +147,7 @@ for (const type of [chromium, webkit]) {
 	try {
 		for (const scenario of ['long-reminder', 'large-receipt', 'plaintext-prefix']) {
 			await verify(browser, scenario);
-			console.log(`${type.name()}: ${scenario}, conversion resume and lost-response replay passed`);
+			console.log(`${type.name()}: ${scenario}, setup resume after a lost reply, tagged paths and lost-response replay passed`);
 		}
 	} finally { await browser.close(); }
 }

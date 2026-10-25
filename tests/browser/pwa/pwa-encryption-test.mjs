@@ -10,6 +10,7 @@ import { openLocalRuntime, issueLocalDevice } from '../../../packages/server/src
 import { listenLocalServer } from '../../../packages/server/src/local-server-http.mjs';
 import { verifyEncryptionReset } from './pwa-encryption-reset-checks.mjs';
 import { verifyEncryptedAttemptCleanup } from './pwa-encryption-cleanup-checks.mjs';
+import { assertNoPlaintextNames, isWirePath, recordPlaintextNames } from './pwa-encrypted-names-checks.mjs';
 
 if (process.env.CRATE_PWA_PREBUILT !== '1') {
 	const result = spawnSync(process.execPath, ['scripts/build-worker.mjs'], { stdio: 'inherit' });
@@ -17,24 +18,28 @@ if (process.env.CRATE_PWA_PREBUILT !== '1') {
 }
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
-
-export * from './src/encryption/file-codec';
-export * from './src/encryption/file-authority';
+export { createEncryptionState } from './src/encryption/server-state';
+export { PathTags } from './src/encryption/path-tags';
 export * from './src/encryption/reminder-projection';
-export * from './src/sync/encryption/conversion';
+export * from './src/sync/encryption/server-encryption';
 export * from './src/sync/encryption/reset';
 export * from './src/sync/worker-api/http';
 export * from './src/sync/worker-api/client';
 export * from './src/sync/encryption/encrypted-files';
 export * from './src/sync/worker-api/sync';
 export * from './src/sync/durability/durable-restores';
-export { makeApiFetch } from './src/pwa/reminders/api-fetch';
-export { AUTH_TOKEN_KEY } from './src/pwa/config';
+export { sha256Hex } from './src/platform/sha256';
+export { arrayBufferToBase64, base64ToArrayBuffer } from './src/sync/encoding';
 export * from './src/pwa/encryption/encrypted-push';
 export * from './src/pwa/encryption/encryption-keys';
 export * from './src/pwa/reminders/encrypted-reminder-attempts';
 export { unlockPrivateStorage } from './src/pwa/reminders/private-storage';
 `, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, write: false, format: 'iife', globalName: 'crateEncryptionTest', platform: 'browser', target: 'es2022', alias: { obsidian: resolve('src/test/mocks/obsidian.ts') } })).outputFiles[0].text;
+
+// Plaintext names that may exist only inside ciphertext once the vault is encrypted.
+const PLAINTEXT_NAMES = ['Reminders/', '"Reminders"', 'folder=Reminders', 'folderPath=Reminders', 'Inbox.md', 'Private.md',
+	'Encrypted appointment', 'Private browser task', 'Offline encrypted task', 'Private surrounding', 'secret paragraph', 'Excluded/project',
+	'Tasks/', 'Moved folder task'];
 
 async function verify(type) {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-e2ee-browser-'));
@@ -62,106 +67,122 @@ async function verify(type) {
 	const owner = await issueLocalDevice(runtime.db, 'Encryption integration');
 	const info = await (await fetch(`${origin}/.well-known/crate`)).json();
 	const headers = { Authorization: `Bearer ${owner.token}`, 'X-Crate-Protocol': String(info.protocol.current), 'Content-Type': 'application/json' };
-	const operation = () => `e1_${String(info.reminderOperationDay).padStart(8, '0')}_${randomUUID()}`;
-	const legacyUploads = [];
-	const plain = '# Inbox\n\nPrivate surrounding note text\n\n- [ ] Encrypted appointment 2099-01-02 <!-- crate-id:r1 -->\n';
-	const upload = async (path, content, previous = 'absent') => {
-		const bytes = Buffer.from(content), hash = createHash('sha256').update(bytes).digest('hex'), operationId = operation();
-		const response = await fetch(`${origin}/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: bytes, headers: {
-			...headers, 'Content-Type': 'text/markdown', 'X-File-Hash': hash, 'X-File-Size': String(bytes.length), 'X-Crate-Expected-Hash': previous, 'X-Crate-Upload-Operation': operationId,
-		} });
-		assert.equal(response.status, 200, await response.text());
-		legacyUploads.push({ operationId, payload: { path, hash, size: bytes.length, contentType: 'text/markdown', expectedHash: previous === 'absent' ? null : previous } });
-		return hash;
-	};
 	let context;
 	try {
-		await upload('Reminders/Inbox.md', plain);
-		const previous = await upload('Private.md', 'Retained secret paragraph');
-		await upload('Private.md', 'Current secret paragraph', previous);
-		const legacyId = operation();
-		const legacyCreate = { operationId: legacyId, id: legacyId, folderPath: 'Reminders', project: 'Inbox', content: 'Accepted before conversion', priority: 4 };
-		const oldCreate = await fetch(`${origin}/reminders/create`, { method: 'POST', headers, body: JSON.stringify(legacyCreate) });
-		assert.equal(oldCreate.status, 200, await oldCreate.clone().text());
-		const oldCreateReceipt = await oldCreate.json();
-		// Valid plaintext settings larger than the former encrypted envelope limit
-		// must convert, resume and remain editable through the production client.
+		// A plaintext server copy, with history and settings, that turning encryption on replaces.
+		const plain = Buffer.from('# Inbox\n\n- [ ] Plaintext task before encryption <!-- crate-id:r0 -->\n');
+		const plainUpload = await fetch(`${origin}/sync/upload?path=${encodeURIComponent('Reminders/Inbox.md')}`, { method: 'PUT', body: plain, headers: {
+			...headers, 'Content-Type': 'text/markdown', 'X-File-Hash': createHash('sha256').update(plain).digest('hex'), 'X-File-Size': String(plain.length),
+			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': `e1_${String(info.reminderOperationDay).padStart(8, '0')}_${randomUUID()}`,
+		} });
+		assert.equal(plainUpload.status, 200, await plainUpload.text());
+		// Valid settings larger than the former encrypted envelope limit must remain editable.
 		const seedSettings = { ignorePatterns: Array.from({ length: 2000 }, (_, index) => `Excluded/project-${String(index).padStart(4, '0')}/archive/`), syncInterval: 300, pushEnabled: false };
-		const initialSettings = type.name() === 'chromium' ? null : seedSettings;
-		if (initialSettings) {
-			const settings = await fetch(`${origin}/settings`, { method: 'PUT', headers, body: JSON.stringify({ settings: initialSettings, expectedVersion: null }) });
-			assert.equal(settings.status, 200, await settings.text());
-		}
-		const checkpoint = await fetch(`${origin}/sync/checkpoints`, { method: 'POST', headers, body: '{}' });
-		assert.equal(checkpoint.status, 200, await checkpoint.clone().text());
-		const checkpointId = (await checkpoint.json()).checkpoint.id;
+		const settings = await fetch(`${origin}/settings`, { method: 'PUT', headers, body: JSON.stringify({ settings: seedSettings, expectedVersion: null }) });
+		assert.equal(settings.status, 200, await settings.text());
 		await admin.goto(`${origin}/health`);
 		await admin.addScriptTag({ content: harness });
-		const enrolled = await admin.evaluate(async ({ origin, token, checkpointId, legacyUploads, initialSettings, seedSettings }) => {
+		const enrolled = await admin.evaluate(async ({ origin, token, seedSettings }) => {
 			const t = window.crateEncryptionTest;
 			const bundle = await t.createVaultKeyBundle();
 			const recovery = await t.generateRecoveryCode();
-			let loseResponse = true, loseRestoreResponse = false;
+			let loseSetupResponse = true, loseRestoreResponse = false;
 			const restoreBodies = [];
 			const transport = async request => {
 				if (request.url.endsWith('/sync/restore-version')) restoreBodies.push(request.body);
 				const response = await fetch(request.url, { method: request.method, body: request.body, headers: { ...request.headers, 'Content-Type': request.contentType ?? 'application/json' } });
 				const buffer = await response.arrayBuffer();
-				if (loseResponse && request.method === 'PUT' && request.url.includes('/conversion/file?')) { loseResponse = false; throw new Error('Injected lost conversion response'); }
+				if (loseSetupResponse && request.method === 'POST' && request.url.includes('/encryption/reset?') && response.ok) { loseSetupResponse = false; throw new Error('Injected lost setup response'); }
 				if (loseRestoreResponse && request.url.endsWith('/sync/restore-version')) { loseRestoreResponse = false; throw new Error('Injected lost restore response'); }
 				return { status: response.status, headers: Object.fromEntries(response.headers), arrayBuffer: buffer, text: new TextDecoder().decode(buffer) };
 			};
-			const http = new t.WorkerApiHttpClient(origin, token, transport);
-			try { await t.convertEncryptedVault(http, bundle, recovery, () => {}, ['Reminders']); throw new Error('Expected injected response loss'); }
+			const createHttp = token => new t.WorkerApiHttpClient(origin, token, transport);
+			// Turning encryption on replaces the server copy. The saved checkpoint resumes
+			// with its replacement credential after the begin response is lost.
+			let saved = t.createEncryptionSetup(origin, token, bundle, true);
+			const target = async () => t.createEncryptionState(bundle, await t.sealRecoveryBundle(bundle, recovery));
+			const persist = reset => { saved = structuredClone(reset); };
+			try { await t.resetRemoteEncryption(saved, () => {}, () => {}, createHttp, persist, target); throw new Error('Expected a lost setup response'); }
 			catch (error) { if (!error.message.includes('Injected lost')) throw error; }
-			if ((await t.readServerEncryption(http)).mode !== 'converting') throw new Error('Interrupted conversion was not retained');
-			await t.convertEncryptedVault(http, bundle, recovery, () => {}, ['Reminders']);
-			const recovered = await t.openRecoveryBundle((await t.readServerEncryption(http)).recovery, recovery);
+			if (saved.beginState !== 'attempted') throw new Error('Interrupted setup was not saved');
+			await t.resetRemoteEncryption(structuredClone(saved), () => {}, () => {}, createHttp, persist, target);
+			const owner = saved.replacementToken;
+			const http = createHttp(owner);
+			const state = await t.readServerEncryption(http);
+			if (state.mode !== 'active' || state.vaultId !== bundle.vaultId) throw new Error('Encryption setup did not activate the new vault');
+			const recovered = await t.openRecoveryBundle(state.recovery, recovery);
 			if (JSON.stringify(recovered) !== JSON.stringify(bundle)) throw new Error('Vault recovery failed');
-			const api = new t.SyncApiClient(origin, token, transport); await api.configureEncryption(bundle, () => ['Reminders']);
-			if (JSON.stringify((await api.getSharedSettings()).settings) !== JSON.stringify(initialSettings)) throw new Error('Converted shared settings did not round-trip');
-			// A new client must obtain the converted version even when no settings existed.
-			const settingsWriter = new t.SyncApiClient(origin, token, transport); await settingsWriter.configureEncryption(bundle, () => ['Reminders']);
+			if ((await createHttp(token).requestJson('/health').then(() => 200, error => error.status)) !== 401) throw new Error('Setup kept the old device credential');
+			const api = new t.SyncApiClient(origin, owner, transport); await api.configureEncryption(bundle, () => ['Reminders']);
+			if (Object.keys((await api.getManifest()).files).length) throw new Error('Setup kept plaintext server files');
+			if ((await api.getSharedSettings()).settings !== null) throw new Error('Setup kept plaintext shared settings');
+			// A new client must create the first encrypted settings version.
+			const settingsWriter = new t.SyncApiClient(origin, owner, transport); await settingsWriter.configureEncryption(bundle, () => ['Reminders']);
 			await settingsWriter.putSharedSettings(seedSettings);
 			if (JSON.stringify((await api.getSharedSettings()).settings) !== JSON.stringify(seedSettings)) throw new Error('First encrypted settings write failed');
-			const files = await t.EncryptedFiles.create(http, bundle, async () => null);
-			for (const old of legacyUploads) {
-				const receipt = await files.resolveConvertedOperation(old.operationId, old.payload);
-				if (!receipt.success || receipt.hash !== old.payload.hash) throw new Error('Pre-conversion upload receipt was lost');
-			}
+			// Upload this device's notes as the plugin does: sealed, at their tagged server paths.
+			http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
+			const notifications = await t.importNotificationKeys(bundle.vaultId, bundle.notifications);
+			// Notes carry schedules for the current reminders folder, as the plugin uploads them.
+			const remindersFolders = window.encryptedTestRemindersFolders = ['Reminders'];
+			const files = await t.EncryptedFiles.create(http, bundle, (path, bytes) => t.createReminderProjection(notifications, remindersFolders, path, bytes));
+			const syncApi = new t.SyncWorkerApi(http); syncApi.setEncryption(files);
+			const upload = async (path, text, expectedHash = null) => {
+				const bytes = new TextEncoder().encode(text).buffer, hash = await t.sha256Hex(bytes);
+				const wire = await files.prepare({ path, content: t.arrayBufferToBase64(bytes), hash, size: bytes.byteLength, contentType: 'text/markdown', expectedHash,
+					operationId: 'prepared-by-test', intent: { kind: 'local' }, origin: { clientSession: 'test', at: new Date().toISOString() } });
+				const receipt = await syncApi.uploadFile(wire.path, t.base64ToArrayBuffer(wire.content), wire.hash, wire.size, wire.contentType, wire.expectedHash);
+				if (!receipt.success || receipt.path !== wire.path) throw new Error(`Encrypted upload of ${path} failed: ${receipt.error}`);
+				return hash;
+			};
+			await upload('Reminders/Inbox.md', '# Inbox\n\nPrivate surrounding note text\n\n- [ ] Encrypted appointment 2099-01-02 <!-- crate-id:r1 -->\n');
+			await upload('Private.md', 'Current secret paragraph', await upload('Private.md', 'Retained secret paragraph'));
+			const tags = await t.PathTags.fromSecret(bundle.vaultId, bundle.vault);
+			const wires = { inbox: await tags.wire('Reminders/Inbox.md'), private: await tags.wire('Private.md'), folder: await tags.wire('Reminders') };
+			if (!wires.inbox.startsWith(`${wires.folder}/`)) throw new Error('A note was not stored under its folder tag');
+			const checkpointId = (await http.requestJson('/sync/checkpoints', { method: 'POST', body: '{}' })).checkpoint.id;
 			if (new TextDecoder().decode((await api.downloadFile('Private.md')).content) !== 'Current secret paragraph') throw new Error('Current note did not decrypt');
 			const history = await api.listFileVersions({ path: 'Private.md' });
 			if (new TextDecoder().decode(await api.previewFileVersion(history.versions[0])) !== 'Retained secret paragraph') throw new Error('Retained history did not decrypt');
 			const snapshot = await api.sharedHistory.load(checkpointId);
-			if (!snapshot.files['Private.md']) throw new Error('Encrypted checkpoint was lost');
+			if (!snapshot.files['Private.md'] || !snapshot.files['Reminders/Inbox.md']) throw new Error('Encrypted checkpoint did not resolve plaintext paths');
 			const manifest = await api.getManifest();
+			if (JSON.stringify(Object.keys(manifest.files).sort()) !== JSON.stringify(['Private.md', 'Reminders/Inbox.md'])) throw new Error('Manifest did not resolve plaintext paths');
 			if (manifest.files['Private.md'].size !== 24) throw new Error('Plaintext metadata was not recovered');
 			// The actual restore endpoint must receive ciphertext preconditions and
 			// retain its original receipt across a client restart after response loss.
-			const restoreApi = new t.SyncWorkerApi(http); restoreApi.setEncryption(files);
 			let intents = [];
 			const journal = { getRestoreIntents: () => structuredClone(intents),
 				setRestoreIntent: intent => { intents = [structuredClone(intent)]; }, removeRestoreIntent: () => { intents = []; }, save: async () => {} };
 			loseRestoreResponse = true;
-			try { await new t.DurableRestores(journal, restoreApi).restore(history.versions[0]); throw new Error('Expected lost restore response'); }
+			try { await new t.DurableRestores(journal, syncApi).restore(history.versions[0]); throw new Error('Expected lost restore response'); }
 			catch (error) { if (!error.message.includes('Injected lost restore response')) throw error; }
-			if (intents[0]?.phase !== 'pending' || !intents[0].encryptedWire) throw new Error('Encrypted restore intent was not retained');
-			await new t.DurableRestores(journal, restoreApi).restore(history.versions[0]);
+			if (intents[0]?.phase !== 'pending' || intents[0].encryptedWire?.path !== wires.private) throw new Error('Encrypted restore intent was not retained');
+			await new t.DurableRestores(journal, syncApi).restore(history.versions[0]);
 			if (restoreBodies.length !== 2 || restoreBodies[0] !== restoreBodies[1] || intents[0].phase !== 'committed') throw new Error('Restore replay changed its original request');
+			if (restoreBodies[0].includes('Private.md')) throw new Error('Restore named the plaintext path');
 			if (new TextDecoder().decode((await api.downloadFile('Private.md')).content) !== 'Retained secret paragraph') throw new Error('Encrypted restore did not recover the original bytes');
 			window.encryptedTestApi = api;
+			window.encryptedTestUpload = upload;
 			window.encryptedTestKeys = bundle;
 			window.encryptedTestRecovery = recovery;
-			return { ...(await api.createRemindersEnrollmentToken('Reminders')), grant: recovery, vaultId: bundle.vaultId };
-		}, { origin, token: owner.token, checkpointId, legacyUploads, initialSettings, seedSettings });
-		const rows = await runtime.db.prepare('SELECT storage_key FROM files UNION SELECT storage_key FROM file_versions').all();
+			return { ...(await api.createRemindersEnrollmentToken('Reminders')), grant: recovery, vaultId: bundle.vaultId, owner, wires };
+		}, { origin, token: owner.token, seedSettings });
+		// The plugin's replacement credential is the vault's only device credential now.
+		owner.token = enrolled.owner;
+		const fileRows = (await runtime.db.prepare('SELECT path FROM files').all()).results.map(row => row.path).sort();
+		assert.deepEqual(fileRows, [enrolled.wires.inbox, enrolled.wires.private].sort());
+		const rows = await runtime.db.prepare('SELECT path, storage_key FROM files UNION SELECT path, storage_key FROM file_versions').all();
 		for (const row of rows.results) {
+			assert.ok(isWirePath(row.path), `${row.path} is not a tagged server path`);
 			const text = await (await bucket.get(row.storage_key)).text();
 			assert.ok(text.startsWith('CRATE-E2EE/1\n')); assert.ok(!text.includes('secret paragraph')); assert.ok(!text.includes('Private surrounding'));
 		}
-		const rawSettings = await runtime.db.prepare("SELECT value FROM maintenance_state WHERE key = 'e2ee:settings'").first();
-		assert.ok(!rawSettings.value.includes('secret-pattern'));
+		assert.equal((await runtime.db.prepare('SELECT folder_path FROM web_enrollment_tokens LIMIT 1').first()).folder_path, enrolled.wires.folder);
+		await assertNoPlaintextNames(runtime.db, PLAINTEXT_NAMES);
 		context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+		// Every request the web app sends while the vault is encrypted, URL and body.
+		const sent = recordPlaintextNames(context, origin, PLAINTEXT_NAMES);
 		// Native offline navigation in Playwright WebKit fails before its service
 		// worker runs. Chromium covers real offline navigation; WebKit covers the
 		// same launch policy with an offline signal and unavailable data APIs.
@@ -187,7 +208,9 @@ async function verify(type) {
 		}
 		let recoverySent = false;
 		const requests = []; page.on('request', request => { if ((request.url() + (request.postData() ?? '')).includes(enrolled.grant)) recoverySent = true; if (request.method() !== 'GET') requests.push({ url: request.url(), body: request.postData() }); });
-		await page.goto(`${origin}/notifications?browserToken=${enrolled.browserToken}&folder=Reminders&tab=inbox#crateKey=${encodeURIComponent(enrolled.grant)}`);
+		// The plugin's link for an encrypted vault: the folder's name travels only in the fragment.
+		const fragment = new URLSearchParams({ crateKey: enrolled.grant, crateReadingKey: enrolled.grant, crateFolder: 'Reminders' });
+		await page.goto(`${origin}/notifications?browserToken=${enrolled.browserToken}&tab=inbox#${fragment}`);
 		try { await expect(page.getByText('Encrypted appointment', { exact: true })).toBeVisible({ timeout: 20000 }); }
 		catch (error) {
 			console.log('PWA bootstrap errors:', errors);
@@ -236,17 +259,10 @@ async function verify(type) {
 		assert.equal(replays[0], replays[1]);
 		assert.equal(replays[1], replays[2]);
 		assert.ok(!replays[0].includes('Offline encrypted task'));
+		assert.ok(replays[0].includes(enrolled.wires.folder), 'Encrypted commits name the folder by its tag');
 		await page.reload();
 		await expect(page.locator('.premium-reminder-title').filter({ hasText: /^Offline encrypted task$/ })).toBeVisible();
 		await page.addScriptTag({ url: `${origin}/test-encryption-harness.js` });
-		const replayedLegacy = await page.evaluate(async body => {
-			const t = window.crateEncryptionTest;
-			const api = t.makeApiFetch(localStorage.getItem(t.AUTH_TOKEN_KEY), () => {});
-			const response = await api('/reminders/create', { method: 'POST', body: JSON.stringify(body) });
-			if (!response.ok) throw new Error(await response.text());
-			return response.json();
-		}, legacyCreate);
-		assert.deepEqual(replayedLegacy, oldCreateReceipt);
 		await verifyEncryptedAttemptCleanup(page, enrolled.vaultId, info.reminderOperationDay);
 		const notification = await admin.evaluate(async () => {
 			const t = window.crateEncryptionTest, bundle = window.encryptedTestKeys;
@@ -256,7 +272,7 @@ async function verify(type) {
 		await page.evaluate(async notice => {
 			const t = window.crateEncryptionTest;
 			const keys = await t.readVaultKeys(notice.vaultId);
-			if (keys.vault.key.extractable || keys.notifications.key.extractable || keys.seal.privateKey.extractable || keys.vault.secret || keys.notifications.secret) throw new Error('Browser persisted extractable keys');
+			if (keys.vault.key.extractable || keys.notifications.key.extractable || keys.seal.privateKey.extractable || keys.pathTag.extractable || keys.vault.secret || keys.notifications.secret) throw new Error('Browser persisted extractable keys');
 			if ((await t.decryptPushDisplay(notice))?.title !== 'Private push title') throw new Error('Remembered keys cannot decrypt notifications');
 			if (await t.decryptPushDisplay({ ...notice, reminderId: 'substitution' }) !== null) throw new Error('Notification context substitution accepted');
 		}, notification);
@@ -278,12 +294,13 @@ async function verify(type) {
 		// for the recovery key before downloading/decrypting reminder content.
 		const second = await admin.evaluate(() => window.encryptedTestApi.createRemindersEnrollmentToken('Reminders'));
 		const lockedContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+		const lockedSent = recordPlaintextNames(lockedContext, origin, PLAINTEXT_NAMES);
 		if (type === webkit) await lockedContext.addInitScript(() => {
 			Object.defineProperty(ServiceWorkerRegistration.prototype, 'pushManager', { get: () => undefined });
 		});
 		try {
 			const locked = await lockedContext.newPage();
-			await locked.goto(`${origin}/notifications?browserToken=${second.browserToken}&folder=Reminders&tab=inbox`);
+			await locked.goto(`${origin}/notifications?browserToken=${second.browserToken}&tab=inbox#crateFolder=Reminders`);
 			await expect(locked.getByRole('heading', { name: 'Unlock Crate' })).toBeVisible();
 			await mkdir('.generated/browser-encryption', { recursive: true });
 			await locked.screenshot({ path: `.generated/browser-encryption/${type.name()}-unlock.png`, fullPage: true });
@@ -307,23 +324,46 @@ async function verify(type) {
 			await locked.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
 			await expect(locked.getByText('Private browser task', { exact: true })).toBeVisible();
 			const state = JSON.parse((await runtime.db.prepare("SELECT value FROM maintenance_state WHERE key = 'e2ee:state'").first()).value);
-			await runtime.db.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify({ ...state, mode: 'converting' })).run();
+			await runtime.db.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify({ ...state, mode: 'resetting' })).run();
 			try {
 				await locked.waitForLoadState('networkidle');
 				await locked.reload();
-				await expect(locked.getByRole('heading', { name: 'Encryption conversion in progress' })).toBeVisible();
+				await expect(locked.getByRole('heading', { name: 'Encryption setup in progress' })).toBeVisible();
 				await expect(locked.getByRole('button', { name: 'Unlock Crate', exact: true })).toHaveCount(0);
 			} finally { await runtime.db.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify(state)).run(); }
-			// Background verification may already have dismissed the conversion
-			// gate. Reload checks durable recovery without racing that dismissal.
+			// Background verification may already have dismissed the setup gate.
+			// Reload checks durable recovery without racing that dismissal.
 			await locked.waitForLoadState('networkidle');
 			await locked.reload();
 			await expect(locked.getByText('Private browser task', { exact: true })).toBeVisible();
 		} finally { await lockedContext.close(); }
+		// Changing the reminders folder in Obsidian moves this session, and the app
+		// follows from a refused request or from its next unlock, without a new link.
+		const moveFolder = folderPath => admin.evaluate(async folderPath => {
+			const api = window.encryptedTestApi;
+			const current = (await api.getNotificationPolicy()).policy
+				?? (await api.ensureNotificationPolicy({ enabled: true, folderPath: 'Reminders', timezone: 'UTC', allDayTime: null })).policy;
+			await api.updateNotificationPolicy({ ...current, folderPath });
+		}, folderPath);
+		await admin.evaluate(() => { window.encryptedTestRemindersFolders[0] = 'Tasks'; return window.encryptedTestUpload('Tasks/Inbox.md', '- [ ] Moved folder task <!-- crate-id:moved -->\n'); });
+		await moveFolder('Tasks');
+		await page.evaluate(() => window.dispatchEvent(new Event('online')));
+		await expect(page.getByText('Moved folder task', { exact: true })).toBeVisible();
+		await expect(page.getByText('Private browser task', { exact: true })).toHaveCount(0);
+		assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-config')).folderPath), 'Tasks');
+		await moveFolder('Reminders');
+		await page.reload();
+		await expect(page.getByText('Private browser task', { exact: true })).toBeVisible();
+		await expect(page.getByText('Moved folder task', { exact: true })).toHaveCount(0);
+		assert.deepEqual(sent.leaks, [], 'The web app sent a plaintext file or folder name');
+		assert.deepEqual(lockedSent.leaks, [], 'The locked web app sent a plaintext file or folder name');
+		assert.ok(sent.count > 0 && lockedSent.count > 0);
+		await assertNoPlaintextNames(runtime.db, PLAINTEXT_NAMES);
+		sent.stop();
 		await verifyEncryptionReset({ admin, page, origin, owner, runtime });
 		assert.equal(recoverySent, false, 'Recovery key must never be sent to the server');
 		assert.deepEqual(errors, []);
-		console.log(`${type.name()}: conversion/resume, recovery, history, enrollment, offline reload, lost-response replay, private storage, push decryption and separate-app unlock, destructive reset and plaintext re-enrollment passed`);
+		console.log(`${type.name()}: destructive setup/resume, tagged paths, recovery, history, enrollment, offline reload, lost-response replay, private storage, no plaintext names in requests, push decryption and separate-app unlock, reminders folder moves, destructive reset and plaintext re-enrollment passed`);
 	} finally {
 		await context?.close(); await adminContext.close(); await browser.close();
 		await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

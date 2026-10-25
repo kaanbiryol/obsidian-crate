@@ -3,18 +3,20 @@ import { makeApiFetch } from './api-fetch';
 import { prepareReminderEncryption } from './encryption-session';
 import { invalidatePwaSession } from '../session-generation';
 import type { ApiFetch } from '../types';
+import { adoptReminderFolder } from '../config';
 
 vi.mock('./encryption-session', () => ({
 	prepareReminderEncryption: vi.fn(async (_token: string, rawFetch: ApiFetch) => { await rawFetch('/encryption'); return null; }),
 	reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }),
 }));
+vi.mock('../config', async () => ({ ...await vi.importActual('../config'), adoptReminderFolder: vi.fn() }));
 
 beforeEach(() => {
 	vi.stubGlobal('localStorage', { getItem: () => 'session' });
 	vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
 	vi.stubGlobal('navigator', { userAgent: 'Test Browser', maxTouchPoints: 0 });
 });
-afterEach(() => { invalidatePwaSession(); vi.unstubAllGlobals(); vi.mocked(prepareReminderEncryption).mockClear(); });
+afterEach(() => { invalidatePwaSession(); vi.unstubAllGlobals(); vi.mocked(prepareReminderEncryption).mockClear(); vi.mocked(adoptReminderFolder).mockClear(); });
 
 it('probes encryption once while server responses confirm the vault is unencrypted', async () => {
 	let enabled = false;
@@ -45,4 +47,18 @@ it('reuses the startup probe in the app client instead of probing again', async 
 	// Another credential never inherits this confirmation.
 	await makeApiFetch('other', vi.fn())('/reminders/list?folderPath=Reminders');
 	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
+});
+
+
+it('switches to the folder the server moved this session to', async () => {
+	const off = { 'X-Crate-Encryption-State': 'off' };
+	vi.stubGlobal('fetch', vi.fn(async (path: string) => path === '/encryption' ? Response.json({ encryption: null }, { headers: off })
+		: path.includes('Private') ? Response.json({ error: 'Forbidden' }, { status: 403, headers: off })
+			: Response.json({ error: 'The reminders folder changed', code: 'reminders_folder_changed', folderPath: 'Tasks' }, { status: 403, headers: off })));
+	const api = makeApiFetch('moved-session', vi.fn());
+	await expect(api('/reminders/list?folderPath=Reminders')).rejects.toThrow('reminders folder changed in Obsidian');
+	expect(adoptReminderFolder).toHaveBeenCalledWith('Tasks');
+	// Other refusals reach the caller unchanged.
+	expect((await api('/reminders/list?folderPath=Private')).status).toBe(403);
+	expect(adoptReminderFolder).toHaveBeenCalledOnce();
 });

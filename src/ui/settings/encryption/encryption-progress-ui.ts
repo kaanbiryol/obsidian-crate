@@ -1,7 +1,7 @@
 import { createModalActions, createModalFooter } from '../../plugin/shared-modal';
-import type { EncryptionProgress } from '../../../sync/encryption/conversion';
+import type { EncryptionProgress } from '../../../sync/encryption/server-encryption';
 
-/** A dedicated conversion view keeps recovery controls out of the running operation. */
+/** A dedicated setup view keeps recovery controls out of the running operation. */
 export function renderEncryptionProgress(container: HTMLElement) {
   container.empty();
   // The view is ready immediately; keeping its live region busy would hide stage updates.
@@ -10,7 +10,7 @@ export function renderEncryptionProgress(container: HTMLElement) {
   const status = content.createEl('p', { cls: 'crate-encryption-operation__title', text: 'Preparing encrypted storage', attr: { role: 'status', 'aria-live': 'polite' } });
   const count = content.createEl('p', { cls: 'crate-encryption-intro' });
   const bar = content.createEl('progress', { cls: 'crate-encryption-progress', attr: { 'aria-label': 'Encryption progress' } });
-  const explanation = content.createEl('p', { cls: 'crate-encryption-intro', text: 'Keep Obsidian open. Sync and notifications pause while existing server content is encrypted. Your local files stay readable.' });
+  const explanation = content.createEl('p', { cls: 'crate-encryption-intro', text: 'Keep Obsidian open. Sync and notifications pause while the server copy is replaced. Your local files stay readable.' });
   const footer = createModalFooter(container);
   footer.addClass('crate-encryption-footer');
   createModalActions(footer).addButton(button => button.setButtonText('Encrypting…').setDisabled(true));
@@ -39,7 +39,7 @@ export function renderEncryptionProgress(container: HTMLElement) {
       createModalActions(footer).addButton(button => button.setButtonText('Retry').setCta().onClick(retry));
     },
     complete(automaticSync: boolean, manage: () => void, close: () => void) {
-      finish('Your vault is protected', 'Server content is encrypted. Files you sync from now on are encrypted on this device before uploading.');
+      finish('Your vault is protected', 'This device’s vault was uploaded encrypted. Files you sync from now on are encrypted on this device before uploading.');
       content.createEl('p', { cls: 'crate-encryption-intro', text: automaticSync
         ? 'Automatic sync remains on. Pending local changes will upload encrypted on the next sync.'
         : 'Automatic sync remains off. Select Sync now when you’re ready to upload local changes.' });

@@ -5,7 +5,7 @@ import { parseJsonObject } from '../request-validation';
 import { ENCRYPTION_STATE_KEY, hasEncryptionAuthority, readEncryptionState } from './state';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
-import type { ResetReceipt } from '../../../encryption/server-state';
+import { validateEncryptionState, type EncryptionServerState, type ResetReceipt } from '../../../encryption/server-state';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { isSha256Hex } from '../../../platform/validation';
 import { drainNotificationCancellations } from '../notifications/outbox';
@@ -13,12 +13,15 @@ import { sha256Hex } from '../../../platform/sha256';
 import { putMaintenanceValue } from '../db';
 
 const PREFIX = 'encryption-reset:';
+// Marks a reset that turns encryption on: completion activates the saved state instead of removing it.
+const SETUP_SUFFIX = ':setup';
 const READING_TABLES = ['reading_policy', 'reading_sources', 'reading_jobs', 'reading_operations',
 	'reading_enrollments', 'reading_handoffs', 'reading_captures'] as const;
 const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValue(db, key, JSON.stringify(value));
 
 /** Runs under the projection coordinator lock. The replacement credential and
- * reset receipt commit together, so a lost begin reply is safe to retry. */
+ * reset receipt commit together, so a lost begin reply is safe to retry. The same
+ * wipe turns encryption off (an active vault) or on (a plaintext vault given its new state). */
 export async function handleEncryptionReset(request: Request, env: Env, path: string, principal: AuthPrincipal): Promise<Response | null> {
 	if (path !== '/encryption/reset' || principal.scope !== 'vault') return null;
 	const id = new URL(request.url).searchParams.get('id');
@@ -33,18 +36,31 @@ export async function handleEncryptionReset(request: Request, env: Env, path: st
 	}
 	if (request.method === 'GET') return corsResponse({ error: 'Reset has not started' }, 404);
 	if (request.method !== 'POST') return corsResponse({ error: 'Method not allowed' }, 405);
-	const state = await readEncryptionState(env.DB);
-	if (!state || state.mode !== 'active') return corsResponse({ error: 'An active encrypted vault is required to start this reset' }, 409);
-	if (!hasEncryptionAuthority(request, state)) return corsResponse({ error: 'Unlock this vault before resetting it' }, 428);
-	const parsed = await parseJsonObject(request, 2048);
+	const current = await readEncryptionState(env.DB);
+	if (current && current.mode !== 'active') return corsResponse({ error: 'Finish the current encryption reset first' }, 409);
+	if (current && !hasEncryptionAuthority(request, current)) return corsResponse({ error: 'Unlock this vault before resetting it' }, 428);
+	const parsed = await parseJsonObject(request, 512 * 1024);
 	if (!parsed.ok) return parsed.response;
-	const { replacementToken, confirmation } = parsed.value;
+	const { replacementToken, confirmation, encryption } = parsed.value;
 	if (confirmation !== 'delete-remote-data' || !isSha256Hex(replacementToken)) {
 		return corsResponse({ error: 'Explicit data-loss confirmation and a new device credential are required' }, 400);
+	}
+	let state: EncryptionServerState;
+	if (current) {
+		if (encryption !== undefined) return corsResponse({ error: 'This vault is already encrypted' }, 409);
+		state = current;
+	} else {
+		try { validateEncryptionState(encryption); } catch { return corsResponse({ error: 'A valid encrypted vault configuration is required' }, 400); }
+		if (encryption.mode !== 'active') return corsResponse({ error: 'A valid encrypted vault configuration is required' }, 400);
+		state = encryption;
+		// The wipe cannot keep links the server is still downloading or an unfinished first sync.
+		if (await env.DB.prepare('SELECT 1 FROM reading_captures LIMIT 1').first()) return corsResponse({ error: 'Wait for saved links to finish downloading, then turn on encryption.' }, 409);
+		if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return corsResponse({ error: 'Finish the initial sync before enabling encryption' }, 409);
 	}
 	const next: ResetReceipt = { id, vaultId: state.vaultId, generation: state.generation, complete: false };
 	await env.DB.batch([
 		save(env.DB, PREFIX + id, next),
+		...(current ? [] : [save(env.DB, PREFIX + id + SETUP_SUFFIX, true)]),
 		save(env.DB, ENCRYPTION_STATE_KEY, { ...state, mode: 'resetting' }),
 		putMaintenanceValue(env.DB, SYNC_RESET_GENERATION_KEY, id),
 		env.DB.prepare(`INSERT INTO auth_tokens(id, token_hash, device_id, device_name, platform, scope)
@@ -81,6 +97,7 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 		return corsResponse(receipt);
 	}
 	const complete = { ...receipt, complete: true };
+	const setup = await env.DB.prepare('SELECT 1 FROM maintenance_state WHERE key = ?').bind(PREFIX + receipt.id + SETUP_SUFFIX).first();
 	await env.DB.batch([
 		...['files', 'file_versions', 'changelog', 'file_deletion_receipts', 'upload_operations', 'reminder_operations',
 			'reminder_file_cache', 'reminder_identities', 'reminder_occurrences', 'reminder_sources', 'reminder_source_state',
@@ -90,6 +107,7 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 		// Preserve reset authority even after the vault returns to plaintext mode.
 		env.DB.prepare('DELETE FROM maintenance_state WHERE key NOT IN (?, ?) AND key NOT LIKE ?')
 			.bind(DEPLOYMENT_FENCE_KEY, SYNC_RESET_GENERATION_KEY, PREFIX + '%'),
+		...(setup ? [save(env.DB, ENCRYPTION_STATE_KEY, { ...state, mode: 'active' })] : []),
 		save(env.DB, PREFIX + receipt.id, complete),
 	]);
 	return corsResponse(complete);
