@@ -2,7 +2,8 @@ name: Node.js build
 
 on:
   push:
-    branches: ["**"]
+    # Dependabot always opens a pull request, which runs this workflow once.
+    branches-ignore: ["dependabot/**"]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
