@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type CratePlugin from '../../plugin/CratePlugin';
-import type { SharedSettings } from '../../protocol/shared-settings';
-import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
-import { SyncApiClient } from '../../sync/worker-api/client';
-import type { ApiHttpResponse, ApiHttpTransport } from '../../sync/worker-api/http';
-import { Notice } from '../../test/mocks/obsidian';
-import { createSharedSettingsPush, SHARED_SETTINGS_CONFLICT_NOTICE } from './shared-settings-push';
+import type CratePlugin from './CratePlugin';
+import type { SharedSettings } from '../protocol/shared-settings';
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
+import { SyncApiClient } from '../sync/worker-api/client';
+import type { ApiHttpResponse, ApiHttpTransport } from '../sync/worker-api/http';
+import { Notice } from '../test/mocks/obsidian';
+import { createSharedSettingsSync, SHARED_SETTINGS_CONFLICT_NOTICE } from './shared-settings-sync';
 
 const WORKER_URL = 'https://worker.example';
 const otherDevice: SharedSettings = { ignorePatterns: ['Archive/'], syncInterval: 300, pushEnabled: true };
@@ -46,7 +46,7 @@ function fixture(remote: SharedSettings | null) {
 	const writeSettings = vi.fn(async (update: Partial<typeof settings>) => { Object.assign(settings, update); });
 	const updateSyncSettings = vi.fn();
 	const plugin = { settings, writeSettings, syncRuntime: { getApiClient: () => api, updateSyncSettings } };
-	const sharedSettings = createSharedSettingsPush(plugin as unknown as CratePlugin);
+	const sharedSettings = createSharedSettingsSync(plugin as unknown as CratePlugin);
 	const editRemotely = (changes: Partial<SharedSettings>) => {
 		server.settings = { ...server.settings!, ...changes };
 		server.version = `remote-${server.version ?? 0}`;
@@ -149,5 +149,29 @@ describe('shared settings push on settings close', () => {
 		settings.syncInterval = 120;
 		await sharedSettings.push();
 		expect(requests()).toEqual([]);
+	});
+});
+
+describe('shared settings pull on refresh', () => {
+	it('adopts another device\'s change while keeping this device\'s unsaved one', async () => {
+		const { sharedSettings, requests, settings, updateSyncSettings } = fixture(otherDevice);
+		sharedSettings.observe();
+		settings.syncInterval = 120;
+		await sharedSettings.pull();
+
+		expect(settings).toMatchObject({ ignorePatterns: ['Archive/'], syncInterval: 120, pushEnabled: true });
+		expect(updateSyncSettings).toHaveBeenCalledOnce();
+		await sharedSettings.push();
+		expect(requests()).toEqual(['GET', { PUT: { settings: { ...otherDevice, syncInterval: 120 }, expectedVersion: 'v1' } }]);
+	});
+
+	it('leaves settings alone when the server has none or this device cannot read them', async () => {
+		for (const stored of [null, { encrypted: 'envelope' } as unknown as SharedSettings]) {
+			const { sharedSettings, settings, writeSettings } = fixture(stored);
+			const before = structuredClone(settings);
+			await sharedSettings.pull();
+			expect(settings).toEqual(before);
+			expect(writeSettings).not.toHaveBeenCalled();
+		}
 	});
 });

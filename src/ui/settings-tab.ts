@@ -20,17 +20,17 @@ import { renderCrateWebApp } from './settings/reminders-web-app';
 import { renderReadingSettings } from '../reading/ui/plugin/settings-section';
 import { captureSettingsView, restoreSettingsView } from './settings/settings-view-state';
 import { getSettingsTabSections } from './settings/settings-tab-model';
-import { createSharedSettingsPush } from './settings/shared-settings-push';
+import { sharedSettingsSync } from '../plugin/shared-settings-sync';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
 	private cleanupFns: (() => void)[] = [];
-	private readonly sharedSettings: ReturnType<typeof createSharedSettingsPush>;
+	private readonly sharedSettings: ReturnType<typeof sharedSettingsSync>;
 
 	constructor(app: App, plugin: CratePlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
-		this.sharedSettings = createSharedSettingsPush(plugin);
+		this.sharedSettings = sharedSettingsSync(plugin);
 	}
 
 	display(): void {

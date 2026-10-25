@@ -4,6 +4,7 @@ import { captureServerConnection, serverRequest } from './server-request';
 import { restartReading } from '../reading/runtime';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { parseFeaturePolicy, type FeaturePolicy } from '../protocol/feature-policy';
+import { sharedSettingsSync } from './shared-settings-sync';
 
 async function requestFeatures(plugin: CratePlugin, body?: unknown): Promise<FeaturePolicy> {
   const policy = parseFeaturePolicy(await serverRequest<unknown>(plugin, '/features', body, { timeout: 5_000 }));
@@ -66,6 +67,8 @@ export function registerSharedFeatures(plugin: CratePlugin): void {
   const refresh = () => {
     if (refreshing) return;
     refreshing = true;
+    // Shared sync settings ride the same throttled refresh as the feature policy.
+    void sharedSettingsSync(plugin).pull();
     void refreshSharedFeatures(plugin).then(() => { lastRefreshAt = Date.now(); })
       .catch(() => { /* Keep the last confirmed state offline. */ }).finally(() => { refreshing = false; });
   };
