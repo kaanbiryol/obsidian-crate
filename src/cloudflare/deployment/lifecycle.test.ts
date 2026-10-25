@@ -138,7 +138,7 @@ function harness() {
 		const service = new CloudflareDeploymentService({
 			clientId: 'd'.repeat(32), settingsOwner: { settings, writeSettings }, transport: send,
 			loadArtifacts: async () => ({ version: '0.1.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: 'fresh-schema', d1SchemaSha256: '' }),
-			openExternal: url => { opened.push(url); }, selectDeployment: async () => null, beforeServerReset,
+			openExternal: url => { opened.push(url); }, beforeServerReset,
 		});
 		return {
 			service,
@@ -152,6 +152,7 @@ function harness() {
 }
 
 const device = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', platform: 'desktop' };
+const selectNone = async () => null;
 
 describe('Cloudflare deployment interruption and recovery', () => {
 	it('deletes an older server with a settled update and clears the saved connection', async () => {
@@ -169,7 +170,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 			}),
 		});
 		const { service } = h.createService();
-		const result = await service.deployWithSavedAuthorization('delete', operation => operation({ accessToken: 'saved' }));
+		const result = await service.deployWithSavedAuthorization('delete', operation => operation({ accessToken: 'saved' }), selectNone);
 		expect(result.status).toBe('deleted');
 		expect(h.settings.cloudflareDeployment).toBeNull();
 		expect(h.remote).toEqual({ worker: false, bucket: false, database: false, retired: true });
@@ -180,8 +181,8 @@ describe('Cloudflare deployment interruption and recovery', () => {
 	it.each(['oauth', 'saved'] as const)('rebuilds after reset with %s authorization', async authorization => {
 		const h = harness();
 		const { service, authorize } = h.createService();
-		const result = authorization === 'oauth' ? await service.handleCallback(await authorize('reset'), device)
-			: await service.deployWithSavedAuthorization('reset', operation => operation({ accessToken: 'saved' }), device);
+		const result = authorization === 'oauth' ? await service.handleCallback(await authorize('reset'), selectNone, device)
+			: await service.deployWithSavedAuthorization('reset', operation => operation({ accessToken: 'saved' }), selectNone, device);
 		expect(result.status === 'deployed' && result.workerUrl).toContain('.workers.dev');
 		expect(h.settings.cloudflareDeployment).toMatchObject({ d1DatabaseId: h.replacementId, lastKnownRevision: SERVER_RELEASE.revision });
 		expect(h.settings.cloudflareDeployment!.reset).toBeUndefined();
@@ -204,12 +205,12 @@ describe('Cloudflare deployment interruption and recovery', () => {
 			if (failure === 'lost creation response' && fail && request.method === 'POST' && url.endsWith('/d1/database')) { fail = false; throw new Error('response lost'); }
 			return response;
 		});
-		await expect(first.service.handleCallback(await first.authorize('reset'), device)).rejects.toThrow(failure === 'failed checkpoint' ? 'disk full' : 'response lost');
+		await expect(first.service.handleCallback(await first.authorize('reset'), selectNone, device)).rejects.toThrow(failure === 'failed checkpoint' ? 'disk full' : 'response lost');
 		expect(h.settings.cloudflareDeployment).toMatchObject({ d1DatabaseId: h.databaseId, reset: { phase: 'rebuilding', databaseId: h.databaseId } });
 		expect(h.mutations).not.toContain('create-bucket');
 		const deletions = h.transport.mock.calls.filter(([, request]) => request.method === 'DELETE').length;
 		const retry = h.createService();
-		await retry.service.deployWithSavedAuthorization('reset', operation => operation({ accessToken: 'saved' }), device);
+		await retry.service.deployWithSavedAuthorization('reset', operation => operation({ accessToken: 'saved' }), selectNone, device);
 		expect(h.settings.cloudflareDeployment!.d1DatabaseId).toBe(h.replacementId);
 		expect(h.settings.cloudflareDeployment!.reset).toBeUndefined();
 		expect(h.mutations.filter(value => value === 'create-database')).toHaveLength(1);
@@ -232,7 +233,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		};
 		const first = h.createService(transport);
 		const params = await first.authorize(intent);
-		const running = first.service.handleCallback(params, device);
+		const running = first.service.handleCallback(params, selectNone, device);
 		const rejected = expect(running).rejects.toMatchObject({ name: 'AbortError' });
 		await vi.waitFor(() => expect(dispatched).toBe(true));
 		const checkpoint = structuredClone(intent === 'delete' ? h.settings.cloudflareDeployment!.deletion : h.settings.cloudflareDeployment!.reset);
@@ -250,7 +251,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 
 		if (intent === 'delete') {
 			const retry = h.createService();
-			const result = await retry.service.handleCallback(await retry.authorize('delete'));
+			const result = await retry.service.handleCallback(await retry.authorize('delete'), selectNone);
 			expect(result.status).toBe('deleted');
 			expect(h.settings.cloudflareDeployment).toBeNull();
 			expect(h.remote).toEqual({ worker: false, bucket: false, database: false, retired: true });
@@ -264,7 +265,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		const h = harness();
 		const first = h.createService();
 		h.beforeServerReset.mockImplementation(async () => { first.service.destroy(); });
-		await expect(first.service.handleCallback(await first.authorize('reset'), device))
+		await expect(first.service.handleCallback(await first.authorize('reset'), selectNone, device))
 			.rejects.toMatchObject({ name: 'AbortError' });
 		expect(h.mutations).toEqual([]);
 		expect(h.settings.cloudflareDeployment!.reset).toBeUndefined();
@@ -280,7 +281,7 @@ it('deletes with saved credentials through the real deletion path without openin
 		// Keep the account available until the shared credential operation settles.
 		expect(h.settings.cloudflareDeployment?.accountId).toBe('a'.repeat(32));
 		return result;
-	});
+	}, selectNone);
 	expect(result.status).toBe('deleted');
 	expect(h.settings.cloudflareDeployment).toBeNull();
 	expect(h.remote).toMatchObject({ worker: false, database: false, bucket: false });
@@ -295,8 +296,8 @@ it('keeps cleanup capability rejection distinct from account OAuth and allows de
 		return h.transport(url, request);
 	});
 	const authorize = <T>(operation: (tokens: { accessToken: string }) => Promise<T>) => operation({ accessToken: 'saved' });
-	await expect(service.deployWithSavedAuthorization('delete', authorize)).rejects.toThrow('Remote file cleanup failed with HTTP 403');
+	await expect(service.deployWithSavedAuthorization('delete', authorize, selectNone)).rejects.toThrow('Remote file cleanup failed with HTTP 403');
 	expect(h.remote).toMatchObject({ worker: false, database: true, bucket: true });
 	rejectCleanup = false;
-	await expect(service.deployWithSavedAuthorization('delete', authorize)).resolves.toMatchObject({ status: 'deleted' });
+	await expect(service.deployWithSavedAuthorization('delete', authorize, selectNone)).resolves.toMatchObject({ status: 'deleted' });
 });

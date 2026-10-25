@@ -20,12 +20,12 @@ function harness(status: number, scope = CLOUDFLARE_OAUTH_SCOPES.join(' ')) {
   connection.acceptAuthorization(settings.cloudflareDeployment.accountId, { accessToken: 'synthetic', expiresIn: 3600, scope });
   const service = new CloudflareDeploymentService({ clientId: 'client', settingsOwner: { settings, writeSettings: async update => { Object.assign(settings, update); } },
     transport, loadArtifacts: async () => ({ version: '0.4.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: '', d1SchemaSha256: '' }),
-    openExternal: vi.fn(), selectDeployment: async () => null });
+    openExternal: vi.fn() });
   const choice: BackupChoice = { prefix: `__crate__/backups/schema-upgrade-${settings.cloudflareDeployment.d1DatabaseId}`, hash: 'b'.repeat(64),
     manifest: { format: 1, complete: true, createdAt: new Date().toISOString(), source: { account: settings.cloudflareDeployment.accountId, database: settings.cloudflareDeployment.d1DatabaseId, bucket: name }, databaseSha256: 'c'.repeat(64), objects: [] } };
   const authorize: Parameters<typeof service.recoverUpdate>[0] = operation => connection.withAuthorization(operation);
   return { connection, service, transport, operations: {
-    update: () => service.deployWithSavedAuthorization('update', authorize),
+    update: () => service.deployWithSavedAuthorization('update', authorize, async () => null),
     recover: () => service.recoverUpdate(authorize),
     list: () => service.listRestoreBackups(authorize),
     restore: () => service.restoreBackup(authorize, choice, vi.fn()),

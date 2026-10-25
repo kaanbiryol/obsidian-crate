@@ -51,8 +51,6 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 		transport: obsidianHttpTransport,
 		loadArtifacts: loadEmbeddedCloudflareArtifacts,
 		openExternal: url => openCloudflareAuthorization(plugin, url),
-		// Every operation passes its deployment dialog's own server picker.
-		selectDeployment: () => Promise.reject(new Error('Choose a server in the Cloudflare deployment dialog.')),
 		beforeServerSwitch: async () => {
 			plugin.clearSettingsUiState();
 			await plugin.syncRuntime.clearSyncConfiguration(signal);
@@ -249,8 +247,8 @@ function runDeployment(
 	const selectDeployment = (deployments: Parameters<typeof progress.selectVault>[0], missingServer?: boolean) => progress.selectVault(deployments, missingServer);
 	return savedIntent
 		? plugin.cloudflareDeploymentService.deployWithSavedAuthorization(savedIntent,
-			operation => plugin.cloudflareUsageConnection.withAuthorization(operation), device, onProgress, selectDeployment)
-		: plugin.cloudflareDeploymentService.handleCallback(params, device, onProgress, selectDeployment);
+			operation => plugin.cloudflareUsageConnection.withAuthorization(operation), selectDeployment, device, onProgress)
+		: plugin.cloudflareDeploymentService.handleCallback(params, selectDeployment, device, onProgress);
 }
 
 async function handleDeploymentFailure({ plugin, signal, savedIntent, intent, progress, presentation }: CloudflareOperation, error: unknown): Promise<void> {
