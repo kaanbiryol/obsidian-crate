@@ -145,7 +145,8 @@ settling an earlier upload cannot silently bypass the guard for a newer local ed
 `sync/runtime/history-workflow.ts` keeps pause, persistence, application, sync,
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper. `sync/runtime/startup-sync.ts` runs the startup
-sync and its single recovery pass; the runtime keeps initialization revision checks.
+sync; the runtime keeps initialization revision checks and queues the vault events
+that arrived during it.
 
 `sync/history/preview-format.ts` owns text decoding and binary control-character rejection.
 `protocol/sync-limits.ts` owns the 256 KB preview limit shared with the Worker's version

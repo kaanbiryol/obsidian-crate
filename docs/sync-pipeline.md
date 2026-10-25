@@ -23,10 +23,10 @@ edit-triggered sync. Tests that disable automatic work should set
 
 Configured vaults start with a yellow indicator while the saved sync state loads.
 With automatic sync off, it stays yellow through the local pending-file scan after
-layout readiness. With automatic sync on, it stays yellow through startup sync and
-its recovery probe. A saved last-sync timestamp does not show green before those
-checks finish. Sync activity shows **Checking local files…** during local startup
-checks; errors and server availability warnings remain visible.
+layout readiness. With automatic sync on, it stays yellow through startup sync. A
+saved last-sync timestamp does not show green before those checks finish. Sync
+activity shows **Checking local files…** during local startup checks; errors and
+server availability warnings remain visible.
 
 ## Sync Modes
 
@@ -356,7 +356,7 @@ Implementation: `manifest.ts:LocalManifest`
 - **Upload memory:** incremental and queued uploads reserve room for the next maximum-size file before preparation, using the 48 MiB mobile / 128 MiB desktop budget and a 128-file cap. Chunks finish uploading before further contents are prepared; history retains paths rather than file buffers. These budgets cover prepared binary contents, not total process memory or request encoding overhead.
 - **Incremental-to-full fallback:** if incremental sync returns `null` (error/cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
-- **Startup event recovery:** event capture resumes before a post-startup metadata probe; if the startup sync missed a local edit, one recovery sync runs without opening another event blind window
+- **Startup event recovery:** the startup sync scans the vault itself, and vault events that arrive while it runs are queued once it finishes, keeping the latest change per path. Pending verification settles download echoes and other files that still match their baseline; real edits flush like live events
 - **Conflict recovery:** the durable conflict registry recovers from `.tmp` and discovers visible or hidden conflict copies that were created before their metadata was committed
 - **Revoked access:** a 401 shows the reconnect message in the status bar and Activity on every sync path. Full, incremental and forced syncs, queue flushes and queue reconciliation treat a 401 reported for one downloaded, uploaded or deleted file the same way. Its notice appears once until a sync succeeds or the connection changes, so background flushes that keep failing do not repeat it
 - **Queue retry:** retryable flush failures are re-added to `pendingKeys`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts

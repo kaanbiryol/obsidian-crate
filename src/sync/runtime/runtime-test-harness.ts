@@ -1,4 +1,5 @@
 import { afterEach, expect, vi } from 'vitest';
+import { TFolder } from 'obsidian';
 import { SyncEngine } from '../engine/engine';
 import type { SyncApiClient } from '../worker-api/client';
 import { SyncRuntime } from './runtime';
@@ -14,11 +15,12 @@ export type Deferred<T> = {
 	reject: (reason?: unknown) => void;
 };
 
-/** Exercise event gating through a public event, without changing the queue. */
+/** Exercise event gating through a public event, without changing the queue: the
+ * runtime never defers folder events. */
 export function expectFileEventsAccepted(runtime: SyncRuntime, accepted: boolean): void {
 	const event = vi.spyOn(SyncEngine.prototype, 'onFileChange').mockImplementation(() => {});
 	try {
-		runtime.onFileChange({ path: 'notes/event-probe.md' } as never);
+		runtime.onFileChange(Object.assign(new TFolder(), { path: 'notes/event-probe' }));
 		expect(event).toHaveBeenCalledTimes(accepted ? 1 : 0);
 	} finally { event.mockRestore(); }
 }
