@@ -217,10 +217,6 @@ export class EncryptedFiles {
 		return { version: 1, vaultId: authority.vaultId, keyId: authority.key.id, envelope: await encryptJson(settings, authority.key,
 			{ vaultId: authority.vaultId, scopeId: authority.scopeId, objectId: 'shared-settings', purpose: 'settings' }) };
 	}
-	async openCheckpoint(envelope: string, id: string): Promise<unknown> {
-		const authority = this.keys.forVaultMetadata();
-		return decryptJson(envelope, authority.key, { vaultId: authority.vaultId, scopeId: authority.scopeId, objectId: id, purpose: 'settings' });
-	}
 	async prepareRestore(intent: RestoreIntent): Promise<NonNullable<RestoreIntent['encryptedWire']>> {
 		let cursor: string | undefined;
 		const seen = new Set<string>();

@@ -68,7 +68,7 @@ export async function validateUploadEncryption(db: D1Database, files: Array<{
 /** The server's own sealed Reading capture, which may use the seal key in this folder. */
 export interface SealedCommit { readingFolder: string }
 
-export function validateEncryptedContent(state: EncryptionServerState, path: string, content: string | ArrayBuffer | Uint8Array, sealed?: SealedCommit): EncryptedFileDescriptor {
+function validateEncryptedContent(state: EncryptionServerState, path: string, content: string | ArrayBuffer | Uint8Array, sealed?: SealedCommit): EncryptedFileDescriptor {
 	// Encrypted vaults store tagged names only; a readable path is never published.
 	if (!isWirePath(path)) throw new EncryptionStateError('Update Crate: this encrypted vault stores encrypted file names', 428);
 	const bytes = typeof content === 'string' || content instanceof Uint8Array ? content : new Uint8Array(content);

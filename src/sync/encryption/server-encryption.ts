@@ -1,7 +1,7 @@
 import { validateEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
 
-export interface EncryptionFileProgress { completed: number; total?: number }
+interface EncryptionFileProgress { completed: number; total?: number }
 export type EncryptionProgress = (message: string, files?: EncryptionFileProgress) => void;
 
 export async function readServerEncryption(http: WorkerApiHttpClient, timeout?: number): Promise<EncryptionServerState | null> {

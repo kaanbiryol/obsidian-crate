@@ -3,7 +3,6 @@ import { getSyncPathIssue } from './portable-path';
 /** Encrypted vaults store each folder and file name as a 26-character lowercase
  * tag, keeping only `.md` readable. Lowercase wire paths are their own portable
  * form, so the server's identity, folder and Markdown rules apply unchanged. */
-export const WIRE_SEGMENT_LENGTH = 26;
 const WIRE_SEGMENT = /^[a-z2-7]{26}(\.md)?$/;
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
 

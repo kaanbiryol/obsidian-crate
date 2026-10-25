@@ -4,7 +4,7 @@
  * this module. `cloudflare/worker/standalone/reset-worker.js` embeds copies of the
  * patterns; storage-keys.test.ts keeps them identical.
  */
-export const MANAGED_FILES_PREFIX = '__crate__/files/';
+const MANAGED_FILES_PREFIX = '__crate__/files/';
 export const SHARED_SETTINGS_KEY = '__crate__/settings.json';
 export const HISTORY_INDEX_KEY = '__crate__/history/index.json';
 export const HISTORY_CHECKPOINT_PREFIX = '__crate__/history/checkpoints/';

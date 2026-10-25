@@ -5,7 +5,7 @@ import { corsResponse } from '../cors';
 import { parseJsonObject } from '../request-validation';
 import { changedRows } from '../db';
 
-export const ENCRYPTED_SETTINGS_KEY = 'e2ee:settings';
+const ENCRYPTED_SETTINGS_KEY = 'e2ee:settings';
 
 /** GET and PUT /settings for an encrypted vault. */
 export async function handleEncryptedSettings(request: Request, db: D1Database, state: EncryptionServerState): Promise<Response> {

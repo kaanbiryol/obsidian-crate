@@ -20,12 +20,9 @@ export class SharedHistoryApi {
         return parseSharedCheckpointList(await this.http.requestJson('/sync/checkpoints'));
     }
     async load(id: string) {
-        const raw: unknown = await this.http.requestJson(`/sync/checkpoint?id=${encodeURIComponent(id)}`, {}, TRANSFER_TIMEOUT_MS);
-        const encryptedLegacy = isRecord(raw) && typeof raw.encrypted === 'string';
-        if (encryptedLegacy && !this.encryption) throw new Error('Unlock the vault before reading its encrypted history');
-        const result = parseSharedCheckpointDocument(encryptedLegacy ? await this.encryption!.openCheckpoint(raw.encrypted as string, id) : raw);
+        const result = parseSharedCheckpointDocument(await this.http.requestJson(`/sync/checkpoint?id=${encodeURIComponent(id)}`, {}, TRANSFER_TIMEOUT_MS));
         if (result.checkpoint.id !== id) throw new Error('The server returned a different checkpoint.');
-        if (this.encryption && !encryptedLegacy) {
+        if (this.encryption) {
             // Checkpoints list server paths; each entry keeps its server path for downloads.
             const wires = Object.keys(result.files);
             const entries = await this.encryption.metadata(wires.map(path => ({ path, entry: result.files[path]! })), false);
