@@ -2,7 +2,7 @@ import { Notice, Setting, type TextComponent, type ToggleComponent, type ButtonC
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../platform/logger';
-import { normalizeTimeString } from '../../reminders/settings';
+import { normalizeTimeString } from '../../platform/validation';
 import { saveNotificationPolicy } from '../../reminders/notification-policy-sync';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import type { SyncApiClient } from '../../sync/worker-api/client';

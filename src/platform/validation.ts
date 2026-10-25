@@ -39,3 +39,23 @@ export function normalizeStringArray(value: unknown, fallback: string[]): string
 
 	return [...normalized];
 }
+
+/** C0 control characters and DEL, which no stored name or folder may contain. */
+export function containsControlCharacters(value: string): boolean {
+	for (const character of value) {
+		const codePoint = character.codePointAt(0);
+		if (codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/** A 24-hour HH:MM time, or null. */
+export function normalizeTimeString(value: unknown): string | null {
+	if (typeof value !== 'string') return null;
+	const match = TIME_PATTERN.exec(value.trim());
+	return match ? `${match[1]}:${match[2]}` : null;
+}

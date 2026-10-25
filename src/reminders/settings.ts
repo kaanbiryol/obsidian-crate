@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { normalizePath } from 'obsidian';
-import { isRecord } from '../platform/validation';
+import { containsControlCharacters, isRecord, normalizeTimeString } from '../platform/validation';
 import type { TabId } from './ui/shared/layoutConstants';
 import { DEFAULT_LIST_STYLE, normalizeListStyle, type ListStyle } from '@/ui/shared/list-style';
 
@@ -13,7 +13,6 @@ export const DEFAULT_REMINDERS_FOLDER_PATH = 'Reminders';
 const VALID_DUE_DATE_DEFAULTS = new Set<string>(['none', 'today', 'tomorrow']);
 const VALID_AUTO_OPEN_SETTINGS = new Set<string>(['none', 'sidebar']);
 const VALID_TAB_IDS = new Set<string>(['inbox', 'today', 'upcoming', 'browse']);
-const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export type RemindersSettings = {
 	/** Explicit local edit waiting for this server, never copied to another connection. */
@@ -58,26 +57,10 @@ function normalizeTabId(value: unknown, fallback: TabId): TabId {
 		: fallback;
 }
 
-export function normalizeTimeString(value: unknown): string | null {
-	if (typeof value !== 'string') return null;
-	const match = TIME_PATTERN.exec(value.trim());
-	return match ? `${match[1]}:${match[2]}` : null;
-}
-
 function normalizePositiveInteger(value: unknown, fallback: number): number {
 	return typeof value === 'number' && Number.isInteger(value) && value > 0
 		? value
 		: fallback;
-}
-
-function containsControlCharacters(value: string): boolean {
-	for (const character of value) {
-		const codePoint = character.codePointAt(0);
-		if (codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f)) {
-			return true;
-		}
-	}
-	return false;
 }
 
 export function normalizeRemindersFolderPath(rawPath: string | null | undefined): string {
