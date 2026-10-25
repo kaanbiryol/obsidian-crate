@@ -207,22 +207,11 @@ export class SyncWorkerApi {
 
 		for (let index = 0; index < uniquePaths.length; index += BATCH_DOWNLOAD_MAX_FILES) {
 			const chunk = uniquePaths.slice(index, index + BATCH_DOWNLOAD_MAX_FILES);
-			try {
-				const response = parseFileMetadata(await this.http.requestJson<unknown>('/sync/metadata', {
-					method: 'POST',
-					body: JSON.stringify({ paths: chunk }),
-				}), chunk);
-				Object.assign(files, response.files);
-			} catch (error) {
-				if (!(error instanceof HttpError) || error.status !== 404) throw error;
-				const manifest = await this.getManifest();
-				const fallbackFiles = createPathRecord<FileEntry>();
-				for (const path of requested) {
-					const entry = getPathEntry(manifest.files, path);
-					if (entry) fallbackFiles[path] = entry;
-				}
-				return { files: fallbackFiles };
-			}
+			const response = parseFileMetadata(await this.http.requestJson<unknown>('/sync/metadata', {
+				method: 'POST',
+				body: JSON.stringify({ paths: chunk }),
+			}), chunk);
+			Object.assign(files, response.files);
 		}
 
 		return { files: await this.decryptEntries(files) };
