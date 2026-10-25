@@ -6,6 +6,7 @@ import { hasLocalFileChanges } from '../local/local-file-changes';
 import { LocalManifest } from '../manifest/manifest';
 import { processDiff } from './process';
 import { sha256Hex } from '../../platform/sha256';
+import { recordAppliedContent } from './applied-content';
 
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 
@@ -60,4 +61,19 @@ it.each(['single', 'batch', 'merge'])('syncs an edit made after %s apply even af
   expect((await getLocalChanges(resumed, 1)).changes).toEqual([{ path, hash: actualHash }]);
   await processDiff(resumed, { path, action: 'upload', localHash: actualHash, remoteHash: await sha256Hex(remote), cause: 'local-edited' }, {}, emptyResult());
   expect(await sha256Hex(remote)).toBe(actualHash);
+});
+
+it('records a baseline without a revision the server sent in an invalid form', async () => {
+  const content = bytes('remote');
+  const setEntry = vi.fn();
+  const context = {
+    vault: { adapter: { readBinary: async () => content } },
+    getModifiedIso: async () => '2026-10-01T00:00:00.000Z',
+    localManifest: { setEntry },
+    files: {},
+  };
+  await recordAppliedContent(context as never, 'image.bin', content, 'bad\\revision');
+  expect(setEntry).toHaveBeenCalledWith('image.bin', expect.objectContaining({ revision: undefined }));
+  await recordAppliedContent(context as never, 'image.bin', content, 'r2');
+  expect(setEntry).toHaveBeenLastCalledWith('image.bin', expect.objectContaining({ revision: 'r2' }));
 });

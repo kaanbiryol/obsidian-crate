@@ -152,6 +152,20 @@ it('keeps the whole batch when its receipt list is invalid', async () => {
   expect(manifest.uploadJournal.pending()).toHaveLength(2); await manifest.close();
 });
 
+it('refuses a receipt with an invalid revision instead of saving it to the checkpoint', async () => {
+	const { create, file } = fixture();
+	const manifest = create();
+	const uploads = new DurableUploads(manifest, {
+		getServerInfo: async () => ({ reminderOperationDay: 20000 }),
+		uploadFile: async (path: string, _content: ArrayBuffer, hash: string) => ({ success: true, path, hash, revision: 5 as never }),
+		batchUpload: vi.fn(),
+	}, { putBase: vi.fn(async () => {}) } as never, crypto.randomUUID());
+	await expect(uploads.single(file)).rejects.toThrow('invalid upload receipt');
+	expect(manifest.getEntry(file.path)).toBeUndefined();
+	expect(manifest.uploadJournal.pending()).toHaveLength(1);
+	await manifest.close();
+});
+
 it('prunes journal copies periodically during a long run of uploads', async () => {
 	const { disk, create, file } = fixture();
 	const manifest = create();

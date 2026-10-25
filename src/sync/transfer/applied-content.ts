@@ -2,6 +2,7 @@ import { isMarkdownPath } from '../merge/markdown-base-cache';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { TransferContext } from './types';
 import { sha256Hex } from '../../platform/sha256';
+import { isSyncRevision } from '../../protocol/sync-validation';
 
 // A remote baseline can be valid even when its local metadata is not. The
 // planners deliberately hash entries whose modification time is not a date.
@@ -27,7 +28,9 @@ export async function recordAppliedContent(
   } catch {
     // A disappearing or unreadable file must remain detectable after restart.
   }
-  const entry = { hash, size: content.byteLength, modified, revision };
+  // A baseline without a revision is reconciled before any delete, while an
+  // invalid one would make the saved checkpoint unreadable after a restart.
+  const entry = { hash, size: content.byteLength, modified, revision: isSyncRevision(revision) ? revision : undefined };
   context.localManifest.setEntry(path, entry);
   if (isMarkdownPath(path)) await context.markdownBaseCache?.putBase(path, hash, content);
   await context.conflictStore?.resolveAppliedIncoming?.(path, hash);
