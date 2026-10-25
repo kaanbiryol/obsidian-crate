@@ -5,6 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleExchangeRemindersEnrollmentToken } from '../notifications/enrollment-handlers';
 import { issueWebEnrollmentToken } from './web-enrollment';
+import { pruneExpiredTokens } from '../maintenance/database';
 import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => { await applySchema(env.DB); });
@@ -83,12 +84,13 @@ it('keeps a committed exchange single-use if its response is lost', async () => 
   expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM auth_tokens').first()).toMatchObject({ count: 1 });
 });
 
-it('issues hashed ten-minute tokens and purges expired enrollments', async () => {
+it('issues hashed ten-minute tokens and leaves expired ones to maintenance', async () => {
   await env.DB.prepare("INSERT INTO web_enrollment_tokens (token_hash, expires_at, folder_path) VALUES ('expired', 0, 'Reminders')").run();
   const before = Date.now();
   const enrollment = await issueWebEnrollmentToken(env.DB, 'Reminders');
   expect(enrollment.token).toHaveLength(64);
   expect(enrollment.expiresAt).toBeGreaterThanOrEqual(before + 600_000);
   expect(enrollment.expiresAt).toBeLessThanOrEqual(Date.now() + 600_000);
+  await pruneExpiredTokens(env.DB);
   expect(await env.DB.prepare('SELECT token_hash FROM web_enrollment_tokens').all()).toMatchObject({ results: [{ token_hash: await sha256Hex(enrollment.token) }] });
 });
