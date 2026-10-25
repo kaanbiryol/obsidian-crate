@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { compile } from 'sass';
 
-export function rawCssPlugin() {
-	const cssFiles = new Map();
+// The id carries the file path, so ids cached by an earlier run still resolve.
+const prefix = '\0raw-css:';
 
+export function rawCssPlugin() {
 	return {
 		name: 'raw-css',
 		enforce: 'pre',
@@ -22,15 +23,13 @@ export function rawCssPlugin() {
 			const filePath = isAbsolute(requestPath)
 				? requestPath
 				: resolve(importer ? dirname(importer) : process.cwd(), requestPath);
-			const moduleId = `\0raw-css:${cssFiles.size}`;
-			cssFiles.set(moduleId, filePath);
-			return moduleId;
+			return `${prefix}${filePath}`;
 		},
 		load(id) {
-			const filePath = cssFiles.get(id);
-			if (!filePath) {
+			if (!id.startsWith(prefix)) {
 				return null;
 			}
+			const filePath = id.slice(prefix.length);
 
 			const contents = filePath.endsWith('.scss')
 				? compile(filePath).css
