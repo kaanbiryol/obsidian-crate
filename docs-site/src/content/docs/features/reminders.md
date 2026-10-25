@@ -3,38 +3,45 @@ title: Reminders
 description: Create reminders, organize projects, and receive notifications while keeping tasks in Markdown.
 ---
 
-Crate keeps reminders as Markdown tasks in your vault. Work with them in Obsidian or the web app, then sync the changes between your devices.
+Crate reminders are ordinary Markdown checkboxes in your vault. Plan your day in Obsidian or on your phone, and your tasks stay plain text you can read and edit anywhere.
 
 ## Create a reminder
 
 1. Open Obsidian's command palette and run **Crate: Create reminder**.
-2. Enter a title such as “Send the proposal tomorrow at 12” and review the parsed date. You can set the date explicitly, choose a project, add a description, mark a priority, or make it repeat.
-3. Save the reminder, then run **Crate: Open sidebar** to see your reminders.
+2. Type something natural, like "Send the proposal tomorrow at 12", and check the date Crate picked up. You can also set the date yourself, choose a project, add a description, set a priority, or make it repeat.
+3. Save it, then run **Crate: Open sidebar** to see your reminders.
 
-Reminders starts enabled and uses the `Reminders` folder. Once connected to a server, you can choose a different folder under **Settings → Crate → Reminders → Reminders folder**. Local reminders do not require a server; syncing and notifications do.
+Reminders are saved in the `Reminders` folder and work without a server. You need a server for syncing and notifications. Once connected, you can pick another folder under **Settings → Crate → Reminders → Reminders folder**.
 
-Relative dates are resolved when you save. A saved “tomorrow” becomes a specific date, so it does not move forward each time you reopen the reminder.
-
-## Links in reminders
-
-Paste a webpage URL into a reminder’s title or description to keep an article or reference with the task. Open the link directly from the saved reminder.
-
-When available, Crate uses the page’s title as the link label. If you paste a URL over selected text, that text stays as the label. Offline, blocked, slow, or untitled pages keep the URL label.
-
-Page titles are fetched through your Crate server, which contacts the linked website without your cookies or authorization headers. This also works with [end-to-end encryption](/docs/features/encryption/): the server sees the link only while fetching its title and doesn't keep it.
+Words like "tomorrow" become a real date when you save, so the reminder doesn't keep drifting forward each time you open it.
 
 ## Organize your day
 
-- **Inbox** holds reminders to organize later.
-- **Today** brings together reminders due today and overdue items.
-- **Upcoming** helps you plan what is next.
-- **Projects** groups reminders by the work or part of life they belong to. Use **Crate: Open reminder project** to jump to one in Obsidian.
+- **Inbox** holds reminders to sort out later.
+- **Today** shows what's due today, plus anything overdue.
+- **Upcoming** helps you plan what's next.
+- **Projects** groups reminders by the work or part of life they belong to. Run **Crate: Open reminder project** to jump to one in Obsidian.
 
-Select a reminder to edit it, or its checkbox to complete it. Completing a repeating reminder advances the same task to its next occurrence. After its final occurrence it stays checked; earlier occurrences are not separate tasks in a completion history.
+Select a reminder to edit it, or its checkbox to complete it.
+
+Completing a repeating reminder moves the same task to its next date. After the last occurrence it stays checked. Past occurrences don't become separate tasks.
+
+## Add links to reminders
+
+Paste a web address into a reminder's title or description to keep an article or reference with the task, then open it straight from the reminder.
+
+When it can, Crate uses the page's title as the link text. If you paste over selected text, your text stays as the label. Pages that are offline, blocked, slow, or untitled keep the plain address.
+
+<details>
+<summary>How page titles are fetched</summary>
+
+Your Crate server fetches the title by contacting the website, without your cookies or sign-in details. This also works with [end-to-end encryption](/docs/features/encryption/): the server sees the link only while fetching the title and doesn't keep it.
+
+</details>
 
 ## Work directly in Markdown
 
-Each note in the reminders folder represents a project. For example, `Reminders/Travel.md` is the **Travel** project. Add ordinary checkbox lines to that note:
+Each note in your reminders folder is a project. `Reminders/Travel.md`, for example, is the **Travel** project. Add checkboxes to it like you normally would:
 
 ```markdown
 - [ ] Check passport expiry
@@ -42,30 +49,46 @@ Each note in the reminders folder represents a project. For example, `Reminders/
 - [x] Choose travel dates
 ```
 
-Crate adds hidden tracking comments to checkbox lines so it can find the same reminder after edits and sync. Keep those comments when editing existing tasks. Choose a dedicated reminders folder if you do not want Crate to adopt checkboxes in your other notes.
+Crate adds small hidden comments to each checkbox line so it can recognize the same reminder after edits and sync. Leave those comments in place when you edit existing tasks.
 
-Checkbox examples inside code blocks are ignored. For nested tasks or tasks with supporting paragraphs, use the Markdown editor to reorder them or move/delete a task together with its children; the reminder list limits these structural edits to preserve the note.
+Crate picks up every checkbox in the reminders folder. Use a dedicated folder so checkboxes in your other notes don't become reminders.
+
+<details>
+<summary>Good to know</summary>
+
+- Checkboxes inside code blocks are ignored.
+- For nested tasks or tasks with paragraphs under them, reorder, move, or delete them in the Markdown editor so children move with their parent. The reminder list limits these edits to protect the note.
+
+</details>
 
 ## Keep tasks beside your notes
 
-Use an [embedded reminder block](/docs/features/embedded-reminders/) to show a project, today's reminders, or upcoming work in a note. The block shows the same underlying reminders, so edits do not create another copy.
+An [embedded reminder block](/docs/features/embedded-reminders/) shows a project, today's reminders, or upcoming work inside any note. It's a live view of the same reminders, not a copy.
 
-## Notifications and the web app
+## Use reminders on your phone
 
-Connect the [Crate web app](/docs/features/web-app/) to use reminders on your phone. Changes made there reach your Obsidian vault on its next sync.
+Connect the [Crate web app](/docs/features/web-app/) to see and edit reminders without Obsidian. Changes you make there reach your vault the next time Obsidian syncs.
 
-For alerts, enable **Settings → Crate → Notifications → Push notifications** in Obsidian, then register each receiving device in the web app. A reminder with only a date also needs an **All-day notification time**. Follow [Set up notifications](/docs/features/notifications/) for the full steps and a test.
+## Get alerts
+
+1. In Obsidian, turn on **Settings → Crate → Notifications → Push notifications**.
+2. Register each device that should receive alerts in the web app.
+3. For reminders with a date but no time, set an **All-day notification time**.
+
+[Set up notifications](/docs/features/notifications/) walks through each step and a test.
 
 ## Change defaults
 
-Under **Settings → Crate → Reminders**, choose a **Default due date**, **Default reminders tab**, and **Upcoming range (days)**. Enable **Open reminders on startup** if you want the view ready when Obsidian opens. These preferences apply to this Obsidian device.
+Under **Settings → Crate → Reminders**, choose a **Default due date**, **Default reminders tab**, and **Upcoming range (days)**. Turn on **Open reminders on startup** to have the view ready when Obsidian opens. These apply to this Obsidian device only.
 
-Changing **Reminders folder** changes where Crate looks; it does not move your existing notes. Read [Choose your folders](/docs/features/settings/#choose-your-folders) before switching an established setup.
+Changing **Reminders folder** changes where Crate looks, not where your notes are. Read [Choose your folders](/docs/features/settings/#choose-your-folders) before switching an established setup.
 
-## Offline use and pausing
+## Offline and pausing
 
-Local reminders remain available in Obsidian. The web app can display cached reminders offline, but new reminder changes require a connection. If a submitted change has not been confirmed, keep its pending work until the server responds.
+Your reminders are always available in Obsidian. The web app shows cached reminders offline, but you need a connection to make new changes there. If you submitted a change that hasn't been confirmed yet, keep it pending until the server responds.
 
-**Enable reminders** in Crate settings controls the feature across connected devices. Pausing it retains notes and device connections, while stopping reminder processing and notification delivery. Vault sync remains available.
+To pause Reminders everywhere, turn off **Enable reminders** in Crate settings. This stops reminder processing and notifications on all connected devices, but keeps your notes, connections, and vault sync.
 
-For the web app, keep each reminder note within 1 MiB. If a note is reported as too large or unavailable, split it into smaller project notes and sync again. See [practical limits](/docs/getting-started/limits/) and [recovery](/docs/troubleshooting/recovery/) for more help.
+:::note[Keep reminder notes small for the web app]
+The web app handles reminder notes up to 1 MB. If a note is reported as too large or unavailable, split it into smaller project notes and sync again. See [practical limits](/docs/getting-started/limits/) and [recovery](/docs/troubleshooting/recovery/) for more help.
+:::

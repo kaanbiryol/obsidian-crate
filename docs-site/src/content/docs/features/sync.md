@@ -3,58 +3,90 @@ title: Vault sync
 description: Keep your Obsidian vault in sync, review pending changes, and understand what Crate transfers.
 ---
 
-Crate syncs files between copies of your Obsidian vault through your server. Notes stay ordinary files on your devices.
+Crate keeps the same vault on all your Obsidian devices, through a server you own. Your notes stay ordinary files on each device, so you can stop using Crate at any time and keep everything.
 
-## Automatic and manual sync
+## Your first sync
 
-**Automatic sync is off by default on each device.** After [connecting your server](/docs/getting-started/hosting/), run **Crate: Sync now** from Obsidian's command palette for your first sync. Connecting alone does not transfer files.
+Connecting a server does not move any files yet. When you're ready:
 
-To keep syncing automatically, turn on **Settings → Crate → Sync → Automatic sync**. Crate then syncs after file changes, on startup and resume, and when periodic checks find changes. Enable it separately on each Obsidian device.
+1. Open Obsidian's command palette and run **Crate: Sync now**.
+2. Wait for it to finish. On a phone, keep Obsidian open until it does.
 
-Under **Sync → Sync options**, you can adjust:
+That's it. From now on you can sync by hand whenever you like, or let Crate do it for you.
 
-| Control | What it changes |
+## Sync automatically
+
+Turn on **Settings → Crate → Sync → Automatic sync**. Crate then syncs a few seconds after you edit, when Obsidian starts or comes back to the foreground, and when it notices changes from your other devices.
+
+Automatic sync is a per-device setting, so turn it on for each device where you want it.
+
+:::note[Keep Obsidian open on mobile]
+Phones pause apps in the background, and sync pauses with them. Before switching devices, let sync finish on the first one.
+:::
+
+<details>
+<summary>Fine-tune timing</summary>
+
+Under **Sync → Sync options**:
+
+| Setting | What it does |
 | --- | --- |
-| **Sync delay after editing (seconds)** | How long this device waits after an edit; the default is 5 seconds. Set it to 0 for immediate syncing. |
-| **Check for remote changes** | How often connected devices check for other devices' changes; the default is 5 minutes. **Off** stops periodic checks, while edits, startup, and resume can still trigger sync. |
+| **Sync delay after editing (seconds)** | How long Crate waits after you stop typing. The default is 5 seconds; 0 syncs right away. |
+| **Check for remote changes** | How often this device looks for edits from your other devices. The default is every 5 minutes. **Off** stops these checks, but edits, startup, and resume still sync. |
 
-Keep Obsidian open until sync finishes, especially on mobile. Sync cannot keep running reliably while the operating system suspends the app.
+</details>
 
-## Pause or resume
+## Take a break from syncing
 
-For manual-only syncing on one device, turn off **Settings → Crate → Sync → Automatic sync**. A running sync can still finish. To stop it, use **Pause sync** in Sync activity or **Crate: Stop sync**. Stopping also turns off automatic sync on that device until you enable it again.
+- **Sync only when you ask:** turn off **Automatic sync**. A sync that is already running still finishes.
+- **Stop right now:** select **Pause sync** in Sync activity, or run **Crate: Stop sync**. This also turns off automatic sync on this device until you turn it back on.
 
-The web app and server notifications continue independently. Turning off automatic sync also leaves a small server availability check on startup and resume; that check does not transfer files.
+The web app and reminder notifications keep working either way, because they use your server directly.
 
-## Review pending changes
+## See what's about to sync
 
-Run **Crate: Show sync activity**, then select **Pending**. Select a file to compare your local edits with this device's last-synced copy. These comparisons do not include newer edits from another device.
+Run **Crate: Show sync activity** and open **Pending** to see every file waiting to sync. Select a file to see what you changed since this device last synced it.
 
-- **Sync all** transfers all pending files.
-- Uncheck files and use **Sync selected** to transfer a subset. The other files remain pending.
-- If no previous copy is cached, Crate shows the file status without a text comparison. Binary and large files show a size summary.
+- Select **Sync all** to send everything.
+- Uncheck the files you want to hold back, then select **Sync selected**. The rest stay pending for next time.
 
-Touched files can remain in the list until sync even if you undo their edits; matching files are labeled **Unchanged**.
+Holding files back applies to that one sync. If you want to decide exactly when the rest go, turn off automatic sync first.
 
-Selecting a subset applies to that sync only. It does not permanently ignore files or disable automatic sync. Turn automatic sync off first if you want to control exactly when the remaining files transfer.
+<details>
+<summary>Good to know</summary>
 
-Highlight rows for file actions: click one, Shift-click a range, or Cmd/Ctrl-click individual rows. Use **Cmd+A** (macOS) or **Ctrl+A** to highlight all rows without changing sync checkboxes, **Space** to toggle the focused file's checkbox, and **Shift+F10** to open its menu. Right-click a highlighted row to act on the whole group, or another row to target only that file. The menu can also open a file in Obsidian or reveal it in your file manager.
+- The comparison shows your local edits only, not newer edits from another device.
+- If you undo an edit, the file can stay in the list, labeled **Unchanged**, until the next sync.
+- Images, PDFs, and very large files show a size summary instead of a text comparison.
+- Select several rows with Shift-click or Cmd/Ctrl-click, or select all with **Cmd+A** (macOS) or **Ctrl+A**. **Space** toggles the focused file's checkbox, and **Shift+F10** or right-click opens its menu. From the menu you can open the file in Obsidian or show it in your file manager.
 
-The file menu also offers actions to discard local changes. Check the filenames in the confirmation: discarding restores server versions or moves local additions to trash. Use this only when you want to give up those edits; it is not needed to leave a file pending. Replaced content is kept as recovery copies in `<vault config>/plugins/crate/discard-recovery/`, and discarding never changes the server copy.
+</details>
+
+### Throw away local changes
+
+If you want to give up edits on this device, right-click the file and choose the discard action. Your device goes back to the server's version, and files you added on this device move to the trash. The server copy never changes.
+
+Check the file names in the confirmation before you continue. If you change your mind, Crate keeps a copy of what it replaced in `<vault config>/plugins/crate/discard-recovery/`.
 
 ## What syncs
 
-Sync includes file creation, edits, deletions, renames, and attachments, with a maximum file size of 25 MiB. Updates to existing binary files require review.
+Everything in your vault syncs: new files, edits, renames, deletions, and attachments. A few things stay local:
 
-Crate excludes its own plugin folder, workspace state, conflict copies, and common temporary files. Other Obsidian configuration, plugins, and their settings can sync unless excluded. After a successful sync, restart Obsidian to load downloaded plugins and settings. Install and connect Crate separately on every device.
+- Crate's own plugin folder. Install and connect Crate on each device separately.
+- Workspace layout, conflict copies, and common temporary files.
+- Files over 25 MB. They stay on the device and show up as sync errors.
 
-## Keep files local
+Your other plugins and their settings sync too. After they download, restart Obsidian to load them.
+
+New attachments download on their own. When an existing image, PDF, or other attachment changes, Crate asks you to [review it](/docs/troubleshooting/conflicts/#attachments-and-binary-files) instead of overwriting it.
+
+## Keep files on one device
+
+Some files shouldn't leave a device, such as private folders, huge design files, or plugins that store passwords or device-specific paths.
 
 1. Open **Settings → Crate → Sync → Sync options → Excluded files and folders**.
-2. Keep the existing rules you need, and add one pattern per line. A folder pattern ends in `/`; `*` and `?` are supported wildcards.
-3. Select **Preview files** to check the matching paths before your next sync.
-
-For example:
+2. Add one pattern per line. End folders with `/`. You can use `*` and `?` as wildcards.
+3. Select **Preview files** to check what matches.
 
 ```text
 Private/
@@ -62,14 +94,15 @@ Private/
 .obsidian/plugins/example-plugin/
 ```
 
-These exclude a folder, Photoshop files, and one plugin's files and settings. Replace `example-plugin` with the actual plugin folder, and use your vault's configuration folder if it is not `.obsidian`. Check plugins that store credentials or device-specific paths. Hidden files are otherwise eligible for sync.
+This keeps the `Private` folder, all Photoshop files, and one plugin's files local. Use the real plugin folder name, and your own configuration folder if it isn't `.obsidian`.
 
-Exclusions are shared with your other Obsidian devices. Adding a rule stops future transfers but keeps existing server copies. To remove those too, select **Review and remove** under **Remove excluded server files** in the same section. Review the listed files before confirming; local files are kept, and removed server copies remain recoverable for 30 days.
+Exclusions apply to all your Obsidian devices. Adding a rule stops future syncing but leaves existing copies on the server. To remove those too, select **Review and remove** under **Remove excluded server files**. Your local files are kept, and the server copies stay recoverable for 30 days.
 
-## Conflicts and earlier versions
+## When something goes wrong
 
-When versions need your input, Crate preserves content for review. [Conflict management](/docs/troubleshooting/conflicts/) explains how to choose or combine versions.
+- **Two devices changed the same note:** Crate keeps both versions for you to compare. See [Resolve conflicts](/docs/troubleshooting/conflicts/).
+- **You need an earlier version:** the server keeps replaced and deleted files for 30 days, and you can restore your whole vault to an earlier synced state. See [History and recovery](/docs/troubleshooting/recovery/) before you restore.
 
-Server file history retains replaced and deleted files for 30 days. Shared checkpoints let you inspect and restore an earlier synced state. See [History and recovery](/docs/troubleshooting/recovery/) before restoring.
-
-Sync carries deletions as well as edits. Keep an independent backup of important notes.
+:::caution[Sync is not a backup]
+Deleting a file on one device deletes it everywhere. Keep a separate backup of notes you can't afford to lose.
+:::

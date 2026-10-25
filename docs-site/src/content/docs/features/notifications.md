@@ -3,33 +3,38 @@ title: Set up notifications
 description: Receive reminder alerts, choose an all-day alert time, and turn notifications off for one device or your whole vault.
 ---
 
-Crate can send reminder alerts to your phones and browsers while Obsidian is closed. Your server must be running, and the reminder must have reached it through sync or the web app.
+Get a nudge on your phone or computer when a reminder is due, even with Obsidian closed. Your server sends the alerts, so it needs to be running, and the reminder needs to have reached it through sync or the web app.
 
-There are two controls: Obsidian manages whether the vault sends alerts, and each receiving device grants notification permission.
+Setup has two parts: turn alerts on for your vault in Obsidian, then allow notifications on each device that should receive them.
 
 ## Enable alerts for your vault
 
 1. In Obsidian, open **Settings → Crate → Reminders** and check that **Enable reminders** is on.
 2. Expand **Notifications** and turn on **Push notifications**.
-3. Check the displayed notification folder and timezone. To use this device's reminders folder and timezone, select **Use this device’s settings** under **Notification folder and timezone**.
-4. For reminders with a date but no time, set **All-day notification time**. Leave it empty to receive alerts only for reminders with an explicit time.
+3. Check the notification folder and timezone shown. To use this device's reminders folder and timezone, select **Use this device’s settings** under **Notification folder and timezone**.
+4. For reminders with a date but no time, set **All-day notification time**. Leave it empty if you only want alerts for reminders with a specific time.
 
-These settings apply to all subscribed devices. The saved notification timezone does not change just because another device opens Crate or you travel.
+These settings apply to every subscribed device. The saved timezone stays put when you travel or open Crate on another device.
 
 ## Connect each receiving device
 
 1. [Open the Crate web app](/docs/getting-started/devices/#open-the-web-app) on the device.
-2. On iPhone or iPad, [add it to your Home Screen](/docs/features/web-app/#install-on-your-phone) and open the installed app first.
-3. Open the app's **Settings → Reminders** and select **Enable** beside **Push notifications**.
-4. Allow notifications when the browser or device asks. Wait until Crate shows **On**.
+2. On iPhone or iPad, [add it to your Home Screen](/docs/features/web-app/#install-on-your-phone) and open the installed app.
+3. In the app, open **Settings → Reminders** and select **Enable** beside **Push notifications**.
+4. Allow notifications when asked, and wait until Crate shows **On**.
 
-Repeat on each device where you want alerts. **Off for vault** means this device is registered, but Reminders or the vault's notification setting is paused; check **Reminders** and **Notifications** in Obsidian.
+Repeat this on each device where you want alerts.
+
+If a device shows **Off for vault**, it's registered, but Reminders or the vault's notifications are paused. Check **Reminders** and **Notifications** in Obsidian.
 
 ## Check that it works
 
-In Obsidian, open **Settings → Crate → Notifications**. Under **Notification devices**, select **Refresh** and check that your device appears. Select **Send test** under **Test notification** to send to all enabled devices.
+1. In Obsidian, open **Settings → Crate → Notifications**.
+2. Under **Notification devices**, select **Refresh** and check that your device is listed.
+3. Under **Test notification**, select **Send test**. Every enabled device should get an alert.
+4. For a full check, create a reminder a few minutes from now and sync it. This tests scheduling as well as delivery.
 
-Then create a reminder a few minutes in the future and sync it. This checks scheduling as well as delivery. An all-day reminder needs an all-day notification time; its date alone does not enable an alert.
+Reminders with only a date alert at your **All-day notification time**. Without one set, they won't alert at all.
 
 ## Turn alerts off
 
@@ -37,15 +42,19 @@ Then create a reminder a few minutes in the future and sync it. This checks sche
 | --- | --- |
 | Stop alerts everywhere, keep using reminders | Turn off **Settings → Crate → Notifications → Push notifications** in Obsidian. |
 | Stop alerts on one device | Turn off notifications for Crate in that device's browser or system settings. |
-| Stop only date-only alerts | Select **Turn off** beside **All-day notification time**, or clear its time. Timed reminders still qualify for alerts. |
-| Pause the entire Reminders feature | Turn off **Reminders → Enable reminders**. This also stops notification processing. |
+| Stop only date-only alerts | Select **Turn off** beside **All-day notification time**, or clear its time. Timed reminders still alert. |
+| Pause the entire Reminders feature | Turn off **Reminders → Enable reminders**. This also stops notifications. |
 
-Use **Notification devices → Remove notification subscription** to remove an obsolete registration. To remove a device's access to Crate as well, [disconnect its session](/docs/getting-started/devices/#disconnect-a-device).
+To clean up a device you no longer use, select **Notification devices → Remove notification subscription**. To remove its access to Crate entirely, [disconnect its session](/docs/getting-started/devices/#disconnect-a-device).
 
 ## What to expect
 
-Device permissions, Focus modes, network access, and your hosting provider can affect delivery. Crate cannot schedule a reminder that exists only on an offline Obsidian device. A Docker host must stay awake and online.
+Alerts usually just work, but a few things can get in the way:
 
-Turning alerts back on does not guarantee that old missed reminders will be replayed. For a missed reminder that still matters, choose a new future time and sync it.
+- Device permissions, Focus modes, network access, and your hosting provider all affect delivery.
+- Crate can't schedule a reminder that exists only on an offline Obsidian device.
+- A server on your own hardware must stay awake and online.
 
-If an alert does not arrive, follow [Notification troubleshooting](/docs/troubleshooting/notifications/).
+Turning alerts back on doesn't replay reminders you missed. If a missed reminder still matters, give it a new time in the future and sync it.
+
+If an alert doesn't arrive, see [Notification troubleshooting](/docs/troubleshooting/notifications/).

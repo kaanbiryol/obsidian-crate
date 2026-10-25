@@ -3,53 +3,66 @@ title: What to know before you start
 description: The practical limits of Crate, including background sync, file sizes, offline use, history, and privacy.
 ---
 
-Crate keeps your notes in your vault and lets you run the server yourself. These are the limits most likely to affect everyday use.
+Crate keeps your notes in your vault and lets you run the server yourself. Here are the limits you're most likely to notice day to day.
+
+:::caution[Crate is in beta]
+Try it with a vault you don't depend on yet, and keep a separate backup of your notes. Sync carries deletions as well as edits, so a backup is your safety net.
+:::
 
 ## Sync needs an open Obsidian app
 
-The plugin syncs while Obsidian is running and able to work. Do not rely on a phone completing sync after Obsidian has been closed or suspended. Before switching devices, let sync finish on the first one, then sync the second.
+Crate syncs while Obsidian is open and running. Phones pause apps in the background, and sync pauses with them. Before switching devices, let sync finish on the first one, then sync the second.
 
-**Automatic sync starts off on each device.** Enable it in **Settings → Crate → Sync**, or use **Crate: Sync now**. Connecting a server does not perform your first file transfer.
+**Automatic sync starts off on each device.** Connecting a server doesn't move any files. Run **Crate: Sync now**, or turn on **Settings → Crate → Sync → Automatic sync**.
 
-The web app and scheduled notifications use your server directly, so Obsidian can be closed after the relevant notes have synced. A server on your own hardware must stay awake and online.
+The web app and scheduled notifications talk to your server directly, so Obsidian can be closed once your notes have synced. If your server runs on your own hardware, it needs to stay awake and online.
 
 ## File and storage limits
 
 | Limit | What it means for you |
 | --- | --- |
-| 25 MiB per synced file | Larger files stay on the device and appear as sync errors. Keep large media outside the synced vault or exclude it. |
-| 1 MiB per Reading note | Oversized notes are reported instead of opened in Reading. Keep a shorter note or read the original source. |
-| 1 MiB per reminder note for the web app | Oversized notes, or notes with too much parsed reminder data, are omitted with an explanation. Split them into smaller project notes to restore web editing and scheduling. |
-| 200 articles or 50 MiB in the web app's article cache | Articles you open are kept first, then your newest inbox articles. Open the web app online before going offline so it can catch up. |
-| 30 days of replaced or deleted server file versions | Recover promptly. Local-only files may have no server history. |
-| Latest 20 shared checkpoints, for up to 30 days | Checkpoints cover recent synced states, not an unlimited backup archive. |
+| 25 MB per synced file | Bigger files stay on the device and show up as sync errors. Keep large media outside the synced vault, or exclude it. |
+| 1 MB per Reading note | Bigger notes are reported instead of opened in Reading. Shorten the note or read the original source. |
+| 1 MB per reminder note in the web app | Bigger notes, or notes with a very large number of reminders, are left out with an explanation. Split them into smaller project notes to edit and schedule them in the web app again. |
+| 200 articles or 50 MB in the web app's article cache | Articles you've opened are kept first, then your newest inbox articles. Open the web app while online before going offline so it can catch up. |
+| 30 days of server history for replaced or deleted files | Recover promptly. Files that only ever existed on one device may have no server history. |
+| Latest 20 checkpoints, for up to 30 days | Checkpoints are saved states of your whole vault you can return to. They cover recent syncs, not an unlimited backup archive. |
 
-MiB is a file-size unit: 1 MiB is 1,048,576 bytes, roughly one megabyte. The separate Reading and reminder limits can apply even when a note is small enough for ordinary vault sync.
+Sizes are rounded down, so a file under the listed size always fits. The Reading and reminder limits can apply even when a note is small enough to sync.
 
-Updated attachments such as PDFs and images require [conflict review](/docs/troubleshooting/conflicts/#attachments-and-binary-files). New attachments can download automatically. File names also need to work across devices: names differing only by capitalization, Windows-reserved names, and trailing dots or spaces can block sync. Rename files identified in an error and retry. With [encryption](/docs/features/encryption/), files can be nested at most 36 folders deep.
+<details>
+<summary>Good to know about files</summary>
+
+- **Attachments:** new attachments download on their own. When an existing image, PDF, or other attachment changes, you [review it](/docs/troubleshooting/conflicts/#attachments-and-binary-files) before it's replaced.
+- **File names have to work on every device.** Names that differ only by capitalization, names Windows reserves, and names ending in a dot or space can block sync. Rename the file named in the error and sync again.
+- **With [encryption](/docs/features/encryption/),** files can be nested at most 36 folders deep.
+
+</details>
 
 ## Offline access is different in each app
 
-In Obsidian, your local notes, reminders, and saved article text remain available. Changes sync when you reconnect and run sync, automatically or manually.
+**In Obsidian,** your notes, reminders, and saved article text are always there. Changes sync when you're back online and sync runs, automatically or by hand.
 
-In the web app, cached reminders are read-only offline. Reading can queue saves and edits, but new article downloads need a connection. The browser can remove cached data, and signing out clears pending work and drafts. See [offline use and pending saves](/docs/features/web-app/#before-going-offline).
+**In the web app,** cached reminders are read-only offline. Reading can queue saves and edits, but downloading new articles needs a connection. Your browser can clear cached data, and signing out clears pending work and drafts. See [offline use and pending saves](/docs/features/web-app/#before-going-offline).
 
-## Some websites cannot be saved as full articles
+## Some websites can't be saved as full articles
 
-Pages requiring a login, restricting automated downloads, or relying heavily on scripts may remain bookmarks. YouTube transcripts depend on available captions; videos are streamed, not downloaded.
+Pages that need a login, block automated downloads, or depend heavily on scripts may stay as bookmarks. YouTube transcripts need captions to exist; videos are streamed, not downloaded.
 
-Keep the saved link, retry when connected, or [use Web Clipper](/docs/features/reading/#use-obsidian-web-clipper) to save text you can access in your browser.
+Keep the link and try again later, or [use Web Clipper](/docs/features/reading/#use-obsidian-web-clipper) to save text you can see in your browser.
 
 ## Cloudflare's free daily limits
 
-On Cloudflare's Free plan, D1 allows 100,000 row writes and 5 million row reads a day. A first upload of a very large vault, or turning on encryption for one (which uploads the whole vault again), can reach the write limit. Sync then stops with **Cloudflare’s free daily database limit stopped this sync**. Your changes stay on the device; after 00:00 UTC, sync again or resume encryption setup, and the upload continues where it stopped.
+On Cloudflare's Free plan, the database Crate uses allows 100,000 row writes and 5 million row reads a day. The first upload of a very large vault, or turning on encryption for one (which uploads the whole vault again), can hit the write limit.
 
-**Settings → Crate → Server and usage → Cloudflare usage** compares your usage, including storage, with the free allowances. R2 storage beyond its free allowance is billed rather than stopped.
+If that happens, sync stops with **Cloudflare’s free daily database limit stopped this sync**. Nothing is lost: your changes stay on the device. After 00:00 UTC, sync again or resume encryption setup, and the upload picks up where it stopped.
+
+To see where you stand, open **Settings → Crate → Server and usage → Cloudflare usage**. It compares your usage, including storage, with the free allowances. File storage beyond its free allowance is billed rather than stopped.
 
 ## Privacy and backups
 
-Without [end-to-end encryption](/docs/features/encryption/), your server can read synced content. With it, content and file and folder names are encrypted, but folder structure, approximate sizes, and some scheduling information remain visible. Keep the recovery key outside your vault; Crate cannot replace a lost key.
+**Without [end-to-end encryption](/docs/features/encryption/),** your server can read synced content. **With it,** content and file and folder names are encrypted, but folder structure, approximate sizes, and some scheduling information stay visible. Keep your recovery key outside your vault; Crate can't replace a lost key.
 
-Reading can contact saved websites for article text, favicons, or video playback. [Reading's privacy notes](/docs/features/reading/#privacy-and-availability) explain when that happens.
+Reading can contact saved websites to fetch article text, icons, or video playback. [Reading's privacy notes](/docs/features/reading/#privacy-and-availability) explain when.
 
-Sync carries deletions as well as edits. Keep an independent backup, and use [history and recovery](/docs/troubleshooting/recovery/) when you need an earlier version. Cloudflare usage charges can apply; self-hosting also needs storage, maintenance, and backups. Crate is currently beta software, so try it with a non-critical vault first.
+Keep an independent backup, and use [history and recovery](/docs/troubleshooting/recovery/) when you need an earlier version. Cloudflare may charge for usage, and self-hosting means looking after storage, maintenance, and backups yourself.

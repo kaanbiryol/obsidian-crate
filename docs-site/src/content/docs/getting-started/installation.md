@@ -3,40 +3,44 @@ title: Install Crate
 description: Install the Crate beta in Obsidian using BRAT, or install release files manually.
 ---
 
-Crate is an Obsidian plugin for sync, reminders, and reading. You need **Obsidian 1.13.0 or newer** on each device where you install the plugin.
+Crate is an Obsidian plugin, so you install it inside Obsidian on each device where you want it. You need **Obsidian 1.13.0 or newer**.
 
-The beta is not in Obsidian's community plugin catalog yet. BRAT can install it and help you keep it updated. Start with a non-critical vault and keep a separate backup of your notes.
+Crate isn't in Obsidian's community plugin catalog yet. Until it is, a helper plugin called BRAT installs it for you and keeps it updated. Before you start, read [what to know about the beta](/docs/getting-started/limits/).
 
 ## Install with BRAT
 
-1. In Obsidian, open **Settings → Community plugins**. Enable community plugins if needed, then select **Browse**.
+1. In Obsidian, open **Settings → Community plugins**. Enable community plugins if asked, then select **Browse**.
 2. Search for **BRAT**, install it, and enable it.
 3. Open **Settings → BRAT** and select **Add beta plugin**.
 4. Enter the repository below, select the latest release, and add the plugin.
-5. Return to **Settings → Community plugins** and enable **Crate**.
+5. Go back to **Settings → Community plugins** and enable **Crate**.
 
 ```text
 kaanbiryol/obsidian-crate
 ```
 
-Open **Settings → Crate** to finish setup. For help with BRAT itself, see [BRAT's installation guide](https://tfthacker.com/brat-quick-guide).
+Crate is now installed. Open **Settings → Crate** to finish setup. If BRAT gives you trouble, see [BRAT's installation guide](https://tfthacker.com/brat-quick-guide).
 
-## Choose your next step
+## What next?
 
-For vault sync and the web app, [choose a host](/docs/getting-started/hosting/). You can deploy into your Cloudflare account or run Crate on your own computer with Docker.
+- **Sync your vault or use the web app:** [choose where your server runs](/docs/getting-started/hosting/), either your Cloudflare account or your own computer with Docker.
+- **Just try it on this device:** run **Crate: Add link to reading list** or **Crate: Create reminder** from Obsidian's command palette. Both work without a server and save to the `Reading` and `Reminders` folders.
 
-To try local features first, use **Crate: Add link to reading list** or **Crate: Create reminder** from Obsidian's command palette. They start enabled and use the `Reading` and `Reminders` folders. A server is needed for vault sync, the web app, and notifications; the current settings screen also shows feature controls after connection.
+Vault sync, the web app, and notifications need a server. The settings screen shows feature controls after you connect one.
 
-Follow [Reading](/docs/features/reading/) or [Reminders](/docs/features/reminders/) for everyday use, and [Choose and manage features](/docs/features/settings/) when you are ready to adjust the setup.
+When you're ready, follow [Reading](/docs/features/reading/) or [Reminders](/docs/features/reminders/) for everyday use, and [Choose and manage features](/docs/features/settings/) to adjust your setup.
 
-## Install release files manually
+<details>
+<summary>Install release files manually</summary>
 
-Download `main.js`, `manifest.json`, and `styles.css` from the same [Crate release](https://github.com/kaanbiryol/obsidian-crate/releases). Place them in this folder inside your vault:
+Download `main.js`, `manifest.json`, and `styles.css` from the same [Crate release](https://github.com/kaanbiryol/obsidian-crate/releases). Put them in this folder inside your vault:
 
 ```text
 .obsidian/plugins/crate/
 ```
 
-Reload Obsidian, then enable **Crate** under **Settings → Community plugins**. If you use a custom vault configuration folder, use that folder in place of `.obsidian`.
+Reload Obsidian, then enable **Crate** under **Settings → Community plugins**. If your vault uses a custom configuration folder, use it instead of `.obsidian`.
 
-To work on the plugin itself, follow the repository's [build-from-source instructions](https://github.com/kaanbiryol/obsidian-crate#install-from-source).
+</details>
+
+Want to work on the plugin itself? Follow the repository's [build-from-source instructions](https://github.com/kaanbiryol/obsidian-crate#install-from-source).

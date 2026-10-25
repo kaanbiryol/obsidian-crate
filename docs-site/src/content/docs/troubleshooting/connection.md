@@ -3,50 +3,76 @@ title: Connection problems
 description: Fix Cloudflare sign-in, expired pairing codes, changed server addresses, and web app connections.
 ---
 
-Start with the device and server you are trying to connect. Obsidian vault connections and web app sessions use different setup flows.
+A failed connection doesn't touch your notes. They stay on your device while you sort it out.
 
-## Cloudflare does not return to Obsidian
+Find the problem you're seeing below. Obsidian and the web app connect in different ways, so check which one you're setting up.
 
-On mobile, select **Open Cloudflare** in Crate's connection dialog to begin authorization. When the callback page opens, select **Open Obsidian** if the app does not open automatically.
+## Cloudflare doesn't send me back to Obsidian
 
-If authorization was interrupted, return to Crate settings and start **Connect with Cloudflare** again. Use the Cloudflare account that owns the server.
+1. On mobile, select **Open Cloudflare** in Crate's connection dialog to start signing in.
+2. When the confirmation page opens, select **Open Obsidian** if the app doesn't open on its own.
 
-## R2 is not active
+If signing in was interrupted, go back to Crate settings and select **Connect with Cloudflare** again. Use the Cloudflare account that owns your server.
 
-Open the Cloudflare dashboard in the same account you chose during setup and finish R2 activation. Then retry the connection. Activating R2 in a different account does not enable it for this server.
+## Cloudflare says R2 isn't active
 
-See [R2 activation steps](/docs/getting-started/cloudflare/#before-you-connect).
+R2 is Cloudflare's file storage, and Crate needs it turned on.
 
-## A Docker server cannot be reached
+1. Open the Cloudflare dashboard, signed in to the same account you chose during setup.
+2. Finish turning on R2.
+3. Try connecting again.
 
-Check that the host is awake and online, then inspect the server logs:
+Turning on R2 in a different Cloudflare account won't help this server. See the [R2 activation steps](/docs/getting-started/cloudflare/#before-you-connect).
 
-```sh
-docker compose logs -f crate
-```
+## I can't reach my Docker server
 
-Wait for confirmation that the public HTTPS address reaches this Crate server. Use **Server address to paste into Obsidian**, including `https://`. Do not use the internal Docker listener address.
+1. Check that the computer running the server is awake and online.
+2. Look at the server logs:
 
-The default Quick Tunnel address changes when the server restarts. In Obsidian, use **Settings → Crate → Server → Update server address** on each device, then sync. Create a fresh connection link for the web app.
+   ```sh
+   docker compose logs -f crate
+   ```
 
-On a phone, `localhost` and `127.0.0.1` point to the phone itself. Use the server's public HTTPS address.
+3. Wait until the logs confirm that the public HTTPS address reaches this Crate server.
+4. In Obsidian, paste the address shown as **Server address to paste into Obsidian**, including `https://`.
 
-## A pairing code has expired
+<details>
+<summary>Good to know</summary>
+
+- Don't use the internal Docker listener address. Use the public HTTPS one.
+- On a phone, `localhost` and `127.0.0.1` point to the phone itself, not your server.
+- The default Quick Tunnel address changes every time the server restarts. When that happens, select **Settings → Crate → Server → Update server address** on each Obsidian device, then sync. Create a fresh connection link for the web app.
+
+</details>
+
+## My pairing code expired
 
 Pairing codes work once and expire after ten minutes. [Create a new code](/docs/getting-started/self-hosting/#create-another-pairing-code), then enter it under **Connect to your server** in Obsidian.
 
-A pairing code for Obsidian is not a web app connection link. To connect the web app, use **Crate web app → Connect another device** after Obsidian has connected.
+A pairing code is for Obsidian only. To connect the web app, connect Obsidian first, then use **Crate web app → Connect another device**.
 
-## The web app asks to reconnect
+## The web app asks me to reconnect
 
-Generate a new link from **Settings → Crate → Crate web app** on a connected Obsidian device. Open it in the browser or installed app you want to use.
+1. On a connected Obsidian device, open **Settings → Crate → Crate web app** and create a new link.
+2. Open the link in the browser or installed app you want to use.
+3. Reconnect to the same server and folder, then follow the review and resume prompts.
 
-If the app contains pending saves or drafts, preserve them before signing out or clearing browser data. Reconnect to the same server and folder, then follow its review and resume prompts. See [Pending work](/docs/troubleshooting/recovery/#pending-work-in-the-web-app).
+If the app has unsent saves or drafts, keep them safe before you sign out or clear browser data. See [Pending work in the web app](/docs/troubleshooting/recovery/#pending-work-in-the-web-app).
 
-## Files are missing after connecting
+## My files are missing after connecting
 
-Connection does not transfer files. Run **Crate: Sync now** on the original device, wait for completion, then sync the other device. Confirm both are connected to the same server and check ignore rules.
+Connecting doesn't move files. To bring them over:
 
-Automatic sync starts off on each device. Enable **Settings → Crate → Sync → Automatic sync** if you expect files to transfer after editing. For missing articles or reminders, also check that the feature is enabled and its configured folder contains the notes. The [settings guide](/docs/features/settings/) explains these controls.
+1. Run **Crate: Sync now** on the original device and wait for it to finish.
+2. Run **Crate: Sync now** on the other device.
 
-If Crate reports an incompatible server, follow [Updates](/docs/troubleshooting/updates/). Do not reset storage to bypass a compatibility message.
+Still missing something? Check that:
+
+- Both devices are connected to the same server.
+- Your exclusion rules aren't keeping the files local.
+- **Settings → Crate → Sync → Automatic sync** is on, if you expect files to sync after editing. It starts off on each device.
+- For missing articles or reminders, the feature is turned on and its folder contains the notes. The [settings guide](/docs/features/settings/) explains these controls.
+
+## Crate says my server is incompatible
+
+Follow [Updates](/docs/troubleshooting/updates/) to bring the plugin and server back in step. Don't reset storage to get past a compatibility message.

@@ -3,52 +3,62 @@ title: Use the web app
 description: Install Crate on your phone, use Reading and Reminders outside Obsidian, and understand offline access.
 ---
 
-The Crate web app gives you Reading and Reminders without opening Obsidian. It runs from your Crate server and can be added to your phone's Home Screen.
+The Crate web app puts your reading list and reminders on your phone, no Obsidian needed. It runs from your own Crate server and installs to your Home Screen like a regular app.
 
-Use Obsidian with the Crate plugin when you want your **whole vault**. The web app works with your connected Reading and Reminders folders; it is not a general Obsidian editor.
+It works with your Reading and Reminders folders only. For your whole vault, use Obsidian with the Crate plugin.
 
 ## Connect for the first time
 
-On a connected Obsidian device, finish a sync, then open **Settings → Crate → Crate web app**. Select **Open app** for this device or **Connect another device** for a QR code and **Copy link** option.
+1. On a connected Obsidian device, finish a sync.
+2. Open **Settings → Crate → Crate web app**.
+3. Select **Open app** to use this device, or **Connect another device** to show a QR code. **Copy link** gives you the same link to send to another device.
+4. Open the link or scan the code on the device you want to connect.
+5. Open a reminder or article you know is synced to check you're looking at the right vault.
 
-Open the connection link on the receiving device. Keep it private: it grants access to your data. If it expires, create a new link from Obsidian. With encryption, follow the [unlock instructions](/docs/features/encryption/#reading-and-reminders-web-app) if prompted.
+Once connected, Obsidian can close. Your server needs to stay available.
 
-After connecting, open a synced reminder or article to check that you are seeing the right vault. Your server must stay available, but Obsidian can close.
+:::caution[Keep connection links private]
+Anyone with the link can open your library and reminders. If a link expires, create a new one in Obsidian.
+:::
+
+With encryption, follow the [unlock instructions](/docs/features/encryption/#reading-and-reminders-web-app) if the app asks.
 
 ## Install on your phone
 
-**On iPhone or iPad:** open the connected app in Safari, select **Share → Add to Home Screen**, then open the new icon. The connection handoff lasts ten minutes; use a fresh link if you miss it. The installed app may ask you to unlock encryption again because Safari and the Home Screen app store keys separately.
+**iPhone or iPad:** open the connected app in Safari, select **Share → Add to Home Screen**, then open the new icon within ten minutes. If you miss that window, use a fresh link. The installed app may ask you to unlock encryption again, because Safari and the Home Screen app keep keys separately.
 
-**On Android:** use your browser's install or add-to-home-screen action, then open Crate from the new icon. The wording depends on the browser. You can also keep using the browser tab.
+**Android:** use your browser's install or add-to-home-screen option, then open Crate from the new icon. The wording varies by browser. You can also just keep using the browser tab.
 
-For alerts, complete [notification setup](/docs/features/notifications/) inside each receiving app. Installing it alone does not enable notifications.
+Installing doesn't turn on alerts by itself. To get them, follow [notification setup](/docs/features/notifications/) in each app that should receive them.
 
 ## Make it yours
 
-Open **Settings** from the web app to adjust appearance and preferences. Under **Tabs**, choose **Open app to** and reorder the navigation tabs. For example, choose **Reading** to start in your library, or **Today** to start with your reminders.
+Open **Settings** in the web app to adjust appearance and preferences. Under **Tabs**, choose **Open app to** and reorder the tabs. Pick **Reading** to start in your library, or **Today** to start with your reminders.
 
-These preferences belong to this browser or installed app. The same settings screen serves Reading and Reminders. Their feature switches, folders, and notification schedule are managed in [Obsidian's Crate settings](/docs/features/settings/).
+These preferences belong to this browser or installed app. Feature switches, folders, and the notification schedule are managed in [Obsidian's Crate settings](/docs/features/settings/).
 
-To save links from another app, see the [Reading share options](/docs/features/reading/#read-on-your-phone).
+To save links from other apps, see the [Reading share options](/docs/features/reading/#read-on-your-phone).
 
 ## Before going offline
 
-Open the web app while connected so it can refresh. It saves your newest inbox articles for offline reading in the background and keeps the articles you open, up to a limit, rather than downloading your entire library.
+Open the web app while you're online so it can catch up. It saves your newest inbox articles in the background and keeps the articles you open, up to a limit. It doesn't download your whole library.
 
-| Activity | Offline behavior |
+| What you're doing | Offline |
 | --- | --- |
-| View reminders | Previously cached reminders remain readable. |
-| Create, edit, or complete a reminder | Reconnect before starting a new change. A previously submitted, unconfirmed change stays pending. |
-| Read articles | Opened articles and your newest inbox articles are cached, up to 200 articles or 50 MiB. Background copies are removed before articles you opened. |
-| Save Reading links or edit cached Reading items | Changes can wait on this device until it reconnects. Downloading new article text needs a connection. |
-| Play a saved YouTube video | Requires internet access; Crate does not download videos. Cached transcripts remain readable. |
+| Viewing reminders | Reminders you've already loaded stay readable. |
+| Creating, editing, or completing a reminder | Reconnect first. A change you already submitted stays pending until it's confirmed. |
+| Reading articles | Opened articles and your newest inbox articles are kept, up to 200 articles or 50 MB. Background copies are removed before articles you opened. |
+| Saving links or editing saved articles | Changes wait on this device until you reconnect. Downloading new article text needs a connection. |
+| Playing a saved YouTube video | Needs internet; Crate doesn't download videos. Saved transcripts stay readable. |
 
-Browser storage can be cleared by you or the browser. Treat the offline copy as a convenience, and let pending saves finish while the app is open and connected.
+Your browser can clear its storage, and so can you. Think of the offline copy as a convenience, and let pending saves finish while the app is open and online.
 
 ## Check a pending save
 
-Open **Settings → Sync** to see the state of both features. Use **Refresh all** to check again. If a change needs review, follow the app's review or retry action and compare it with the confirmed content.
+Open **Settings → Sync** in the web app to see where Reading and Reminders stand, and select **Refresh all** to check again. If a change needs review, use the app's review or retry action and compare it with the confirmed version.
 
-Before clearing browser data or signing out, use **Export Reading data** or **Export unsynced reminders** when offered. A session expiring keeps pending work for recovery; explicitly selecting **Log out and clear device data** clears offline data and drafts for both features on this device.
+:::caution[Export before you clear or sign out]
+Use **Export Reading data** or **Export unsynced reminders** when offered. If your session expires, pending work is kept for recovery. Selecting **Log out and clear device data** deletes offline data and drafts for both features on this device.
+:::
 
-For a stuck save, expired session, or unavailable cache, use [History and recovery](/docs/troubleshooting/recovery/#pending-work-in-the-web-app).
+For a stuck save, expired session, or missing offline copy, see [History and recovery](/docs/troubleshooting/recovery/#pending-work-in-the-web-app).

@@ -3,42 +3,66 @@ title: History and recovery
 description: Restore a file version or a saved vault state, and preserve pending work in the web app.
 ---
 
-Choose the smallest recovery that solves the problem: one file, a saved vault state, or pending work on a device.
+Lost a change? There's a good chance Crate still has it. Start with the smallest fix: one file, then your whole vault, then unsent work on a device.
 
-## Restore a file
+## Get back an earlier version of a file
 
-Crate retains server versions of replaced and deleted files for 30 days.
+Your server keeps replaced and deleted files for 30 days.
 
-1. Open the file's context menu in Obsidian and select **File history**, or run **Crate: Show file sync history** for the active file.
-2. Choose an earlier version and compare it with your current file.
-3. Restore the version you want, check the resulting note, then sync.
+1. In Obsidian, open the file's menu and select **File history**, or run **Crate: Show file sync history** for the open file.
+2. Pick an earlier version and compare it with what you have now.
+3. Restore the version you want, check the note, then sync.
 
-For a deleted file, look under **Sync activity → History → File history**. Local-only files may have no server history. Also check the vault's `.trash` folder for files removed by remote sync.
+**Looking for a deleted file?** Open **Sync activity → History → File history**. Also check your vault's `.trash` folder, where files removed by sync from another device end up.
 
-## Return to an earlier vault state
+Files that only ever lived on one device may have no server history.
 
-Under **Sync activity → History**, select a checkpoint and use **Return to this state**. Review the file-by-file preview before confirming.
+## Put your whole vault back the way it was
 
-The latest 20 shared checkpoints are available across connected devices for up to 30 days. Restoration keeps local recovery copies, and files excluded on the restoring device remain untouched.
+Crate saves recent snapshots of your synced vault, called checkpoints.
 
-If shared checkpoints are unavailable, [update the server](/docs/troubleshooting/updates/) and complete a successful sync.
+1. Before you start, back up your current vault and let any unsent web app edits finish.
+2. Turn off automatic sync on your other devices while you work.
+3. Open **Sync activity → History** and select a checkpoint.
+4. Select **Return to this state** and review the file-by-file preview.
+5. Confirm, then check the restored vault before turning automatic sync back on elsewhere.
 
-Before a broad restore, back up the current vault and let pending browser edits finish. Pause automatic sync on other devices while you inspect and verify the restored state.
+<details>
+<summary>Good to know</summary>
+
+- Crate keeps the latest 20 checkpoints, for up to 30 days, and all your connected devices can see them.
+- Restoring keeps local recovery copies of what it replaces.
+- Files you've excluded on the restoring device aren't touched.
+- If no checkpoints show up, [update your server](/docs/troubleshooting/updates/) and complete a successful sync.
+
+</details>
 
 ## Pending work in the web app
 
-If a save is not confirmed, keep the draft or pending change. Use the app's retry, edit, or review controls instead of repeatedly creating the same item.
+If the app couldn't confirm a save, your draft or change is still there. Don't create the same item again; use the app's retry, edit, or review controls instead.
 
-When a session needs renewal, reconnect to the same server and folder, review the saved work, and use **Resume saved changes** when offered. Export pending work before clearing browser data.
+If your session needs renewing:
 
-**Signing out clears cached data, pending changes, and drafts.** It is not the first step for recovering an unconfirmed save.
+1. Reconnect to the same server and folder.
+2. Review your saved work.
+3. Select **Resume saved changes** when it's offered.
 
-## Rebuild an offline copy
+Export pending work before you clear browser data.
 
-If the app reports **Offline copy unavailable**, reconnect and close old tabs. Use **Rebuild offline copy** to rebuild the cache while preserving pending changes and drafts. If it still cannot recover, retain any export and record the error before changing storage manually.
+:::caution[Don't sign out to fix a stuck save]
+**Signing out clears cached data, pending changes, and drafts.** Try the steps above first.
+:::
 
-## Keep an independent backup
+## The app says "Offline copy unavailable"
 
-Sync history has a retention window, and sync propagates deletions. Back up important vaults separately.
+1. Reconnect and close any old Crate tabs.
+2. Select **Rebuild offline copy**. This rebuilds the app's saved copy and keeps your pending changes and drafts.
 
-For a self-hosted server, use the [verified backup and restore commands](/docs/reference/self-hosting/#verified-backups-restore-and-updates). Cloudflare storage recovery requires matching database and file storage; see the [operator recovery runbook](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/recovery.md).
+If that doesn't fix it, keep any export you have and write down the error before you change browser storage by hand.
+
+## Keep a backup of your own
+
+Crate's history only goes back so far, and deletions sync like any other change. Keep a separate backup of vaults that matter to you.
+
+- **Self-hosted:** use the [verified backup and restore commands](/docs/reference/self-hosting/#verified-backups-restore-and-updates).
+- **Cloudflare:** restoring the server's storage means restoring its database and file storage together. See the [operator recovery runbook](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/recovery.md).

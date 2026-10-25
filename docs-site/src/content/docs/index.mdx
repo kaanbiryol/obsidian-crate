@@ -10,17 +10,21 @@ next:
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Crate brings vault sync, reminders, and read-it-later articles to Obsidian. Your notes stay in your vault as ordinary files. For sync and the web app, you run a Crate server in your Cloudflare account or on your own hardware. There is no Crate account to create.
+Crate brings vault sync, reminders, and read-it-later articles to Obsidian. Your notes stay in your vault as ordinary files, so nothing is locked in. For sync and the web app, you run your own Crate server in your Cloudflare account or on your own hardware. There is no Crate account to create.
 
-Start with the features you need; you can turn the others off.
+Use only the features you want; you can turn the others off.
+
+:::caution[Crate is in beta]
+Try it with a vault you don't depend on yet, and keep a separate backup of your notes. [What to know before you start](/docs/getting-started/limits/) covers the practical limits.
+:::
 
 ## What would you like to do?
 
 | I want to… | Start here |
 | --- | --- |
 | Keep my whole vault on several devices | Install Crate, choose a host, then connect each Obsidian device below. |
-| Save articles in Obsidian | [Try Reading](/docs/features/reading/) with its default folder. Local saves do not need a Crate server. |
-| Keep tasks in my notes | [Create a reminder](/docs/features/reminders/). Local reminders work without a server. |
+| Save articles in Obsidian | [Try Reading](/docs/features/reading/) with its default folder. Saving on your device doesn't need a server. |
+| Keep tasks in my notes | [Create a reminder](/docs/features/reminders/). Reminders on your device work without a server. |
 | Read and manage reminders on my phone without Obsidian | Set up a server, then [connect the web app](/docs/features/web-app/). |
 | Choose what runs and where | [Manage features and settings](/docs/features/settings/). |
 
@@ -33,23 +37,22 @@ Start with the features you need; you can turn the others off.
   <LinkCard title="04 · Make it yours" description="Choose features, turn on automatic sync, and set your preferences." href="/docs/features/settings/" />
 </CardGrid>
 
-Crate is currently a beta; try it with a non-critical vault and keep a separate backup. Read [What to know before you start](/docs/getting-started/limits/) for the practical limits.
-
 :::tip[Your first sync]
-Connecting a server does not transfer your files. Run **Crate: Sync now** in Obsidian, then enable **Settings → Crate → Sync → Automatic sync** on each device if you want ongoing automatic transfers.
+Connecting a server doesn't move any files yet. Run **Crate: Sync now** in Obsidian. If you want Crate to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync** on each device.
 :::
 
 ## Get more from Crate
 
-- [Sync](/docs/features/sync/) — understand what syncs and review pending changes.
-- [Reminders](/docs/features/reminders/) — plan your day with tasks stored as Markdown.
-- [Reading](/docs/features/reading/) — collect articles, highlight passages, and read offline.
-- [Notifications](/docs/features/notifications/) — choose when and where reminders alert you.
-- [Web app](/docs/features/web-app/) — install on your phone and check what works offline.
-- [Encryption](/docs/features/encryption/) — protect synced content, connect devices, and save your recovery key.
+- [Sync](/docs/features/sync/): see what syncs and review changes before they go.
+- [Reminders](/docs/features/reminders/): plan your day with tasks stored as Markdown.
+- [Reading](/docs/features/reading/): collect articles, highlight passages, and read offline.
+- [Notifications](/docs/features/notifications/): choose when and where reminders alert you.
+- [Web app](/docs/features/web-app/): install it on your phone and see what works offline.
+- [Encryption](/docs/features/encryption/): protect synced content, connect devices, and save your recovery key.
 
 ## When you need a hand
 
 Resolve [conflicts](/docs/troubleshooting/conflicts/), [recover an earlier version](/docs/troubleshooting/recovery/),
-or troubleshoot [connections](/docs/troubleshooting/connection/) and [notifications](/docs/troubleshooting/notifications/).
-Developer and operator details live in the collapsed **Developer reference** section. If you are building on Crate, start with the [architecture reference](/docs/reference/architecture/).
+or fix [connection](/docs/troubleshooting/connection/) and [notification](/docs/troubleshooting/notifications/) problems.
+
+Building on Crate or running a server for others? The collapsed **Developer reference** section has the technical details, starting with the [architecture reference](/docs/reference/architecture/).
