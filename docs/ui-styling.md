@@ -209,7 +209,7 @@ Dock morphs use the shared collapsed height.
 - `src/pwa/components/PwaToast.tsx` renders feedback from `useToast` in either
   feature. Errors use assertive alerts; other feedback uses polite status messages.
   Both features share bottom-center positioning above the dock and safe area.
-  Toasts use the flat chrome surface.
+  Toasts use the chrome surface raised by the `--pwa-toast-*` tokens (a lighter dark fill, stronger border and shadow) so they stand out from cards.
   Toasts fade in and out over 160ms without moving; reduced motion skips the fade.
   Replacing feedback updates the current toast instead of stacking another one.
   Reading confirms explicit link, tag, and highlight-note saves after local
@@ -744,7 +744,8 @@ button, back button, header actions, article reader controls, sheet header
 buttons, the **Today / Upcoming** track, and toasts.
 `src/pwa/styles/_glass.scss` defines it; the theme files set its `--pwa-glass-*`
 fill, hover fill, border, and shadow (none). Surfaces are opaque with a hairline
-border and no blur, sheen, or rim. The PWA backdrop layer starts below the
+border and no blur, sheen, or rim. Toasts override the fill, border and shadow
+with `--pwa-toast-*` so they read above content. The PWA backdrop layer starts below the
 pill's top edge and stays partly transparent, so rows soften beneath the pill.
 Content above the pill remains clear.
 The layer spans the PWA viewport or Obsidian pane, even when the pill reaches its
