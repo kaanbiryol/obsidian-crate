@@ -155,6 +155,14 @@ export class ConflictStore {
 			.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 	}
 
+	/** The saved copy of an incoming version that is still waiting for review
+	 * while the local file is unchanged. */
+	findIncomingReview(originalPath: string, remoteHash: string, localHash: string): ConflictRecord | undefined {
+		return this.data.conflicts.find(conflict => conflict.status === 'active' && conflict.cause === 'incoming-review'
+			&& conflict.copySide === 'remote' && conflict.originalPath === originalPath
+			&& conflict.remoteHash === remoteHash && conflict.localHash === localHash);
+	}
+
 	/** Records queued while an earlier mutation runs share one durable save; each
 	 * caller still resolves only after its record is written. */
 	record(input: RecordConflictInput): Promise<void> {

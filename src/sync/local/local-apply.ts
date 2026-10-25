@@ -38,13 +38,19 @@ async function prepareLocalFilePath(vault: Vault, path: string): Promise<void> {
 
 class IncomingFileReviewError extends Error {}
 
+const INCOMING_REVIEW_REASON = 'This file needs manual review because it cannot be replaced atomically.';
+
+export function incomingReviewMessage(copy: string, reason = INCOMING_REVIEW_REASON): string {
+	return `${reason} Incoming file saved at ${copy}. Review both versions and replace the original when ready`;
+}
+
 /** Preserve incoming bytes without replacing a path lacking an atomic writer. */
 async function preserveIncomingForReview(
 	context: { vault: Vault; conflictStore?: { record(input: RecordConflictInput): Promise<void> } },
 	path: string,
 	content: ArrayBuffer,
 	localHash: string,
-	reason = 'This file needs manual review because it cannot be replaced atomically.',
+	reason = INCOMING_REVIEW_REASON,
 ): Promise<never> {
 	const hash = await sha256Hex(content);
 	let copy = getIncomingConflictFileName(path, hash);
@@ -59,7 +65,7 @@ async function preserveIncomingForReview(
 		await context.vault.createBinary(copy, content);
 	}
 	await context.conflictStore?.record({ originalPath: path, conflictPath: copy, cause: 'incoming-review', copySide: 'remote', localHash, remoteHash: hash });
-	throw new IncomingFileReviewError(`${reason} Incoming file saved at ${copy}. Review both versions and replace the original when ready`);
+	throw new IncomingFileReviewError(incomingReviewMessage(copy, reason));
 }
 
 const MAX_CONFLICT_COPY_ATTEMPTS = 3;
