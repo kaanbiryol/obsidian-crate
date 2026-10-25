@@ -27,10 +27,12 @@ export function enrichReadingBookmark(target: string, source: string): string {
 	if (!clipBody.trim()) throw new Error('The clipped note has no content.');
 	if (clipBody.includes(ARTICLE_START) || clipBody.includes(ARTICLE_END)) throw new Error('The clip contains managed article markers. Review it in Obsidian.');
 	const result = target.slice(0, block.start) + '\n\n' + clipBody + '\n\n' + target.slice(block.end);
-	const targetBody = readReadingFrontmatter(target)!.body;
+	// Render each body once, and only when it has highlights to anchor.
+	const targetText = item.highlights?.length ? readingDocument(readReadingFrontmatter(target)!.body).text : '';
+	const clipText = clip.highlights?.length ? readingDocument(clipBody).text : '';
 	const anchors = [
-		...(item.highlights ?? []).map(highlight => anchorHighlight(readingDocument(targetBody).text, highlight)),
-		...(clip.highlights ?? []).map(highlight => anchorHighlight(readingDocument(clipBody).text, highlight)),
+		...(item.highlights ?? []).map(highlight => anchorHighlight(targetText, highlight)),
+		...(clip.highlights ?? []).map(highlight => anchorHighlight(clipText, highlight)),
 	];
 	const mapped = readMarkdownHighlights(readReadingFrontmatter(result)!.body, anchors);
 	const recovery = [...(item.highlight_recovery ?? []), ...(clip.highlight_recovery ?? []), ...mapped.recovery];
