@@ -183,8 +183,5 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 		const url = data.navigate || '/notifications' + (params.toString() ? '?' + params.toString() : '');
 		event.waitUntil(focusOrOpenNotificationTarget(url));
 	});
-
-	scope.addEventListener('pushsubscriptionchange', () => {
-		// Re-subscription is handled by the app the next time it opens.
-	});
+	// A changed push subscription is renewed by the app the next time it opens.
 }
