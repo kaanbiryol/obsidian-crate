@@ -1,6 +1,6 @@
 import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
 import { onReadingEncryptionReset } from './encryption-lifecycle';
-import { prepareReadingEncryption, readingEncryptionHeaders } from './encryption-session';
+import { prepareReadingEncryption, readingEncryptionHeaders, readingKeys } from './encryption-session';
 import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingIndex, writeReadingAttempt } from './storage';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { AUTH_TOKEN_KEY } from '../config';
@@ -13,6 +13,9 @@ export { ReadingApiError } from './api-error';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './record-validation';
 import { EncryptionStateChangedError } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
+
+/** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
+const noteFolder = (session: ReadingSession) => readingKeys()?.folderPath ?? session.folderPath;
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -126,7 +129,7 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
       response = first.response;
       if (first.revision) cache.revision = first.revision;
     } else response = await readingRequest<unknown>(`/reading/list?cursor=${encodeURIComponent(cursor!)}`, session);
-    const page = parseReadingListPage(response, session.folderPath);
+    const page = parseReadingListPage(response, noteFolder(session));
     if (!page) throw new Error('Reading library response is unreadable.');
     if (cache.items.length + page.items.length > MAX_READING_LIST_ITEMS
       || cache.issues.length + page.issues.length > MAX_READING_LIST_ISSUES) throw new Error('Reading library response is too large or unreadable.');
@@ -142,6 +145,6 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
 
 export async function loadReadingArticle(session: ReadingSession, id: string): Promise<ReadingArticle> {
   const article = await readingRequest<unknown>(`/reading/item?id=${encodeURIComponent(id)}`, session);
-  if (!isReadingArticle(article, session.folderPath, id) || !article.item.path) throw new Error('Reading article response is unreadable.');
+  if (!isReadingArticle(article, noteFolder(session), id) || !article.item.path) throw new Error('Reading article response is unreadable.');
   return article;
 }
