@@ -389,7 +389,7 @@ it.each([true, 'bulk'] as const)('negotiates larger asset uploads with server su
     let value: unknown;
     if (request.url.endsWith('/.well-known/crate')) {
       value = { service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL,
-        reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: supported === 'bulk' ? ['asset-upload-batches-v1', 'bulk-new-file-uploads-v1'] : supported ? ['asset-upload-batches-v1'] : [] };
+        reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: supported === 'bulk' ? ['sync-v1', 'bulk-new-file-uploads-v1'] : supported ? ['sync-v1'] : [] };
     } else {
       const { files } = JSON.parse(request.body as string) as { files: Array<{ path: string; operationId: string }> };
       batches.push(files);

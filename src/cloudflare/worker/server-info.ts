@@ -3,7 +3,7 @@ import { SHARED_CHECKPOINT_CAPABILITY } from '../../protocol/history-checkpoints
 import { PWA_ASSET_VERSION } from '../../pwa/shell/version';
 import release from '../server-release.json';
 import type { Env } from './types';
-import { BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';
+import { BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';
 import {
 	CRATE_PLUGIN_PROTOCOL,
 	CRATE_SERVICE_ID,
@@ -33,7 +33,6 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 		'e2ee-reset-v1',
         SHARED_CHECKPOINT_CAPABILITY,
     INITIAL_IMPORT_CAPABILITY,
-		BATCH_ASSET_UPLOAD_CAPABILITY,
 		BULK_NEW_UPLOAD_CAPABILITY,
 		'sync-v1',
 		'file-revision-deletes',

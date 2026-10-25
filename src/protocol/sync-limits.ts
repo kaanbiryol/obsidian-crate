@@ -7,7 +7,6 @@
 export const BATCH_UPLOAD_MAX_FILES = 3;
 // Non-Markdown files do not incur reminder-index mutations.
 export const BATCH_ASSET_UPLOAD_MAX_FILES = 4;
-export const BATCH_ASSET_UPLOAD_CAPABILITY = 'asset-upload-batches-v1';
 export const BATCH_DELETE_MAX_FILES = 4;
 export const BATCH_DOWNLOAD_MAX_FILES = 50;
 
