@@ -100,13 +100,13 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('height=device-height');
 	});
 
-	it('uses shared selection tokens and a violet action accent', () => {
+	it('uses shared selection tokens and a monochrome action accent', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('--interactive-accent:#8b5cf6;');
-		expect(html).toContain('--interactive-accent-hover:#9b75f7;');
+		expect(html).toContain('--interactive-accent:#f0f0f2;');
+		expect(html).toContain('--interactive-accent-hover:#d4d4d8;');
 		expect(html).toContain('--accent:var(--interactive-accent);');
-		expect(html).toContain('--accent-rgb:139,92,246;');
+		expect(html).toContain('--accent-rgb:240,240,242;');
 		expect(html).toContain('--accent-strong:var(--interactive-accent);');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-button {');
 		expect(html).toContain('color: var(--crate-tab-active-color, var(--interactive-accent));');
@@ -218,7 +218,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--text-error:#b42318;');
 		expect(html).toContain('--text-warning:#92400e;');
 		expect(html).toContain('--text-success:#166534;');
-		expect(html).toContain('--interactive-accent:#6d28d9;');
+		expect(html).toContain('--interactive-accent:#18181b;');
 		expect(html).toContain('--crate-reminder-card-bg: var(--crate-panel-bg);');
 		expect(html).toContain('--dock-surface: var(--background-primary-alt);');
 		expect(html).toContain('.pwa-modal-sheet{color:var(--text-normal);color-scheme:light}');
@@ -257,8 +257,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui .project-picker-row {');
 		expect(html).toContain('.crate-reminders-ui .recurrence-frequency-tabs {');
 		expect(html).not.toContain('@keyframes pwa-nested-sheet-in');
-		expect(html).toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;border:0;border-radius:0;padding:0;box-shadow:none');
-		expect(html).not.toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:#0f0f12;');
+		expect(html).toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - var(--pwa-sheet-top-inset,env(safe-area-inset-top)) - 28px);min-height:0;overflow:hidden;flex-direction:column;border:0;border-radius:0;padding:0;box-shadow:none');
+		expect(html).not.toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - var(--pwa-sheet-top-inset,env(safe-area-inset-top)) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:#0f0f12;');
 		expect(html).toContain('.settings-panel{display:flex;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;');
 		expect(html).toContain('.crate-reminders-ui .modal-card.pwa-reminder-editor .modal-form {');
 		expect(html).toContain('.crate-reminders-ui .modal-card.pwa-reminder-editor .reminder-modal-body {');
