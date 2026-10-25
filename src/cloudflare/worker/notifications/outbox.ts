@@ -29,10 +29,11 @@ export async function dispatchNotificationJobs(env: Env, remindersEnabled?: bool
 
 /** Makes queued cancellations due and drains a bounded batch of them. A lost reply
  * is harmless: cancellation is token-checked and removes its private DO state.
+ * Drains even while Reminders is paused: the reset turned every job into a cancel.
  * Returns whether any job or installed schedule remains. */
 export async function drainNotificationCancellations(env: Env): Promise<boolean> {
-	await env.DB.prepare("UPDATE notification_jobs SET available_at = 0 WHERE operation = 'cancel'").run();
-	await dispatchNotificationJobs(env);
+	await env.DB.prepare("UPDATE notification_jobs SET available_at = 0 WHERE operation = 'cancel' AND available_at != 0").run();
+	await dispatchNotificationJobs(env, true);
 	return Boolean(await env.DB.prepare('SELECT 1 FROM notification_jobs UNION SELECT 1 FROM scheduled_reminders LIMIT 1').first());
 }
 

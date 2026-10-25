@@ -98,6 +98,15 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	expect((await request('/sync/manifest', nextToken)).status).toBe(200);
 });
 
+it('cancels installed alarms and completes while Reminders is paused', async () => {
+	await env.DB.prepare('UPDATE server_state SET features = ? WHERE id = 1')
+		.bind(JSON.stringify({ reading: true, reminders: false, revision: 'paused' })).run();
+	for (let index = 0; index < 14; index++) await env.DB.prepare("INSERT INTO scheduled_reminders(reminder_id, schedule_token, content, due_datetime) VALUES (?, 'schedule', 'encrypted', '2099-01-01T00:00:00.000Z')").bind(`alarm-${index}`).run();
+	expect((await start()).status).toBe(200);
+	await finish();
+	for (const table of ['scheduled_reminders', 'notification_jobs']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
+});
+
 it('rejects an encrypted upload authorized before reset, even if staging starts after completion', async () => {
 	const fixture = await createEncryptionFixture('active');
 	state = fixture.state;
