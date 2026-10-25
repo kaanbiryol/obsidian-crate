@@ -113,6 +113,8 @@ export class SyncEngineContexts {
 				save: () => d.localManifest.save(),
 				setLastSeq: lastSeq => updateSyncProgress(d.getSettings(), { lastSeq }),
 				report: work => d.updateState({ work }),
+				getImportToken: () => d.localManifest.getInitialImportToken(),
+				setImportToken: token => d.localManifest.setInitialImportToken(token),
 			}, result, progress),
 			// Resolved per call so tests can replace the incremental planner.
 			incrementalSync: (progressCallback, onFailure) => this.incrementalSync(progressCallback, onFailure),

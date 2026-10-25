@@ -4,7 +4,12 @@ A never-populated remote uses a separate initial import in protocol 1. Its commi
 file inventory is the resume checkpoint: the client compares path, hash and size,
 skips matching files and uploads only missing or changed content. Initial imports
 create no per-file receipt journal, changelog, or version history. Locally deleted
-files are pruned while the import is open. Shared staging leases cover at most 32 files per initial-import request, and
+files are pruned while the import is open. Only the device that started the import
+prunes or uploads for it: it saves the import token in its local checkpoint before its
+first prune or upload. Another device that finds files in the open import stops with
+"Another device is uploading this vault for the first time. Let it finish, then sync."
+A device without a saved token, for example one updated mid-import, continues only
+while its checkpoint holds the revision of every file already imported. Shared staging leases cover at most 32 files per initial-import request, and
 durable object cleanup protects interrupted puts. The decoded request size remains
 limited to 10 MiB; large files use individual binary requests. Completion verifies the inventory, records a
 single baseline, and permanently closes import writes. Normal history and recovery

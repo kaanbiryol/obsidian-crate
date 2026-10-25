@@ -54,6 +54,7 @@ export class LocalManifest {
 	private uploadDiagnostics: UploadDiagnostic[] = [];
 	private restoreIntents: RestoreIntent[] = [];
 	private initialConfigPull?: InitialConfigPull;
+	private initialImportToken?: string;
 	// Random server names of encrypted notes learned before their entry is written.
 	private pendingWires = new Map<string, string>();
 
@@ -125,6 +126,7 @@ export class LocalManifest {
 			this.uploadDiagnostics = selected.uploadDiagnostics;
 			this.restoreIntents = selected.restoreIntents;
 			this.initialConfigPull = selected.initialConfigPull;
+			this.initialImportToken = selected.initialImportToken;
 			this.renames = new RenameDependencies(selected.renames);
 			this.appliedRename = selected.appliedRename;
 			this.persistedState = encodeLogState(selected);
@@ -184,6 +186,7 @@ export class LocalManifest {
 			uploadDiagnostics: this.uploadDiagnostics,
 			restoreIntents: this.restoreIntents,
 			initialConfigPull: this.initialConfigPull,
+			initialImportToken: this.initialImportToken,
 		});
 	}
 
@@ -255,6 +258,7 @@ export class LocalManifest {
 			uploadDiagnostics: this.uploadDiagnostics,
 			restoreIntents: this.restoreIntents,
 			initialConfigPull: this.initialConfigPull,
+			initialImportToken: this.initialImportToken,
 		};
 	}
 
@@ -324,6 +328,13 @@ export class LocalManifest {
 
 	setInitialConfigPull(state: InitialConfigPull | undefined): void {
 		this.initialConfigPull = parseInitialConfigPull(state);
+		this.markChanged();
+	}
+
+	getInitialImportToken(): string | undefined { return this.initialImportToken; }
+
+	setInitialImportToken(token: string | undefined): void {
+		this.initialImportToken = token;
 		this.markChanged();
 	}
 

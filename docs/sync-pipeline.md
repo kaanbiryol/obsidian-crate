@@ -91,7 +91,7 @@ removed after successful reconciliation.
 
 ### 5. Initial Import
 
-There is no separate initial-sync command. Each sync first asks the server for an unfinished initial import; while one is open, the vault is uploaded through it before any incremental or full reconciliation. Server files missing locally are pruned from the import, files are prepared in byte-budgeted chunks so binary contents cannot accumulate without bound in memory, and small files are committed in batches of up to 32. Files over 25 MB are reported as skipped and keep any server copy they already have. Finishing the import sets the changelog cursor.
+There is no separate initial-sync command. Each sync first asks the server for an unfinished initial import; while one is open, the vault is uploaded through it before any incremental or full reconciliation. Server files missing locally are pruned from the import, files are prepared in byte-budgeted chunks so binary contents cannot accumulate without bound in memory, and small files are committed in batches of up to 32. Files over 25 MB are reported as skipped and keep any server copy they already have. Only the device that started the import prunes or uploads for it; another device stops until it finishes (see [upload recovery](upload-recovery.md)). Finishing the import sets the changelog cursor.
 
 Entry point: `engine/engine.ts:sync()` -> `engine/initial-import.ts:runInitialImport()`
 

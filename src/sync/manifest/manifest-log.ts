@@ -16,7 +16,7 @@ export type ManifestLogState = Omit<ManifestCheckpoint, 'manifest' | 'generation
 
 /** Persisted checkpoint key -> owner field, for the non-file recovery state. */
 const STATE_FIELDS = {
-	appliedRename: 'appliedRename', initialConfigPull: 'initialConfigPull', restoreIntents: 'restoreIntents',
+	appliedRename: 'appliedRename', initialConfigPull: 'initialConfigPull', initialImportToken: 'initialImportToken', restoreIntents: 'restoreIntents',
 	uploadDiagnostics: 'uploadDiagnostics', settledUploads: 'settledUploads', renameDependencies: 'renames',
 } as const satisfies Record<string, keyof ManifestLogState>;
 
@@ -28,6 +28,7 @@ export function encodeLogState(state: ManifestLogState): EncodedLogState {
 	return {
 		appliedRename: json(state.appliedRename, state.appliedRename),
 		initialConfigPull: json(state.initialConfigPull, state.initialConfigPull),
+		initialImportToken: json(state.initialImportToken, state.initialImportToken),
 		restoreIntents: json(state.restoreIntents, state.restoreIntents.length),
 		uploadDiagnostics: json(state.uploadDiagnostics, state.uploadDiagnostics.length),
 		settledUploads: json(state.settledUploads, state.settledUploads.length),

@@ -98,6 +98,9 @@ it('fails a force full sync when a file grows past 25 MB after discovery', async
 it('finishes an initial import around a file over 25 MB', async () => {
 	const server = createServer([INITIAL_IMPORT_CAPABILITY]);
 	const harness = await createVault(server.transport, 0);
+	// This device started the import, so it may prune the removed note.
+	harness.localManifest.setInitialImportToken('import-1');
+	await harness.localManifest.save();
 
 	const result = await harness.engine.sync();
 
