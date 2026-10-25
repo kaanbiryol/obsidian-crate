@@ -453,9 +453,9 @@ an exact saved-state preview. File previews retain the 256 KB text limit.
 number of current files that will change, including local unsynced edits. Excluded files remain untouched. The current server
 inventory must match the device's baseline before reviewing. Every required version
 must still be available from the server's current files or 30-day retained history.
-Confirmation rechecks the complete local and remote inventories, stages and verifies
-all required bytes and originals under `state-recovery/`, then persistently pauses
-automatic sync before applying changes. Replacements use atomic text comparison or
+Confirmation stages and verifies all required bytes and originals under
+`state-recovery/`, rechecks the complete local and remote inventories, then
+persistently pauses automatic sync before applying changes. Replacements use atomic text comparison or
 local trash and checked creation; deleted files always go to local trash.
 
 Explicit removals sync before restored uploads to support file/folder namespace
