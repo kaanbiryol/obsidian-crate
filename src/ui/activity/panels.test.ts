@@ -2,14 +2,18 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { FakeElement, createObsidianUiModule } from '../../test/fakes/obsidian-ui';
 
 vi.mock('obsidian', () => createObsidianUiModule());
+vi.mock('./pending-browser', () => ({ renderPendingBrowser: vi.fn() }));
 import { renderConflictsPanel, renderPendingPanel } from './panels';
+import { renderPendingBrowser } from './pending-browser';
 import { pendingChangeKey } from '../../sync/pending/pending-change';
+
+const load = vi.fn(async () => { throw new Error('Not loaded in panel tests'); });
 
 afterEach(() => vi.clearAllMocks());
 
 it('shows active sync progress with an empty pending queue', () => {
     const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], false, false, { type: 'sync', current: 12, total: 20 });
+    renderPendingPanel(element as never, [], load, false, false, { type: 'sync', current: 12, total: 20 });
     expect(element.collectText()).toContain('Processing changes: 12/20');
     expect(element.children[0]?.attributes.get('role')).toBe('status');
     expect(element.collectText()).not.toContain('All synced');
@@ -17,14 +21,14 @@ it('shows active sync progress with an empty pending queue', () => {
 
 it('does not claim completion before transfer progress is available', () => {
     const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], false, true);
+    renderPendingPanel(element as never, [], load, false, true);
     expect(element.collectText()).toContain('Starting sync…');
     expect(element.collectText()).not.toContain('All synced');
 });
 
 it('shows the normal empty state after syncing finishes', () => {
     const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], false, false, null, 'Synced just now');
+    renderPendingPanel(element as never, [], load, false, false, null, 'Synced just now');
     expect(element.collectText()).toContain('All synced');
     expect(element.collectText()).toContain('Synced just now');
     expect(element.collectText()).not.toContain('Your vault is up to date.');
@@ -32,7 +36,7 @@ it('shows the normal empty state after syncing finishes', () => {
 
 it('shows runtime saving progress after the engine finishes an unchanged sync', () => {
     const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], false, false, {
+    renderPendingPanel(element as never, [], load, false, false, {
         type: 'sync', current: 0, total: 0, work: { phase: 'saving' },
     }, '', { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
     expect(element.collectText()).toBe('Saving sync progress…');
@@ -41,26 +45,15 @@ it('shows runtime saving progress after the engine finishes an unchanged sync', 
 
 it('replaces the pending file list with a loading indicator during sync', () => {
     const element = new FakeElement('div');
-    renderPendingPanel(element as never, ['Notes/draft.md', pendingChangeKey('delete', 'old.md')], false, true);
+    renderPendingPanel(element as never, ['Notes/draft.md', pendingChangeKey('delete', 'old.md')], load, false, true);
     expect(element.collectText()).toBe('Starting sync…');
     expect(element.children[0]?.classNames.has('crate-activity-loading')).toBe(true);
     expect(element.children[0]?.children[0]?.attributes.get('aria-hidden')).toBe('true');
 
     element.empty();
-    renderPendingPanel(element as never, ['Notes/draft.md']);
-    expect(element.collectText()).toContain('draft.md');
+    renderPendingPanel(element as never, ['Notes/draft.md'], load);
     expect(element.collectText()).not.toContain('Starting sync…');
-});
-
-it('keeps a literal delete-prefixed filename separate from a pending deletion', () => {
-    const element = new FakeElement('div');
-    renderPendingPanel(element as never, [pendingChangeKey('upload', 'delete:note.md'), pendingChangeKey('delete', 'note.md')]);
-    const cards = element.children[0]!.children;
-    expect(cards).toHaveLength(2);
-    expect(cards[0]!.collectText()).toBe('delete:note.md');
-    expect(cards[0]!.querySelector('.crate-file-icon-upload')?.getAttribute('aria-label')).toBe('Upload');
-    expect(cards[1]!.collectText()).toBe('note.md');
-    expect(cards[1]!.querySelector('.crate-file-icon-delete')?.getAttribute('aria-label')).toBe('Delete');
+    expect(renderPendingBrowser).toHaveBeenCalledExactlyOnceWith(element, ['Notes/draft.md'], load, undefined, undefined);
 });
 
 it.each([false, true])('shows a conflict state without a duplicate sync subtitle (checking: %s)', checking => {
@@ -74,20 +67,20 @@ it.each([
  { status: 'offline' as const, lastSync: '2026-09-12T10:00:00Z', title: 'Server unavailable' },
 ])('does not claim completion for $title', ({ status, lastSync, title }) => {
  const element = new FakeElement('div');
- renderPendingPanel(element as never, [], false, false, null, '', { status, lastSync, lastError: null, pendingChanges: 0, conflictCount: 0 });
+ renderPendingPanel(element as never, [], load, false, false, null, '', { status, lastSync, lastError: null, pendingChanges: 0, conflictCount: 0 });
  expect(element.collectText()).toContain(title);
  expect(element.collectText()).not.toContain('All synced');
 });
 
 it('shows change progress independently of the pending queue size', () => {
     const element = new FakeElement('div');
-    renderPendingPanel(element as never, ['queued.md'], false, true, { type: 'sync', current: 3, total: 12 });
+    renderPendingPanel(element as never, ['queued.md'], load, false, true, { type: 'sync', current: 3, total: 12 });
     expect(element.collectText()).toBe('Processing changes: 3/12');
 });
 
 it('shows one spinner with the file count during uploads', () => {
     const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], false, true, null, '', {
+    renderPendingPanel(element as never, [], load, false, true, null, '', {
         status: 'syncing', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0,
         work: { phase: 'uploading', current: 640, total: 1986 },
     });

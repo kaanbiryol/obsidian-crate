@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createObsidianUiModule, FakeElement } from '../../test/fakes/obsidian-ui';
-import { ActivityModal } from './activity-modal';
+import { ActivityModal, type ActivityModalDeps } from './activity-modal';
 import type { ActivityHeader } from './activity-header';
 import { recordSyncHistory } from '../../sync/runtime/sync-activity';
 import { createEmptySyncResult } from '../../sync/sync-result';
@@ -15,16 +15,26 @@ vi.mock('./pending-browser', () => ({
     renderPendingBrowser: (container: FakeElement) => { container.createDiv({ cls: 'crate-pending-browser' }); },
 }));
 
+/** A sync runtime with nothing pending; tests override what they exercise. */
+function runtime(overrides: Partial<ActivityModalDeps>): ActivityModalDeps {
+    const unused = () => Promise.reject(new Error('Not used in this test'));
+    return {
+        loadHistoryComparison: unused, listSharedCheckpoints: async () => [], createHistoryRestore: unused,
+        loadPendingDiff: unused, syncSelected: unused, createPendingDiscard: unused, createConflictReview: unused,
+        listRecentFileVersions: unused, getPendingRestores: () => [], loadFileHistoryPreview: unused,
+        restoreRecentFileVersion: unused, loadCurrentSyncedPreview: unused,
+        getPendingKeys: () => [], getPendingChangeCount: () => 0, hasPendingKey: () => false, getActiveConflicts: () => [],
+        getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
+        getActivityProgress: () => null, addProgressListener: vi.fn(), removeProgressListener: vi.fn(),
+        sync: vi.fn(), stopSync: vi.fn(async () => {}), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+        ...overrides,
+    };
+}
+
 describe('activity modal completion progress', () => {
     it.each(['idle', 'error'] as const)('refreshes saved plugin transfers after the engine becomes %s', async status => {
         const settings = { ...DEFAULT_SETTINGS, syncHistory: [] };
-        const deps = {
-            getState: () => ({ status } as SyncState),
-            getActivityProgress: () => null,
-            getPendingKeys: () => [], getActiveConflicts: () => [],
-            sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
-        };
-        const modal = new ActivityModal({} as never, settings, deps);
+        const modal = new ActivityModal({} as never, settings, runtime({ getState: () => ({ status } as SyncState) }));
         const panel = new FakeElement('div');
         const internal = modal as unknown as {
             pendingPanel: HTMLElement; onProgress(): void; refresh(): void;
@@ -52,10 +62,7 @@ it('shows the reachability warning without treating it as a failed sync', () => 
         status: 'offline', lastSync: null, lastError: 'Cannot reach the temporary tunnel address.',
         pendingChanges: 0, conflictCount: 0,
     };
-    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
-        getState: () => state, getPendingKeys: () => [], getActiveConflicts: () => [],
-        sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
-    });
+    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
     const internal = modal as unknown as { createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader };
     const content = new FakeElement('div');
     internal.createHeader(new FakeElement('div'), content).updateSyncErrorNotice();
@@ -67,10 +74,9 @@ it('updates progress without copying the pending list or rebuilding the empty co
     const pending = Array.from({ length: 5000 }, (_, index) => `note-${index}.md`);
     const state = { status: 'syncing', lastSync: null, lastError: null, pendingChanges: pending.length, conflictCount: 0 } as SyncState;
     const getPendingKeys = vi.fn(() => [...pending]);
-    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
-        getState: () => state, getActivityProgress: () => null, getPendingKeys, getPendingChangeCount: () => pending.length,
-        getActiveConflicts: () => [], sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
-    });
+    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({
+        getState: () => state, getPendingKeys, getPendingChangeCount: () => pending.length,
+    }));
     const internal = modal as unknown as {
         pendingPanel: FakeElement; conflictsPanel: FakeElement; header: ActivityHeader; onProgress(): void; renderConflicts(): void;
         createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
@@ -92,10 +98,7 @@ it('updates progress without copying the pending list or rebuilding the empty co
 
 it('applies a state change and progress tick from the same event once', async () => {
     const state = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 } as SyncState;
-    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
-        getState: () => state, getActivityProgress: () => null, getPendingKeys: () => [], getActiveConflicts: () => [],
-        sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
-    });
+    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
     const internal = modal as unknown as { pendingPanel: FakeElement; onProgress(): void; onStateChange(): void; refresh(): void };
     internal.pendingPanel = new FakeElement('div');
     const refresh = vi.spyOn(internal, 'refresh').mockImplementation(() => {});
@@ -111,10 +114,9 @@ it('keeps the pending file browser and its comparisons while the pending set is 
     let pending = ['a.md', 'b.md'];
     const state = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 2, conflictCount: 0 } as SyncState;
     const loadPendingDiff = vi.fn(() => new Promise<never>(() => {}));
-    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
-        getState: () => state, getActivityProgress: () => null, getPendingKeys: () => [...pending], getActiveConflicts: () => [],
-        loadPendingDiff, sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
-    });
+    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({
+        getState: () => state, getPendingKeys: () => [...pending], loadPendingDiff,
+    }));
     const internal = modal as unknown as {
         pendingPanel: FakeElement; header: ActivityHeader; renderPending(): void;
         pendingBrowserState: { dispose?: () => void };
