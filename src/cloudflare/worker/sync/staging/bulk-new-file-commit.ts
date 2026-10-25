@@ -1,6 +1,7 @@
 import { portablePathKey } from '../../../../protocol/portable-path';
 import { uploadMutation } from '../mutations';
 import { bulkFileProjection } from './bulk-file-projection';
+import { readingIndexStatements } from '../../reading/library-index';
 import { decodeReceipt, recordUploadReceipt, type UploadOperation } from '../upload-operations';
 import { deleteBucketObjectsOrQueue } from '../../maintenance/object-cleanup';
 import type { UploadResult } from '@/protocol/sync-types';
@@ -28,6 +29,7 @@ export async function commitNewFiles(bucket: R2Bucket, db: D1Database, files: Ne
       SELECT f.path, 'put', f.hash, f.size, f.storage_key FROM json_each(?) i JOIN files f
       ON f.portable_path = json_extract(i.value, '$.portable') AND f.path = json_extract(i.value, '$.path') AND f.storage_key = json_extract(i.value, '$.key')`).bind(json),
     ...await bulkFileProjection(db, files, reminderFolder),
+    ...await readingIndexStatements(db, files.map(file => ({ path: file.path, storageKey: file.objectKey, hash: file.hash, size: file.size, content: file.content }))),
     ...files.map(file => recordUploadReceipt(db, file.operation, file)),
     ...finishStagedBatches(db, files),
   ]);

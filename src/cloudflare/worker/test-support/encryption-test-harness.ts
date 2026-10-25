@@ -3,7 +3,7 @@ import { createEncryptionState, type EncryptionServerState } from '../../../encr
 import { FileKeyAuthority } from '../../../encryption/file-authority';
 import { PathTags } from '../../../encryption/path-tags';
 import { importNotificationKeys } from '../../../encryption/reminder-projection';
-import { ENCRYPTION_STATE_KEY } from '../encryption/state';
+import { saveEncryptionState } from '../encryption/state';
 
 /** A fresh vault key bundle, its recovery code and public server state in `mode`,
  * plus the file, notification and path keys a client derives from the bundle.
@@ -19,5 +19,5 @@ export async function createEncryptionFixture(mode: EncryptionServerState['mode'
 
 /** Publish the vault's encryption state, as a finished encryption setup would. */
 export async function storeEncryptionState(db: D1Database, state: EncryptionServerState): Promise<void> {
-	await db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_STATE_KEY, JSON.stringify(state)).run();
+	await saveEncryptionState(db, state).run();
 }

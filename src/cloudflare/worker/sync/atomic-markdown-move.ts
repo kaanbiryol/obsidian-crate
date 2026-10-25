@@ -4,6 +4,7 @@ import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identit
 import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
 import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
 import { enqueueFileProjection } from '../notifications/projection-queue';
+import { readingIndexStatements } from '../reading/library-index';
 import type { CommitEffects } from '../commit-effects';
 import { changedRows } from '../db';
 import { portablePathKey } from '../../../protocol/portable-path';
@@ -60,6 +61,9 @@ export async function writeCommittedMarkdownMove(
 		// Must directly follow the delete's changelog row.
 		recordFileDeletion(db, source.path, source.expectedHash, source.expectedRevision, deletion, audit),
 		...await enqueueFileProjection(db, source.path, null, null),
+		...await readingIndexStatements(db, [{ path: source.path, storageKey: null },
+			{ path: destination.path, storageKey: destination.objectKey, hash: destination.hash, size: destination.size, content: params.destination.content }],
+			{ encrypted: Boolean(encryption.state) }),
 		...(params.effects?.([{ path: destination.path, storageKey: destination.objectKey }]) ?? []),
 	]);
 	const inserted = changedRows(results[0]) === 1, removed = changedRows(results[beforeDelete.length]) === 1;

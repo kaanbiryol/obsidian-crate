@@ -1,13 +1,12 @@
 import { corsResponse } from './cors';
 import { parseJsonObject } from './request-validation';
 import { parseFeaturePolicy, type FeaturePolicy } from '../../protocol/feature-policy';
+import { readServerState, saveServerState } from './server-state';
 
-export const FEATURE_POLICY_KEY = 'crate_feature_policy';
 export async function featurePolicy(db: D1Database): Promise<FeaturePolicy> {
-  const row = await db.prepare('SELECT value FROM maintenance_state WHERE key=?').bind(FEATURE_POLICY_KEY).first<{ value: string }>();
-  return parseStoredFeaturePolicy(row?.value ?? null);
+  return parseStoredFeaturePolicy(await readServerState(db, 'features'));
 }
-/** Parses a stored policy row value; authentication loads it with the token. */
+/** Parses a stored policy value; authentication loads it with the token. */
 export function parseStoredFeaturePolicy(stored: string | null): FeaturePolicy {
   if (stored === null) return { reading: true, reminders: true, revision: null };
   const value = parseFeaturePolicy(JSON.parse(stored));
@@ -29,7 +28,7 @@ export async function handleFeaturePolicy(request: Request, db: D1Database): Pro
   if (revision !== current.revision) return corsResponse({ error: 'Feature settings changed on another device. Check again before saving.' }, 409);
   const next = { ...current, [String(feature)]: enabled, revision: crypto.randomUUID() };
   await db.batch([
-    db.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=datetime(\'now\')').bind(FEATURE_POLICY_KEY, JSON.stringify(next)),
+    saveServerState(db, 'features', JSON.stringify(next)),
     // Wake dormant alarms without replacing occurrence identity or recipient progress.
     ...(feature === 'reminders' && enabled && !current.reminders ? [db.prepare(`INSERT INTO notification_jobs(reminder_id,job_token,operation,payload_json,available_at)
       SELECT reminder_id,schedule_token,'schedule',json_object('reminderId',reminder_id,'content',content,'project',project,'dueDatetime',due_datetime,'resume',json('true')),0

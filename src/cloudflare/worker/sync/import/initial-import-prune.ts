@@ -3,6 +3,7 @@ import { readInitialImport } from './initial-import';
 import { corsResponse } from '../../cors';
 import { parseJsonObject, sanitizePath } from '../../request-validation';
 import { isSha256Hex } from '../../../../platform/validation';
+import { readingIndexStatements } from '../../reading/library-index';
 
 /** Remove files deleted locally while an unpublished import was paused. */
 export async function pruneInitialImport(request: Request, db: D1Database): Promise<Response> {
@@ -27,6 +28,7 @@ export async function pruneInitialImport(request: Request, db: D1Database): Prom
     db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue(storage_key, file_path) SELECT storage_key, path FROM files WHERE ${predicate}`).bind(json, current.token),
     db.prepare(`DELETE FROM files WHERE ${predicate}`).bind(json, current.token),
     db.prepare("UPDATE initial_import SET generation = generation + 1 WHERE token = ? AND state = 'importing'").bind(current.token),
+    ...await readingIndexStatements(db, (files as Array<{ path: string }>).map(file => ({ path: file.path, storageKey: null }))),
   ]);
   return corsResponse({ success: true });
 }

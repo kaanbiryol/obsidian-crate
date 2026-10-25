@@ -25,7 +25,7 @@ async function setup(mode: 'active' | 'resetting' = 'active') {
   const folder = await sealFolderLabel('Reading', paths, await importEncryptionSecret(bundle.vault), bundle.vaultId);
   const reading = { plain: 'Reading', wire: folder.wire };
   await env.DB.batch([
-    env.DB.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?)').bind('e2ee:state', JSON.stringify(state)),
+    env.DB.prepare('INSERT INTO server_state(id,encryption) VALUES (1,?)').bind(JSON.stringify(state)),
     env.DB.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?)').bind(`e2ee:folder:${folder.wire}`, folder.label),
     env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,?,'policy','revision')").bind(folder.wire),
     env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES ('reader',?,'reading',?,'policy')").bind(await sha256Hex('reader-token'), folder.wire),
@@ -68,7 +68,7 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
   expect(file!.path.startsWith(`${h.folder.wire}/`)).toBe(true);
   expect(opened.metadata.path.startsWith('Reading/')).toBe(true);
   expect(h.requests.join()).not.toContain('Reading/');
-  expect((await env.DB.prepare('SELECT * FROM reading_sources').all()).results).toHaveLength(0);
+  expect((await env.DB.prepare('SELECT * FROM reading_items').all()).results).toHaveLength(0);
   expect((await env.DB.prepare('SELECT * FROM reading_jobs').all()).results).toHaveLength(0);
 });
 async function concurrentEdit() {

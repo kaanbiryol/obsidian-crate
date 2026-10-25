@@ -1,7 +1,7 @@
 import { PAIRING_LIFETIME, pairingCommitment, samePairingContext, validatePairingContext, validatePairingKey, validatePairingRecord, type PairingRecord } from '../../../encryption/pairing/protocol';
 import { decodeBase64Url, isEncryptionId } from '../../../encryption/encoding';
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { ENCRYPTION_STATE_KEY } from './state';
+import { ENCRYPTION_STATE_SQL } from './state';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../request-validation';
@@ -17,8 +17,8 @@ const visible = (r: Stored): PairingRecord => ({ context: r.context, commitment:
 const ownerValid = `EXISTS (SELECT 1 FROM auth_tokens a WHERE a.id = json_extract(maintenance_state.value, '$.owner')
   AND a.scope IN ('reminders','reading') AND (a.expires_at IS NULL OR a.expires_at > ?)
   AND (a.scope != 'reading' OR a.reading_generation = (SELECT generation FROM reading_policy WHERE id=1)))`;
-const stateValid = `EXISTS (SELECT 1 FROM maintenance_state s WHERE s.key='${ENCRYPTION_STATE_KEY}'
-  AND json_extract(s.value,'$.mode')='active' AND json_extract(s.value,'$.vaultId')=? AND json_extract(s.value,'$.generation')=?)`;
+const stateValid = `(json_extract(${ENCRYPTION_STATE_SQL},'$.mode')='active' AND json_extract(${ENCRYPTION_STATE_SQL},'$.vaultId')=?
+  AND json_extract(${ENCRYPTION_STATE_SQL},'$.generation')=?)`;
 
 /** Expired relay packets are bounded (32 slots) and can never be redeemed. */
 export async function pruneEncryptionPairings(db: D1Database): Promise<void> {

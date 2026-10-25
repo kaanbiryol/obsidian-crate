@@ -3,8 +3,10 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, isEncryptedFile, parseEncryptedFile, type 
 import { fileRevisionGuard } from '../sync/file-identity';
 import { validateEncryptedSchedules } from '../../../encryption/notification-format';
 import { isWirePath } from '../../../protocol/encrypted-path';
+import { readServerState, saveServerState, serverStateValue } from '../server-state';
 
-export const ENCRYPTION_STATE_KEY = 'e2ee:state';
+/** The stored state JSON, or NULL for a plaintext vault. */
+export const ENCRYPTION_STATE_SQL = serverStateValue('encryption');
 export const ENCRYPTION_FILE_PREFIX = 'e2ee:file:';
 
 export class EncryptionStateError extends Error {
@@ -12,12 +14,15 @@ export class EncryptionStateError extends Error {
 }
 
 export async function readEncryptionState(db: D1Database): Promise<EncryptionServerState | null> {
-	const row = await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(ENCRYPTION_STATE_KEY).first<{ value: string }>();
-	if (!row) return null;
-	const state: unknown = JSON.parse(row.value);
+	const value = await readServerState(db, 'encryption');
+	if (value === null) return null;
+	const state: unknown = JSON.parse(value);
 	validateEncryptionState(state);
 	return state;
 }
+
+export const saveEncryptionState = (db: D1Database, state: EncryptionServerState | null) =>
+	saveServerState(db, 'encryption', state && JSON.stringify(state));
 
 /** Whether the request was made with this vault's current encryption keys. */
 export function hasEncryptionAuthority(request: Request, state: EncryptionServerState): boolean {
@@ -28,11 +33,11 @@ export function hasEncryptionAuthority(request: Request, state: EncryptionServer
 /** Use in the SAME transaction as publishing bytes. A request authorized before
  * encryption is turned on must not be able to commit a late plaintext upload. */
 export function encryptionWriteGuard(state: EncryptionServerState | null): { sql: string; args: string[] } {
-	if (!state) return { sql: 'NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = ?)', args: [ENCRYPTION_STATE_KEY] };
+	if (!state) return { sql: `${ENCRYPTION_STATE_SQL} IS NULL`, args: [] };
 	if (state.mode !== 'active') throw new EncryptionStateError('An encryption reset is in progress. Resume it on the device that started it.');
-	return { sql: `EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? AND json_extract(value, '$.mode') = 'active'
-		AND json_extract(value, '$.vaultId') = ? AND json_extract(value, '$.generation') = CAST(? AS INTEGER))`,
-		args: [ENCRYPTION_STATE_KEY, state.vaultId, String(state.generation)] };
+	return { sql: `EXISTS (SELECT 1 FROM server_state WHERE id = 1 AND json_extract(encryption, '$.mode') = 'active'
+		AND json_extract(encryption, '$.vaultId') = ? AND json_extract(encryption, '$.generation') = CAST(? AS INTEGER))`,
+		args: [state.vaultId, String(state.generation)] };
 }
 
 export async function prepareEncryptedFileCommit(db: D1Database, path: string, content: string | ArrayBuffer, knownState?: EncryptionServerState | null, sealed?: SealedCommit): Promise<{

@@ -1,4 +1,4 @@
-import { ENCRYPTION_FILE_PREFIX, ENCRYPTION_STATE_KEY } from '../encryption/state';
+import { ENCRYPTION_FILE_PREFIX, ENCRYPTION_STATE_SQL } from '../encryption/state';
 
 const CURSOR_KEY = 'e2ee:descriptor-cleanup-cursor';
 // Reference checks materialize each referencing table once per statement, so a
@@ -25,8 +25,8 @@ export async function pruneEncryptionMetadata(db: D1Database): Promise<void> {
 			AND revision NOT IN (SELECT storage_key FROM staged_uploads)
 			AND revision NOT IN (SELECT revision FROM batch_keys WHERE revision IS NOT NULL))
 			AND updated_at < datetime('now', '-1 day')
-			AND EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? AND json_extract(value, '$.mode') = 'active')`)
-			.bind(ENCRYPTION_FILE_PREFIX.length + 1, JSON.stringify(page.results.map(row => row.key)), ENCRYPTION_STATE_KEY),
+			AND json_extract(${ENCRYPTION_STATE_SQL}, '$.mode') = 'active'`)
+			.bind(ENCRYPTION_FILE_PREFIX.length + 1, JSON.stringify(page.results.map(row => row.key))),
 		page.results.length === DESCRIPTOR_CLEANUP_PAGE
 			? db.prepare("INSERT INTO maintenance_state(key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at")
 				.bind(CURSOR_KEY, page.results.at(-1)!.key)

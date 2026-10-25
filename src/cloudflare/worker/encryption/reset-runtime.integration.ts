@@ -44,7 +44,7 @@ beforeEach(async () => {
 	const fixture = await createEncryptionFixture('active'), { bundle, recovery } = fixture;
 	state = fixture.state;
 	storage.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(bundle)); storage.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('e2ee:state', ?)").bind(JSON.stringify(state)).run();
+	await env.DB.prepare('INSERT INTO server_state(id, encryption) VALUES (1, ?)').bind(JSON.stringify(state)).run();
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('original', ?, 'vault')").bind(await sha256Hex('original')).run();
 	failSettings = false; disconnectedOrigin = undefined; loseBeginResponse = false; dropBeginRequest = false;
 	bridge.mockImplementation(async (options: RequestUrlParam) => {
@@ -146,7 +146,7 @@ describe('turning encryption on', () => {
 	let setup: Awaited<ReturnType<typeof createEncryptionFixture>>;
 	const messages: string[] = [];
 	beforeEach(async () => {
-		await env.DB.prepare("DELETE FROM maintenance_state WHERE key = 'e2ee:state'").run();
+		await env.DB.prepare('UPDATE server_state SET encryption = NULL WHERE id = 1').run();
 		storage.delete(SECRET_KEYS.ENCRYPTION_KEYS); storage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
 		setup = await createEncryptionFixture('active');
 		messages.length = 0;

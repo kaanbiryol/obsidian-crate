@@ -62,10 +62,11 @@ class ArchiveTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
     def test_encrypted_configuration_descriptors_and_settings_survive_restore(self):
-        values = {'e2ee:state': '{"version":1,"mode":"active","recovery":{"envelope":"opaque"}}',
-                  'e2ee:file:retained-revision': '{"metadata":"encrypted descriptor"}',
+        state = '{"version":1,"mode":"active","recovery":{"envelope":"opaque"}}'
+        values = {'e2ee:file:retained-revision': '{"metadata":"encrypted descriptor"}',
                   'e2ee:settings': '{"settings":{"envelope":"encrypted settings"}}'}
         database = load_database(self.remote.sql)
+        database.execute('INSERT INTO server_state(id, encryption) VALUES (1, ?)', (state,))
         for key, value in values.items():
             database.execute('INSERT INTO maintenance_state(key, value) VALUES (?, ?)', (key, value))
         database.commit()
@@ -77,6 +78,7 @@ class ArchiveTests(unittest.TestCase):
         recovery.restore(target, self.directory)
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
+        self.assertEqual(restored.execute('SELECT encryption FROM server_state WHERE id = 1').fetchone()[0], state)
         for key, value in values.items():
             self.assertEqual(restored.execute('SELECT value FROM maintenance_state WHERE key = ?', (key,)).fetchone()[0], value)
 

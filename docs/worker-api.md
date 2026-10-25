@@ -6,7 +6,7 @@ App mutations require `X-Crate-Protocol: 1`; check `/.well-known/crate` before w
 
 ## Authentication
 
-All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have `vault`, `reminders`, `reading`, or `reading_capture` scope, and may have an expiry. Reading grants are also bound to the active Reading policy generation. The Worker hashes the bearer token with SHA-256 and looks up the hash in the `auth_tokens` D1 table. Authentication fails closed with `503` when D1 is unavailable.
+All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have `vault`, `reminders`, `reading`, or `reading_capture` scope, and may have an expiry. Reading grants are also bound to the active Reading policy generation. The Worker hashes the bearer token with SHA-256 and looks up the hash in the `auth_tokens` D1 table, joined with the single `server_state` row that holds the encryption state, feature policy and reset generation. Authentication fails closed with `503` when D1 is unavailable.
 
 Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. Once a Reading folder is configured, the same token can use Reading library, save, update, and shortcut-pairing routes. It cannot change the Reading folder, and it cannot call sync, settings, device-management or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
@@ -91,12 +91,22 @@ not protect against a public-looking hostname resolving to a private address.
 
 ### Reading capture handoffs
 
-Reading list and mutation requests return 503 while source indexing is incomplete
-or source bytes cannot be verified. A temporary D1/R2 failure does not mark the
-source revision as successfully indexed or permit capture deduplication against
-an incomplete index. Background storage-failure retries use a 30-second delay;
-ordinary bounded indexing backlog can continue immediately. Verified malformed or
-oversized notes instead produce stable source issues until the source changes.
+The Reading index (`reading_items`) holds one row per Reading note in the Reading
+folder. Every file commit, deletion, move, restore and initial import writes that
+row in the same D1 batch as the file, from the bytes it commits, so list and item
+reads never re-check `files`, and `GET /reading/item` reads the note's R2 object by
+the revision its row names. The list ETag changes only with the library revision,
+which every indexed change and capture queue change advances in its own transaction,
+and with the article fetching setting; writes elsewhere in the vault leave it unchanged.
+
+A new Reading folder or generation, an index format change, a restore or an index
+whose bytes were unavailable at commit time rebuilds the index from R2, 25 files
+per step. Reading list and mutation requests return 503 until that rebuild finishes
+or while source bytes cannot be verified. A temporary R2 failure keeps the rebuild
+position and does not permit capture deduplication against an incomplete index.
+Background storage-failure retries use a 30-second delay; ordinary rebuild steps
+continue immediately. Verified malformed or oversized notes instead produce stable
+source issues until the source changes.
 
 `POST /reading/shortcut/v1/prepare` accepts only capture credentials when the
 Reading library is configured and available. Its five-minute launch URL

@@ -2,20 +2,20 @@ import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../request-validation';
-import { ENCRYPTION_STATE_KEY, hasEncryptionAuthority, readEncryptionState } from './state';
+import { hasEncryptionAuthority, readEncryptionState, saveEncryptionState } from './state';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
 import { validateEncryptionState, type EncryptionServerState, type ResetReceipt } from '../../../encryption/server-state';
-import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { isSha256Hex } from '../../../platform/validation';
 import { drainNotificationCancellations } from '../notifications/outbox';
 import { sha256Hex } from '../../../platform/sha256';
 import { putMaintenanceValue } from '../db';
+import { saveServerState } from '../server-state';
 
 const PREFIX = 'encryption-reset:';
 // Marks a reset that turns encryption on: completion activates the saved state instead of removing it.
 const SETUP_SUFFIX = ':setup';
-const READING_TABLES = ['reading_policy', 'reading_sources', 'reading_jobs', 'reading_operations',
+const READING_TABLES = ['reading_policy', 'reading_items', 'reading_index', 'reading_jobs', 'reading_operations',
 	'reading_enrollments', 'reading_handoffs', 'reading_captures'] as const;
 const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValue(db, key, JSON.stringify(value));
 
@@ -61,8 +61,8 @@ export async function handleEncryptionReset(request: Request, env: Env, path: st
 	await env.DB.batch([
 		save(env.DB, PREFIX + id, next),
 		...(current ? [] : [save(env.DB, PREFIX + id + SETUP_SUFFIX, true)]),
-		save(env.DB, ENCRYPTION_STATE_KEY, { ...state, mode: 'resetting' }),
-		putMaintenanceValue(env.DB, SYNC_RESET_GENERATION_KEY, id),
+		saveEncryptionState(env.DB, { ...state, mode: 'resetting' }),
+		saveServerState(env.DB, 'reset_generation', id),
 		env.DB.prepare(`INSERT INTO auth_tokens(id, token_hash, device_id, device_name, platform, scope)
 			SELECT ?, ?, device_id, device_name, platform, 'vault' FROM auth_tokens WHERE id = ?`)
 			.bind(id, await sha256Hex(replacementToken), principal.tokenId),
@@ -104,10 +104,11 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 			'reminder_projections', 'notification_projection_jobs', 'notification_file_retries', 'notification_policy', 'initial_import',
 			'web_enrollment_tokens', 'push_subscriptions', ...READING_TABLES].map(table => env.DB.prepare(`DELETE FROM ${table}`)),
 		env.DB.prepare('DELETE FROM auth_tokens WHERE id != ?').bind(receipt.id),
-		// Preserve reset authority even after the vault returns to plaintext mode.
-		env.DB.prepare('DELETE FROM maintenance_state WHERE key NOT IN (?, ?) AND key NOT LIKE ?')
-			.bind(DEPLOYMENT_FENCE_KEY, SYNC_RESET_GENERATION_KEY, PREFIX + '%'),
-		...(setup ? [save(env.DB, ENCRYPTION_STATE_KEY, { ...state, mode: 'active' })] : []),
+		env.DB.prepare('DELETE FROM maintenance_state WHERE key != ? AND key NOT LIKE ?')
+			.bind(DEPLOYMENT_FENCE_KEY, PREFIX + '%'),
+		// Keep reset authority even after the vault returns to plaintext mode; features return to their defaults.
+		env.DB.prepare('UPDATE server_state SET encryption = ?, features = NULL WHERE id = 1')
+			.bind(setup ? JSON.stringify({ ...state, mode: 'active' }) : null),
 		save(env.DB, PREFIX + receipt.id, complete),
 	]);
 	return corsResponse(complete);

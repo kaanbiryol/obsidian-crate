@@ -91,7 +91,7 @@ it.each(['cancel','expire','revoke','generation','reset'] as const)('fences a pe
   if (reason === 'cancel') await app.close();
   if (reason === 'expire') await env.DB.prepare("UPDATE maintenance_state SET value=json_set(value,'$.expiresAt',1) WHERE key=?").bind('crate_web_pairing:' + app.id).run();
   if (reason === 'revoke') await env.DB.prepare("DELETE FROM auth_tokens WHERE id='app'").run();
-  if (reason === 'generation' || reason === 'reset') await env.DB.prepare("UPDATE maintenance_state SET value=? WHERE key='e2ee:state'").bind(JSON.stringify({ ...f.state, ...(reason === 'generation' ? { generation: 9 } : { mode: 'resetting' }) })).run();
+  if (reason === 'generation' || reason === 'reset') await env.DB.prepare('UPDATE server_state SET encryption=? WHERE id=1').bind(JSON.stringify({ ...f.state, ...(reason === 'generation' ? { generation: 9 } : { mode: 'resetting' }) })).run();
   await expect(computer.approve({ bundle: f.bundle })).rejects.toThrow();
   expect((await env.DB.prepare('SELECT value FROM maintenance_state WHERE key=?').bind('crate_web_pairing:' + app.id).first<{ value: string }>())?.value).not.toContain('payload');
 });

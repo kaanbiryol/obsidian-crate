@@ -15,7 +15,6 @@ import { getStoredFileRow } from '../sync/storage';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
-import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { sha256Hex } from '../../../platform/sha256';
 
 const id = 'reset-operation', nextToken = 'b'.repeat(64);
@@ -57,10 +56,11 @@ it('requires vault authority, the current encryption identity and explicit destr
 });
 
 it('resumes bounded deletion, revokes old devices and grants, and never repeats a completed wipe', async () => {
-	const readingTables = ['reading_policy', 'reading_sources', 'reading_jobs', 'reading_operations', 'reading_enrollments', 'reading_handoffs', 'reading_captures'];
+	const readingTables = ['reading_policy', 'reading_items', 'reading_index', 'reading_jobs', 'reading_operations', 'reading_enrollments', 'reading_handoffs', 'reading_captures'];
 	await env.DB.batch([
 		env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')"),
-		env.DB.prepare("INSERT INTO reading_sources(path,revision,generation,metadata_json) VALUES ('Reading/private.md','r','reading-generation','private metadata')"),
+		env.DB.prepare("INSERT INTO reading_items(portable_path,path,storage_key,hash,size,metadata_json) VALUES ('reading/private.md','Reading/private.md','r','hash',1,'private metadata')"),
+		env.DB.prepare("INSERT INTO reading_index(id,scope,revision) VALUES (1,'scope','revision')"),
 		env.DB.prepare("INSERT INTO reading_jobs(path,item_id,generation,source_revision,block_hash,url,available_at) VALUES ('Reading/private.md','article','reading-generation','r','hash','https://private.example',0)"),
 		env.DB.prepare("INSERT INTO reading_operations VALUES ('operation','original','reading-generation','hash','{}',1)"),
 		env.DB.prepare("INSERT INTO reading_enrollments VALUES (?,'reading-generation','reading',9999999999999)").bind(await sha256Hex('old-reading-grant')),
@@ -79,7 +79,7 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	expect(begin.status, await begin.clone().text()).toBe(200);
 	expect((await readEncryptionState(env.DB))?.mode).toBe('resetting');
 	for (const table of readingTables) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
-	expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(SYNC_RESET_GENERATION_KEY).first()).toEqual({ value: id });
+	expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 	for (const token of ['original', 'other', 'web']) expect((await request('/health', token)).status).toBe(401);
 	for (const path of ['/sync/manifest', '/encryption/pairing', '/auth/tokens']) expect((await request(path, nextToken)).status).toBe(423);
 	expect((await request(`/encryption/reset?id=${id}`, nextToken)).status).toBe(200);
@@ -87,7 +87,7 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	await finish();
 	for (const table of readingTables) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 	expect(await readEncryptionState(env.DB)).toBeNull();
-	expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(SYNC_RESET_GENERATION_KEY).first()).toEqual({ value: id });
+	expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 	expect((await env.BUCKET.list()).objects).toHaveLength(0);
 	for (const table of ['files', 'file_versions', 'scheduled_reminders', 'notification_jobs']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 	expect(await env.DB.prepare("SELECT state FROM staged_uploads WHERE storage_key = 'late-object'").first()).toEqual({ state: 'deleting' });
@@ -101,7 +101,7 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 it('rejects an encrypted upload authorized before reset, even if staging starts after completion', async () => {
 	const fixture = await createEncryptionFixture('active');
 	state = fixture.state;
-	await env.DB.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify(state)).run();
+	await env.DB.prepare('UPDATE server_state SET encryption = ? WHERE id = 1').bind(JSON.stringify(state)).run();
 	const { keys } = fixture, wire = await fixture.paths.wire('late.md');
 	const content = await sealFile({ path: 'late.md', content: new TextEncoder().encode('old secret'), contentType: 'text/markdown', publicData: null }, keys.forPath(wire));
 	const upload = () => new Request(`https://test/sync/upload?path=${wire}`, { method: 'PUT', body: content.bytes, headers: {
@@ -129,7 +129,7 @@ it('rejects an encrypted upload authorized before reset, even if staging starts 
 describe('turning encryption on', () => {
 	let target: EncryptionServerState;
 	beforeEach(async () => {
-		await env.DB.prepare("DELETE FROM maintenance_state WHERE key = 'e2ee:state'").run();
+		await env.DB.prepare('UPDATE server_state SET encryption = NULL WHERE id = 1').run();
 		target = (await createEncryptionFixture('active')).state;
 		await env.BUCKET.put('plain-current', 'plaintext note');
 		await env.DB.prepare("INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES ('plain.md', 'plain.md', 'hash', 14, 'plain-current')").run();
@@ -164,7 +164,7 @@ describe('turning encryption on', () => {
 		expect((await env.BUCKET.list()).objects).toHaveLength(0);
 		for (const table of ['files', 'file_versions', 'changelog', 'reading_policy', 'push_subscriptions']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 		expect((await env.DB.prepare('SELECT id FROM auth_tokens').all<{ id: string }>()).results).toEqual([{ id }]);
-		expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(SYNC_RESET_GENERATION_KEY).first()).toEqual({ value: id });
+		expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 		// The replacement credential now syncs only with the new encryption identity.
 		const manifest = await request('/sync/manifest', nextToken);
 		expect(manifest.status, await manifest.clone().text()).toBe(200);

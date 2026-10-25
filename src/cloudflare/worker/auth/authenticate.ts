@@ -2,9 +2,6 @@ import { corsResponse } from '../cors';
 import { parseOptionalString } from '../request-validation';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../../../protocol/web-session';
 import { validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
-import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
-import { FEATURE_POLICY_KEY } from '../feature-policy';
-import { ENCRYPTION_STATE_KEY } from '../encryption/state';
 import { sha256Hex } from '../../../platform/sha256';
 
 type AuthScope = 'vault' | 'reminders' | 'reading' | 'reading_capture';
@@ -47,12 +44,12 @@ export async function authenticateWorkerRequest(
 
 	try {
 		const tokenHash = await sha256Hex(token);
-		const row = await db.prepare(`SELECT id, scope, folder_path, reading_generation, expires_at, device_name,
-			(last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours')) AS last_seen_stale,
-			(SELECT value FROM maintenance_state WHERE key = '${ENCRYPTION_STATE_KEY}') AS encryption_state,
-			(SELECT value FROM maintenance_state WHERE key = '${FEATURE_POLICY_KEY}') AS feature_policy,
-			(SELECT value FROM maintenance_state WHERE key = '${SYNC_RESET_GENERATION_KEY}') AS reset_generation FROM auth_tokens
-			WHERE token_hash = ? AND (expires_at IS NULL OR expires_at > ?)`)
+		// One token row and the one server state row.
+		const row = await db.prepare(`SELECT t.id, t.scope, t.folder_path, t.reading_generation, t.expires_at, t.device_name,
+			(t.last_seen_at IS NULL OR t.last_seen_at < datetime('now', '-6 hours')) AS last_seen_stale,
+			s.encryption AS encryption_state, s.features AS feature_policy, s.reset_generation
+			FROM auth_tokens t LEFT JOIN server_state s ON s.id = 1
+			WHERE t.token_hash = ? AND (t.expires_at IS NULL OR t.expires_at > ?)`)
 			.bind(tokenHash, Date.now())
 			.first<{ id: string; scope?: string | null; folder_path?: string | null; reading_generation?: string | null; expires_at?: number | null; device_name?: string | null; last_seen_stale?: number | null; encryption_state?: string | null; feature_policy?: string | null; reset_generation?: string | null }>();
 		if (!row?.id) {

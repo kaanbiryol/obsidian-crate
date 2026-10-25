@@ -12,7 +12,7 @@ function createDb(tokenHash: string, row: { id: string; scope: string; folder_pa
 					statement.args = args;
 					return statement;
 				}),
-				first: vi.fn(async () => sql.includes('SELECT id, scope, folder_path,') && sql.includes('FROM auth_tokens')
+				first: vi.fn(async () => sql.includes('SELECT t.id, t.scope, t.folder_path,') && sql.includes('FROM auth_tokens t')
 					&& statement.args[0] === tokenHash
 					? row
 					: null),
