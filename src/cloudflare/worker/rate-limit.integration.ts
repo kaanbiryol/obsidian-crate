@@ -93,15 +93,27 @@ it('keeps fallback budgets across real request-local metering wrappers and rotat
 	expect(prepare).not.toHaveBeenCalled();
 });
 
-it('authenticates ordinary Reading routes before invoking the coordinator', async () => {
-	const get = vi.fn(() => { throw new Error('Coordinator must not be reached'); });
-	for (const path of ['/features', '/reading/list', '/reading/item']) {
-		const response = await worker.fetch(new Request(`https://auth-first.test${path}`, { headers: { Authorization: 'Bearer invalid' } }), {
-			...env, NOTIFICATION_REQUEST_LIMITER: { limit: async () => ({ success: true }) }, REMINDER_ALARMS: { ...env.REMINDER_ALARMS, get },
-		});
-		expect(response.status).toBe(401);
-	}
-	expect(get).not.toHaveBeenCalled();
+it('authenticates coordinator routes once, inside the coordinator, and remembers its answer for admission', async () => {
+	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope) VALUES ('owner',?,'vault')").bind(await sha256Hex('owner')).run();
+	const edgeStatements: string[] = [];
+	const edgeDb = new Proxy(env.DB, { get(target, key) {
+		if (key === 'prepare') return (sql: string) => { edgeStatements.push(sql); return target.prepare(sql); };
+		const value: unknown = Reflect.get(target, key);
+		return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+	} });
+	const limit = vi.fn(async () => ({ success: true }));
+	const attempt = (token: string, path = '/reading/policy') => worker.fetch(new Request(`https://once.test${path}`, { headers: { Authorization: `Bearer ${token}` } }),
+		{ ...env, DB: edgeDb, NOTIFICATION_REQUEST_LIMITER: { limit } });
+	for (const path of ['/reading/list', '/reading/item']) expect((await attempt('invalid', path)).status).toBe(401);
+	expect(limit).toHaveBeenCalledTimes(2);
+	for (let index = 0; index < 3; index++) expect((await attempt('owner')).status).toBe(200);
+	// The first accepted answer admits the credential to the authenticated budget.
+	expect(limit).toHaveBeenCalledTimes(3);
+	await env.DB.prepare("DELETE FROM auth_tokens WHERE id='owner'").run();
+	expect((await attempt('owner')).status).toBe(401);
+	expect((await attempt('owner')).status).toBe(401);
+	expect(limit).toHaveBeenCalledTimes(4);
+	expect(edgeStatements.filter(sql => sql.includes('auth_tokens'))).toEqual([]);
 });
 
 it.each(['/reading/shortcut/v1/prepare', '/reading/shortcut/v1/exchange'])('returns a safe launch page when %s is denied at the edge', async path => {

@@ -227,7 +227,11 @@ the plugin too. `reminders/list-parity.integration.ts` checks that both lists ag
 transfer execution with a tagged argument. `request-guards.ts` owns stateless
 protocol and encryption checks; the handler retains their ordering around
 admission, authentication, scope authorization and route dispatch. Transfer
-requests authenticate again after entering the queue. Coordinator execution
+requests authenticate again after entering the queue. Coordinator routes are
+forwarded after edge admission and authenticate once, inside the coordinator,
+under the lock that every token revocation also takes; the edge remembers a
+credential the coordinator accepted for admission. The encrypted shortcut capture
+still authenticates at the edge, where it downloads the page. Coordinator execution
 receives the Durable Object state and persists notification wakes before mutations.
 The handler selects required `UploadCommitters` from that execution kind and passes
 them through the routes. Worker `Env` contains bindings, not optional publication
