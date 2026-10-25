@@ -23,10 +23,10 @@
   <link rel="stylesheet" href="/website-options/canvas/style.css?v=grouped-actions-1">
   <link rel="stylesheet" href="/website-options/canvas/sections.css?v=steady-video-1">
   <link rel="stylesheet" href="/website-options/canvas/gallery.css?v=dialog-focus-2">
-  <script src="/assets/canvas.js?v=home-refresh-1" defer></script>
+  <script src="/assets/canvas.js?v=home-refresh-4" defer></script>
   <script src="/assets/gallery.js?v=escape-focus-1" defer></script>
   <script src="/assets/home-images.js?v=smooth-images-1" defer></script>
-  <link rel="stylesheet" href="/assets/home.css?v=home-refresh-1">
+  <link rel="stylesheet" href="/assets/home.css?v=home-refresh-4">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -42,9 +42,9 @@
 <div class="hero-copy">
 <a class="beta-pill" href="/changelog/"><span class="beta-pill-tag">Beta</span>See what’s new <span aria-hidden="true">→</span></a>
 <h1><span>Sync. Reminders.</span> <span>Read it later.</span></h1>
-<p class="body-copy">Sync your vault, plan reminders, and save articles to read later, all as plain Markdown in Obsidian. Runs on your own Cloudflare account or server.</p>
+<p class="body-copy">Sync your vault, plan reminders, and save articles to read later, all as plain Markdown in Obsidian.</p>
 <div class="actions"><a class="button" href="#setup"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#download" /></svg> Install beta</a><a class="button button--secondary" href="/docs/">Read the docs <span aria-hidden="true">→</span></a></div>
-<p class="release-note">Free and open source. Runs on Cloudflare’s free tier.</p>
+<p class="release-note">Free and open source. Runs on your own server or Cloudflare’s free tier.</p>
 
 </div>
 <figure class="hero-visual hero-devices" id="markdown-example">
@@ -58,24 +58,22 @@
 
 
 
-<div class="feature-preview-grid overview-grid"><figure class="feature-preview">
-<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/crate-conflicts.webp?v=e7b985692e26" data-gallery="sync" aria-label="Enlarge Review conflicting notes" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/lossless/crate-conflicts.webp?v=e7b985692e26" width="3714" height="2324" loading="lazy" alt="Sync activity listing three saved conflict copies: Copenhagen weekend, Launch plan, and Reading notes, each with a Review action."></div></a>
-<figcaption><h3>Review conflicts</h3><p>Every conflict is saved as a copy, so nothing is lost.</p></figcaption>
-</figure><figure class="feature-preview">
-<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/crate-conflict-review.webp?v=20261004" data-gallery="sync" aria-label="Enlarge Choose what to keep" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/lossless/crate-conflict-review.webp?v=20261004" width="3714" height="2324" loading="lazy" alt="Two versions of Reading notes shown side by side, with highlighted changes and options to keep either version, keep both, or create a custom result."></div></a>
-<figcaption><h3>Resolve conflicts</h3><p>Compare side by side, then keep one, both, or a custom result.</p></figcaption>
+<div class="feature-preview-grid overview-grid"><figure class="feature-preview detail-switcher">
+<div class="detail-switcher-media">
+<a class="feature-preview-media gallery-trigger is-active" data-detail="review" data-gallery-title="Review conflicts" data-gallery-description="Every conflict is saved as a copy, so nothing is lost." href="/assets/screenshots/lossless/crate-conflicts.webp?v=e7b985692e26" data-gallery="sync" aria-label="Enlarge Review conflicting notes" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/lossless/crate-conflicts.webp?v=e7b985692e26" width="3714" height="2324" loading="lazy" alt="Sync activity listing three saved conflict copies: Copenhagen weekend, Launch plan, and Reading notes, each with a Review action."></div></a>
+<a class="feature-preview-media gallery-trigger" data-detail="resolve" data-gallery-title="Resolve conflicts" data-gallery-description="Compare side by side, then keep one, both, or a custom result." href="/assets/screenshots/lossless/crate-conflict-review.webp?v=20261004" data-gallery="sync" aria-label="Enlarge Choose what to keep" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/lossless/crate-conflict-review.webp?v=20261004" width="3714" height="2324" loading="lazy" alt="Two versions of Reading notes shown side by side, with highlighted changes and options to keep either version, keep both, or create a custom result."></div></a>
+</div>
+<figcaption><h3>Conflicts</h3><p class="detail-switcher-summary">Saved as copies, then resolved side by side.</p><div class="detail-switcher-tabs" role="group" aria-label="Show conflict step" hidden><button type="button" data-detail-target="review" aria-pressed="true">Review</button><button type="button" data-detail-target="resolve" aria-pressed="false">Resolve</button></div></figcaption>
 </figure><figure class="feature-preview">
 <a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/crate-sync-pending.webp?v=1b51f7084ab5" data-gallery="sync" aria-label="Enlarge Pending changes" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/lossless/crate-sync-pending.webp?v=1b51f7084ab5" width="3714" height="2324" loading="lazy" alt="One pending change to Copenhagen weekend, selected for sync with added and removed text shown in a diff."></div></a>
 <figcaption><h3>Pending changes</h3><p>Compare edits and choose which files to sync.</p></figcaption>
-</figure><figure class="feature-preview">
-<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/crate-sync-history.webp?v=2eaf922e3e16" data-gallery="sync" aria-label="Enlarge Sync history" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/lossless/crate-sync-history.webp?v=2eaf922e3e16" width="3714" height="2324" loading="lazy" alt="Sync history showing uploads and a download, with the latest upload expanded to show Copenhagen weekend and its File history action."></div></a>
-<figcaption><h3>Sync history</h3><p>See recent transfers and the files included.</p></figcaption>
-</figure><figure class="feature-preview">
-<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/crate-file-history.webp?v=20261004" data-gallery="sync" aria-label="Enlarge File history" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/lossless/crate-file-history.webp?v=20261004" width="3714" height="2324" loading="lazy" alt="File history comparing a saved version of Copenhagen weekend with the current file, showing two added and two removed lines."></div></a>
-<figcaption><h3>File history</h3><p>Restore any version from the last 30 days.</p></figcaption>
-</figure><figure class="feature-preview">
-<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/crate-vault-history.webp?v=20261004" data-gallery="sync" aria-label="Enlarge Vault history" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog product-image--vault"><img decoding="async" src="/assets/screenshots/lossless/crate-vault-history.webp?v=20261004" width="3714" height="2324" loading="lazy" alt="Vault history comparing the current vault with a selected saved state, with a Copenhagen weekend diff and a restore action."></div></a>
-<figcaption><h3>Vault history</h3><p>Return your vault to a saved sync point.</p></figcaption>
+</figure><figure class="feature-preview detail-switcher">
+<div class="detail-switcher-media">
+<a class="feature-preview-media gallery-trigger is-active" data-detail="sync" data-gallery-title="Sync history" data-gallery-description="See recent transfers and the files included." href="/assets/screenshots/lossless/crate-sync-history.webp?v=2eaf922e3e16" data-gallery="sync" aria-label="Enlarge Sync history" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/lossless/crate-sync-history.webp?v=2eaf922e3e16" width="3714" height="2324" loading="lazy" alt="Sync history showing uploads and a download, with the latest upload expanded to show Copenhagen weekend and its File history action."></div></a>
+<a class="feature-preview-media gallery-trigger" data-detail="file" data-gallery-title="File history" data-gallery-description="Restore any version from the last 30 days." href="/assets/screenshots/lossless/crate-file-history.webp?v=20261004" data-gallery="sync" aria-label="Enlarge File history" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/lossless/crate-file-history.webp?v=20261004" width="3714" height="2324" loading="lazy" alt="File history comparing a saved version of Copenhagen weekend with the current file, showing two added and two removed lines."></div></a>
+<a class="feature-preview-media gallery-trigger" data-detail="vault" data-gallery-title="Vault history" data-gallery-description="Return your vault to a saved sync point." href="/assets/screenshots/lossless/crate-vault-history.webp?v=20261004" data-gallery="sync" aria-label="Enlarge Vault history" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog product-image--vault"><img decoding="async" src="/assets/screenshots/lossless/crate-vault-history.webp?v=20261004" width="3714" height="2324" loading="lazy" alt="Vault history comparing the current vault with a selected saved state, with a Copenhagen weekend diff and a restore action."></div></a>
+</div>
+<figcaption><h3>History</h3><p class="detail-switcher-summary">See transfers, restore files, or roll back your vault.</p><div class="detail-switcher-tabs" role="group" aria-label="Show history view" hidden><button type="button" data-detail-target="sync" aria-pressed="true">Sync</button><button type="button" data-detail-target="file" aria-pressed="false">File</button><button type="button" data-detail-target="vault" aria-pressed="false">Vault</button></div></figcaption>
 </figure></div><section class="encryption-feature" id="end-to-end-encryption" aria-labelledby="encryption-title">
 <div class="encryption-layout">
 <header class="encryption-copy">
@@ -117,23 +115,14 @@
 <a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/pwa-reminders-projects.webp?v=d2846d093471" data-gallery="reminders" aria-label="Enlarge Projects" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/lossless/pwa-reminders-projects.webp?v=d2846d093471" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Projects view with nine projects, completion progress, and nested Finance and Health projects."></div></a>
 <figcaption><h3>Projects</h3><p>A place for every project.</p></figcaption>
 </figure>
+<figure class="feature-preview feature-preview--phone detail-switcher">
+<div class="detail-switcher-media">
+<a class="feature-preview-media gallery-trigger is-active" data-detail="edit" data-gallery-title="Edit a reminder" data-gallery-description="Update its title, date, project, or priority." href="/assets/screenshots/lossless/pwa-reminders-edit.webp?v=a532a2bf45b9" data-gallery="reminders" aria-label="Enlarge Edit a reminder" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/lossless/pwa-reminders-edit.webp?v=a532a2bf45b9" width="1179" height="2556" loading="lazy" alt="Editing Send the revised proposal on iPhone, with an October 2 due date, Work project, priority, and the keyboard open."></div></a>
+<a class="feature-preview-media gallery-trigger" data-detail="project-picker" data-gallery-title="Choose a project" data-gallery-description="Move a reminder into the right project." href="/assets/screenshots/lossless/pwa-reminders-project-picker.webp?v=c218b1d0ac7c" data-gallery="reminders" aria-label="Enlarge Choose a project" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/lossless/pwa-reminders-project-picker.webp?v=c218b1d0ac7c" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Project sheet with color-coded projects, nested Personal projects, and Home selected."></div></a>
+<a class="feature-preview-media gallery-trigger" data-detail="schedule" data-gallery-title="Schedule" data-gallery-description="Pick a quick date or set an exact time." href="/assets/screenshots/lossless/pwa-reminders-schedule.webp?v=c0ce349809e7" data-gallery="reminders" aria-label="Enlarge Schedule" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/lossless/pwa-reminders-schedule.webp?v=c0ce349809e7" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Schedule sheet with Today selected, quick date options, and custom date and time fields."></div></a>
+<a class="feature-preview-media gallery-trigger" data-detail="repeat" data-gallery-title="Repeat" data-gallery-description="Repeat daily, weekly, or monthly." href="/assets/screenshots/lossless/pwa-reminders-repeat.webp?v=c014fbc8b386" data-gallery="reminders" aria-label="Enlarge Repeat" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/lossless/pwa-reminders-repeat.webp?v=c014fbc8b386" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Repeat sheet with Daily selected, an interval of one day, and a reminder time of 09:00."></div></a>
 </div>
-<div class="feature-preview-grid mobile-gallery" role="group" aria-label="Actions">
-<figure id="mobile-schedule" class="feature-preview feature-preview--phone">
-<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/pwa-reminders-edit.webp?v=a532a2bf45b9" data-gallery="reminders" aria-label="Enlarge Edit a reminder" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/lossless/pwa-reminders-edit.webp?v=a532a2bf45b9" width="1179" height="2556" loading="lazy" alt="Editing Send the revised proposal on iPhone, with an October 2 due date, Work project, priority, and the keyboard open."></div></a>
-<figcaption><h3>Edit a reminder</h3><p>Update its title, date, project, or priority.</p></figcaption>
-</figure>
-<figure class="feature-preview feature-preview--phone">
-<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/pwa-reminders-project-picker.webp?v=c218b1d0ac7c" data-gallery="reminders" aria-label="Enlarge Choose a project" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/lossless/pwa-reminders-project-picker.webp?v=c218b1d0ac7c" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Project sheet with color-coded projects, nested Personal projects, and Home selected."></div></a>
-<figcaption><h3>Choose a project</h3><p>Move a reminder into the right project.</p></figcaption>
-</figure>
-<figure class="feature-preview feature-preview--phone">
-<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/pwa-reminders-schedule.webp?v=c0ce349809e7" data-gallery="reminders" aria-label="Enlarge Schedule" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/lossless/pwa-reminders-schedule.webp?v=c0ce349809e7" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Schedule sheet with Today selected, quick date options, and custom date and time fields."></div></a>
-<figcaption><h3>Schedule</h3><p>Pick a quick date or set an exact time.</p></figcaption>
-</figure>
-<figure class="feature-preview feature-preview--phone">
-<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/lossless/pwa-reminders-repeat.webp?v=c014fbc8b386" data-gallery="reminders" aria-label="Enlarge Repeat" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/lossless/pwa-reminders-repeat.webp?v=c014fbc8b386" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Repeat sheet with Daily selected, an interval of one day, and a reminder time of 09:00."></div></a>
-<figcaption><h3>Repeat</h3><p>Repeat daily, weekly, or monthly.</p></figcaption>
+<figcaption><h3>Plan the details</h3><p class="detail-switcher-summary">Edit, file, schedule, and repeat reminders.</p><div class="detail-switcher-tabs" role="group" aria-label="Show reminder detail" hidden><button type="button" data-detail-target="edit" aria-pressed="true">Edit</button><button type="button" data-detail-target="project-picker" aria-pressed="false">Project</button><button type="button" data-detail-target="schedule" aria-pressed="false">Date</button><button type="button" data-detail-target="repeat" aria-pressed="false">Repeat</button></div></figcaption>
 </figure>
 </div>
 </section>
@@ -150,7 +139,7 @@
 </div>
 </section>
 <section class="section wrap reading-section" id="reading" aria-labelledby="reading-title">
-<header class="reading-intro"><p class="feature-label">Reading</p><h2 id="reading-title">Save it for later.</h2><p class="body-copy">Save articles from your phone or desktop. Read, highlight, and keep it all as Markdown in your vault.</p><div class="intro-actions"><a class="section-guide" href="/docs/features/reading/">Reading guide <span aria-hidden="true">→</span></a><a class="button button--secondary button--small" href="/shortcuts/v1/">Get the iPhone shortcut</a></div></header>
+<header class="reading-intro"><p class="feature-label">Reading</p><h2 id="reading-title">Save it for later.</h2><p class="body-copy">Save articles from your phone or desktop. Read, highlight, and keep it all as Markdown in your vault.</p><div class="intro-actions"><a class="section-guide" href="/docs/features/reading/">Reading guide <span aria-hidden="true">→</span></a></div></header>
 
 <a class="reading-desktop gallery-trigger" href="/assets/screenshots/lossless/plugin-reading.webp?v=20261025-2" data-gallery="reading" data-gallery-title="Read in Obsidian" data-gallery-description="Saved articles open in Obsidian, with your highlights." aria-label="Enlarge Read in Obsidian" aria-haspopup="dialog"><div class="product-image"><img decoding="async" src="/assets/screenshots/lossless/plugin-reading.webp?v=20261025-2" width="3136" height="1940" loading="lazy" alt="A saved article open in Crate’s Reading view in Obsidian, with a highlighted passage, beside the Today reminders list."></div></a>
 
@@ -170,13 +159,14 @@
 </div>
 <section class="save-sources" aria-labelledby="save-sources-title">
 <h3 class="save-sources-title" id="save-sources-title">Save from anywhere.</h3>
+<figure class="reading-share"><a class="gallery-video-trigger" href="/assets/videos/pwa-reading-share-sheet.mp4?v=20261025-7" data-gallery="reading" data-gallery-video="reading-share-sheet" data-gallery-title="Save from the share sheet" data-gallery-description="Share an article from Safari and Crate saves it to your library." aria-haspopup="dialog" aria-label="Play video: Save an article from the iPhone share sheet"><video aria-hidden="true" controlslist="nofullscreen noremoteplayback" disablepictureinpicture="" disableremoteplayback="" id="reading-share-sheet" muted playsinline preload="none" width="880" height="1738" poster="/assets/screenshots/lossless/pwa-reading-share-sheet-poster.webp?v=20261025-4" aria-label="Sharing an article from Safari to Save to Crate on iPhone."><source src="/assets/videos/pwa-reading-share-sheet-transparent.mov?v=20261025-2" type="video/quicktime"><source src="/assets/videos/pwa-reading-share-sheet-transparent.webm?v=20261025-2" type="video/webm"><source src="/assets/videos/pwa-reading-share-sheet.mp4?v=20261025-7" type="video/mp4"></video></a></figure>
 <ul class="save-sources-grid">
-<li class="save-source"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#command" /></svg><h4>Obsidian</h4><p>Add a link from the command palette. The article downloads on your device.</p></li>
-<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg><h4>Web app</h4><p>Paste a link into your library from any browser.</p></li>
-<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13" /></svg><h4>iPhone share sheet</h4><p>Share → Save to Crate with the iPhone shortcut, even with encryption on.</p></li>
-<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13" /></svg><h4>Android share sheet</h4><p>Share → Crate from the installed web app. With encryption on, paste the link instead.</p></li>
-<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12" /></svg><h4>Obsidian Web Clipper</h4><p>Clip into your Reading folder and the note joins your library.</p></li>
-<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4" /><path d="m10 9 5 3-5 3z" /></svg><h4>YouTube</h4><p>Save videos with their transcripts when captions exist, then highlight passages.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#command" /></svg><h4>Obsidian</h4><p>Add a link from the command palette.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg><h4>Web app</h4><p>Paste a link from any browser.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13" /></svg><h4>iPhone share sheet</h4><p>Share → Save to Crate from Safari or any app.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13" /></svg><h4>Android share sheet</h4><p>Share → Crate from any app.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12" /></svg><h4>Obsidian Web Clipper</h4><p>Clip a page and it joins your library.</p></li>
+<li class="save-source"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4" /><path d="m10 9 5 3-5 3z" /></svg><h4>YouTube</h4><p>Save videos with transcripts and highlight them.</p></li>
 </ul>
 </section>
 
@@ -191,7 +181,6 @@
 <p class="feature-label">Hosting</p>
 <h2 id="hosting-title">Your server. Your choice.</h2>
 <p class="body-copy">Your notes stay in Obsidian. Your server connects your devices and brings reading and reminders to the web app.</p>
-<a class="hosting-guide" href="/docs/getting-started/devices/">How to connect your devices <span aria-hidden="true">→</span></a>
 </header>
 <div class="sync-map"><div class="sync-map-hub"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#cloud" /></svg><span>Your Crate server</span><small>Cloudflare or your own hardware</small></div>
 <div class="sync-map-branches" aria-hidden="true"><span></span><span></span></div>

@@ -16,8 +16,8 @@ invalidate cached images.
 
 ## iPhone shortcut downloads
 
-The public install page is `/shortcuts/v1/`. The homepage, Reading documentation,
-and app setup link to this page. Its download serves the signed `.shortcut` file
+The public install page is `/shortcuts/v1/`. The Reading documentation and app
+setup link to this page. Its download serves the signed `.shortcut` file
 directly from the Crate website.
 
 GitHub releases retain the versioned source artifacts. During deployment, Pages

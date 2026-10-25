@@ -74,7 +74,7 @@ window.addEventListener('resize', () => updateNavigation(true));
 updateNavigation();
 
 // Hold the last frame, then fade the video over its stationary phone backdrop.
-document.querySelectorAll('.reminder-recording video, .notification-preview video').forEach((recording) => {
+document.querySelectorAll('.reminder-recording video, .notification-preview video, .reading-share video').forEach((recording) => {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const isGalleryPreview = Boolean(recording.closest('a[data-gallery-video]'));
   const replayDelay = Number(recording.dataset.replayDelay) || 3000;
@@ -225,4 +225,18 @@ document.querySelectorAll('.hosting-option, .encryption-diagram').forEach((card)
     card.style.setProperty('--glow-x', `${event.clientX - bounds.left}px`);
     card.style.setProperty('--glow-y', `${event.clientY - bounds.top}px`);
   });
+});
+
+// Switch detail cards between their screens; every screen stays in the gallery.
+document.querySelectorAll('.detail-switcher').forEach((figure) => {
+  const screens = figure.querySelectorAll('[data-detail]');
+  const buttons = figure.querySelectorAll('[data-detail-target]');
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      screens.forEach((screen) => screen.classList.toggle('is-active', screen.dataset.detail === button.dataset.detailTarget));
+      buttons.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
+    });
+  });
+  figure.querySelector('.detail-switcher-tabs').hidden = false;
+  figure.classList.add('is-enhanced');
 });
