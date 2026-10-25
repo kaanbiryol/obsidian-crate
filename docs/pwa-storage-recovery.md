@@ -128,7 +128,7 @@ Choosing and running suites is covered in [testing](testing.md).
 
 ### PWA sync coordinator
 
-After building the Worker, run `CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-sync-coordinator-test.mjs`.
+After building the Worker, run `CRATE_WORKER_PREBUILT=1 node tests/browser/pwa/pwa-sync-coordinator-test.mjs`.
 It exercises the built app in Chromium and WebKit with native IndexedDB and localStorage:
 Reading dispatch while only Reminders is rendered, reminder dispatch while only Reading
 is rendered, a Reading refresh failure that does not block reminders, shared header

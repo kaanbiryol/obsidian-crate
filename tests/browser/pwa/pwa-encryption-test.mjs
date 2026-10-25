@@ -12,10 +12,9 @@ import { verifyEncryptionReset } from './pwa-encryption-reset-checks.mjs';
 import { verifyEncryptedAttemptCleanup } from './pwa-encryption-cleanup-checks.mjs';
 import { assertNoPlaintextNames, isWirePath, recordPlaintextNames } from './pwa-encrypted-names-checks.mjs';
 
-if (process.env.CRATE_PWA_PREBUILT !== '1') {
-	const result = spawnSync(process.execPath, ['scripts/build-worker.mjs'], { stdio: 'inherit' });
-	if (result.status !== 0) throw new Error('Worker build failed');
-}
+// Under CRATE_WORKER_PREBUILT=1 this verifies the existing build instead of rebuilding.
+const built = spawnSync(process.execPath, ['scripts/build-worker.mjs'], { stdio: 'inherit' });
+if (built.status !== 0) throw new Error('Worker build failed');
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
 export { createEncryptionState } from './src/encryption/server-state';

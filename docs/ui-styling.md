@@ -1047,7 +1047,7 @@ Choosing and running suites is covered in [testing](testing.md).
 
 ### Unified PWA settings
 
-After building the Worker, run `CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-settings-test.mjs`
+After building the Worker, run `CRATE_WORKER_PREBUILT=1 node tests/browser/pwa/pwa-settings-test.mjs`
 for Chromium and WebKit coverage of both settings entry points, retained view/search
 and focus, shared theme and preferences, Reading launch destinations, explicit-link
 precedence, shortcut and installation navigation, pending Reading warnings from Reminders, and shared

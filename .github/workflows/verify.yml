@@ -131,7 +131,7 @@ jobs:
       - name: Smoke test built PWA
         if: inputs.reuse-run-id == ''
         env:
-          CRATE_PWA_PREBUILT: '1'
+          CRATE_WORKER_PREBUILT: '1'
         run: npm run test:pwa-preview
       - name: Verify release artifacts
         run: npm run check:css-scope && npm run size-check && npm run verify:release-artifacts
