@@ -71,7 +71,7 @@ export function selectTodayReminders<T extends Pick<Reminder, 'id' | 'completed'
 /**
  * Get upcoming reminders (next N days)
  */
-export function getUpcomingReminders<T extends Reminder>(reminders: T[], days: number = 7, now = new Date()): T[] {
+export function getUpcomingReminders<T extends Reminder>(reminders: T[], days: number = 7, now = new Date(), includeCompleted = false): T[] {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startDate = new Date(todayStart);
   startDate.setDate(startDate.getDate() + 1);
@@ -79,7 +79,7 @@ export function getUpcomingReminders<T extends Reminder>(reminders: T[], days: n
   endDate.setDate(endDate.getDate() + days + 1);
 
   return reminders.filter(r => {
-    if (r.completed) return false;
+    if (r.completed && !includeCompleted) return false;
     if (r.dueDatetime) {
       const dueDate = new Date(r.dueDatetime);
       return dueDate > now && dueDate < endDate;
