@@ -48,6 +48,8 @@ export class EncryptedReminderApi {
 	// Plaintext path of each server path opened this session, for issues raised after opening.
 	private names = new Map<string, string>();
 	private indexLoaded = false;
+	// The parsed notes the persisted index holds, so an unchanged list skips resealing it.
+	private persistedIndex?: Map<string, ScannedNote>;
 	constructor(private readonly keys: FeatureKeys, private readonly fetch: ApiFetch) {}
 	/** Notes, projects and requests from the app use plaintext paths; the server sees `wireFolder`. */
 	private get localFolder() { return this.keys.folderPath; }
@@ -63,7 +65,9 @@ export class EncryptedReminderApi {
 		if (this.indexLoaded) return;
 		this.indexLoaded = true;
 		try {
-			for (const note of await loadEncryptedReminderIndex(this.indexScope, this.indexIdentity) ?? []) {
+			const notes = await loadEncryptedReminderIndex(this.indexScope, this.indexIdentity);
+			if (notes) this.persistedIndex = new Map(notes.map(note => [note.file.revision, note as ScannedNote]));
+			for (const note of notes ?? []) {
 				if (!this.scanned.has(note.file.revision)) this.scanned.set(note.file.revision, note as ScannedNote);
 			}
 		} catch { /* A missing or unreadable index only costs downloads. */ }
@@ -174,7 +178,12 @@ export class EncryptedReminderApi {
 				this.assertCurrent();
 				this.cached = nextCache;
 				this.scanned = nextScanned;
-				void saveEncryptedReminderIndex(this.indexScope, this.indexIdentity, [...nextScanned.values()], this.current).catch(() => {});
+				// Unchanged notes keep their parsed objects, so identity shows the index is current.
+				const persisted = this.persistedIndex;
+				if (persisted?.size !== nextScanned.size || [...nextScanned].some(([revision, note]) => persisted.get(revision) !== note)) {
+					void saveEncryptedReminderIndex(this.indexScope, this.indexIdentity, [...nextScanned.values()], this.current)
+						.then(() => { this.persistedIndex = nextScanned; }, () => {});
+				}
 				return Response.json(result, { headers: { ETag: etag } });
 			} catch (error) {
 				if (!(error instanceof ReminderCommandError) || error.status !== 409 || attempt === 2) throw error;

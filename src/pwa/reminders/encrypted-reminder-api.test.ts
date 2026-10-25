@@ -5,6 +5,7 @@ import { sha256Hex } from '@/platform/sha256';
 import { importNotificationFingerprintKey } from '@/encryption/reminder-projection';
 import { importSealPrivateKey } from '@/encryption/seal-key';
 import { EncryptedReminderApi } from './encrypted-reminder-api';
+import { saveEncryptedReminderIndex } from './encrypted-reminder-attempts';
 import { invalidatePwaSession } from '../connection/session-generation';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { openFile, sealFile } from '@/encryption/file-codec';
@@ -18,7 +19,7 @@ vi.mock('./encrypted-reminder-attempts', async importOriginal => ({
   loadEncryptedReminderAttempt: async (id: string) => attempts.get(id),
   saveEncryptedReminderAttempt: async (id: string, value: unknown) => { attempts.set(id, value); },
   loadEncryptedReminderIndex: async (scope: string, identity: string) => indexes.get(scope)?.identity === identity ? structuredClone(indexes.get(scope)!.notes) : undefined,
-  saveEncryptedReminderIndex: async (scope: string, identity: string, notes: unknown) => { indexes.set(scope, { identity, notes: structuredClone(notes) }); },
+  saveEncryptedReminderIndex: vi.fn(async (scope: string, identity: string, notes: unknown) => { indexes.set(scope, { identity, notes: structuredClone(notes) }); }),
 }));
 
 let keys: FeatureKeys;
@@ -152,6 +153,31 @@ it('downloads only changed notes after a restart with a newer vault sequence', a
   const listed = await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders');
   expect((await listed!.json() as { reminders: ReminderRecord[] }).reminders.map(reminder => reminder.content).sort()).toEqual(['Edited work task', 'Inbox task']);
   expect(fetch.mock.calls.filter(([route]) => route.startsWith('/reminders/encrypted-file?'))).toHaveLength(1);
+});
+
+it('reseals the persisted index only after the listed notes change', async () => {
+  const authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
+  const note = async (path: string, text: string) => {
+    const sealed = await sealFile({ path, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority);
+    return { wire: await keys.paths.wire(path), sealed };
+  };
+  const inbox = await note('Reminders/Inbox.md', '- [ ] Inbox task <!-- crate-id:inbox -->\n');
+  const edited = await note('Reminders/Inbox.md', '- [ ] Edited inbox task <!-- crate-id:inbox -->\n');
+  let sequence = 1, notes = [inbox];
+  const fetch = vi.fn(async (route: string) => {
+    if (route.startsWith('/reminders/encrypted-files?')) return Response.json({ ...page(sequence), files: notes.map(({ wire, sealed }) => ({ path: wire, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash })) });
+    return new Response(notes[0]!.sealed.bytes);
+  });
+  const saves = vi.mocked(saveEncryptedReminderIndex).mock.calls.length;
+  await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders');
+  expect(vi.mocked(saveEncryptedReminderIndex).mock.calls.length).toBe(saves + 1);
+  // A restart reuses the saved index; changes elsewhere in the vault rewrite nothing.
+  const restarted = new EncryptedReminderApi(keys, fetch);
+  for (sequence of [2, 3]) await restarted.handle('/reminders/list?folderPath=Reminders');
+  expect(vi.mocked(saveEncryptedReminderIndex).mock.calls.length).toBe(saves + 1);
+  sequence = 4; notes = [edited];
+  await restarted.handle('/reminders/list?folderPath=Reminders');
+  expect(vi.mocked(saveEncryptedReminderIndex).mock.calls.length).toBe(saves + 2);
 });
 
 it('commits a semantic revision to the listed note sealed with the vault key', async () => {
