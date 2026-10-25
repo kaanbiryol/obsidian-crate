@@ -37,7 +37,7 @@ export async function publishCapture(env: Env, id: string, generation: string, r
   const { content, title } = assembleReadingArticle(capture.note, item, { kind: 'capture', article: result, resolvedUrl });
   const path = await capturePath(env, current.folder_path, { title, url: item.source_url }, id);
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
-  const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null, readingPolicy: current, encryptionState: null,
+  const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, readingPolicy: current, encryptionState: null,
     effects: files => {
       const revision = fileRevisionGuard(files[0]!.path, files[0]!.storageKey);
       return [env.DB.prepare(`DELETE FROM reading_captures WHERE id=? AND generation=? AND ${revision.sql}`).bind(id, generation, ...revision.args)];

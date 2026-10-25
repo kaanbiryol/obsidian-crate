@@ -134,7 +134,6 @@ export interface StagedFileCommitInput {
 	operation?: UploadOperation;
 	expectedHash: ExpectedFileHash;
 	expectedRevision?: string;
-	previousFile: FileStorageRow | null;
 	/** Only the server's own Reading capture sets this: a new note sealed to the
 	 * vault seal key inside this folder. Client uploads can never create one. */
 	sealedReadingFolder?: string;
@@ -145,7 +144,7 @@ export async function commitStagedFile(
 	db: D1Database,
 	params: StagedFileCommitInput,
 ): Promise<CommitResult> {
-	if (params.sealedReadingFolder !== undefined && (params.previousFile || params.expectedHash !== null)) throw new Error('Sealed notes can only be created');
+	if (params.sealedReadingFolder !== undefined && params.expectedHash !== null) throw new Error('Sealed notes can only be created');
 	const encryption = await prepareEncryptedFileCommit(db, params.path, params.content, params.encryptionState,
 		params.sealedReadingFolder === undefined ? undefined : { readingFolder: params.sealedReadingFolder });
 	const upload: UploadMutationInput = {

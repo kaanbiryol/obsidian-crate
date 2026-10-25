@@ -74,17 +74,6 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		const size = declaredSize ?? computedSize;
 		const operation = await beginUploadOperation(db, request.headers.get(UPLOAD_OPERATION_HEADER), { path: safePath, hash, size, contentType, expectedHash: expectedRemoteHash });
 		if (operation instanceof Response) return operation;
-		let previousFile: FileStorageRow | null = null;
-		try {
-			previousFile = await getStoredFileRow(db, safePath);
-		} catch (error: unknown) {
-			return corsResponse({
-				success: false,
-				path: safePath,
-				error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
-			}, 503);
-		}
-
 		const objectKey = createManagedObjectKey(hash);
 		const validatedEncryption = await validateUploadEncryption(db, [{ path: safePath, content: body, contentType }], expectedEncryption);
 		const encryptionState = await trackStagedUploads(db, [{ storageKey: objectKey, path: safePath }], contentType === ENCRYPTED_FILE_CONTENT_TYPE, validatedEncryption, resetGeneration);
@@ -102,7 +91,6 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				objectKey,
 				content: exactArrayBuffer(body),
 				expectedHash: expectedRemoteHash,
-				previousFile,
 				operation,
 				encryptionState,
 				resetGeneration,

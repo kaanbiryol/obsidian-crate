@@ -25,6 +25,6 @@ export async function commitSealedReadingNote(env: Env, note: SealedReadingNote)
     { vaultId: state.vaultId, keyId: state.seal.keyId, publicKey: state.seal.publicKey });
   const content = new TextDecoder().decode(sealed.bytes);
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null, true);
-  const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null, encryptionState: state, sealedReadingFolder: current.folder_path });
+  const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, encryptionState: state, sealedReadingFolder: current.folder_path });
   return committed.committed;
 }

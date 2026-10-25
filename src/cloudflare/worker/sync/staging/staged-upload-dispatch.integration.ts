@@ -32,7 +32,7 @@ it('retains the current revision when another same-content save finished during 
   await trackStagedUpload(env.DB, objectKey, path);
   await env.BUCKET.put(objectKey, 'New');
   const result = await coordinatedUpload(env)(env.BUCKET, env.DB, {
-    path, hash, size: 3, objectKey, content: 'New', expectedHash: first.hash, previousFile: staleSnapshot,
+    path, hash, size: 3, objectKey, content: 'New', expectedHash: first.hash,
   });
   expect(result.committed).toBe(true);
   expect(await env.DB.prepare('SELECT storage_key FROM file_versions WHERE storage_key = ?').bind(current!.storageKey).first())
@@ -55,7 +55,7 @@ it.each(['single', 'batch'] as const)('commits a plaintext %s reminder upload wi
       await trackStagedUpload(env.DB, objectKey, path);
       await env.BUCKET.put(objectKey, content);
       const size = new TextEncoder().encode(content).byteLength;
-      expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, content, expectedHash: null, previousFile: null })).committed).toBe(true);
+      expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, content, expectedHash: null })).committed).toBe(true);
     } else {
       const response = await handleBatchUpload(new Request('https://test/sync/batch-upload', { method: 'POST', body: JSON.stringify({ bulkNewFiles: true, files: [
         { path, content: btoa(content), expectedHash: null, operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) },
@@ -89,7 +89,7 @@ it('reads the reminder policy and previous file once while committing a reminder
   };
   try {
     const size = new TextEncoder().encode(content).byteLength;
-    expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, content, expectedHash: first.hash, previousFile: null })).committed).toBe(true);
+    expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, content, expectedHash: first.hash })).committed).toBe(true);
   } finally { env.DB.prepare = prepare; }
   // One policy read prepares the upload outside the lock; one combined read commits it.
   expect(reads).toHaveLength(2);

@@ -65,7 +65,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
     const item = parseReadingNote(content)!;
     const path = await capturePath(env, current.folder_path, { title: item.title, url: item.source_url }, id);
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
-    const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null, readingPolicy: current, encryptionState: null, effects: operationEffects(env.DB, op, response) });
+    const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, readingPolicy: current, encryptionState: null, effects: operationEffects(env.DB, op, response) });
     if (!result.committed) throw new ReadingError('This note changed. Retry the same save.', 409);
     return readingResponse(response);
   }
@@ -86,7 +86,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
   }
   const response = { saved: true, id: source.item.crate_reading_id };
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, source.path, content, source.file.hash);
-  const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: source.file, expectedRevision: source.file.storageKey, readingPolicy: current, encryptionState: null, effects: operationEffects(env.DB, op, response) });
+  const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, encryptionState: null, effects: operationEffects(env.DB, op, response) });
   if (!result.committed) throw new ReadingError('This note changed. Refresh before editing it.', 409);
   if (action === 'retry') await env.DB.prepare('DELETE FROM reading_jobs WHERE path=?').bind(source.path).run();
   return readingResponse(response);

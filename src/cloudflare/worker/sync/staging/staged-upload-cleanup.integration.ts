@@ -33,7 +33,7 @@ it('cleans an expired object and prevents its late publication', async () => {
   expect(await cleanStagedUploads(env.BUCKET, env.DB)).toBe(1);
   expect(await env.BUCKET.head(key)).toBeNull();
   const result = await commitStagedFile(env.BUCKET, env.DB, {
-    path: 'Late.bin', hash, size: 4, objectKey: key, content: 'data', expectedHash: null, previousFile: null,
+    path: 'Late.bin', hash, size: 4, objectKey: key, content: 'data', expectedHash: null,
   });
   expect(result.committed).toBe(false);
   expect(await getStoredFileRow(env.DB, 'Late.bin')).toBeNull();
