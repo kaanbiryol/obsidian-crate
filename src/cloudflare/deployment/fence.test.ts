@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DeploymentFence, DeploymentRecoveryRequiredError } from './fence';
+import { DeploymentFence, DeploymentRecoveryRequiredError, withDeploymentFence } from './fence';
+import { createFenceQueryHarness } from './fence-test-harness';
+import { CloudflareReauthorizationRequired } from '../oauth/client';
 
 const record = JSON.stringify({ owner: 'device', worker: 'crate-server', kind: 'update', version: '1', startedAt: '2026-01-01T00:00:00.000Z' });
 
@@ -18,5 +20,21 @@ describe('DeploymentFence', () => {
 		const error = await fence.finish().catch((caught: unknown) => caught);
 		expect(error).toBeInstanceOf(DeploymentRecoveryRequiredError);
 		expect((error as Error).cause).toBe(failure);
+	});
+
+	it('records a refused saved login as a rejected step and releases the lock', async () => {
+		const harness = createFenceQueryHarness();
+		const written: string[] = [];
+		const api = {
+			queryD1: async (_account: string, _database: string, sql: string, params?: string[]) => {
+				if (sql.startsWith('UPDATE maintenance_state') && params?.[0]) written.push(params[0]);
+				return harness.query(sql, params) ?? [];
+			},
+		};
+		const refused = new CloudflareReauthorizationRequired();
+		await expect(withDeploymentFence({ api, accountId: 'account', databaseId: 'database', record: { worker: 'crate-server', kind: 'update', version: '1' } },
+			fence => fence.mutate(async () => { throw refused; }, 'upload-worker'))).rejects.toBe(refused);
+		expect(written.map(value => (JSON.parse(value) as { stepState: string }).stepState)).toEqual(['started', 'rejected']);
+		expect(harness.query('SELECT value FROM maintenance_state WHERE key = ?')).toEqual([{ results: [] }]);
 	});
 });
