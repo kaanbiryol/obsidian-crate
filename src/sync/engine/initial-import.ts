@@ -1,10 +1,11 @@
-import { recordSyncError, SyncIssueError, withSyncFileContext } from '../issues';
+import { recordSyncError, skippedFileIssue, SyncIssueError, withSyncFileContext } from '../issues';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_BYTES } from '@/protocol/sync-limits';
 import type { SyncApiClient } from '../worker-api/client';
 import type { PreparedUpload, SyncResult, SyncWork } from '../types';
 import type { TransferContext } from '../transfer/types';
 import { getAllVaultFiles } from '../local/file-discovery';
+import { isOversizedSyncFile } from '../local/local-file-changes';
 import { pipelineUploadChunks } from '../transfer/budget';
 import { prepareUploadFromVaultFile } from '../transfer/prepare';
 import { createPathRecord } from '@/protocol/path-record';
@@ -41,10 +42,17 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
   await context.api.initialImport.prune(session.token, obsolete.map(path => ({ path, hash: remote.files[path]!.hash })));
   for (const path of obsolete) transfer.localManifest.removeEntry(path);
   const inventory = createPathRecord<FileEntry>();
+  // Oversized files are reported, not uploaded; a server row they already have stays as it is.
+  const files = local.filter(file => !isOversizedSyncFile(file));
+  for (const file of local.filter(isOversizedSyncFile)) {
+    (result.issues ??= []).push(skippedFileIssue(file.path));
+    const existing = remote.files[file.path];
+    if (existing) inventory[file.path] = existing;
+  }
   let completed = 0;
   try {
     // Prepare the next chunk while the current one uploads, within the byte budget.
-    const chunks = pipelineUploadChunks(local, async file => {
+    const chunks = pipelineUploadChunks(files, async file => {
       context.throwIfDestroyed();
       const upload = await prepareUploadFromVaultFile(transfer, file, { force: true, expectedHash: remote.files[file.path]?.hash ?? null });
       if (!upload) throw new Error(`Could not prepare ${file.path}`);
@@ -74,7 +82,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
       await transfer.runConcurrent(batches.map(batch => () => withSyncFileContext(batch.map(file => file.path), async () => {
         context.throwIfDestroyed();
         if (result.errors.length) return;
-        context.report({ phase: 'uploading', current: completed, total: local.length });
+        context.report({ phase: 'uploading', current: completed, total: files.length });
         const response = await context.api.initialImport.upload(session.token, batch);
         if (response.results.length !== batch.length || new Set(response.results.map(file => file.path)).size !== batch.length) throw new Error('Invalid initial upload results');
         for (const upload of batch) {
@@ -92,10 +100,10 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
       })), 3);
       if (result.errors.length) return result;
       await context.save();
-      progress?.(completed, local.length);
+      progress?.(completed, files.length);
     }
     context.throwIfDestroyed();
-    progress?.(completed, local.length);
+    progress?.(completed, files.length);
     context.report({ phase: 'saving' });
     await context.save();
     // Establish the selected folder before sealing creates the reminder-readiness marker.

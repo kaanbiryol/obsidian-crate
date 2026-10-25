@@ -1,5 +1,5 @@
 import { Notice } from 'obsidian';
-import { getSyncIssues, recordSyncError } from './issues';
+import { getSyncIssues, recordSyncError, recordSyncIssue, SkippedFileError, skippedFileIssue } from './issues';
 import type { Logger } from './logger';
 import { errorMessage } from '../platform/logger';
 import type { SyncResult, SyncState } from './types';
@@ -150,7 +150,9 @@ export function handleWorkflowError(
 	}
 
 	const errMsg = errorMessage(error);
-	recordSyncError(result, error);
+	// The error stopped the workflow, so it is a failure even when it names a skipped file.
+	if (error instanceof SkippedFileError) recordSyncIssue(result, skippedFileIssue(error.path));
+	else recordSyncError(result, error);
 	if (options.logGenericError) {
 		options.logger.error(`${options.failureLogPrefix}:`, errMsg);
 	}
