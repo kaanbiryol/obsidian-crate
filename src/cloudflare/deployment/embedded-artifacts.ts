@@ -9,16 +9,15 @@ import {
 } from 'virtual:crate-cloudflare-artifacts';
 import { decodeAndVerifyArtifacts, type CloudflareDeploymentArtifacts } from './artifacts';
 
-let decodedArtifacts: Promise<CloudflareDeploymentArtifacts> | null = null;
-
 export const EMBEDDED_CLOUDFLARE_ARTIFACT = Object.freeze({
 	development: DEVELOPMENT_BUILD ?? undefined,
 		version: artifactVersion,
 	fingerprint: artifactFingerprint,
 });
 
+/** Decodes per call so the Worker source is released when its operation ends. */
 export function loadEmbeddedCloudflareArtifacts(): Promise<CloudflareDeploymentArtifacts> {
-	decodedArtifacts ??= decodeAndVerifyArtifacts({
+	return decodeAndVerifyArtifacts({
 		development: DEVELOPMENT_BUILD ?? undefined,
 		version: artifactVersion,
 		fingerprint: artifactFingerprint,
@@ -27,5 +26,4 @@ export function loadEmbeddedCloudflareArtifacts(): Promise<CloudflareDeploymentA
 		d1SchemaGzipBase64,
 		d1SchemaSha256,
 	});
-	return decodedArtifacts;
 }
