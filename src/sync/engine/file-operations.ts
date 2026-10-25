@@ -27,10 +27,6 @@ export function createEngineFileOperations(
 			expectedHash: string | null, operationId?: string, mergePreimage?: ArrayBuffer) =>
 			uploads.single({ path, content: arrayBufferToBase64(content), hash, size, contentType, expectedHash, operationId }, mergePreimage),
 		batchUpload: (files: BatchUploadFile[]) => uploads.batch(files),
-		async deleteFile(path: string, expectedHash: string, expectedRevision?: string) {
-			await assertRenamePreserved(manifest, vault, path);
-			return transport.deleteFile(path, expectedHash, expectedRevision);
-		},
 		async batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>) {
 			for (const path of paths) await assertRenamePreserved(manifest, vault, path);
 			return transport.batchDelete(paths, expectedHashes, expectedRevisions);

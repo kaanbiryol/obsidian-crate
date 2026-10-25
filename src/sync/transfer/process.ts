@@ -11,7 +11,6 @@ import type { DiffApplyOutcome, TransferContext } from "./types";
 import type { ConflictDiff, FileDiff, SyncResult } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
-import { assertLocalFileAbsent, LocalFilePresentError } from '../local/local-absence';
 import { sha256Hex } from '../../platform/sha256';
 import { recordSyncError } from '../issues';
 import { errorMessage } from '../../platform/logger';
@@ -149,21 +148,9 @@ export async function processDiff(
       return { status: "applied" };
     }
 
-    case "delete": {
-      if (!diff.remoteHash) throw new Error("Missing remote hash for delete");
-      try {
-        await assertLocalFileAbsent(context.vault, diff.path);
-      } catch (error) {
-        if (error instanceof LocalFilePresentError) return { status: 'deferred', reason: error.message };
-        throw error;
-      }
-      await context.files.deleteFile(diff.path, diff.remoteHash, diff.remoteRevision);
-      delete localFiles[diff.path];
-      context.localManifest.removeEntry(diff.path);
-      result.deleted++;
-      result.deletedPaths.push(diff.path);
-      return { status: "applied" };
-    }
+    case "delete":
+      // Every sync mode sends remote deletes through the guarded batch executor.
+      throw new Error("Remote deletes are applied in batches");
 
     case "delete-local": {
       const localDelete = await deletePathLocallyIfUnchanged(context, diff.path, diff.localHash ?? null);

@@ -48,7 +48,6 @@ it('falls back to full sync when cursor is expired', async () => {
 					cursorExpired: true,
 				})),
 				downloadFile: vi.fn(),
-				deleteFile: vi.fn(),
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest: {
@@ -134,7 +133,6 @@ it('falls back to full sync when cursor is expired', async () => {
 					hasMore: false,
 				})),
 				downloadFile: vi.fn(),
-				deleteFile: vi.fn(),
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
@@ -213,7 +211,6 @@ it('falls back to full sync when cursor is expired', async () => {
 					hasMore: false,
 				})),
 				downloadFile: vi.fn(),
-				deleteFile: vi.fn(),
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
@@ -261,7 +258,6 @@ it('falls back to full sync when cursor is expired', async () => {
 					throw new Error('network down');
 				}),
 				downloadFile: vi.fn(),
-				deleteFile: vi.fn(),
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest: {
@@ -305,7 +301,6 @@ it('falls back to full sync when cursor is expired', async () => {
 					throw new SyncTransportError('Request timed out after 30000ms');
 				}),
 				downloadFile: vi.fn(),
-				deleteFile: vi.fn(),
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest: {
@@ -351,7 +346,6 @@ it('falls back to full sync when cursor is expired', async () => {
 					throw new HttpError('Service unavailable', 503);
 				}),
 				downloadFile: vi.fn(),
-				deleteFile: vi.fn(),
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest: {

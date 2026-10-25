@@ -138,7 +138,7 @@ describe('SyncApiClient', () => {
 		}), { status: 409 }));
 		const client = new SyncApiClient('https://worker.example', 'token', transport);
 
-		await expect(client.unjournaled.deleteFile('notes/a.md', 'base-hash', 'base-revision')).rejects.toMatchObject({
+		await expect(client.unjournaled.batchDelete(['notes/a.md'], { 'notes/a.md': 'base-hash' }, { 'notes/a.md': 'base-revision' })).rejects.toMatchObject({
 			status: 409,
 			code: 'version_conflict',
 			currentHash: 'remote-hash',

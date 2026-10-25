@@ -36,7 +36,6 @@ interface TransferApi {
 	mergePreimage?: ArrayBuffer,
   ): Promise<UploadResult>;
   downloadFile(path: string): Promise<DownloadedFile>;
-  deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }>;
   batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
   batchDownload(paths: string[]): Promise<DownloadedBatch>;
 }

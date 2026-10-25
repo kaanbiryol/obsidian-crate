@@ -34,7 +34,6 @@ export function createTransferHarness() {
 	const api = {
 		uploadFile: vi.fn(),
 		downloadFile: vi.fn(),
-		deleteFile: vi.fn(),
 		batchUpload: vi.fn(),
 		batchDownload: vi.fn(),
 	};

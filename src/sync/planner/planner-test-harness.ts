@@ -48,7 +48,6 @@ export function createIncrementalHarness(overrides: Partial<{
 			hasMore: overrides.hasMore ?? false,
 		})),
 		downloadFile: vi.fn(),
-		deleteFile: vi.fn(),
 		batchDelete: vi.fn(async (paths: string[]) => ({
 			success: true,
 			deleted: paths,
