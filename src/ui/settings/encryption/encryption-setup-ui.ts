@@ -78,7 +78,7 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
     'Other Obsidian devices reconnect and enter the recovery key. Web apps log out and connect again; logging out discards their drafts and pending edits.',
     'Use your recovery key only in web apps you trust. They handle it during unlock and can read entire notes in their connected Reading and Reminders folders.',
     'File and folder names are encrypted. The server still sees folder structure, which files are notes, file sizes and notification times. Notification titles and text are encrypted.',
-    'Pasted links keep their URL labels because private URLs are not sent to the server for title lookup.',
+    'To show page titles for pasted links, the server fetches each link without storing it.',
     'Existing backup copies are not changed or retroactively encrypted.',
     'Turning encryption off later deletes remote data and history before uploading this device’s files.',
   ]) changes.createEl('li', { text });
