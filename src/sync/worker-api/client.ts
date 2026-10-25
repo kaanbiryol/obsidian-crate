@@ -9,7 +9,6 @@ import type { WireStore } from '../encryption/path-index';
 
 import type {
 	BackendDiagnostics,
-	ChangesResponse,
 	CheckResponse,
 	FileManifest,
 	FileMetadataResponse,
@@ -30,7 +29,7 @@ import type {
 } from './notifications';
 import { NotificationsWorkerApi } from './notifications';
 import { SharedSettingsWorkerApi, type VersionedSharedSettings } from './shared-settings';
-import { SyncWorkerApi, type DownloadedBatch, type DownloadedFile } from './sync';
+import { SyncWorkerApi, type ChangesPage, type DownloadedBatch, type DownloadedFile } from './sync';
 import { InitialImportApi } from './initial-import';
 import { LinksWorkerApi } from './links';
 import { EncryptedFiles } from '../encryption/encrypted-files';
@@ -162,7 +161,7 @@ export class SyncApiClient {
 		return this.syncApi.checkForChanges(since);
 	}
 
-	async getChanges(since: number): Promise<ChangesResponse> {
+	async getChanges(since: number): Promise<ChangesPage> {
 		return this.syncApi.getChanges(since);
 	}
 

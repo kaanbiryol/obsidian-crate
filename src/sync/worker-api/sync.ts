@@ -56,6 +56,8 @@ type BatchDownloadEntry = BatchDownloadResponse['files'][number];
 /** Client-side batch entries: decrypted files carry verified bytes instead of base64. */
 type DownloadedBatchFile = BatchDownloadEntry | (Omit<BatchDownloadEntry, 'content'> & { verifiedContent: ArrayBuffer });
 export interface DownloadedBatch { files: DownloadedBatchFile[] }
+/** Encrypted pages leave out deletes this device never synced, so `nextSince` is the raw page's last sequence. */
+export type ChangesPage = ChangesResponse & { nextSince?: number };
 
 export class SyncWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
@@ -272,7 +274,7 @@ export class SyncWorkerApi {
 		return parseChangesCheck(await this.http.requestJson<unknown>(`/sync/check?since=${since}`), since);
 	}
 
-	async getChanges(since: number): Promise<ChangesResponse> {
+	async getChanges(since: number): Promise<ChangesPage> {
 		const response = await this.getRawChanges(since);
 		if (!this.encryption) return response;
 		const puts = response.changes.filter(change => change.action === 'put');
@@ -285,7 +287,7 @@ export class SyncWorkerApi {
 			const path = await this.encryption.paths.plainFor(change.path);
 			if (path) changes.push({ ...change, path });
 		}
-		return { ...response, changes };
+		return { ...response, changes, nextSince: response.changes.at(-1)?.seq ?? since };
 	}
 
 	private async getRawChanges(since: number): Promise<ChangesResponse> {

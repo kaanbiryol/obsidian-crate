@@ -25,6 +25,8 @@ interface PlannerApi {
     lastSeq: number;
     hasMore: boolean;
     cursorExpired?: boolean;
+    /** Where the next page starts when filtering left out entries; defaults to the last change. */
+    nextSince?: number;
   }>;
   downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }>;
   batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>): Promise<{
