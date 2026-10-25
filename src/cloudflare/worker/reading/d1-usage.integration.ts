@@ -55,6 +55,21 @@ it('keeps Reading projection passes independent of unrelated vault files', async
   expect(idle.rowsRead).toBeLessThan(MAX_ROWS_READ);
 });
 
+it('does not re-project a large Reading folder after a write elsewhere in the vault', async () => {
+  await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 2000)
+    INSERT INTO files(path, portable_path, storage_key) SELECT 'Reading/' || x || '.md', 'reading/' || x || '.md', 'reading-key-' || x FROM n`).run();
+  await env.DB.prepare(`INSERT INTO reading_sources(path, revision, generation) SELECT path, storage_key, 'g' FROM files WHERE path LIKE 'Reading/%'`).run();
+  const current = (await policy(env.DB))!;
+  expect(await projectReading(env, current)).toBe('complete');
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Notes/Elsewhere.md', 'Unrelated edit', null);
+  const after = await measure(target => projectReading(target, current));
+  expect(after.result).toBe('complete');
+  expect(after.rowsRead).toBeLessThan(MAX_ROWS_READ);
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/New.md', createReadingNote({ id: crypto.randomUUID(), url: 'https://example.invalid/new', savedAt: new Date().toISOString() }), null);
+  expect(await projectReading(env, current)).toBe('complete');
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM reading_sources WHERE path = 'Reading/New.md'").first()).toMatchObject({ n: 1 });
+});
+
 it('keeps Reading library reads, saves, and extraction cleanup independent of unrelated vault files', async () => {
   const id = crypto.randomUUID(), url = 'https://example.invalid/saved';
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Saved.md', createReadingNote({ id, url, savedAt: new Date().toISOString() }), null);
