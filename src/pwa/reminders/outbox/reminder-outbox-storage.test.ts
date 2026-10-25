@@ -52,12 +52,33 @@ describe('durable reminder outbox storage', () => {
 		other.put(change());
 		const moved = await createReminderOutboxStorage('token', 'Tasks');
 		expect(moved.load()).toEqual([]);
-		const quarantined = moved.quarantined();
+		const quarantined = moved.quarantined().filter(entry => entry.raw.includes(pending.operationId));
 		expect(quarantined).toHaveLength(1);
-		expect(quarantined[0]!.raw).toContain(pending.operationId);
 		moved.removeQuarantined(quarantined);
 		expect(old.load()).toEqual([]);
 		expect(other.load()).toHaveLength(1);
+	});
+
+	it('quarantines an earlier session\'s change for an earlier folder so it cannot block updates unseen', async () => {
+		const old = await createReminderOutboxStorage('token-a', 'Reminders');
+		const pending = change();
+		old.put(pending);
+		const current = await createReminderOutboxStorage('token-b', 'Tasks');
+		expect(current.load()).toEqual([]);
+		expect((await createReminderRecoveryStorage('token-b', 'Tasks')).load()).toEqual([]);
+		const quarantined = current.quarantined();
+		expect(quarantined).toEqual([{ key: expect.stringContaining(pending.operationId) as string, raw: expect.stringContaining(pending.operationId) as string }]);
+		expect(hasUnsettledReminders()).toBe(true);
+		current.removeQuarantined(quarantined);
+		expect(hasUnsettledReminders()).toBe(false);
+	});
+
+	it('leaves earlier sessions\' changes in this folder to recovery', async () => {
+		const old = await createReminderOutboxStorage('token-a', 'Reminders');
+		const pending = change();
+		old.put(pending);
+		expect((await createReminderOutboxStorage('token-b', 'Reminders')).quarantined()).toEqual([]);
+		expect((await createReminderRecoveryStorage('token-b', 'Reminders')).load()).toEqual([pending]);
 	});
 
 	it('restores the exact attempted command after reload without storing the token', async () => {

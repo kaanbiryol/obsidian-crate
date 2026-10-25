@@ -94,15 +94,24 @@ async function outboxScope(authToken: string, folderPath: string): Promise<strin
 	return `${await credentialScope(authToken)}${encodeURIComponent(folderPath)}:`;
 }
 
+/** Any session's well-formed key for this folder. Recovery owns those of earlier sessions. */
+function isFolderKey(key: string, folderPath: string): boolean {
+	const parts = key.split(':');
+	return parts.length === 5 && `${parts[0]}:` === REMINDER_OUTBOX_PREFIX && parts[1] === 'v1'
+		&& isSha256Hex(parts[2]) && parts[3] === encodeURIComponent(folderPath);
+}
+
 /** One key per command prevents another tab from replacing an unrelated command. */
 export async function createReminderOutboxStorage(authToken: string, folderPath: string): Promise<ReminderOutboxStorage & ReminderOutboxQuarantine> {
 	const scope = await outboxScope(authToken, folderPath);
 	const credential = await credentialScope(authToken);
 	const storage = browserStorage();
 	const keys = () => storageKeys(storage).filter(key => key.startsWith(scope));
-	// Changes saved before this session moved to another reminders folder cannot
-	// be sent here, so they stay quarantined for export.
-	const quarantineKeys = () => storageKeys(storage).filter(key => key.startsWith(credential));
+	// Changes saved for another reminders folder, by this or an earlier session,
+	// cannot be sent here, so they stay quarantined for export. Every key that
+	// blocks an update is then shown here or in recovery.
+	const quarantineKeys = () => storageKeys(storage).filter(key => key.startsWith(credential)
+		|| key.startsWith(`${REMINDER_OUTBOX_PREFIX}v1:`) && !isFolderKey(key, folderPath));
 	const read = (key: string) => {
 		let raw: string | null;
 		try { raw = storage.getItem(key); } catch { throw new Error(STORAGE_ERROR); }
@@ -145,12 +154,7 @@ export async function createReminderOutboxStorage(authToken: string, folderPath:
 export async function createReminderRecoveryStorage(authToken: string, folderPath: string) {
 	const scope = await outboxScope(authToken, folderPath);
 	const storage = browserStorage();
-	const acceptsKey = (key: string | null) => {
-		if (key === null) return true;
-		const parts = key.split(':');
-		return parts.length === 5 && `${parts[0]}:` === REMINDER_OUTBOX_PREFIX && parts[1] === 'v1'
-			&& isSha256Hex(parts[2]) && parts[3] === encodeURIComponent(folderPath);
-	};
+	const acceptsKey = (key: string | null) => key === null || isFolderKey(key, folderPath);
 	const keys = () => storageKeys(storage).filter(key => acceptsKey(key) && !key.startsWith(scope));
 	const entries = () => recoverableEntries(storage, keys(), folderPath).valid;
 	return {
