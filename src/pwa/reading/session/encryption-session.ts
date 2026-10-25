@@ -25,10 +25,12 @@ onReadingEncryptionReset(discardKeys => {
 export function readingEncryptionHeaders(): Record<string, string> {
   return expected ? { [ENCRYPTION_VAULT_HEADER]: expected.vaultId, [ENCRYPTION_GENERATION_HEADER]: String(expected.generation) } : {};
 }
-export function prepareReadingEncryption(session: ReadingSession, refresh = false): Promise<FeatureKeys | null> {
+/** `beforePlaintextBody` verifies a cached plaintext verdict again before a request
+ * sends plaintext. Reads reuse it: the server answers 428 once encryption is on. */
+export function prepareReadingEncryption(session: ReadingSession, refresh = false, beforePlaintextBody = false): Promise<FeatureKeys | null> {
   assertReadingSession(session);
-  if (refresh) pending = undefined;
   const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath]);
+  if (refresh || beforePlaintextBody && !currentKeys && verifiedIdentity === identity) pending = undefined;
   if (pending?.identity === identity) return pending.promise;
   const current = () => { try { assertReadingSession(session); return pending?.promise === work; } catch { return false; } };
   const work = (async () => {
@@ -76,9 +78,6 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
     throw error;
   });
   pending = { identity, promise: work };
-  // Plaintext is a current server state, not a permanent enrollment property.
-  // Keep concurrent checks shared, but verify again before the next request.
-  void work.then(keys => { if (!keys && pending?.promise === work) pending = undefined; }, () => {});
   return work;
 }
 export async function unlockReadingWithCode(code: string, session: ReadingSession): Promise<void> {

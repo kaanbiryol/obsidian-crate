@@ -36,6 +36,19 @@ it('rechecks plaintext Reading before sending a new URL after another device ena
   expect(() => encodeReadingValue('pending:session', [])).toThrow();
 });
 
+it('checks plaintext Reading once for reads and again before each plaintext body', async () => {
+  vi.stubGlobal('localStorage', storage()); vi.stubGlobal('navigator', { onLine: true });
+  const session: ReadingSession = { id: 'session', token: 'token', folderPath: 'Reading', generation: 'policy', expiresAt: Date.now() + 86400_000 };
+  localStorage.setItem(READING_SESSION_KEY, JSON.stringify(session));
+  const request = vi.fn(async (path: string) => path === '/reading/encryption' ? Response.json({ encryption: null }) : Response.json({ items: [] }));
+  vi.stubGlobal('fetch', request);
+  const probes = () => request.mock.calls.filter(([path]) => path === '/reading/encryption').length;
+  for (const path of ['/reading/list', '/reading/list?cursor=next', '/reading/item?id=a', '/reading/item?id=b']) await readingRequest(path, session);
+  expect(probes()).toBe(1);
+  await readingRequest('/reading/update', session, '{}');
+  expect(probes()).toBe(2);
+});
+
 // Intended difference from reminders (see reminders/encryption-session.ts): Reading keeps
 // verified access on EncryptionVerificationUnavailableError, while reminders lock.
 it('keeps verified local Reading edits available when encryption verification loses the network', async () => {

@@ -65,7 +65,7 @@ export async function readingRequest<T>(path: string, session: ReadingSession | 
 }
 async function preparedReadingRequest<T>(path: string, session: ReadingSession | null, body?: string, refresh = false): Promise<T> {
   if (session) {
-    const keys = await prepareReadingEncryption(session, refresh);
+    const keys = await prepareReadingEncryption(session, refresh, body !== undefined);
     if (keys && /^\/reading\/(list|item|capture|update|retry)(?:\?|$)/.test(path)) {
       const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.generation]);
       const indexIdentity = JSON.stringify([keys.vaultId, keys.generation, keys.folderPath]);
