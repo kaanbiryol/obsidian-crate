@@ -12,6 +12,8 @@ export type PendingDiffLoader = (path: string, deleted: boolean) => Promise<Pend
 export interface PendingBrowserState extends PendingRowSelectionState {
     selectedKey?: string;
     excludedKeys?: Set<string>;
+    /** Finished file statuses by pending key, so a rebuild checks only files it has not checked. */
+    statusLabels?: Map<string, string>;
     showDetail?: boolean;
     scrollTop?: number;
     startChecks?: () => void;
@@ -20,8 +22,10 @@ export interface PendingBrowserState extends PendingRowSelectionState {
 }
 
 let nextBrowserId = 0;
+/** Each check reads and hashes a file, plus Worker requests for some, so longer lists check on selection. */
+const MAX_AUTO_CHECKED_FILES = 200;
 
-/** Check file statuses on opening; keep one selected comparison in view. */
+/** Check file statuses on opening, or on selection in long lists; keep one selected comparison in view. */
 export function renderPendingBrowser(container: HTMLElement, paths: string[], load: PendingDiffLoader, state: PendingBrowserState = {}, actions?: PendingActions): void {
     const changes = paths.map(decodePendingChange);
     const browser = container.createDiv({ cls: 'crate-pending-browser' });
@@ -57,19 +61,28 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     let selectedIndex = -1;
     // Binary files have no text diff; load their metadata only when selected.
     const canPreview = (index: number) => !isBinaryPreviewPath(changes[index]!.path);
+    const labels = state.statusLabels ??= new Map<string, string>();
+    // A file that left the pending set may return with other changes.
+    const pending = new Set(paths);
+    for (const key of labels.keys()) if (!pending.has(key)) labels.delete(key);
+    const needsCheck = (index: number) => canPreview(index) && !labels.has(paths[index]!);
+    const autoCheck = paths.filter((_, index) => needsCheck(index)).length <= MAX_AUTO_CHECKED_FILES;
     const rows: Array<{ button: HTMLButtonElement; status: HTMLSpanElement }> = [];
+    const showStatus = (status: HTMLSpanElement, text: string) => {
+        status.textContent = text;
+        status.title = text;
+        status.classList.toggle('is-unchanged', text === 'Unchanged');
+    };
     const comparisons = new PendingComparisons(paths.length, index => {
         const { kind, path } = changes[index]!;
         return load(path, kind === 'delete');
     }, (index, snapshot) => {
-        if (!browser.isConnected) return;
-        const status = rows[index]!.status;
-        status.textContent = describeSnapshot(snapshot);
-        status.title = status.textContent;
-        status.classList.toggle('is-unchanged', status.textContent === 'Unchanged');
+        const label = describeSnapshot(snapshot);
+        labels.set(paths[index]!, label);
+        if (browser.isConnected) showStatus(rows[index]!.status, label);
     }, index => {
         if (browser.isConnected) rows[index]!.status.textContent = 'Unavailable';
-    }, canPreview);
+    }, index => autoCheck && needsCheck(index));
     state.startChecks = () => comparisons.start();
     state.pauseChecks = () => comparisons.pause();
     state.dispose = () => comparisons.dispose();
@@ -148,7 +161,9 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
         info.createSpan({ cls: 'crate-browser-file-name', text: parts.pop() ?? path, attr: { title: path } });
         const meta = info.createSpan({ cls: 'crate-browser-file-meta' });
         meta.createSpan({ cls: 'crate-browser-file-path', text: parts.join('/') || 'Vault root' });
-        const status = meta.createSpan({ cls: 'crate-browser-file-status', text: canPreview(index) ? 'Checking…' : 'No preview' });
+        const status = meta.createSpan({ cls: 'crate-browser-file-status', text: !canPreview(index) ? 'No preview' : autoCheck ? 'Checking…' : 'Not checked' });
+        const label = labels.get(key);
+        if (label) showStatus(status, label);
         status.id = `${detail.id}-status-${index}`;
         button.setAttribute('aria-describedby', status.id);
         selection?.addMenuButton(row, key);
