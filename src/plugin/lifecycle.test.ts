@@ -9,6 +9,8 @@ type SyncRuntimeTarget = {
 		initialize: () => Promise<void>;
 		waitForStartupSync: () => Promise<boolean>;
 		destroy?: () => void;
+		getApiClient?: () => unknown;
+		updateSyncSettings?: () => void;
 	};
 };
 
@@ -27,8 +29,10 @@ const createCloudflareDeploymentService = vi.fn(() => ({
 }));
 const secretStorageHas = vi.fn(() => false);
 
-async function loadLifecycleModule() {
+async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 	vi.doMock('./feature-settings', () => ({ refreshSharedFeatures: vi.fn(async () => {}), registerSharedFeatures: vi.fn() }));
+	// Most tests do not model a sync connection, so their startup shared settings pull does nothing.
+	if (!realSharedSettings) vi.doMock('./shared-settings-sync', () => ({ sharedSettingsSync: () => ({ pull: vi.fn(async () => {}) }) }));
 	vi.doMock('../reading/register-integrations', () => ({ registerReading: vi.fn() }));
 	vi.doMock('../reading/runtime', () => ({ stopReading: vi.fn() }));
 	vi.doMock('../sync/durability/checkpoint-backup-cleanup', () => ({ registerCheckpointBackupCleanup: vi.fn() }));
@@ -140,6 +144,7 @@ afterEach(() => {
 	vi.doUnmock('./deviceId');
 	vi.doUnmock('./cloudflare-operations');
 	vi.doUnmock('../cloudflare/update-notice');
+	vi.doUnmock('./shared-settings-sync');
 });
 
 describe('bootstrapPlugin', () => {
@@ -484,6 +489,37 @@ it('finishes loading before sync initializes and starts sync once the layout is 
   finishInitialize();
   await vi.waitFor(() => expect(ensureReminderNotificationPolicy).toHaveBeenCalledWith(plugin));
   expect(waitForStartupSync).toHaveBeenCalledOnce();
+});
+
+it('pulls shared settings once the sync connection exists on a cold start', async () => {
+  const { bootstrapPlugin } = await loadLifecycleModule({ realSharedSettings: true });
+  const remote = { ignorePatterns: ['Archive/'], syncInterval: 120, pushEnabled: true };
+  // Stands in for the API client's `GET /settings`; only the client created by initialize() has it.
+  const getSharedSettings = vi.fn(async () => ({ settings: remote, settingsVersion: 'v1' }));
+  let api: { getSharedSettings: typeof getSharedSettings } | null = null;
+  const settings = { workerUrl: 'https://crate.example', ignorePatterns: ['*.tmp'], syncInterval: 300, pushEnabled: false };
+  const writeSettings = vi.fn(async (update: Partial<typeof settings>) => { Object.assign(settings, update); });
+  const plugin = createPlugin({ settings, writeSettings });
+  let layoutReady!: () => void;
+  plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
+  const updateSyncSettings = vi.fn();
+  initializeSyncManagers.mockImplementation(target => {
+    target.syncRuntime = {
+      isConfigured: () => true,
+      initialize: vi.fn(async () => { api = { getSharedSettings }; }),
+      waitForStartupSync: async () => false,
+      getApiClient: () => api,
+      updateSyncSettings,
+    };
+  });
+
+  await bootstrapPlugin(plugin as never);
+  expect(api).toBeNull();
+  layoutReady();
+
+  await vi.waitFor(() => expect(updateSyncSettings).toHaveBeenCalledOnce());
+  expect(getSharedSettings).toHaveBeenCalledOnce();
+  expect(settings).toMatchObject(remote);
 });
 
 it('does not initialize sync when the plugin unloads before the layout is ready', async () => {

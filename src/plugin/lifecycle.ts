@@ -1,4 +1,5 @@
 import { registerSharedFeatures } from './feature-settings';
+import { sharedSettingsSync } from './shared-settings-sync';
 import { Notice } from "obsidian";
 import { registerReading } from '../reading/register-integrations';
 import { stopReading } from '../reading/runtime';
@@ -116,6 +117,8 @@ async function initializePluginSync(plugin: CratePlugin, signal: AbortSignal): P
   try {
     if (plugin.syncRuntime.isConfigured()) {
       await plugin.syncRuntime.initialize();
+      // The API client exists only now, so the pull during onload could not reach the server.
+      if (!signal.aborted) void sharedSettingsSync(plugin).pull();
     } else {
       showSetupNotice(plugin);
     }
