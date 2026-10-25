@@ -268,9 +268,10 @@ for (const browserType of [chromium, webkit]) {
                 await expect(syncSelected).toBeVisible();
                 await expect(syncSelected).toHaveText('Sync 6 files');
                 await expect(page.locator('.crate-browser-selection-count')).toHaveText('6 of 6 files selected');
-                // Remounting intentionally rechecks statuses; reset the call baseline.
+                // Remounting keeps finished statuses instead of checking every file again.
                 await expect(rows.last().getByText('Deleted', { exact: true })).toBeVisible();
                 const checkedCalls = await page.evaluate(() => window.calls);
+                assert.equal(checkedCalls, 6, 'A rebuild with the same files checks none of them again');
                 await first.focus();
                 await page.keyboard.press('Space');
                 await expect(checks.first()).not.toBeChecked();
@@ -324,7 +325,7 @@ for (const browserType of [chromium, webkit]) {
                 await preview.getByRole('button', { name: /Show .* unchanged lines/ }).click();
                 await expect(preview.locator('.crate-diff-text').filter({ hasText: 'interfaceFont' })).toBeVisible();
                 await expect(page.getByRole('button', { name: /Show raw diff|Format JSON/ })).toHaveCount(0);
-                assert.equal(await page.evaluate(() => window.calls), checkedCalls, 'Selection reuses the checked snapshot');
+                assert.equal(await page.evaluate(() => window.calls), checkedCalls + 1, 'Selection loads a file once after a rebuild, then reuses it');
                 await page.evaluate(() => { window.fail = true; });
                 await page.evaluate(() => window.mount());
                 await expect(preview.getByText('Could not reach the sync server.')).toBeVisible();
