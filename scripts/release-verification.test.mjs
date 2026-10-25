@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { parse } from 'yaml';
-import { assertCandidate, assertVerifiedRun, checkVerifiedRun, findVerifiedRun } from './release-verification.mjs';
+import { assertCandidate, assertVerifiedRun, assertVersionOnlyChange, checkVerifiedParentRun, checkVerifiedRun, findVerifiedParentRun, findVerifiedRun, versionOnlyParent } from './release-verification.mjs';
 import { verifyReleaseAssets } from './release-artifacts.mjs';
 
 const commit = 'a'.repeat(40), repository = 'example/crate';
@@ -44,6 +44,68 @@ test('a selected run is rechecked and cannot be reused after cancellation, rerun
 	assert.equal((await checkVerifiedRun(10, commit, { repository, request })).id, 10);
 	await assert.rejects(checkVerifiedRun(10, commit, { repository, request: () => run(10, { status: 'in_progress' }) }), /exact commit/);
 	await assert.rejects(checkVerifiedRun(10, commit, { repository, request: path => path.endsWith('/10') ? run() : { artifacts: [{ ...artifact, expired: true }] } }), /expired/);
+});
+
+const parent = 'b'.repeat(40);
+const versionFiles = version => ({
+	'manifest.json': JSON.stringify({ id: 'crate', version, minAppVersion: '1.13.0' }),
+	'package.json': JSON.stringify({ name: 'crate', version, dependencies: { yaml: '2.0.0' } }),
+	'package-lock.json': JSON.stringify({ name: 'crate', version, packages: { '': { version, dependencies: { yaml: '2.0.0' } }, 'node_modules/yaml': { version: '2.0.0' } } }),
+	'versions.json': JSON.stringify(version === '0.4.1' ? { '0.4.1': '1.13.0' } : { '0.4.1': '1.13.0', [version]: '1.13.0' }),
+});
+const edit = (files, path, change) => ({ ...files, [path]: JSON.stringify(change(JSON.parse(files[path]))) });
+
+test('parent reuse accepts a release version bump and nothing else', () => {
+	assertVersionOnlyChange(versionFiles('0.4.1'), versionFiles('0.4.2'));
+	const bumped = versionFiles('0.4.2');
+	for (const change of [
+		edit(bumped, 'package.json', value => ({ ...value, dependencies: { yaml: '9.9.9' } })),
+		edit(bumped, 'package-lock.json', value => ({ ...value, packages: { ...value.packages, 'node_modules/yaml': { version: '9.9.9' } } })),
+		edit(bumped, 'package-lock.json', value => ({ ...value, packages: { ...value.packages, '': { ...value.packages[''], version: '0.4.1' } } })),
+		edit(bumped, 'manifest.json', value => ({ ...value, minAppVersion: '1.14.0' })),
+		edit(bumped, 'package.json', value => ({ ...value, version: '0.4.3' })),
+		edit(bumped, 'versions.json', value => ({ ...value, '0.4.1': '1.12.0' })),
+		edit(bumped, 'versions.json', value => ({ ...value, '0.4.2': '1.14.0' })),
+		{ ...bumped, 'manifest.json': 'not json' },
+	]) {
+		assert.throws(() => assertVersionOnlyChange(versionFiles('0.4.1'), change), /only changes the release version/);
+	}
+});
+
+function fakeGit({ parents = [parent], changed = ['manifest.json', 'package.json', 'package-lock.json', 'versions.json'], child = versionFiles('0.4.2') } = {}) {
+	return args => {
+		if (args[0] === 'rev-list') return [commit, ...parents].join(' ');
+		if (args[0] === 'diff') return changed.join('\n');
+		if (args[0] === 'show') {
+			const [sha, path] = args[1].split(':');
+			return (sha === parent ? versionFiles('0.4.1') : child)[path];
+		}
+		throw new Error('Unexpected git call: ' + args.join(' '));
+	};
+}
+
+test('parent reuse rejects merges, root commits and commits that change other files', () => {
+	assert.equal(versionOnlyParent(commit, fakeGit()), parent);
+	for (const git of [fakeGit({ parents: [] }), fakeGit({ parents: [parent, 'c'.repeat(40)] }), fakeGit({ changed: [] }),
+		fakeGit({ changed: ['manifest.json', 'src/main.ts'] }), fakeGit({ child: edit(versionFiles('0.4.2'), 'package.json', value => ({ ...value, scripts: { build: 'x' } })) })]) {
+		assert.throws(() => versionOnlyParent(commit, git), /only changes the release version/);
+	}
+});
+
+test('parent reuse selects a trusted push build of the parent without needing its artifacts', async () => {
+	const paths = [];
+	const request = path => {
+		paths.push(path);
+		return { workflow_runs: [run(1, { head_sha: parent, event: 'pull_request' }), run(2, { head_sha: commit }), run(3, { head_sha: parent })] };
+	};
+	assert.equal((await findVerifiedParentRun(commit, { repository, request, git: fakeGit() })).id, 3);
+	assert.ok(paths.every(path => path.includes('head_sha=' + parent) && !path.includes('/artifacts')));
+	assert.equal(await findVerifiedParentRun(commit, { repository, request, git: fakeGit({ changed: ['src/main.ts'] }) }), undefined);
+	assert.equal(paths.length, 1);
+	assert.equal((await checkVerifiedParentRun(3, commit, { repository, request: () => run(3, { head_sha: parent }), git: fakeGit() })).id, 3);
+	await assert.rejects(checkVerifiedParentRun(3, commit, { repository, request: () => run(3, { head_sha: parent, conclusion: 'cancelled' }), git: fakeGit() }), /exact commit/);
+	await assert.rejects(checkVerifiedParentRun(3, commit, { repository, request: () => run(3, { head_sha: commit }), git: fakeGit() }), /exact commit/);
+	await assert.rejects(checkVerifiedParentRun(3, commit, { repository, request: () => run(3, { head_sha: parent }), git: fakeGit({ changed: ['src/main.ts'] }) }), /only changes/);
 });
 
 test('candidate proof rejects dirty, foreign, stale and legacy artifacts', () => {
@@ -114,6 +176,14 @@ test('draft attachment depends on the complete verifier, with reproduction gated
 	assert.ok(verify.jobs.reproducible.steps.some(step => step.run === 'node scripts/release-artifacts.mjs reproduce'));
 	assert.ok(verify.jobs.checks.steps.some(step => step.run === 'npm run security:check' && !step.if));
 	assert.ok(verify.jobs.checks.steps.some(step => step.run?.includes('npm run check:server-revision') && step.if === "inputs.reuse-run-id != ''"));
+	// Version-only parent reuse skips test jobs, but the checks, staging and reproducible rebuild still run.
+	for (const [name, job] of Object.entries(verify.jobs)) {
+		if (['checks', 'reproducible'].includes(name)) assert.ok(!job.if?.includes('parent-run-id'), name);
+		else assert.equal(job.if, "inputs.reuse-run-id == '' && inputs.parent-run-id == ''", name);
+	}
+	assert.ok(verify.jobs.checks.steps.some(step => step.run === 'node scripts/release-verification.mjs check-parent "$PARENT_RUN_ID"' && step.if === "inputs.parent-run-id != ''"));
+	assert.ok(release.jobs.publish.steps.some(step => step.run === 'node scripts/release-verification.mjs check-parent "$PARENT_RUN_ID"'));
+	assert.equal(release.jobs.verify.with['parent-run-id'], '${{ needs.resolve.outputs.parent-run-id }}');
 	const build = parse(await readFile(new URL('../.github/workflows/lint.yml', import.meta.url), 'utf8'));
 	assert.ok(build.on.workflow_dispatch.inputs['reuse-run-id']);
 	assert.ok(build.on.workflow_dispatch.inputs['release-tag']);

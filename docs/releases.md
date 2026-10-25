@@ -21,7 +21,7 @@ The command takes committed HEAD into an isolated checkout, updates all four
 version files, commits them as `chore: release <version>`, and signs the pairing
 shortcut. It pushes the version commit to `release/<version>` and a tag exactly
 matching the manifest, uploads the signed shortcut to a draft, waits for branch
-verification, and dispatches **Release plugin**. It waits for release verification
+verification (unless a version-only parent build can be reused), and dispatches **Release plugin**. It waits for release verification
 and prints the draft and workflow links. Publication remains an explicit maintainer
 action after device and hosted acceptance.
 
@@ -52,7 +52,14 @@ The workflow rejects missing shortcut assets, checksum mismatches, source drift,
 and published releases. It selects a successful **Node.js build** push run from
 this repository for the exact tag commit, with unexpired release artifacts.
 Pull-request, fork, failed, cancelled and different-commit runs cannot substitute.
-Without eligible artifacts it runs the complete verification suite.
+When the release commit only bumps the version over a commit that already passed a
+push build, such as a green `master`, it reuses that parent run for the browser,
+Worker and Docker tests instead. The source checks, plugin build and reproducible
+rebuild still run on the release commit, and preparation dispatches **Release
+plugin** without waiting for the release branch's own push build. Without either
+run it runs the complete verification suite.
+
+For the fastest release, prepare it from a commit whose push build already passed.
 
 Reused assets retain their original candidate record, commit, workflow identity,
 toolchain and checksums. Security and server-revision checks run again, the current

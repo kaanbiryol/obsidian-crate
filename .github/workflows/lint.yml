@@ -15,6 +15,10 @@ on:
         description: Optional successful exact-commit push run to verify artifact reuse
         type: string
         default: ""
+      parent-run-id:
+        description: Optional successful push run of the parent commit to verify version-only reuse
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -30,6 +34,7 @@ jobs:
     with:
       release-tag: ${{ inputs.release-tag || '' }}
       reuse-run-id: ${{ inputs.reuse-run-id || '' }}
+      parent-run-id: ${{ inputs.parent-run-id || '' }}
   # Keep the existing aggregate check name for branch protection.
   build:
     needs: verify

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { assetName, metadataName, shortcutName, sha256, sourceHash, verifyShortcut } from './shortcut-release.mjs';
-import { findVerifiedRun } from './release-verification.mjs';
+import { findVerifiedParentRun, findVerifiedRun } from './release-verification.mjs';
 
 const versionFiles = ['package.json', 'package-lock.json', 'manifest.json', 'versions.json'];
 const stableVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -130,8 +130,11 @@ export async function prepareRelease({ target, dryRun = false, noWait = false, r
 			}
 			throw new Error('Could not find ' + workflow + ' for ' + commit + '. Draft retained; retry preparation.');
 		}
-		const verified = await findVerifiedRun(commit, { repository, request });
-		if (!verified) {
+		const verified = await findVerifiedRun(commit, { repository, request })
+			?? await findVerifiedParentRun(commit, { repository, request, git: args => git(args, inCheckout) });
+		if (verified && verified.head_sha !== commit) {
+			logger.log('Reusing version-only parent verification: ' + verified.html_url);
+		} else if (!verified) {
 			const pushRun = !remoteCommit ? await waitForRun('lint.yml', item => item.event === 'push' && item.head_branch === 'release/' + tag)
 				: runs('lint.yml').find(item => item.event === 'push' && item.status !== 'completed');
 			if (pushRun) {

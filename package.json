@@ -88,7 +88,9 @@
 		"build:worker:dev": "node scripts/build-worker.mjs --development",
 		"build:dev": "npm run build:worker:dev && npm run typecheck && CRATE_ALLOW_DEV_BUILD=1 npm run build:plugin:dev",
 		"test:reading-server": "npm run test:reading-extraction && node --test scripts/reading-server.test.mjs scripts/reading-shortcut-server.test.mjs scripts/reading-shortcut.test.mjs",
-		"test:reading-browser": "node --test --test-concurrency=1 tests/browser/reading/reading-browser.test.mjs tests/browser/reading/reading-consent.browser.test.mjs tests/browser/reading/reading-optimistic.browser.test.mjs tests/browser/reading/reading-cache-recovery.browser.test.mjs tests/browser/reading/reading-highlights.browser.test.mjs tests/browser/reading/reading-shortcut-browser.test.mjs tests/browser/reading/reading-video.browser.test.mjs"
+		"test:reading-browser": "npm run test:reading-browser:library && npm run test:reading-browser:annotations",
+		"test:reading-browser:library": "node --test --test-concurrency=1 tests/browser/reading/reading-browser.test.mjs tests/browser/reading/reading-consent.browser.test.mjs tests/browser/reading/reading-cache-recovery.browser.test.mjs tests/browser/reading/reading-shortcut-browser.test.mjs",
+		"test:reading-browser:annotations": "node --test --test-concurrency=1 tests/browser/reading/reading-optimistic.browser.test.mjs tests/browser/reading/reading-highlights.browser.test.mjs tests/browser/reading/reading-video.browser.test.mjs"
 	},
 	"keywords": [
 		"obsidian",

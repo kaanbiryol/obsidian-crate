@@ -73,6 +73,7 @@ async function fixture(t, controls = {}) {
 			if (path.includes('/commits/')) return JSON.stringify({ sha: git(['rev-parse', 'refs/tags/0.4.2']) });
 			if (path.includes('/workflows/lint.yml/')) {
 				const sha = new URL('https://example.invalid/' + path).searchParams.get('head_sha');
+				if (controls.parentVerified && sha === before.head) return JSON.stringify({ workflow_runs: [{ ...pushRun(sha), status: 'completed', conclusion: 'success', head_branch: 'main' }] });
 				return JSON.stringify({ workflow_runs: path.includes('status=success') && !pushWatched ? [] : [pushRun(sha)] });
 			}
 			if (path.includes('/workflows/release.yml/')) return JSON.stringify({ workflow_runs: releaseRunId >= 20 ? [{ id: releaseRunId, event: 'workflow_dispatch', html_url: 'https://example.invalid/release/' + releaseRunId }] : [] });
@@ -139,6 +140,16 @@ test('one command pushes only the version commit, waits for CI, prepares a draft
 	assert.ok(f.calls.slice(firstCalls).some(call => call.args[0] === 'scripts/download-release-shortcut.mjs'));
 	assert.ok(!f.calls.slice(firstCalls).some(call => call.args[0] === 'scripts/sign-reading-shortcut.mjs'));
 	unchanged(f);
+});
+
+test('a version-only release commit reuses its verified parent build instead of waiting for push verification', async t => {
+	const f = await fixture(t, { parentVerified: true });
+	const result = await prepareRelease(f.options);
+	unchanged(f);
+	assert.equal(f.git(['rev-parse', result.commit + '^']), f.before.head);
+	const watches = f.calls.filter(call => call.command === 'gh' && call.args[0] === 'run');
+	assert.deepEqual(watches.map(call => call.args[2]), ['20']);
+	assert.ok(f.logs.includes('Reusing version-only parent verification: https://example.invalid/build/10'));
 });
 
 test('signing failure cannot upload stale local bytes, push a tag or dispatch verification', async t => {

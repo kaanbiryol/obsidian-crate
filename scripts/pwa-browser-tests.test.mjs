@@ -61,7 +61,7 @@ test('invalid shards fail instead of silently passing with no tests', () => {
 const logger = { log() {}, error() {} };
 test('builds once, preserves child environment and reports all test failures', () => {
 	const calls = [];
-	const results = [{ status: 0 }, { status: 1 }, { error: new Error('spawn failed') }, { status: 0 }];
+	const results = [{ status: 0 }, { status: 0 }, { status: 1 }, { status: 0 }, { error: new Error('spawn failed') }, { status: 1 }];
 	const status = runBrowserTests(['first', 'second', 'third'], {
 		logger, env: { CI: 'true' },
 		run(command, args, options) {
@@ -70,7 +70,7 @@ test('builds once, preserves child environment and reports all test failures', (
 		},
 	});
 	assert.equal(status, 1);
-	assert.deepEqual(calls.map(call => call.args[0]), ['scripts/build-worker.mjs', 'first', 'second', 'third']);
+	assert.deepEqual(calls.map(call => call.args[0]), ['scripts/build-worker.mjs', 'first', 'second', 'second', 'third', 'third']);
 	assert.ok(calls.every(call => call.command === process.execPath));
 	assert.ok(calls.every(call => call.options.env.CI === 'true'));
 	assert.deepEqual(calls[0].options.env, { CI: 'true' });
@@ -92,4 +92,18 @@ test('stops after a child is terminated and succeeds only if all children pass',
 	}), 1);
 	assert.equal(calls, 2);
 	assert.equal(runBrowserTests(['first', 'second'], { logger, run: () => ({ status: 0 }) }), 0);
+});
+
+test('retries a failed script once on CI only and reports a pass on retry as flaky', () => {
+	const errors = [];
+	let calls = 0;
+	assert.equal(runBrowserTests(['first'], {
+		logger: { log() {}, error: message => errors.push(String(message)) }, env: { CI: 'true' },
+		run() { calls++; return calls === 2 ? { status: 1 } : { status: 0 }; },
+	}), 0);
+	assert.equal(calls, 3);
+	assert.ok(errors.some(message => message.includes('Flaky: first')));
+	calls = 0;
+	assert.equal(runBrowserTests(['first'], { logger, env: {}, run() { return ++calls === 1 ? { status: 0 } : { status: 1 }; } }), 1);
+	assert.equal(calls, 2);
 });

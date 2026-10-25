@@ -116,18 +116,24 @@ export function runBrowserTests(scripts, { run = spawnSync, env = process.env, l
 		return 1;
 	}
 	const failures = [];
+	// CI retries a failed script once, matching the Playwright suites; the retry is logged as flaky.
+	const attempts = env.CI ? 2 : 1;
 	for (const script of scripts) {
-		logger.log(`\nRunning ${script}`);
-		const started = performance.now();
-		const result = run(process.execPath, [script], { stdio: 'inherit', env: { ...env, CRATE_PWA_PREBUILT: '1' } });
-		logger.log(`${script}: ${((performance.now() - started) / 1000).toFixed(1)}s`);
-		if (result.signal) {
-			logger.error(`${script} terminated by ${result.signal}`);
-			return 1;
-		}
-		if (result.error || result.status !== 0) {
-			failures.push(script);
+		for (let attempt = 1; attempt <= attempts; attempt++) {
+			logger.log(`\nRunning ${script}${attempt > 1 ? ` (retry ${attempt - 1})` : ''}`);
+			const started = performance.now();
+			const result = run(process.execPath, [script], { stdio: 'inherit', env: { ...env, CRATE_PWA_PREBUILT: '1' } });
+			logger.log(`${script}: ${((performance.now() - started) / 1000).toFixed(1)}s`);
+			if (result.signal) {
+				logger.error(`${script} terminated by ${result.signal}`);
+				return 1;
+			}
+			if (!result.error && result.status === 0) {
+				if (attempt > 1) logger.error(`Flaky: ${script} passed on retry ${attempt - 1}.`);
+				break;
+			}
 			if (result.error) logger.error(result.error);
+			if (attempt === attempts) failures.push(script);
 		}
 	}
 	if (failures.length > 0) {

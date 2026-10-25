@@ -15,6 +15,10 @@ on:
         description: Successful exact-commit push build whose artifacts passed all checks
         type: string
         default: ""
+      parent-run-id:
+        description: Successful push build of the parent commit; this commit may change only the release version
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -41,6 +45,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Recheck the version-only parent push verification
+        if: inputs.parent-run-id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PARENT_RUN_ID: ${{ inputs.parent-run-id }}
+        run: node scripts/release-verification.mjs check-parent "$PARENT_RUN_ID"
       - name: Check dependencies and source security
         run: npm run security:check
       # These are the npm run check:source commands, one step each so an early
@@ -160,7 +171,8 @@ jobs:
 
   worker:
     name: Worker integration tests
-    if: inputs.reuse-run-id == ''
+    # A version-only release commit reuses its parent's browser and runtime tests.
+    if: inputs.reuse-run-id == '' && inputs.parent-run-id == ''
     runs-on: ubuntu-24.04
     container:
       # Match package-lock.json; browsers and OS dependencies are preinstalled.
@@ -187,7 +199,7 @@ jobs:
 
   docker:
     name: Docker server (${{ matrix.runner }})
-    if: inputs.reuse-run-id == ''
+    if: inputs.reuse-run-id == '' && inputs.parent-run-id == ''
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     strategy:
@@ -207,7 +219,7 @@ jobs:
 
   visual:
     name: Visual tests (${{ matrix.shard }}/2)
-    if: inputs.reuse-run-id == ''
+    if: inputs.reuse-run-id == '' && inputs.parent-run-id == ''
     # Keep the reviewed snapshot platform; system fonts differ on Linux.
     runs-on: macos-26
     timeout-minutes: 15
@@ -225,6 +237,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # Reuses this macOS runner; the parser check needs plutil.
+      - name: Check the native shortcut parser
+        run: node --test scripts/reading-shortcut.test.mjs
       - name: Install browser test runtimes
         run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build
@@ -243,7 +258,7 @@ jobs:
 
   editor:
     name: Editor and activity browser tests (${{ matrix.shard }}/4)
-    if: inputs.reuse-run-id == ''
+    if: inputs.reuse-run-id == '' && inputs.parent-run-id == ''
     runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
@@ -292,7 +307,7 @@ jobs:
 
   pwa:
     name: PWA browser tests (${{ matrix.shard }}/4)
-    if: inputs.reuse-run-id == ''
+    if: inputs.reuse-run-id == '' && inputs.parent-run-id == ''
     runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
@@ -328,7 +343,7 @@ jobs:
 
   pwa-native:
     name: Native PWA browser tests (${{ matrix.shard }}/2)
-    if: inputs.reuse-run-id == ''
+    if: inputs.reuse-run-id == '' && inputs.parent-run-id == ''
     runs-on: macos-26
     timeout-minutes: 20
     strategy:
@@ -361,10 +376,17 @@ jobs:
           retention-days: 7
 
   reading:
-    name: Reading browser and native shortcut tests
-    if: inputs.reuse-run-id == ''
-    runs-on: macos-26
+    name: Reading browser tests (${{ matrix.group }})
+    if: inputs.reuse-run-id == '' && inputs.parent-run-id == ''
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --ipc=host
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [library, annotations]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -375,16 +397,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Check the native shortcut parser
-        run: node --test scripts/reading-shortcut.test.mjs
-      - name: Install native browser test runtimes
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build
-      - run: npm run test:reading-browser
+      - run: npm run test:reading-browser:${{ matrix.group }}
       - name: Upload Reading browser diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: reading-browser
+          name: reading-browser-${{ matrix.group }}
           path: test-results/
           retention-days: 7

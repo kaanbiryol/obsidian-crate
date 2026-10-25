@@ -40,13 +40,13 @@ Pushes to any branch and pull requests run `lint.yml` ("Node.js build"), and the
 | `worker` | Linux, Playwright container | `test:worker-runtime`, `test:reading-server`, the `packages/server/test/*.test.mjs` tests (the `test:local-server` tests) and `test:server-package`. |
 | `docker` | Linux AMD64 and ARM64 | `test:docker`. |
 | `editor` (4 shards) | Linux, Playwright container | The editor contract Playwright shard on each; `test:activity-browser` on shard 1, `test:file-history-browser` on shard 2 and `test:plugin-dialogs` on shard 3. |
-| `pwa` (4 shards) | Linux, Playwright container | `test:pwa-browser -- --platform=linux --shard=N/4`. |
-| `pwa-native` (2 shards) | macOS | `test:pwa-browser -- --platform=macos --shard=N/2`. |
-| `visual` (2 shards) | macOS | `scripts/visual-test-run.mjs --shard=N/2`. |
-| `reading` | macOS | `scripts/reading-shortcut.test.mjs` (the native shortcut parser), then `test:reading-browser`. |
+| `pwa` (4 shards) | Linux, Playwright container | `test:pwa-browser -- --platform=linux --shard=N/4`. Failed scripts retry once on CI and are logged as flaky. |
+| `pwa-native` (2 shards) | macOS | `test:pwa-browser -- --platform=macos --shard=N/2`. Failed scripts retry once on CI and are logged as flaky. |
+| `visual` (2 shards) | macOS | `scripts/reading-shortcut.test.mjs` (the native shortcut parser), then `scripts/visual-test-run.mjs --shard=N/2`. |
+| `reading` (2 groups) | Linux, Playwright container | `test:reading-browser:library` or `test:reading-browser:annotations`. |
 | `reproducible` | Linux | Only when a release tag is supplied: a clean-install `npm run build` compared with the checked artifacts. |
 
-`release:check` covers the same suites except `test:docker` and the `reproducible` rebuild, which run only in CI. A release run that reuses a successful push build skips the test jobs; see [Release verification](#release-verification).
+`release:check` covers the same suites except `test:docker` and the `reproducible` rebuild, which run only in CI. A release run that reuses a successful push build of the tag commit, or of its version-only parent, skips the test jobs; see [Release verification](#release-verification).
 
 Other workflows: `security.yml` runs the secret scan on every push and pull request. `pages.yml` runs `check:docs`, the shortcut and site-deployment tests and the site build for documentation, site and shortcut changes; it deploys only for a published release or a manual run. `visual.yml` is manual, for baseline review and generation.
 
@@ -67,19 +67,28 @@ It first runs the npm advisory audit (including development dependencies, failin
 
 Asset limits are defined once in `scripts/bundle-budgets.mjs`; the artifact checks and PWA smoke test use the same byte limits. Use the [local release preparation command](releases.md) to sign and upload the public shortcut, then dispatch verification. Verified plugin assets are attached to the same draft GitHub release. Publish the draft only after completing the physical-device and hosted acceptance record below.
 
-GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, Docker hosting on AMD64/ARM64, four editor shards (activity on the first, file/vault history on the second, plugin dialogs on the third), and four PWA browser shards run on Linux. Linux browser jobs use a pinned Playwright image with preinstalled browsers and OS dependencies; update its version and digest alongside the Playwright lockfile version. Two balanced native PWA shards retain macOS for native menus, font geometry and WebKit rendering/focus checks. Two visual shards retain the reviewed macOS snapshot platform. The Reading browser job runs on macOS and checks the native shortcut parser before its browser suite. These five macOS jobs fit the hosted macOS concurrency limit. Capacity benchmarks remain in the gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
+GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, Docker hosting on AMD64/ARM64, four editor shards (activity on the first, file/vault history on the second, plugin dialogs on the third), four PWA browser shards and two Reading browser groups run on Linux. Linux browser jobs use a pinned Playwright image with preinstalled browsers and OS dependencies; update its version and digest alongside the Playwright lockfile version. Two balanced native PWA shards retain macOS for native menus, font geometry and WebKit rendering/focus checks. Two visual shards retain the reviewed macOS snapshot platform and also check the native shortcut parser. These four macOS jobs stay under the hosted macOS concurrency limit, leaving a slot for overlapping runs. Capacity benchmarks remain in the gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
 
 Successful push builds upload candidate records and release assets for seven days.
 Release preparation can reuse only a successful repository push run for the exact
 tag commit. It rechecks that run, rejects missing or expired artifacts, refreshes
 security and the published server-revision baseline, and verifies the candidate's
 workflow identity, Node.js toolchain, version and artifact hashes. PR and fork runs
-are excluded. If no eligible run exists, the complete matrix runs normally.
+are excluded.
+
+Without an exact-commit run, a release commit whose only change from its single
+parent is the version can reuse that parent's successful push run for the browser,
+Worker and Docker jobs. The four version files may change only their version fields
+and add the new `versions.json` entry; dependencies, `minAppVersion` and every other
+file must match. The source checks, plugin build, candidate record and clean-install
+reproducible rebuild still run on the tag commit, and the parent run and diff are
+rechecked before assets are attached. If neither run exists, the complete matrix
+runs normally.
 
 Reading checks use the same named groups locally and in CI: `test:reading-server`
 covers extraction, server behavior, and shortcut contracts; `test:reading-browser`
 covers the library, consent, optimistic changes, highlights, and shortcut browser
-flows, one browser script at a time to avoid competing selection and focus tests.
+flows in two groups (`library` and `annotations`, one CI job each), one browser script at a time to avoid competing selection and focus tests.
 Both groups require Chromium/WebKit and a built Worker. `test:reading` builds the
 Worker and runs both groups.
 File/vault history and plugin dialog browser checks also run in `release:check`.

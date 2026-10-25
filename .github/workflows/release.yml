@@ -31,11 +31,14 @@ jobs:
     outputs:
       commit: ${{ steps.commit.outputs.sha }}
       reuse-run-id: ${{ steps.verification.outputs.run-id }}
+      parent-run-id: ${{ steps.verification.outputs.parent-run-id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
+          # The parent commit is needed to check a version-only release commit.
+          fetch-depth: 2
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
@@ -63,6 +66,7 @@ jobs:
       ref: ${{ needs.resolve.outputs.commit }}
       release-tag: ${{ inputs.tag }}
       reuse-run-id: ${{ needs.resolve.outputs.reuse-run-id }}
+      parent-run-id: ${{ needs.resolve.outputs.parent-run-id }}
 
   publish:
     needs: [resolve, verify]
@@ -77,6 +81,7 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.commit }}
           persist-credentials: false
+          fetch-depth: 2
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
@@ -97,6 +102,13 @@ jobs:
           GH_REPO: ${{ github.repository }}
           REUSE_RUN_ID: ${{ needs.resolve.outputs.reuse-run-id }}
         run: node scripts/release-verification.mjs check "$REUSE_RUN_ID"
+      - name: Recheck the version-only parent verification before attaching assets
+        if: needs.resolve.outputs.parent-run-id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PARENT_RUN_ID: ${{ needs.resolve.outputs.parent-run-id }}
+        run: node scripts/release-verification.mjs check-parent "$PARENT_RUN_ID"
       - name: Attest release assets
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
