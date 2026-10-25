@@ -26,7 +26,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
-      - run: npm run build
+      - run: npm run build:worker && npm run build:plugin
       - run: npm run typecheck:visual
       - name: Compare shared UI screenshots
         if: inputs.update_baselines != true
