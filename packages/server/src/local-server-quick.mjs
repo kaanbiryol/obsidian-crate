@@ -61,7 +61,7 @@ export async function startQuickServer({ dataDir, port = 0, name = hostname().sl
 		// Reject a bad or already-running data directory before any exposure.
 		runtime = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
 		const command = await installCloudflared({ signal });
-		server = await listenLocalServer(() => active, { host: '127.0.0.1', port, instance,
+		server = await listenLocalServer(() => active, { host: '127.0.0.1', port, instance, tunnel: true,
 			pairing: { exchange: code => pairing.exchange(code) } });
 		tunnel = await startQuickTunnel({ command, port: server.address().port, signal });
 		await runtime.close();

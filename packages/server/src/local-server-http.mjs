@@ -3,9 +3,19 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { readSmallJson, sendJson } from './local-server-pairing.mjs';
 
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+/** A managed tunnel connects from loopback and forwards each client's address from
+ * Cloudflare's edge, so per-address admission limits stay per client. */
+export function clientAddress(request, tunnel) {
+	const peer = request.socket.remoteAddress ?? '127.0.0.1';
+	const forwarded = request.headers['cf-connecting-ip'];
+	return tunnel && LOOPBACK.has(peer) && typeof forwarded === 'string' && forwarded ? forwarded : peer;
+}
+
 // Expose only the application fetch handler. Miniflare's development HTTP
 // endpoints and inspector stay on their own private loopback listener.
-export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 8787, pairing, instance } = {}) {
+export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 8787, pairing, instance, tunnel = false } = {}) {
 	const server = createServer(async (request, response) => {
 		try {
 			const active = typeof runtime === 'function' ? runtime() : runtime;
@@ -38,7 +48,7 @@ export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 87
 					headers.set(name, Array.isArray(value) ? value.join(', ') : value);
 				}
 			}
-			headers.set('CF-Connecting-IP', request.socket.remoteAddress ?? '127.0.0.1');
+			headers.set('CF-Connecting-IP', clientAddress(request, tunnel));
 			const abort = new AbortController();
 			response.on('close', () => { if (!response.writableFinished) abort.abort(); });
 			const result = await active.mf.dispatchFetch(url.href, {

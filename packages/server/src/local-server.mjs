@@ -160,7 +160,7 @@ try {
 			else {
 				const instance = randomUUID();
 				const pairing = createPairing({ db: runtime.db });
-				server = await listenLocalServer(runtime, { host, port, pairing, instance });
+				server = await listenLocalServer(runtime, { host, port, pairing, instance, tunnel: Boolean(remote) });
 				control = await startLocalControl({ dataDir, pairing, origin });
 				const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
 				if (existing.count === 0) printPairing(pairing.issue(values.name?.trim() || computerName().slice(0, 128)));
