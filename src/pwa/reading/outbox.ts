@@ -104,11 +104,12 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
         await readingRequest(`/reading/${op.action}`, session, op.body);
         confirmed.add(op.id);
       } catch (error) {
+        const review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
         await readingLock(async () => {
           const current = await pendingReading(session), failed = current.find(entry => entry.id === op.id);
           if (!failed) return;
           failed.error = error instanceof Error ? error.message : 'Save has not been confirmed. Retry when connected.';
-          failed.review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
+          failed.review = review;
           failed.attempts = (failed.attempts ?? 0) + 1;
           failed.retryAt = !failed.review && (!(error instanceof ReadingApiError) || error.status >= 500 || error.status === 429)
             ? Date.now() + automaticRetryDelayMs(failed.attempts) : undefined;
@@ -123,6 +124,9 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
           }
           await savePendingReading(session, current);
         });
+        // A definite rejection holds back only this change and its dependents;
+        // independent changes still send. Anything else may affect them all.
+        if (review) continue;
         break;
       }
     }
