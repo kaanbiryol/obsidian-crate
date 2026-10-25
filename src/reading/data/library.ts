@@ -113,7 +113,7 @@ export class ReadingLibrary {
 					// Markers typed in Obsidian get stable IDs once nobody is editing the note.
 					let deferred = false;
 					if (metadata?.highlights?.some(highlight => highlight.id?.startsWith('markdown-')) && this.canAdopt()) {
-						const recorded = await recordMarkdownHighlights(original);
+						const recorded = await recordMarkdownHighlights(original, metadata);
 						this.assertActive();
 						if (recorded !== original && this.vault.editing?.(file.path)) deferred = true;
 						else if (recorded !== original) {

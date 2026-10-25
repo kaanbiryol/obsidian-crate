@@ -59,10 +59,10 @@ export function readingImportId(path: string, original: string): Promise<string>
  * Persists markers added outside Crate, such as `==text==` typed in Obsidian.
  * IDs derive from the note's bytes, so devices recording the same note write
  * identical files. No creation date is stored because the true one is unknown.
+ * `metadata` is the note's `parseReadingNote` result, which callers already have.
  */
-export async function recordMarkdownHighlights(markdown: string): Promise<string> {
-	const metadata = parseReadingNote(markdown);
-	if (!metadata?.highlights) return markdown;
+export async function recordMarkdownHighlights(markdown: string, metadata: ReadingMetadata): Promise<string> {
+	if (!metadata.highlights) return markdown;
 	const stored = new Set((validateReadingMetadata(readReadingFrontmatter(markdown)!.value).highlights ?? []).map(highlight => highlight.id));
 	const unrecorded = metadata.highlights.filter(highlight => highlight.id?.startsWith('markdown-') && !stored.has(highlight.id));
 	if (!unrecorded.length) return markdown;
