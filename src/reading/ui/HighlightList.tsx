@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { youtubeVideoId, youtubeMomentUrl } from '../core/youtube';
 import { timestampLabel } from '../core/transcript';
 import type { ReadingHighlight } from '../core/highlights';
@@ -29,6 +29,12 @@ export function HighlightList<T extends ReadingMetadata>({ entries, onView, onAn
 }) {
 	const withActions = Boolean(onAnnotate || onDelete);
 	const [copied, setCopied] = useState<string | null>(null);
+	// Restore the copy icon, matching the reader's link copy confirmation.
+	useEffect(() => {
+		if (copied === null) return;
+		const timer = window.setTimeout(() => setCopied(null), 2500);
+		return () => window.clearTimeout(timer);
+	}, [copied]);
 	const copy = async (key: string, text: string) => {
 		try {
 			await navigator.clipboard.writeText(text);
