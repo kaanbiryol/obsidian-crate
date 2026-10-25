@@ -37,22 +37,15 @@ export interface ApiHttpResponse {
 
 export type ApiHttpTransport = (request: ApiHttpRequest) => Promise<ApiHttpResponse>;
 
-export const obsidianHttpTransport: ApiHttpTransport = async request => {
-	const response = await requestUrl({
-		url: request.url,
-		method: request.method,
-		body: request.body,
-		contentType: request.contentType,
-		headers: request.headers,
-		throw: false,
-	});
-	return {
-		status: response.status,
-		headers: response.headers,
-		arrayBuffer: response.arrayBuffer,
-		text: response.text,
-	};
-};
+// Return Obsidian's response as is: copying `text` would decode every binary download as a string.
+export const obsidianHttpTransport: ApiHttpTransport = request => requestUrl({
+	url: request.url,
+	method: request.method,
+	body: request.body,
+	contentType: request.contentType,
+	headers: request.headers,
+	throw: false,
+});
 
 export class HttpError extends Error {
 	constructor(
