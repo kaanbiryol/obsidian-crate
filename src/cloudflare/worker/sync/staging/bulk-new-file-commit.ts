@@ -28,9 +28,6 @@ export async function commitNewFiles(bucket: R2Bucket, db: D1Database, files: Ne
       SELECT f.path, 'put', f.hash, f.size, f.storage_key FROM json_each(?) i JOIN files f
       ON f.portable_path = json_extract(i.value, '$.portable') AND f.path = json_extract(i.value, '$.path') AND f.storage_key = json_extract(i.value, '$.key')`).bind(json),
     ...await bulkFileProjection(db, files, reminderFolder),
-    db.prepare(`DELETE FROM staged_uploads WHERE storage_key IN (
-      SELECT f.storage_key FROM json_each(?) i JOIN files f
-      ON f.portable_path = json_extract(i.value, '$.portable') AND f.path = json_extract(i.value, '$.path') AND f.storage_key = json_extract(i.value, '$.key'))`).bind(json),
     ...files.map(file => recordUploadReceipt(db, file.operation, file)),
     ...finishStagedBatches(db, files),
   ]);
