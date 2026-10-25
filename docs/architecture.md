@@ -372,7 +372,9 @@ the application component owns presentation and invokes commands. Durable Readin
 before the hooks publish them or the queue dispatches them. `reading/outbox.ts` owns
 typed commands, exact dispatch bytes, dependent-edit ordering and retry eligibility;
 automatic refreshes honor the persisted deadline and three-attempt budget, while an
-explicit refresh can retry uncertain commands. Rejected commands remain for review.
+explicit refresh can retry uncertain commands. Rejected commands remain for review;
+after exporting one (or the queues of an earlier sign-in, whose receipts can never settle)
+settings can remove it while the stored record still matches the export.
 Settings deadlines and failure announcements use the same outbox policy: transient
 errors remain visible, while toasts wait until automatic recovery stops or review
 is required.
