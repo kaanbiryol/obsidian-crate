@@ -43,7 +43,9 @@ describe('partial reminder updates', () => {
 		expect(returned).toEqual(toReminder(after));
 		for (const field of ['content', 'description', 'priority', 'recurrence', 'completed', 'id', 'project', 'dueDate', 'dueDatetime'] as const) {
 			if (field in patch || (field === 'dueDate' || field === 'dueDatetime') && ('dueDate' in patch || 'dueDatetime' in patch)) continue;
-			expect(after[field], field).toEqual(before[field]);
+			// The rule holds the time of a timed due; a date-only due drops it again.
+			if (field === 'recurrence' && patch.dueDate) expect(after.recurrence).toEqual(rule);
+			else expect(after[field], field).toEqual(before[field]);
 		}
 		expect(files.get(after.filePath)).toContain('<!-- crate-desc:Important details\nKeep both lines -->');
 	});
