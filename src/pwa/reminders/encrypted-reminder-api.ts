@@ -11,7 +11,8 @@ import { ReminderMarkdownContextError } from '../../reminders/core/markdownTaskC
 import { MAX_REMINDER_NOTE_BYTES } from '../../reminders/core/constants';
 import { validateEncryptedSchedules, ENCRYPTED_SCHEDULING_CAPACITY_ISSUE } from '../../encryption/notification-format';
 import { capturePwaSession } from '../connection/session-generation';
-import { loadEncryptedReminderAttempt, saveEncryptedReminderAttempt, pruneEncryptedReminderAttempts, type EncryptedReminderAttempt as Attempt } from './encrypted-reminder-attempts';
+import { loadEncryptedReminderAttempt, loadEncryptedReminderIndex, saveEncryptedReminderAttempt, saveEncryptedReminderIndex, pruneEncryptedReminderAttempts, type EncryptedReminderAttempt as Attempt } from './encrypted-reminder-attempts';
+import { PWA_ASSET_VERSION } from '../shell/version';
 import { requireCompatibleServer } from '../connection/server-compatibility';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import type { ApiFetch } from '../types';
@@ -47,6 +48,7 @@ export class EncryptedReminderApi {
 	private scanned = new Map<string, ScannedNote>();
 	// Plaintext path of each server path opened this session, for issues raised after opening.
 	private names = new Map<string, string>();
+	private indexLoaded = false;
 	constructor(private readonly keys: FeatureKeys, private readonly fetch: ApiFetch) {}
 	/** Notes, projects and requests from the app use plaintext paths; the server sees `wireFolder`. */
 	private get localFolder() { return this.keys.folderPath; }
@@ -55,6 +57,18 @@ export class EncryptedReminderApi {
 		return { vaultId: this.keys.vaultId, scopeId: 'vault', key: this.keys.vault };
 	}
 	private assertCurrent(): void { if (!this.current()) throw new Error('Session changed. Reopen Crate before saving.'); }
+	private get indexScope() { return `${this.keys.vaultId}:${this.keys.wireFolder}`; }
+	private get indexIdentity() { return JSON.stringify([PWA_ASSET_VERSION, this.keys.vaultId, this.keys.generation, this.keys.wireFolder, this.keys.folderPath]); }
+	/** Seed parsed notes from the last session's complete list once per instance. */
+	private async loadIndex(): Promise<void> {
+		if (this.indexLoaded) return;
+		this.indexLoaded = true;
+		try {
+			for (const note of await loadEncryptedReminderIndex(this.indexScope, this.indexIdentity) ?? []) {
+				if (!this.scanned.has(note.file.revision)) this.scanned.set(note.file.revision, note as ScannedNote);
+			}
+		} catch { /* A missing or unreadable index only costs downloads. */ }
+	}
 	private context(operationId: string) { return { vaultId: this.keys.vaultId, scopeId: 'vault', objectId: operationId, purpose: 'reminder' as const }; }
 	private attemptKey(operationId: string) { return `${this.keys.vaultId}:vault:${operationId}`; }
 
@@ -125,6 +139,7 @@ export class EncryptedReminderApi {
 				this.cleanup();
 				const etag = `"e2ee-${this.keys.vaultId}-${this.keys.generation}-${first.sequence}"`;
 				if (etag === previousEtag) return new Response(null, { status: 304, headers: { ETag: etag } });
+				await this.loadIndex();
 				const inventory = await this.inventory(first);
 				const nextCache = new Map(this.cached);
 				const sources: Array<{ path: string; project: string; reminders: ReminderPayload[]; issue?: string }> = [];
@@ -160,6 +175,7 @@ export class EncryptedReminderApi {
 				this.assertCurrent();
 				this.cached = nextCache;
 				this.scanned = nextScanned;
+				void saveEncryptedReminderIndex(this.indexScope, this.indexIdentity, [...nextScanned.values()], this.current).catch(() => {});
 				return Response.json(result, { headers: { ETag: etag } });
 			} catch (error) {
 				if (!(error instanceof ReminderCommandError) || error.status !== 409 || attempt === 2) throw error;
