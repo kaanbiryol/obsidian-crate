@@ -23,11 +23,6 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
   const confirmedCache = useRef<{ session: ReadingSession; cache: ReadingCache } | null>(null);
   const completedAt = useRef<{ session: ReadingSession; at: number } | null>(null);
   const prefetching = useRef(false);
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => { mounted.current = false; };
-  }, []);
   useEffect(() => {
     const changed = () => { setIsOffline(!navigator.onLine); setSyncedSession(null); };
     window.addEventListener('online', changed); window.addEventListener('offline', changed);
@@ -83,7 +78,7 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
       }
     } finally {
       refreshing.current = false;
-      if (mounted.current) setSyncing(false);
+      setSyncing(false);
       const queued = refreshQueued.current;
       refreshQueued.current = null;
       if (queued && isCurrentSession(queued.session)) void run(() => refresh(queued.session, queued.mode));

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { findSavedReadingLink } from '@/reading/core/inventory';
 import { readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingItem } from '@/reading/core/model';
 import { youtubeVideoId } from '@/reading/core/youtube';
@@ -23,11 +23,6 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
   const savingRef = useRef(false);
   const preparingChanges = useRef(0);
   const [preparationCount, setPreparationCount] = useState(0);
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => { mounted.current = false; };
-  }, []);
   const canApplyUpdate = useCallback(() => preparingChanges.current === 0 && !savingRef.current, []);
 
   const withPreparation = async <T,>(action: () => Promise<T>): Promise<T> => {
@@ -37,7 +32,7 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
     try { return await action(); }
     finally {
       preparingChanges.current--;
-      if (mounted.current) setPreparationCount(preparingChanges.current);
+      setPreparationCount(preparingChanges.current);
     }
   };
   const persistChange = async (command: ReadingCommand) => {
@@ -89,7 +84,7 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
       return true;
     } finally {
       savingRef.current = false;
-      if (mounted.current) setSaving(false);
+      setSaving(false);
     }
   };
 
