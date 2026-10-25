@@ -26,7 +26,7 @@ interface ShadowReactRootOptions {
 interface ShadowReactMountOptions extends ShadowRootMountOptions, ShadowReactRootOptions {}
 
 /** Mirrors Obsidian's body theme class onto a shadow mount point. */
-export function syncMountTheme(mountPoint: HTMLElement): void {
+function syncMountTheme(mountPoint: HTMLElement): void {
   const dark = mountPoint.doc.body.classList.contains("theme-dark");
   mountPoint.classList.toggle("dark", dark);
   mountPoint.classList.toggle("light", !dark);

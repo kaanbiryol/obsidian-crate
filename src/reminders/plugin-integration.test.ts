@@ -29,7 +29,6 @@ type MockPlugin = {
 	};
 	writeRemindersSettings: ReturnType<typeof vi.fn<(update: Partial<RemindersSettingsStub>) => Promise<void>>>;
 	registerMarkdownCodeBlockProcessor: ReturnType<typeof vi.fn>;
-	registerEditorExtension: ReturnType<typeof vi.fn>;
 	registerView: ReturnType<typeof vi.fn>;
 	addRibbonIcon: ReturnType<typeof vi.fn>;
 	addCommand: ReturnType<typeof vi.fn>;
@@ -52,7 +51,6 @@ const reminderIndexFactory = vi.fn();
 const createMarkdownWriter = vi.fn();
 const createReminderRepository = vi.fn();
 const reminderQueryOnBlock = vi.fn();
-const createRemindersBlockExtension = vi.fn(() => 'extension');
 const registerReminderCommands = vi.fn();
 const recoverMoves = vi.fn(async (): Promise<string[]> => []);
 const notices = vi.fn();
@@ -104,9 +102,6 @@ async function loadPluginIntegrationModule() {
 		ReminderQueryInjector: class ReminderQueryInjector {
 			onBlock = reminderQueryOnBlock;
 		},
-	}));
-	vi.doMock('./query/remindersBlockLivePreview', () => ({
-		createRemindersBlockExtension,
 	}));
 	vi.doMock('./commands', () => ({
 		registerReminderCommands,
@@ -167,7 +162,6 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 		},
 		writeRemindersSettings: vi.fn(async (update: Partial<RemindersSettingsStub>) => { Object.assign(plugin.remindersSettings, update); }),
 		registerMarkdownCodeBlockProcessor: vi.fn(),
-		registerEditorExtension: vi.fn(),
 		registerView: vi.fn(),
 		addRibbonIcon: vi.fn(),
 		addCommand: vi.fn(),
@@ -191,7 +185,6 @@ beforeEach(() => {
 	createMarkdownWriter.mockReset();
 	createReminderRepository.mockReset();
 	reminderQueryOnBlock.mockReset();
-	createRemindersBlockExtension.mockReset();
 	registerReminderCommands.mockReset();
 
 	latestWatcher = {
@@ -209,7 +202,6 @@ beforeEach(() => {
 	createReminderRepository.mockReturnValue({
 		getProjects: vi.fn(() => ['Inbox', 'Work']),
 	});
-	createRemindersBlockExtension.mockReturnValue('extension');
 });
 
 afterEach(() => {
@@ -221,7 +213,6 @@ afterEach(() => {
 	vi.doUnmock('./data/reminder-repository');
 	vi.doUnmock('./data/reminder-move-journal');
 	vi.doUnmock('./query/injector');
-	vi.doUnmock('./query/remindersBlockLivePreview');
 	vi.doUnmock('./commands');
 	vi.doUnmock('./data/vault-watcher');
 	vi.doUnmock('./ui/plugin/workspaceLayout');
@@ -248,7 +239,6 @@ describe('initializeReminders', () => {
 			processor('source', 'el', 'ctx');
 			expect(reminderQueryOnBlock).toHaveBeenLastCalledWith(language, 'source', 'el', 'ctx');
 		}
-		expect(plugin.registerEditorExtension).toHaveBeenCalledWith('extension');
 		expect(plugin.registerView).toHaveBeenCalledWith('reminders-view', expect.any(Function));
 		expect(plugin.addRibbonIcon).toHaveBeenCalledWith('crate-logo', 'Open Crate', expect.any(Function));
 		expect(registerReminderCommands).toHaveBeenCalledWith(plugin);

@@ -3,7 +3,6 @@ import { addIcon, type MarkdownPostProcessorContext } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { registerReminderCommands } from './commands';
 import { ReminderQueryInjector } from './query/injector';
-import { createRemindersBlockExtension } from './query/remindersBlockLivePreview';
 import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/plugin/reminders-view';
 import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
@@ -34,11 +33,6 @@ export async function registerReminderIntegrations(plugin: CratePlugin, openView
 		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onBlock('reminders-upcoming', source, el, ctx),
 	);
 
-	try {
-		plugin.registerEditorExtension(createRemindersBlockExtension(plugin));
-	} catch (error) {
-		remindersLogger.error('Failed to register reminder block extension:', error);
-	}
 	addIcon(CRATE_ICON_ID, CRATE_ICON_SVG);
 	plugin.registerView(
 		VIEW_TYPE_REMINDERS,
