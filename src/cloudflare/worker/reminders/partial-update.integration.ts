@@ -13,6 +13,7 @@ import type { ReminderRecord } from '@/pwa/reminders/types';
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });
 const path = 'Reminders/Inbox.md';
+const rule = { frequency: 'daily' as const, timezone: 'Europe/Berlin', count: 5, completedCount: 1 };
 async function reminder() {
 	const response = await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env);
 	return (await response.json() as { reminders: ReminderRecord[] }).reminders[0]!;
@@ -20,7 +21,7 @@ async function reminder() {
 async function setup() {
 	const content = appendCreatedReminderBlock('# Inbox\n', buildCreatedReminderBlock({ content: 'Original',
 		description: 'Important details', dueDate: new Date('2099-09-09T09:00:00Z'), hasTime: true, priority: 4,
-		recurrence: { frequency: 'daily', timezone: 'Europe/Berlin', count: 5, completedCount: 1 }, reminderId: 'one' }));
+		recurrence: rule, reminderId: 'one' }));
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	return reminder();
 }
@@ -38,7 +39,9 @@ it.each([{ priority: 1 }, { content: 'Updated' }, { project: 'Other' }, { dueDat
 	const after = await reminder();
 	for (const field of ['content', 'description', 'priority', 'recurrence', 'completed', 'id', 'project', 'dueDate', 'dueDatetime'] as const) {
 		if (field in patch || (field === 'dueDate' || field === 'dueDatetime') && ('dueDate' in patch || 'dueDatetime' in patch)) continue;
-		expect(after[field], field).toEqual(before[field]);
+		// The rule holds the time of a timed due; a date-only due drops it again.
+		if (field === 'recurrence' && 'dueDate' in patch) expect(after.recurrence).toEqual(rule);
+		else expect(after[field], field).toEqual(before[field]);
 	}
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, after.filePath))?.content).toContain('<!-- crate-desc:Important details -->');
 });

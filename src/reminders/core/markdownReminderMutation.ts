@@ -1,4 +1,4 @@
-import { anchorMonthlyRecurrence, recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrence/recurrenceCalendar';
+import { anchorRecurrence, recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrence/recurrenceCalendar';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
 import { parseCheckboxLine, rebuildCheckboxLine } from '@/reminders/core/grammar/checkboxParser';
 import { UnresolvedReminderScheduleError } from '@/reminders/core/grammar/reminderParser';
@@ -104,7 +104,7 @@ export function buildCreatedReminderBlock(params: {
 		: params.dueDate;
 	const hasTime = params.hasTime ?? (rule && !params.dueDate ? rule.hour !== undefined : inferHasTimeFromDate(dueDate));
 	if (rule && !params.dueDate && dueDate && !hasTime) dueDate = recurrenceCalendarDate(dueDate, rule);
-	const recurrence = rule && dueDate ? anchorMonthlyRecurrence(rule, dueDate, hasTime) : rule;
+	const recurrence = rule && dueDate ? anchorRecurrence(rule, dueDate, hasTime) : rule;
 	const storedDates = buildStoredReminderDates(dueDate, hasTime);
 	return assertReadsBack({
 		checkboxLine: rebuildCheckboxLine(
@@ -158,7 +158,7 @@ export function buildUpdatedReminderBlock(
 		dueDate = calculateFirstOccurrence(recurrence);
 		if (!hasTime) dueDate = recurrenceCalendarDate(dueDate, recurrence);
 	}
-	if (recurrence && dueDate) recurrence = anchorMonthlyRecurrence(recurrence, dueDate, hasTime);
+	if (recurrence && dueDate) recurrence = anchorRecurrence(recurrence, dueDate, hasTime);
 	const priority = updates.priority ?? reminder.priority;
 	const description = 'description' in updates
 		? (updates.description?.trim() || undefined)
@@ -271,7 +271,7 @@ function completionTransition(
 			line = { kind: 'rebuild', completed: false, due: currentDue };
 		} else line = { kind: 'uncheck' };
 	} else if (recurrence && !reminder.completed) {
-		recurrence = anchorMonthlyRecurrence(recurrence, currentDue, currentHasTime);
+		recurrence = anchorRecurrence(recurrence, currentDue, currentHasTime);
 		const completedCount = recurrence.completedCount ?? 0;
 		const nextInstant = calculateNextOccurrence(currentHasTime ? currentDue : recurrenceCalendarInstant(currentDue, recurrence), recurrence, completedCount);
 		const nextDue = nextInstant && !currentHasTime ? recurrenceCalendarDate(nextInstant, recurrence) : nextInstant;
