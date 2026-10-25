@@ -34,6 +34,7 @@ const { outputFiles } = await build({
       window.disposeContent = renderEncryptionSetup(body, {recovery:window.recovery,
         automaticSync:()=>false, setTitle:title=>window.unmountHeader.setTitle(title), manage:()=>{window.manageOpened=true;}, close:()=>{window.closed=true;},
         assertCurrent:()=>{if(window.connectionChanged) throw new Error('The server connection changed.');},
+        confirm:async()=>{window.confirmations=(window.confirmations??0)+1; return true;},
         encrypt:async(code,progress)=>{
           window.calls.push(code); window.progress=progress; progress('Encrypting files and retained versions',{completed:0,total:12});
           await new Promise((resolve,reject)=>{window.finish = resolve; window.fail = ()=>reject(new Error('Connection lost.'));});
@@ -172,6 +173,7 @@ for (const browserType of [chromium,webkit]) {
       await page.screenshot({path:`${output}/${hostName}${browserType.name()}-${width}-${theme}-progress.png`});
       await expect(content).toHaveJSProperty('inert',false); // Keep progress and explanations available to assistive technology.
       assert.deepEqual(await page.evaluate(()=>window.calls),[recovery]);
+      assert.equal(await page.evaluate(()=>window.confirmations),1,'Setup asks for confirmation once');
       await checkLayout();
       await page.evaluate(()=>window.fail());
       await expect(content).toContainText('Connection lost.');

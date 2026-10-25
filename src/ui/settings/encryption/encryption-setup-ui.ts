@@ -21,6 +21,8 @@ export function renderEncryptionLoading(container: HTMLElement): void {
 export function renderEncryptionSetup(container: HTMLElement, options: {
   recovery: string;
   assertCurrent(): void;
+  /** Asks the user to accept deleting the server copy and its history. */
+  confirm(): Promise<boolean>;
   encrypt(code: string, progress: EncryptionProgress): Promise<void>;
   automaticSync(): boolean;
   setTitle(title: string): void;
@@ -75,7 +77,6 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
     'Sync and notifications pause while encryption runs. Keep Obsidian open.',
     'Other Obsidian devices reconnect and enter the recovery key. Web apps log out and connect again; logging out discards their drafts and pending edits.',
     'Use your recovery key only in web apps you trust. They handle it during unlock and can read entire notes in their connected Reading and Reminders folders.',
-    'Renaming, moving or changing the reminders folder requires a fresh web app setup link.',
     'File and folder names are encrypted. The server still sees folder structure, which files are notes, file sizes and notification times. Notification titles and text are encrypted.',
     'Pasted links keep their URL labels because private URLs are not sent to the server for title lookup.',
     'Existing backup copies are not changed or retroactively encrypted.',
@@ -85,6 +86,14 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
   const label = 'Enable encryption';
   const run = async () => {
     if (busy || disposed || !saved.checked) return;
+    busy = true;
+    let confirmed = false;
+    try { confirmed = await options.confirm(); } finally { busy = false; }
+    if (confirmed) await encrypt();
+  };
+  // A retry resumes the confirmed setup.
+  const encrypt = async () => {
+    if (busy || disposed) return;
     busy = true;
     options.setTitle('Encrypting vault');
     const view = renderEncryptionProgress(container);
@@ -98,7 +107,7 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
     } catch (error) {
       if (!disposed) {
         options.setTitle('Encryption needs attention');
-        view.fail(errorMessage(error), () => { void run(); });
+        view.fail(errorMessage(error), () => { void encrypt(); });
       }
     } finally { busy = false; }
   };

@@ -68,6 +68,29 @@ describe('openConfirmationModal', () => {
 });
 
 
+it('keeps the confirm button disabled until the typed confirmation matches', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { openConfirmationModal } = await import('./confirmation-modal');
+	const result = openConfirmationModal({} as never, {
+		title: 'Turn on encryption?', message: 'Replace the server copy?', confirmText: 'Delete server copy and encrypt',
+		warning: true, typedConfirmation: 'encrypt',
+	});
+	const field = MockSetting.instances[0]!, confirm = MockSetting.instances[1]!.buttons[1]!;
+	expect(field.descEl.textContent).toBe('Type encrypt to continue.');
+	expect(confirm.buttonEl.classNames.has('is-disabled')).toBe(true);
+	let settled = false;
+	void result.then(() => { settled = true; });
+	confirm.click();
+	await Promise.resolve();
+	expect(settled).toBe(false);
+	field.texts[0]!.change('encryp');
+	expect(confirm.buttonEl.classNames.has('is-disabled')).toBe(true);
+	field.texts[0]!.change('encrypt');
+	expect(confirm.buttonEl.classNames.has('is-disabled')).toBe(false);
+	confirm.click();
+	await expect(result).resolves.toBe(true);
+});
+
 it('starts the optional forget switch unchecked and reports changes without confirming', async () => {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	const { openConfirmationModal } = await import('./confirmation-modal');

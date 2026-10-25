@@ -18,11 +18,12 @@ const convert = vi.fn(async (keys: VaultKeyBundle, recovery: string, _progress: 
 	state = createEncryptionState(keys, await sealRecoveryBundle(keys, recovery));
 });
 const turnOff = vi.fn(async () => {});
+const confirmTurnOn = vi.fn(async (_app: unknown, _options: { typedConfirmation?: string; warning?: boolean }) => true);
 const sync = vi.fn(async () => ({ success: true, conflicts: [] }));
 const setting = (name: string) => [...MockSetting.instances].reverse().find(item => item.nameEl.textContent === name)!;
 
 beforeEach(() => {
-	resetObsidianUiMocks(); convert.mockClear(); sync.mockClear(); turnOff.mockClear();
+	resetObsidianUiMocks(); convert.mockClear(); sync.mockClear(); turnOff.mockClear(); confirmTurnOn.mockClear();
 	read.mockReset().mockImplementation(async () => state);
 	state = null; titles = []; values = new Map([[SECRET_KEYS.AUTH_TOKEN, 'token']]);
 	vi.doMock('obsidian', () => createObsidianUiModule());
@@ -37,6 +38,7 @@ beforeEach(() => {
 		close() { this.onClose(); }
 		open() { closeModal = () => this.close(); this.onOpen(); }
 	} }));
+	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal: confirmTurnOn }));
 	vi.doMock('../../../sync/worker-api/http', () => ({ WorkerApiHttpClient: class {
 		constructor(private readonly url: string) {}
 		setAbortSignal() {}
@@ -50,7 +52,7 @@ beforeEach(() => {
 });
 afterEach(() => {
 	vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.resetModules();
-	for (const name of ['obsidian', '../../plugin/shared-modal', '../../sync/worker-api/http', '../../sync/encryption/server-encryption']) vi.doUnmock(name);
+	for (const name of ['obsidian', '../../plugin/shared-modal', '../../confirmation-modal', '../../sync/worker-api/http', '../../sync/encryption/server-encryption']) vi.doUnmock(name);
 });
 
 async function renderRow() {
@@ -126,8 +128,15 @@ it('automatically verifies the key and requires acknowledgment before setup', as
 	acknowledge(false); start.click();
 	expect(start.buttonEl.classNames.has('is-disabled')).toBe(true);
 	expect(convert).not.toHaveBeenCalled();
+	confirmTurnOn.mockResolvedValueOnce(false);
 	acknowledge(); start.click();
+	await vi.waitFor(() => expect(confirmTurnOn).toHaveBeenCalledOnce());
+	expect(confirmTurnOn.mock.calls[0]![1]).toMatchObject({ warning: true, typedConfirmation: 'encrypt' });
+	expect(convert).not.toHaveBeenCalled();
+	expect(body.querySelector('textarea')).not.toBeNull();
+	start.click();
 	await vi.waitFor(() => expect(body.collectText()).toContain('Your vault is protected'));
+	expect(confirmTurnOn).toHaveBeenCalledTimes(2);
 	expect(titles.at(-1)).toBe('Encryption enabled');
 	expect(convert).toHaveBeenCalledOnce(); expect(sync).not.toHaveBeenCalled();
 	expect(body.collectText()).toContain('Automatic sync remains off');
@@ -177,6 +186,7 @@ it('retries an interrupted setup with the same keys without starting a normal sy
 	await vi.waitFor(() => expect(body.collectText()).toContain('Your vault is protected'));
 	expect(convert.mock.calls[1]![0]).toBe(convert.mock.calls[0]![0]);
 	expect(convert.mock.calls[1]![1]).toBe(convert.mock.calls[0]![1]);
+	expect(confirmTurnOn).toHaveBeenCalledOnce();
 	expect(sync).not.toHaveBeenCalled();
 });
 

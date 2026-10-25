@@ -13,7 +13,8 @@ Turning encryption on replaces the server copy. Crate syncs this device first, t
 2. Open **Settings → Crate → Sync → End-to-end encryption** and select **Enable encryption**.
 3. Select **Copy** and save the recovery key somewhere safe outside your vault, such as a password manager.
 4. Select **I’ve saved it outside my vault.** Review **What changes with encryption?**, then select **Enable encryption**.
-5. Keep Obsidian open until setup finishes. Sync and notifications pause while Crate replaces the server copy.
+5. Read the confirmation. It lists what is deleted from the server and which devices must reconnect. Type **encrypt**, then select **Delete server copy and encrypt**.
+6. Keep Obsidian open until setup finishes. Sync and notifications pause while Crate replaces the server copy.
 
 If this device's sync has errors or conflicts, setup stops before deleting anything; resolve them and try again. If your server is still downloading saved links, setup asks you to wait and try again later. If setup is interrupted, select **Retry** in the dialog, or return to the same settings and select **Resume reset**, then **Resume**. Keep the saved recovery key and this device’s Crate configuration.
 

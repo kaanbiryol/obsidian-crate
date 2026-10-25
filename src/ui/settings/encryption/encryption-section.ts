@@ -1,5 +1,6 @@
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { createModalActions, SharedModal } from '../../plugin/shared-modal';
+import { openConfirmationModal } from '../../confirmation-modal';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
 import { encryptVault, loadDeviceEncryptionKeys, prepareEncryptionKeys, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
@@ -145,6 +146,18 @@ class EncryptionModal extends SharedModal {
 			automaticSync: () => this.plugin.settings.automaticSync,
 			setTitle: title => this.setLayoutTitle(title), close: () => this.close(),
 			manage: () => { this.setLayoutTitle('Manage encryption'); void this.load().catch(error => this.unavailable(error)); },
+			confirm: () => openConfirmationModal(this.app, {
+				title: 'Turn on encryption?',
+				message: 'Crate replaces the server copy of your vault with this device’s vault, encrypted. This cannot be undone.',
+				details: [
+					'The server copy, its version history and checkpoints are deleted. Earlier versions cannot be restored.',
+					'Files this device does not sync, such as excluded folders, are deleted from the server.',
+					'Other Obsidian devices must reconnect and enter the recovery key. Web apps must log out and open a fresh setup link; logging out discards their drafts and pending edits.',
+				],
+				confirmText: 'Delete server copy and encrypt',
+				warning: true,
+				typedConfirmation: 'encrypt',
+			}),
 			assertCurrent: () => this.assertCurrentConnection(), encrypt: async (verifiedRecovery, progress) => {
 			if (this.running) return;
 			this.running = true;
