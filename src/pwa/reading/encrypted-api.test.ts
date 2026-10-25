@@ -36,6 +36,20 @@ it('bounds empty advancing encrypted pages independently of the item budget', as
 	expect(request).toHaveBeenCalledTimes(1000);
 });
 
+it('rejects a library larger than the documented 10,000-file budget', async () => {
+	const { api, request } = harness();
+	const hash = 'a'.repeat(64);
+	let pages = 0;
+	request.mockImplementation(async path => {
+		if (!path.startsWith('/reading/encrypted-files')) return Response.json({ error: 'Not found' }, { status: 404 });
+		const index = pages++;
+		const files = Array.from({ length: 1000 }, (_, file) => ({ path: `${wireFolder}/${index}-${file}.md`, hash, size: 1, revision: `${index}-${file}` }));
+		return Response.json(page(files, `cursor-${String(index).padStart(3, '0')}`));
+	});
+	await expect(api.request('/reading/list')).rejects.toThrow('limit');
+	expect(pages).toBe(11);
+});
+
 it.each([['A', 'A'], ['A', 'B', 'A']])('rejects an encrypted cursor cycle: %j', async (...cursors) => {
 	const { api, request } = harness();
 	for (const cursor of cursors) request.mockResolvedValueOnce(Response.json(page([], cursor)));
