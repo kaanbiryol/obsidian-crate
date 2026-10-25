@@ -7,7 +7,8 @@ Run with the repository's Node version after `npm install`:
 
 - `npm run test:editor-contract`: the browser suite plus the built-PWA editor
   integration script. Requires port 8791 free.
-- `npm run typecheck:editor-contract`: type-check the browser harness and tests.
+- `npm run typecheck:visual`: type-check the browser harness and tests, together
+  with the visual suite.
 
 The browser suite also runs through `npm run test:visual`, and the built
 PWA checks through `npm run test:pwa-browser`. The Lexical-specific
