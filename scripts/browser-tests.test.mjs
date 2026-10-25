@@ -129,3 +129,11 @@ test('retries a failed script once on CI only and reports a pass on retry as fla
 	assert.equal(runBrowserTests(['first'], { logger, env: {}, run() { return ++calls === 1 ? { status: 0 } : { status: 1 }; } }), 1);
 	assert.equal(calls, 2);
 });
+
+test('Linux browser containers ship the installed Playwright version', () => {
+	// Dependabot bumps the package but never the container image.
+	const installed = JSON.parse(readFileSync('node_modules/playwright/package.json', 'utf8')).version;
+	const images = readdirSync('.github/workflows').flatMap(name => [...readFileSync(`.github/workflows/${name}`, 'utf8').matchAll(/playwright:v([\d.]+)-/g)].map(match => match[1]));
+	assert.ok(images.length > 0);
+	assert.deepEqual([...new Set(images)], [installed]);
+});
