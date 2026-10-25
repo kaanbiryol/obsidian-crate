@@ -124,7 +124,7 @@ class EncryptionModal extends SharedModal {
 		this.setLayoutTitle(encryptionModalTitle(state));
 		const keys = loadDeviceEncryptionKeys(this.plugin, state);
 		if (state?.mode === 'resetting') { this.clearContent(); this.bodyEl.createEl('p', { text: 'An encryption reset is in progress. Resume it on the Obsidian device that started it.' }); return; }
-		if (state && !keys) { this.clearContent(); this.status(state, null); this.recover(state); return; }
+		if (state && !keys) { this.clearContent(); this.status(); this.recover(state); return; }
 		if (state?.mode === 'active' && keys) { this.clearContent(); this.ready(keys, state); return; }
 		// Only an unencrypted server reaches setup: an encrypted one is unlocked or managed above.
 		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin, keys);
@@ -157,15 +157,13 @@ class EncryptionModal extends SharedModal {
 			} finally { this.running = false; this.onChanged(); }
 		} });
 	}
-	private status(state: EncryptionServerState | null, keys: VaultKeyBundle | null): Setting {
+	/** An encrypted server that this device cannot unlock yet. */
+	private status(): void {
 		const overview = this.bodyEl.createDiv({ cls: 'crate-encryption-status' });
-		const vault = new Setting(overview).setName('Vault encryption').setDesc(state ? 'Active' : 'Not enabled');
-		if (!state) return vault;
-		const devices = createSettingsDisclosure(overview, keys ? 'This device is unlocked' : 'This device needs a recovery key', { inline: true });
-		new Setting(devices).setName('This device').setDesc(keys ? 'Unlocked · keys saved on this device.' : 'Locked · enter your saved recovery key below.');
-		new Setting(devices).setName('Notification keys').setDesc(!keys ? 'Unavailable until this device is unlocked.'
-			: 'Ready for enrollment · web apps use the same recovery key and need notification permission.');
-		return vault;
+		new Setting(overview).setName('Vault encryption').setDesc('Active');
+		const devices = createSettingsDisclosure(overview, 'This device needs a recovery key', { inline: true });
+		new Setting(devices).setName('This device').setDesc('Locked · enter your saved recovery key below.');
+		new Setting(devices).setName('Notification keys').setDesc('Unavailable until this device is unlocked.');
 	}
 	private recover(state: EncryptionServerState): void {
 		this.bodyEl.createEl('p', { text: 'This server is encrypted. Enter the recovery key saved when encryption was enabled to unlock this Obsidian device.' });
