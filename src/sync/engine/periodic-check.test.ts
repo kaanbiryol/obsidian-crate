@@ -10,6 +10,7 @@ function createContext(overrides: Partial<{
 	syncIntervalSeconds: number;
 }> = {}) {
 	let automaticSync = true;
+	let status: 'idle' | 'syncing' = 'idle';
 	const checkForChanges = vi.fn(
 		overrides.checkForChanges ?? (async () => ({ hasChanges: false })),
 	);
@@ -18,7 +19,7 @@ function createContext(overrides: Partial<{
 	const dependencies = {
 		automaticSyncEnabled: () => automaticSync,
 		apiConfigured: () => true,
-		getStatus: () => 'idle' as const,
+		getStatus: () => status,
 		getSyncIntervalSeconds: () => overrides.syncIntervalSeconds ?? 60,
 		getLastSeq: () => 10,
 		getPendingPathCount: () => overrides.pendingPathCount ?? 0,
@@ -35,6 +36,7 @@ function createContext(overrides: Partial<{
 		hasLocalFileChanges,
 		getFailures: () => lifecycle.checkFailureCount,
 		setAutomaticSync: (enabled: boolean) => { automaticSync = enabled; },
+		setStatus: (value: 'idle' | 'syncing') => { status = value; },
 		sync,
 		dependencies,
 		lifecycle,
@@ -66,6 +68,18 @@ describe('SyncEngineLifecycle periodic check', () => {
 		});
 		await harness.lifecycle.periodicCheck();
 		expect(harness.sync).not.toHaveBeenCalled();
+	});
+
+	it('leaves a sync that started during the check alone instead of recording a refused attempt', async () => {
+		const harness = createContext();
+		harness.checkForChanges.mockImplementation(async () => {
+			// A debounced queue flush starts while the check awaits the network.
+			harness.setStatus('syncing');
+			return { hasChanges: true };
+		});
+		await harness.lifecycle.periodicCheck();
+		expect(harness.sync).not.toHaveBeenCalled();
+		expect(harness.getFailures()).toBe(0);
 	});
 
 	afterEach(() => {

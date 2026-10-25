@@ -135,7 +135,8 @@ export class SyncEngineLifecycle {
 				return;
 			}
 
-			if (dependencies.automaticSyncEnabled?.() === false) return;
+			// A queue flush may have started while this check awaited; it covers these changes.
+			if (dependencies.automaticSyncEnabled?.() === false || dependencies.getStatus() === 'syncing') return;
 			logger.info('Periodic check: changes detected, running sync');
 			const result = await dependencies.sync();
 			if (result.outcome === 'cancelled') return;
