@@ -9,6 +9,8 @@ vi.mock('../../encryption/file-codec', async original => ({ ...await original<ob
 	sealFile: async (input: { path: string; content: Uint8Array }) => ({ bytes: input.content, hash: 'sealed',
 		metadata: { path: input.path, hash: 'plain', size: input.content.byteLength } }) }));
 vi.mock('../../encryption/file-authority', () => ({ FileKeyAuthority: { fromBundle: async () => ({ forPath: () => ({}) }) } }));
+// Server paths equal plaintext paths here, so the tests cover batching only.
+vi.mock('../../encryption/path-tags', () => ({ PathTags: { fromSecret: async () => ({ wire: async (path: string) => path }) } }));
 
 it('decrypts large inventories in bounded, overlapping batches and keeps their order', async () => {
 	let active = 0, peak = 0;
@@ -27,7 +29,7 @@ it('decrypts large inventories in bounded, overlapping batches and keeps their o
 	expect(requestJson).toHaveBeenCalledTimes(6);
 	expect(peak).toBeGreaterThan(1);
 	expect(peak).toBeLessThanOrEqual(4);
-	expect(result.map(entry => entry.hash)).toEqual(entries.map(({ entry }) => `plain-${entry.revision}`));
+	expect(result.map(({ entry }) => entry.hash)).toEqual(entries.map(({ entry }) => `plain-${entry.revision}`));
 });
 
 function precondition() {

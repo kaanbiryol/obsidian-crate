@@ -5,6 +5,8 @@ import { changedRows } from '../db';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../request-validation';
 import { parseFolderPath } from '../reminders/requests';
+import { readEncryptionState } from '../encryption/state';
+import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';
 
 export async function getNotificationPolicy(db: D1Database): Promise<NotificationPolicy | null> {
   const row = await db.prepare('SELECT enabled, folder_path, timezone, all_day_time, revision FROM notification_policy WHERE id = 1')
@@ -12,8 +14,15 @@ export async function getNotificationPolicy(db: D1Database): Promise<Notificatio
   return row ? { enabled: row.enabled !== 0, folderPath: row.folder_path, timezone: row.timezone, allDayTime: row.all_day_time, revision: row.revision } : null;
 }
 
+/** For clients: an encrypted vault's policy also carries the folder's sealed name. */
+async function labelledNotificationPolicy(db: D1Database): Promise<NotificationPolicy | null> {
+  const policy = await getNotificationPolicy(db);
+  const label = policy && await readEncryptionState(db) ? await readFolderLabel(db, policy.folderPath) : null;
+  return policy && label ? { ...policy, folderLabel: label } : policy;
+}
+
 export async function handleNotificationPolicy(request: Request, db: D1Database): Promise<Response> {
-  if (request.method === 'GET') return corsResponse({ policy: await getNotificationPolicy(db) });
+  if (request.method === 'GET') return corsResponse({ policy: await labelledNotificationPolicy(db) });
   const parsed = await parseJsonObject(request);
   if (!parsed.ok) return parsed.response;
   const { timezone, allDayTime, expectedRevision, enabled = true } = parsed.value;
@@ -22,6 +31,9 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
     return corsResponse({ error: 'Valid folderPath, timezone and allDayTime required' }, 400);
   }
   try { new Intl.DateTimeFormat('en', { timeZone: timezone }); } catch { return corsResponse({ error: 'Invalid timezone' }, 400); }
+  const encryption = await readEncryptionState(db);
+  const labelIssue = folderLabelIssue(encryption, folder, parsed.value.folderLabel);
+  if (labelIssue) return corsResponse({ error: labelIssue }, 428);
   const reading = await db.prepare('SELECT folder_path FROM reading_policy WHERE id=1').first<{ folder_path: string }>();
   if (reading) { try { validateReadingFolder(reading.folder_path, folder); } catch { return corsResponse({ error: 'Choose separate Reading and reminders folders.' }, 400); } }
   const revision = crypto.randomUUID();
@@ -29,6 +41,7 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
     ? db.prepare('INSERT INTO notification_policy (id, folder_path, timezone, all_day_time, revision, enabled) VALUES (1, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0)
     : db.prepare('UPDATE notification_policy SET folder_path = ?, timezone = ?, all_day_time = ?, revision = ?, enabled = ? WHERE id = 1 AND revision = ?').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0, typeof expectedRevision === 'string' ? expectedRevision : '');
   const results = await db.batch([mutation,
+    ...(encryption ? [saveFolderLabel(db, folder, parsed.value.folderLabel as string)] : []),
     db.prepare('DELETE FROM notification_file_retries WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)').bind(revision),
     db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
       SELECT path, ? FROM files WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md'
@@ -41,5 +54,5 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
       ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, revision),
   ]);
   if (request.method === 'PUT' && changedRows(results[0]) !== 1) return corsResponse({ error: 'Notification settings changed on another device. Refresh before saving.' }, 409);
-  return corsResponse({ policy: await getNotificationPolicy(db) });
+  return corsResponse({ policy: await labelledNotificationPolicy(db) });
 }

@@ -26,6 +26,7 @@ afterEach(() => {
 async function setup(connected = true, enabled = true) {
 	const plugin = {
 		app: { workspace: { detachLeavesOfType: vi.fn() } },
+		syncRuntime: { getApiClient: () => null },
 		remindersSettings: { enabled: true },
 		secretStorage: { get: (key: string) => key === 'crate-auth-token' ? 'synthetic' : null },
 		settings: { reading: { enabled, folderPath: 'Reading' }, workerUrl: connected ? 'https://crate.example' : '' },

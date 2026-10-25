@@ -16,7 +16,7 @@ function nextNotificationWork(db: D1Database): Promise<NotificationWork | null> 
 
 export async function runNotificationCoordinator(state: DurableObjectState, env: Env): Promise<void> {
   const encryption = await readEncryptionState(env.DB);
-  if (['converting', 'resetting'].includes(encryption?.mode ?? '')) return;
+  if (encryption?.mode === 'resetting') return;
   if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return;
   // Each sub-step would otherwise reload these rows within the same query budget.
   const features = await featurePolicy(env.DB);

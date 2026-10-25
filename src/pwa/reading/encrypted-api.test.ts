@@ -4,14 +4,21 @@ import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec'
 import type { EncryptedInventoryFile } from '@/encryption/file-inventory';
 import { EncryptedReadingApi, type EncryptedReadingIndexEntry } from './encrypted-api';
 import { createReadingNote } from '../../reading/core/notes';
+import { PathTags } from '@/encryption/path-tags';
 
 let authority: FileEncryptionAuthority;
-beforeAll(async () => { authority = { vaultId: 'vault-a', scopeId: 'reading-a', key: await importEncryptionSecret(generateEncryptionSecret()) }; });
+// The server lists notes by tagged paths inside the tagged Reading folder.
+let paths: PathTags, wireFolder: string;
+beforeAll(async () => {
+	authority = { vaultId: 'vault-a', scopeId: 'reading-a', key: await importEncryptionSecret(generateEncryptionSecret()) };
+	paths = await PathTags.fromSecret('vault-a', generateEncryptionSecret());
+	wireFolder = await paths.wire('Reading');
+});
 const page = (files: EncryptedInventoryFile[] = [], nextCursor: string | null = null, sequence = 1) => ({ files, nextCursor, sequence, generation: 1 });
 const itemId = '00000000-0000-4000-8000-000000000001';
 function harness() {
 	const request = vi.fn<(path: string) => Promise<Response>>(async () => { throw new Error('Unexpected request'); });
-	const api = new EncryptedReadingApi({ folderPath: 'Reading', generation: 1, authority, request,
+	const api = new EncryptedReadingApi({ folderPath: 'Reading', wireFolder, paths, generation: 1, authority, request,
 		readAttempt: async () => undefined, writeAttempt: async () => {}, error: message => new Error(message) });
 	return { api, request };
 }
@@ -19,7 +26,7 @@ async function article(title: string) {
 	const path = 'Reading/Article.md';
 	const text = createReadingNote({ id: itemId, url: 'https://example.com/article', title, savedAt: '2026-10-01T12:00:00Z' }) + `\n${title} text.\n`;
 	const sealed = await sealFile({ path, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: null }, authority);
-	return { bytes: sealed.bytes, file: { path, hash: sealed.hash, size: sealed.bytes.length, revision: title } };
+	return { bytes: sealed.bytes, file: { path: await paths.wire(path), hash: sealed.hash, size: sealed.bytes.length, revision: title } };
 }
 
 it('bounds empty advancing encrypted pages independently of the item budget', async () => {
@@ -93,7 +100,7 @@ async function notes(count: number, revision = 'r1') {
 		const path = `Reading/Note ${String(i).padStart(3, '0')}.md`;
 		const text = createReadingNote({ id, url: `https://example.com/${i}`, title: `Note ${i}`, savedAt: '2026-10-01T12:00:00Z' });
 		const sealed = await sealFile({ path, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: null }, authority);
-		return { bytes: sealed.bytes, file: { path, hash: sealed.hash, size: sealed.bytes.length, revision } };
+		return { bytes: sealed.bytes, file: { path: await paths.wire(path), hash: sealed.hash, size: sealed.bytes.length, revision } };
 	}));
 }
 function serve(request: ReturnType<typeof harness>['request'], saved: Awaited<ReturnType<typeof notes>>, sequence = 1) {
@@ -130,7 +137,7 @@ it('reuses the saved index after a reload and downloads only changed notes', asy
 	const saveIndex = vi.fn(async (entries: EncryptedReadingIndexEntry[]) => { stored = structuredClone(entries); });
 	const reload = () => {
 		const request = vi.fn<(path: string) => Promise<Response>>();
-		const api = new EncryptedReadingApi({ folderPath: 'Reading', generation: 1, authority, request, loadIndex: async () => stored, saveIndex,
+		const api = new EncryptedReadingApi({ folderPath: 'Reading', wireFolder, paths, generation: 1, authority, request, loadIndex: async () => stored, saveIndex,
 			readAttempt: async () => undefined, writeAttempt: async () => {}, error: message => new Error(message) });
 		return { api, request };
 	};
@@ -200,7 +207,7 @@ it('keeps other decrypted notes after committing an edit', async () => {
 		const target = new URL(path, 'https://crate.invalid').searchParams.get('path');
 		return new Response(current.find(note => note.file.path === target)!.bytes);
 	});
-	const api = new EncryptedReadingApi({ folderPath: 'Reading', generation: 1, authority, request,
+	const api = new EncryptedReadingApi({ folderPath: 'Reading', wireFolder, paths, generation: 1, authority, request,
 		readAttempt: async () => undefined, writeAttempt: async () => {}, error: message => new Error(message) });
 	const list = await api.request('/reading/list') as { items: Array<{ crate_reading_id: string; title: string }> };
 	const first = list.items.find(item => item.title === 'Note 0'), second = list.items.find(item => item.title === 'Note 1');

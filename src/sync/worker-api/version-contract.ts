@@ -1,6 +1,7 @@
 import { isRecord, isSha256Hex } from '../../platform/validation';
 import { isSyncDate, isSyncPath, isSyncRevision, isSyncSequence } from '../../protocol/sync-validation';
 import type { FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
+import { isWirePath } from '../../protocol/encrypted-path';
 
 export function parseFileVersions(value: unknown): FileVersionsPage {
 	if (!isRecord(value) || !Array.isArray(value.versions) || value.versions.length > 100 || typeof value.hasMore !== 'boolean') {
@@ -11,9 +12,10 @@ export function parseFileVersions(value: unknown): FileVersionsPage {
 	const versions: RemoteFileVersion[] = value.versions.map((row: unknown) => {
 		if (!isRecord(row) || !isSyncPath(row.path) || !isSyncRevision(row.storage_key) || !isSha256Hex(row.hash)
 			|| !isSyncSequence(row.size) || !isSyncSequence(row.expires_at) || !isSyncDate(row.created_at)
-			|| row.reason !== 'replaced' && row.reason !== 'deleted') throw new Error('Invalid retained-file metadata');
+			|| row.reason !== 'replaced' && row.reason !== 'deleted'
+			|| (row.wire !== undefined && (typeof row.wire !== 'string' || !isWirePath(row.wire)))) throw new Error('Invalid retained-file metadata');
 		return { path: row.path, storage_key: row.storage_key, hash: row.hash, size: row.size, expires_at: row.expires_at,
-			created_at: row.created_at, reason: row.reason };
+			created_at: row.created_at, reason: row.reason, ...(row.wire === undefined ? {} : { wire: row.wire }) };
 	});
 	return { versions, hasMore: value.hasMore, ...(value.hasMore ? { nextCursor: value.nextCursor as string } : {}) };
 }

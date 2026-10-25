@@ -1,7 +1,9 @@
 import { createAbortError } from '../abort';
-import type { EncryptionServerState } from '../../encryption/server-state';
+import { createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
+import { sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
+import { loadEncryptionKeys, saveEncryptionKeys } from '../encryption/key-storage';
 import type { SecretStorageService } from '../../plugin/secret-storage';
-import { createEncryptionReset, loadEncryptionReset, saveEncryptionReset, resetRemoteEncryption, EncryptionResetRejectedError } from '../encryption/reset';
+import { createEncryptionReset, createEncryptionSetup, loadEncryptionReset, saveEncryptionReset, resetRemoteEncryption, EncryptionResetRejectedError } from '../encryption/reset';
 import type { SyncEngine } from '../engine/engine';
 import type { RuntimeConfigurationTransition } from './runtime';
 import { resetStoredSyncState } from './sync-activity';
@@ -18,14 +20,20 @@ interface EncryptionResetContext {
 	/** Also pauses vault event capture until resumeEvents runs. */
 	getResetEngine: () => Pick<SyncEngine, 'sync' | 'updateSettings'>;
 	pushSharedSettings: () => Promise<boolean>;
+	/** Sync once more so the wipe cannot discard changes that exist only on the server. */
+	syncBeforeEncrypting: () => Promise<void>;
 	resumeEvents: () => void;
 	reportError: (message: string) => void;
 }
 
-/** Keep remote reset, local invalidation and reconciliation in their durable order. */
+/** What to start when no reset is saved: turn encryption off, or on with these keys. */
+export type EncryptionResetRequest = { target: 'plain'; state: EncryptionServerState | null } | { target: 'encrypted'; bundle: VaultKeyBundle; recovery: string };
+
+/** Keep remote reset, local invalidation and reconciliation in their durable order. A
+ * saved reset always resumes in its own direction, whatever the request. */
 export async function runEncryptionReset(
-	{ settings, secretStorage, transition, persistSettings, clearLocalState, getResetEngine, pushSharedSettings, resumeEvents, reportError }: EncryptionResetContext,
-	state: EncryptionServerState | null, progress: (message: string) => void,
+	{ settings, secretStorage, transition, persistSettings, clearLocalState, getResetEngine, pushSharedSettings, syncBeforeEncrypting, resumeEvents, reportError }: EncryptionResetContext,
+	request: EncryptionResetRequest, progress: (message: string) => void,
 	expected: { workerUrl: string; authToken: string }, signal?: AbortSignal,
 ): Promise<void> {
 	const { verify } = transition;
@@ -38,11 +46,24 @@ export async function runEncryptionReset(
 		throw new Error('Reconnect the original server before resuming this reset');
 	}
 	if (!reset) {
-		if (!state) throw new Error('No encryption reset is pending');
+		if (request.target === 'plain' && !request.state) throw new Error('No encryption reset is pending');
+		if (request.target === 'encrypted') {
+			progress('Syncing this device before replacing the server copy…');
+			await syncBeforeEncrypting();
+			// Keys are saved before the checkpoint, so a resumed setup always has them.
+			saveEncryptionKeys(secretStorage, request.bundle, request.recovery);
+		}
 		if (expected.workerUrl !== settings.workerUrl || expected.authToken !== secretStorage.get(SECRET_KEYS.AUTH_TOKEN)) throw new Error('The server connection changed. Reopen Manage encryption.');
-		reset = createEncryptionReset(settings.workerUrl, expected.authToken, state, settings.automaticSync);
+		reset = request.target === 'plain' ? createEncryptionReset(settings.workerUrl, expected.authToken, request.state!, settings.automaticSync)
+			: createEncryptionSetup(settings.workerUrl, expected.authToken, request.bundle, settings.automaticSync);
 		saveEncryptionReset(secretStorage, reset);
 	}
+	const encrypting = reset.target === 'encrypted';
+	const savedKeys = () => {
+		const keys = loadEncryptionKeys(secretStorage), recovery = secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
+		if (!keys || !recovery || keys.vaultId !== reset!.vaultId || keys.generation !== reset!.generation) throw new Error('This device’s encryption keys are missing. Restore them before resuming.');
+		return { keys, recovery };
+	};
 	transition.stop();
 	try {
 		await transition.waitForIdle();
@@ -55,7 +76,10 @@ export async function runEncryptionReset(
 				const http = new WorkerApiHttpClient(expected.workerUrl, token);
 				if (signal) http.setAbortSignal(signal);
 				return http;
-			}, checkpoint => saveEncryptionReset(secretStorage, checkpoint));
+			}, checkpoint => saveEncryptionReset(secretStorage, checkpoint), encrypting ? async () => {
+				const { keys, recovery } = savedKeys();
+				return createEncryptionState(keys, await sealRecoveryBundle(keys, recovery));
+			} : undefined);
 			verify();
 			reset = { ...reset, phase: 'local' };
 			saveEncryptionReset(secretStorage, reset);
@@ -66,7 +90,8 @@ export async function runEncryptionReset(
 			verify();
 			secretStorage.set(SECRET_KEYS.AUTH_TOKEN, reset.replacementToken);
 			if (secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== reset.replacementToken) throw new Error('Could not save the new device credential');
-			for (const key of [SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]) {
+			if (encrypting) savedKeys();
+			else for (const key of [SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]) {
 				secretStorage.delete(key);
 				if (secretStorage.has(key)) throw new Error('Could not clear this device’s previous encryption keys');
 			}
@@ -79,7 +104,7 @@ export async function runEncryptionReset(
 		await transition.initialize(true);
 		verify();
 		const engine = getResetEngine();
-		progress('Uploading this device’s vault without end-to-end encryption…');
+		progress(encrypting ? 'Encrypting and uploading this device’s vault…' : 'Uploading this device’s vault without end-to-end encryption…');
 		// The wipe is complete. Another reconnected device may already have
 		// edited the new server copy; retries must retain the normal sync baseline.
 		const result = await engine.sync((current, total) => progress(`Syncing files: ${current} of ${total}`));
@@ -95,7 +120,7 @@ export async function runEncryptionReset(
 		settings.automaticSync = reset.automaticSync;
 		engine.updateSettings(settings);
 		resumeEvents();
-		progress('Encryption is off. Reconnect your other devices and web apps.');
+		progress(encrypting ? 'Encryption is on. Reconnect your other devices and web apps.' : 'Encryption is off. Reconnect your other devices and web apps.');
 	} catch (error) {
 		settings.automaticSync = false;
 		transition.stop();

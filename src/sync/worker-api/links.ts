@@ -1,6 +1,6 @@
 import type { WorkerApiHttpClient } from './http';
 import type { EncryptedFiles } from '../encryption/encrypted-files';
-import { readServerEncryption } from '../encryption/conversion';
+import { readServerEncryption } from '../encryption/server-encryption';
 
 export class LinksWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}

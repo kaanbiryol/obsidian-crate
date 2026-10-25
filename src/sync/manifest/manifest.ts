@@ -54,6 +54,8 @@ export class LocalManifest {
 	private uploadDiagnostics: UploadDiagnostic[] = [];
 	private restoreIntents: RestoreIntent[] = [];
 	private initialConfigPull?: InitialConfigPull;
+	// Random server names of encrypted notes learned before their entry is written.
+	private pendingWires = new Map<string, string>();
 
 	constructor(app: App, pluginManifest: PluginManifest, private readonly authority?: string) {
 		this.app = app;
@@ -266,7 +268,30 @@ export class LocalManifest {
 	 */
 	setEntry(path: string, entry: Readonly<FileEntry>): void {
 		const previous = this.getEntry(path);
-		this.manifest.files[path] = { ...entry, revision: entry.revision ?? (previous?.hash === entry.hash ? previous.revision : undefined) };
+		// A note keeps its random server name until it is deleted or renamed.
+		const wire = entry.wire ?? previous?.wire ?? this.pendingWires.get(path);
+		this.pendingWires.delete(path);
+		this.manifest.files[path] = { ...entry, revision: entry.revision ?? (previous?.hash === entry.hash ? previous.revision : undefined), ...(wire ? { wire } : {}) };
+		this.changedPaths.add(path);
+		this.markChanged();
+	}
+
+	/** The server path of an encrypted note whose server name is random, if known. */
+	wireOf(path: string): string | undefined {
+		return this.getEntry(path)?.wire ?? this.pendingWires.get(path);
+	}
+
+	pathOfWire(wire: string): string | undefined {
+		for (const [path, entry] of Object.entries(this.manifest.files)) if (entry.wire === wire) return path;
+		for (const [path, pending] of this.pendingWires) if (pending === wire) return path;
+		return undefined;
+	}
+
+	noteWire(path: string, wire: string): void {
+		const entry = this.getEntry(path);
+		if (!entry) { this.pendingWires.set(path, wire); return; }
+		if (entry.wire === wire) return;
+		this.manifest.files[path] = { ...entry, wire };
 		this.changedPaths.add(path);
 		this.markChanged();
 	}
@@ -276,6 +301,7 @@ export class LocalManifest {
 	 */
 	removeEntry(path: string): void {
 		this.renames.delete(path);
+		this.pendingWires.delete(path);
 		delete this.manifest.files[path];
 		this.changedPaths.add(path);
 		this.markChanged();

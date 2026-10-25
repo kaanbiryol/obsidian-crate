@@ -11,10 +11,11 @@ import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger, errorMessage } from '../logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { loadEncryptionKeys } from '../encryption/key-storage';
-import { runEncryptionReset } from './encryption-reset-workflow';
+import { runEncryptionReset, type EncryptionResetRequest } from './encryption-reset-workflow';
 import { changeEncryptedServerAddress, changeEncryptionResetAddress } from './address-workflow';
 import { changeServerConnection, disconnectServerConnection } from './connection-workflow';
 import type { EncryptionServerState } from '../../encryption/server-state';
+import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from '../types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 import { SyncApiClient } from '../worker-api/client';
@@ -437,6 +438,17 @@ export class SyncRuntime {
 	/** A durable checkpoint blocks ordinary sync until reset and reconciliation finish. */
 	turnOffEncryption(state: EncryptionServerState | null, progress: (message: string) => void,
 		expected: { workerUrl: string; authToken: string }, signal?: AbortSignal): Promise<void> {
+		return this.resetEncryption({ target: 'plain', state }, progress, expected, signal);
+	}
+
+	/** Replaces the server copy, its history and checkpoints with this device's vault, encrypted. */
+	turnOnEncryption(bundle: VaultKeyBundle, recovery: string, progress: (message: string) => void,
+		expected: { workerUrl: string; authToken: string }, signal?: AbortSignal): Promise<void> {
+		return this.resetEncryption({ target: 'encrypted', bundle, recovery }, progress, expected, signal);
+	}
+
+	private resetEncryption(request: EncryptionResetRequest, progress: (message: string) => void,
+		expected: { workerUrl: string; authToken: string }, signal?: AbortSignal): Promise<void> {
 		return this.changeConfiguration(transition => runEncryptionReset({
 			settings: this.settings, secretStorage: this.secretStorage,
 			transition, persistSettings: this.persistSettings,
@@ -447,9 +459,16 @@ export class SyncRuntime {
 				return this.syncEngine;
 			},
 			pushSharedSettings: () => this.pushSharedSettingsBestEffort(),
+			syncBeforeEncrypting: async () => {
+				if (!this.syncEngine) throw new Error('Connect sync on this device before enabling encryption');
+				const result = await this.syncEngine.sync();
+				if (result.outcome === 'cancelled' || !result.success || result.conflicts.length) {
+					throw new Error('Sync this device without errors or conflicts first, so no server-only changes are lost.');
+				}
+			},
 			resumeEvents: () => { this.acceptingEvents = true; },
 			reportError: message => { this.initializationError = message; this.emitCurrentState(); },
-		}, state, progress, expected, signal), signal);
+		}, request, progress, expected, signal), signal);
 	}
 
 	private configurationTransition(signal?: AbortSignal): RuntimeConfigurationTransition {

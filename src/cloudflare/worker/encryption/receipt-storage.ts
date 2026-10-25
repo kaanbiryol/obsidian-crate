@@ -20,15 +20,14 @@ export function prepareEncryptedReceipt(db: D1Database, kind: ReceiptKind, id: s
 	if (!/^[A-Za-z0-9_-]{1,128}$/.test(id) || !/^[\x20-\x7e]*$/.test(json)) throw new Error('Invalid encrypted receipt');
 	const count = Math.ceil(json.length / CHUNK_SIZE);
 	if (count > MAX_CHUNKS) throw new Error('Encrypted receipt is too large');
-	return { json: JSON.stringify('e2eeLegacy' in response ? { e2eeLegacy: { chunks: count } } : { e2eeChunks: count }),
+	return { json: JSON.stringify({ e2eeChunks: count }),
 		statements: Array.from({ length: count }, (_, index) => db.prepare(`INSERT INTO maintenance_state(key, value)
 			SELECT ?, ? WHERE ${guard.sql}`).bind(chunkKey(kind, id, index), json.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE), ...guard.args)) };
 }
 
 export async function readEncryptedReceipt(db: D1Database, kind: ReceiptKind, id: string, json: string): Promise<Record<string, unknown>> {
 	const response = JSON.parse(json) as Record<string, unknown>;
-	const converted = response.e2eeLegacy as { chunks?: unknown } | undefined;
-	const count = converted?.chunks ?? response.e2eeChunks;
+	const count = response.e2eeChunks;
 	if (count === undefined) return response;
 	if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > MAX_CHUNKS) throw new Error('Invalid encrypted receipt chunks');
 	const keys = Array.from({ length: count }, (_, index) => chunkKey(kind, id, index));

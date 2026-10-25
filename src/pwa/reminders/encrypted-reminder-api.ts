@@ -5,7 +5,6 @@ import { scanReminderMarkdownContent, getProjectFromPath } from '../../reminders
 import { decodeMarkdownBytes } from '../../reminders/core/markdownEncoding';
 import { buildReminderList } from '../../reminders/core/reminder-list';
 import { applyReminderFileCommand, reminderCommandPayload, ReminderCommandError } from '../../reminders/core/reminderFileCommand';
-import { reminderRequestHash } from '../../encryption/reminder-receipt';
 import { MarkdownEncodingError } from '../../reminders/core/markdownEncoding';
 import { ReminderInputError } from '../../reminders/core/reminderMutationInput';
 import { ReminderMarkdownContextError } from '../../reminders/core/markdownTaskContext';
@@ -23,11 +22,14 @@ import { isSyncPath } from '@/protocol/sync-validation';
 import { REMINDER_OUTBOX_LOCK } from '@/pwa/reminders/outbox/reminder-storage-keys';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
+import { resolveEncryptedPath } from '@/encryption/path-binding';
+import { compareCodePoints } from '@/protocol/initial-import';
 
 const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
 const NOTE_CONCURRENCY = 6;
 type ReminderPayload = Awaited<ReturnType<typeof reminderCommandPayload>>;
-interface ScannedNote { file: RemoteFile; reminders: ReminderPayload[]; issue?: string }
+/** `file` is listed by server path; `path` is the note's plaintext path. */
+interface ScannedNote { file: RemoteFile; path: string; reminders: ReminderPayload[]; issue?: string }
 
 async function json<T>(response: Response): Promise<T> {
 	if (!response.ok) {
@@ -39,14 +41,17 @@ async function json<T>(response: Response): Promise<T> {
 
 export class EncryptedReminderApi {
 	private readonly current = capturePwaSession();
-	private cached = new Map<string, { file: RemoteFile; content: string; issue?: string }>();
+	private cached = new Map<string, { file: RemoteFile; path: string; content: string; issue?: string }>();
 	// Parsed reminders per immutable revision. Unlike the bounded content cache,
 	// this keeps every current note, so a change re-downloads only changed notes.
 	private scanned = new Map<string, ScannedNote>();
+	// Plaintext path of each server path opened this session, for issues raised after opening.
+	private names = new Map<string, string>();
 	constructor(private readonly keys: FeatureKeys, private readonly fetch: ApiFetch) {}
+	/** Notes, projects and requests from the app use plaintext paths; the server sees `wireFolder`. */
 	private get localFolder() { return this.keys.folderPath; }
-	private authority(path: string) {
-		if (!path.startsWith(`${this.keys.folderPath}/`) || !isSyncPath(path)) throw new ReminderCommandError('File is outside this enrollment', 403, 'scope_mismatch');
+	private authority(wire: string) {
+		if (!wire.startsWith(`${this.keys.wireFolder}/`) || !isSyncPath(wire)) throw new ReminderCommandError('File is outside this enrollment', 403, 'scope_mismatch');
 		return { vaultId: this.keys.vaultId, scopeId: 'vault', key: this.keys.vault };
 	}
 	private assertCurrent(): void { if (!this.current()) throw new Error('Session changed. Reopen Crate before saving.'); }
@@ -71,9 +76,9 @@ export class EncryptedReminderApi {
 	}
 
 	private async page(after?: string): Promise<FilePage> {
-		const query = new URLSearchParams({ folderPath: this.keys.folderPath });
+		const query = new URLSearchParams({ folderPath: this.keys.wireFolder });
 		if (after) query.set('after', after);
-		return parseEncryptedInventoryPage(await json<unknown>(await this.fetch(`/reminders/encrypted-files?${query}`)), this.keys.folderPath, this.keys.generation);
+		return parseEncryptedInventoryPage(await json<unknown>(await this.fetch(`/reminders/encrypted-files?${query}`)), this.keys.wireFolder, this.keys.generation);
 	}
 
 	private async inventory(first?: FilePage): Promise<{ files: RemoteFile[]; sequence: number }> {
@@ -90,24 +95,26 @@ export class EncryptedReminderApi {
 		return (await this.readNote(file, cache)).content;
 	}
 
-	private async readNote(file: RemoteFile, cache: typeof this.cached): Promise<{ content: string; issue?: string }> {
+	private async readNote(file: RemoteFile, cache: typeof this.cached): Promise<{ path: string; content: string; issue?: string }> {
 		const cached = cache.get(file.revision);
 		if (cached && cached.file.path === file.path && cached.file.hash === file.hash && cached.file.size === file.size) return cached;
 		// Coarse ciphertext bound before download; the 1 MiB plaintext limit is checked after opening.
 		if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
-		const query = new URLSearchParams({ folderPath: this.keys.folderPath, path: file.path, revision: file.revision });
+		const query = new URLSearchParams({ folderPath: this.keys.wireFolder, path: file.path, revision: file.revision });
 		const response = await this.fetch(`/reminders/encrypted-file?${query}`);
 		if (!response.ok) await json(response);
 		const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, this.authority(file.path),
-			'Encrypted reminder transfer failed integrity validation');
+			'Encrypted reminder transfer failed integrity validation', (metadataPath, sealed) => resolveEncryptedPath(this.keys.paths, file.path, metadataPath, sealed, null));
+		this.names.set(file.path, opened.metadata.path);
 		if (opened.content.byteLength > MAX_REMINDER_NOTE_BYTES) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
 		const content = decodeMarkdownBytes(opened.content);
 		validateEncryptedSchedules(opened.publicData);
 		const issue = opened.publicData.issue === 'scheduling-capacity' ? ENCRYPTED_SCHEDULING_CAPACITY_ISSUE : undefined;
+		const path = opened.metadata.path;
 		this.assertCurrent();
-		cache.set(file.revision, { file, content, issue });
+		cache.set(file.revision, { file, path, content, issue });
 		trimContentCache(cache, 1000);
-		return { content, issue };
+		return { path, content, issue };
 	}
 
 	private async list(previousEtag: string | null): Promise<Response> {
@@ -127,8 +134,8 @@ export class EncryptedReminderApi {
 						const known = this.scanned.get(file.revision);
 						if (known && known.file.path === file.path && known.file.hash === file.hash && known.file.size === file.size) return known;
 						const note = await this.readNote(file, nextCache);
-						const scanned = scanReminderMarkdownContent(file.path, note.content, this.localFolder).reminders;
-						return { file, reminders: await Promise.all(scanned.map(reminder => reminderCommandPayload(reminder))), issue: note.issue };
+						const scanned = scanReminderMarkdownContent(note.path, note.content, this.localFolder).reminders;
+						return { file, path: note.path, reminders: await Promise.all(scanned.map(reminder => reminderCommandPayload(reminder))), issue: note.issue };
 					} catch (error) {
 						if (!(error instanceof MarkdownEncodingError) && !(error instanceof ReminderCommandError && error.status === 413)) throw error;
 						return { file, error };
@@ -136,7 +143,9 @@ export class EncryptedReminderApi {
 				});
 				for (const entry of loaded) {
 					const { file } = entry;
-					const source = { path: file.path, project: getProjectFromPath(file.path, this.keys.folderPath) };
+					// A note that could not even be opened is reported by its server path.
+					const path = 'path' in entry ? entry.path : this.names.get(file.path) ?? file.path;
+					const source = { path, project: getProjectFromPath(path, path === file.path ? this.keys.wireFolder : this.keys.folderPath) };
 					if ('error' in entry) {
 						sources.push({ ...source, reminders: [], issue: entry.error instanceof Error ? entry.error.message : 'This note could not be decrypted' });
 						continue;
@@ -145,6 +154,8 @@ export class EncryptedReminderApi {
 					sources.push({ ...source, reminders: entry.reminders, issue: entry.issue });
 				}
 				if ((await this.page()).sequence !== inventory.sequence) throw new ReminderCommandError('Reminder files changed while loading. Refresh again.');
+				// The server lists tags; order notes by plaintext path, as an unencrypted server does.
+				sources.sort((a, b) => compareCodePoints(a.path, b.path));
 				const result = buildReminderList(sources);
 				this.assertCurrent();
 				this.cached = nextCache;
@@ -182,43 +193,32 @@ export class EncryptedReminderApi {
 		if (attempt && attempt.semanticHash !== semanticHash && !attempt.rejected) throw new Error('The original encrypted save is still unresolved. Retry it before changing the request.');
 		const movedAttempt = attempt && attempt.generation !== this.keys.generation;
 		if (attempt?.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.vault, this.context(body.operationId)));
-		if (!attempt || movedAttempt) {
-			const query = new URLSearchParams({ folderPath: this.keys.folderPath, operationId: body.operationId });
-			const receipt = await json<{ envelope: string | null }>(await this.fetch(`/reminders/encrypted-receipt?${query}`));
-			if (receipt.envelope) {
-				const converted = await decryptJson(receipt.envelope, this.keys.vault, this.context(body.operationId)) as { requestHash: string; response: unknown };
-				if (converted.requestHash !== await reminderRequestHash(attempt ? 'encrypted-files' : action === 'set-completed' ? 'complete' : action,
-					attempt ? JSON.parse(attempt.body) as Record<string, unknown> : original)) throw new ReminderCommandError('The original reminder operation has different saved content. Preserve it before recovery.', 409, 'operation_mismatch');
-				const encrypted = (converted.response as { encrypted?: unknown })?.encrypted;
-				return Response.json(typeof encrypted === 'string' ? await decryptJson(encrypted, this.keys.vault, this.context(body.operationId)) : converted.response);
-			}
-			if (attempt) {
-				// The old generation can no longer publish. An absent converted receipt
-				// confirms this immutable attempt never committed; retain its semantic ID.
-				const rejected = { ...attempt, rejected: true };
-				await saveEncryptedReminderAttempt(key, rejected, attempt, this.current); attempt = rejected;
-			}
+		if (attempt && movedAttempt) {
+			// Other keys can no longer publish, so this immutable attempt never committed; retain its semantic ID.
+			const rejected = { ...attempt, rejected: true };
+			await saveEncryptedReminderAttempt(key, rejected, attempt, this.current); attempt = rejected;
 		}
 		for (let retry = 0; retry < 2; retry++) {
 			if (!attempt || attempt.rejected) {
 				const inventory = await this.inventory();
+				// Reminder notes are always created by key holders, so each lives at its name's tag.
 				const files = new Map(inventory.files.map(file => [file.path, file]));
 				const command = await applyReminderFileCommand(action, body, this.localFolder, async path => {
-					const file = files.get(path);
+					const file = files.get(await this.keys.paths.wire(path));
 					return file ? this.read(file) : null;
 				});
 				const replacements = [];
 				for (const change of command.files) {
-					const path = change.path;
+					const path = change.path, wire = await this.keys.paths.wire(path);
 					const content = new TextEncoder().encode(change.content);
 					const projection = await createReminderProjection({ vaultId: this.keys.vaultId, key: this.keys.notifications, fingerprint: this.keys.notificationFingerprint },
 						[this.keys.folderPath], path, content.buffer);
-					const sealed = await sealFile({ path, content, contentType: 'text/markdown; charset=utf-8', publicData: projection }, this.authority(path));
-					replacements.push({ path, content: new TextDecoder().decode(sealed.bytes),
-						expectedHash: files.get(path)?.hash ?? null, expectedRevision: files.get(path)?.revision });
+					const sealed = await sealFile({ path, content, contentType: 'text/markdown; charset=utf-8', publicData: projection }, this.authority(wire));
+					replacements.push({ path: wire, content: new TextDecoder().decode(sealed.bytes),
+						expectedHash: files.get(wire)?.hash ?? null, expectedRevision: files.get(wire)?.revision });
 				}
 				const acknowledgment = await encryptJson(command.response, this.keys.vault, this.context(body.operationId));
-				const next: Attempt = { semanticHash, generation: this.keys.generation, body: JSON.stringify({ folderPath: this.keys.folderPath, operationId: body.operationId,
+				const next: Attempt = { semanticHash, generation: this.keys.generation, body: JSON.stringify({ folderPath: this.keys.wireFolder, operationId: body.operationId,
 					files: replacements, acknowledgment, ...(command.createdId ? { createdId: command.createdId } : {}) }) };
 				await saveEncryptedReminderAttempt(key, next, attempt, this.current); attempt = next;
 			}

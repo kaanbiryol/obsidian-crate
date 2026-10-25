@@ -43,8 +43,9 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 	// startup and reset already publish checking; changing it here races push
 	// provider selection against an ordinary concurrent reminder-list request.
 	const work = (async () => {
-		const expected = await loadEncryptionState({ token, purpose: 'reminders', fragment: fragmentCode, request: () => rawFetch('/encryption'), current });
-		if (!expected) {
+		const verified = await loadEncryptionState({ token, purpose: 'reminders', fragment: fragmentCode, request: () => rawFetch('/encryption'), current });
+		const expected = verified?.state;
+		if (!verified || !expected) {
 			useUnencryptedStorage();
 			state = undefined;
 			publish({ status: 'unencrypted' });
@@ -54,7 +55,9 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 		if (view.status !== 'ready') requirePrivateStorageUnlock();
 		assertEncryptionActive(expected);
 		const localFolder = loadStoredConfig().folderPath;
-		const keys = await loadVaultKeys(expected, localFolder, current, fragmentCode);
+		if (!verified.folderPath) throw new Error('Update the Crate server and reconnect this app from Obsidian.');
+		const keys = await loadVaultKeys(verified, verified.folderPath, current, fragmentCode);
+		if (keys.folderPath !== localFolder) throw new Error('This app’s reminders folder changed. Open a fresh setup link from Obsidian.');
 		fragmentCode = undefined;
 		const local = await unlockLocalState(keys, 'reminders');
 		if (!current()) { local.destroy(); throw new Error('Session changed before unlocking'); }

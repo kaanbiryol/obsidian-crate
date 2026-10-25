@@ -1,8 +1,9 @@
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { isEncryptionId } from '../../encryption/encoding';
 import type { EncryptionServerState, ResetReceipt } from '../../encryption/server-state';
+import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { HttpError, WorkerApiHttpClient, TRANSFER_TIMEOUT_MS } from '../worker-api/http';
-import { readServerEncryption } from './conversion';
+import { readServerEncryption } from './server-encryption';
 import { isSha256Hex } from '../../platform/validation';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import { createRandomHexToken } from '../../platform/random-hex';
@@ -16,6 +17,8 @@ export interface EncryptionReset {
 	oldToken: string;
 	replacementToken: string;
 	automaticSync: boolean;
+	/** Turning encryption off uploads plaintext; turning it on uploads with this device's keys. */
+	target: 'plain' | 'encrypted';
 	phase: 'remote' | 'local' | 'upload';
 	/** Missing on older checkpoints, whose begin outcome must be treated as uncertain. */
 	beginState?: 'prepared' | 'attempted' | 'rejected';
@@ -29,7 +32,7 @@ export function loadEncryptionReset(storage: SecretStorageService): EncryptionRe
 		|| !Number.isSafeInteger(value.generation) || value.generation! < 1 || typeof value.workerUrl !== 'string'
 		|| !value.workerUrl || typeof value.oldToken !== 'string' || !value.oldToken
 		|| !isSha256Hex(value.replacementToken)
-		|| typeof value.automaticSync !== 'boolean' || !['remote', 'local', 'upload'].includes(value.phase ?? '')
+		|| typeof value.automaticSync !== 'boolean' || !['plain', 'encrypted'].includes(value.target ?? '') || !['remote', 'local', 'upload'].includes(value.phase ?? '')
 		|| (value.beginState !== undefined && !['prepared', 'attempted', 'rejected'].includes(value.beginState))) {
 		throw new Error('The saved encryption reset is invalid. Sync remains paused; preserve this device’s data.');
 	}
@@ -43,14 +46,19 @@ export function saveEncryptionReset(storage: SecretStorageService, reset: Encryp
 }
 
 export function createEncryptionReset(workerUrl: string, oldToken: string, state: EncryptionServerState, automaticSync: boolean): EncryptionReset {
-	if (state.mode !== 'active') throw new Error('Finish encryption conversion before turning encryption off');
+	if (state.mode !== 'active') throw new Error('Finish the current encryption reset first');
 	return { version: 1, id: crypto.randomUUID(), workerUrl, oldToken, vaultId: state.vaultId, generation: state.generation,
-		replacementToken: createRandomHexToken(),
-		automaticSync, phase: 'remote', beginState: 'prepared' };
+		replacementToken: createRandomHexToken(), automaticSync, target: 'plain', phase: 'remote', beginState: 'prepared' };
+}
+
+/** Turning encryption on replaces the plaintext server copy with this device's vault. */
+export function createEncryptionSetup(workerUrl: string, oldToken: string, bundle: VaultKeyBundle, automaticSync: boolean): EncryptionReset {
+	return { version: 1, id: crypto.randomUUID(), workerUrl, oldToken, vaultId: bundle.vaultId, generation: bundle.generation,
+		replacementToken: createRandomHexToken(), automaticSync, target: 'encrypted', phase: 'remote', beginState: 'prepared' };
 }
 
 export class EncryptionResetRejectedError extends Error {
-	constructor() { super('The server rejected the reset before it started. Reopen Manage encryption or reconnect this device.'); }
+	constructor(reason?: string) { super(`${reason ? `${reason} ` : ''}The server rejected the reset before it started. Reopen Manage encryption or reconnect this device.`); }
 }
 
 function checkReceipt(reset: EncryptionReset, receipt: ResetReceipt): ResetReceipt {
@@ -68,7 +76,9 @@ export async function verifyEncryptionResetAddress(reset: EncryptionReset, creat
 	} catch (error) {
 		if (!(error instanceof HttpError) || error.status !== 401 || reset.phase !== 'remote') throw error;
 		const state = await readServerEncryption(createHttp(reset.oldToken));
-		if (!state || state.mode !== 'active' || state.vaultId !== reset.vaultId || state.generation !== reset.generation) {
+		// Before it starts, a reset that turns encryption on finds the plaintext server.
+		if (reset.target === 'encrypted' ? state !== null
+			: !state || state.mode !== 'active' || state.vaultId !== reset.vaultId || state.generation !== reset.generation) {
 			throw new Error('The new address does not identify the vault being reset');
 		}
 	}
@@ -77,7 +87,8 @@ export async function verifyEncryptionResetAddress(reset: EncryptionReset, creat
 /** Only the saved replacement credential may resume. Never start a new reset
  * when a response is lost, and never fall back on network/server errors. */
 export async function resetRemoteEncryption(reset: EncryptionReset, progress: (message: string) => void, verify: () => void,
-	createHttp: (token: string) => WorkerApiHttpClient, persist: (reset: EncryptionReset) => void): Promise<void> {
+	createHttp: (token: string) => WorkerApiHttpClient, persist: (reset: EncryptionReset) => void,
+	encryption?: () => Promise<EncryptionServerState>): Promise<void> {
 	if (reset.beginState === 'rejected') throw new EncryptionResetRejectedError();
 	const route = `/encryption/reset?id=${encodeURIComponent(reset.id)}`;
 	const http = createHttp(reset.replacementToken);
@@ -92,19 +103,21 @@ export async function resetRemoteEncryption(reset: EncryptionReset, progress: (m
 		if (!(error instanceof HttpError) || error.status !== 401) throw error;
 		verify();
 		const original = createHttp(reset.oldToken);
-		original.setEncryptionAuthority(reset.vaultId, reset.generation);
+		if (reset.target === 'plain') original.setEncryptionAuthority(reset.vaultId, reset.generation);
+		if (reset.target === 'encrypted' && !encryption) throw new Error('This device’s encryption keys are required to finish turning encryption on');
+		const target = reset.target === 'encrypted' ? await encryption!() : undefined;
 		const firstAttempt = reset.beginState === 'prepared';
 		reset.beginState = 'attempted';
 		persist(reset); // A crash or lost response from here on must preserve the replacement credential.
 		try {
 			receipt = check(await original.requestJson<ResetReceipt>(route, { method: 'POST', body: JSON.stringify({
-				confirmation: 'delete-remote-data', replacementToken: reset.replacementToken,
+				confirmation: 'delete-remote-data', replacementToken: reset.replacementToken, ...(target ? { encryption: target } : {}),
 			}) }, TRANSFER_TIMEOUT_MS));
 		} catch (error) {
 			if (firstAttempt && error instanceof HttpError && [400, 401, 403, 404, 405, 409, 428].includes(error.status)) {
 				reset.beginState = 'rejected';
 				persist(reset);
-				throw new EncryptionResetRejectedError();
+				throw new EncryptionResetRejectedError(error.status === 409 ? error.message : undefined);
 			}
 			throw error;
 		}

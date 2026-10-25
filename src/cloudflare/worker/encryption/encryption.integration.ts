@@ -10,7 +10,7 @@ import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import { createReminderProjection } from '../../../encryption/reminder-projection';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
-import { ENCRYPTION_STATE_KEY, ENCRYPTION_FILE_PREFIX } from './state';
+import { ENCRYPTION_FILE_PREFIX } from './state';
 import { handleUpload } from '../sync/file-handlers';
 import { getStoredFileRow } from '../sync/storage';
 import { trackStagedUpload } from '../sync/staged-uploads';
@@ -21,15 +21,11 @@ import { drainNotificationJobs } from '../notifications/outbox';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { parseEncryptedNotification } from '../../../encryption/notification-format';
 import { handleEncryptionRoute } from '../routes/encryption';
-import { CONVERSION_SWEEP_PAGE_SIZE, handleEncryptionConversion } from './conversion';
-import { meterD1Usage } from '../d1-usage';
-import { encryptJson } from '../../../encryption/envelope';
-import { openFile } from '../../../encryption/file-codec';
-import { readEncryptionState } from './state';
-import { handleCheckChanges } from '../sync/metadata-handlers';
 import worker from '../index';
 import { createManagedObjectKey } from '../../../protocol/storage-keys';
 import { sha256Hex } from '../../../platform/sha256';
+import { sealFolderLabel } from '../../../encryption/folder-label';
+import { importEncryptionSecret } from '../../../encryption/envelope';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
@@ -42,12 +38,16 @@ async function configure() {
 const secrets = (bundle: VaultKeyBundle) => [bundle.vault.secret, bundle.notifications.secret, bundle.seal.privateKey];
 
 it('atomically stores ciphertext, its descriptor and encrypted scheduling projections', async () => {
-	const { bundle, state, keys, notifications } = await configure();
-	await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: null }) }), env.DB);
-	const path = 'Reminders/Inbox.md';
+	const { bundle, state, keys, notifications, paths } = await configure();
+	// The server stores the folder's tag and its sealed name, never the name itself.
+	const folder = await sealFolderLabel('Reminders', paths, await importEncryptionSecret(bundle.vault), bundle.vaultId);
+	const policy = await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST',
+		body: JSON.stringify({ folderPath: folder.wire, folderLabel: folder.label, timezone: 'UTC', allDayTime: null }) }), env.DB);
+	expect(policy.status, await policy.clone().text()).toBe(200);
+	const plain = 'Reminders/Inbox.md', path = await paths.wire(plain);
 	const text = '- [ ] Secret medical appointment 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->';
 	const content = new TextEncoder().encode(text);
-	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
+	const file = await sealFile({ path: plain, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], plain, content.buffer) }, keys.forPath(path));
 	const request = new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes,
 		headers: { 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)) } });
@@ -64,8 +64,8 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	expect(alarm?.content).not.toContain('Secret medical');
 	expect(parseEncryptedNotification(alarm!.content)).toMatchObject({ vaultId: bundle.vaultId, reminderId: 'r1' });
 	// Every session reads the same public configuration; none of it is secret.
-	const scoped = await (await handleEncryptionRoute(new Request('https://test/encryption'), env.DB, '/encryption', { tokenId: 'web', scope: 'reminders', folderPath: 'Reminders' }))!.text();
-	expect(JSON.parse(scoped)).toEqual({ encryption: state });
+	const scoped = await (await handleEncryptionRoute(new Request('https://test/encryption'), env.DB, '/encryption', { tokenId: 'web', scope: 'reminders', folderPath: folder.wire }))!.text();
+	expect(JSON.parse(scoped)).toEqual({ encryption: state, folderPath: folder.wire, folderLabel: folder.label });
 	for (const secret of secrets(bundle)) expect(scoped).not.toContain(secret);
 });
 
@@ -79,61 +79,6 @@ it('rejects an in-flight plaintext publication whose SQL was prepared before enc
 	await expect(trackStagedUpload(env.DB, createManagedObjectKey(hash), 'new-plaintext.md')).rejects.toThrow('Encryption changed');
 });
 
-it('keeps the next change visible after converting an empty vault', async () => {
-	const { state } = await configure();
-	await env.DB.prepare('UPDATE maintenance_state SET value = ? WHERE key = ?').bind(JSON.stringify({ ...state, mode: 'converting' }), ENCRYPTION_STATE_KEY).run();
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('e2ee:settings-converted', 'true')").run();
-	const response = await handleEncryptionConversion(new Request('https://test/encryption/conversion/finish', { method: 'POST', headers: {
-		'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation),
-	} }), env, '/encryption/conversion/finish');
-	expect(response?.status).toBe(200);
-	const floor = (await env.DB.prepare('SELECT snapshot_seq FROM initial_import').first<{ snapshot_seq: number }>())!.snapshot_seq;
-	await env.DB.prepare("INSERT INTO changelog(path, action, revision, hash, size) VALUES ('new.md', 'put', 'new', 'hash', 1)").run();
-	const sequence = (await env.DB.prepare('SELECT MAX(seq) AS seq FROM changelog').first<{ seq: number }>())!.seq;
-	expect(sequence).toBeGreaterThan(floor);
-	expect(await (await handleCheckChanges(new Request(`https://test/sync/check?since=${floor}`), env.DB)).json()).toMatchObject({ hasChanges: true });
-});
-
-it('resumes an R2 replacement before D1 reconciliation and protects retained history before activation', async () => {
-	const { bundle, keys, state, notifications } = await createEncryptionFixture('converting');
-	const path = 'Reminders/Inbox.md', plain = '- [ ] Conversion secret 2099-01-02 <!-- crate-id:r1 -->';
-	for (const [revision, content, current] of [['current-version', plain, true], ['old-version', plain + '\nOld private paragraph', false]] as const) {
-		await env.BUCKET.put(revision, content, { httpMetadata: { contentType: 'text/markdown' } });
-		const hash = await sha256Hex(content), size = new TextEncoder().encode(content).length;
-		if (current) await env.DB.prepare('INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES (?, ?, ?, ?, ?)').bind(path, path.toLowerCase(), hash, size, revision).run();
-		else await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES (?, ?, ?, ?, 'replaced', ?)").bind(revision, path, hash, size, Date.now() + 86400000).run();
-	}
-	await env.BUCKET.put('__crate__/files/orphan', 'orphan plaintext');
-	await env.DB.prepare("INSERT INTO changelog(path, action, revision, hash, size) VALUES (?, 'put', 'current-version', ?, ?)").bind(path, await sha256Hex(plain), plain.length).run();
-	const headers = { 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) };
-	const control = (path: string, method = 'GET', body?: string | Uint8Array<ArrayBuffer>) => handleEncryptionConversion(new Request(`https://test${path}`, { method, headers, body }), env, path.split('?')[0]!);
-	expect((await control('/encryption/conversion', 'POST', JSON.stringify(state)))?.status).toBe(200);
-	expect((await control('/encryption/conversion/finish', 'POST', '{}'))?.status).toBe(409);
-	for (const [revision, original] of [['current-version', plain], ['old-version', plain + '\nOld private paragraph']]) {
-		const content = new TextEncoder().encode(original);
-		const sealed = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
-		// Simulate process death after replacing the R2 object, before publishing
-		// the descriptor/hash. Resume must retain those exact first ciphertext bytes.
-		await env.BUCKET.put(revision!, sealed.bytes, { httpMetadata: { contentType: ENCRYPTED_FILE_CONTENT_TYPE }, customMetadata: { hash: sealed.hash } });
-		const fresh = await sealFile({ path, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], path, content.buffer) }, keys.forPath(path));
-		const response = await control(`/encryption/conversion/file?revision=${revision}`, 'PUT', fresh.bytes);
-		expect(response?.status, await response?.clone().text()).toBe(200);
-		expect(await response!.json()).toMatchObject({ hash: sealed.hash });
-		expect(await (await env.BUCKET.get(revision!))!.arrayBuffer()).toEqual(sealed.bytes.buffer);
-	}
-	const settings = { version: 1, vaultId: bundle.vaultId, keyId: bundle.vault.id, envelope: await encryptJson(null, keys.forVaultMetadata().key, { vaultId: bundle.vaultId, scopeId: 'vault', objectId: 'shared-settings', purpose: 'settings' }) };
-	expect((await control('/encryption/conversion/settings', 'PUT', JSON.stringify(settings)))?.status).toBe(200);
-	const finished = await control('/encryption/conversion/finish', 'POST', '{}');
-	expect(finished?.status, await finished?.clone().text()).toBe(200);
-	expect((await readEncryptionState(env.DB))?.mode).toBe('active');
-	expect(await env.DB.prepare("SELECT name FROM sqlite_master WHERE name = 'files_conversion_storage_key_idx'").first()).toBeNull();
-	expect(await env.BUCKET.get('__crate__/files/orphan')).toBeNull();
-	expect(await (await control('/encryption/conversion/finish', 'POST', '{}'))!.json()).toMatchObject({ encryption: { mode: 'active' } });
-	const old = await env.BUCKET.get('old-version');
-	expect(new TextDecoder().decode((await openFile(new Uint8Array(await old!.arrayBuffer()), path, keys.forPath(path))).content)).toContain('Old private paragraph');
-	expect(await (await handleCheckChanges(new Request('https://test/sync/check?since=1'), env.DB)).json()).toMatchObject({ cursorExpired: true });
-});
-
 it('fences old clients and keeps scoped sessions away from vault secrets, history and sibling files', async () => {
 	const { bundle, state } = await configure();
 	for (const [id, scope, folder] of [['root', 'vault', null], ['web', 'reminders', 'Reminders']] as const) await env.DB.prepare('INSERT INTO auth_tokens(id, token_hash, scope, folder_path) VALUES (?, ?, ?, ?)').bind(id, await sha256Hex(id), scope, folder).run();
@@ -142,7 +87,7 @@ it('fences old clients and keeps scoped sessions away from vault secrets, histor
 	} }), env);
 	expect((await request('/sync/manifest', 'root', false)).status).toBe(428);
 	expect((await request('/sync/manifest', 'root', true, '11')).status).toBe(428);
-	expect((await request('/encryption/conversion', 'web')).status).toBe(403);
+	expect((await request('/encryption/deletion-precondition?path=note.md&revision=revision', 'web')).status).toBe(403);
 	expect((await request('/sync/versions', 'web')).status).toBe(403);
 	expect((await request('/reminders/encrypted-files?folderPath=Private', 'web')).status).toBe(403);
 	const publicState = await (await request('/encryption', 'web')).text();
@@ -152,87 +97,4 @@ it('fences old clients and keeps scoped sessions away from vault secrets, histor
 	expect((await request('/sync/manifest', 'web')).status).toBe(403);
 	expect((await request('/settings', 'web')).status).toBe(403);
 	expect((await request('/reminders/encrypted-files?folderPath=Reminders', 'web')).status).toBe(200);
-});
-
-it('sweeps full conversion pages within the query budget and preserves live and retained objects', async () => {
-	const { state, keys } = await configure();
-	await env.DB.prepare('UPDATE maintenance_state SET value = ? WHERE key = ?').bind(JSON.stringify({ ...state, mode: 'converting' }), ENCRYPTION_STATE_KEY).run();
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('e2ee:settings-converted', 'true')").run();
-	const retained = ['__crate__/files/current', '__crate__/files/history'];
-	for (const [index, key] of retained.entries()) {
-		const file = await sealFile({ path: 'note.bin', content: new Uint8Array([index]), contentType: 'application/octet-stream', publicData: null }, keys.forPath('note.bin'));
-		await env.BUCKET.put(key, file.bytes);
-		await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(ENCRYPTION_FILE_PREFIX + key, JSON.stringify(file.descriptor)).run();
-		if (index === 0) await env.DB.prepare("INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES ('note.bin', 'note.bin', ?, ?, ?)").bind(file.hash, file.bytes.length, key).run();
-		else await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES (?, 'note.bin', ?, ?, 'replaced', ?)").bind(key, file.hash, file.bytes.length, Date.now() + 86400000).run();
-	}
-	const orphans = Array.from({ length: CONVERSION_SWEEP_PAGE_SIZE * 2 + 25 }, (_, index) => `__crate__/files/orphan-${String(index).padStart(4, '0')}`);
-	for (let offset = 0; offset < orphans.length; offset += 100) await Promise.all(orphans.slice(offset, offset + 100).map(key => env.BUCKET.put(key, 'old plaintext')));
-	const prepare = vi.spyOn(env.DB, 'prepare');
-	let pages = 0;
-	// R2 may return fewer than the requested keys when metadata is included.
-	for (; pages < 50; pages++) {
-		prepare.mockClear();
-		const response = await handleEncryptionConversion(new Request('https://test/encryption/conversion/finish', { method: 'POST', headers: {
-			'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation),
-		} }), env, '/encryption/conversion/finish');
-		expect(response?.status).toBe(200);
-		expect(prepare.mock.calls.length).toBeLessThanOrEqual(46);
-		const result = await response!.json() as { pending?: boolean; encryption?: { mode: string } };
-		if (!result.pending) { expect(result.encryption?.mode).toBe('active'); break; }
-	}
-	expect(pages).toBeLessThan(50);
-	expect((await env.BUCKET.list()).objects.map(object => object.key)).toEqual(retained);
-	expect((await readEncryptionState(env.DB))?.mode).toBe('active');
-}, 60000);
-
-it('pages conversion inventory with key cursors and indexed revision lookups', async () => {
-	const { state } = await createEncryptionFixture('converting');
-	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 2000)
-		INSERT INTO files(path, portable_path, hash, size, storage_key) SELECT 'note-'||x||'.md', 'note-'||x||'.md', 'hash', 1, 'key-'||printf('%05d', x) FROM n`).run();
-	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 500)
-		INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) SELECT 'old-'||printf('%05d', x), 'note-'||x||'.md', 'hash', 1, 'replaced', ? FROM n`).bind(Date.now() + 86400000).run();
-	const headers = { 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) };
-	expect((await handleEncryptionConversion(new Request('https://test/encryption/conversion', { method: 'POST', headers, body: JSON.stringify(state) }), env, '/encryption/conversion'))?.status).toBe(200);
-	const seen = new Set<string>();
-	let cursor: string | undefined;
-	for (let page = 0; page < 200; page++) {
-		const meter = meterD1Usage(env.DB);
-		const query = cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`;
-		const response = await handleEncryptionConversion(new Request(`https://test/encryption/conversion${query}`, { headers }), { ...env, DB: meter.db }, '/encryption/conversion');
-		const body = await response!.json() as { files: Array<{ revision: string }>; cursor: string };
-		expect(meter.usage.rowsRead).toBeLessThan(250);
-		for (const file of body.files) { expect(seen.has(file.revision)).toBe(false); seen.add(file.revision); }
-		cursor = body.cursor;
-		if (!body.files.length) break;
-	}
-	expect(seen.size).toBe(2500);
-	expect((await handleEncryptionConversion(new Request('https://test/encryption/conversion?cursor=%7B', { headers }), env, '/encryption/conversion'))?.status).toBe(400);
-	await env.BUCKET.put('key-01999', 'plain');
-	const meter = meterD1Usage(env.DB);
-	const download = await handleEncryptionConversion(new Request('https://test/encryption/conversion/file?revision=key-01999', { headers }), { ...env, DB: meter.db }, '/encryption/conversion/file');
-	expect(download?.status).toBe(200);
-	expect(meter.usage.rowsRead).toBeLessThan(10);
-});
-
-it('resumes file conversion after a D1 limit failure without repeating converted files', async () => {
-	const { bundle, keys, state } = await createEncryptionFixture('converting');
-	const headers = { 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) };
-	const control = (path: string, method = 'GET', body?: string | Uint8Array<ArrayBuffer>) => handleEncryptionConversion(new Request(`https://test${path}`, { method, headers, body }), env, path.split('?')[0]!);
-	for (const name of ['a', 'b']) {
-		const content = `Note ${name}`;
-		await env.BUCKET.put(`rev-${name}`, content);
-		await env.DB.prepare('INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES (?, ?, ?, ?, ?)')
-			.bind(`${name}.md`, `${name}.md`, await sha256Hex(content), content.length, `rev-${name}`).run();
-	}
-	expect((await control('/encryption/conversion', 'POST', JSON.stringify(state)))?.status).toBe(200);
-	const seal = async (name: string) => (await sealFile({ path: `${name}.md`, content: new TextEncoder().encode(`Note ${name}`), contentType: 'text/markdown', publicData: null }, keys.forPath(`${name}.md`))).bytes;
-	expect((await control('/encryption/conversion/file?revision=rev-a', 'PUT', await seal('a')))?.status).toBe(200);
-	// The Free plan's daily write limit fails D1 statements until the next day.
-	vi.spyOn(env.DB, 'batch').mockRejectedValueOnce(new Error('D1 exceeded its daily write limit'));
-	await expect(control('/encryption/conversion/file?revision=rev-b', 'PUT', await seal('b'))).rejects.toThrow('daily write limit');
-	const pending = await (await control('/encryption/conversion'))!.json() as { files: Array<{ revision: string }> };
-	expect(pending.files.map(file => file.revision)).toEqual(['rev-b']);
-	expect((await control('/encryption/conversion/file?revision=rev-b', 'PUT', await seal('b')))?.status).toBe(200);
-	expect((await (await control('/encryption/conversion'))!.json() as { files: unknown[] }).files).toEqual([]);
 });

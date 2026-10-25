@@ -12,6 +12,7 @@ import { importSealPrivateKey } from '@/encryption/seal-key';
 import { sealFile } from '@/encryption/file-codec';
 import { EncryptedReminderApi } from '@/pwa/reminders/encrypted-reminder-api';
 import { REMINDER_IDENTITY_CONFLICT_ISSUE } from '@/reminders/core/reminder-list';
+import { derivePathTagKey, PathTags } from '@/encryption/path-tags';
 
 // The Worker index and the encrypted web app build their lists with one shared
 // rule, so the same notes give the same reminders, projects and issues.
@@ -35,7 +36,9 @@ async function listPlaintext(): Promise<unknown> {
 
 async function listEncrypted(): Promise<unknown> {
 	const bundle = await createVaultKeyBundle();
+	const pathTag = await derivePathTagKey(bundle.vaultId, bundle.vault), paths = new PathTags(pathTag);
 	const keys = { version: 1 as const, vaultId: bundle.vaultId, generation: bundle.generation, folderPath: 'Reminders',
+		wireFolder: await paths.wire('Reminders'), paths, pathTag,
 		vault: await importEncryptionSecret(bundle.vault), notifications: await importEncryptionSecret(bundle.notifications),
 		notificationFingerprint: await importNotificationFingerprintKey(bundle.vaultId, bundle.notifications),
 		seal: { keyId: bundle.seal.id, publicKey: bundle.seal.publicKey, privateKey: await importSealPrivateKey(bundle.seal) }, localState: 'unused' };
@@ -44,7 +47,9 @@ async function listEncrypted(): Promise<unknown> {
 		const path = `Reminders/${name}`;
 		return { path, sealed: await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
 	}));
-	const files = sealed.map(({ path, sealed }) => ({ path, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }));
+	// The server lists the notes by their tags, in tag order.
+	const files = (await Promise.all(sealed.map(async ({ path, sealed }) => ({ path: await paths.wire(path), hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }))))
+		.sort((a, b) => a.path.localeCompare(b.path));
 	const fetch = async (route: string) => {
 		if (!route.startsWith('/reminders/encrypted-file?')) return Response.json({ files, sequence: 1, generation: keys.generation, nextCursor: null });
 		const revision = new URL(route, 'https://worker.test').searchParams.get('revision');

@@ -9,6 +9,7 @@ import { invalidatePwaSession } from '../session-generation';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { openFile, sealFile } from '@/encryption/file-codec';
 import type { ReminderRecord } from './types';
+import { derivePathTagKey, PathTags } from '@/encryption/path-tags';
 
 const attempts = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('./encrypted-reminder-attempts', () => ({
@@ -22,7 +23,8 @@ beforeEach(async () => {
   vi.stubGlobal('localStorage', { getItem: () => 'session-token' });
   vi.stubGlobal('navigator', {});
   const bundle = await createVaultKeyBundle();
-  keys = { version: 1, vaultId: bundle.vaultId, folderPath: 'Reminders',
+  const pathTag = await derivePathTagKey(bundle.vaultId, bundle.vault), paths = new PathTags(pathTag);
+  keys = { version: 1, vaultId: bundle.vaultId, folderPath: 'Reminders', wireFolder: await paths.wire('Reminders'), paths, pathTag,
     generation: bundle.generation, vault: await importEncryptionSecret(bundle.vault),
     notifications: await importEncryptionSecret(bundle.notifications),
     notificationFingerprint: await importNotificationFingerprintKey(bundle.vaultId, bundle.notifications),
@@ -84,7 +86,7 @@ it('rejects a malformed later page before downloading any files', async () => {
 });
 
 it('rejects duplicate paths before downloading or projecting files', async () => {
-  const file = { path: 'Reminders/Inbox.md', hash: 'a'.repeat(64), revision: 'first', size: 12 };
+  const file = { path: await keys.paths.wire('Reminders/Inbox.md'), hash: 'a'.repeat(64), revision: 'first', size: 12 };
   const fetch = vi.fn().mockResolvedValueOnce(Response.json({ ...page(7, 'A'), files: [file] }))
     .mockResolvedValueOnce(Response.json({ ...page(7), files: [file] }));
   await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('repeated a file');
@@ -92,7 +94,7 @@ it('rejects duplicate paths before downloading or projecting files', async () =>
 });
 
 it('rejects repeated paths before acknowledging an unchanged inventory', async () => {
-  const file = { path: 'Reminders/Inbox.md', hash: 'a'.repeat(64), revision: 'first', size: 12 };
+  const file = { path: await keys.paths.wire('Reminders/Inbox.md'), hash: 'a'.repeat(64), revision: 'first', size: 12 };
   const fetch = vi.fn(async () => Response.json({ ...page(7), files: [file, file] }));
   await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } })).rejects.toThrow('repeated a file');
   expect(fetch).toHaveBeenCalledOnce();
@@ -106,10 +108,10 @@ it('retains bounded retries when a sequence changes between pages', async () => 
 });
 
 it('publishes decrypted cache entries only after the complete inventory is confirmed', async () => {
-  const path = 'Reminders/Inbox.md', authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
+  const path = 'Reminders/Inbox.md', wire = await keys.paths.wire(path), authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
   const seal = (text: string) => sealFile({ path, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority);
   const original = await seal('- [ ] Original <!-- crate-id:task -->\n'), changed = await seal('- [ ] Changed <!-- crate-id:task -->\n');
-  const inventory = (sealed: typeof original) => ({ ...page(7), files: [{ path, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }] });
+  const inventory = (sealed: typeof original) => ({ ...page(7), files: [{ path: wire, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }] });
   const fetch = vi.fn(async (route: string) => route.startsWith('/reminders/encrypted-file?') ? new Response(original.bytes) : Response.json(inventory(original)));
   const api = new EncryptedReminderApi(keys, fetch);
   await api.handle('/reminders/list?folderPath=Reminders');
@@ -130,11 +132,11 @@ it('publishes decrypted cache entries only after the complete inventory is confi
 it('commits a semantic revision to the listed note sealed with the vault key', async () => {
   const text = '- [ ] Queued task <!-- crate-id:task -->\n';
   const authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
-  const livePath = 'Reminders/Inbox.md';
+  const livePath = 'Reminders/Inbox.md', liveWire = await keys.paths.wire(livePath);
   const sealed = await sealFile({ path: livePath, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority);
   const commits: Array<{ files: Array<{ path: string; content: string }> }> = [];
   const fetch = async (path: string, init?: RequestInit) => {
-    if (path.startsWith('/reminders/encrypted-files?')) return Response.json({ files: [{ path: livePath, hash: sealed.hash, size: sealed.bytes.length, revision: 'live' }], sequence: 1, generation: keys.generation, nextCursor: null });
+    if (path.startsWith('/reminders/encrypted-files?')) return Response.json({ files: [{ path: liveWire, hash: sealed.hash, size: sealed.bytes.length, revision: 'live' }], sequence: 1, generation: keys.generation, nextCursor: null });
     if (path.startsWith('/reminders/encrypted-file?')) return new Response(sealed.bytes);
     if (path.startsWith('/reminders/encrypted-receipt?')) return Response.json({ envelope: null });
     const body = JSON.parse(init!.body as string) as { acknowledgment: string; files: Array<{ path: string; content: string }> }; commits.push(body);
@@ -151,7 +153,8 @@ it('commits a semantic revision to the listed note sealed with the vault key', a
   expect(response!.status).toBe(200);
   expect((await response!.json() as { reminder: ReminderRecord }).reminder.filePath).toBe(livePath);
   expect(commits).toHaveLength(1);
-  expect(commits[0]!.files[0]!.path).toBe(livePath);
+  // The server receives the tagged path; the note itself keeps its plaintext path.
+  expect(commits[0]!.files[0]!.path).toBe(liveWire);
   const opened = await openFile(new TextEncoder().encode(commits[0]!.files[0]!.content), livePath, authority);
   expect(new TextDecoder().decode(opened.content)).toContain('- [x] Queued task');
 });
@@ -161,21 +164,21 @@ it('downloads only changed notes even when the folder exceeds the content cache'
   const count = 1050;
   const notes = await Promise.all(Array.from({ length: count }, async (_, index) => {
     const path = `Reminders/N${String(index).padStart(4, '0')}.md`;
-    return { path, sealed: await sealFile({ path, content: new TextEncoder().encode(`- [ ] Task ${index} <!-- crate-id:t${index} -->\n`), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
+    return { path, wire: await keys.paths.wire(path), sealed: await sealFile({ path, content: new TextEncoder().encode(`- [ ] Task ${index} <!-- crate-id:t${index} -->\n`), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
   }));
   const byRevision = new Map(notes.map(note => [note.sealed.hash, note.sealed.bytes]));
   let sequence = 7;
   const fetch = vi.fn(async (route: string) => {
     if (route.startsWith('/reminders/encrypted-file?')) return new Response(byRevision.get(new URL(route, 'https://x').searchParams.get('revision')!));
     const after = new URL(route, 'https://x').searchParams.get('after') ?? '';
-    const files = notes.filter(note => note.path > after).slice(0, 1000);
-    return Response.json({ ...page(sequence, files.length === 1000 ? files.at(-1)!.path : null),
-      files: files.map(note => ({ path: note.path, hash: note.sealed.hash, size: note.sealed.bytes.length, revision: note.sealed.hash })) });
+    const files = [...notes].sort((a, b) => a.wire.localeCompare(b.wire)).filter(note => note.wire > after).slice(0, 1000);
+    return Response.json({ ...page(sequence, files.length === 1000 ? files.at(-1)!.wire : null),
+      files: files.map(note => ({ path: note.wire, hash: note.sealed.hash, size: note.sealed.bytes.length, revision: note.sealed.hash })) });
   });
   const api = new EncryptedReminderApi(keys, fetch);
   expect((await (await api.handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: unknown[] }).reminders).toHaveLength(count);
-  const path = notes[0]!.path;
-  notes[0] = { path, sealed: await sealFile({ path, content: new TextEncoder().encode('- [x] Task 0 <!-- crate-id:t0 -->\n'), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
+  const { path, wire } = notes[0]!;
+  notes[0] = { path, wire, sealed: await sealFile({ path, content: new TextEncoder().encode('- [x] Task 0 <!-- crate-id:t0 -->\n'), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
   byRevision.set(notes[0].sealed.hash, notes[0].sealed.bytes);
   sequence = 8;
   fetch.mockClear();
@@ -187,9 +190,9 @@ it('downloads only changed notes even when the folder exceeds the content cache'
 it('downloads cold notes with bounded concurrency while keeping note order and issues', async () => {
   const authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
   const notes = await Promise.all(Array.from({ length: 20 }, async (_, index) => {
-    const path = `Reminders/N${String(index).padStart(2, '0')}.md`;
+    const path = `Reminders/N${String(index).padStart(2, '0')}.md`, wire = await keys.paths.wire(path);
     const content = index === 3 ? new Uint8Array([0xff, 0xfe, 0xfd]) : new TextEncoder().encode(`- [ ] Task ${index} <!-- crate-id:t${index} -->\n`);
-    return { path, sealed: await sealFile({ path, content, contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
+    return { path, wire, sealed: await sealFile({ path, content, contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
   }));
   const byRevision = new Map(notes.map(note => [note.sealed.hash, note.sealed.bytes]));
   let inFlight = 0, maxInFlight = 0;
@@ -200,7 +203,7 @@ it('downloads cold notes with bounded concurrency while keeping note order and i
       inFlight--;
       return new Response(byRevision.get(new URL(route, 'https://x').searchParams.get('revision')!));
     }
-    return Response.json({ ...page(4), files: notes.map(note => ({ path: note.path, hash: note.sealed.hash, size: note.sealed.bytes.length, revision: note.sealed.hash })) });
+    return Response.json({ ...page(4), files: notes.map(note => ({ path: note.wire, hash: note.sealed.hash, size: note.sealed.bytes.length, revision: note.sealed.hash })) });
   });
   const listed = await (await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: Array<{ id: string }>; issues: Array<{ path: string }> };
   expect(maxInFlight).toBeGreaterThan(1);

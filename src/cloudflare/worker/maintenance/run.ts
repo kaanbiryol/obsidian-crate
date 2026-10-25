@@ -20,7 +20,7 @@ export interface MaintenanceResult { removedObjects: number; backlog: boolean }
  * is false for the follow-up passes of one maintenance episode. */
 export async function runScheduledMaintenance(env: Env, { firstPass = true }: { firstPass?: boolean } = {}): Promise<MaintenanceResult> {
   if (await env.DB.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first()) return { removedObjects: 0, backlog: false };
-	if (['converting', 'resetting'].includes((await readEncryptionState(env.DB))?.mode ?? '')) return { removedObjects: 0, backlog: false };
+	if ((await readEncryptionState(env.DB))?.mode === 'resetting') return { removedObjects: 0, backlog: false };
 	const errors: string[] = [];
   let removedObjects = 0, backlog = false;
   const bounded = (task: () => Promise<boolean>) => async () => { if (await task()) backlog = true; };

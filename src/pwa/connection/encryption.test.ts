@@ -33,9 +33,9 @@ afterEach(() => { vi.unstubAllGlobals(); });
 describe('encryption verification', () => {
 	it('remembers verified encryption and uses it while offline', async () => {
 		const state = await encryptionState();
-		expect(await load(async () => Response.json({ encryption: state }))).toEqual(state);
+		expect((await load(async () => Response.json({ encryption: state })))?.state).toEqual(state);
 		vi.stubGlobal('navigator', { onLine: false });
-		expect(await load(async () => { throw new TypeError('offline'); })).toEqual(state);
+		expect((await load(async () => { throw new TypeError('offline'); }))?.state).toEqual(state);
 	});
 
 	it('refuses a server that stops reporting known encryption', async () => {

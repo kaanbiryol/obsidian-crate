@@ -6,6 +6,7 @@ import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
 import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES, parseEncryptedFile } from '../../encryption/file-format';
 import { sha256Hex } from '../../platform/sha256';
+import { isWirePath } from '../../protocol/encrypted-path';
 
 interface UploadPreimage { content: string; hash: string; size: number }
 export type UploadIntent = { kind: 'local' } | { kind: 'merge'; preimage: UploadPreimage };
@@ -13,6 +14,8 @@ export type IntendedUpload = BatchUploadFile & { intent: UploadIntent };
 export interface EncryptedUploadWire {
 	format: 'crate-e2ee-v1';
 	generation: number;
+	/** The server path: retries must reach exactly the same one. */
+	path: string;
 	content: string;
 	hash: string;
 	size: number;
@@ -53,6 +56,7 @@ export async function validateUploadIntent(value: unknown, sealedInMemory = fals
 		const wire = value.encryptedWire;
 		if (!isRecord(wire) || wire.format !== 'crate-e2ee-v1' || wire.contentType !== ENCRYPTED_FILE_CONTENT_TYPE
 			|| typeof wire.generation !== 'number' || !Number.isSafeInteger(wire.generation) || wire.generation < 1
+			|| typeof wire.path !== 'string' || !isWirePath(wire.path)
 			|| !(wire.expectedHash === null || isSha256Hex(wire.expectedHash))) throw new Error('Invalid encrypted upload journal');
 		await validateBytes(wire, MAX_ENCRYPTED_FILE_BYTES, !sealedInMemory);
 		if (!sealedInMemory) parseEncryptedFile(new Uint8Array(base64ToArrayBuffer(wire.content as string)));

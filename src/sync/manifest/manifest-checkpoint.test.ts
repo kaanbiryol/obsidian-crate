@@ -26,7 +26,7 @@ function checkpoint(): ManifestCheckpoint {
 			version: { path: 'note.md', storage_key: 'retained-version', hash, size: 1,
 				expires_at: 2_000_000_000_000, created_at: '2026-01-01T00:00:00Z', reason: 'replaced' },
 			phase: 'committed',
-			encryptedWire: { vaultId: 'vault-id', generation: 2, expectedHash: hash, restoredHash: hash },
+			encryptedWire: { vaultId: 'vault-id', generation: 2, path: 'aaaaaaaaaaaaaaaaaaaaaaaaaa.md', expectedHash: hash, restoredHash: hash },
 		}],
 		initialConfigPull: { configDir: '.obsidian', files: { '.obsidian/app.json': hash } },
 	};

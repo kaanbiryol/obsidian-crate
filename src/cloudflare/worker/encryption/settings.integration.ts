@@ -3,68 +3,41 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { createEncryptionFixture } from '../test-support/encryption-test-harness';
+import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import { decryptJson, encryptJson } from '../../../encryption/envelope';
 import { MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES, MAX_SHARED_SETTINGS_BYTES } from '../../../encryption/settings-format';
-import { handleEncryptionConversion } from './conversion';
 import { handleEncryptedSettings } from './settings';
-import { readEncryptionState } from './state';
-import { handlePutSettings } from '../sync/metadata-handlers';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });
 
 const preferences = () => ({ ignorePatterns: ['秘密/'], syncInterval: 30, pushEnabled: false });
-async function fixture() {
-	const { bundle, state, keys } = await createEncryptionFixture('converting');
+
+it.each([66_200, MAX_SHARED_SETTINGS_BYTES])('stores and updates encrypted settings accepted in a %i-byte plaintext request', async bytes => {
+	const { bundle, state, keys } = await createEncryptionFixture('active');
+	await storeEncryptionState(env.DB, state);
 	const key = keys.forVaultMetadata().key;
 	const context = { vaultId: bundle.vaultId, scopeId: 'vault', objectId: 'shared-settings', purpose: 'settings' as const };
-	const control = (path: string, body: unknown) => handleEncryptionConversion(new Request(`https://test${path}`, { method: 'POST', body: JSON.stringify(body), headers: {
-		'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation),
-	} }), env, path);
-	return { bundle, state, key, context, control };
-}
-
-it.each([66_200, MAX_SHARED_SETTINGS_BYTES])('converts and updates settings accepted in a %i-byte plaintext request', async bytes => {
-	const { bundle, state, key, context, control } = await fixture();
 	const settings = preferences();
 	const original = { settings, expectedVersion: null };
 	settings.ignorePatterns[0] += 'x'.repeat(bytes - new TextEncoder().encode(JSON.stringify(original)).length);
-	const plainBody = JSON.stringify(original);
-	expect(new TextEncoder().encode(plainBody).length).toBe(bytes);
-	expect((await handlePutSettings(new Request('https://test/settings', { method: 'PUT', body: plainBody }), env.BUCKET)).status).toBe(200);
-	expect((await control('/encryption/conversion', state))?.status).toBe(200);
+	expect(new TextEncoder().encode(JSON.stringify(original)).length).toBe(bytes);
 	const encrypted = { version: 1, vaultId: bundle.vaultId, keyId: key.id, envelope: await encryptJson(settings, key, context) };
-	const converted = await handleEncryptionConversion(new Request('https://test/encryption/conversion/settings', {
-		method: 'PUT', body: JSON.stringify(encrypted), headers: { 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) },
-	}), env, '/encryption/conversion/settings');
-	expect(converted?.status, await converted?.clone().text()).toBe(200);
-	expect((await control('/encryption/conversion/finish', {}))?.status).toBe(200);
-	const active = (await readEncryptionState(env.DB))!;
-	expect(active.mode).toBe('active');
-	expect(await env.BUCKET.get('__crate__/settings.json')).toBeNull();
-	const read = async () => (await handleEncryptedSettings(new Request('https://test/settings'), env.DB, active)).json() as Promise<{ settings: typeof encrypted; settingsVersion: string }>;
+	const put = (expectedVersion: string | null, value = encrypted) => handleEncryptedSettings(new Request('https://test/settings', {
+		method: 'PUT', body: JSON.stringify({ settings: value, expectedVersion }) }), env.DB, state);
+	const read = async () => (await handleEncryptedSettings(new Request('https://test/settings'), env.DB, state)).json() as Promise<{ settings: typeof encrypted; settingsVersion: string }>;
+	// Settings at the plaintext limit still fit once encrypted.
+	const created = await put(null);
+	expect(created.status, await created.clone().text()).toBe(200);
 	const saved = await read();
 	await expect(decryptJson(saved.settings.envelope, key, context)).resolves.toEqual(settings);
 	settings.syncInterval++;
 	encrypted.envelope = await encryptJson(settings, key, context);
-	const update = await handleEncryptedSettings(new Request('https://test/settings', { method: 'PUT', body: JSON.stringify({ settings: encrypted, expectedVersion: saved.settingsVersion }) }), env.DB, active);
+	const update = await put(saved.settingsVersion);
 	expect(update.status, await update.clone().text()).toBe(200);
 	await expect(decryptJson((await read()).settings.envelope, key, context)).resolves.toEqual(settings);
 	// The larger allowance remains bounded and a rejection preserves committed data.
-	const oversized = await handleEncryptedSettings(new Request('https://test/settings', { method: 'PUT', body: JSON.stringify({ settings: { ...encrypted, envelope: 'a'.repeat(MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES) }, expectedVersion: saved.settingsVersion }) }), env.DB, active);
+	const oversized = await put(saved.settingsVersion, { ...encrypted, envelope: 'a'.repeat(MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES) });
 	expect(oversized.status).toBe(413);
 	await expect(decryptJson((await read()).settings.envelope, key, context)).resolves.toEqual(settings);
-});
-
-it('rejects unsupported stored settings before freezing sync and permits retry after reducing them', async () => {
-	const { state, control } = await fixture();
-	const body = JSON.stringify(preferences()) + ' '.repeat(MAX_SHARED_SETTINGS_BYTES);
-	await env.BUCKET.put('__crate__/settings.json', body);
-	expect((await control('/encryption/conversion', state))?.status).toBe(413);
-	expect(await readEncryptionState(env.DB)).toBeNull();
-	expect(await (await env.BUCKET.get('__crate__/settings.json'))!.text()).toBe(body);
-	const expectedVersion = (await env.BUCKET.head('__crate__/settings.json'))!.etag;
-	expect((await handlePutSettings(new Request('https://test/settings', { method: 'PUT', body: JSON.stringify({ settings: preferences(), expectedVersion }) }), env.BUCKET)).status).toBe(200);
-	expect((await control('/encryption/conversion', state))?.status).toBe(200);
 });

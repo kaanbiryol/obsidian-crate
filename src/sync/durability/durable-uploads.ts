@@ -12,8 +12,6 @@ import type { UploadPreconditions } from '../encryption/encrypted-files';
 import { sha256Hex } from '@/platform/sha256';
 
 interface UploadTransport {
-	requiresConvertedReceipt?(file: JournalUpload): boolean;
-	resolveConvertedUpload?(file: JournalUpload): Promise<UploadResult | null>;
 	prepareUploadWire?(file: JournalUpload, preconditions?: UploadPreconditions): ReturnType<PrepareUploadWire>;
 	/** Resolve encrypted preconditions for a batch in one request instead of one per file. */
 	preloadUploadPreconditions?(files: Array<{ path: string; expectedHash: string | null }>): Promise<UploadPreconditions | undefined>;
@@ -24,6 +22,8 @@ interface UploadTransport {
 }
 
 const RECEIPTS_PER_CHECKPOINT = 64;
+/** Encrypted uploads name the server path saved with their ciphertext. */
+const serverPath = (file: JournalUpload) => file.encryptedWire?.path ?? file.path;
 
 export class DurableUploads {
 	private unsavedReceipts = 0;
@@ -53,24 +53,19 @@ export class DurableUploads {
 	}
 
 	private async sendBatch(durable: JournalUpload[], onSettled?: () => Promise<void>): Promise<BatchUploadResponse> {
-		if (durable.some(file => this.transport.requiresConvertedReceipt?.(file))) {
-			const results = [];
-			for (const file of durable) { const result = await this.sendSingle(file); results.push(result); if (result.success || this.definitive(result)) await onSettled?.(); }
-			return { success: results.every(result => result.success), results };
-		}
 		for (const file of durable) this.active.add(file.operationId);
 		try {
 			for (const file of durable) await this.transport.assertPreparedUpload?.(file);
 			const response = await this.transport.batchUpload(durable.map(uploadWire));
 			if (response.results.length !== durable.length || new Set(response.results.map(file => file.path)).size !== durable.length) throw new Error('Invalid upload receipt batch');
 			const receipts = new Map(response.results.map(result => [result.path, result]));
-			for (const file of durable) this.validate(file, receipts.get(file.path));
+			for (const file of durable) this.validate(file, receipts.get(serverPath(file)));
 			for (const file of durable) {
-				const receipt = receipts.get(file.path)!;
+				const receipt = receipts.get(serverPath(file))!;
 				await this.accept(file, receipt);
 				if (receipt.success || this.definitive(receipt)) await onSettled?.();
 			}
-			return { ...response, results: response.results.map(result => this.localReceipt(durable.find(file => file.path === result.path)!, result)) };
+			return { ...response, results: response.results.map(result => this.localReceipt(durable.find(file => serverPath(file) === result.path)!, result)) };
 		} finally { for (const file of durable) this.active.delete(file.operationId); }
 	}
 
@@ -139,13 +134,9 @@ export class DurableUploads {
 		try {
 			let result: UploadResult;
 			try {
-				const converted = await this.transport.resolveConvertedUpload?.(file);
-				if (converted) result = converted;
-				else {
-					await this.transport.assertPreparedUpload?.(file);
-					const wire = uploadWire(file);
-					result = await this.transport.uploadFile(wire.path, base64ToArrayBuffer(wire.content), wire.hash, wire.size, wire.contentType, wire.expectedHash, wire.operationId);
-				}
+				await this.transport.assertPreparedUpload?.(file);
+				const wire = uploadWire(file);
+				result = await this.transport.uploadFile(wire.path, base64ToArrayBuffer(wire.content), wire.hash, wire.size, wire.contentType, wire.expectedHash, wire.operationId);
 			} catch (error) {
 				result = refusedUploadResult(file.path, error);
 			}
@@ -159,10 +150,13 @@ export class DurableUploads {
 		return isRefusedWrite(result.status, result.code);
 	}
 	private validate(file: JournalUpload, result?: UploadResult): void {
-		if (!result || result.path !== file.path || (result.success && (result.hash !== (file.encryptedWire?.hash ?? file.hash) || !result.revision))) throw new Error('Server returned an invalid upload receipt; the original upload is preserved for recovery');
+		if (!result || result.path !== serverPath(file) || (result.success && (result.hash !== (file.encryptedWire?.hash ?? file.hash) || !result.revision))) throw new Error('Server returned an invalid upload receipt; the original upload is preserved for recovery');
 	}
 	private localReceipt(file: JournalUpload, receipt: UploadResult): UploadResult {
-		return receipt.success && file.encryptedWire ? { ...receipt, hash: file.hash } : receipt;
+		if (!file.encryptedWire) return receipt;
+		const wire = file.encryptedWire.path;
+		return { ...receipt, path: file.path, ...(receipt.success ? { hash: file.hash } : {}),
+			...(receipt.error ? { error: receipt.error.split(wire).join(file.path) } : {}) };
 	}
 	private async accept(file: JournalUpload, result: UploadResult): Promise<void> {
 		if (result.success) {

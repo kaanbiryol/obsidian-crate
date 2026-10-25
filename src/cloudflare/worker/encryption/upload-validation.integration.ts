@@ -14,17 +14,20 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { sha256Hex } from '../../../platform/sha256';
+import type { PathTags } from '../../../encryption/path-tags';
+import { createOpaqueWireName } from '../../../protocol/encrypted-path';
 
 let state: EncryptionServerState;
 let keys: FileKeyAuthority;
 let notifications: NotificationKeys;
+let paths: PathTags;
 const operationId = () => createReminderOperationId(Math.floor(Date.now() / 86400000));
 const headers = () => ({ Authorization: 'Bearer owner', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current),
 	'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) });
 
 beforeEach(async () => {
 	await applySchema(env.DB);
-	({ state, keys, notifications } = await createEncryptionFixture('active'));
+	({ state, keys, notifications, paths } = await createEncryptionFixture('active'));
 	await storeEncryptionState(env.DB, state);
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('owner', ?, 'vault')").bind(await sha256Hex('owner')).run();
 });
@@ -45,7 +48,7 @@ it.each(['single markdown', 'single binary', 'batch', 'mixed batch'] as const)('
 	const files = [{ path, content: btoa(content), contentType: 'text/markdown', hash, size: content.length, expectedHash: null, operationId: operationId() }];
 	if (kind === 'mixed batch') {
 		const valid = await sealFile({ path: 'valid.md', content: new TextEncoder().encode('encrypted'), contentType: 'text/markdown' }, keys.forPath('valid.md'));
-		files.unshift({ path: 'valid.md', content: btoa(new TextDecoder().decode(valid.bytes)), contentType: ENCRYPTED_FILE_CONTENT_TYPE,
+		files.unshift({ path: await paths.wire('valid.md'), content: btoa(new TextDecoder().decode(valid.bytes)), contentType: ENCRYPTED_FILE_CONTENT_TYPE,
 			hash: valid.hash, size: valid.bytes.length, expectedHash: null, operationId: operationId() });
 	}
 	const response = await worker.fetch(new Request(batch ? 'https://test/sync/batch-upload' : `https://test/sync/upload?path=${path}`, {
@@ -79,7 +82,7 @@ it('keeps the content guard when a caller supplies the authenticated encryption 
 it('rejects ciphertext from another vault before storing it', async () => {
 	const { keys: other } = await createEncryptionFixture('active');
 	const file = await sealFile({ path: 'wrong.bin', content: new Uint8Array([1]), contentType: 'application/octet-stream' }, other.forPath('wrong.bin'));
-	const response = await worker.fetch(new Request('https://test/sync/upload?path=wrong.bin', { method: 'PUT', body: file.bytes,
+	const response = await worker.fetch(new Request(`https://test/sync/upload?path=${await paths.wire('wrong.bin')}`, { method: 'PUT', body: file.bytes,
 		headers: { ...headers(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
 	}), env);
 	expect(response.status, await response.clone().text()).toBe(428);
@@ -94,7 +97,7 @@ it.each(['another notification key', 'a non-Markdown file'] as const)('rejects r
 	const publicData = await createReminderProjection(projectionKeys, ['Reminders'], 'Reminders/note.md', content.buffer);
 	expect(publicData?.reminders).toHaveLength(1);
 	const file = await sealFile({ path, content, contentType: 'application/octet-stream', publicData }, keys.forPath(path));
-	const response = await worker.fetch(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes,
+	const response = await worker.fetch(new Request(`https://test/sync/upload?path=${encodeURIComponent(await paths.wire(path))}`, { method: 'PUT', body: file.bytes,
 		headers: { ...headers(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
 	}), env);
 	expect(response.status, await response.clone().text()).toBe(409);
@@ -111,7 +114,8 @@ it.each(['/sync-upload', '/sync-batch-upload'])('does not expose the internal tr
 it('accepts valid encrypted uploads and replays their exact receipt through the public route', async () => {
 	const file = await sealFile({ path: 'safe.bin', content: new Uint8Array([1, 2, 3]), contentType: 'application/octet-stream' }, keys.forPath('safe.bin'));
 	const id = operationId();
-	const send = () => worker.fetch(new Request('https://test/sync/upload?path=safe.bin', { method: 'PUT', body: file.bytes,
+	const wire = await paths.wire('safe.bin');
+	const send = () => worker.fetch(new Request(`https://test/sync/upload?path=${wire}`, { method: 'PUT', body: file.bytes,
 		headers: { ...headers(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash,
 			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': id },
 	}), env);
@@ -126,13 +130,14 @@ it('accepts valid encrypted uploads and replays their exact receipt through the 
 
 it.each(['single', 'batch'] as const)('commits an encrypted %s Markdown upload without reading it back from R2', async kind => {
 	const file = await sealFile({ path: 'note.md', content: new TextEncoder().encode('# Private'), contentType: 'text/markdown' }, keys.forPath('note.md'));
+	const wire = await paths.wire('note.md');
 	const get = env.BUCKET.get.bind(env.BUCKET);
 	let reads = 0;
 	env.BUCKET.get = ((...args: Parameters<R2Bucket['get']>) => { reads += 1; return get(...args); });
 	try {
-		const response = await worker.fetch(new Request(kind === 'single' ? 'https://test/sync/upload?path=note.md' : 'https://test/sync/batch-upload', {
+		const response = await worker.fetch(new Request(kind === 'single' ? `https://test/sync/upload?path=${wire}` : 'https://test/sync/batch-upload', {
 			method: kind === 'single' ? 'PUT' : 'POST',
-			body: kind === 'single' ? file.bytes : JSON.stringify({ files: [{ path: 'note.md', content: btoa(String.fromCharCode(...file.bytes)),
+			body: kind === 'single' ? file.bytes : JSON.stringify({ files: [{ path: wire, content: btoa(String.fromCharCode(...file.bytes)),
 				contentType: ENCRYPTED_FILE_CONTENT_TYPE, hash: file.hash, size: file.bytes.length, expectedHash: null, operationId: operationId() }] }),
 			headers: { ...headers(), 'Content-Type': kind === 'single' ? ENCRYPTED_FILE_CONTENT_TYPE : 'application/json', 'X-File-Hash': file.hash,
 				'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
@@ -141,13 +146,13 @@ it.each(['single', 'batch'] as const)('commits an encrypted %s Markdown upload w
 		expect(response.headers.get('X-Crate-Encryption-State')).toBe('on');
 	} finally { env.BUCKET.get = get; }
 	expect(reads).toBe(0);
-	expect(await env.DB.prepare('SELECT path FROM files').first()).toEqual({ path: 'note.md' });
+	expect(await env.DB.prepare('SELECT path FROM files').first()).toEqual({ path: wire });
 	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).not.toBeNull();
 });
 
 it('rejects a client upload sealed to the vault seal key, even inside the Reading folder', async () => {
 	const { sealFileForVault } = await import('../../../encryption/sealed-file');
-	const path = 'Reading/Article - forged.md';
+	const path = `${await paths.wire('Reading')}/${createOpaqueWireName()}`;
 	const sealed = await sealFileForVault({ path, content: new TextEncoder().encode('forged article'), contentType: 'text/markdown' },
 		{ vaultId: state.vaultId, keyId: state.seal.keyId, publicKey: state.seal.publicKey });
 	const response = await worker.fetch(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, {
@@ -156,5 +161,19 @@ it('rejects a client upload sealed to the vault seal key, even inside the Readin
 			'X-File-Hash': sealed.hash, 'X-File-Size': String(sealed.bytes.length), 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
 	}), env);
 	expect(response.status, await response.clone().text()).toBe(428);
+	await expectNoPublication();
+});
+
+it.each(['single', 'batch'] as const)('rejects valid ciphertext at a readable path before storing a %s upload', async kind => {
+	const file = await sealFile({ path: 'Private/note.md', content: new TextEncoder().encode('# Private'), contentType: 'text/markdown' }, keys.forPath('Private/note.md'));
+	const response = await worker.fetch(new Request(kind === 'single' ? `https://test/sync/upload?path=${encodeURIComponent('Private/note.md')}` : 'https://test/sync/batch-upload', {
+		method: kind === 'single' ? 'PUT' : 'POST',
+		body: kind === 'single' ? file.bytes : JSON.stringify({ files: [{ path: 'Private/note.md', content: btoa(String.fromCharCode(...file.bytes)),
+			contentType: ENCRYPTED_FILE_CONTENT_TYPE, hash: file.hash, size: file.bytes.length, expectedHash: null, operationId: operationId() }] }),
+		headers: { ...headers(), 'Content-Type': kind === 'single' ? ENCRYPTED_FILE_CONTENT_TYPE : 'application/json', 'X-File-Hash': file.hash,
+			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
+	}), env);
+	expect(response.status, await response.clone().text()).toBe(428);
+	expect((await response.json() as { error: string }).error).toContain('encrypted file names');
 	await expectNoPublication();
 });

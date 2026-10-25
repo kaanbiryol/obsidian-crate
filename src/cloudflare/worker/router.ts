@@ -18,7 +18,6 @@ import { apiRoutePolicy } from './routes/policy';
 import { handleEncryptionRoute } from './routes/encryption';
 import { handleEncryptedFolderFiles } from './encryption/encrypted-folder-files';
 import { handleEncryptionReset } from './encryption/reset';
-import { handleEncryptionConversion } from './encryption/conversion';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import type { UploadCommitters } from './sync/upload-committers';
 
@@ -82,7 +81,6 @@ export async function handleAuthenticatedRoute(
 	}
 
 	return await handleEncryptionReset(request, env, path, principal)
-		?? (principal.scope === 'vault' ? await handleEncryptionConversion(request, env, path) : null)
 		?? await handleEncryptionRoute(request, db, path, principal, encryption)
 		?? await handleEncryptedFolderFiles(request, env, path, 'reminders', principal.scope === 'reminders' ? principal.folderPath : undefined)
 		?? await handleSyncRoute(request, env, uploadCommitters, path, method, resetGeneration, mutationAuditContext(request, principal, requestId), encryption)

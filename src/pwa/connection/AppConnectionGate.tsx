@@ -46,7 +46,7 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
   const connectionScreen = () => {
     if (browserSetup) return shell(<BrowserSetup onContinue={() => setBrowserSetup(false)} />);
     if (!app.bootstrapped) return <PwaLaunchSplash />;
-    if (locked) return shell(<EncryptionUnlockCard title={locked.converting ? 'Encryption conversion in progress' : 'Unlock Crate'}
+    if (locked) return shell(<EncryptionUnlockCard title={locked.converting ? 'Encryption setup in progress' : 'Unlock Crate'}
       message={locked.message} setupRequired={locked.setupRequired} action="Unlock Crate" onUnlock={locked.converting ? undefined : locked.unlock}
       pairing={locked.converting ? undefined : <AppPairing key={section} feature={section} />}>
       {busy => <>

@@ -7,6 +7,8 @@ import { issueWebEnrollmentToken } from '../auth/web-enrollment';
 import { changedRows } from '../db';
 import { sha256Hex } from '../../../platform/sha256';
 import { createRandomHexToken } from '../../../platform/random-hex';
+import { readEncryptionState } from '../encryption/state';
+import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';
 
 const REMINDERS_AUTH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -20,6 +22,11 @@ export async function handleCreateRemindersEnrollmentToken(db: D1Database, reque
 	if (!parsed.ok) return parsed.response;
 	const folderPath = parseFolderPath(parsed.value.folderPath);
 	if (!folderPath) return corsResponse({ error: 'folderPath required' }, 400);
+	const encryption = await readEncryptionState(db);
+	const labelIssue = folderLabelIssue(encryption, folderPath, parsed.value.folderLabel);
+	if (labelIssue) return corsResponse({ error: labelIssue }, 428);
+	// The web app recovers the folder's plaintext name from this label.
+	if (encryption && await readFolderLabel(db, folderPath) !== parsed.value.folderLabel) await saveFolderLabel(db, folderPath, parsed.value.folderLabel as string).run();
 	const installEnrollment = await issueWebEnrollmentToken(db, folderPath);
 	const browserEnrollment = await issueWebEnrollmentToken(db, folderPath);
 	return corsResponse({

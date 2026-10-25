@@ -16,7 +16,9 @@ async function fixture() {
 	const content = new TextEncoder().encode('Private content').buffer;
 	const file = { path: 'note.md', content: arrayBufferToBase64(content), hash: await sha256Hex(content), size: content.byteLength,
 		contentType: 'text/markdown', expectedHash: null };
-	const encryption = await EncryptedFiles.create({} as WorkerApiHttpClient, await createVaultKeyBundle(), async () => null);
+	// New files are checked for a server file under another spelling first.
+	const http = { requestJson: async (path: string) => { if (path === '/sync/metadata') return { files: {} }; throw new Error(`Unexpected request ${path}`); } };
+	const encryption = await EncryptedFiles.create(http as unknown as WorkerApiHttpClient, await createVaultKeyBundle(), async () => null);
 	return { disk, create, file, encryption };
 }
 
@@ -89,29 +91,14 @@ it('does not dispatch when persisting the encrypted wire fails', async () => {
 	await manifest.close();
 });
 
-it('settles a saved plaintext upload from its converted receipt without retransmitting plaintext', async () => {
-	const { create, file } = await fixture();
-	const manifest = create();
-	await manifest.uploadJournal.prepare([{ ...file, intent: { kind: 'local' } }], 20000, crypto.randomUUID());
-	const uploadFile = vi.fn(), batchUpload = vi.fn(), cache = { putBase: vi.fn(async () => {}) };
-	await new DurableUploads(manifest, { getServerInfo: async () => ({ reminderOperationDay: 20000 }),
-		resolveConvertedUpload: async () => ({ success: true, path: file.path, hash: file.hash, revision: 'old-accepted-revision' }),
-		assertPreparedUpload: async () => { throw new Error('Plaintext must not be dispatched'); }, uploadFile, batchUpload,
-	}, cache as never, crypto.randomUUID()).recover();
-	expect(uploadFile).not.toHaveBeenCalled(); expect(batchUpload).not.toHaveBeenCalled();
-	expect(manifest.getEntry(file.path)).toMatchObject({ hash: file.hash, revision: 'old-accepted-revision' });
-	expect(manifest.uploadJournal.pending()).toEqual([]);
-	await manifest.close();
-});
-
-it('preserves a pre-encryption upload when encryption cannot establish its old outcome', async () => {
-	const { create, file } = await fixture();
+it('preserves a plaintext upload journaled before encryption instead of sending it', async () => {
+	const { create, file, encryption } = await fixture();
 	const manifest = create();
 	await manifest.uploadJournal.prepare([{ ...file, intent: { kind: 'local' } }], 20000, crypto.randomUUID());
 	const uploadFile = vi.fn();
 	await expect(new DurableUploads(manifest, { getServerInfo: async () => ({ reminderOperationDay: 20000 }),
-		resolveConvertedUpload: async () => { throw new Error('Old receipt expired'); }, uploadFile, batchUpload: vi.fn(),
-	}, { putBase: vi.fn() } as never, crypto.randomUUID()).recover()).rejects.toThrow('Old receipt expired');
+		assertPreparedUpload: upload => encryption.verifyPrepared(upload), uploadFile, batchUpload: vi.fn(),
+	}, { putBase: vi.fn() } as never, crypto.randomUUID()).recover()).rejects.toThrow('plaintext upload is unresolved');
 	expect(uploadFile).not.toHaveBeenCalled(); expect(manifest.uploadJournal.pending()).toHaveLength(1);
 	await manifest.close();
 });
@@ -137,7 +124,7 @@ it('reconciles a stale encrypted precondition without blocking the rest of its b
 		{ path: 'after.md', success: true, hash: file.hash },
 	]);
 	expect(batchUpload).toHaveBeenCalledOnce();
-	expect(batchUpload.mock.calls[0]![0].map(file => file.path)).toEqual(['before.md', 'after.md']);
+	expect(batchUpload.mock.calls[0]![0].map(file => file.path)).toEqual(await Promise.all(['before.md', 'after.md'].map(path => encryption.paths.wireFor(path))));
 	expect(manifest.getEntry('stale.md')).toBeUndefined();
 	expect(manifest.uploadJournal.pending()).toEqual([]);
 	await manifest.close();

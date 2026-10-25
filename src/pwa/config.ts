@@ -149,7 +149,8 @@ export function applyConfigFromUrl(config: StoredConfig): {
 		if (manifest) manifest.href = manifestHrefForUrl(window.location.href);
 	}
 	const nextConfig = { ...config };
-	const folderPath = params.get('folder');
+	// Encrypted vaults send the folder's plaintext name only in the fragment.
+	const folderPath = params.get('folder') ?? new URLSearchParams(window.location.hash.slice(1)).get('crateFolder');
 	const upcomingDays = params.get('upcomingDays');
 	const allDayTime = params.get('allDayTime');
 	const reminderId = params.get('reminderId')?.trim() ?? '';

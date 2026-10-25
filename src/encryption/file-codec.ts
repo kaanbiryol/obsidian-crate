@@ -42,10 +42,14 @@ async function fileKey(descriptor: EncryptedFileDescriptor, authority: FileEncry
 	return openSealedFileKey({ ...descriptor, seal: descriptor.seal }, authority.seal);
 }
 
-function validateMetadata(value: unknown, expectedPath: string): asserts value is PrivateFileMetadata {
+/** How a reader checks the path a file claims: an exact path, or a check that compares
+ * it with where the file is stored and returns the plaintext path. */
+export type PathBinding = string | ((metadataPath: string, sealed: boolean) => Promise<string>);
+
+function validateMetadata(value: unknown): asserts value is PrivateFileMetadata {
 	if (!value || typeof value !== 'object') throw new Error('Invalid encrypted file metadata');
 	const item = value as Partial<PrivateFileMetadata>;
-	if (item.version !== 1 || item.path !== expectedPath || !isSha256Hex(item.hash)
+	if (item.version !== 1 || typeof item.path !== 'string' || !item.path || item.path.length > 4096 || !isSha256Hex(item.hash)
 		|| typeof item.size !== 'number' || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > 25 * 1024 * 1024
 		|| typeof item.contentType !== 'string' || item.contentType.length > 256
 		|| !isSha256Hex(item.publicDataHash)) {
@@ -68,7 +72,7 @@ export async function sealFileWithHeader(input: FileInput, header: Omit<Encrypte
 	const metadata: PrivateFileMetadata = { version: 1, path: input.path, hash: await digest(input.content),
 		size: input.content.byteLength, contentType: input.contentType,
 		publicDataHash: await digest(new TextEncoder().encode(JSON.stringify(publicData))) };
-	validateMetadata(metadata, input.path);
+	validateMetadata(metadata);
 	const descriptor: EncryptedFileDescriptor = { ...header, metadata: '' };
 	descriptor.metadata = await encryptJson(metadata, key, context(descriptor, 'file-metadata'));
 	const ciphertext = await encryptBytes(input.content, key, context(descriptor, 'file'));
@@ -76,24 +80,27 @@ export async function sealFileWithHeader(input: FileInput, header: Omit<Encrypte
 	return { bytes, descriptor, metadata, hash: await digest(bytes) };
 }
 
-export async function openFileMetadata(descriptor: EncryptedFileDescriptor, expectedPath: string, authority: FileEncryptionAuthority): Promise<PrivateFileMetadata> {
-	return (await openMetadataWithKey(descriptor, expectedPath, authority)).metadata;
+/** The returned metadata carries the plaintext path the binding accepted. */
+export async function openFileMetadata(descriptor: EncryptedFileDescriptor, binding: PathBinding, authority: FileEncryptionAuthority): Promise<PrivateFileMetadata> {
+	return (await openMetadataWithKey(descriptor, binding, authority)).metadata;
 }
 
-async function openMetadataWithKey(descriptor: EncryptedFileDescriptor, expectedPath: string, authority: FileEncryptionAuthority) {
+async function openMetadataWithKey(descriptor: EncryptedFileDescriptor, binding: PathBinding, authority: FileEncryptionAuthority) {
 	const key = await fileKey(descriptor, authority);
 	const metadata = await decryptJson(descriptor.metadata, key, context(descriptor, 'file-metadata'));
-	validateMetadata(metadata, expectedPath);
-	return { metadata, key };
+	validateMetadata(metadata);
+	const path = typeof binding === 'string' ? metadata.path === binding ? binding : null : await binding(metadata.path, !!descriptor.seal);
+	if (path === null) throw new Error('Encrypted file metadata does not match the requested file');
+	return { metadata: { ...metadata, path }, key };
 }
 
-export async function openFile(bytes: Uint8Array<ArrayBuffer>, expectedPath: string, authority: FileEncryptionAuthority): Promise<{
+export async function openFile(bytes: Uint8Array<ArrayBuffer>, binding: PathBinding, authority: FileEncryptionAuthority): Promise<{
 	content: Uint8Array<ArrayBuffer>;
 	metadata: PrivateFileMetadata;
 	publicData: unknown;
 }> {
 	const packet = parseEncryptedFile(bytes);
-	const { metadata, key } = await openMetadataWithKey(packet.descriptor, expectedPath, authority);
+	const { metadata, key } = await openMetadataWithKey(packet.descriptor, binding, authority);
 	if (await digest(new TextEncoder().encode(JSON.stringify(packet.publicData))) !== metadata.publicDataHash) {
 		throw new Error('Encrypted file scheduling metadata failed authentication');
 	}

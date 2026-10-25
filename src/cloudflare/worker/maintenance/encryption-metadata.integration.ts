@@ -38,10 +38,10 @@ it('removes only old unreferenced descriptors and preserves data, receipts, and 
 	expect(await retained()).not.toContain('receipt');
 });
 
-it('retains everything during conversion and advances bounded pages past live revisions', async () => {
+it('retains everything during an encryption reset and advances bounded pages past live revisions', async () => {
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x < ?)
 		INSERT INTO maintenance_state(key, value, updated_at) SELECT 'e2ee:file:'||printf('%05d', x), 'opaque descriptor', datetime('now', '-2 days') FROM n`).bind(DESCRIPTOR_CLEANUP_PAGE + 4).run();
-	await env.DB.prepare(`UPDATE maintenance_state SET value = '{"mode":"converting"}' WHERE key = 'e2ee:state'`).run();
+	await env.DB.prepare(`UPDATE maintenance_state SET value = '{"mode":"resetting"}' WHERE key = 'e2ee:state'`).run();
 	await pruneEncryptionMetadata(env.DB);
 	expect(await retained()).toHaveLength(DESCRIPTOR_CLEANUP_PAGE + 5);
 	await env.DB.prepare(`UPDATE maintenance_state SET value = '{"mode":"active"}' WHERE key = 'e2ee:state'`).run();

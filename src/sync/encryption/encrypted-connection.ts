@@ -1,7 +1,8 @@
 import { openRecoveryBundle } from '../../encryption/key-bundle';
 import { loadEncryptionKeys } from './key-storage';
 import type { SecretStorageService } from '../../plugin/secret-storage';
-import { assertEncryptionKeys, readServerEncryption } from './conversion';
+import { readServerEncryption } from './server-encryption';
+import { assertEncryptionKeys } from '../../encryption/server-state';
 import type { WorkerApiHttpClient } from '../worker-api/http';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 

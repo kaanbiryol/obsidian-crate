@@ -19,10 +19,6 @@ it.each([
 	['POST', '/encryption/pairing', ['vault', 'reminders', 'reading'], undefined],
 	['GET', '/encryption/reset', ['vault'], { kind: 'coordinator', wake: true }],
 	['POST', '/encryption/reset', ['vault'], { kind: 'coordinator', wake: true }],
-	['GET', '/encryption/conversion/file', ['vault'], { kind: 'coordinator', wake: true }],
-	['PUT', '/encryption/conversion/reading-capture', ['vault'], { kind: 'coordinator', wake: true }],
-	['POST', '/encryption/conversion/finish', ['vault'], { kind: 'coordinator', wake: true }],
-	['GET', '/reminders/encrypted-receipt', ['vault', 'reminders'], undefined],
 	['POST', '/reminders/encrypted-commit', ['vault', 'reminders'], { kind: 'coordinator', wake: true }],
 	['GET', '/reminders/list', ['vault', 'reminders'], undefined],
 	['POST', '/reminders/update', ['vault', 'reminders'], { kind: 'coordinator', wake: true }],
@@ -72,7 +68,7 @@ it.each([[shortcut.preparePath, { kind: 'coordinator', wake: true }], [shortcut.
 
 it.each([
 	['DELETE', '/sync/manifest'], ['POST', '/sync/upload'], ['GET', '/reminders/update'],
-	['PATCH', '/reading/capture'], ['POST', '/encryption/conversion/file'],
+	['PATCH', '/reading/capture'], ['POST', '/encryption/conversion'],
 	['POST', '/reading/shortcut/v0/prepare'], ['POST', '/reading/shortcut/v2/exchange'],
 	['POST', '/reading/shortcut/v01/prepare'], ['POST', '/reading/shortcut/v1000/prepare'],
 	['GET', '/unknown'], ['GET', '/notifications/unknown'], ['GET', '/__proto__'],

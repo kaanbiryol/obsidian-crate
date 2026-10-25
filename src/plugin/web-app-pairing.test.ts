@@ -16,7 +16,7 @@ vi.mock('../sync/worker-api/http', () => ({ obsidianHttpTransport: vi.fn(), Work
   getServerInfo = mocks.info;
   requestJson = mocks.request;
 } }));
-vi.mock('../sync/encryption/conversion', async () => ({ ...await vi.importActual('../sync/encryption/conversion'), readServerEncryption: mocks.state }));
+vi.mock('../sync/encryption/server-encryption', async () => ({ ...await vi.importActual('../sync/encryption/server-encryption'), readServerEncryption: mocks.state }));
 afterEach(() => { vi.clearAllMocks(); mocks.info.mockResolvedValue({ capabilities: [PAIRING_CAPABILITY] }); });
 async function fixture() {
   const bundle = await createVaultKeyBundle();

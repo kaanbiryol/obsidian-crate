@@ -4,7 +4,8 @@ import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { sameVaultKeyBundle } from '../encryption/key-bundle';
 import { PAIRING_PATH, type PairingContext, type PairingTransport } from '../encryption/pairing/protocol';
 import { obsidianHttpTransport, WorkerApiHttpClient } from '../sync/worker-api/http';
-import { assertEncryptionKeys, readServerEncryption } from '../sync/encryption/conversion';
+import { readServerEncryption } from '../sync/encryption/server-encryption';
+import { assertEncryptionKeys } from '../encryption/server-state';
 
 export async function openWebAppPairing(plugin: CratePlugin, signal: AbortSignal) {
   const connection = captureServerConnection(plugin);

@@ -82,11 +82,12 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 	const subscribeUrl = new URL('notifications', `${apiClient.getWorkerUrl()}/`);
 	if (keys && recovery) {
 		// Reminders and Reading unlock independently at launch, from the same recovery key.
-		subscribeUrl.hash = new URLSearchParams({ crateKey: recovery, crateReadingKey: recovery }).toString();
+		// The fragment never reaches the server, so the folder's plaintext name can travel with the key.
+		subscribeUrl.hash = new URLSearchParams({ crateKey: recovery, crateReadingKey: recovery, crateFolder: folder }).toString();
 	}
 	subscribeUrl.searchParams.set('token', token);
 	if (browserToken) subscribeUrl.searchParams.set('browserToken', browserToken);
-	subscribeUrl.searchParams.set('folder', folder);
+	if (!keys) subscribeUrl.searchParams.set('folder', folder);
 	subscribeUrl.searchParams.set('upcomingDays', String(plugin.remindersSettings.upcomingDaysDefault ?? 7));
 	if (plugin.remindersSettings.allDayNotificationTime) {
 		subscribeUrl.searchParams.set('allDayTime', plugin.remindersSettings.allDayNotificationTime);

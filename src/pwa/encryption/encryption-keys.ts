@@ -3,6 +3,7 @@ import { importEncryptionSecret, encryptBytes, decryptBytes, type EncryptionKey 
 import { validateVaultKeyBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { LocalStateCipher } from '../../encryption/local-state';
 import { importNotificationFingerprintKey } from '../../encryption/reminder-projection';
+import { derivePathTagKey, type PathTags } from '../../encryption/path-tags';
 import { importSealPrivateKey } from '../../encryption/seal-key';
 import { validateP256PublicKey } from '../../encryption/p256';
 import { isEncryptionId } from '../../encryption/encoding';
@@ -17,12 +18,15 @@ export interface StoredVaultKeys {
 	vault: EncryptionKey;
 	notifications: EncryptionKey;
 	notificationFingerprint: CryptoKey;
+	/** Turns file and folder names into the tags the server stores. */
+	pathTag: CryptoKey;
 	seal: { keyId: string; publicKey: string; privateKey: CryptoKey };
 	/** A random secret for private browser data, wrapped by the vault key. */
 	localState: string;
 }
-/** Vault keys plus the folder one feature reads, for that feature's requests. */
-export type FeatureKeys = StoredVaultKeys & { folderPath: string };
+/** Vault keys plus the folder one feature reads: `folderPath` is its plaintext name
+ * and `wireFolder` the tag the server stores and requests name. */
+export type FeatureKeys = StoredVaultKeys & { folderPath: string; wireFolder: string; paths: PathTags };
 export type EncryptedFeature = 'reminders' | 'reading';
 
 interface EncryptionDatabase extends DBSchema {
@@ -39,6 +43,7 @@ function wrappingKey(key: EncryptionKey | undefined): key is EncryptionKey {
 		&& key.key.usages?.includes('wrapKey') && key.key.usages.includes('unwrapKey');
 }
 
+const signingKey = (key: CryptoKey | undefined) => key?.algorithm?.name === 'HMAC' && !key.extractable && key.usages?.includes('sign');
 const damaged = () => new Error('The saved encryption keys are damaged. Preserve pending changes before recovering.');
 
 function validateStoredIdentity(value: StoredVaultKeys, vaultId: string): void {
@@ -49,8 +54,7 @@ function validateStoredIdentity(value: StoredVaultKeys, vaultId: string): void {
 function validateStoredKeys(value: StoredVaultKeys, vaultId: string): void {
 	validateStoredIdentity(value, vaultId);
 	const seal = value.seal;
-	if (!wrappingKey(value.vault) || !wrappingKey(value.notifications) || value.notificationFingerprint?.algorithm?.name !== 'HMAC'
-		|| value.notificationFingerprint.extractable || !value.notificationFingerprint.usages?.includes('sign')
+	if (!wrappingKey(value.vault) || !wrappingKey(value.notifications) || !signingKey(value.notificationFingerprint) || !signingKey(value.pathTag)
 		|| !seal || !isEncryptionId(seal.keyId) || seal.privateKey?.type !== 'private' || seal.privateKey.extractable
 		|| seal.privateKey.algorithm?.name !== 'ECDH') throw damaged();
 	validateP256PublicKey(seal.publicKey);
@@ -73,12 +77,13 @@ export async function rememberVaultKeys(bundle: VaultKeyBundle, isCurrent = () =
 		const vault = await importEncryptionSecret(bundle.vault);
 		const notifications = await importEncryptionSecret(bundle.notifications);
 		const notificationFingerprint = await importNotificationFingerprintKey(bundle.vaultId, bundle.notifications);
+		const pathTag = await derivePathTagKey(bundle.vaultId, bundle.vault);
 		const seal = { keyId: bundle.seal.id, publicKey: bundle.seal.publicKey, privateKey: await importSealPrivateKey(bundle.seal) };
 		const localSecret = previous ? await decryptBytes(previous.localState, vault, context(bundle.vaultId)) : crypto.getRandomValues(new Uint8Array(32));
 		try {
 			if (localSecret.length !== 32) throw new Error('Damaged browser encryption key. Preserve pending changes before recovery.');
 			const stored: StoredVaultKeys = { version: 1, vaultId: bundle.vaultId, generation: bundle.generation,
-				vault, notifications, notificationFingerprint, seal, localState: await encryptBytes(localSecret, vault, context(bundle.vaultId)) };
+				vault, notifications, notificationFingerprint, pathTag, seal, localState: await encryptBytes(localSecret, vault, context(bundle.vaultId)) };
 			if (!isCurrent()) throw new Error('Session changed before enrollment');
 			const tx = database.transaction('keys', 'readwrite');
 			const current = await tx.store.get(bundle.vaultId);

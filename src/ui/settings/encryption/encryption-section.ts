@@ -5,7 +5,7 @@ import type CratePlugin from '../../../plugin/CratePlugin';
 import { encryptVault, loadDeviceEncryptionKeys, prepareEncryptionKeys, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
 import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import { WorkerApiHttpClient } from '../../../sync/worker-api/http';
-import { readServerEncryption } from '../../../sync/encryption/conversion';
+import { readServerEncryption } from '../../../sync/encryption/server-encryption';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { createLogger, errorMessage } from '../../../sync/logger';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
@@ -20,7 +20,7 @@ import { SECRET_KEYS } from '../../../platform/secret-keys';
 const log = createLogger('EncryptionSettings');
 
 function encryptionModalTitle(state: EncryptionServerState | null): string {
-	return state?.mode === 'converting' ? 'Resume encryption' : state ? 'Manage encryption' : 'Enable encryption';
+	return state ? 'Manage encryption' : 'Enable encryption';
 }
 
 export function renderEncryptionSection(container: HTMLElement, plugin: CratePlugin): () => void {
@@ -59,7 +59,6 @@ export function renderEncryptionSection(container: HTMLElement, plugin: CratePlu
 			loading = false;
 			modalTitle = encryptionModalTitle(state);
 			if (state?.mode === 'resetting') show('Reset in progress', 'Continue on the device that started the reset.', 'View reset');
-			else if (state?.mode === 'converting') show('Converting…', 'Sync and notifications are paused until conversion finishes.', 'Resume conversion');
 			else if (state) show('On', 'Synced notes, attachments and history are encrypted.', 'Manage encryption');
 			else show('Off', 'Keep synced notes, attachments and history private from your server.', 'Enable encryption');
 		} catch (error) {
@@ -136,19 +135,13 @@ class EncryptionModal extends SharedModal {
 		if (state?.mode === 'resetting') { this.clearContent(); this.bodyEl.createEl('p', { text: 'An encryption reset is in progress. Resume it on the Obsidian device that started it.' }); return; }
 		if (state && !keys) { this.clearContent(); this.status(state, null); this.recover(state); return; }
 		if (state?.mode === 'active' && keys) { this.clearContent(); this.ready(keys, state); return; }
+		// Only an unencrypted server reaches setup: an encrypted one is unlocked or managed above.
 		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin, keys);
-		if (!recovery) { this.clearContent(); this.status(state, keys); this.bodyEl.createEl('p', { text: 'Restore the recovery key from your saved copy before resuming encryption.' }); if (state) this.recover(state); return; }
-		try { await verifySetupRecovery(state, bundle, recovery); }
-		catch (error) {
-			this.assertCurrentConnection();
-			if (!state) throw error;
-			this.clearContent();
-			this.bodyEl.createEl('p', { text: 'This device’s saved recovery key could not be verified. Restore it from your saved copy before resuming encryption.' });
-			this.recover(state); return;
-		}
+		if (!recovery) { this.clearContent(); this.bodyEl.createEl('p', { text: 'Restore the recovery key from your saved copy before enabling encryption.' }); return; }
+		await verifySetupRecovery(null, bundle, recovery);
 		this.assertCurrentConnection();
 		this.clearContent();
-		this.disposeContent = renderEncryptionSetup(this.bodyEl, { recovery, resuming: Boolean(state),
+		this.disposeContent = renderEncryptionSetup(this.bodyEl, { recovery,
 			automaticSync: () => this.plugin.settings.automaticSync,
 			setTitle: title => this.setLayoutTitle(title), close: () => this.close(),
 			manage: () => { this.setLayoutTitle('Manage encryption'); void this.load().catch(error => this.unavailable(error)); },
@@ -157,19 +150,17 @@ class EncryptionModal extends SharedModal {
 			this.running = true;
 			try {
 				this.assertCurrentConnection();
-				await encryptVault(this.plugin, this.http, bundle, verifiedRecovery, progress, () => this.assertCurrentConnection());
+				await encryptVault(this.plugin, bundle, verifiedRecovery, progress, () => this.assertCurrentConnection());
 			} finally { this.running = false; this.onChanged(); }
 		} });
 	}
 	private status(state: EncryptionServerState | null, keys: VaultKeyBundle | null): Setting {
 		const overview = this.bodyEl.createDiv({ cls: 'crate-encryption-status' });
-		const vault = new Setting(overview).setName('Vault encryption').setDesc(state?.mode === 'active' ? 'Active · conversion complete'
-			: state ? 'Conversion in progress · sync and notifications are paused. Resume below.' : 'Not enabled');
+		const vault = new Setting(overview).setName('Vault encryption').setDesc(state ? 'Active' : 'Not enabled');
 		if (!state) return vault;
 		const devices = createSettingsDisclosure(overview, keys ? 'This device is unlocked' : 'This device needs a recovery key', { inline: true });
 		new Setting(devices).setName('This device').setDesc(keys ? 'Unlocked · keys saved on this device.' : 'Locked · enter your saved recovery key below.');
 		new Setting(devices).setName('Notification keys').setDesc(!keys ? 'Unavailable until this device is unlocked.'
-			: state.mode === 'converting' ? 'Saved · notifications resume after conversion.'
 			: 'Ready for enrollment · web apps use the same recovery key and need notification permission.');
 		return vault;
 	}
