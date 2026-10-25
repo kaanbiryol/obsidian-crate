@@ -37,10 +37,24 @@ export function loadDeviceEncryptionKeys(plugin: CratePlugin, state: EncryptionS
 	}
 }
 
-/** Reuse this device's keys and recovery key, or create both. */
+type PreparedKeys = { bundle: VaultKeyBundle; recovery: string };
+
+/** Keys created for setup, by server, until encryption is turned on. Reopening setup shows
+ * the recovery key the user may already have saved instead of a new one. */
+const preparedKeys = new WeakMap<CratePlugin, Map<string, PreparedKeys>>();
+
+/** Reuse this device's keys and recovery key, or the ones created for this server's setup, or create both. */
 export async function prepareEncryptionKeys(plugin: CratePlugin, keys: VaultKeyBundle | null): Promise<{ bundle: VaultKeyBundle; recovery: string | null }> {
 	if (keys) return { bundle: keys, recovery: plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY) };
-	return { bundle: await createVaultKeyBundle(), recovery: await generateRecoveryCode() };
+	const { workerUrl } = plugin.settings;
+	const byServer = preparedKeys.get(plugin) ?? new Map<string, PreparedKeys>();
+	preparedKeys.set(plugin, byServer);
+	let prepared = byServer.get(workerUrl);
+	if (!prepared) {
+		prepared = { bundle: await createVaultKeyBundle(), recovery: await generateRecoveryCode() };
+		byServer.set(workerUrl, prepared);
+	}
+	return prepared;
 }
 
 /** Confirm the recovery key opens the server's recovery envelope, or a new one sealed for these keys. */
@@ -52,8 +66,10 @@ export async function verifySetupRecovery(state: EncryptionServerState | null, b
  * A saved checkpoint resumes the same setup after an interruption. */
 export async function encryptVault(plugin: CratePlugin, bundle: VaultKeyBundle, recovery: string, progress: (message: string) => void, assertCurrent: () => void): Promise<void> {
 	assertCurrent();
+	const { workerUrl } = plugin.settings;
 	await plugin.syncRuntime.turnOnEncryption(bundle, recovery, progress,
-		{ workerUrl: plugin.settings.workerUrl, authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) ?? '' }, getPluginLifecycleSignal(plugin));
+		{ workerUrl, authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) ?? '' }, getPluginLifecycleSignal(plugin));
+	preparedKeys.get(plugin)?.delete(workerUrl);
 }
 
 export async function unlockVault(plugin: CratePlugin, state: EncryptionServerState, recoveryCode: string, assertCurrent: () => void): Promise<void> {
