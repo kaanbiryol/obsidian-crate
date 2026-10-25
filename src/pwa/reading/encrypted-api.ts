@@ -16,8 +16,9 @@ import { trimContentCache } from '@/pwa/storage/content-cache';
 import type { PathTags } from '@/encryption/path-tags';
 import { resolveEncryptedPath } from '@/encryption/path-binding';
 
-const MAX_READING_FILES = 100_000;
-const MAX_READING_METADATA_BYTES = 64 * 1024 * 1024;
+// The documented device budget: each refresh seals the whole list and index.
+const MAX_READING_FILES = 10_000;
+const MAX_READING_METADATA_BYTES = 12 * 1024 * 1024;
 // Changed notes download in parallel, a few at a time, in page order.
 const SOURCE_CONCURRENCY = 6;
 /** `revision` fingerprints the Reading files and issues, so edits elsewhere in the vault keep it. */
