@@ -1,4 +1,5 @@
 import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
+import { CloudflareReauthorizationRequired } from '../oauth/client';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 
 
@@ -74,7 +75,9 @@ export class DeploymentFence {
 			this.uncertain = false;
 			return result;
 		} catch (error) {
-			if (error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408) {
+			// A saved login surfaces Cloudflare's 401/403 refusal as reauthorization.
+			if (error instanceof CloudflareReauthorizationRequired
+				|| error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408) {
         await this.recordStep(step, 'rejected');
         this.uncertain = false;
       }

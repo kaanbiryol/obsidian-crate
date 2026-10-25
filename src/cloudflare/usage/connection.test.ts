@@ -132,6 +132,20 @@ it('renews saved deployment access and preserves scopes when renewal omits them'
 	expect(deploy).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'renewed', scope: CLOUDFLARE_OAUTH_SCOPES.join(' ') }));
 });
 
+it('renews a saved login with under 10 minutes left before a long operation starts', async () => {
+	const h = setup();
+	h.connection.acceptAuthorization('account-a', { accessToken: 'old', refreshToken: 'refresh', expiresIn: 3600 });
+	h.advance(2_999_000);
+	const operation = vi.fn(async () => 'done');
+	await h.connection.withAuthorization(operation);
+	expect(h.transport).not.toHaveBeenCalled();
+	expect(operation).toHaveBeenLastCalledWith(expect.objectContaining({ accessToken: 'old' }));
+	h.advance(2000);
+	await h.connection.withAuthorization(operation);
+	expect(h.transport.mock.calls[0]?.[1]?.body).toContain('grant_type=refresh_token');
+	expect(operation).toHaveBeenLastCalledWith(expect.objectContaining({ accessToken: 'access' }));
+});
+
 it.each([
 	[400, '{"error":"invalid_grant"}', 'Reconnect Cloudflare'],
 	[503, '{}', 'unavailable'],

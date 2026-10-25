@@ -7,6 +7,8 @@ import { fetchCloudflareUsage } from './service';
 import type { SecretKey } from '../../platform/secret-keys';
 
 const USAGE_SCOPE = CLOUDFLARE_ANALYTICS_SCOPE;
+// Renew early so a long deployment or reset does not outlive its access token.
+const RENEWAL_MARGIN_MS = 600_000;
 interface Credentials extends CloudflareOAuthTokens { expiresAt: number }
 interface Secrets {
 	get(key: SecretKey): string | null | undefined;
@@ -123,7 +125,7 @@ export class CloudflareUsageConnection {
 		if (!credentials) throw new CloudflareReauthorizationRequired();
 		this.busy = true;
 		try {
-			if (credentials.expiresAt <= this.now() + 60_000) {
+			if (credentials.expiresAt <= this.now() + RENEWAL_MARGIN_MS) {
 				if (!credentials.refreshToken) throw new CloudflareReauthorizationRequired();
 				const refreshed = await this.oauth.refreshTokens(credentials.refreshToken);
 				try {
