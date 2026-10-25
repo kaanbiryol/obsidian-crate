@@ -1,7 +1,7 @@
 import { recordSyncError } from '../issues';
 import { isAbortError } from "../abort";
 import { base64ToArrayBuffer } from "../encoding";
-import { applyRemoteContentIfUnchanged } from "../local/local-apply";
+import { applyRemoteContentIfUnchanged, incomingReviewMessage } from "../local/local-apply";
 import { recordAppliedContent } from './applied-content';
 import type { DiffApplyOutcome, TransferContext } from "./types";
 import { createLogger } from "../logger";
@@ -71,6 +71,13 @@ export async function downloadAndSaveFile(
   return { status: "applied" };
 }
 
+/** A version already saved for review is not downloaded again only to save the same copy. */
+async function awaitingReview(context: TransferContext, request: DownloadRequest): Promise<string | null> {
+  if (request.expectedLocalHash === null) return null;
+  const review = context.conflictStore?.findIncomingReview?.(request.path, request.expectedRemoteHash, request.expectedLocalHash);
+  return review && await context.vault.adapter.exists(review.conflictPath) ? incomingReviewMessage(review.conflictPath) : null;
+}
+
 export async function parallelDownloadAndSaveFiles(
   context: TransferContext,
   requests: DownloadRequest[],
@@ -83,7 +90,11 @@ export async function parallelDownloadAndSaveFiles(
   const individual: DownloadRequest[] = [];
 
   for (const request of requests) {
-    if (request.remoteSize < BATCH_FILE_SIZE_LIMIT) batchable.push(request);
+    const review = await awaitingReview(context, request);
+    if (review) {
+      recordSyncError(result, review, request.path);
+      onProcessed?.();
+    } else if (request.remoteSize < BATCH_FILE_SIZE_LIMIT) batchable.push(request);
     else individual.push(request);
   }
 
