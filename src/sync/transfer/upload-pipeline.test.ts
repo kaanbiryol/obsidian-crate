@@ -17,13 +17,12 @@ describe('upload pipeline', () => {
 		await uploadPipelined({ uploadPreparedFiles }, ['a.md', 'b.md', 'c.md', 'skipped.md'], createEmptySyncResult(), {
 			prepare: async path => path === 'skipped.md' ? null : prepared(path),
 			retry: true,
-			concurrency: 3,
 			beforeChunk: chunk => events.push(`before:${chunk.length}`),
 			onProcessed: count => events.push(`processed:${count}`),
 			afterChunk: unreported => events.push(`after:${unreported}`),
 		});
 		expect(events).toEqual(['before:3', 'processed:1', 'upload:3', 'after:2']);
-		expect(uploadPreparedFiles).toHaveBeenCalledWith(expect.any(Array), expect.any(Object), expect.objectContaining({ retry: true, concurrency: 3 }));
+		expect(uploadPreparedFiles).toHaveBeenCalledWith(expect.any(Array), expect.any(Object), expect.objectContaining({ retry: true }));
 	});
 
 	it('passes only the policies a mode supplies to the shared executor', async () => {

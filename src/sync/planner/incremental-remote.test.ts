@@ -44,7 +44,7 @@ describe('runIncrementalSync', () => {
       result.uploadedPaths.push(...uploads.map(upload => upload.path));
     });
 
-    const result = await runIncrementalSync(harness.context, { uploadConcurrency: 2 });
+    const result = await runIncrementalSync(harness.context, {});
 
     expect(result?.success).toBe(true);
     expect(result?.uploadedPaths).toEqual([path]);
@@ -67,7 +67,7 @@ describe('runIncrementalSync', () => {
 		const download = vi.fn(async () => {});
 		harness.context.parallelDownloadAndSaveFiles = download;
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 2 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(result?.success).toBe(true);
 		expect(harness.vault.adapter.readBinary).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe('runIncrementalSync', () => {
 			uploadPreparedFiles: vi.fn(async () => {}),
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 
 		expect(result).toEqual({
 			outcome: 'completed',
@@ -165,7 +165,7 @@ describe('runIncrementalSync', () => {
 			modified: '2026-02-06T12:00:00.000Z',
 		});
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(result?.deleted).toBe(1);
 		expect(harness.vault.trash).toHaveBeenCalledWith(note, false);
@@ -202,7 +202,7 @@ describe('runIncrementalSync', () => {
 			modified: '2026-02-06T12:00:00.000Z',
 		});
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(result?.deleted).toBe(1);
 		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
@@ -255,7 +255,7 @@ describe('runIncrementalSync', () => {
 			result.uploadedPaths.push(...uploads.map(upload => upload.path));
 		});
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
 		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
@@ -278,7 +278,7 @@ describe('runIncrementalSync', () => {
 			h.vault.getAbstractFileByPath.mockReturnValue({ path, children: [{ path: `${path}/new-note.md`, extension: 'md' }] });
 			return content;
 		});
-		const result = await runIncrementalSync(h.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(h.context, {});
 		expect(result?.errors).toEqual([expect.stringContaining(`${path}: Local deletion target changed`)]);
 		expect(h.settings.lastSeq).toBe(4);
 		expect(h.localManifest.removeEntry).not.toHaveBeenCalled();
@@ -303,7 +303,7 @@ describe('runIncrementalSync', () => {
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.vault.adapter.exists.mockResolvedValue(false);
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(result?.deleted).toBe(0);
 		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
@@ -337,7 +337,7 @@ describe('runIncrementalSync', () => {
 		});
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(result?.downloaded).toBe(0);
 		expect(harness.api.downloadFile).not.toHaveBeenCalled();
@@ -370,12 +370,12 @@ describe('runIncrementalSync', () => {
 		harness.context.prepareUploadFromPath = vi.fn(async () => prepared);
 		harness.context.uploadPreparedFiles = uploadPreparedFiles;
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(uploadPreparedFiles).toHaveBeenCalledWith(
 			[prepared],
 			expect.any(Object),
-			expect.objectContaining({ concurrency: 5, retry: true }),
+			expect.objectContaining({ retry: true }),
 		);
 		expect(result?.uploaded).toBe(1);
 		expect(harness.settings.lastSeq).toBe(9);
@@ -411,12 +411,12 @@ describe('runIncrementalSync', () => {
 		harness.context.prepareUploadFromPath = vi.fn(async () => prepared);
 		harness.context.uploadPreparedFiles = uploadPreparedFiles;
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(uploadPreparedFiles).toHaveBeenCalledWith(
 			[prepared],
 			expect.any(Object),
-			expect.objectContaining({ concurrency: 5 }),
+			expect.objectContaining({ retry: true }),
 		);
 		expect(prepared.expectedHash).toBeNull();
 		expect(result?.conflicts).toEqual([]);
@@ -455,7 +455,7 @@ describe('runIncrementalSync', () => {
 			}]);
 		});
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(harness.api.batchDelete).not.toHaveBeenCalled();
 		expect(result?.downloadedPaths).toContain(path);
@@ -484,7 +484,7 @@ describe('runIncrementalSync', () => {
 			modified: '2026-02-06T10:00:00.000Z',
 		});
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(harness.api.batchDelete).toHaveBeenCalledWith([path], { [path]: 'base' }, { [path]: 'version-1' });
 		expect(result?.deletedPaths).toContain(path);

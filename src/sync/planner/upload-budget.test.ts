@@ -12,7 +12,7 @@ describe('incremental upload budgeting', () => {
 			result.errors.push('earlier.md: unreadable');
 			throw new DOMException('Cancelled', 'AbortError');
 		};
-		expect(await runIncrementalSync(h.context, { uploadConcurrency: 2 })).toMatchObject({
+		expect(await runIncrementalSync(h.context, {})).toMatchObject({
 			outcome: 'cancelled', success: false, uploaded: 1, uploadedPaths: ['saved.md'], errors: ['earlier.md: unreadable'],
 		});
 		expect(h.settings.lastSeq).toBe(10);
@@ -32,7 +32,7 @@ describe('incremental upload budgeting', () => {
 			events.push('upload');
 			result.uploaded += files.length;
 		};
-		const result = await runIncrementalSync(h.context, { uploadConcurrency: 2 });
+		const result = await runIncrementalSync(h.context, {});
 		expect(result?.uploaded).toBe(300);
 		expect(events.indexOf('upload')).toBeLessThan(events.indexOf('prepare:299.png'));
 	});
@@ -43,7 +43,7 @@ describe('incremental upload budgeting', () => {
 		const upload = vi.spyOn(h.context, 'uploadPreparedFiles');
 		const prepare = vi.fn(async () => { throw new DOMException('Cancelled', 'AbortError'); });
 		h.context.prepareUploadFromPath = prepare;
-		await expect(runIncrementalSync(h.context, { uploadConcurrency: 2 })).resolves.toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
+		await expect(runIncrementalSync(h.context, {})).resolves.toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 		expect(h.settings.lastSeq).toBe(cursor);
 		expect(upload).not.toHaveBeenCalled();
 	});
