@@ -30,8 +30,7 @@ export function renderReadingSettings({ containerEl: container, plugin, rerender
 				bindCommittedText(text, () => plugin.settings.reading.folderPath, async folderPath => {
 					try {
 						const { assertCurrent } = captureServerConnection(plugin);
-						const reading = { enabled: true, folderPath };
-						validateReadingConfiguration(plugin, reading);
+						validateReadingConfiguration(plugin, { ...plugin.settings.reading, folderPath });
 						if (plugin.settings.workerUrl) {
 							const policy = await readReadingPolicy(plugin);
 							assertCurrent();
@@ -44,7 +43,8 @@ export function renderReadingSettings({ containerEl: container, plugin, rerender
 							await writeReadingPolicy(plugin, { enabled: Boolean(policy?.enabled), folderPath, revision: policy?.revision ?? null });
 						}
 						assertCurrent();
-						await plugin.writeSettings({ reading }, assertCurrent);
+						// Read after the requests, so a pause made meanwhile stays in place.
+						await plugin.writeSettings({ reading: { ...plugin.settings.reading, folderPath } }, assertCurrent);
 						assertCurrent();
 						restartReading(plugin);
 						rerender();
