@@ -5,6 +5,7 @@ import { AddReminderModal as SharedAddReminderModal } from "@/reminders/ui/plugi
 import type { NewReminder } from "@/reminders/ui/plugin/reminder-modal/reminderMutation";
 import { createLogger } from "@/reminders/logger";
 import { DEFAULT_PROJECT, projectOptionsWithDefault } from '../../core/constants';
+import { ReminderInputError } from '../../core/reminderMutationInput';
 
 const log = createLogger('ReminderModal');
 
@@ -90,7 +91,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
       new Notice("Reminder updated!");
       onSave?.(saved);
     } catch (err) {
-      new Notice("Failed to update reminder");
+      new Notice(err instanceof ReminderInputError ? err.message : "Failed to update reminder");
       log.error("Failed to update reminder", err);
       throw err;
     }

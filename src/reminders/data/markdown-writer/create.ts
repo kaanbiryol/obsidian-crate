@@ -29,7 +29,7 @@ export async function createReminderInMarkdown(
   const normalizedProject = requireReminderProjectPath(project);
   const stableReminderId = reminderId ?? createReminderId();
   if (context.index.getById(stableReminderId)) throw new Error('This reminder already exists. Close the draft and refresh to see its saved state.');
-  const file = await context.getOrCreateProjectFile(normalizedProject);
+  // Building first refuses a title that would not read back before any file is created.
   const mutation = buildCreatedReminderBlock({
     content,
     description,
@@ -39,6 +39,7 @@ export async function createReminderInMarkdown(
     hasTime,
     reminderId: stableReminderId,
   });
+  const file = await context.getOrCreateProjectFile(normalizedProject);
 
   const optimisticReminder: IndexedReminder = {
     id: stableReminderId,

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { scanReminderMarkdownContent } from './markdownScan';
-import { buildCreatedReminderBlock, buildReminderCompletionPlan, planReminderCompletion, setReminderCompletionInContent } from './markdownReminderMutation';
+import { buildCreatedReminderBlock, buildReminderCompletionPlan, buildUpdatedReminderBlock, planReminderCompletion, setReminderCompletionInContent } from './markdownReminderMutation';
+import { ReminderInputError } from './reminderMutationInput';
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 
 function saved(completed: boolean, recurrence?: RecurrenceRule) {
@@ -42,4 +43,19 @@ it('anchors a monthly reminder saved before the rule carried its day', () => {
 	expect(planReminderCompletion(reminder, true)).toMatchObject({
 		dueDatetime: '2026-10-21T09:00:00.000Z', recurrence: { frequency: 'monthly', dayOfMonth: 21, completedCount: 1 },
 	});
+});
+
+it.each(['Read pages 13-19', 'Pages 20-30', 'Sprint 14-28'])('refuses a date-only title the saved-line parser would reject: %s', content => {
+	const build = () => buildCreatedReminderBlock({ content, priority: 4, dueDate: new Date(2026, 9, 30), hasTime: false, reminderId: 'one' });
+	expect(build).toThrow(ReminderInputError);
+	expect(build).toThrow('This title cannot be saved as a reminder');
+	// The timed form keeps an ISO date, which reads back.
+	expect(buildCreatedReminderBlock({ content, priority: 4, dueDate: new Date('2026-10-30T09:00:00Z'), hasTime: true, reminderId: 'one' }).content).toBe(content);
+	const timed = { ...saved(false), content, rawLine: `- [ ] ${content} 2026-09-21T09:00:00.000Z <!-- crate-id:one -->` };
+	expect(() => buildUpdatedReminderBlock(timed, { dueDate: new Date(2026, 9, 30), hasTime: false })).toThrow(ReminderInputError);
+});
+
+it('refuses a title whose markers would read back as a different reminder', () => {
+	expect(() => buildCreatedReminderBlock({ content: 'Wow !', priority: 4, dueDate: undefined, reminderId: 'one' })).toThrow(ReminderInputError);
+	expect(buildCreatedReminderBlock({ content: 'Spaced  title', priority: 4, dueDate: new Date(2026, 9, 30), hasTime: false, reminderId: 'one' }).dueDateKey).toBe('2026-10-30');
 });
