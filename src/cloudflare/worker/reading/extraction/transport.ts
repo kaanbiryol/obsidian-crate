@@ -1,4 +1,5 @@
 import { extractionUrl } from '@/reading/extraction/url';
+import { decodeHtml } from '@/reading/extraction/charset';
 import { youtubeVideoId } from '@/reading/core/youtube';
 import { youtubeMetadata, youtubeMetadataUrl, YOUTUBE_METADATA_MAX_BYTES } from '@/reading/extraction/youtube';
 import type { CapturedArticle } from '@/reading/extraction/types';
@@ -48,8 +49,8 @@ async function fetchResource(source: string, fetchPublic: (request: Request) => 
     } } finally { await reader.cancel(); }
     const bytes = new Uint8Array(size); let offset = 0;
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-    const charset = /charset=["']?([\w-]+)/i.exec(response.headers.get('Content-Type') ?? '')?.[1] ?? 'utf-8';
-    return { html: new TextDecoder(charset).decode(bytes), url: url.href };
+    // JSON is always UTF-8; only pages declare an encoding.
+    return { html: json ? new TextDecoder().decode(bytes) : decodeHtml(bytes, response.headers.get('Content-Type')), url: url.href };
   }
   throw new Error('Too many redirects');
 }

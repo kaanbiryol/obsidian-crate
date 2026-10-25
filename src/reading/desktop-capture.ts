@@ -1,6 +1,7 @@
 import { requestUrl } from 'obsidian';
 import type { CapturedArticle } from './extraction/types';
 import { extractionUrl } from './extraction/url';
+import { decodeHtml } from './extraction/charset';
 import { youtubeVideoId } from './core/youtube';
 import { youtubeMetadata, youtubeMetadataUrl, YOUTUBE_METADATA_MAX_BYTES } from './extraction/youtube';
 
@@ -46,8 +47,7 @@ export async function captureDesktopArticle(source: string, signal: AbortSignal)
       throw new Error('The website did not return a readable article.');
     }
     if (response.arrayBuffer.byteLength > MAX_BYTES) throw new Error('This article exceeds the 2 MB download limit.');
-    const charset = /charset=["']?([\w-]+)/i.exec(headers.get('Content-Type') ?? '')?.[1] ?? 'utf-8';
-    const html = new TextDecoder(charset).decode(response.arrayBuffer);
+    const html = decodeHtml(response.arrayBuffer, headers.get('Content-Type'));
     const { extractDocument } = await import('./extraction/document');
     signal.throwIfAborted();
     // requestUrl follows redirects itself, so only the first hop is allowlisted here.
