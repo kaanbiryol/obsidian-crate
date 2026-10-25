@@ -6,7 +6,7 @@ interface UploadPipelineContext {
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
 }
 
-export interface UploadPipelineOptions<T> extends Pick<UploadPreparedFilesOptions, 'retry' | 'concurrency' | 'onFailure' | 'onVersionConflicts'> {
+export interface UploadPipelineOptions<T> extends Pick<UploadPreparedFilesOptions, 'retry' | 'onFailure' | 'onVersionConflicts'> {
 	/** Reads one item's upload. Null leaves it out; the callback reports why. */
 	prepare(item: T): Promise<PreparedUpload | null>;
 	/** Runs before each prepared chunk uploads. */
@@ -32,7 +32,6 @@ export async function uploadPipelined<T>(
 		let reported = 0;
 		await context.uploadPreparedFiles(chunk, result, {
 			retry: options.retry,
-			...(options.concurrency !== undefined ? { concurrency: options.concurrency } : {}),
 			...(options.onFailure ? { onFailure: options.onFailure } : {}),
 			...(options.onVersionConflicts ? { onVersionConflicts: options.onVersionConflicts } : {}),
 			onProcessed: count => {

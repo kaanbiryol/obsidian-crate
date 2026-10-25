@@ -20,7 +20,6 @@ const logger = createLogger("SyncPlanner");
 export async function runIncrementalSync(
   context: IncrementalSyncPlannerContext,
   options: {
-    uploadConcurrency?: number;
     progressCallback?: (current: number, total: number) => void;
     /** Receives each file's failure with its HTTP status, so the caller can classify the result. */
     onFailure?: (failure: MutationFailure) => void;
@@ -137,7 +136,6 @@ export async function runIncrementalSync(
         return null;
       },
       retry: true,
-      concurrency: options.uploadConcurrency,
       onFailure: options.onFailure,
       ...(context.reconcileVersionConflicts ? {
         onVersionConflicts: (paths: string[], syncResult: SyncResult) =>

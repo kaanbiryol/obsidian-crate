@@ -67,7 +67,7 @@ it('falls back to full sync when cursor is expired', async () => {
 			uploadPreparedFiles: vi.fn(async () => {}),
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 
 		expect(result).toBeNull();
 		expect(settings.lastSeq).toBe(5);
@@ -145,13 +145,13 @@ it('falls back to full sync when cursor is expired', async () => {
 			uploadPreparedFiles,
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 
 		expect(result?.conflicts).toEqual([]);
 		expect(uploadPreparedFiles).toHaveBeenCalledWith(
 			[preparedUpload],
 			expect.any(Object),
-			expect.objectContaining({ concurrency: 5 }),
+			expect.objectContaining({ retry: true }),
 		);
 		expect(context.processDiff).not.toHaveBeenCalled();
 		expect(settings.lastSeq).toBe(11);
@@ -223,7 +223,7 @@ it('falls back to full sync when cursor is expired', async () => {
 			uploadPreparedFiles: vi.fn(async () => {}),
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 
 		expect(processDiff).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -277,7 +277,7 @@ it('falls back to full sync when cursor is expired', async () => {
 			uploadPreparedFiles: vi.fn(async () => {}),
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 		expect(result).toBeNull();
 	});
 
@@ -320,7 +320,7 @@ it('falls back to full sync when cursor is expired', async () => {
 			uploadPreparedFiles: vi.fn(async () => {}),
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 		expect(result).toMatchObject({ success: false, outcome: 'failed' });
 		expect(result?.errors).toHaveLength(1);
 		expect(context.setLastSeq).not.toHaveBeenCalled();
@@ -365,7 +365,7 @@ it('falls back to full sync when cursor is expired', async () => {
 			uploadPreparedFiles: vi.fn(async () => {}),
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 		expect(result).toMatchObject({ success: false, outcome: 'failed' });
 		expect(result?.errors).toHaveLength(1);
 		expect(context.setLastSeq).not.toHaveBeenCalled();

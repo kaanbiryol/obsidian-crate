@@ -32,7 +32,7 @@ describe('runIncrementalSync', () => {
     harness.context.prepareUploadFromPath = vi.fn(async () => ({ path: 'edit.md', hash: 'edited', content: new ArrayBuffer(1), size: 1 }));
     harness.context.uploadPreparedFiles = vi.fn(async (_uploads: PreparedUpload[], result: SyncResult) => { result.errors.push('Upload failed'); });
 
-    const result = await runIncrementalSync(harness.context, { uploadConcurrency: 2 });
+    const result = await runIncrementalSync(harness.context, {});
 
     expect(result?.success).toBe(false);
     expect(result?.errors).toContain('deleted.md: Remote deletion deferred until uploads and reconciliation finish successfully');
@@ -55,7 +55,7 @@ describe('runIncrementalSync', () => {
 			modified: '2026-02-06T10:00:00.000Z',
 		});
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(harness.api.batchDelete.mock.calls.map(([chunk]) => chunk.length)).toEqual([4, 4, 4, 2]);
 		expect(result?.deletedPaths).toEqual(paths);
@@ -124,7 +124,7 @@ describe('runIncrementalSync', () => {
 			uploadPreparedFiles,
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 
 		expect(parallelDownloadAndSaveFiles).toHaveBeenCalledWith([
 			{ path: 'notes/remote.md', expectedLocalHash: null, expectedRemoteHash: 'remote-hash', remoteSize: 12 },
@@ -192,7 +192,7 @@ describe('runIncrementalSync', () => {
 			uploadPreparedFiles: vi.fn(async () => {}),
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 
 		expect(localManifest.removeEntry).toHaveBeenCalledWith('notes/ok.md');
 		expect(localManifest.removeEntry).not.toHaveBeenCalledWith('notes/fail.md');
@@ -232,7 +232,7 @@ describe('runIncrementalSync', () => {
 		});
 		harness.context.reconcileVersionConflicts = reconcileVersionConflicts;
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(reconcileVersionConflicts).toHaveBeenCalledWith(
 			[pendingChangeKey('delete', 'notes/changed-remotely.md')],
@@ -296,7 +296,7 @@ describe('runIncrementalSync', () => {
 			uploadPreparedFiles: vi.fn(async () => {}),
 		};
 
-		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		const result = await runIncrementalSync(context, {});
 
 		expect(result?.success).toBe(false);
 		expect(result?.errors).toContain('notes/too-big.bin: Skipped remote file larger than 25MB');
@@ -321,7 +321,7 @@ it('reports local upload progress after transfer, not preparation', async () => 
     });
 
     harness.context.uploadPreparedFiles = uploadPreparedFiles;
-    const result = await runIncrementalSync(harness.context, { uploadConcurrency: 2, progressCallback });
+    const result = await runIncrementalSync(harness.context, { progressCallback });
 
     expect(result?.success).toBe(true);
     expect(uploadPreparedFiles).toHaveBeenCalledOnce();

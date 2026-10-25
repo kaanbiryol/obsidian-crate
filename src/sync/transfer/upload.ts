@@ -122,7 +122,7 @@ export async function uploadPreparedFiles(
       options.onProcessed?.(chunk.length);
     });
 
-    await context.runConcurrent(batchTasks, options.batchConcurrency ?? BATCH_UPLOAD_CONCURRENCY);
+    await context.runConcurrent(batchTasks, BATCH_UPLOAD_CONCURRENCY);
   }
 
   if (individual.length > 0) {
@@ -150,9 +150,7 @@ export async function uploadPreparedFiles(
 }
 
 export interface UploadPreparedFilesOptions {
-  concurrency?: number;
   retry: boolean;
-  batchConcurrency?: number;
   onProcessed?: (count: number) => void;
   onFailure?: (failure: MutationFailure) => void;
   onVersionConflicts?: (paths: string[], result: SyncResult) => Promise<void>;
@@ -162,7 +160,7 @@ async function uploadPreparedFilesIndividually(
   context: UploadTransferContext,
   prepared: PreparedUpload[],
   result: SyncResult,
-  options: Pick<UploadPreparedFilesOptions, 'concurrency' | 'retry' | 'onProcessed' | 'onFailure'>,
+  options: Pick<UploadPreparedFilesOptions, 'retry' | 'onProcessed' | 'onFailure'>,
 ): Promise<string[]> {
   const tasks = prepared.map((upload) => async () => {
     try {
@@ -214,7 +212,7 @@ async function uploadPreparedFilesIndividually(
     return null;
   });
 
-  const versionConflicts = await context.runConcurrent(tasks, options.concurrency ?? UPLOAD_CONCURRENCY);
+  const versionConflicts = await context.runConcurrent(tasks, UPLOAD_CONCURRENCY);
   return versionConflicts.filter((path): path is string => path !== null);
 }
 

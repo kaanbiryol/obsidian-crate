@@ -41,7 +41,7 @@ describe('destructive sync requires complete discovery', () => {
 		h.localManifest.getEntry.mockReturnValue(entry);
 		h.api.batchDelete.mockImplementationOnce(async deleted => ({ success: true, deleted, errors: [] }))
 			.mockRejectedValueOnce(new DOMException('Delete cancelled', 'AbortError'));
-		const result = await runIncrementalSync(h.context, { uploadConcurrency: 2 });
+		const result = await runIncrementalSync(h.context, {});
 		expect(result).toMatchObject({
 			outcome: 'cancelled', success: false, errors: [], deleted: BATCH_DELETE_MAX_FILES, deletedPaths: paths.slice(0, -1),
 		});
@@ -55,7 +55,7 @@ describe('destructive sync requires complete discovery', () => {
 		const h = createIncrementalHarness({ localDeletes: [path] });
 		h.localManifest.getEntry.mockReturnValue(entry);
 		h.api.batchDelete.mockRejectedValue(new DOMException('Delete cancelled', 'AbortError'));
-		const result = await runIncrementalSync(h.context, { uploadConcurrency: 2 });
+		const result = await runIncrementalSync(h.context, {});
 		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 		expect(h.localManifest.removeEntry).not.toHaveBeenCalled();
 		expect(h.settings.lastSeq).toBe(10);
@@ -113,7 +113,7 @@ describe('destructive sync requires complete discovery', () => {
 		// Reconciliation cannot settle this injected interleaving yet.
 		harness.context.reconcileVersionConflicts = async (_paths, result) => { result.errors.push('Retry after local recreation'); };
 
-		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 2 });
+		const result = await runIncrementalSync(harness.context, {});
 
 		expect(result?.success).toBe(false);
 		expect(harness.api.batchDelete).not.toHaveBeenCalled();

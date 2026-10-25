@@ -3,6 +3,7 @@ import type { BatchUploadFile } from '../../protocol/sync-types';
 import type { PreparedUpload } from '../types';
 import { HttpError } from '../worker-api/client';
 import { uploadPreparedFiles } from './upload';
+import { BATCH_UPLOAD_CONCURRENCY } from './constants';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';
 
 describe('transfer upload helpers', () => {
@@ -16,7 +17,7 @@ describe('transfer upload helpers', () => {
 		const onVersionConflicts = vi.fn();
 		await uploadPreparedFiles(harness.context, [{
 			path: 'Projects.md', content: new ArrayBuffer(1), hash: 'local', size: mode === 'batch' ? 1 : 1024 * 1024,
-		}], result, { concurrency: 1, retry: false, onVersionConflicts });
+		}], result, { retry: false, onVersionConflicts });
 		expect(result.errors).toEqual([`Projects.md: ${message}`]);
 		expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
 		expect(onVersionConflicts).not.toHaveBeenCalled();
@@ -39,7 +40,7 @@ describe('transfer upload helpers', () => {
 		];
 		const result = emptyResult();
 
-		await uploadPreparedFiles(harness.context, prepared, result, { concurrency: 2, retry: true });
+		await uploadPreparedFiles(harness.context, prepared, result, { retry: true });
 
 		expect(harness.retryWithBackoff).toHaveBeenCalledTimes(1);
 		expect(result.uploaded).toBe(0);
@@ -48,7 +49,7 @@ describe('transfer upload helpers', () => {
 		);
 	});
 
-	it('runs batch uploads concurrently when batchConcurrency > 1', async () => {
+	it('runs batch uploads concurrently', async () => {
 		const harness = createTransferHarness();
 		let concurrentCalls = 0;
 		let maxConcurrentCalls = 0;
@@ -72,11 +73,7 @@ describe('transfer upload helpers', () => {
 		}));
 		const result = emptyResult();
 
-		await uploadPreparedFiles(harness.context, prepared, result, {
-			concurrency: 2,
-			retry: false,
-			batchConcurrency: 3,
-		});
+		await uploadPreparedFiles(harness.context, prepared, result, { retry: false });
 
 		expect(harness.api.batchUpload).toHaveBeenCalledTimes(5); // 15 files, at most 3 per batch
 		expect(maxConcurrentCalls).toBeGreaterThan(1);
@@ -102,7 +99,7 @@ describe('transfer upload helpers', () => {
 		];
 		const result = emptyResult();
 
-		await uploadPreparedFiles(harness.context, prepared, result, { concurrency: 2, retry: false });
+		await uploadPreparedFiles(harness.context, prepared, result, { retry: false });
 
 		expect(harness.api.batchUpload).not.toHaveBeenCalled();
 		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
@@ -134,7 +131,7 @@ describe('transfer upload helpers', () => {
 			hash: 'local-hash',
 			size: 5,
 			expectedHash: 'base-hash',
-		}], result, { concurrency: 2, retry: false, onVersionConflicts });
+		}], result, { retry: false, onVersionConflicts });
 
 		expect(onVersionConflicts).toHaveBeenCalledWith(['notes/a.md'], result);
 		expect(result.errors).toEqual([]);
@@ -159,7 +156,7 @@ describe('transfer upload helpers', () => {
 			hash: 'local-hash',
 			size: 1024 * 1024,
 			expectedHash: 'base-hash',
-		}], result, { concurrency: 2, retry: false, onVersionConflicts });
+		}], result, { retry: false, onVersionConflicts });
 
 		expect(onVersionConflicts).toHaveBeenCalledWith(['large.bin'], result);
 		expect(result.errors).toEqual([]);
@@ -167,7 +164,7 @@ describe('transfer upload helpers', () => {
 
 });
 
-it.each([2, 4])('limits batch concurrency to %i and reports every completed file', async (batchConcurrency) => {
+it('limits batch concurrency and reports every completed file', async () => {
     const harness = createTransferHarness();
     let active = 0;
     let maximum = 0;
@@ -194,8 +191,8 @@ it.each([2, 4])('limits batch concurrency to %i and reports every completed file
         path: `file-${index}.md`, content: new ArrayBuffer(1), hash: 'h', size: 1,
     }));
     const result = emptyResult();
-    await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { concurrency: 2, batchConcurrency, retry: false, onProcessed });
-    expect(maximum).toBe(batchConcurrency);
+    await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { retry: false, onProcessed });
+    expect(maximum).toBe(BATCH_UPLOAD_CONCURRENCY);
     expect(result.uploaded).toBe(15);
     expect(result.errors).toEqual([]);
     expect(onProcessed.mock.calls.map(([count]) => count)).toEqual([3, 3, 3, 3, 3]);
