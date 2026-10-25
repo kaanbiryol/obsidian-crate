@@ -1,6 +1,8 @@
 import { createDeleteCandidates, type DeleteRemoteFiles } from '../transfer/delete';
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
+import { isOversizedSyncFile } from '../local/local-file-changes';
+import { skippedFileIssue } from '../issues';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
@@ -65,8 +67,11 @@ export async function runForceFullSyncWorkflow(
 		const remotePaths = new Set(Object.keys(remoteManifest.files));
 
 		context.updateState({ work: { phase: 'scanning' } });
-		const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
-		const localPaths = new Set(files.map(file => file.path));
+		const localFiles = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
+		// Oversized files stay local paths, so their server copy is neither replaced nor deleted.
+		const localPaths = new Set(localFiles.map(file => file.path));
+		const files = localFiles.filter(file => !isOversizedSyncFile(file));
+		for (const file of localFiles.filter(isOversizedSyncFile)) (result.issues ??= []).push(skippedFileIssue(file.path));
 
 		const remoteOnlyPaths = [...remotePaths].filter(
 			path => !localPaths.has(path) && !context.shouldIgnore(path),
