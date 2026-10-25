@@ -11,6 +11,9 @@ import { CHECKPOINT_PAGE_SIZE, createSharedCheckpoint, getSharedCheckpoint, prun
 import { parseSharedCheckpointDocument } from '../../../protocol/history-checkpoints';
 import worker from '../index';
 import { sha256Hex } from '../../../platform/sha256';
+import { writeLegacyCheckpoint } from '../../../sync/history/checkpoint-test-harness';
+import { getCheckpointAuthority } from '../../../sync/connection/worker-url';
+import { TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -37,7 +40,7 @@ it('restores a full checkpoint through real sync and converges another device', 
     first.disk.write('deleted.md', 'before deletion\n');
     first.disk.write('original.md', 'before rename\n');
     await sync(first);
-    const checkpoint = await first.engine.saveHistoryCheckpoint();
+    const checkpoint = await saveLegacyCheckpoint(first);
     expect(checkpoint).toMatch(/^[a-f0-9]{64}$/);
     await sync(second);
     first.disk.write('edited.md', 'after edit\n');
@@ -45,7 +48,7 @@ it('restores a full checkpoint through real sync and converges another device', 
     first.disk.rename('original.md', 'renamed.md');
     first.disk.write('added.md', 'after checkpoint\n');
     await sync(first); await sync(second);
-    const runtime = historyRuntime(first, checkpoint!);
+    const runtime = historyRuntime(first, checkpoint);
     const review = await runtime.createHistoryRestore(first.settings.syncHistory[0]!);
     expect(review.items).toHaveLength(5);
     await review.restore();
@@ -58,6 +61,12 @@ it('restores a full checkpoint through real sync and converges another device', 
     }
     expect(Object.keys((await first.api.getManifest()).files).sort()).toEqual(['deleted.md', 'edited.md', 'original.md']);
 });
+
+/** Device-local checkpoints are no longer created, but legacy history entries still restore. */
+function saveLegacyCheckpoint(device: SyncTestDevice): Promise<string> {
+    return writeLegacyCheckpoint(device.disk.vault.adapter, `${TEST_PLUGIN_DIR}/history-checkpoints`,
+        getCheckpointAuthority(device.settings), device.checkpoint().files, [...device.settings.ignorePatterns]);
+}
 
 function historyRuntime(device: SyncTestDevice, checkpoint: string): SyncRuntime {
     const entry: SyncHistoryEntry = { timestamp: new Date().toISOString(), type: 'sync', success: true,
@@ -73,13 +82,13 @@ it('restores a historical file after that path became a directory', async () => 
     clients.push(device); await device.authorize(); await device.open();
     device.disk.write('note.md', 'original file');
     await sync(device);
-    const checkpoint = await device.engine.saveHistoryCheckpoint();
+    const checkpoint = await saveLegacyCheckpoint(device);
     device.disk.remove('note.md');
     await sync(device);
     await device.disk.vault.createFolder('note.md');
     device.disk.write('note.md/child.md', 'later file in directory');
     await sync(device);
-    const runtime = historyRuntime(device, checkpoint!);
+    const runtime = historyRuntime(device, checkpoint);
     await (await runtime.createHistoryRestore(device.settings.syncHistory[0]!)).restore();
     expect(device.disk.paths()).toEqual(['note.md']);
     expect(device.disk.text('note.md')).toBe('original file');

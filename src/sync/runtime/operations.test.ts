@@ -18,17 +18,15 @@ describe('SyncRuntime operation wrappers', () => {
 	it.each(['manual', 'automatic'] as const)('does not record %s cancellation as sync history or checkpoint progress', async mode => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness();
 		const result = cancelSyncResult({ ...createEmptySyncResult(), uploaded: 1, uploadedPaths: ['saved.md'] });
-		const saveHistoryCheckpoint = vi.fn(async () => 'checkpoint');
 		const saveSharedHistoryCheckpoint = vi.fn(async () => undefined);
 		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
-		await initializeRuntime(runtime, { sync: vi.fn(async () => result), saveHistoryCheckpoint, saveSharedHistoryCheckpoint });
+		await initializeRuntime(runtime, { sync: vi.fn(async () => result), saveSharedHistoryCheckpoint });
 		const automatic = callback.mock.calls.at(-1)![0];
 		callback.mockRestore();
 		if (mode === 'manual') expect(await runtime.sync()).toBe(result);
 		else await automatic(result);
 		expect(settings.syncHistory).toEqual([]);
 		expect(settings.lastSync).toBeNull();
-		expect(saveHistoryCheckpoint).not.toHaveBeenCalled();
 		expect(saveSharedHistoryCheckpoint).not.toHaveBeenCalled();
 		expect(persistSettings).not.toHaveBeenCalled();
 		expect(runtime.getActivityProgress()).toBeNull();
@@ -57,67 +55,62 @@ describe('SyncRuntime operation wrappers', () => {
 
 	it('attaches a completed checkpoint without changing older snapshots or replacing newer history', async () => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness();
-		const checkpoint = createDeferred<string>();
-		const saveHistoryCheckpoint = vi.fn(() => checkpoint.promise);
-		await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveHistoryCheckpoint });
+		const checkpoint = createDeferred<{ id: string }>();
+		const saveSharedHistoryCheckpoint = vi.fn(() => checkpoint.promise);
+		await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveSharedHistoryCheckpoint } as never);
 		const operation = runtime.sync();
-		await vi.waitFor(() => expect(saveHistoryCheckpoint).toHaveBeenCalledOnce());
+		await vi.waitFor(() => expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
 		const previousSnapshot = buildPersistedCrateSettings(settings);
 		const original = previousSnapshot.syncHistory[0]!;
 		const newer = recordSyncHistory(settings, 'initial', createEmptySyncResult());
 		persistSettings.mockImplementation(async () => {
-			expect(settings.syncHistory[1]?.historyCheckpoint).toBe('a'.repeat(64));
+			expect(settings.syncHistory[1]?.sharedCheckpoint).toBe('shared-1');
 		});
-		checkpoint.resolve('a'.repeat(64));
+		checkpoint.resolve({ id: 'shared-1' });
 		await operation;
 		expect(settings.syncHistory[0]).toBe(newer);
-		expect(settings.syncHistory[1]).toEqual({ ...original, historyCheckpoint: 'a'.repeat(64) });
+		expect(settings.syncHistory[1]).toEqual({ ...original, sharedCheckpoint: 'shared-1' });
 		expect(previousSnapshot.syncHistory).toEqual([original]);
-		expect(original).not.toHaveProperty('historyCheckpoint');
+		expect(original).not.toHaveProperty('sharedCheckpoint');
 		expect(persistSettings).toHaveBeenCalledOnce();
 	});
 
 	it.each(['manual', 'automatic'] as const)('does not publish %s completion after its engine is replaced during checkpointing', async mode => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness();
-		const checkpoint = createDeferred<undefined>();
+		const checkpoint = createDeferred<{ id: string }>();
 		const saveSharedHistoryCheckpoint = vi.fn(() => checkpoint.promise);
-		const oldLocalCheckpoint = vi.fn(async () => 'old-checkpoint');
 		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
 		await initializeRuntime(runtime, {
 			sync: vi.fn(async () => createEmptySyncResult()),
-			saveSharedHistoryCheckpoint, saveHistoryCheckpoint: oldLocalCheckpoint,
-		});
+			saveSharedHistoryCheckpoint,
+		} as never);
 		const automatic = callback.mock.calls.at(-1)![0];
 		callback.mockRestore();
 		const operation = mode === 'manual' ? runtime.sync() : automatic(createEmptySyncResult());
 		await vi.waitFor(() => expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
-		const newLocalCheckpoint = vi.fn(async () => 'new-checkpoint');
-		await initializeRuntime(runtime, { saveHistoryCheckpoint: newLocalCheckpoint });
+		await initializeRuntime(runtime);
 		const entry = settings.syncHistory[0]!;
 		const stateChanged = vi.fn();
 		runtime.addStateChangeListener(stateChanged);
-		checkpoint.resolve(undefined);
+		checkpoint.resolve({ id: 'old-checkpoint' });
 		await operation;
-		expect(oldLocalCheckpoint).not.toHaveBeenCalled();
-		expect(newLocalCheckpoint).not.toHaveBeenCalled();
-		expect(entry).not.toHaveProperty('historyCheckpoint');
 		expect(entry).not.toHaveProperty('sharedCheckpoint');
 		expect(persistSettings).not.toHaveBeenCalled();
 		expect(stateChanged).not.toHaveBeenCalled();
 	});
 
-	it('does not attach a local checkpoint or persist after destruction during its save', async () => {
+	it('does not attach a checkpoint or persist after destruction during its save', async () => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness();
-		const checkpoint = createDeferred<string>();
-		const saveHistoryCheckpoint = vi.fn(() => checkpoint.promise);
-		await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveHistoryCheckpoint });
+		const checkpoint = createDeferred<{ id: string }>();
+		const saveSharedHistoryCheckpoint = vi.fn(() => checkpoint.promise);
+		await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveSharedHistoryCheckpoint } as never);
 		const operation = runtime.sync();
-		await vi.waitFor(() => expect(saveHistoryCheckpoint).toHaveBeenCalledOnce());
+		await vi.waitFor(() => expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
 		const entry = settings.syncHistory[0]!;
 		runtime.destroy();
-		checkpoint.resolve('obsolete-checkpoint');
+		checkpoint.resolve({ id: 'obsolete-checkpoint' });
 		await operation;
-		expect(entry).not.toHaveProperty('historyCheckpoint');
+		expect(entry).not.toHaveProperty('sharedCheckpoint');
 		expect(persistSettings).not.toHaveBeenCalled();
 	});
 

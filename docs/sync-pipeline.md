@@ -409,7 +409,8 @@ reads near 2.4 per day on the Cloudflare Free plan.
 The server reads the inventory in bounded pages and verifies the monotonic changelog
 generation before and after capture. An incomplete initial import or concurrent
 mutation rejects capture. Current limits are 100,000 files and 32 MiB of metadata;
-exceeding them never publishes a partial inventory. The small shared index is
+exceeding them never publishes a partial inventory, and vaults above these limits
+get no checkpoints. The small shared index is
 published conditionally only after its immutable inventory exists. Uncertain writes
 retain their possible committed objects; a bounded, cursor-based maintenance sweep
 removes unreferenced metadata after a one-day grace period.
@@ -421,8 +422,9 @@ check the live index and exact current/retained D1 path and revision ownership; 
 client verifies size and SHA-256 against the checkpoint before staging. Unlike text
 previews, these reads support the full 25 MiB sync-file limit.
 
-Local checkpoint inventories that no sync history entry references are pruned
-when the sync engine starts. Shared checkpoints
+Earlier releases saved device-local inventories; their history entries can still
+be browsed and restored, and inventories that no sync history entry references are
+pruned when the sync engine starts. Shared checkpoints
 contain the full remote inventory; each restoring device preserves its current
 excluded files and rejects exclusion changes during review.
 

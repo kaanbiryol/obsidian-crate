@@ -29,7 +29,6 @@ export function expectFileEventsAccepted(runtime: SyncRuntime, accepted: boolean
 export async function initializeRuntime(runtime: SyncRuntime, overrides: Partial<SyncEngine> = {}): Promise<void> {
 	const initialize = vi.spyOn(SyncEngine.prototype, 'initialize').mockImplementationOnce(async function (this: SyncEngine) {
 		Object.assign(this, {
-			saveHistoryCheckpoint: vi.fn(async () => undefined),
 			saveSharedHistoryCheckpoint: vi.fn(async () => undefined),
 		}, overrides);
 	});
