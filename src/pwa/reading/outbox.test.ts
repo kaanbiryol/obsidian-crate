@@ -109,21 +109,33 @@ it('removes a reviewed rejected edit and its dependents only while the export st
 
 it('retains rejected edits and their dependents for review without sending dependents', async () => {
 	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } });
+	await queueReading(session, { action: 'update', intent: { id: 'other', changes: { favorite: true }, before: { favorite: false } } });
 	const started = deferred<void>(), release = deferred<Response>();
 	network.mockImplementationOnce(async () => response({ day: 20_000, generation: session.generation }))
 		.mockImplementationOnce(() => { started.resolve(); return release.promise; });
 	const draining = drainReading(session); await started.promise;
 	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { tags: ['essays'] }, before: { tags: [] } } });
-	await queueReading(session, { action: 'update', intent: { id: 'other', changes: { favorite: true }, before: { favorite: false } } });
 	release.resolve(response({ error: 'Changed on another device' }, 409)); await draining;
+	const sent = () => network.mock.calls.filter(([path]) => path === '/reading/update').map(([, init]) => (JSON.parse(init!.body as string) as { id: string }).id);
+	// The rejection does not hold back an independent article.
+	expect(sent()).toEqual(['article', 'other']);
 	const work = await pendingReading(session);
-	expect(work.map(op => op.review)).toEqual([true, true, undefined]);
+	expect(work.map(op => op.action !== 'capture' && [op.intent.id, op.review])).toEqual([['article', true], ['article', true]]);
 	expect(work[0]?.retryAt).toBeUndefined();
 	await expect(queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: false }, before: { favorite: true } } })).rejects.toThrow('Review');
 	await drainReading(session);
-	const sent = network.mock.calls.filter(([path]) => path === '/reading/update').map(([, init]) => JSON.parse(init!.body as string) as { id: string });
-	expect(sent.map(op => op.id)).toEqual(['article', 'other']);
+	expect(sent()).toEqual(['article', 'other']);
 	expect(await pendingReading(session)).toHaveLength(2);
+});
+
+it('stops sending after a failure that may affect every change', async () => {
+	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } });
+	await queueReading(session, { action: 'update', intent: { id: 'other', changes: { favorite: true }, before: { favorite: false } } });
+	network.mockImplementationOnce(async () => response({ day: 20_000, generation: session.generation }))
+		.mockImplementationOnce(async () => response({ error: 'Unavailable' }, 503));
+	await drainReading(session);
+	expect(network.mock.calls.filter(([path]) => path === '/reading/update')).toHaveLength(1);
+	expect((await pendingReading(session)).map(op => op.review)).toEqual([false, undefined]);
 });
 
 it('rejects stale peer edits and failed persistence before accepting work', async () => {
