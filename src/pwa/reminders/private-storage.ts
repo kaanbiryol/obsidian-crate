@@ -9,7 +9,9 @@ export const REMINDER_OUTBOX_LOCK = 'crate-reminder-outbox';
 
 let cipher: LocalStateCipher | undefined;
 let locked = false;
-export const privateStorageEnabled = () => !!cipher || locked;
+/** Plaintext records count as stale only once a cipher is unlocked. A failed
+ * check locks writes but does not prove the vault is encrypted. */
+export const privateStorageUnlocked = () => !!cipher;
 
 export function requirePrivateStorageUnlock(): void { cipher?.destroy(); cipher = undefined; locked = true; }
 

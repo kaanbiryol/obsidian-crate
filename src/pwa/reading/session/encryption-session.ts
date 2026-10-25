@@ -66,7 +66,8 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
     return currentKeys;
   })().catch(error => {
     if (current()) {
-      // Losing the network must not revoke this session's verified local access.
+      // An unanswered check (network or server error) must not revoke this
+      // session's verified local access.
       // The request still fails, so no unverified plaintext reaches the server.
       // Reminders deliberately lock instead (see reminders/encryption-session.ts).
       if (!(error instanceof EncryptionVerificationUnavailableError) || verifiedIdentity !== identity) {

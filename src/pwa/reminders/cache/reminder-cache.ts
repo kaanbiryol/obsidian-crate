@@ -3,7 +3,7 @@ import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue } from
 import { AUTH_TOKEN_KEY } from '../../config';
 import { CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME, deleteCacheDatabase, openCacheDatabase, reminderCacheHealth, reportCacheProblem } from './reminder-cache-database';
 import { normalizeSnapshot } from './reminder-cache-validation';
-import { sealPrivateValue, openPrivateValue, privateStorageEnabled } from '../private-storage';
+import { sealPrivateValue, openPrivateValue, privateStorageUnlocked } from '../private-storage';
 import { sha256Hex } from '../../../platform/sha256';
 
 let cacheGeneration = 0;
@@ -51,7 +51,7 @@ const noteKey = (sessionScope: string, folderPath: string, path: string) => `cac
  * match the private storage setting or is damaged. */
 function openMetadata(raw: StoredMetadata, sessionScope: string, folderPath: string): { metadata: Partial<SnapshotMetadata>; versions: Map<string, string> } | null {
 	try {
-		if (raw.sessionScope !== sessionScope || Boolean(raw.encrypted) !== privateStorageEnabled()) return null;
+		if (raw.sessionScope !== sessionScope || Boolean(raw.encrypted) !== privateStorageUnlocked()) return null;
 		const metadata = (raw.encrypted ? JSON.parse(openPrivateValue(raw.encrypted, `cache:${sessionScope}:${folderPath}`)) : raw) as Partial<SnapshotMetadata>;
 		if (metadata.layout !== 'notes' || !Array.isArray(metadata.noteVersions)) return null;
 		const versions = new Map<string, string>();
@@ -88,8 +88,9 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 				transaction.objectStore(NOTES_STORE_NAME).getAll(noteRange(folderPath)) as Promise<StoredNote[]>,
 			]))(),
 		]);
-		if (raw && !raw.encrypted && privateStorageEnabled()) {
-			// Plaintext reminders must not outlive the switch to private storage.
+		if (raw && !raw.encrypted && privateStorageUnlocked()) {
+			// Plaintext reminders must not outlive the switch to private storage. A
+			// locked check proves nothing, so the offline copy waits for a cipher.
 			const cleanup = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME], 'readwrite');
 			await Promise.all([
 				cleanup.objectStore(CACHE_STORE_NAME).delete(folderPath),
@@ -122,7 +123,7 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 			const read = new Map<string, PersistedNote>();
 			for (const note of notes) {
 				if (note.sessionScope !== sessionScope || typeof note.version !== 'string' || typeof note.path !== 'string') return null;
-				if (privateStorageEnabled() !== Boolean(note.encrypted)) return null;
+				if (privateStorageUnlocked() !== Boolean(note.encrypted)) return null;
 				// The decrypted text is the JSON the write path compares, so reuse it.
 				const openedJson = note.encrypted ? openPrivateValue(note.encrypted, noteKey(sessionScope, folderPath, note.path)) : undefined;
 				const value: unknown = openedJson !== undefined ? JSON.parse(openedJson) : note.reminders;

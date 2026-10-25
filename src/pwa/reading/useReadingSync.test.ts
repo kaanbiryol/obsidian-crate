@@ -36,7 +36,7 @@ vi.mock('./storage/storage', async importOriginal => ({
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'one', folderPath: 'Reading', expiresAt: 1 };
 const cache: ReadingCache = { items: [], issues: [], savedAt: 1 };
 const resetSession = vi.fn();
-const connection: ReadingConnection = { session, ready: true, lockedSession: null, encryptionSetupRequired: false,
+const connection: ReadingConnection = { session, ready: true, lockedSession: null, verificationUnavailable: false, encryptionSetupRequired: false,
   converting: false, expire: vi.fn(), connecting: false, connect: vi.fn(), resetSession, issue: null, error: null, connectionState: 'available' };
 function renderSync(enabled = () => true, currentConnection = connection) {
   return renderHook(() => {

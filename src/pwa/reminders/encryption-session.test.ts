@@ -3,7 +3,7 @@ import { consumeReminderEncryptionFragment, reminderEncryptionSnapshot, prepareR
 import { invalidatePwaSession } from '../connection/session-generation';
 import { AUTH_TOKEN_KEY } from '../config';
 import { LocalStateCipher } from '../../encryption/local-state';
-import { unlockPrivateStorage, privateStorageEnabled, sealPrivateValue, openPrivateValue } from './private-storage';
+import { unlockPrivateStorage, privateStorageUnlocked, sealPrivateValue, openPrivateValue } from './private-storage';
 import { createReminderOutboxStorage } from './outbox/reminder-outbox-storage';
 import { getPwaPushManager } from '../service-worker-registration';
 
@@ -73,7 +73,7 @@ it('restores durable writes when an open encrypted tab adopts a verified unencry
 	expect(() => sealPrivateValue('before confirmation', 'test')).toThrow('Unlock');
 	await prepareReminderEncryption('new-session', async () => Response.json({ encryption: null }));
 	expect(reminderEncryptionSnapshot().status).toBe('unencrypted');
-	expect(privateStorageEnabled()).toBe(false);
+	expect(privateStorageUnlocked()).toBe(false);
 	const outbox = await createReminderOutboxStorage('new-session', 'Reminders');
 	const operationId = crypto.randomUUID();
 	const change = { operationId, kind: 'complete' as const, recordId: 'reminder', status: 'pending' as const,
@@ -91,7 +91,8 @@ it.each([[200, 'no longer reports'], [404, 'Could not verify encryption']] as co
 	localStorage.setItem('crate-encryption-session:previous-session', 'encrypted enrollment');
 	await expect(prepareReminderEncryption('session', async () => Response.json({ encryption: null }, { status })))
 		.rejects.toThrow(message);
-	expect(reminderEncryptionSnapshot().status).toBe('locked');
+	// Only a definite answer offers the recovery-key card.
+	expect(reminderEncryptionSnapshot()).toMatchObject({ status: 'locked', unavailable: status !== 200 });
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 });
 
@@ -105,6 +106,7 @@ it.each([200, 404])('rejects plaintext mode for a fresh encrypted setup link whe
 
 it('keeps storage locked after an unavailable check and permits writes after a successful plaintext retry', async () => {
 	await expect(prepareReminderEncryption('session', async () => Response.json({}, { status: 503 }))).rejects.toThrow('Could not verify encryption');
+	expect(reminderEncryptionSnapshot()).toMatchObject({ status: 'locked', unavailable: true });
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 	await prepareReminderEncryption('session', async () => Response.json({ encryption: null }));
 	expect(sealPrivateValue('new draft', 'draft')).toBe('new draft');

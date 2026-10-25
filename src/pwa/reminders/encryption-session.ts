@@ -1,5 +1,5 @@
 import { EncryptionKeyRequiredError, rememberEncryptionUnlock } from '../encryption/encryption-onboarding';
-import { loadEncryptionState, loadVaultKeys, assertEncryptionActive } from '../connection/encryption';
+import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../connection/encryption';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from './private-storage';
@@ -11,7 +11,7 @@ import { unlockLocalState } from '../encryption/encryption-keys';
 import { rememberRecoveryKey } from '../encryption/web-app-unlock';
 
 type EncryptionView = { status: 'checking' | 'unencrypted' } | { status: 'ready'; folderPath: string }
-	| { status: 'locked'; message: string; converting: boolean; setupRequired: boolean };
+	| { status: 'locked'; message: string; converting: boolean; setupRequired: boolean; unavailable: boolean };
 let view: EncryptionView = { status: 'checking' };
 const listeners = new Set<() => void>();
 let pending: { token: string; promise: Promise<FeatureKeys | null> } | undefined;
@@ -68,7 +68,8 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 	})().catch(error => {
 		// Unlike Reading, which keeps a verified session's access when verification is only
 		// unavailable, any failed check locks reminders until a check succeeds.
-		if (current()) { requirePrivateStorageUnlock(); publish({ status: 'locked', message: error instanceof Error ? error.message : String(error), converting: !!state && state.mode !== 'active', setupRequired: error instanceof EncryptionKeyRequiredError && error.firstUnlock }); }
+		// An unavailable check shows a connection error, not the recovery-key card.
+		if (current()) { requirePrivateStorageUnlock(); publish({ status: 'locked', message: error instanceof Error ? error.message : String(error), converting: !!state && state.mode !== 'active', setupRequired: error instanceof EncryptionKeyRequiredError && error.firstUnlock, unavailable: error instanceof EncryptionVerificationUnavailableError }); }
 		throw error;
 	});
 	pending = { token, promise: work };

@@ -56,6 +56,15 @@ describe('encryption verification', () => {
 		await expect(load(async () => { throw new TypeError('network'); })).rejects.toBeInstanceOf(EncryptionVerificationUnavailableError);
 	});
 
+	it.each([
+		['a server error', () => Response.json({ error: 'Deploying' }, { status: 503 })],
+		['a captive portal page', () => new Response('<html>Sign in</html>', { headers: { 'Content-Type': 'text/html' } })],
+		['a reply without an encryption status', () => Response.json({})],
+	])('reports %s as an unavailable check', async (_, response) => {
+		await expect(load(async () => response())).rejects.toBeInstanceOf(EncryptionVerificationUnavailableError);
+		await expect(load(async () => new Response(null, { status: 401 }))).rejects.not.toBeInstanceOf(EncryptionVerificationUnavailableError);
+	});
+
 	it('requires one online verification for an encrypted session link', async () => {
 		vi.stubGlobal('navigator', { onLine: false });
 		await expect(loadEncryptionState({ token: 'token', purpose: 'reminders', fragment: 'e2ee', request: async () => { throw new TypeError('offline'); }, current: () => true }))
