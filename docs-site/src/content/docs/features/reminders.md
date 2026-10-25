@@ -71,6 +71,10 @@ An [embedded reminder block](/docs/features/embedded-reminders/) shows a project
 
 Connect the [Crate web app](/docs/features/web-app/) to see and edit reminders without Obsidian. Changes you make there reach your vault the next time Obsidian syncs.
 
+Select a reminder to change its title, date, project, or priority. Pick a project from the list, or choose a quick date or exact time.
+
+![Editing a reminder in the web app, with its date, project, and priority](../../../assets/screenshots/phone-reminders-edit.png) ![Choosing a project for a reminder in the web app](../../../assets/screenshots/phone-reminders-project.png) ![Scheduling a reminder with quick dates or an exact time in the web app](../../../assets/screenshots/phone-reminders-schedule.png)
+
 ## Get alerts
 
 1. In Obsidian, turn on **Settings → Crate → Notifications → Push notifications**.
