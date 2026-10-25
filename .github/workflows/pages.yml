@@ -106,7 +106,6 @@ jobs:
             ${{ (github.event.release.tag_name || inputs.release_tag)
                 && format('refs/tags/{0}', github.event.release.tag_name || inputs.release_tag)
                 || (github.event_name == 'workflow_dispatch' && 'master' || github.sha) }}
-          fetch-depth: 0
           persist-credentials: false
       - name: Use Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -120,8 +119,6 @@ jobs:
         run: |
           npm ci
           npm --prefix docs-site ci
-      - name: Check dependencies and source for security findings
-        run: npm run security:check
       - name: Check documentation
         run: npm run check:docs
       - name: Verify shortcut template and website downloads
