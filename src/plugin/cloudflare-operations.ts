@@ -168,6 +168,7 @@ async function executeCloudflareOperation(
 		return;
 	}
 	const operation = beginOperation(plugin, signal, params, savedIntent);
+	const accountId = plugin.settings.cloudflareDeployment?.accountId;
 	let credential: DeviceCredential;
 	let deployment: CloudflareDeploymentResult;
 	try {
@@ -182,6 +183,8 @@ async function executeCloudflareOperation(
 	if (signal.aborted) return;
 
 	if (deployment.status === 'deleted') {
+		// This vault no longer has a server, so drop its account-wide management login.
+		if (accountId) await plugin.cloudflareUsageConnection.forget(accountId);
 		plugin.refreshSettingsTab();
 		operation.presentation.deleted();
 		return;

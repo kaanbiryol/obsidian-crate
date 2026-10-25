@@ -9,7 +9,7 @@ Detailed data-flow disclosures for Crate. The [README](../README.md) summarizes 
 - Choosing `setup --hostname` creates a named tunnel and DNS route through your Cloudflare account instead. That mode saves tunnel credentials in a private directory beside the server data; Cloudflare's browser login saves its management certificate in `~/.cloudflared`.
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
-- OAuth state and PKCE material exist only in memory during one deployment; authorization codes are never stored or logged. After successful setup, Crate stores OAuth credentials with server management and analytics permissions in Obsidian secret storage.
+- OAuth state and PKCE material exist only in memory during one deployment; authorization codes are never stored or logged. After successful setup, Crate stores OAuth credentials with server management and analytics permissions in Obsidian secret storage. After **Delete server and all data** finishes, Crate revokes them and clears them from that device.
 - The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases with schema 1; no migrations are registered. Unsupported schemas are rejected without modification. Deployment code is never fetched at runtime.
 - Cloudflare-hosted vault devices are authorized through the owning Cloudflare account. Locally hosted vault devices use tokens issued by the server operator.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
