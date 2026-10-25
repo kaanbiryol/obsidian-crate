@@ -113,6 +113,16 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	if (execution.kind === 'coordinator' && readingGrant) return handleReadingRoute(request, env, undefined, execution.state);
 	const publicResponse = await handlePublicRoute(request, env, path, method);
 	if (publicResponse) return publicResponse;
+	// Coordinator routes authenticate once, under the coordinator lock that every
+	// revocation also takes. The encrypted shortcut capture downloads its page here
+	// before entering the coordinator, so it still authenticates at the edge.
+	if (routeExecution?.kind === 'coordinator' && execution.kind !== 'coordinator' && shortcut?.kind !== 'prepare') {
+		const response = await forwardToCoordinator(env, request);
+		// Only an authenticated coordinator response carries the encryption state.
+		if (response.headers.has(ENCRYPTION_STATE_HEADER)) await rememberAuthenticatedRequest(request, admissionDb, true);
+		else if (response.status === 401) await rememberAuthenticatedRequest(request, admissionDb, false);
+		return forwardedResponse(response, context);
+	}
 
 	const authResult = await authenticateWorkerRequest(request, db);
 	if (execution.kind !== 'coordinator') await rememberAuthenticatedRequest(request, admissionDb, !authResult.response);
