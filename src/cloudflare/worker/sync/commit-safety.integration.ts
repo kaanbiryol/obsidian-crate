@@ -1,5 +1,8 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { commitStagedFile } from './mutations';
+import { commitFileDelete, commitStagedFile } from './mutations';
+import { trackStagedUpload } from './staging/staged-uploads';
+import { createManagedObjectKey } from '@/protocol/storage-keys';
+import { sha256Hex } from '@/platform/sha256';
 import { commitNewFiles } from './staging/bulk-new-file-commit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
@@ -155,5 +158,33 @@ describe('publication history and derived state', () => {
 			{ path: destinationPath, objectKey: stalePath === destinationPath ? 'unpublished-destination' : destination.storageKey },
 		])]);
 		expect(await db.prepare('SELECT 1 FROM file_versions').first()).toBeNull();
+	});
+});
+
+describe('replaced version retention', () => {
+	const path = 'image.bin';
+	const absent = (body: string) => handleUpload(new Request(`https://test/sync/upload?path=${path}`, {
+		method: 'PUT', headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent' }, body,
+	}), bucket, db, { commitUpload: commitStagedFile, commitNewFiles });
+
+	it('retains the object an upload replaces when the same bytes were recreated after its snapshot', async () => {
+		expect((await absent('first')).status).toBe(200);
+		const snapshot = (await getStoredFileRow(db, path))!;
+		expect((await commitFileDelete(bucket, db, { path, expectedHash: snapshot.hash, expectedRevision: snapshot.storageKey, previousFile: snapshot })).committed).toBe(true);
+		expect((await absent('first')).status).toBe(200);
+		const recreated = (await getStoredFileRow(db, path))!;
+		expect(recreated.storageKey).not.toBe(snapshot.storageKey);
+
+		const content = new TextEncoder().encode('second').buffer;
+		const hash = await sha256Hex(content);
+		const objectKey = createManagedObjectKey(hash);
+		await trackStagedUpload(db, objectKey, path);
+		await bucket.put(objectKey, content);
+		const result = await commitStagedFile(bucket, db, {
+			path, hash, size: content.byteLength, objectKey, content, expectedHash: snapshot.hash, previousFile: snapshot,
+		});
+
+		expect(result.committed).toBe(true);
+		expect(await db.prepare('SELECT reason FROM file_versions WHERE storage_key = ?').bind(recreated.storageKey).first()).toEqual({ reason: 'replaced' });
 	});
 });

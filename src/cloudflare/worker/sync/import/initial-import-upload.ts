@@ -1,4 +1,3 @@
-import { portablePathKey } from '../../../../protocol/portable-path';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { BATCH_UPLOAD_MAX_BYTES, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
@@ -7,7 +6,7 @@ import { parseJsonObject, sanitizePath } from '../../request-validation';
 import { readInitialImport } from './initial-import';
 import { loadStoredFileRows, parseExpectedFileHash } from '../storage';
 import { trackStagedBatch, finishStagedBatches } from '../staging/staged-upload-batches';
-import { uploadMutation } from '../mutations';
+import { queueReplacedUploadCleanup, uploadMutation } from '../mutations';
 import { readLimitedRequestBody } from '../../body-reader';
 import { isSha256Hex } from '@/platform/validation';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
@@ -93,16 +92,14 @@ async function commitImportFiles(token: string, files: ImportFile[], bucket: R2B
     }));
   }
   if (staged.length) {
-    const json = JSON.stringify(staged.map(file => ({ path: file.path, portable: portablePathKey(file.path), key: file.objectKey, old: previous.get(file.path)?.storageKey ?? null })));
+    const uploads = staged.map(file => ({
+      path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey,
+      expectedHash: file.expectedHash, stagingBatchId, importToken: token,
+    }));
     await db.batch([
-      ...staged.map(file => uploadMutation(db, {
-        path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey,
-        expectedHash: file.expectedHash, stagingBatchId, importToken: token,
-      })),
-      db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue(storage_key, file_path)
-        SELECT json_extract(i.value, '$.old'), json_extract(i.value, '$.path') FROM json_each(?) i JOIN files f
-        ON f.portable_path = json_extract(i.value, '$.portable') AND f.path = json_extract(i.value, '$.path') AND f.storage_key = json_extract(i.value, '$.key')
-        WHERE json_extract(i.value, '$.old') IS NOT NULL`).bind(json),
+      // Read the replaced objects from the live rows before the updates change them.
+      ...uploads.flatMap(upload => queueReplacedUploadCleanup(db, upload)),
+      ...uploads.map(upload => uploadMutation(db, upload)),
       ...finishStagedBatches(db, staged.map(file => ({ ...file, stagingBatchId }))),
       db.prepare("UPDATE initial_import SET generation = generation + 1 WHERE token = ? AND state = 'importing'").bind(token),
     ]);
