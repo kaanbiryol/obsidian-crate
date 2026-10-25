@@ -53,7 +53,7 @@ export function HighlightList<T extends ReadingMetadata>({ entries, onView, onAn
 			{withActions
 				? <div className="crate-reading-highlights__toolbar">
 					{highlight.createdAt ? <time className="crate-reading-highlights__date" dateTime={highlight.createdAt}>{highlightDate(highlight.createdAt)}</time> : <span className="crate-reading-highlights__date" />}
-					{onAnnotate && <IconButton icon={highlight.note ? 'pencil' : 'message-square-plus'} iconSize="s" label={highlight.note ? 'Edit note' : 'Add note'} disabled={disabled} onClick={() => onAnnotate(item, highlight)} />}
+					{onAnnotate && <IconButton icon={highlight.note ? 'pencil' : 'notepad-text'} iconSize="s" label={highlight.note ? 'Edit note' : 'Add note'} disabled={disabled} onClick={() => onAnnotate(item, highlight)} />}
 					<IconButton icon={copied === key ? 'check' : 'copy'} iconSize="s" label={copied === key ? 'Text copied' : 'Copy text'} onClick={() => void copy(key, highlight.text)} />
 					{momentControls}
 					{onDelete && <IconButton className="crate-reading-highlights__delete" icon="trash-2" iconSize="s" tone="danger" label="Delete highlight" disabled={disabled} onClick={() => onDelete(item, highlight)} />}
