@@ -135,11 +135,14 @@ it('reuses the encrypted Reading index only for the same encryption identity and
 
 it('removes queues from earlier sign-ins only while they match the reviewed export', async () => {
   values.set('pending:earlier', [{ ...command(), sessionId: 'earlier' }]);
+  values.set('attempt:earlier:operation', { requestHash: 'hash', body: '{}' });
   values.set(`pending:${session.id}`, [command()]);
+  values.set(`attempt:${session.id}:operation`, { requestHash: 'hash', body: '{}' });
   const exported = JSON.stringify(await earlierReadingChanges(session.id));
   values.set('pending:older', []);
   expect(await removeEarlierReadingChanges(session.id, exported)).toBe(false);
   expect(values.has('pending:earlier')).toBe(true);
+  expect(values.has('attempt:earlier:operation')).toBe(true);
   expect(await removeEarlierReadingChanges(session.id, JSON.stringify(await earlierReadingChanges(session.id)))).toBe(true);
-  expect([...values.keys()]).toEqual([`pending:${session.id}`]);
+  expect([...values.keys()]).toEqual([`pending:${session.id}`, `attempt:${session.id}:operation`]);
 });

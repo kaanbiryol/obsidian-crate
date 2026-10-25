@@ -136,3 +136,20 @@ it('skips downloads that could not displace the copies already kept', async () =
   values.delete(`article-index:${session.id}`);
   expect(await pick(20)).toEqual([]);
 });
+
+it('replaces earlier sign-ins\' offline copies while keeping their queues, drafts, attempts and unreadable records', async () => {
+  const earlier = 'reminders:earlier:generation';
+  const kept = {
+    [`pending:${earlier}`]: [], [`draft:${earlier}`]: { url: 'https://draft.example' }, [`attempt:${earlier}:operation`]: { requestHash: 'hash', body: '{}' },
+    [`article:${earlier}:opaque`]: { encryptedReading: 1, content: 'unreadable without its key' },
+  };
+  for (const [key, value] of Object.entries(kept)) values.set(key, value);
+  values.set(`list:${earlier}`, { items: [item(1)], issues: [], savedAt: 1 });
+  values.set(`article-index:${earlier}`, { version: 1, entries: [] });
+  values.set(`encrypted-index:${earlier}`, { version: 1, identity: 'identity', entries: [] });
+  values.set(`article:${earlier}:${item(1).crate_reading_id}`, { item: { ...item(1), path: 'Old reading/article-1.md' }, markdown: 'Old folder', usedAt: 1 });
+  values.set(articleKey(2), { item: item(2), markdown: 'Current', usedAt: 2 });
+  await commitReadingCache(session, { items: [item(2)], issues: [], savedAt: 3 });
+  expect(Object.fromEntries([...values].filter(([key]) => key.includes(earlier)))).toEqual(kept);
+  expect(values.has(articleKey(2))).toBe(true);
+});
