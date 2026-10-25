@@ -110,7 +110,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 			if (typeof body.completed !== 'boolean') throw new ReminderCommandError('Choose a completion state', 400, 'invalid_reminder_input');
 			changes.set(path, current.completed === body.completed ? content : setReminderCompletionInContent(content, current, body.completed).content);
 		} else if (action === 'update') {
-			const update = buildReminderUpdate(parseReminderUpdateParams(body)).updates;
+			const update = buildReminderUpdate(parseReminderUpdateParams(body));
 			if (update.project && update.project !== current.project) {
 				const destination = getReminderProjectFilePath(folderPath, update.project);
 				const before = await load(destination) ?? getInitialProjectFileContent(update.project);

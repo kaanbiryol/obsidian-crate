@@ -105,8 +105,7 @@ function createReminderRepositoryMutations({ index, writer }: ReminderRepository
       if (!indexed) return undefined;
 
       if (params.expectedRevision && params.expectedRevision !== await reminderRevision(toReminder(indexed))) throw new Error('Reminder changed while editing. Your draft was not saved.');
-      const update = buildReminderUpdate(params);
-      await writer.updateReminder(indexed, update.updates);
+      await writer.updateReminder(indexed, buildReminderUpdate(params));
 
       return currentReminder(id);
     },
