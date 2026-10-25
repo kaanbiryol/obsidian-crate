@@ -58,7 +58,26 @@ export async function readReadingArticle(session: ReadingSession, id: string) {
   return value;
 }
 
-/** Publish a complete library and prune only confirmed deletions in one transaction. */
+/** Offline copies saved under an earlier sign-in; session IDs change with the
+ * token and the folder generation. Queues, drafts and attempts are not copies. */
+function isEarlierCopyKey(key: string, sessionId: string): boolean {
+  if (key.startsWith('article:')) return !key.startsWith(readingKeys.articlePrefix(sessionId));
+  return [readingKeys.list, readingKeys.articleIndex, (id: string) => `encrypted-index:${id}`]
+    .some(build => key.startsWith(build('')) && key !== build(sessionId));
+}
+
+/** A copy this version can read; unknown or undecodable records stay exportable. */
+function isReadableCopy(key: string, raw: unknown): boolean {
+  let value: unknown;
+  try { value = decodeReadingValue(key, raw); } catch { return false; }
+  if (!isRecord(value)) return false;
+  if (key.startsWith('article:')) return isRecord(value.item) && typeof value.markdown === 'string';
+  if (key.startsWith('list:')) return Array.isArray(value.items);
+  return value.version === 1 && Array.isArray(value.entries);
+}
+
+/** Publish a complete library and prune only confirmed deletions in one transaction.
+ * The confirmed library also replaces earlier sign-ins' offline copies. */
 export async function commitReadingCache(session: ReadingSession, cache: ReadingCache): Promise<ReadingCache> {
   const db = await readingDatabase(); assertReadingSession(session);
   const tx = db.transaction('values', 'readwrite'), prefix = readingKeys.articlePrefix(session.id);
@@ -81,7 +100,12 @@ export async function commitReadingCache(session: ReadingSession, cache: Reading
         cache.items.push(item); ids.add(item.crate_reading_id);
       }
     }
-    for (const key of await tx.store.getAllKeys()) if (key.startsWith(prefix) && !ids.has(key.slice(prefix.length))) {
+    for (const key of await tx.store.getAllKeys()) {
+      if (isEarlierCopyKey(key, session.id)) {
+        if (isReadableCopy(key, await tx.store.get(key))) await tx.store.delete(key);
+        continue;
+      }
+      if (!key.startsWith(prefix) || ids.has(key.slice(prefix.length))) continue;
       const raw = await tx.store.get(key);
       let article: unknown;
       try { article = decodeReadingValue(key, raw); } catch { continue; }

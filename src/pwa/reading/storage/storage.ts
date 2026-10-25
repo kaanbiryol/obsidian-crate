@@ -66,14 +66,17 @@ export async function earlierReadingChanges(sessionId?: string): Promise<Array<[
   }
   return changes;
 }
-/** Removes earlier queues only while they still match the reviewed export. */
+/** Removes earlier queues only while they still match the reviewed export, with
+ * the exact request bodies saved for retrying them. */
 export function removeEarlierReadingChanges(sessionId: string | undefined, reviewed: string): Promise<boolean> {
   return readingLock(async () => {
     const changes = await earlierReadingChanges(sessionId);
     if (JSON.stringify(changes) !== reviewed) return false;
     const db = await readingDatabase(), tx = db.transaction('values', 'readwrite');
+    const attempts = changes.map(([key]) => readingKeys.attemptPrefix(key.slice(readingKeys.pending('').length)));
     try {
       for (const [key] of changes) await tx.store.delete(key);
+      for (const key of await tx.store.getAllKeys()) if (attempts.some(prefix => key.startsWith(prefix))) await tx.store.delete(key);
       await tx.done;
     } catch (error) { await abortTransaction(tx); throw error; }
     return true;

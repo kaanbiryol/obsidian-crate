@@ -93,6 +93,11 @@ preservation. `tests/browser/reading/reading-optimistic-test.mjs` also verifies 
 IndexedDB preservation through reload and retry in Chromium and WebKit.
 
 Reading refresh commits the list and article removals in one IndexedDB transaction.
+The same transaction removes the readable lists, indexes and articles saved under
+earlier sign-ins, whose session IDs change with the credential and folder generation,
+so the article cap covers the whole device. Their pending changes, drafts, saved
+request attempts and unreadable records stay for review and export. Removing an
+earlier sign-in's reviewed changes also removes its saved request attempts.
 A failed list write leaves the previous list and articles intact. A source issue
 does not authorize removing that source's cached article or its last verified list
 entry; the issue remains visible while the saved copy is retained. Unknown article
