@@ -47,6 +47,13 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 	];
 
 	scope.addEventListener('install', event => {
+		// The Worker serves the current script for any requested version, so a
+		// browser update check of an older registration must not install it
+		// behind the update flow, which registers the version it verified.
+		if (new URL(scope.location.href).searchParams.get('v') !== config.version) {
+			event.waitUntil(Promise.reject(new Error('This app version was not requested by the update flow.')));
+			return;
+		}
 		event.waitUntil(caches.open(shellCache).then(async cache => {
 			// Keep installation conditional on a complete shell and bound traffic.
 			// A content-hashed chunk an earlier version cached is the same file.
