@@ -393,6 +393,15 @@ describe('worker entrypoint', () => {
 		expect(await response.json()).toEqual({ error: 'Authentication service unavailable' });
 	});
 
+	it('reports a D1 daily limit during authentication as the documented 429', async () => {
+		const DB = { prepare: () => { throw new Error('D1_ERROR: Exceeded daily rows read limit'); } };
+		const response = await worker.fetch(new Request('https://worker.test/sync/manifest', {
+			headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer secret-token' },
+		}), createEnv({ DB: DB as never }));
+		expect(response.status).toBe(429);
+		expect(await response.json()).toMatchObject({ code: 'd1_daily_limit' });
+	});
+
 	it('explains a D1 daily limit instead of hiding it as a server error', async () => {
 		const DB = { prepare: () => { throw new Error('D1_ERROR: Exceeded daily rows written limit'); } };
 		const response = await worker.fetch(new Request('https://worker.test/notifications/vapid-public-key'), createEnv({ DB: DB as never }));

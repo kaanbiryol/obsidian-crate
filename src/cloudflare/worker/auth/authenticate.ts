@@ -3,6 +3,7 @@ import { parseOptionalString } from '../request-validation';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../../../protocol/web-session';
 import { validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { sha256Hex } from '../../../platform/sha256';
+import { isD1DailyLimitError } from '../d1-usage';
 
 type AuthScope = 'vault' | 'reminders' | 'reading' | 'reading_capture';
 
@@ -67,12 +68,16 @@ export async function authenticateWorkerRequest(
 			: null;
 		// The SELECT already says whether this write would change anything.
 		if (row.last_seen_stale || (sessionName !== null && row.device_name !== sessionName)) {
-			await db.prepare(`UPDATE auth_tokens
-				SET device_name = COALESCE(?, device_name), last_seen_at = datetime('now')
-				WHERE id = ? AND ((? IS NOT NULL AND (device_name IS NULL OR device_name != ?))
-					OR last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours'))`)
-				.bind(sessionName, row.id, sessionName, sessionName)
-				.run();
+			// This only feeds the device list, so a failed write (such as an
+			// exhausted daily write allowance) never blocks the request.
+			try {
+				await db.prepare(`UPDATE auth_tokens
+					SET device_name = COALESCE(?, device_name), last_seen_at = datetime('now')
+					WHERE id = ? AND ((? IS NOT NULL AND (device_name IS NULL OR device_name != ?))
+						OR last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours'))`)
+					.bind(sessionName, row.id, sessionName, sessionName)
+					.run();
+			} catch { /* best effort */ }
 		}
 		const encryption: unknown = row.encryption_state ? JSON.parse(row.encryption_state) as unknown : null;
 		if (encryption) validateEncryptionState(encryption);
@@ -89,6 +94,8 @@ export async function authenticateWorkerRequest(
 			},
 		};
 	} catch (error) {
+		// The request handler reports this as the documented 429 `d1_daily_limit`.
+		if (isD1DailyLimitError(error)) throw error;
 		console.error('Worker authentication database unavailable', error);
 		return { response: corsResponse({ error: 'Authentication service unavailable' }, 503) };
 	}
