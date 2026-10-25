@@ -11,8 +11,9 @@ it('waits for explicit activation and retains assets for every live client versi
 	const skipWaiting = vi.fn().mockResolvedValue(undefined);
 	const put = vi.fn().mockResolvedValue(undefined);
 	new Script(SERVICE_WORKER_JS).runInNewContext({
-		TextEncoder, TextDecoder,
+		TextEncoder, TextDecoder, URL,
 		self: { addEventListener: (type: string, handler: (event: Record<string, unknown>) => void) => handlers.set(type, handler), skipWaiting,
+			location: { href: `https://crate.test/notifications/sw.js?v=${PWA_ASSET_VERSION}` },
 			clients: { matchAll: async () => live, claim: async () => {} } },
 		fetch: async () => ({ ok: true }),
 		caches: { keys: async () => [...shells], delete: async (name: string) => shells.delete(name), open: async () => ({ put }) },
@@ -49,7 +50,7 @@ function runtimeHarness() {
 		TextEncoder, TextDecoder, URL, URLSearchParams, Response, Request, fetch,
 		caches: { open, match: matchAsset },
 		self: { addEventListener: (type: string, handler: (event: Record<string, unknown>) => void) => handlers.set(type, handler),
-			location: { origin: 'https://crate.test' }, skipWaiting,
+			location: { origin: 'https://crate.test', href: `https://crate.test/notifications/sw.js?v=${PWA_ASSET_VERSION}` }, skipWaiting,
 			registration: { showNotification }, clients: { matchAll: matchClients, openWindow } },
 	});
 	async function dispatch(type: string, value: Record<string, unknown> = {}) {

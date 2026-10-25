@@ -11,7 +11,7 @@ const runtime = await build({
 const chunks = Array.from({ length: 74 }, (_, index) => `/notifications/assets/chunk-${index.toString(36).padStart(8, 'A')}.js`);
 
 /** Runs one install against in-memory caches holding `previous` from an earlier version. */
-async function install(chunkUrls: string[], previous: string[], failing?: string) {
+async function install(chunkUrls: string[], previous: string[], failing?: string, scriptVersion = 'v2') {
   const stores = new Map<string, Map<string, Response>>([['crate-reminders-shell-v1', new Map(previous.map(url => [url, new Response(url)]))]]);
   let inFlight = 0, peak = 0;
   const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
@@ -30,7 +30,8 @@ async function install(chunkUrls: string[], previous: string[], failing?: string
   };
   const handlers = new Map<string, (event: unknown) => void>();
   new Script(`${runtime.outputFiles[0]!.text}\ncrateServiceWorker.initialize(self, config);`).runInNewContext({
-    self: { addEventListener: (name: string, handler: (event: unknown) => void) => handlers.set(name, handler) },
+    self: { addEventListener: (name: string, handler: (event: unknown) => void) => handlers.set(name, handler),
+      location: { href: `https://crate.example/notifications/sw.js?v=${scriptVersion}` } },
     config: { version: 'v2', chunkUrls }, fetch, caches, Response, URL, setTimeout, TextEncoder, TextDecoder,
   });
   let work!: Promise<unknown>;
@@ -61,4 +62,11 @@ it('bypasses the HTTP cache only for the unversioned shell', async () => {
   expect(init.get('/notifications')).toEqual({ cache: 'reload' });
   expect([...init].filter(([url, options]) => url !== '/notifications' && options !== undefined)).toEqual([]);
   expect(init.size).toBe(9);
+});
+
+it('refuses to install a version its registration did not request', async () => {
+  const { result, fetched, cached } = await install(chunks, [], undefined, 'v1');
+  expect(result).toBe('This app version was not requested by the update flow.');
+  expect(fetched).toEqual([]);
+  expect(cached).toBeUndefined();
 });
