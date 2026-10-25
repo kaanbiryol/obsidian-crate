@@ -95,6 +95,22 @@ describe('worker authentication principals', () => {
 		expect(db.prepare).toHaveBeenCalledTimes(1);
 	});
 
+	it('authenticates when only the last-seen update fails', async () => {
+		const token = 'vault-token';
+		const db = createDb(await sha256Hex(token), { id: 'vault-id', scope: 'vault', last_seen_stale: 1 });
+		const prepare = db.prepare.getMockImplementation()!;
+		db.prepare.mockImplementation((sql: string) => {
+			const statement = prepare(sql);
+			if (sql.startsWith('UPDATE auth_tokens')) statement.run.mockRejectedValue(new Error('D1_ERROR: Exceeded daily rows written limit'));
+			return statement;
+		});
+
+		const result = await authenticateWorkerRequest(new Request('https://worker.test/sync/manifest', { headers: { Authorization: `Bearer ${token}` } }), db as never);
+
+		expect(result).toMatchObject({ principal: { tokenId: 'vault-id', scope: 'vault' } });
+		expect(db.prepare).toHaveBeenCalledTimes(2);
+	});
+
 	it('returns 503 instead of falling back when D1 authentication fails', async () => {
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 		const result = await authenticateWorkerRequest(
