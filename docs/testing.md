@@ -36,7 +36,7 @@ Pushes to any branch and pull requests run `lint.yml` ("Node.js build"), and the
 
 | `verify.yml` job | Runner | What it runs |
 | --- | --- | --- |
-| `checks` | Linux | `security:check`, the `check:source` commands (one step each), `check:server-revision`, `typecheck:visual`, `build:plugin`, `test:pwa-preview`, `check:css-scope`, `size-check`, `verify:release-artifacts`, then the release candidate record and asset staging. |
+| `checks` | Linux | `security:audit` and `security:secrets` (separate steps), the `check:source` commands (one step each), `check:server-revision`, `typecheck:visual`, `build:plugin`, `test:pwa-preview`, `check:css-scope`, `size-check`, `verify:release-artifacts`, then the release candidate record and asset staging. |
 | `worker` | Linux, Playwright container | `test:worker-runtime`, `test:reading-server`, the `packages/server/test/*.test.mjs` tests (the `test:local-server` tests) and `test:server-package`. |
 | `docker` | Linux AMD64 and ARM64 | `test:docker`. |
 | `editor` (4 shards) | Linux, Playwright container | The editor contract Playwright shard on each; `test:activity-browser` on shard 1, `test:file-history-browser` on shard 2 and `test:plugin-dialogs` on shard 3. |
@@ -48,7 +48,7 @@ Pushes to any branch and pull requests run `lint.yml` ("Node.js build"), and the
 
 `release:check` covers the same suites except `test:docker` and the `reproducible` rebuild, which run only in CI. A release run that reuses a successful push build of the tag commit, or of its version-only parent, skips the test jobs; see [Release verification](#release-verification).
 
-Other workflows: `security.yml` runs the secret scan on every push and pull request. `pages.yml` runs `check:docs`, the shortcut and site-deployment tests and the site build for documentation, site and shortcut changes; it deploys only for a published release or a manual run. `visual.yml` is manual, for baseline review and generation.
+Other workflows: `pages.yml` runs `check:docs`, the shortcut and site-deployment tests and the site build for documentation, site and shortcut changes; it deploys only for a published release or a manual run. `visual.yml` is manual, for baseline review and generation.
 
 ## Release verification
 

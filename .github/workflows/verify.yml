@@ -52,8 +52,12 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PARENT_RUN_ID: ${{ inputs.parent-run-id }}
         run: node scripts/release-verification.mjs check-parent "$PARENT_RUN_ID"
-      - name: Check dependencies and source security
-        run: npm run security:check
+      - name: Check dependencies for advisories
+        run: npm run security:audit
+      # An advisory must not hide the secret scan result.
+      - name: Scan source and history for secrets
+        if: ${{ !cancelled() }}
+        run: npm run security:secrets
       # These are the npm run check:source commands, one step each so an early
       # failure does not hide the results of later checks.
       - name: Build the Worker and PWA assets
