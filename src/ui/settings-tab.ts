@@ -19,7 +19,6 @@ import { renderNotificationsSection } from './settings/notifications-section';
 import { renderCrateWebApp } from './settings/reminders-web-app';
 import { renderReadingSettings } from '../reading/ui/plugin/settings-section';
 import { captureSettingsView, restoreSettingsView } from './settings/settings-view-state';
-import { getSettingsTabSections } from './settings/settings-tab-model';
 import { sharedSettingsSync } from '../plugin/shared-settings-sync';
 
 export class CrateSettingTab extends PluginSettingTab {
@@ -43,10 +42,8 @@ export class CrateSettingTab extends PluginSettingTab {
 		containerEl.addClass('crate-settings');
 
 		const isConfigured = this.plugin.syncRuntime.isConfigured();
-		const sections = getSettingsTabSections({
-			isConfigured,
-			hasDeployment: Boolean(this.plugin.settings.cloudflareDeployment?.d1DatabaseId),
-		});
+		// A deployment's management stays reachable while this device is disconnected.
+		const showInfrastructure = isConfigured || Boolean(this.plugin.settings.cloudflareDeployment?.d1DatabaseId);
 
 		this.renderSection(renderServerUpdateNotice, containerEl);
 
@@ -58,34 +55,17 @@ export class CrateSettingTab extends PluginSettingTab {
 		if (isConfigured) {
 			createSettingsSectionHeading(containerEl, 'Sync');
 			this.renderSection(renderConnectionStatus, containerEl);
-		}
-
-		if (sections.showSync) {
 			this.renderSection(renderSyncSection, containerEl);
-		}
-
-		if (isConfigured) {
 			this.renderSection(renderCrateWebApp, containerEl);
 			this.renderSection(renderAppearanceSettings, containerEl);
-		}
 
-		if (sections.showReminders || sections.showReading || sections.showNotifications) {
 			createSettingsSectionHeading(containerEl, 'Features');
-		}
-
-		if (sections.showReminders) {
 			this.renderSection(renderRemindersSettings, containerEl.createDiv({ cls: 'crate-reminders-settings' }));
-		}
-
-		if (sections.showReading) {
 			this.renderSection(renderReadingSettings, containerEl);
-		}
-
-		if (sections.showNotifications) {
 			this.renderSection(renderNotificationsSection, containerEl);
 		}
 
-		if (isConfigured || sections.showInfrastructure) {
+		if (showInfrastructure) {
 			createSettingsSectionHeading(containerEl, 'Management');
 		}
 
@@ -125,7 +105,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			}
 		}
 
-		if (sections.showInfrastructure) {
+		if (showInfrastructure) {
 			this.renderSection(context => renderInfrastructureSection({ ...context, isConfigured }), containerEl);
 		}
 		restoreSettingsView(containerEl, viewState);
