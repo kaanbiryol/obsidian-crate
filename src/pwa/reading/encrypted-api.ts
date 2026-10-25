@@ -17,7 +17,7 @@ import type { PathTags } from '@/encryption/path-tags';
 import { resolveEncryptedPath } from '@/encryption/path-binding';
 
 // The documented device budget: each refresh seals the whole list and index.
-const MAX_READING_FILES = 10_000;
+export const MAX_READING_FILES = 10_000;
 const MAX_READING_METADATA_BYTES = 12 * 1024 * 1024;
 // Changed notes download in parallel, a few at a time, in page order.
 const SOURCE_CONCURRENCY = 6;
