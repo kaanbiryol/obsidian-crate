@@ -149,7 +149,7 @@ describe('durable plugin move recovery', () => {
 		const beforeDestination = files.get(destinationPath)!;
 		const resumed = await session();
 		if (edit === 'both tasks changed') {
-			expect(resumed.issues.join()).toContain('reload Crate to retry recovery');
+			expect(resumed.issues.join()).toContain('Crate retries recovery after the next sync or reload');
 			expect(files.get(sourcePath)).toBe(beforeSource);
 			expect(files.get(destinationPath)).toBe(beforeDestination);
 			expect(records()).toHaveLength(1);
