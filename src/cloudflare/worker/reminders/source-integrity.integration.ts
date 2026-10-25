@@ -8,7 +8,7 @@ import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
 import { drainNotificationProjections } from '../notifications/projection';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { handleListReminders } from './routes/list';
-import { handleDelete } from '../sync/file-handlers';
+import { handleBatchDelete } from '../sync/batch/delete';
 import { getStoredFileRow } from '../sync/storage';
 import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from '../notifications/push';
@@ -29,7 +29,7 @@ const note = (title: string, due: string, done = false) => `- [${done ? 'x' : ' 
 const list = async (): Promise<unknown> => (await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env)).json() as Promise<unknown>;
 async function remove(path: string) {
   const file = await getStoredFileRow(env.DB, path);
-  expect((await handleDelete(new Request('https://test/delete', { method: 'POST', body: JSON.stringify({ path, expectedHash: file?.hash, expectedRevision: file?.storageKey }) }), env.BUCKET, env.DB)).status).toBe(200);
+  expect(await (await handleBatchDelete(new Request('https://test/delete', { method: 'POST', body: JSON.stringify({ files: [{ path, expectedHash: file?.hash, expectedRevision: file?.storageKey }] }) }), env.BUCKET, env.DB)).json()).toMatchObject({ deleted: [path] });
 }
 async function command() {
   return env.DB.prepare('SELECT operation, job_token, payload_json FROM notification_jobs WHERE reminder_id = ?').bind(id).first<{ operation: string; job_token: string; payload_json: string }>();

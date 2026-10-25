@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../storage';
-import { handleDelete } from '../sync/file-handlers';
+import { handleBatchDelete } from '../sync/batch/delete';
 import { drainNotificationProjections, notificationDatetime } from './projection';
 import { handleNotificationPolicy } from './policy';
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
@@ -25,10 +25,10 @@ describe('authoritative projections and file revisions', () => {
   it('keeps a recreated same-content file when an earlier delete is retried', async () => {
     const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'note.md', 'same', null);
     const prior = await getStoredFileRow(env.DB, 'note.md');
-    const request = () => new Request('https://test/sync/delete', { method: 'POST', body: JSON.stringify({ path: 'note.md', expectedHash: first.hash, expectedRevision: prior?.storageKey }) });
-    expect((await handleDelete(request(), env.BUCKET, env.DB)).status).toBe(200);
+    const request = () => new Request('https://test/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files: [{ path: 'note.md', expectedHash: first.hash, expectedRevision: prior?.storageKey }] }) });
+    expect(await (await handleBatchDelete(request(), env.BUCKET, env.DB)).json()).toMatchObject({ deleted: ['note.md'] });
     await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'note.md', 'same', null);
-    expect((await handleDelete(request(), env.BUCKET, env.DB)).status).toBe(409);
+    expect(await (await handleBatchDelete(request(), env.BUCKET, env.DB)).json()).toMatchObject({ deleted: [], errors: [{ path: 'note.md', status: 409 }] });
     expect(await getStoredFileRow(env.DB, 'note.md')).not.toBeNull();
   });
   it('records projection intent even when a file commit response is lost', async () => {
@@ -46,7 +46,7 @@ describe('authoritative projections and file revisions', () => {
     await drainNotificationProjections(env);
     expect(JSON.parse(String((await jobs())[0]?.payload_json))).toMatchObject({ content: 'New title' });
     const file = await getStoredFileRow(env.DB, 'Reminders/Inbox.md');
-    await handleDelete(new Request('https://test/sync/delete', { method: 'POST', body: JSON.stringify({ path: 'Reminders/Inbox.md', expectedHash: file?.hash, expectedRevision: file?.storageKey }) }), env.BUCKET, env.DB);
+    await handleBatchDelete(new Request('https://test/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files: [{ path: 'Reminders/Inbox.md', expectedHash: file?.hash, expectedRevision: file?.storageKey }] }) }), env.BUCKET, env.DB);
     await drainNotificationProjections(env);
     expect(await jobs()).toMatchObject([{ reminder_id: '11111111-1111-4111-8111-111111111111', operation: 'cancel' }]);
   });

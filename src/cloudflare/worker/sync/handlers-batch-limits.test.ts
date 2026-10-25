@@ -5,7 +5,6 @@ import {
 	handleBatchDownload,
 	handleBatchDelete,
 	handleBatchUpload,
-	handleDelete,
 	handleUpload,
 } from './index';
 import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
@@ -170,39 +169,9 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 		expect(store.size).toBe(1);
 	});
 
-	it('rejects stale deletes without removing the committed file', async () => {
-		const currentHash = 'c'.repeat(64);
-		const managedKey = `__crate__/files/${currentHash}/current`;
-		const { bucket, store } = createMockR2Bucket({ [managedKey]: 'current' });
-		const { db, files } = createMockD1Database({
-			files: {
-				'notes/test.md': { hash: currentHash, size: 7, storageKey: managedKey },
-			},
-		});
-
-		const response = await handleDelete(
-			new Request('https://worker.test/sync/delete', {
-				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md', operationId: createTestUploadOperationId(), expectedHash: 'd'.repeat(64), expectedRevision: managedKey }),
-				headers: { 'Content-Type': 'application/json' },
-			}),
-			bucket,
-			db,
-		);
-
-		expect(response.status).toBe(409);
-		expect(await responseJson(response)).toEqual(expect.objectContaining({
-			success: false,
-			code: 'version_conflict',
-			currentHash,
-		}));
-		expect(files.has('notes/test.md')).toBe(true);
-		expect(store.has(managedKey)).toBe(true);
-	});
-
 	it('returns structured version conflicts for stale batch deletes', async () => {
 		const currentHash = 'e'.repeat(64);
-		const { bucket } = createMockR2Bucket();
+		const { bucket, store } = createMockR2Bucket({ 'current-key': 'current' });
 		const { db, files } = createMockD1Database({
 			files: {
 				'notes/test.md': { hash: currentHash, size: 7, storageKey: 'current-key' },
@@ -234,6 +203,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			}],
 		});
 		expect(files.has('notes/test.md')).toBe(true);
+		expect(store.has('current-key')).toBe(true);
 	});
 
 	it('preflights batch download size before reading R2 objects', async () => {

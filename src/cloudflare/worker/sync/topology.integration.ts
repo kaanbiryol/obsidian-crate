@@ -37,7 +37,7 @@ it('a remote folder-to-file replacement converges after its child is removed', a
   client.disk.write('Projects/note.md', 'initial note');
   expect((await client.engine.sync()).success).toBe(true);
   const prior = (await client.api.getManifest()).files['Projects/note.md']!;
-  expect((await request('/sync/delete', { path: 'Projects/note.md', expectedHash: prior.hash, expectedRevision: prior.revision })).status).toBe(200);
+  expect(await (await request('/sync/batch-delete', { files: [{ path: 'Projects/note.md', expectedHash: prior.hash, expectedRevision: prior.revision }] })).json()).toMatchObject({ deleted: ['Projects/note.md'] });
   const content = new TextEncoder().encode('replacement parent file');
   const upload = await worker.fetch(new Request('https://worker.test/sync/upload?path=Projects', {
     method: 'PUT', body: content,

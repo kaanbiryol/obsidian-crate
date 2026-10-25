@@ -32,7 +32,6 @@ tokens and scoped PWA enrollment keep their current behavior.
 | `POST` | `/sync/metadata` | Fetch current metadata for up to 50 selected paths |
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB) |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
-| `POST` | `/sync/delete` | Delete single file with expected hash and revision |
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 3 files, 10 MiB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
 | `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 4 files) |
@@ -199,11 +198,9 @@ Response: `{ files: [{ path, content, hash, size, contentType, revision, error? 
 
 Content is base64-encoded. The Worker rejects a batch before reading R2 if D1 metadata shows that it exceeds 8 MB. The client batches only files smaller than 1 MB, validates the exact response path set, size, and SHA-256 hash, and falls back to individual streaming downloads when a batch is too large or unavailable.
 
-### POST /sync/delete / batch-delete
+### POST /sync/batch-delete
 
-Single: `{ path: "notes/file.md", expectedHash: "sha256...", expectedRevision: "opaque-key" }` -> `{ success, path }`
-
-Batch: `{ files: [{ path, expectedHash, expectedRevision }, ...] }` (max 4) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
+`{ files: [{ path, expectedHash, expectedRevision }, ...] }` (max 4) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
 
 Uploads compare the observed D1 content hash. Deletes also compare the original opaque revision, rejecting same-content recreations. Reminder edits compare a semantic revision captured by the client, then apply file-level preconditions. D1 commits the file row, changelog, retention, operation receipt, and notification projection intent atomically; stale writers receive `409`.
 

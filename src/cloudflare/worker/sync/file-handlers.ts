@@ -5,12 +5,9 @@ import { EncryptionStateError, validateUploadEncryption } from '../encryption/st
 import { beginUploadOperation } from './upload-operations';
 import { exactArrayBuffer, readLimitedRequestBody } from '../body-reader';
 import { corsHeaders, corsResponse } from '../cors';
-import { parseJsonObject, parseOptionalString, sanitizePath } from '../request-validation';
-import { commitFileDelete } from './mutations';
+import { sanitizePath } from '../request-validation';
 import type { UploadCommitters } from './staging/upload-committers';
 import { FileNamespaceConflictError } from './file-namespace';
-import { mutationAuditContext } from '../request-diagnostics';
-import type { FileDeletionReceipt } from './file-delete-audit';
 import {
 	formatMetadataCommitFailure,
 	formatMutationError,
@@ -184,54 +181,4 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 			...corsHeaders(),
 		},
 	});
-}
-
-export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Database, audit = mutationAuditContext(request)): Promise<Response> {
-	const parsedBody = await parseJsonObject(request);
-	if (!parsedBody.ok) {
-		return parsedBody.response;
-	}
-
-	const rawPath = parseOptionalString(parsedBody.value.path, 1024);
-	if (!rawPath) return corsResponse({ error: 'Path required' }, 400);
-
-	const safePath = sanitizePath(rawPath);
-	if (!safePath) return corsResponse({ error: 'Invalid path' }, 400);
-	const expectedHash = parseExpectedFileHash(parsedBody.value.expectedHash);
-	if (expectedHash === undefined || expectedHash === null) {
-		return corsResponse({ error: 'Valid expectedHash required' }, 400);
-	}
-
-	const expectedRevision = parseOptionalString(parsedBody.value.expectedRevision, 1024);
-	if (!expectedRevision) return corsResponse({ error: 'expectedRevision required; refresh before deleting' }, 428);
-	let previousFile: FileStorageRow | null = null;
-	let deletion: FileDeletionReceipt | undefined;
-	try {
-		previousFile = await getStoredFileRow(db, safePath);
-		const commit = await commitFileDelete(bucket, db, {
-			path: safePath,
-			expectedHash,
-			expectedRevision,
-			previousFile,
-			audit,
-		});
-		deletion = commit.deletion;
-		if (!commit.committed) {
-			return corsResponse({
-				success: false,
-				path: safePath,
-				error: 'Remote file changed since it was read',
-				code: 'version_conflict',
-				currentHash: commit.currentHash,
-			}, 409);
-		}
-	} catch (error: unknown) {
-		return corsResponse({
-			success: false,
-			path: safePath,
-			error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
-		}, 503);
-	}
-
-	return corsResponse({ success: true, path: safePath, ...deletion });
 }

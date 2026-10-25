@@ -158,7 +158,6 @@ describe('multiple real sync engines across Worker and storage boundaries', () =
 		await sync(second);
 		expect(second.disk.read('image.bin')).toEqual(incoming);
 		expect((await first.api.downloadFile('image.bin')).content).toEqual(incoming);
-		expect(second.requests).not.toContain('POST /sync/delete');
 		expect(second.requests).not.toContain('POST /sync/batch-delete');
 	});
 	it.each(['alpha', 'beta'])('keeps competing frontmatter intact when %s arrives first', async firstTag => {

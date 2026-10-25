@@ -38,8 +38,11 @@ async function upload(filePath = path, body = secret): Promise<File> {
 	expect(response.status).toBe(200);
 	return response.json() as Promise<File>;
 }
-function remove(file: File, device?: string, headers?: Record<string, string>) {
-	return request('/sync/delete', { method: 'POST', body: JSON.stringify({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision }), headers }, device);
+/** Deletes one file in a batch and reports that file's status and receipt. */
+async function remove(file: File, device?: string, headers?: Record<string, string>) {
+	const response = await request('/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files: [{ path: file.path, expectedHash: file.hash, expectedRevision: file.revision }] }), headers }, device);
+	const body = await response.json() as { results?: object[]; errors?: Array<{ status: number }> };
+	return { status: body.errors?.[0]?.status ?? response.status, headers: response.headers, json: async () => body.results?.[0] ?? {} };
 }
 async function receipts() { return (await env.DB.prepare('SELECT * FROM file_deletion_receipts ORDER BY changelog_seq').all<Receipt>()).results; }
 async function tombstones() { return (await env.DB.prepare("SELECT * FROM changelog WHERE action = 'delete' ORDER BY seq").all()).results; }
@@ -88,7 +91,7 @@ it('links a retry to the original deletion after the commit acknowledgement is l
 	expect((await request(`/sync/download?path=${encodeURIComponent(path)}`)).headers.get('X-Crate-Revision')).toBe(recreated.revision);
 });
 
-it('attributes simultaneous single and batch deletes to exactly the transaction that consumed the revision', async () => {
+it('attributes simultaneous deletes to exactly the transaction that consumed the revision', async () => {
 	const file = await upload();
 	const extra = await upload('Private folder/Other.md');
 	const [single, batch] = await Promise.all([

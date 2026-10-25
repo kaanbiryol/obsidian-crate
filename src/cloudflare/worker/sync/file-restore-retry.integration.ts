@@ -40,7 +40,7 @@ function loseCommitResponse() {
 }
 async function removeCurrent() {
 	const current = (await live())!;
-	expect((await request('/sync/delete', { path:'note.md', expectedHash:current.hash, expectedRevision:current.storage_key })).status).toBe(200);
+	expect(await (await request('/sync/batch-delete', { files: [{ path:'note.md', expectedHash:current.hash, expectedRevision:current.storage_key }] })).json()).toMatchObject({ deleted: ['note.md'] });
 }
 
 it('replays a committed receipt without resurrecting a later deletion, even after retained bytes expire', async () => {
