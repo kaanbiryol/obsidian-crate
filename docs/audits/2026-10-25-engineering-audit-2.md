@@ -434,3 +434,49 @@ Keep these; they are load-bearing and easy to "simplify" by mistake.
   - macOS PWA shard 2 used 1,046 s of its 1,200 s timeout with two retries.
 - **Areas only skimmed:** encryption address workflow, `server-reset/delete*.ts`, `packages/server` backup and restore (no migrations exist yet, so the upgrade path is untested in practice), Lexical editor behavior with IME and paste, PWA navigation and sheet hooks.
 - **Leads dropped after checking:** per-vault `secretStorage` (tokens are scoped by a deployment hash, so a shared `crate-device-id` matters only for two vaults on one server); `localeCompare` in the reminder receipt hash (computed only in the Worker over fixed ASCII keys); reminder index cost per event (1.9 ms per changed note at 5,000 reminders); unmemoized PWA connection context (views are already memoized); encryption-reset completion as one D1 batch (atomic, cheap to retry, under the statement limit); an encrypted remote delete loss for files uploaded mid-session (the device's own changelog echo teaches the path index before the delete is read).
+
+## 7. Results
+
+Fixed on `feat/engineering-audit-38a854` between 2026-10-25 and 2026-10-26, one commit per finding. Eight fix agents worked in isolated worktrees based on `cbbd1aff` and the lead cherry-picked their commits in order. The D1 cost items were fixed separately before this round, in `659409ff` (write-time Reading index, one `server_state` row) and `acd1a1b2` (coordinator routes authenticate once).
+
+| Finding | Commit | Notes |
+| --- | --- | --- |
+| C1 | `cb4661ac` | Reproduced with a two-engine Worker-runtime test before fixing. The local checkpoint stores the import token; a device without it continues only if it already holds every imported revision. |
+| H1 | `7359e8e6` | An oversized file that already has a server row stays in the import inventory unchanged. |
+| H2 | `29670dd4` | Gate shows **Unable to connect** instead of **Unlock Crate**; the onboarding browser test now expects that. |
+| H3 | `7cf4c6f1` | Also refuses titles with a raw priority marker that would read back as a different reminder. |
+| H4 | `170bec22` | |
+| H5 | `659409ff` | D1 round. |
+| H6 | `3588b822` | New optional `sharedSettingsBase` in plugin data. |
+| H7 | `b661c6d5` | |
+| H8 | `eeb0a90b` | `undici` 7.30.1 (root override and server pin), `fast-uri` 3.1.9, plus a `zod` 4.6.7 override for a dev-only advisory published after the audit. `security:audit` reports 0 vulnerabilities. |
+| M1 | `30a56ad4` | |
+| M2 | `6f01df31` | |
+| M3 | `2293bd5d` | The prepared key is kept in memory only, so restarting Obsidian still creates a new one. |
+| M4 | `6b0a5742` | |
+| M5 | `1a8ae4b3` | Reverses a deliberate rule that never exported another folder's changes; drop this commit if folder separation should win. |
+| M6 | `95481599` | |
+| M7 | `ac185b8b` | Replays events recorded during the startup sync instead of a third walk; renames made during startup are not preserved as renames. |
+| M8 | `3317883e` | Lazy `text` getter in real Obsidian not verified. |
+| M9 | `60f42969` | A fully expired token still leaves the lock held, because releasing it needs a working token; the 10-minute renewal margin makes that rarer. |
+| M10 | `c040d209` | |
+| M11 | `21e98b2d` | |
+| L1 | `0b2aa127` | A typed repeat time is dropped when an API call sets a date-only due; otherwise that request would be refused. |
+| L2 | `8c28d49f` | |
+| L3 | `670f45bc` | |
+| L4 | `7eb9248d` | |
+| L5 | `9b33df35` | |
+| L6 | `6f4bb67f` | |
+| L7 | `b6fb8f91` | |
+| L8 | `e41b347b` | |
+| L9 | `60dab449`, `eda7e21c`, `eebabb6f` | |
+
+Checks on the combined branch at `eda7e21c` after `npm ci`: `lint` (0 errors), `typecheck`, `typecheck:worker`, `typecheck:service-worker`, `deadcode`, `build`, `size-check`, `security:audit` (0 vulnerabilities) and `check:server-revision` (revision 1 verified, pre-launch baseline) pass; `npm test` passes 5,436 of 5,436 and `npm run test:worker-runtime` passes 859 of 859 at default timeouts. `typecheck:visual` fails on five gallery fixtures missing `colorScheme`, as it did before this round. Browser, visual and device checks were not run.
+
+Simplification candidates: `8bd16489` (usage authorization flow), `21388a49` (`POST /sync/delete`, confirmed unreachable in 0.8.0), `410f37b4` (`previousFile`), `d2031110` (Activity deps), `b4ce201f` (on-demand PWA assets), `9b33df35` (local checkpoint save), `43ed6013` (startup budget row), `33422954` (server picker leftovers), `e8e6e2d2` (test-only concurrency options), `3317883e` (response remap), `066e77f9` (asset batch capability), `5b215ba4` (unreachable status branch), `00d13bd2`, `16cba2b4`, `8e26e004` (Reading re-parse and cache walks), `8d2ac139` (hard-coded index limits), `fead84f1` (discard under lock), `1432f9e0` (artifact cache), `c126d018` (restore verify), `ea62056f` (Pages security step), and `28e61d56` (sealed index rewrite).
+
+Not done:
+
+- The second `/reading/session` fetch in the Reading drain was kept: it is the only check that the folder generation has not changed before sending, since the Worker does not check generation on Reading writes.
+- `GET /reading/list` and `GET /reading/item` still use coordinator execution with `wake: true` (`src/cloudflare/worker/routes/policy.ts`), although 659409ff removed the projection they used to run. Carried to the third pass.
+- Follow-ups the fix agents reported: a second device with automatic sync on may still push ordinary uploads during an open import; a 401 while acquiring the deployment fence reads as "Could not confirm deployment ownership"; the cleanup Worker upload in `server-reset/delete.ts` leaves `helperUploadPending` set after a refused login; `src/cloudflare/usage/service.ts` still tells users to reconnect a usage flow that no longer exists; `docs/protocol.md` still calls skipped oversized files errors; `npm run typecheck:visual` fails on `tests/visual/gallery/ReminderListStyleFixture.tsx` (missing `colorScheme`, already failing before this round).
