@@ -20,7 +20,6 @@ const { outputFiles } = await build({
     import { openExternalBrowserModal } from './src/ui/external-browser-modal';
     import { openCloudflareAuthorizationModal } from './src/ui/cloudflare/authorization-modal';
     import { openCloudflareDeploymentModal } from './src/ui/cloudflare/deployment-modal';
-    import { selectCloudflareServer } from './src/ui/cloudflare/server-picker-modal';
     import { EncryptionResetModal } from './src/ui/settings/encryption/encryption-reset-modal';
     import { renderEncryptionManagement } from './src/ui/settings/encryption/encryption-manage-ui';
     import { WebAppPairingModal } from './src/ui/settings/web-app-pairing-modal';
@@ -67,7 +66,6 @@ const { outputFiles } = await build({
       else if(scene==='external') openExternalBrowserModal({},url,{title:'Open Crate',message:'Open the web app in your browser.',linkText:'Open app',showCopyableUrl:true});
       else if(scene==='authorization') openCloudflareAuthorizationModal({},url,new AbortController().signal);
       else if(scene==='deployment') { const modal=openCloudflareDeploymentModal({}); modal.fail('Server update needs attention','Check your connection and try again.',[],{technicalDetails:'The connection was interrupted.',action:{label:'Try again',onClick:()=>{}}}); }
-      else if(scene==='server') void selectCloudflareServer({},[{metadata:{workerName:'crate-fixture',vaultName:'Personal vault'},modifiedOn:'2026-10-01T12:00:00Z'}]);
       else if(scene==='pairing') new WebAppPairingModal({app:{}}).open();
       else if(scene==='reset') new EncryptionResetModal({app:{},settings:{workerUrl:url},secretStorage:{get:()=>null}},null).open();
     };
@@ -83,7 +81,7 @@ const obsidianCss = process.env.CRATE_OBSIDIAN_CSS_PATH ? await readFile(process
 const output = '.generated/plugin-dialog-review';
 const hostName = obsidianCss ? 'obsidian-' : '';
 await mkdir(output,{recursive:true});
-const scenes=['confirmation','diagnostics','qr','external','authorization','deployment','server','pairing','reset','management','discard','delete'];
+const scenes=['confirmation','diagnostics','qr','external','authorization','deployment','pairing','reset','management','discard','delete'];
 for (const browserType of [chromium,webkit]) {
   const browser = await browserType.launch();
   try {

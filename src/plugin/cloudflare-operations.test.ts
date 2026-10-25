@@ -34,7 +34,6 @@ async function loadPluginIntegration() {
 	}));
 	vi.doMock('../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal, revealCloudflareOperation }));
 	vi.doMock('../ui/cloudflare/authorization-modal', () => ({ openCloudflareAuthorizationModal, dismissCloudflareAuthorizationModal }));
-	vi.doMock('../ui/cloudflare/server-picker-modal', () => ({ selectCloudflareServer: vi.fn() }));
 	vi.doMock('../cloudflare/deployment/embedded-artifacts', () => ({ loadEmbeddedCloudflareArtifacts: vi.fn() }));
 	vi.doMock('../cloudflare/http', () => ({ obsidianHttpTransport: vi.fn() }));
 
@@ -95,7 +94,6 @@ afterEach(() => {
 	vi.doUnmock('./deviceInfo');
 	vi.doUnmock('../ui/cloudflare/deployment-modal');
 	vi.doUnmock('../ui/cloudflare/authorization-modal');
-	vi.doUnmock('../ui/cloudflare/server-picker-modal');
 	vi.doUnmock('../cloudflare/deployment/embedded-artifacts');
 	vi.doUnmock('../cloudflare/http');
 });
