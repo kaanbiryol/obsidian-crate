@@ -3,6 +3,8 @@ import { SyncEngine } from '../engine/engine';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../../plugin/settings';
 
 import { SyncQueueController } from '../queue/controller';
+import { pendingChangeKey } from '../pending/pending-change';
+import { TFolder } from 'obsidian';
 import { cancelSyncResult, createEmptySyncResult } from '../sync-result';
 import * as conflict from '../conflict/conflict';
 import { SyncRuntime } from './runtime';
@@ -31,7 +33,6 @@ describe('SyncRuntime startup event handling', () => {
 
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 		vi.spyOn(SyncEngine.prototype, 'sync').mockImplementation(async () => startupSync.promise);
-		vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockResolvedValue(false);
 		vi.spyOn(SyncEngine.prototype, 'saveHistoryCheckpoint').mockResolvedValue(undefined);
         vi.spyOn(SyncEngine.prototype, 'saveSharedHistoryCheckpoint').mockResolvedValue(undefined);
 		vi.spyOn(SyncQueueController.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
@@ -123,14 +124,17 @@ describe('SyncRuntime startup event handling', () => {
 		{
 			name: 'create',
 			invoke: (runtime: SyncRuntime) => runtime.onFileChange({ path: 'notes/new.md' } as never),
+			queued: ['notes/new.md'],
 		},
 		{
 			name: 'edit',
 			invoke: (runtime: SyncRuntime) => runtime.onFileChange({ path: 'notes/existing.md' } as never),
+			queued: ['notes/existing.md'],
 		},
 		{
 			name: 'delete',
 			invoke: (runtime: SyncRuntime) => runtime.onFileDelete({ path: 'notes/removed.md' } as never),
+			queued: [pendingChangeKey('delete', 'notes/removed.md')],
 		},
 		{
 			name: 'rename',
@@ -138,8 +142,9 @@ describe('SyncRuntime startup event handling', () => {
 				{ path: 'notes/renamed.md' } as never,
 				'notes/original.md',
 			),
+			queued: [pendingChangeKey('delete', 'notes/original.md'), 'notes/renamed.md'],
 		},
-	])('ignores $name events while startup sync is in flight', async ({ invoke }) => {
+	])('defers $name events during the startup sync and queues them once it finishes', async ({ invoke, queued }) => {
 		const { runtime } = createRuntimeHarness();
 
 		await runtime.initialize();
@@ -149,6 +154,36 @@ describe('SyncRuntime startup event handling', () => {
 		invoke(runtime);
 
 		expect(runtime.getPendingKeys()).toEqual([]);
+		startupSync.resolve(createEmptySyncResult());
+		await runtime.waitForStartupSync();
+		expect(runtime.getPendingKeys()).toEqual(queued);
+	});
+
+	it('queues only the latest change per path and skips folders and ignored files', async () => {
+		const { runtime } = createRuntimeHarness();
+		await runtime.initialize();
+		runtime.onFileChange({ path: 'notes/recreated.md' } as never);
+		runtime.onFileDelete({ path: 'notes/recreated.md' } as never);
+		runtime.onFileChange({ path: 'notes/recreated.md' } as never);
+		runtime.onFileChange(Object.assign(new TFolder(), { path: 'notes' }));
+		runtime.onFileChange({ path: 'notes/scratch.tmp' } as never);
+		startupSync.resolve(createEmptySyncResult());
+		await runtime.waitForStartupSync();
+		expect(runtime.getPendingKeys()).toEqual(['notes/recreated.md']);
+	});
+
+	it('replays raw notifications for hidden files through the engine after the startup sync', async () => {
+		const onRawFileChange = vi.spyOn(SyncEngine.prototype, 'onRawFileChange').mockResolvedValue();
+		const { runtime } = createRuntimeHarness();
+		await runtime.initialize();
+		runtime.onRawFileChange('.vault-config/app.json');
+		runtime.onRawFileChange('notes/visible.md');
+		runtime.onFileChange({ path: 'notes/visible.md' } as never);
+		expect(onRawFileChange).not.toHaveBeenCalled();
+		startupSync.resolve(createEmptySyncResult());
+		await runtime.waitForStartupSync();
+		expect(onRawFileChange.mock.calls).toEqual([['.vault-config/app.json']]);
+		expect(runtime.getPendingKeys()).toEqual(['notes/visible.md']);
 	});
 
 	it('starts accepting events after startup sync finishes', async () => {
@@ -189,48 +224,31 @@ describe('SyncRuntime startup event handling', () => {
 		expect(onFileDelete).toHaveBeenCalledWith(conflictFile);
 	});
 
-	it('runs one recovery pass when a visible edit was missed during startup sync', async () => {
-		vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockResolvedValue(true);
+	it('does not scan the vault again after the startup sync', async () => {
+		const probe = vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges');
 		const sync = vi.spyOn(SyncEngine.prototype, 'sync');
-		const { runtime } = createRuntimeHarness();
-
-		await runtime.initialize();
-		startupSync.resolve(createEmptySyncResult());
-
-		await expect(runtime.waitForStartupSync()).resolves.toBe(true);
-		expect(sync).toHaveBeenCalledTimes(2);
-		expectFileEventsAccepted(runtime, true);
-	});
-
-	it('keeps startup status through the local recovery probe after the first sync finishes', async () => {
-		const checked = createDeferred<boolean>();
-		const probe = vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockReturnValueOnce(checked.promise);
 		const { runtime } = createRuntimeHarness({ lastSync: '2026-10-01T00:00:00Z' });
+
 		await runtime.initialize();
 		expect(runtime.getState().initializing).toBe(true);
 		startupSync.resolve(createEmptySyncResult());
-		try {
-			await vi.waitFor(() => expect(probe).toHaveBeenCalledOnce());
-			expect(runtime.getActivityProgress()).toBeNull();
-			expect(runtime.getState().initializing).toBe(true);
-		} finally { checked.resolve(false); }
-		await runtime.waitForStartupSync();
+
+		await expect(runtime.waitForStartupSync()).resolves.toBe(true);
+		expect(sync).toHaveBeenCalledOnce();
+		expect(probe).not.toHaveBeenCalled();
 		expect(runtime.getState().initializing).toBeFalsy();
+		expectFileEventsAccepted(runtime, true);
 	});
 
-	it('does not announce conflicts or report completion when the startup recovery pass is cancelled', async () => {
-		vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockResolvedValue(true);
-		const sync = vi.spyOn(SyncEngine.prototype, 'sync');
-		sync.mockResolvedValueOnce(createEmptySyncResult()).mockResolvedValueOnce(
-			cancelSyncResult({ ...createEmptySyncResult(), conflicts: ['notes/recovery-conflict.md'] }),
+	it('does not announce conflicts or report completion when the startup sync is cancelled', async () => {
+		vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValueOnce(
+			cancelSyncResult({ ...createEmptySyncResult(), conflicts: ['notes/startup-conflict.md'] }),
 		);
 		const notifyConflicts = vi.spyOn(conflict, 'notifyConflicts').mockImplementation(() => {});
 		const { runtime, settings } = createRuntimeHarness();
 		await runtime.initialize();
 		expect(await runtime.waitForStartupSync()).toBe(false);
-		expect(sync).toHaveBeenCalledTimes(2);
-		expect(notifyConflicts).toHaveBeenCalledExactlyOnceWith([]);
-		expect(settings.syncHistory).toHaveLength(1);
-		expectFileEventsAccepted(runtime, true);
+		expect(notifyConflicts).not.toHaveBeenCalled();
+		expect(settings.syncHistory).toHaveLength(0);
 	});
 });

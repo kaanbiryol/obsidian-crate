@@ -590,6 +590,11 @@ export class SyncEngine {
 		}
 	}
 
+	/** Queues changes whose vault events the runtime dropped, as live events would. */
+	restoreDroppedEvents(keys: string[]): void {
+		this.queueController.restoreDroppedEvents(keys);
+	}
+
 	onFileChange(file: TAbstractFile): void {
 		if (this.lifecycle.isDestroyed) return;
 		if (isConflictFile(file.path)) {

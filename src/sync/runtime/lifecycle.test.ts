@@ -124,7 +124,8 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		});
 
 		runtime.onFileChange({ path: 'notes/active.md' } as never);
-		expect(runtime.getPendingKeys()).toEqual(['notes/active.md']);
+		// The latest startup sync queues the event it deferred.
+		expect(runtime.getPendingKeys()).toEqual(['notes/still-blocked.md', 'notes/active.md']);
 	});
 
 	it('does not re-enable events after destroy while startup sync is in flight', async () => {

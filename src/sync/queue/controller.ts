@@ -74,6 +74,14 @@ export class SyncQueueController {
 		this.context.updateState({ pendingChanges: this.pendingKeys.size });
 	}
 
+	/** Like `restorePendingPaths`, then verifies and flushes the keys as live events. */
+	restoreDroppedEvents(keys: string[]): void {
+		if (!keys.length) return;
+		this.restorePendingPaths(keys);
+		for (const key of keys) if (this.pendingKeys.has(key)) this.verificationKeys.add(key);
+		this.debouncedSync(false);
+	}
+
 	onFileChange(file: Pick<TAbstractFile, 'path'>): void {
 		if (!(file instanceof TFolder) && !this.context.shouldIgnore(file.path)) {
 			this.debouncedSync(this.addPendingPath({ kind: 'upload', path: file.path }));
