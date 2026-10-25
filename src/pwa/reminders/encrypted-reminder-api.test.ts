@@ -12,14 +12,17 @@ import type { ReminderRecord } from './types';
 import { derivePathTagKey, PathTags } from '@/encryption/path-tags';
 
 const attempts = vi.hoisted(() => new Map<string, unknown>());
+const indexes = vi.hoisted(() => new Map<string, { identity: string; notes: unknown }>());
 vi.mock('./encrypted-reminder-attempts', () => ({
   loadEncryptedReminderAttempt: async (id: string) => attempts.get(id),
   saveEncryptedReminderAttempt: async (id: string, value: unknown) => { attempts.set(id, value); },
+  loadEncryptedReminderIndex: async (scope: string, identity: string) => indexes.get(scope)?.identity === identity ? structuredClone(indexes.get(scope)!.notes) : undefined,
+  saveEncryptedReminderIndex: async (scope: string, identity: string, notes: unknown) => { indexes.set(scope, { identity, notes: structuredClone(notes) }); },
 }));
 
 let keys: FeatureKeys;
 beforeEach(async () => {
-  attempts.clear();
+  attempts.clear(); indexes.clear();
   vi.stubGlobal('localStorage', { getItem: () => 'session-token' });
   vi.stubGlobal('navigator', {});
   const bundle = await createVaultKeyBundle();
@@ -126,6 +129,27 @@ it('publishes decrypted cache entries only after the complete inventory is confi
   fetch.mockImplementation(async route => route.startsWith('/reminders/encrypted-file?') ? new Response(changed.bytes) : Response.json(inventory(changed)));
   const refreshed = await api.handle('/reminders/list?folderPath=Reminders');
   expect(await refreshed!.json()).toMatchObject({ reminders: [{ content: 'Changed' }] });
+  expect(fetch.mock.calls.filter(([route]) => route.startsWith('/reminders/encrypted-file?'))).toHaveLength(1);
+});
+
+it('downloads only changed notes after a restart with a newer vault sequence', async () => {
+  const authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
+  const note = async (path: string, text: string) => {
+    const sealed = await sealFile({ path, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority);
+    return { wire: await keys.paths.wire(path), sealed };
+  };
+  const inbox = await note('Reminders/Inbox.md', '- [ ] Inbox task <!-- crate-id:inbox -->\n');
+  const work = await note('Reminders/Work.md', '- [ ] Work task <!-- crate-id:work -->\n');
+  const edited = await note('Reminders/Work.md', '- [ ] Edited work task <!-- crate-id:work -->\n');
+  const serve = (sequence: number, notes: Array<typeof inbox>) => vi.fn(async (route: string) => {
+    if (route.startsWith('/reminders/encrypted-files?')) return Response.json({ ...page(sequence), files: notes.map(({ wire, sealed }) => ({ path: wire, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash })) });
+    const wire = new URLSearchParams(route.slice(route.indexOf('?'))).get('path');
+    return new Response(notes.find(entry => entry.wire === wire)!.sealed.bytes);
+  });
+  await new EncryptedReminderApi(keys, serve(1, [inbox, work])).handle('/reminders/list?folderPath=Reminders');
+  const fetch = serve(2, [inbox, edited]);
+  const listed = await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders');
+  expect((await listed!.json() as { reminders: ReminderRecord[] }).reminders.map(reminder => reminder.content).sort()).toEqual(['Edited work task', 'Inbox task']);
   expect(fetch.mock.calls.filter(([route]) => route.startsWith('/reminders/encrypted-file?'))).toHaveLength(1);
 });
 

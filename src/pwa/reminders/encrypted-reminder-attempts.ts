@@ -4,7 +4,7 @@ import { sealPrivateValue, openPrivateValue, REMINDER_OUTBOX_PREFIX, REMINDER_DR
 import { clearSessionStore } from '../storage/clear-session-store';
 import { abortTransaction } from '../storage/abort-transaction';
 import { openEncryptedDatabase } from '../storage/encrypted-storage-database';
-import { isSha256Hex } from '../../platform/validation';
+import { isRecord, isSha256Hex } from '../../platform/validation';
 
 export interface EncryptedReminderAttempt { semanticHash: string; body: string; generation: number; rejected?: boolean; acknowledgment?: string }
 interface AttemptDatabase extends DBSchema { attempts: { key: string; value: string } }
@@ -71,6 +71,41 @@ export async function pruneEncryptedReminderAttempts(scope: { vaultId: string; f
 		await tx.done;
 		return cursor ? last : undefined;
 	} finally { db.close(); }
+}
+
+/** One parsed note from the last complete encrypted list, by its server file. */
+export interface IndexedReminderNote { file: { path: string; hash: string; size: number; revision: string }; path: string; reminders: unknown[]; issue?: string }
+const MAX_INDEXED_NOTES = 100_000;
+const indexKey = (scope: string) => `index:${scope}`;
+
+function isIndexedNote(value: unknown): value is IndexedReminderNote {
+	if (!isRecord(value) || !isRecord(value.file) || typeof value.path !== 'string' || !Array.isArray(value.reminders)
+		|| (value.issue !== undefined && typeof value.issue !== 'string')) return false;
+	const { path, hash, size, revision } = value.file;
+	return typeof path === 'string' && typeof hash === 'string' && typeof revision === 'string'
+		&& Number.isSafeInteger(size) && (size as number) >= 0 && value.reminders.every(isRecord);
+}
+
+/** Parsed notes from the last complete encrypted list, sealed like other private data
+ * and kept in this store so logout clears them. A cold start then downloads only
+ * notes whose revision changed. `identity` binds them to the keys, folder and build. */
+export async function loadEncryptedReminderIndex(scope: string, identity: string): Promise<IndexedReminderNote[] | undefined> {
+	const db = await openAttempts();
+	try {
+		const raw = await db.get('attempts', indexKey(scope));
+		if (raw === undefined) return undefined;
+		const value: unknown = JSON.parse(openPrivateValue(raw, indexKey(scope)));
+		if (!isRecord(value) || value.identity !== identity || !Array.isArray(value.notes) || value.notes.length > MAX_INDEXED_NOTES) return undefined;
+		const notes = value.notes as unknown[];
+		return notes.every(isIndexedNote) ? notes : undefined;
+	} finally { db.close(); }
+}
+
+export async function saveEncryptedReminderIndex(scope: string, identity: string, notes: IndexedReminderNote[], isCurrent: () => boolean): Promise<void> {
+	const encoded = sealPrivateValue(JSON.stringify({ identity, notes }), indexKey(scope));
+	const db = await openAttempts();
+	try { if (isCurrent()) await db.put('attempts', encoded, indexKey(scope)); }
+	finally { db.close(); }
 }
 
 export async function clearEncryptedReminderAttempts(isCurrent: () => boolean): Promise<void> {
