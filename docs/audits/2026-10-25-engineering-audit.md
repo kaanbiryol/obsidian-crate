@@ -169,9 +169,9 @@ Close runners-up with one-line fixes: F14 (periodic check race), F12 (coordinato
 - **Dimension** - Code quality
 - **Confidence** - Confirmed for the unit tests (run locally) and the version mismatch. Plausible that the mismatch is what fails the Linux browser jobs (one shard log would confirm it).
 - **Evidence**
-  - `npm test` fails 8 tests in `src/cloudflare/worker/pwa/index.test.ts`, which assert minified CSS such as `--interactive-accent:#8b5cf6;` that no source contains since 4874a023 ("use a monochrome accent in the pwa") and later design commits.
+  - `npm test` fails 8 tests in `src/cloudflare/worker/pwa/index.test.ts`. Correction found while fixing: the main cause is `scripts/vite/raw-css-vite-plugin.mjs`, whose virtual ids end in `.scss`, so the CSS pipeline in Vitest 5 and Vite 8.3 replaces their string export (empty shell styles in tests; a Sass error in the `scripts/visual-preview.test.mjs` tooling test). Three of the 8 tests also assert CSS that 4874a023 ("use a monochrome accent in the pwa") and later design commits changed.
   - Linux browser jobs run in `mcr.microsoft.com/playwright:v1.63.0-noble` (`.github/workflows/verify.yml:180,265,314,384`) while the lockfile installs Playwright 1.64.1 (bumped in 4c51ff48). Every Linux browser shard and editor-contract shard failed in recent runs, while the macOS jobs that run `playwright install` passed. The last green "Node.js build" run predates the bump.
-- **Proposed fix** - Update the expectations in `index.test.ts` to the current tokens, or assert on token names instead of exact minified values. Bump the image tag and digest to v1.64.1, and add a few lines to an existing `test:ci` test that assert every `playwright:vX.Y.Z` image matches the installed `playwright` version (Dependabot bumps the package but never `container.image`).
+- **Proposed fix** - End the raw CSS virtual ids with a script extension, and update the three stale expectations in `index.test.ts`. Bump the image tag and digest to v1.64.1, and add a few lines to an existing `test:ci` test that assert every `playwright:vX.Y.Z` image matches the installed `playwright` version (Dependabot bumps the package but never `container.image`).
 - **Effort** - S
 - **Test to add** - The `test:ci` version assertion; the next run's Linux shards go green.
 
