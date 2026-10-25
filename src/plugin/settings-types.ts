@@ -2,6 +2,7 @@ import type { ServerRestoreState } from '../cloudflare/restore/state';
 import type { UsageSnapshot } from '../cloudflare/usage/snapshot';
 import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment/types';
 import type { PersistedSyncSettings } from '../sync/settings';
+import type { SharedSettings } from '../protocol/shared-settings';
 import { DEFAULT_READING_SETTINGS, type ReadingSettings } from '../reading/settings';
 
 export interface PersistedCrateSettings extends PersistedSyncSettings {
@@ -10,6 +11,9 @@ export interface PersistedCrateSettings extends PersistedSyncSettings {
 	usageSnapshot?: UsageSnapshot | null;
 	cloudflareDeployment: CloudflareDeploymentMetadata | null;
 	debugLogging: boolean;
+	/** Shared settings as this device last reconciled them with `workerUrl`'s server, so a
+	 * change that failed to save stays this device's edit after a restart. */
+	sharedSettingsBase?: { workerUrl: string; settings: SharedSettings };
 }
 
 export interface CrateSettings extends PersistedCrateSettings {

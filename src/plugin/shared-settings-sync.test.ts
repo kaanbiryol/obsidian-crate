@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type CratePlugin from './CratePlugin';
+import type { CrateSettings } from './settings';
 import type { SharedSettings } from '../protocol/shared-settings';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
 import { SyncApiClient } from '../sync/worker-api/client';
@@ -39,11 +40,13 @@ function settingsServer(settings: SharedSettings | null) {
 	return { server, transport, requests };
 }
 
-function fixture(remote: SharedSettings | null) {
+type TrackedSettings = Pick<CrateSettings, 'workerUrl' | 'ignorePatterns' | 'syncInterval' | 'pushEnabled' | 'sharedSettingsBase'>;
+
+function fixture(remote: SharedSettings | null, saved: Partial<TrackedSettings> = {}) {
 	const { server, transport, requests } = settingsServer(remote);
 	let api: SyncApiClient | null = new SyncApiClient(WORKER_URL, 'token', transport);
-	const settings = { workerUrl: WORKER_URL, ignorePatterns: ['*.tmp'], syncInterval: 300, pushEnabled: false };
-	const writeSettings = vi.fn(async (update: Partial<typeof settings>) => { Object.assign(settings, update); });
+	const settings: TrackedSettings = { workerUrl: WORKER_URL, ignorePatterns: ['*.tmp'], syncInterval: 300, pushEnabled: false, ...saved };
+	const writeSettings = vi.fn(async (update: Partial<TrackedSettings>) => { Object.assign(settings, update); });
 	const updateSyncSettings = vi.fn();
 	const plugin = { settings, writeSettings, syncRuntime: { getApiClient: () => api, updateSyncSettings } };
 	const sharedSettings = createSharedSettingsSync(plugin as unknown as CratePlugin);
@@ -51,7 +54,12 @@ function fixture(remote: SharedSettings | null) {
 		server.settings = { ...server.settings!, ...changes };
 		server.version = `remote-${server.version ?? 0}`;
 	};
-	return { server, requests, settings, writeSettings, updateSyncSettings, sharedSettings, editRemotely, setApi: (next: SyncApiClient | null) => { api = next; } };
+	/** A restart keeps the plugin data but starts a new tracker and API client. */
+	const restart = () => {
+		api = new SyncApiClient(WORKER_URL, 'token', transport);
+		return createSharedSettingsSync(plugin as unknown as CratePlugin);
+	};
+	return { server, requests, settings, writeSettings, updateSyncSettings, sharedSettings, editRemotely, restart, setApi: (next: SyncApiClient | null) => { api = next; } };
 }
 
 beforeEach(() => {
@@ -154,15 +162,57 @@ describe('shared settings push on settings close', () => {
 
 describe('shared settings pull on refresh', () => {
 	it('adopts another device\'s change while keeping this device\'s unsaved one', async () => {
-		const { sharedSettings, requests, settings, updateSyncSettings } = fixture(otherDevice);
-		sharedSettings.observe();
+		const { sharedSettings, requests, settings, writeSettings, updateSyncSettings } = fixture(otherDevice);
 		settings.syncInterval = 120;
 		await sharedSettings.pull();
 
 		expect(settings).toMatchObject({ ignorePatterns: ['Archive/'], syncInterval: 120, pushEnabled: true });
+		expect(writeSettings).toHaveBeenCalledExactlyOnceWith({
+			ignorePatterns: ['Archive/'], syncInterval: 120, pushEnabled: true,
+			sharedSettingsBase: { workerUrl: WORKER_URL, settings: otherDevice },
+		});
 		expect(updateSyncSettings).toHaveBeenCalledOnce();
 		await sharedSettings.push();
 		expect(requests()).toEqual(['GET', { PUT: { settings: { ...otherDevice, syncInterval: 120 }, expectedVersion: 'v1' } }]);
+	});
+
+	it('keeps a change that failed to save across a restart and sends it on the next close', async () => {
+		const { server, sharedSettings, requests, settings, writeSettings, restart } = fixture(otherDevice, {
+			...otherDevice, sharedSettingsBase: { workerUrl: WORKER_URL, settings: otherDevice },
+		});
+		server.failReads = 1;
+		settings.syncInterval = 120;
+		await sharedSettings.push();
+
+		const restarted = restart();
+		await restarted.pull();
+		expect(settings).toMatchObject({ ...otherDevice, syncInterval: 120 });
+		expect(writeSettings).not.toHaveBeenCalled();
+		await restarted.push();
+		expect(requests()).toEqual(['GET', 'GET', { PUT: { settings: { ...otherDevice, syncInterval: 120 }, expectedVersion: 'v1' } }]);
+		expect(settings.sharedSettingsBase).toEqual({ workerUrl: WORKER_URL, settings: { ...otherDevice, syncInterval: 120 } });
+	});
+
+	it('starts another server from this device\'s settings instead of a saved base', async () => {
+		const { sharedSettings, settings } = fixture(otherDevice, {
+			syncInterval: 120,
+			sharedSettingsBase: { workerUrl: 'https://old.example', settings: { ...otherDevice, syncInterval: 300 } },
+		});
+		await sharedSettings.pull();
+
+		expect(settings).toMatchObject(otherDevice);
+		expect(settings.sharedSettingsBase).toEqual({ workerUrl: WORKER_URL, settings: otherDevice });
+	});
+
+	it('waits while settings are open', async () => {
+		const { sharedSettings, requests, settings } = fixture(otherDevice);
+		sharedSettings.observe();
+		await sharedSettings.pull();
+		expect(requests()).toEqual([]);
+
+		await sharedSettings.push();
+		await sharedSettings.pull();
+		expect(settings).toMatchObject(otherDevice);
 	});
 
 	it('leaves settings alone when the server has none or this device cannot read them', async () => {

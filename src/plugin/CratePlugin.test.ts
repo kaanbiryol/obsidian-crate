@@ -86,19 +86,23 @@ describe('CratePlugin settings persistence', () => {
 		expect(settings.debugLogging).toBe(kind === 'debug');
 	});
 
-	it('publishes normalized requested settings and invalidates a checkpoint scope when its address changes', async () => {
+	it('publishes normalized requested settings and invalidates address-bound state when its address changes', async () => {
 		const plugin = new CratePlugin({} as never, {} as never);
 		const saveData = vi.fn<(value: unknown) => Promise<void>>(async () => {});
+		const sharedSettingsBase = { workerUrl: 'https://old.example', settings: { ignorePatterns: ['Archive/'], syncInterval: 300, pushEnabled: false } };
 		Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } }, saveData,
 			settings: normalizeCrateSettings({ workerUrl: 'https://old.example', checkpointScope: {
 				workerUrl: 'https://old.example', authority: 'https://original.example',
-			} }, '.obsidian'),
+			}, sharedSettingsBase }, '.obsidian'),
 		});
+		expect(plugin.settings.sharedSettingsBase).toEqual(sharedSettingsBase);
 		await plugin.writeSettings({ workerUrl: ' https://new.example/ ', ignorePatterns: ['secret/', 'secret/'] });
 		expect(plugin.settings.workerUrl).toBe('https://new.example');
 		expect(plugin.settings.ignorePatterns).toEqual(['secret/', '.obsidian/workspace*']);
-		expect(plugin.settings).not.toHaveProperty('checkpointScope');
-		expect(saveData.mock.calls[0]![0]).not.toHaveProperty('checkpointScope');
+		for (const key of ['checkpointScope', 'sharedSettingsBase']) {
+			expect(plugin.settings).not.toHaveProperty(key);
+			expect(saveData.mock.calls[0]![0]).not.toHaveProperty(key);
+		}
 	});
 
 	it('retains sync progress and a queued save when a preference write fails', async () => {

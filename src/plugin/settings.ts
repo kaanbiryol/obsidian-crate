@@ -10,6 +10,7 @@ import { normalizeUsageSnapshot } from '../cloudflare/usage/snapshot';
 import { normalizeWorkerUrl } from '../sync/connection/worker-url';
 import { type CrateSettings, type PersistedCrateSettings, DEFAULT_SETTINGS } from './settings-types';
 import { normalizeSyncHistory } from '../sync/settings';
+import { normalizeSharedSettingsValue } from '../protocol/shared-settings';
 
 function normalizeString(value: unknown, fallback = ''): string {
 	return typeof value === 'string' ? value.trim() : fallback;
@@ -34,6 +35,9 @@ export function normalizePersistedCrateSettings(
 	const workerUrl = normalizeWorkerUrl(normalizeString(value?.workerUrl));
 	const scopeUrl = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.workerUrl));
 	const authority = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.authority));
+	// The shared settings base belongs to one server; another address starts from local settings.
+	const sharedBaseUrl = normalizeWorkerUrl(normalizeString(value?.sharedSettingsBase?.workerUrl));
+	const sharedBase = workerUrl && sharedBaseUrl === workerUrl ? normalizeSharedSettingsValue(value?.sharedSettingsBase?.settings) : null;
 	return {
 		reading: normalizeReadingSettings(value?.reading),
 		usageSnapshot: normalizeUsageSnapshot(value?.usageSnapshot),
@@ -53,6 +57,7 @@ export function normalizePersistedCrateSettings(
 		pushEnabled: normalizeBoolean(value?.pushEnabled, DEFAULT_SETTINGS.pushEnabled),
 		debugLogging: normalizeBoolean(value?.debugLogging, DEFAULT_SETTINGS.debugLogging),
 		debounceDelay: normalizeNonNegativeInteger(value?.debounceDelay, DEFAULT_SETTINGS.debounceDelay),
+		...(sharedBase ? { sharedSettingsBase: { workerUrl, settings: sharedBase } } : {}),
 	};
 }
 
