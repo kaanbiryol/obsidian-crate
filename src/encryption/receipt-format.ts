@@ -1,5 +1,4 @@
 // A 1 MiB reminder note can expand sixfold when JSON escapes control characters.
-// Pre-encryption responses already fit a D1 row, but conversion stores two encrypted copies.
 export const MAX_ENCRYPTED_REMINDER_ACK = Math.ceil((6 * 1024 * 1024 + 16 * 1024) * 4 / 3) + 4096;
 export const MAX_ENCRYPTED_REMINDER_REQUEST_BYTES = 24 * 1024 * 1024;
 

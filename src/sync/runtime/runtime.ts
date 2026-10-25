@@ -423,8 +423,8 @@ export class SyncRuntime {
 		return task;
 	}
 
-	/** Keep the current connection stable and wait for local journal I/O before
-	 * moving its server into conversion. Failed conversions remain resumable. */
+	/** Keep the current connection stable and wait for local journal I/O while
+	 * this device's encryption keys change, then start sync again. */
 	runEncryptionSetup(operation: () => Promise<void>): Promise<void> {
 		return this.changeConfiguration(async transition => {
 			transition.stop();
