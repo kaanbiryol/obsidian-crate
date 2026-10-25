@@ -286,7 +286,7 @@ Response: `{ success: true, settingsVersion }`. A stale version returns `409` in
 
 `expectedVersion: null` stores settings only when none exist. Connecting a Cloudflare device uses it to seed a fresh deployment with that device's preferences. A connecting device applies settings it reads and never writes over settings it could not read, including an encrypted vault's.
 
-Closing Crate settings writes only the shared settings changed on this device since it last synced them. It merges those changes onto the server's settings as it last read or wrote them, reading first when it has not, and writes against that version. A newer version, or a setting both devices changed, loads the server's settings with a short notice instead of overwriting them.
+Closing Crate settings writes only the shared settings changed on this device since it last synced them. It merges those changes onto the server's settings as it last read or wrote them, reading first when it has not, and writes against that version. A newer version, or a setting both devices changed, loads the server's settings with a short notice instead of overwriting them. The plugin saves the server's settings as it last reconciled them in its plugin data (`sharedSettingsBase`, cleared when the server address changes), so a change that could not be saved is still written on a later close after a restart. The periodic refresh loads other devices' changes, keeps this device's unsaved ones, and waits while Crate settings are open.
 
 Reminder handlers live in `src/cloudflare/worker/reminders/routes/`. Mutations apply the shared Markdown command described in the [architecture](architecture.md).
 
