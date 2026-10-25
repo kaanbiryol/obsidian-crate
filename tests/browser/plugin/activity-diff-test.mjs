@@ -50,21 +50,20 @@ const { outputFiles } = await build({
                 state.dispose?.();
                 const panel = document.querySelector('.crate-activity-panel');
                 panel.replaceChildren();
-                renderPendingPanel(panel, window.paths, false, false, null, '', undefined,
-                    async (path, deleted) => {
+                renderPendingPanel(panel, window.paths, async (path, deleted) => {
                         window.calls++;
                         window.loadArguments.push({ path, deleted });
                         if (window.delayed) { window.delayed = false; await new Promise(resolve => { window.release = resolve; }); }
                         if (window.fail) throw new Error('Could not reach the sync server.');
                         return { before, after: deleted ? '' : window.allChanged || path.endsWith('appearance.json') ? after : before, beforeSize: before.length, afterSize: deleted ? 0 : after.length, kind: deleted ? 'deleted' : 'modified' };
-                    }, state, actions);
+                    }, false, false, null, '', undefined, state, actions);
             };
             window.mount();
             window.showSyncProgress = work => {
                 state.dispose?.();
                 const panel = document.querySelector('.crate-activity-panel');
                 panel.empty();
-                renderPendingPanel(panel, [], false, true, null, '', {
+                renderPendingPanel(panel, [], () => Promise.reject(new Error('Nothing is pending')), false, true, null, '', {
                     status: 'syncing', work, lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0,
                 });
             };

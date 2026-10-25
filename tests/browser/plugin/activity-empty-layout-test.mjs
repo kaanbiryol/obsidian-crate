@@ -16,11 +16,18 @@ const { outputFiles } = await build({
     let status = 'idle';
     let initializing = false;
     let lastSync = null;
+    const unused = () => Promise.reject(new Error('Not used in this test'));
+    // The sync runtime's Activity interface with nothing pending.
     const deps = {
       getState: () => ({ status, initializing, lastSync, lastError: null, pendingChanges: 0, conflictCount: 0 }),
-      getPendingKeys: () => [], getActiveConflicts: () => [],
-      sync: async () => window.setSyncing(true),
+      getPendingKeys: () => [], getPendingChangeCount: () => 0, hasPendingKey: () => false, getActiveConflicts: () => [],
+      getActivityProgress: () => null, addProgressListener: () => {}, removeProgressListener: () => {},
+      sync: async () => window.setSyncing(true), stopSync: async () => window.setSyncing(false),
       addStateChangeListener: fn => listeners.add(fn), removeStateChangeListener: fn => listeners.delete(fn),
+      listSharedCheckpoints: async () => [], loadHistoryComparison: unused, createHistoryRestore: unused,
+      loadPendingDiff: unused, syncSelected: unused, createPendingDiscard: unused, createConflictReview: unused,
+      listRecentFileVersions: unused, getPendingRestores: () => [], loadFileHistoryPreview: unused,
+      restoreRecentFileVersion: unused, loadCurrentSyncedPreview: unused,
     };
     window.setSyncing = syncing => { status = syncing ? 'syncing' : 'idle'; for (const fn of listeners) fn(); };
     window.finishStartup = () => { initializing = false; for (const fn of listeners) fn(); };
@@ -114,8 +121,9 @@ for (const engine of [chromium, webkit]) {
       await expect(indicator).toHaveAttribute('data-sync-state', 'synced');
       await expect(sync).toBeEnabled();
       await sync.click();
-      await expect(page.getByRole('button', { name: 'Syncing…', exact: true })).toBeDisabled();
-      await page.evaluate(() => window.setSyncing(false));
+      const stop = page.getByRole('button', { name: 'Stop sync', exact: true });
+      await expect(stop).toBeEnabled();
+      await stop.click();
       await expect(sync).toBeEnabled();
       await page.mouse.move(0, 0);
       await page.evaluate(() => window.mount('conflict'));

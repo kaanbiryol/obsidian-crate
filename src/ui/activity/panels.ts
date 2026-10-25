@@ -3,11 +3,10 @@ import { formatSyncProgress } from './progress-label';
 import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, renderLoadingState } from './rendering';
 import { renderPendingBrowser, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
-import { decodePendingChange } from '../../sync/pending/pending-change';
 
-export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState, loadDiff?: PendingDiffLoader, browserState?: PendingBrowserState, actions?: PendingActions): void {
+export function renderPendingPanel(container: HTMLElement, paths: string[], loadDiff: PendingDiffLoader, hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState, browserState?: PendingBrowserState, actions?: PendingActions): void {
 	const checking = state?.initializing && !hasError && state.status !== 'offline';
-	container.toggleClass('has-file-browser', !!loadDiff && paths.length > 0 && !syncing && !progress && !checking);
+	container.toggleClass('has-file-browser', paths.length > 0 && !syncing && !progress && !checking);
 	if (syncing || progress) {
         renderLoadingState(container, formatSyncProgress(progress, state?.work));
         return;
@@ -29,26 +28,7 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 		return;
 	}
 
-	if (loadDiff) {
-		renderPendingBrowser(container, paths, loadDiff, browserState, actions);
-		return;
-	}
-
-	const uploads: string[] = [];
-	const deletes: string[] = [];
-	for (const raw of paths) {
-		const { kind, path } = decodePendingChange(raw);
-		if (kind === 'delete') deletes.push(path);
-		else uploads.push(path);
-	}
-
-	const list = container.createDiv({ cls: 'crate-activity-list' });
-	for (const filePath of uploads) {
-		renderFileMicroCard(list, filePath, 'upload');
-	}
-	for (const filePath of deletes) {
-		renderFileMicroCard(list, filePath, 'delete');
-	}
+	renderPendingBrowser(container, paths, loadDiff, browserState, actions);
 }
 
 export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[], checking: boolean, onReview?: (conflict: ConflictRecord) => void): void {

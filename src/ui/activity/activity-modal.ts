@@ -28,25 +28,25 @@ import { renderConflictsPanel, renderPendingPanel } from './panels';
 import { renderLoadingState } from './rendering';
 import type { PendingDiffLoader, PendingBrowserState } from './pending-browser';
 
-export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
-    loadHistoryComparison?(entry: SyncHistoryEntry): Promise<HistoryComparison>;
-    listSharedCheckpoints?(): Promise<SharedCheckpoint[]>;
-    createHistoryRestore?(entry: SyncHistoryEntry): Promise<HistoryRestoreReview>;
-	loadPendingDiff?: PendingDiffLoader;
-    syncSelected?(keys: string[]): Promise<unknown>;
-    createPendingDiscard?(keys: string[]): Promise<PendingDiscardReview>;
-	createConflictReview?(record: ConflictRecord): Promise<ConflictReview>;
+export interface ActivityModalDeps extends FileHistoryRuntime {
+    loadHistoryComparison(entry: SyncHistoryEntry): Promise<HistoryComparison>;
+    listSharedCheckpoints(): Promise<SharedCheckpoint[]>;
+    createHistoryRestore(entry: SyncHistoryEntry): Promise<HistoryRestoreReview>;
+	loadPendingDiff: PendingDiffLoader;
+    syncSelected(keys: string[]): Promise<unknown>;
+    createPendingDiscard(keys: string[]): Promise<PendingDiscardReview>;
+	createConflictReview(record: ConflictRecord): Promise<ConflictReview>;
 	getPendingKeys(): string[];
 	/** Pending count without copying the pending list on every progress tick. */
-	getPendingChangeCount?(): number;
-	hasPendingKey?(key: string): boolean;
+	getPendingChangeCount(): number;
+	hasPendingKey(key: string): boolean;
 	getActiveConflicts(): ConflictRecord[];
 	getState(): SyncState;
-	getActivityProgress?(): SyncActivityProgress | null;
-	addProgressListener?(listener: (current: number, total: number) => void): void;
-	removeProgressListener?(listener: (current: number, total: number) => void): void;
+	getActivityProgress(): SyncActivityProgress | null;
+	addProgressListener(listener: (current: number, total: number) => void): void;
+	removeProgressListener(listener: (current: number, total: number) => void): void;
 	sync(): Promise<unknown>;
-	stopSync?(): Promise<void>;
+	stopSync(): Promise<void>;
 	addStateChangeListener(listener: (state: SyncState) => void): void;
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
 }
@@ -93,7 +93,7 @@ export class ActivityModal extends BaseUiModal {
 		const state = this.deps.getState();
 		// Manual sync records history after the engine's final state event.
 		// Its completion progress event must refresh history as well as pending files.
-		if (state.status !== 'syncing' && !(state.initializing && state.status === 'idle') && !this.deps.getActivityProgress?.()) {
+		if (state.status !== 'syncing' && !(state.initializing && state.status === 'idle') && !this.deps.getActivityProgress()) {
 			this.refresh();
             if (this.currentTabIndex === 2) void this.sharedHistory?.refresh();
 			return;
@@ -107,7 +107,7 @@ export class ActivityModal extends BaseUiModal {
 	}
 	private renderPending(): void {
 		const state = this.deps.getState();
-        const progress = this.deps.getActivityProgress?.();
+        const progress = this.deps.getActivityProgress();
         const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
         if (loadingLabel && (state.status === 'syncing' || progress || state.initializing && state.status === 'idle')) {
             // Keep the spinner mounted through frequent progress updates.
@@ -118,7 +118,7 @@ export class ActivityModal extends BaseUiModal {
         }
         const paths = this.deps.getPendingKeys();
         // Rebuilding the file browser discards its comparisons; keep it while the pending set is unchanged.
-        const showsBrowser = !!this.deps.loadPendingDiff && paths.length > 0 && state.status !== 'syncing' && !progress
+        const showsBrowser = paths.length > 0 && state.status !== 'syncing' && !progress
             && !(state.initializing && state.status !== 'error' && state.status !== 'offline');
         const browserSignature = showsBrowser ? paths.join('\0') : undefined;
         if (browserSignature !== undefined && browserSignature === this.renderedBrowserSignature
@@ -132,16 +132,15 @@ export class ActivityModal extends BaseUiModal {
         this.pendingBrowserState.pauseChecks = undefined;
         this.pendingBrowserState.dispose = undefined;
         this.pendingPanel.empty();
-		renderPendingPanel(this.pendingPanel, paths, state.status === 'error', state.status === 'syncing', progress, this.getActivityStatus().lastSyncLabel, state,
-			this.deps.loadPendingDiff ? (path, deleted) => this.deps.loadPendingDiff!(path, deleted) : undefined, this.pendingBrowserState,
-            this.deps.syncSelected && this.deps.createPendingDiscard ? {
+		renderPendingPanel(this.pendingPanel, paths, (path, deleted) => this.deps.loadPendingDiff(path, deleted), state.status === 'error', state.status === 'syncing',
+			progress, this.getActivityStatus().lastSyncLabel, state, this.pendingBrowserState, {
                 syncSelected: async keys => {
-                    try { return await this.deps.syncSelected!(keys); }
+                    try { return await this.deps.syncSelected(keys); }
                     catch (error) { new Notice(error instanceof Error ? error.message : 'Could not sync selected files.'); throw error; }
                 },
                 fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
-                discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard!(keys.filter(this.pendingPathFilter())), () => this.refresh()).open(),
-            } : undefined);
+                discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard(keys.filter(key => this.deps.hasPendingKey(key))), () => this.refresh()).open(),
+            });
         this.header.updateSyncBtn();
 	}
 	private applyStateChange(): void {
@@ -162,9 +161,7 @@ export class ActivityModal extends BaseUiModal {
 
 	onOpen(): void {
         this.closed = false;
-        if (this.deps.listSharedCheckpoints) {
-            this.sharedHistory = new SharedHistoryLoader(() => this.deps.listSharedCheckpoints!(), () => this.refresh());
-        }
+        this.sharedHistory = new SharedHistoryLoader(() => this.deps.listSharedCheckpoints(), () => this.refresh());
 		this.modalEl.addClass('crate-reminder-editor-modal');
 		this.modalEl.toggleClass('is-mobile', Platform.isMobile);
 		hideNativeModalCloseButton(this.modalEl);
@@ -197,7 +194,7 @@ export class ActivityModal extends BaseUiModal {
                 this.refresh();
                 this.switchTab(this.initialTab === 'history' ? 2 : this.initialTab === 'conflicts' ? 1 : 0);
                 this.deps.addStateChangeListener(this.onStateChange);
-                this.deps.addProgressListener?.(this.onProgress);
+                this.deps.addProgressListener(this.onProgress);
             },
         }));
     }
@@ -213,7 +210,7 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	private toggleSync(): void {
-		if (this.deps.stopSync && (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress?.())) {
+		if (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress()) {
 			this.stoppingSync = true;
 			this.header.updateSyncBtn();
 			void this.deps.stopSync()
@@ -234,23 +231,13 @@ export class ActivityModal extends BaseUiModal {
         this.header.updateSyncStatusText();
 	}
 
-    private pendingPathFilter(): (key: string) => boolean {
-        if (this.deps.hasPendingKey) return key => this.deps.hasPendingKey!(key);
-        const pending = new Set(this.deps.getPendingKeys());
-        return key => pending.has(key);
-    }
-
-    private pendingChangeCount(): number {
-        return this.deps.getPendingChangeCount?.() ?? this.deps.getPendingKeys().length;
-    }
-
     private getActivityStatus() {
-        return describeActivityStatus(this.deps.getState(), this.deps.getActivityProgress?.() ?? null,
-            this.pendingChangeCount(), !!this.deps.stopSync, this.stoppingSync);
+        return describeActivityStatus(this.deps.getState(), this.deps.getActivityProgress(),
+            this.deps.getPendingChangeCount(), true, this.stoppingSync);
     }
 
 	private updateTabCounts(): void {
-		const pendingLen = this.pendingChangeCount();
+		const pendingLen = this.deps.getPendingChangeCount();
 		const conflictLen = this.deps.getActiveConflicts().length;
 
 		this.pendingCount.setText(pendingLen > 0 ? String(pendingLen) : '');
@@ -277,9 +264,9 @@ export class ActivityModal extends BaseUiModal {
 		this.conflictsPanel.empty();
 		const conflicts = this.deps.getActiveConflicts();
 		this.renderedCheckingConflicts = conflicts.length ? undefined : status.checkingConflicts;
-		renderConflictsPanel(this.conflictsPanel, conflicts, status.checkingConflicts, this.deps.createConflictReview ? conflict => {
-			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview!(conflict), () => this.refresh()).open();
-		} : undefined);
+		renderConflictsPanel(this.conflictsPanel, conflicts, status.checkingConflicts, conflict => {
+			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview(conflict), () => this.refresh()).open();
+		});
     }
 
     private renderHistory(): void {
@@ -292,17 +279,12 @@ export class ActivityModal extends BaseUiModal {
         }
         if (!this.activityHistory) {
             this.historyPanel.empty();
-            const historyRuntime = deps.listRecentFileVersions && deps.getPendingRestores && deps.loadFileHistoryPreview && deps.restoreRecentFileVersion && deps.loadCurrentSyncedPreview ? {
-                loadCurrentSyncedPreview: deps.loadCurrentSyncedPreview.bind(deps),
-                listRecentFileVersions: deps.listRecentFileVersions.bind(deps), getPendingRestores: deps.getPendingRestores.bind(deps),
-                loadFileHistoryPreview: deps.loadFileHistoryPreview.bind(deps), restoreRecentFileVersion: deps.restoreRecentFileVersion.bind(deps),
-            } : undefined;
             this.activityHistory = new ActivityHistory(this.app, this.historyPanel, {
-                load: deps.loadHistoryComparison?.bind(deps),
-                openFile: historyRuntime ? path => openFileHistoryModal(this.app, historyRuntime, path) : undefined,
-                restore: deps.createHistoryRestore ? entry => {
-                    new HistoryRestoreModal(this.app, entry, () => deps.createHistoryRestore!(entry), () => this.refresh()).open();
-                } : undefined,
+                load: deps.loadHistoryComparison.bind(deps),
+                openFile: path => openFileHistoryModal(this.app, deps, path),
+                restore: entry => {
+                    new HistoryRestoreModal(this.app, entry, () => deps.createHistoryRestore(entry), () => this.refresh()).open();
+                },
             }, () => this.close());
         }
         const checkpoints = this.sharedHistory?.getSnapshot().checkpoints;
@@ -317,7 +299,7 @@ export class ActivityModal extends BaseUiModal {
         this.activityHistory = undefined;
 		this.pendingBrowserState.dispose?.();
 		this.deps.removeStateChangeListener(this.onStateChange);
-		this.deps.removeProgressListener?.(this.onProgress);
+		this.deps.removeProgressListener(this.onProgress);
 		this.header?.dispose();
 		this.tabsRoot?.unmount();
 		this.tabsRoot = undefined;
