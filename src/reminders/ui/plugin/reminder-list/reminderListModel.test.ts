@@ -76,6 +76,22 @@ describe("loadRemindersListData", () => {
 
     expect(loaded).toEqual([upcomingReminder]);
   });
+
+  it("includes completed upcoming reminders when the block shows completed ones", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
+
+    const open = makeReminder({ id: "open", dueDate: "2026-01-12" });
+    const done = makeReminder({ id: "done", completed: true, dueDate: "2026-01-11" });
+    const loaded = await loadRemindersListData({
+      repository: createRepository({ getAll: () => [open, done] }),
+      showUpcoming: true,
+      showCompleted: true,
+      effectiveDays: 7,
+    });
+
+    expect(loaded).toEqual([open, done]);
+  });
 });
 
 describe("buildRemindersListPresentation", () => {

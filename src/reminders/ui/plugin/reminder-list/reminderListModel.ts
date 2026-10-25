@@ -52,7 +52,7 @@ export async function loadRemindersListData(options: RemindersListLoadOptions): 
 
   if (showUpcoming) {
     const allReminders = showCompleted ? repository.getAll() : repository.getActive();
-    return getUpcomingReminders(allReminders, effectiveDays);
+    return getUpcomingReminders(allReminders, effectiveDays, new Date(), showCompleted);
   }
 
   return showCompleted ? repository.getAll() : repository.getActive();
