@@ -232,6 +232,17 @@ describe('clearSyncedPendingPaths', () => {
 		expect(h.flushes).toHaveBeenCalledTimes(1);
 	});
 
+	it('settles the revision of an unchanged file the flush skips', async () => {
+		const h = createController({ automaticSync: true });
+		h.flushes.mockReturnValue(true);
+		h.controller.onFileChange({ path: 'notes/unchanged.md' });
+		expect(h.revisions()).toEqual(['notes/unchanged.md']);
+		await vi.advanceTimersByTimeAsync(25);
+		expect(h.flushes).toHaveBeenCalled();
+		expect(h.pending()).toEqual([]);
+		expect(h.revisions()).toEqual([]);
+	});
+
 	it('keeps a newer event for the same path during sync reconciliation', () => {
 		const h = createController();
 		h.controller.onFileChange({ path: 'notes/a.md' });
