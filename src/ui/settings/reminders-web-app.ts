@@ -62,15 +62,12 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 	}
 	const tokenBefore = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
 	const keys = loadEncryptionKeys(plugin.secretStorage);
-	const recovery = keys ? plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY) : null;
-	if (keys && !recovery) throw new Error('Unlock this vault with your recovery key before connecting the web app.');
 	const folder = plugin.remindersSettings.remindersFolderPath;
 	const readingFolder = plugin.settings.reading.folderPath;
 	return plugin.syncRuntime.withCurrentApi(async (apiClient, isCurrentApi) => {
 		const assertCurrent = () => {
 			if (!isCurrentApi() || plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== tokenBefore
-				|| plugin.remindersSettings.remindersFolderPath !== folder || plugin.settings.reading.folderPath !== readingFolder
-				|| (keys && plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY) !== recovery)) {
+				|| plugin.remindersSettings.remindersFolderPath !== folder || plugin.settings.reading.folderPath !== readingFolder) {
 				throw new Error(CONNECTION_CHANGED);
 			}
 		};
@@ -83,10 +80,11 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 		const { token, browserToken } = await apiClient.createRemindersEnrollmentToken(folder);
 		assertCurrent();
 		const subscribeUrl = new URL('notifications', `${apiClient.getWorkerUrl()}/`);
-		if (keys && recovery) {
-			// Reminders and Reading unlock independently at launch, from the same recovery key.
-			// The fragment never reaches the server, so the folder's plaintext name can travel with the key.
-			subscribeUrl.hash = new URLSearchParams({ crateKey: recovery, crateReadingKey: recovery, crateFolder: folder }).toString();
+		if (keys) {
+			// The link never carries the recovery key: links land in browser history and
+			// sync, and the key cannot be rotated. The app unlocks by pairing instead.
+			// The fragment never reaches the server, so the folder's plaintext name can travel in it.
+			subscribeUrl.hash = new URLSearchParams({ crateFolder: folder }).toString();
 		}
 		subscribeUrl.searchParams.set('token', token);
 		if (browserToken) subscribeUrl.searchParams.set('browserToken', browserToken);

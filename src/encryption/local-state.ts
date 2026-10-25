@@ -5,7 +5,7 @@ const PREFIX = 'crate-local-e2ee-v1.';
 const LIMIT = 16 * 1024 * 1024;
 
 /** Synchronous protection preserves Web Storage's write-before-dispatch contract.
- * The independent local key is wrapped with the folder key when persisted.
+ * The independent local key is wrapped with the vault key when persisted.
  * XChaCha's random 192-bit nonces permit independent tabs to write safely. */
 export class LocalStateCipher {
 	private secret: Uint8Array<ArrayBuffer>;

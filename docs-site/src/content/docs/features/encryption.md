@@ -84,7 +84,7 @@ If you lose your recovery key and every unlocked device, your encrypted server c
 
 To save another copy, open **Manage encryption → Recovery key → Copy** on an unlocked Obsidian device.
 
-Only enter your recovery key in apps you trust. An unlocked web app can read every note in its Reading and Reminders folders. Encryption can't protect you from a compromised device, or from malicious code served from your web app's address.
+Only unlock web apps you trust. An unlocked web app holds the vault key, which can decrypt every synced note, not only its Reading and Reminders folders. Encryption can't protect you from a compromised device, or from malicious code served from your web app's address.
 
 Encryption only protects data from now on. Earlier exports, hosting provider snapshots, backups, and copies on other devices stay as they were.
 

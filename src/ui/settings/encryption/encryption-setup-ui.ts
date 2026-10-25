@@ -76,7 +76,7 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
     'This device syncs first. Crate then deletes the server copy, its history and checkpoints, and uploads this device’s vault encrypted. Local vault files stay readable.',
     'Sync and notifications pause while encryption runs. Keep Obsidian open.',
     'Other Obsidian devices reconnect and enter the recovery key. Web apps log out and connect again; logging out discards their drafts and pending edits.',
-    'Use your recovery key only in web apps you trust. They handle it during unlock and can read entire notes in their connected Reading and Reminders folders.',
+    'Web apps you unlock receive the vault key, which can decrypt every synced note. Unlock only web apps you trust.',
     'File and folder names are encrypted. The server still sees folder structure, which files are notes, file sizes and notification times. Notification titles and text are encrypted.',
     'To show page titles for pasted links, the server fetches each link without storing it.',
     'Existing backup copies are not changed or retroactively encrypted.',
