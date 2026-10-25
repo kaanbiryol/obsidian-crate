@@ -46,7 +46,8 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
     let source: Awaited<ReturnType<typeof readSource>> | undefined;
     try { source = await readSource(env, row.path); }
     catch (failure) {
-      if (failure instanceof ReadingError && failure.status === 413) error = failure.message;
+      // Oversized or mis-encoded notes are stable issues; other failures are retried.
+      if (failure instanceof ReadingError && (failure.status === 413 || failure.code === 'invalid_encoding')) error = failure.message;
       else { unavailable = true; continue; }
     }
     if (source && source.file.storageKey !== row.revision) { complete = false; continue; }

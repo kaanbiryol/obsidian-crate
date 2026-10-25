@@ -10,6 +10,7 @@ import { projectReading } from './projection';
 import { handleReadingRoute } from './routes';
 import { getStoredFileRow } from '../sync/storage';
 import { runNotificationCoordinator } from '../notifications/coordinator';
+import { sha256Hex } from '@/platform/sha256';
 
 const policy = { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' };
 const principal = { tokenId: 'vault', scope: 'vault' as const };
@@ -104,4 +105,20 @@ it('quarantines a verified invalid note once and retries when the source is repa
   const note = createReadingNote({ id, url, savedAt: new Date().toISOString() });
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, note, (await getStoredFileRow(env.DB, path))!.hash);
   expect(await (await list()).json()).toMatchObject({ items: [{ crate_reading_id: id }], issues: [] });
+});
+
+it.each([
+  ['invalid UTF-8', (note: string) => new Uint8Array([...new TextEncoder().encode(note), 0xff]), 1],
+  ['a byte order mark', (note: string) => new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(note)]), 0],
+])('keeps the library available when a note is saved with %s', async (_name, encode, expectedIssues) => {
+  const { id, note, file } = await seed();
+  const bytes = encode(note);
+  await env.BUCKET.put(file.storageKey, bytes);
+  await env.DB.prepare('UPDATE files SET hash = ?, size = ? WHERE path = ?').bind(await sha256Hex(bytes), bytes.byteLength, path).run();
+  expect(await projectReading(env, (await env.DB.prepare('SELECT * FROM reading_policy').first())!)).toBe('complete');
+  const response = await list();
+  expect(response.status).toBe(200);
+  const body = await response.json() as { items: Array<{ crate_reading_id: string }>; issues: unknown[] };
+  expect(body.issues).toHaveLength(expectedIssues);
+  expect(body.items.map(item => item.crate_reading_id)).toEqual(expectedIssues ? [] : [id]);
 });
