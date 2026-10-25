@@ -19,17 +19,17 @@ describe('reading Markdown', () => {
 		const noted = updateReadingNote(article, '00000000-0000-4000-8000-000000000001',
 			{ highlights: [{ ...at('world'), note: 'Keep' }, { ...at('Second'), note: 'Removed' }] });
 		const edited = noted.replace('==Second== line.', 'Second ==line==.');
-		const recorded = await recordMarkdownHighlights(edited);
+		const recorded = await recordMarkdownHighlights(edited, parseReadingNote(edited)!);
 		expect(readReadingFrontmatter(recorded)!.body).toBe(readReadingFrontmatter(edited)!.body);
-		expect(await recordMarkdownHighlights(edited)).toBe(recorded);
-		expect(await recordMarkdownHighlights(recorded)).toBe(recorded);
+		expect(await recordMarkdownHighlights(edited, parseReadingNote(edited)!)).toBe(recorded);
+		expect(await recordMarkdownHighlights(recorded, parseReadingNote(recorded)!)).toBe(recorded);
 		const metadata = parseReadingNote(recorded)!;
 		expect(metadata.highlights?.map(({ text, note }) => ({ text, note }))).toEqual([{ text: 'world', note: 'Keep' }, { text: 'line', note: undefined }]);
 		const manual = metadata.highlights![1]!;
 		expect(manual.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 		expect(manual.createdAt).toBeUndefined();
 		expect(metadata.highlight_recovery?.map(highlight => highlight.note)).toEqual(['Removed']);
-		expect(await recordMarkdownHighlights(note)).toBe(note);
+		expect(await recordMarkdownHighlights(note, parseReadingNote(note)!)).toBe(note);
 	});
 
 	it('imports default Clipper properties without a Crate template', async () => {
