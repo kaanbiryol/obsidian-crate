@@ -23,8 +23,8 @@ Scripts in `package.json` are the source of truth. [Framework and Config](#frame
 | PWA preview smoke test | `npm run test:pwa-preview` | Smoke test of the built PWA preview and its asset budgets. |
 | PWA browser | `npm run test:pwa-browser` | Chromium and WebKit. `-- --platform=linux --shard=1/4 --list` selects and lists a CI group. One script: `node tests/browser/pwa/<name>.mjs`. |
 | Reading | `npm run test:reading` | `test:reading-server` (extraction, server and shortcut contracts), then `test:reading-browser`. |
-| Shared UI | `npm run test:visual` | Screenshot comparisons on the reviewed macOS baselines, then the editor contract. A subset: `node scripts/visual-test-run.mjs <spec>`. |
-| Editor contract | `npm run test:editor-contract` | Playwright editor contract, then the PWA editor contract script. |
+| Shared UI | `npm run test:visual` | Screenshot comparisons on the reviewed macOS baselines, then the editor contract. A subset: `node scripts/visual-test-run.mjs <spec>`. Local runs record no traces; add `--trace=on` when debugging a failure. |
+| Editor contract | `npm run test:editor-contract` | Playwright editor contract, then the PWA editor contract script. Uses half the local cores (4 workers on CI); `--project=chromium-pwa` runs one of its four projects. |
 | Plugin browser | `npm run test:activity-browser`, `npm run test:file-history-browser`, `npm run test:plugin-dialogs` | Run `npm run build` first. |
 | Benchmarks | `npm run benchmark:reminders`, `npm run benchmark:sync`, `npm run benchmark:pwa` | See [Reminder capacity measurements](#reminder-capacity-measurements) and [sync capacity](sync-capacity.md). |
 | Focused bundles | `npm run test:page-titles`, `npm run test:lexical` | Editor work. Their pieces also run in the suites above; there is no dedicated CI job. |

@@ -16,6 +16,6 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   outputDir: `test-results/visual-${run.id}`,
   reporter: [['list'], ['html', { open: 'never', outputFolder: `playwright-report/visual-${run.id}` }]],
-  use: { baseURL, locale: 'en-US', timezoneId: 'UTC', reducedMotion: 'reduce', trace: 'retain-on-failure' },
+  use: { baseURL, locale: 'en-US', timezoneId: 'UTC', reducedMotion: 'reduce', trace: 'on-first-retry' },
   webServer: { command: 'node scripts/visual-preview.mjs', url: baseURL, reuseExistingServer: false, timeout: 120_000 },
 });
