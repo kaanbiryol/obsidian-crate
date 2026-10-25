@@ -1,58 +1,12 @@
 import { parseQuery, type ReminderQueryOptions } from "./queryOptions";
 
-const REMINDERS_BLOCK_TYPES = [
-  "reminders",
-  "reminders-today",
-  "reminders-upcoming",
-] as const;
+export type RemindersBlockType = "reminders" | "reminders-today" | "reminders-upcoming";
 
-export type RemindersBlockType = (typeof REMINDERS_BLOCK_TYPES)[number];
-
-export type RemindersBlockInfo = {
+type RemindersBlockInfo = {
   content: string;
   type: RemindersBlockType;
 };
 
-function isRemindersBlockType(type: string): type is RemindersBlockType {
-  return (REMINDERS_BLOCK_TYPES as readonly string[]).includes(type);
-}
-
-export function isRemindersBlockStart(text: string): boolean {
-  const firstLine = text.split("\n", 1)[0]?.trim() ?? "";
-  if (!firstLine.startsWith("```")) {
-    return false;
-  }
-
-  return isRemindersBlockType(firstLine.slice(3).trim().toLowerCase());
-}
-
-export function extractRemindersBlockInfo(blockText: string): RemindersBlockInfo | null {
-  const lines = blockText.split("\n");
-  if (lines.length < 2) {
-    return null;
-  }
-
-	const opening = lines[0]?.trim();
-	if (!opening) return null;
-  if (!opening.startsWith("```")) {
-    return null;
-  }
-
-  const type = opening.slice(3).trim().toLowerCase();
-  if (!isRemindersBlockType(type)) {
-    return null;
-  }
-
-  const closingIndex = lines.findIndex((line, idx) => idx !== 0 && line.trim().startsWith("```"));
-  const contentLines = closingIndex === -1 ? lines.slice(1) : lines.slice(1, closingIndex);
-
-  return {
-    content: contentLines.join("\n"),
-    type,
-  };
-}
-
-/** Shared by Reading view and Live Preview so both render a block identically. */
 export function parseRemindersBlockOptions(blockInfo: RemindersBlockInfo): ReminderQueryOptions {
   const parsed = parseQuery(blockInfo.content);
 

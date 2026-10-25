@@ -25,7 +25,7 @@ export class ReminderQueryInjector {
   onBlock(type: RemindersBlockType, source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
     const options = parseRemindersBlockOptions({ type, content: source });
 
-    // Like Live Preview, the toggle rewrites the block's own show-completed option.
+    // In Reading view and Live Preview, the toggle rewrites the block's own show-completed option.
     const toggleShowCompleted = ctx.sourcePath && ctx.getSectionInfo(el)
       ? (showCompleted: boolean) => {
         void writeShowCompleted(this.plugin, el, ctx, showCompleted).catch((error: unknown) => {

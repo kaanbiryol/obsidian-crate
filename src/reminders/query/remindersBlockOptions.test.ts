@@ -1,45 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-	extractRemindersBlockInfo,
-	isRemindersBlockStart,
 	parseRemindersBlockOptions,
 	setRemindersBlockShowCompleted,
 } from './remindersBlockOptions';
 
 describe('reminders block options', () => {
-	it('extracts supported reminders code fences', () => {
-		const blockInfo = extractRemindersBlockInfo([
-			'```reminders-upcoming',
-			'project: Work',
-			'show-completed: true',
-			'```',
-		].join('\n'));
-
-		expect(blockInfo).toEqual({
-			content: 'project: Work\nshow-completed: true',
-			type: 'reminders-upcoming',
-		});
-	});
-
-	it('rejects non-reminders code fences', () => {
-		expect(extractRemindersBlockInfo('```tasks\nnot ours\n```')).toBeNull();
-		expect(extractRemindersBlockInfo('plain text')).toBeNull();
-		expect(isRemindersBlockStart('```tasks')).toBe(false);
-	});
-
 	it('parses options for special reminders block types', () => {
-		const todayBlock = extractRemindersBlockInfo('```reminders-today\nproject: Work\n```');
-		const upcomingBlock = extractRemindersBlockInfo('```reminders-upcoming\nproject: Work\n```');
-
-		expect(todayBlock).not.toBeNull();
-		expect(upcomingBlock).not.toBeNull();
-		expect(parseRemindersBlockOptions(todayBlock!)).toMatchObject({
+		expect(parseRemindersBlockOptions({ type: 'reminders-today', content: 'project: Work' })).toMatchObject({
 			showToday: true,
 			showUpcoming: false,
 			projectFilter: 'Work',
 		});
-		expect(parseRemindersBlockOptions(upcomingBlock!)).toMatchObject({
+		expect(parseRemindersBlockOptions({ type: 'reminders-upcoming', content: 'project: Work' })).toMatchObject({
 			showToday: false,
 			showUpcoming: true,
 			projectFilter: 'Work',
