@@ -109,3 +109,23 @@ it('rejects an exclusion change during comparison or preview', async () => {
     h.settings.ignorePatterns.push('other.md');
     await expect(pending).rejects.toThrow('exclusions changed');
 });
+it('looks up only the previewed file when reading a local checkpoint', async () => {
+    const h = await harness({ 'note.md': 'unsynced' }, { 'note.md': 'saved' });
+    const text = new Map<string, string>();
+    h.adapter.write.mockImplementation(async (path: string, value: string) => { text.set(path, value); });
+    Object.assign(h.adapter, { read: vi.fn(async (path: string) => text.get(path)!) });
+    h.adapter.exists.mockImplementation(async (path: string) => h.files.has(path) || text.has(path));
+    const target = h.context.getManifest().files;
+    const api = Object.assign(h.api, {
+        getManifest: vi.fn(async () => ({ version: 1, files: target })),
+        getFileMetadata: vi.fn(async (paths: string[]) => ({ files: Object.fromEntries(paths.map(path => [path, target[path]])) })),
+        downloadFile: vi.fn(async () => ({ content: bytes('saved') })),
+    });
+    const history = createEngineHistory({ ...h.context, canCheckpoint: () => true, hasPendingMutations: () => false });
+    const id = await history.saveLocal();
+
+    const comparison = await history.compare(id!, false);
+    expect(await comparison.preview('note.md')).toEqual({ current: 'unsynced', saved: 'saved' });
+    expect(api.getFileMetadata).toHaveBeenCalledWith(['note.md']);
+    expect(api.getManifest).not.toHaveBeenCalled();
+});

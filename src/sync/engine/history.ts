@@ -56,7 +56,7 @@ export function createEngineHistory(context: EngineHistoryContext) {
         verify();
         if (saved.files[path] !== file) throw new Error('This file is not in the selected saved state.');
         const bytes = shared ? await context.api.sharedHistory.download(checkpoint, path, file)
-          : await (await findHistorySource(context.api, path, file, (await context.api.getManifest()).files[path]))();
+          : await (await findHistorySource(context.api, path, file, (await context.api.getFileMetadata([path])).files[path]))();
         verify();
         return bytes;
       } };
