@@ -229,29 +229,12 @@ describe('SyncApiClient', () => {
 		expect(secondBody.paths).toEqual(['notes/50.md']);
 	});
 
-	it('falls back to the manifest when an older worker lacks targeted metadata', async () => {
-		const transport = mockTransport(
-			new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }),
-			new Response(JSON.stringify({
-				version: 1,
-				files: {
-					'notes/a.md': { hash: 'a'.repeat(64), size: 4, modified: '2026-01-01', revision: 'r1' },
-					'notes/unrelated.md': { hash: 'd'.repeat(64), size: 5, modified: '2026-01-01', revision: 'r1' },
-				},
-				lastSeq: 3,
-				snapshotSeq: 3,
-				hasMore: false, cursorExpired: false,
-			})),
-			new Response(JSON.stringify({ changes: [], lastSeq: 3, snapshotSeq: 3, hasMore: false, cursorExpired: false })),
-		);
+	it('reports a failed metadata lookup instead of downloading the whole manifest', async () => {
+		const transport = mockTransport(new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }));
 		const client = new SyncApiClient('https://worker.example', 'token', transport);
 
-		await expect(client.getFileMetadata(['notes/a.md'])).resolves.toEqual({
-			files: {
-				'notes/a.md': { hash: 'a'.repeat(64), size: 4, modified: '2026-01-01', revision: 'r1' },
-			},
-		});
-		expect(transport).toHaveBeenCalledTimes(3);
+		await expect(client.getFileMetadata(['notes/a.md'])).rejects.toMatchObject({ status: 404 });
+		expect(transport).toHaveBeenCalledTimes(1);
 	});
 
 	it('refreshes the shared-settings version after a stale write', async () => {

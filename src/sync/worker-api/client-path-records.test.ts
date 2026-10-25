@@ -6,7 +6,6 @@ import type { ApiHttpTransport } from './http';
 
 const paths = ['__proto__', 'constructor', 'toString'];
 const entry: FileEntry = { hash: 'a'.repeat(64), size: 1, modified: '2026-01-01', revision: 'r1' };
-const noChanges = { changes: [], lastSeq: 3, snapshotSeq: 3, hasMore: false, cursorExpired: false };
 
 function clientWithResponses(...responses: Response[]) {
 	const transport = vi.fn<ApiHttpTransport>(async request => {
@@ -48,19 +47,6 @@ describe('literal path names in sync API records', () => {
 		expect(Object.keys(metadata.files)).toEqual(['__proto__', 'toString']);
 		expect(metadata.files.__proto__).toEqual(entry);
 		expect(metadata.files.constructor).toBeUndefined();
-	});
-
-	it('preserves names when an older server falls back from metadata to a manifest', async () => {
-		const { client } = clientWithResponses(
-			Response.json({ error: 'Not found' }, { status: 404 }),
-			Response.json({ version: 1, files: { ['__proto__']: entry }, lastSeq: 3, snapshotSeq: 3, hasMore: false, cursorExpired: false }),
-			Response.json(noChanges),
-		);
-		const metadata = await client.getFileMetadata(paths);
-		expect(Object.keys(metadata.files)).toEqual(['__proto__']);
-		expect(metadata.files.__proto__).toEqual(entry);
-		expect(metadata.files.constructor).toBeUndefined();
-		expect(metadata.files[paths[2]!]).toBeUndefined();
 	});
 
 	it.each(paths)('requires explicit delete preconditions for %s', async path => {
