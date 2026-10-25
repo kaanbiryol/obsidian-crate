@@ -55,6 +55,7 @@ const reminderQueryOnBlock = vi.fn();
 const createRemindersBlockExtension = vi.fn(() => 'extension');
 const registerReminderCommands = vi.fn();
 const recoverMoves = vi.fn(async (): Promise<string[]> => []);
+const notices = vi.fn();
 const pendingMoves = vi.fn(() => false);
 const pendingMoveFile = vi.fn(() => false);
 const moveJournal = { recover: recoverMoves, hasPending: pendingMoves, isPendingFile: pendingMoveFile,
@@ -87,7 +88,7 @@ async function loadPluginIntegrationModule() {
 	vi.doMock('obsidian', () => ({
 		addIcon: vi.fn(),
 		normalizePath: (path: string) => path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''),
-		Notice: class {},
+		Notice: class { constructor(message: unknown) { notices(message); } },
 	}));
 	vi.doMock('./data/reminder-move-journal', () => ({ createReminderMoveJournal: createMoveJournal }));
 	vi.doMock('./data/reminder-index', () => ({
@@ -178,6 +179,7 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 
 beforeEach(() => {
 	recoverMoves.mockReset().mockResolvedValue([]);
+	notices.mockReset();
 	pendingMoves.mockReset().mockReturnValue(false);
 	pendingMoveFile.mockReset().mockReturnValue(false);
 	createMoveJournal.mockClear();
@@ -433,6 +435,22 @@ it('recovers interrupted moves before scanning and protects unresolved file path
 	expect(defer('Reminders/Healthy.md')).toBe(false);
 	expect(defer('Reminders/Pending.md')).toBe(true);
 
+});
+
+it('reports an unresolved move once and does not rescan reminders on every sync state change', async () => {
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	pendingMoves.mockReturnValue(true);
+	recoverMoves.mockResolvedValue(['Review both copies before retrying recovery.']);
+	await initializeReminders(plugin as never);
+	const listener = plugin.syncRuntime.addStateChangeListener.mock.calls[0]?.[0] as () => void;
+	for (let index = 0; index < 3; index++) {
+		listener();
+		await flushMicrotasks();
+	}
+	expect(recoverMoves).toHaveBeenCalledTimes(4);
+	expect(notices).toHaveBeenCalledOnce();
+	expect(reminderIndexLoad).toHaveBeenCalledOnce();
 });
 
 it('does not start normalization when unloaded during journal recovery', async () => {

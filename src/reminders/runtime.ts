@@ -37,10 +37,17 @@ export function requireReminderBackend(plugin: CratePlugin): ReminderBackend {
 	return plugin.reminders;
 }
 
-function reportMoveRecoveryIssues(issues: string[]): void {
-	if (!issues.length) return;
-	for (const issue of issues) remindersLogger.error(issue);
-	new Notice(issues.join('\n\n'), 0);
+/** Recovery reruns after every sync; a record awaiting review reports once until its issues change. */
+function createMoveRecoveryReporter(): (issues: string[]) => void {
+	let reported = '';
+	return issues => {
+		const text = issues.join('\n\n');
+		if (text === reported) return;
+		reported = text;
+		if (!text) return;
+		for (const issue of issues) remindersLogger.error(issue);
+		new Notice(text, 0);
+	};
 }
 
 export function stopReminderBackend(plugin: CratePlugin): void {
@@ -62,6 +69,7 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	controller.signal.addEventListener('abort', () => lifetime.removeEventListener('abort', abort), { once: true });
 	plugin.reminders?.watcher.unregister();
 	const journal = createReminderMoveJournal(plugin.app, `${plugin.manifest.dir}/reminder-moves`, folderPath, controller.signal);
+	const reportMoveRecoveryIssues = createMoveRecoveryReporter();
 	try {
 		if (plugin.syncRuntime.getState().status !== 'syncing') reportMoveRecoveryIssues(await journal.recover());
 	} catch (error) {
@@ -85,7 +93,8 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 			if (status === 'syncing' || controller.signal.aborted) return;
 			if (journal.hasPending()) {
 				reportMoveRecoveryIssues(await journal.recover());
-				await index.load();
+				// Reload only once recovery settles; a record awaiting review keeps its paths deferred.
+				if (!journal.hasPending()) await index.load();
 			}
 			await index.flushDeferredScans();
 		};
