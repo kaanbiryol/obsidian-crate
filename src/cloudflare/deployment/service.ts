@@ -39,7 +39,6 @@ export interface CloudflareDeploymentServiceOptions {
 	transport: HttpTransport;
 	loadArtifacts: () => Promise<CloudflareDeploymentArtifacts>;
 	openExternal: (url: string) => void;
-	selectDeployment: SelectDeployment;
 	onAuthorized?: (accountId: string, tokens: CloudflareOAuthTokens) => void;
 	beforeServerReset?: () => Promise<void>;
 	beforeServerSwitch?: () => Promise<void>;
@@ -87,15 +86,15 @@ export class CloudflareDeploymentService {
 		}, this.lifetime.signal);
 	}
 
-	async handleCallback(params: Record<string, string>, device?: CloudflareAuthorizedDevice, onProgress?: (message: string) => void, selectDeployment = this.options.selectDeployment): Promise<CloudflareDeploymentResult> {
+	async handleCallback(params: Record<string, string>, selectDeployment: SelectDeployment, device?: CloudflareAuthorizedDevice, onProgress?: (message: string) => void): Promise<CloudflareDeploymentResult> {
 		this.assertIdle('A Cloudflare operation is already in progress.');
 		// The callback consumes the pending browser session, so it does not cancel it.
 		this.handlingCallback = true;
 		try {
-			return await this.whileActive(() => this.handleAuthorizedCallback(params, device, message => {
+			return await this.whileActive(() => this.handleAuthorizedCallback(params, selectDeployment, device, message => {
 				this.lifetime.signal.throwIfAborted();
 				onProgress?.(message);
-			}, selectDeployment));
+			}));
 		} finally {
 			this.handlingCallback = false;
 		}
@@ -103,23 +102,23 @@ export class CloudflareDeploymentService {
 
 	private async handleAuthorizedCallback(
 		params: Record<string, string>,
+		selectDeployment: SelectDeployment,
 		device?: CloudflareAuthorizedDevice,
 		onProgress?: (message: string) => void,
-		selectDeployment = this.options.selectDeployment,
 	): Promise<CloudflareDeploymentResult> {
 		const { code, verifier, request } = this.oauthSession.take(params);
 		onProgress?.('Completing Cloudflare authorization…');
 		this.lifetime.signal.throwIfAborted();
 		const tokens = await this.oauthClient.exchangeTokens(code, verifier);
-		return this.runAuthorizedDeployment(request, tokens, device, onProgress, selectDeployment);
+		return this.runAuthorizedDeployment(request, tokens, selectDeployment, device, onProgress);
 	}
 
 	private async runAuthorizedDeployment(
 		request: DeploymentRequest,
 		tokens: CloudflareOAuthTokens,
+		selectDeployment: SelectDeployment,
 		device?: CloudflareAuthorizedDevice,
 		onProgress?: (message: string) => void,
-		selectDeployment = this.options.selectDeployment,
 		savedLogin = false,
 	): Promise<CloudflareDeploymentResult> {
 		let retained = savedLogin;
@@ -257,9 +256,9 @@ export class CloudflareDeploymentService {
 	async deployWithSavedAuthorization(
 		intent: SavedDeploymentIntent,
 		withAuthorization: WithCloudflareAuthorization,
+		selectDeployment: SelectDeployment,
 		device?: CloudflareAuthorizedDevice,
 		onProgress?: (message: string) => void,
-		selectDeployment = this.options.selectDeployment,
 	): Promise<CloudflareDeploymentResult> {
 		this.assertIdle('A Cloudflare operation is already in progress.');
 		const metadata = this.options.settingsOwner.settings.cloudflareDeployment;
@@ -275,7 +274,7 @@ export class CloudflareDeploymentService {
 				this.lifetime.signal.throwIfAborted();
 				this.checkSavedTarget(request.metadata, request.intent);
 				if (stableJson(this.options.settingsOwner.settings.cloudflareDeployment) !== request.originalMetadata) throw new Error('Server settings changed. Confirm the operation again.');
-				return this.runAuthorizedDeployment(request, tokens, device, onProgress, selectDeployment, true);
+				return this.runAuthorizedDeployment(request, tokens, selectDeployment, device, onProgress, true);
 			});
 			if (result.status === 'deleted') await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
 			return result;
