@@ -79,12 +79,14 @@ export class ReadingLibrary {
 	}
 	private async scan(): Promise<void> {
 		const items: ReadingItem[] = [];
-		const issues: ReadingIssue[] = [...this.captureErrors].map(([path, message]) => ({ path, message }));
 		try {
 			this.assertActive();
 			const files = this.vault.files().filter(file => file.path.startsWith(`${this.folder}/`) && /\.md$/i.test(file.path));
 			const paths = new Set(files.map(file => file.path));
 			for (const path of this.cache.keys()) if (!paths.has(path)) this.cache.delete(path);
+			// A failed download is reported until its note is retried, moved or deleted.
+			for (const path of this.captureErrors.keys()) if (!paths.has(path)) this.captureErrors.delete(path);
+			const issues: ReadingIssue[] = [...this.captureErrors].map(([path, message]) => ({ path, message }));
 			for (const file of files) {
 				this.assertActive();
 				if (file.size > MAX_READING_BYTES) { issues.push({ path: file.path, message: 'File exceeds the 1 MB reading limit.' }); continue; }
