@@ -181,7 +181,7 @@ describe('replaced version retention', () => {
 		await trackStagedUpload(db, objectKey, path);
 		await bucket.put(objectKey, content);
 		const result = await commitStagedFile(bucket, db, {
-			path, hash, size: content.byteLength, objectKey, content, expectedHash: snapshot.hash, previousFile: snapshot,
+			path, hash, size: content.byteLength, objectKey, content, expectedHash: snapshot.hash,
 		});
 
 		expect(result.committed).toBe(true);

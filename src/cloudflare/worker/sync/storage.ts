@@ -53,18 +53,6 @@ function normalizeStorageKey(value: unknown): string | null {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
-export function collectCleanupKeys(previousFile: FileStorageRow | null, preserve?: string): string[] {
-	const keys = new Set<string>();
-	if (previousFile) {
-		const previousKey = previousFile.storageKey;
-		if (previousKey !== preserve) {
-			keys.add(previousKey);
-		}
-	}
-
-	return Array.from(keys);
-}
-
 export function storedObjectMatchesMetadata(
 	object: { size: number; customMetadata?: Record<string, string> },
 	storedFile: FileStorageRow,
@@ -84,7 +72,7 @@ export async function getStoredFileRow(db: D1Database, path: string): Promise<Fi
 	return toFileStorageRow(row);
 }
 
-export function toFileStorageRow(row: { hash?: string | null; size?: number | null; storage_key?: string | null } | null): FileStorageRow | null {
+function toFileStorageRow(row: { hash?: string | null; size?: number | null; storage_key?: string | null } | null): FileStorageRow | null {
 	const storageKey = normalizeStorageKey(row?.storage_key);
 	if (!row || !storageKey) {
 		return null;

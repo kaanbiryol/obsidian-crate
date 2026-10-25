@@ -45,7 +45,7 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
       return;
     }
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, job.path, content, source.file.hash);
-    await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: source.file, expectedRevision: source.file.storageKey, readingPolicy: current, encryptionState: null });
+    await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, encryptionState: null });
   } finally {
     // A capture that is still pending at its current revision is queued again by scheduleReading.
     await env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision).run();

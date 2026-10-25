@@ -120,10 +120,9 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 			await writeCommittedMarkdownFilePair(env.BUCKET, env.DB, { source: { ...source, expectedHash: source.expectedHash }, destination: destination!, effects });
 		} else {
 			const file = files[0]!;
-			const previous = await getStoredFileRow(env.DB, file.path);
 			const staged = await stageMarkdownFile(env.BUCKET, env.DB, file.path, file.content, file.expectedHash, true);
 			const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content: file.content,
-				expectedRevision: file.expectedRevision, previousFile: previous, effects });
+				expectedRevision: file.expectedRevision, effects });
 			if (!result.committed) throw new FileVersionConflictError(file.path, result.currentHash);
 		}
 		return corsResponse(response);

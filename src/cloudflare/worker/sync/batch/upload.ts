@@ -10,8 +10,6 @@ import { EncryptionStateError, validateUploadEncryption } from '../../encryption
 import {
 	formatMetadataCommitFailure,
 	formatMutationError,
-	loadStoredFileRows,
-	type FileStorageRow,
 } from '../storage';
 import { prepareBatchUpload, validationFailure } from './upload-validation';
 import type { BatchUploadResponse } from '../../../../protocol/sync-types';
@@ -47,24 +45,6 @@ export async function handleBatchUpload(
 		}
 	}));
 	const uploads = checked.filter((file): file is NonNullable<typeof file> => file !== null);
-
-	let previousFiles = new Map<string, FileStorageRow>();
-	if (!bulkNew && uploads.length > 0) {
-		try {
-			previousFiles = await loadStoredFileRows(db, uploads.map((file) => file.safePath));
-		} catch (error: unknown) {
-			return corsResponse({
-				success: false,
-				results: results.concat(uploads.map((file) => ({
-					path: file.safePath,
-					success: false as const,
-					error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
-					code: 'storage' as const,
-					status: 503,
-				}))),
-			}, 503);
-		}
-	}
 
 	let stagingBatchId: string | undefined;
 	let encryptionState: EncryptionServerState | null = null;
@@ -127,7 +107,6 @@ export async function handleBatchUpload(
 				objectKey: file.objectKey,
 				content: file.bytes,
 				expectedHash: file.expectedHash,
-				previousFile: previousFiles.get(file.safePath) ?? null,
 			});
 			if (!commit.committed) {
 				if (commit.failure) { results.push(commit.failure); return; }

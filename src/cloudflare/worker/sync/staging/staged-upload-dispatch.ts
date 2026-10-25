@@ -1,5 +1,3 @@
-import { toFileStorageRow } from '../storage';
-import { filePathArgs } from '../file-identity';
 import { commitStagedFile } from '../mutations';
 import { armNotificationCoordinator } from '../../notifications/lifecycle';
 import { FileNamespaceConflictError } from '../file-namespace';
@@ -15,7 +13,7 @@ type CommitUpload = UploadCommitters['commitUpload'];
 // Explicit fields keep local-only commit options out of the JSON transport.
 type UploadMetadata = Pick<UploadParams,
   'path' | 'hash' | 'size' | 'objectKey' | 'expectedHash' | 'expectedRevision'
-  | 'previousFile' | 'encryptionState' | 'resetGeneration' | 'operation'>;
+  | 'encryptionState' | 'resetGeneration' | 'operation'>;
 
 // Markdown commits carry their bytes, framed after the metadata, so the
 // coordinator validates and projects them without reading the staged object
@@ -60,7 +58,7 @@ export function coordinatedUpload(env: Env): CommitUpload {
     const metadata: UploadMetadata = {
       path: params.path, hash: params.hash, size: params.size, objectKey: params.objectKey,
       expectedHash: params.expectedHash, expectedRevision: params.expectedRevision,
-      previousFile: params.previousFile, encryptionState: params.encryptionState,
+      encryptionState: params.encryptionState,
       resetGeneration: params.resetGeneration, operation: params.operation,
     };
     const response = await commitCoordinatorUpload(env, params.encryptionState || hasFramedMarkdown(params)
@@ -92,19 +90,17 @@ export async function prepareCoordinatedUpload(request: Request, env: Env): Prom
 }
 
 export async function commitCoordinatedUpload(params: UploadParams, state: DurableObjectState, env: Env): Promise<Response> {
-  // One read under the lock covers the policy fence, the previous file and the
-  // folders used by the reminder projection and the Reading index.
-  const current = await env.DB.prepare(`SELECT p.revision, p.folder_path, r.folder_path AS reading_folder, f.hash, f.size, f.storage_key
-    FROM (SELECT 1) LEFT JOIN notification_policy p ON p.id = 1 LEFT JOIN reading_policy r ON r.id = 1
-    LEFT JOIN files f ON f.portable_path = ? AND f.path = ?`).bind(...filePathArgs(params.path))
-    .first<{ revision: string | null; folder_path: string | null; reading_folder: string | null; hash: string | null; size: number | null; storage_key: string | null }>();
+  // One read under the lock covers the policy fence and the folders used by the
+  // reminder projection and the Reading index.
+  const current = await env.DB.prepare(`SELECT p.revision, p.folder_path, r.folder_path AS reading_folder
+    FROM (SELECT 1) LEFT JOIN notification_policy p ON p.id = 1 LEFT JOIN reading_policy r ON r.id = 1`)
+    .first<{ revision: string | null; folder_path: string | null; reading_folder: string | null }>();
   if (params.reminderPolicyRevision !== undefined && params.reminderPolicyRevision !== (current?.revision ?? null)) {
     return Response.json({ error: 'Reminder folder changed during upload. Retry the upload.' }, { status: 503 });
   }
-  const previousFile = toFileStorageRow(current);
   await armNotificationCoordinator(state);
   try {
-    return Response.json(await commitStagedFile(env.BUCKET, env.DB, { ...params, previousFile, reminderFolder: current?.folder_path ?? null,
+    return Response.json(await commitStagedFile(env.BUCKET, env.DB, { ...params, reminderFolder: current?.folder_path ?? null,
       readingPolicy: current?.reading_folder ? { folder_path: current.reading_folder } : null }));
   } catch (error) {
     if (error instanceof FileNamespaceConflictError) return error.toResponse();

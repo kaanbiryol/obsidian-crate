@@ -6,7 +6,6 @@ import { commitStagedFile } from '../mutations';
 import { FileNamespaceConflictError } from '../file-namespace';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../../../encryption/file-format';
 import {
-	getStoredFileRow,
 	storedObjectMatchesMetadata,
 } from '../storage';
 import { parseExpectedFileHash } from '../storage';
@@ -68,7 +67,6 @@ export async function handleRestoreFileVersion(
 		return corsResponse({ error: 'Stored file version content failed integrity validation' }, 503);
 	}
 
-	const previous = await getStoredFileRow(db, path);
 	// Expiry cleanup may already own the retained key. Never make it live again.
 	const objectKey = createManagedObjectKey(version.hash);
 	try {
@@ -86,7 +84,6 @@ export async function handleRestoreFileVersion(
 			expectedHash,
 			expectedRevision: expectedRevision ?? undefined,
 			operation,
-			previousFile: previous,
 		});
 		if (!result.committed) {
 			return corsResponse(result.failure ?? { error: 'Remote file changed before the version could be restored', currentHash: result.currentHash }, 409);

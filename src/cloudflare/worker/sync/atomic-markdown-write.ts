@@ -13,7 +13,6 @@ import { stageMarkdownFile, type StagedMarkdownFile } from './markdown-file-stag
 import { FileVersionConflictError } from '../storage';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import {
-	collectCleanupKeys,
 	getStoredFileRow,
 } from './storage';
 
@@ -146,10 +145,10 @@ export async function writeCommittedMarkdownFilePair(
 	source.expectedRevision = params.source.expectedRevision;
 	destination.expectedRevision = params.destination.expectedRevision;
 	const previousVersions = [
-		...(previousSource && collectCleanupKeys(previousSource, source.objectKey).length > 0
+		...(previousSource && previousSource.storageKey !== source.objectKey
 			? [{ path: source.path, ...previousSource }]
 			: []),
-		...(previousDestination && collectCleanupKeys(previousDestination, destination.objectKey).length > 0
+		...(previousDestination && previousDestination.storageKey !== destination.objectKey
 			? [{ path: destination.path, ...previousDestination }]
 			: []),
 	];
