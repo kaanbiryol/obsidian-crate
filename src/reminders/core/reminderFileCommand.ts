@@ -1,9 +1,9 @@
 import { scanReminderMarkdownContent, type ScannedReminderRecord } from './markdownScan';
 import { reminderRevision } from './reminderRevision';
-import { assertReminderMutationInput, parseReminderRecurrenceInput, parseReminderUpdateParams, ReminderInputError } from './reminderMutationInput';
+import { assertReminderMutationInput, parseReminderRecurrenceInput, parseReminderUpdateParams } from './reminderMutationInput';
 import { getReminderProjectFilePath, normalizeReminderProjectPath } from './reminderProjectPath';
 import { buildCreateReminderArgs, buildReminderUpdate } from './reminderMutationPlan';
-import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildMovedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
+import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildMovedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent, unreadableReminderTitle } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderReminderBlocksInContent } from './markdownReminderFile';
 import { DEFAULT_PROJECT, MAX_REMINDER_NOTE_BYTES, MAX_REMINDERS_PER_NOTE } from './constants';
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
@@ -40,10 +40,6 @@ function project(value: unknown): string {
 	if (!normalized) throw new ReminderCommandError('Invalid reminder project', 400, 'invalid_reminder_input');
 	return normalized;
 }
-/** A written line that no longer reads as its reminder would hide it in the note. */
-function unreadableTitle(): ReminderInputError {
-	return new ReminderInputError('content', 'This title cannot be saved as a reminder. Remove date, repeat or priority text from it.');
-}
 /** Applies to every note an edit reads or writes, deletes and reorders included.
  * Reminder lists skip notes over the 1 MiB index limit, so an edit there could
  * only come from a stale list, and its parsed result would bypass that limit. */
@@ -71,7 +67,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		let reminders: ScannedReminderRecord[];
 		// Each note was scanned before this edit, so only the written line can fail here.
 		try { reminders = scan(path, changes.get(path)!); }
-		catch (error) { throw error instanceof UnresolvedReminderScheduleError ? unreadableTitle() : error; }
+		catch (error) { throw error instanceof UnresolvedReminderScheduleError ? unreadableReminderTitle() : error; }
 		scanned.set(path, reminders);
 		return reminders;
 	};
@@ -124,7 +120,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		if (action !== 'delete' && !reminder) reminder = scanChange(path).find(item => item.id === current.id);
 	}
 	for (const content of changes.values()) checkSize(content);
-	if (!['delete', 'reorder'].includes(action) && !reminder) throw unreadableTitle();
+	if (!['delete', 'reorder'].includes(action) && !reminder) throw unreadableReminderTitle();
 	// `reminders` is present when the command already scanned the changed note.
 	return { files: [...changes].map(([path, content]) => ({ path, content, original: originals.get(path)!, reminders: scanned.get(path) })), createdId,
 		response: { success: true, ...(reminder ? { reminder: await reminderCommandPayload(reminder) } : action === 'delete' ? { id: body.id } : {}) } };

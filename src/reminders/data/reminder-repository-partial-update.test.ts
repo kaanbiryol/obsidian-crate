@@ -7,6 +7,7 @@ import { createReminderRepository } from './reminder-repository';
 import { toReminder } from './toReminder';
 import { buildCreatedReminderBlock, appendCreatedReminderBlock } from '../core/markdownReminderMutation';
 import type { UpdateReminderParams } from '../types/reminder';
+import { ReminderInputError } from '../core/reminderMutationInput';
 
 const path = 'Reminders/Inbox.md';
 const rule = { frequency: 'daily' as const, timezone: 'Europe/Berlin', count: 5, completedCount: 1 };
@@ -73,5 +74,28 @@ describe('partial reminder updates', () => {
 		expect(reopened.dueDatetime).toBe(final.dueDatetime);
 		expect(reopened.recurrence!.completedCount).toBe(4);
 		expect(await compare(repository.complete('one'))).toEqual(final);
+	});
+});
+
+describe('titles that would not read back', () => {
+	it('refuses a create before writing and keeps the note readable', async () => {
+		const { files, index, repository } = await workspace();
+		await expect(repository.create({ content: 'Read pages 13-19', project: 'Inbox', priority: 4, dueDate: '2026-10-30' }))
+			.rejects.toThrow('This title cannot be saved as a reminder');
+		expect(files.get(path)).toBe(content);
+		expect(index.sourceIssues).toEqual([]);
+		expect(index.getAll().map(reminder => reminder.id)).toEqual(['one']);
+
+		await expect(repository.create({ content: 'Pages 20-30', project: 'Reading', priority: 4, dueDate: '2026-10-30' })).rejects.toThrow(ReminderInputError);
+		expect(files.has('Reminders/Reading.md')).toBe(false);
+	});
+
+	it('refuses an edit before writing', async () => {
+		const { files, index, repository } = await workspace();
+		await expect(repository.update('one', { content: 'Sprint 14-28', dueDate: '2026-10-30', dueDatetime: undefined, recurrence: null }))
+			.rejects.toThrow(ReminderInputError);
+		expect(files.get(path)).toBe(content);
+		expect(index.sourceIssues).toEqual([]);
+		expect(index.getById('one')?.content).toBe('Original');
 	});
 });

@@ -1,6 +1,7 @@
 import { anchorMonthlyRecurrence, recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrence/recurrenceCalendar';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
-import { rebuildCheckboxLine } from '@/reminders/core/grammar/checkboxParser';
+import { parseCheckboxLine, rebuildCheckboxLine } from '@/reminders/core/grammar/checkboxParser';
+import { UnresolvedReminderScheduleError } from '@/reminders/core/grammar/reminderParser';
 import { calculateFirstOccurrence, calculateNextOccurrence } from '@/reminders/core/recurrence/recurrenceCalculator';
 import {
 	buildStoredReminderDates,
@@ -18,6 +19,7 @@ import {
 	type ReminderLineRecord,
 } from './markdownReminderFile';
 import { buildDescriptionBlock } from './reminderDescription';
+import { ReminderInputError } from './reminderMutationInput';
 
 export interface MarkdownReminderRecord extends ReminderLineRecord {
 	description?: string;
@@ -65,6 +67,27 @@ export function reminderBlockFields(mutation: ReminderBlockMutation): {
 	};
 }
 
+/** A written line that no longer reads as its reminder would hide it in the note. */
+export function unreadableReminderTitle(): ReminderInputError {
+	return new ReminderInputError('content', 'This title cannot be saved as a reminder. Remove date, repeat or priority text from it.');
+}
+
+/** Every host reads the line back before writing it. A title ending in a number
+ * range, such as "Read pages 13-19", can join the written date into a schedule
+ * the saved-line parser rejects, which disables every reminder in the note. */
+function assertReadsBack(mutation: ReminderBlockMutation): ReminderBlockMutation {
+	let parsed;
+	try { parsed = parseCheckboxLine(mutation.checkboxLine, { persisted: true })?.parsed; }
+	catch (error) {
+		if (error instanceof UnresolvedReminderScheduleError) throw unreadableReminderTitle();
+		throw error;
+	}
+	const dates = buildStoredReminderDates(parsed?.dueDate, parsed?.hasTime);
+	if (parsed?.cleanContent !== mutation.content.replace(/\s+/g, ' ').trim()
+		|| dates.dueDate !== mutation.dueDateKey || dates.dueDatetime !== mutation.dueDatetime) throw unreadableReminderTitle();
+	return mutation;
+}
+
 export function buildCreatedReminderBlock(params: {
 	content: string;
 	description?: string;
@@ -83,7 +106,7 @@ export function buildCreatedReminderBlock(params: {
 	if (rule && !params.dueDate && dueDate && !hasTime) dueDate = recurrenceCalendarDate(dueDate, rule);
 	const recurrence = rule && dueDate ? anchorMonthlyRecurrence(rule, dueDate, hasTime) : rule;
 	const storedDates = buildStoredReminderDates(dueDate, hasTime);
-	return {
+	return assertReadsBack({
 		checkboxLine: rebuildCheckboxLine(
 			'',
 			params.completed ?? false,
@@ -102,7 +125,7 @@ export function buildCreatedReminderBlock(params: {
 		hasTime,
 		priority: params.priority,
 		recurrence,
-	};
+	});
 }
 
 export function appendCreatedReminderBlock(
@@ -143,7 +166,7 @@ export function buildUpdatedReminderBlock(
 	const indentation = reminder.rawLine.match(/^(\s*)/)?.[1] ?? '';
 	const storedDates = buildStoredReminderDates(dueDate, hasTime);
 
-	return {
+	return assertReadsBack({
 		checkboxLine: rebuildCheckboxLine(
 			indentation,
 			reminder.completed,
@@ -162,7 +185,7 @@ export function buildUpdatedReminderBlock(
 		hasTime,
 		priority,
 		recurrence,
-	};
+	});
 }
 
 /** A project move writes the edited reminder as a new block in the destination
