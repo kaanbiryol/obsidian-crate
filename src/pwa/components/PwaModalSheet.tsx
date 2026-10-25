@@ -9,7 +9,7 @@ import { PwaSheetSurface } from './PwaSheetSurface';
 
 export function PwaModalSheet({
 	isOpen, onClose, onCloseEnd, onOpenEnd, children, variant, sheetClassName,
-	keyboardInset: keyboardInsetOverride, dismissible = true, viewportPortal = false, recedeCanvas = true, label, role = 'dialog', descriptionId,
+	keyboardInset: keyboardInsetOverride, dismissible = true, viewportPortal = false, recedeCanvas = true, recedeCovered = true, label, role = 'dialog', descriptionId,
 }: {
 	isOpen: boolean;
 	/** Return false when dismissal navigates within the sheet instead of closing it. */
@@ -25,6 +25,8 @@ export function PwaModalSheet({
 	viewportPortal?: boolean;
 	/** A nested sheet leaves the underlying sheet's canvas depth in place. */
 	recedeCanvas?: boolean;
+	/** A nested sheet pushes back the sheet it covers unless it is a flat confirmation. */
+	recedeCovered?: boolean;
 	dismissible?: boolean;
 	label: string;
 	role?: 'dialog' | 'alertdialog';
@@ -46,11 +48,11 @@ export function PwaModalSheet({
 		stopPresentation.current = undefined;
 		popupRef.current = popup;
 		measureSheetTravel(popup);
-		if (popup) stopPresentation.current = trackSheetPresentation(popup, recedeCanvas, anchorRef.current?.closest<HTMLElement>('.pwa-modal-sheet__container'));
+		if (popup) stopPresentation.current = trackSheetPresentation(popup, recedeCanvas, recedeCovered ? anchorRef.current?.closest<HTMLElement>('.pwa-modal-sheet__container') : null);
 		// The portal can attach after the parent layout effect. Focus in its
 		// mount ref so a synchronous opening tap still activates the keyboard.
 		popup?.querySelector<HTMLElement>('[data-initial-focus]:not(:disabled)')?.focus({ preventScroll: true });
-	}, [recedeCanvas]);
+	}, [recedeCanvas, recedeCovered]);
 	useLayoutEffect(() => {
 		// Snapshot before exit, including the currently visible keyboard inset.
 		// Do not retarget travel on every frame of the keyboard animation.

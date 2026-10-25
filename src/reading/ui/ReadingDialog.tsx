@@ -13,6 +13,8 @@ export interface ReadingDialogProps {
 	busy?: boolean;
 	/** Use a full-width, tall sheet instead of sizing to the contents. */
 	fullHeight?: boolean;
+	/** Confirmations stack without pushing back the sheet they cover, like reminder deletion. */
+	role?: 'dialog' | 'alertdialog';
 	children: React.ReactNode | ((close: () => void) => React.ReactNode);
 }
 
