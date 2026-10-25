@@ -74,9 +74,7 @@ export class ReadingLibrary {
 		this.parsed = { content, metadata };
 		return metadata;
 	}
-	invalidate(path: string): void {
-		for (const cachedPath of this.cache.keys()) if (cachedPath === path || cachedPath.startsWith(`${path}/`)) this.cache.delete(cachedPath);
-	}
+	invalidate(path: string): void { this.cache.delete(path); }
 	private async scan(): Promise<void> {
 		const items: ReadingItem[] = [];
 		try {
