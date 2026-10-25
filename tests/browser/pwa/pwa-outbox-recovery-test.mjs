@@ -11,7 +11,9 @@ const key = (token, id, folder = 'Reminders') => `crate-reminder-outbox:v1:${cre
 const id = digit => `${digit.repeat(8)}-${digit.repeat(4)}-4${digit.repeat(3)}-8${digit.repeat(3)}-${digit.repeat(12)}`;
 const badKey = key(previewAuthToken, id('1'));
 const oldBadKey = key('expired-session', id('2'));
-const privateKey = key('private-session', id('3'), 'Private');
+// An earlier sign-in's change for an earlier folder can never be sent, but blocks updates.
+const otherFolderKey = key('private-session', id('3'), 'Private');
+const otherFolderRaw = 'Saved for an earlier folder';
 const healthyId = id('4'); const oldHealthyId = id('5');
 const lateKey = key(previewAuthToken, id('6'));
 const badRaw = '{"title":"Keep exact bytes 🗒️\n<script>window.injected=true</script>"' + 'long-fragment'.repeat(100);
@@ -38,23 +40,23 @@ async function verify(browser) {
 	try {
 		await page.goto(`${origin}/outbox-seed`);
 		const healthyKey = key(previewAuthToken, healthyId); const oldHealthyKey = key('expired-session', oldHealthyId);
-		const draft = await page.evaluate(({ badKey, oldBadKey, privateKey, badRaw, oldBadRaw, healthyKey, oldHealthyKey, healthyId, oldHealthyId }) => {
+		const draft = await page.evaluate(({ badKey, oldBadKey, otherFolderKey, otherFolderRaw, badRaw, oldBadRaw, healthyKey, oldHealthyKey, healthyId, oldHealthyId }) => {
 			const queued = (operationId, content, attempts = 1) => JSON.stringify({ version: 1, createdAt: 1, change: {
 				operationId, recordId: operationId, kind: 'save', path: '/reminders/create', method: 'POST', status: 'uncertain', attempts, retryAt: 0,
 				body: JSON.stringify({ operationId, id: operationId, folderPath: 'Reminders', content, project: 'Inbox', priority: 4 }),
 			} });
-			localStorage.setItem(badKey, badRaw); localStorage.setItem(oldBadKey, oldBadRaw); localStorage.setItem(privateKey, 'Never export another folder');
+			localStorage.setItem(badKey, badRaw); localStorage.setItem(oldBadKey, oldBadRaw); localStorage.setItem(otherFolderKey, otherFolderRaw);
 			localStorage.setItem(healthyKey, queued(healthyId, 'Healthy pending creation'));
 			localStorage.setItem(oldHealthyKey, queued(oldHealthyId, 'Healthy recovered creation', 3));
 			const draft = JSON.stringify({ mode: 'create', draft: { content: 'Keep independent draft', description: 'Full details', project: 'Inbox', defaultProject: 'Inbox',
 				priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: false } });
 			sessionStorage.setItem('crate-reminder-draft:Reminders:new', draft); return draft;
-		}, { badKey, oldBadKey, privateKey, badRaw, oldBadRaw, healthyKey, oldHealthyKey, healthyId, oldHealthyId });
+		}, { badKey, oldBadKey, otherFolderKey, otherFolderRaw, badRaw, oldBadRaw, healthyKey, oldHealthyKey, healthyId, oldHealthyId });
 		await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
-		await expect(notice(page)).toContainText('2 saved changes need recovery');
+		await expect(notice(page)).toContainText('3 saved changes need recovery');
 		await page.getByRole('region', { name: 'Couldn’t sync: Reminder', exact: true }).waitFor();
 		await other.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
-		await expect(notice(other)).toContainText('2 saved changes need recovery');
+		await expect(notice(other)).toContainText('3 saved changes need recovery');
 		fail = false;
 		await page.evaluate(() => window.dispatchEvent(new Event('online')));
 		const card = (tab, content) => tab.getByRole('group', { name: `${content}. Press Enter to edit reminder.`, exact: true });
@@ -83,7 +85,7 @@ async function verify(browser) {
 		expect(await page.evaluate(key => localStorage.getItem(key), oldHealthyKey)).toBeNull();
 		await notice(page).getByText('Review damaged entries', { exact: true }).focus();
 		await page.keyboard.press('Enter');
-		await expect(notice(page).locator('pre').first()).toHaveText(badRaw);
+		await expect(notice(page).locator('pre').filter({ hasText: 'Keep exact bytes' })).toHaveText(badRaw);
 		expect(await notice(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
 		expect(await page.evaluate(() => window.injected)).toBeUndefined();
 		const downloadEntries = async () => {
@@ -94,17 +96,19 @@ async function verify(browser) {
 			return JSON.parse(await readFile(await downloaded.path(), 'utf8'));
 		};
 		const exported = await downloadEntries();
-		expect(exported).toEqual({ format: 'crate-damaged-reminder-changes-v1', origin, folderPath: 'Reminders',
-			entries: [{ key: badKey, raw: badRaw }, { key: oldBadKey, raw: oldBadRaw }] });
+		expect(exported).toEqual({ format: 'crate-damaged-reminder-changes-v1', origin, folderPath: 'Reminders', entries: expect.any(Array) });
+		expect(exported.entries).toHaveLength(3);
+		expect(exported.entries).toEqual(expect.arrayContaining([{ key: badKey, raw: badRaw }, { key: oldBadKey, raw: oldBadRaw }, { key: otherFolderKey, raw: otherFolderRaw }]));
 		const remove = () => notice(page).getByRole('button', { name: 'Remove exported copies from device', exact: true });
 		await expect(remove()).toBeDisabled();
 		await other.evaluate(({ badKey, lateKey }) => {
 			localStorage.setItem(badKey, 'Changed after the export'); localStorage.setItem(lateKey, 'New entry after export');
 		}, { badKey, lateKey });
-		await expect(notice(page)).toContainText('3 saved changes need recovery');
+		await expect(notice(page)).toContainText('4 saved changes need recovery');
 		await notice(page).getByRole('checkbox', { name: 'I saved and reviewed the export', exact: true }).check();
 		await remove().click();
 		await expect(notice(page)).toContainText('2 saved changes need recovery');
+		expect(await page.evaluate(key => localStorage.getItem(key), otherFolderKey)).toBeNull();
 		expect(await page.evaluate(key => localStorage.getItem(key), badKey)).toBe('Changed after the export');
 		expect(await page.evaluate(key => localStorage.getItem(key), lateKey)).toBe('New entry after export');
 		expect(await page.evaluate(key => localStorage.getItem(key), oldBadKey)).toBeNull();
@@ -113,7 +117,8 @@ async function verify(browser) {
 		await expect(remove()).toBeDisabled();
 		await notice(page).getByRole('checkbox').check(); await remove().click();
 		for (const tab of [page, other]) await expect(notice(tab)).toHaveCount(0);
-		expect(await page.evaluate(key => localStorage.getItem(key), privateKey)).toBe('Never export another folder');
+		// Nothing left blocks an update once the reviewed entries are gone.
+		expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('crate-reminder-outbox:')))).toEqual([]);
 		expect(await page.evaluate(() => sessionStorage.getItem('crate-reminder-draft:Reminders:new'))).toBe(draft);
 		await page.locator('[data-action="open-create-modal"]').click();
 		await expect(page.getByRole('textbox', { name: 'Reminder title', exact: true })).toHaveText('Keep independent draft');
@@ -124,7 +129,7 @@ async function verify(browser) {
 try {
 	for (const browserType of [chromium, webkit]) {
 		const browser = await browserType.launch();
-		try { await verify(browser); console.log(`${browserType.name()}: damaged entries remain exportable, healthy current/recovered commands sync across tabs, and removal preserves changed or unexported bytes and other folders`); }
+		try { await verify(browser); console.log(`${browserType.name()}: damaged entries remain exportable, healthy current/recovered commands sync across tabs, and removal preserves changed or unexported bytes and clears earlier folders' changes`); }
 		finally { await browser.close(); }
 	}
 } finally { await new Promise(resolve => server.close(resolve)); }
