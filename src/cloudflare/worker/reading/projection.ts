@@ -6,14 +6,14 @@ import { readingUrlIdentity } from '@/reading/core/model';
 import { ReadingError, readSource } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import type { Env } from '../types';
-import { vaultChangeToken } from '../vault-change-token';
+import { changedPathsSince, deltaBase, parseDeltaBase, readVaultChangeState } from '../vault-change-token';
 import { sha256Hex } from '@/platform/sha256';
 import { putMaintenanceValue } from '../db';
 
 export const READING_PROJECTION_KEY = 'reading_projection';
 
 /** Rows are a pure function of the folder's file revisions and the policy, so a
- * complete projection stays complete until a file write changes the vault token. */
+ * complete projection stays complete until a file in the folder changes. */
 // Bump with the `_highlightIndex` row format below, so upgraded rows are rebuilt.
 const PROJECTION_FORMAT = 1;
 const projectionScope = (current: ReadingPolicy) => `reading:${current.generation}\nfolder:${current.folder_path}\nenabled:${current.enabled}\nformat:${PROJECTION_FORMAT}`;
@@ -26,9 +26,18 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
   if (await readEncryptionState(env.DB)) return 'complete';
   const db = env.DB;
   // Every Reading read checks the projection. Skip the folder-wide checks when
-  // nothing changed since the last complete pass.
-  const token = await vaultChangeToken(db, projectionScope(current));
-  if ((await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(READING_PROJECTION_KEY).first<{ value: string }>())?.value === token) return 'complete';
+  // nothing in the folder changed since the last complete pass.
+  const base = await deltaBase(projectionScope(current), await readVaultChangeState(db));
+  const completed = parseDeltaBase((await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(READING_PROJECTION_KEY).first<{ value: string }>())?.value ?? null);
+  const latest = parseDeltaBase(base)!;
+  if (completed?.scope === latest.scope) {
+    if (completed.seq === latest.seq) return 'complete';
+    // Writes elsewhere in the vault only advance the recorded position.
+    if ((await changedPathsSince(db, current.folder_path, completed.seq))?.length === 0) {
+      await putMaintenanceValue(db, READING_PROJECTION_KEY, base).run();
+      return 'complete';
+    }
+  }
   // Current-generation sources are inside the Reading folder, so its primary-key range replaces a vault scan.
   await db.prepare(`DELETE FROM reading_sources WHERE generation != ? OR path NOT IN
     (SELECT path FROM files WHERE ${FILE_FOLDER_MATCH})`).bind(current.generation, ...fileFolderArgs(current.folder_path)).run();
@@ -75,7 +84,7 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
   // Pending extractions are queued only while fewer than 1,000 jobs exist, so a
   // full queue must be revisited once it drains.
   if (complete && !unavailable && ((await db.prepare('SELECT count(*) AS jobs FROM reading_jobs').first<{ jobs: number }>())?.jobs ?? 0) < 1000) {
-    await putMaintenanceValue(db, READING_PROJECTION_KEY, token).run();
+    await putMaintenanceValue(db, READING_PROJECTION_KEY, base).run();
   }
   return unavailable ? 'unavailable' : complete ? 'complete' : 'pending';
 }
