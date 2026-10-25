@@ -630,10 +630,12 @@ and preserved plaintext/encrypted conflict responses.
 `markdown-merge-transitions.test.ts` protects newly added, moved and removed code
 fences and indented blocks, alongside ordinary prose and independent-block controls.
 `sync-engine.integration.ts` checks authored conflict copies across both arrival
-orders, restart, retry and a third device. `reading/projection-recovery.integration.ts`
-injects R2 failures, missing/invalid bytes, permanent parse
-errors; it checks duplicate-capture prevention, healthy-source progress, retained
-identity and delayed coordinator retry.
+orders, restart, retry and a third device. `reading/library-index.integration.ts`
+injects R2 failures, missing/invalid bytes and permanent parse errors into index
+rebuilds; it checks duplicate-capture prevention, delayed coordinator retry, and that
+edits, moves, deletions and duplicate IDs update the index in their commits without
+reading R2. `reading/d1-usage.integration.ts` measures `meta.rows_read` per request
+through the Worker, with 10,000 Reading notes and 10,000 other files.
 
 `node --test tests/browser/reading/reading-cache-recovery-test.mjs` exercises the production
 Reading loader and native IndexedDB in Chromium/WebKit. It covers old-server source

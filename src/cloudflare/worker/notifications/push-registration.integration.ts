@@ -56,7 +56,7 @@ it('confirms vault scheduling separately from permission without enabling a paus
 	await env.DB.prepare("UPDATE notification_policy SET folder_path = 'Other'").run();
 	expect(await confirmation()).toMatchObject({ notificationsEnabled: false });
 	await env.DB.prepare("UPDATE notification_policy SET folder_path = 'Reminders'").run();
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('crate_feature_policy', ?)")
+	await env.DB.prepare('INSERT INTO server_state(id, features) VALUES (1, ?)')
 		.bind(JSON.stringify({ reminders: false, reading: true, revision: 'paused' })).run();
 	expect(await confirmation()).toMatchObject({ notificationsEnabled: false });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM push_subscriptions').first()).toEqual({ count: 1 });

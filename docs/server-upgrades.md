@@ -120,7 +120,8 @@ capture requests remain supported.
 
 `shared-features-v1` is a server-authoritative policy independent of push and
 article-extraction preferences. Both features default on. The policy is stored in
-`maintenance_state` under `crate_feature_policy`. Local enabled flags cache the
+the `features` column of the single `server_state` row, which authentication reads
+with the token. Local enabled flags cache the
 server state rather than overwriting it.
 
 Pausing stops server APIs and background work without deleting sources, indexes,

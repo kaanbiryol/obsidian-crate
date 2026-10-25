@@ -1,5 +1,5 @@
 import { getChangelogBounds, LAST_SEQ_SQL } from './sync/storage';
-import { SYNC_RESET_GENERATION_KEY } from './sync/reset-generation';
+import { serverStateValue } from './server-state';
 import { sha256Hex } from '../../platform/sha256';
 
 export interface VaultChangeState { seq: number; importGeneration: number; resetGeneration: string }
@@ -7,8 +7,7 @@ export interface VaultChangeState { seq: number; importGeneration: number; reset
 export async function readVaultChangeState(db: D1Database): Promise<VaultChangeState> {
 	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS seq,
 		COALESCE((SELECT generation FROM initial_import WHERE id = 1), 0) AS importGeneration,
-		COALESCE((SELECT value FROM maintenance_state WHERE key = ?), '') AS resetGeneration`)
-		.bind(SYNC_RESET_GENERATION_KEY).first<VaultChangeState>();
+		COALESCE(${serverStateValue('reset_generation')}, '') AS resetGeneration`).first<VaultChangeState>();
 	return { seq: row?.seq ?? 0, importGeneration: row?.importGeneration ?? 0, resetGeneration: row?.resetGeneration ?? '' };
 }
 

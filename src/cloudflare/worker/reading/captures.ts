@@ -11,6 +11,7 @@ import { policy } from './common';
 import { assembleReadingArticle } from '@/reading/core/article';
 import type { Publication } from './extraction/jobs';
 import { publishReading } from '@/cloudflare/worker/coordinator/coordinator';
+import { bumpReadingRevision } from './library-index';
 
 export interface CapturePublication { captureId: string; generation: string; result: Publication['result']; resolvedUrl?: string }
 export interface PendingCapture { id: string; generation: string; url_identity: string; note: string; attempts: number; available_at: number }
@@ -36,7 +37,7 @@ export async function publishCapture(env: Env, id: string, generation: string, r
   const { content, title } = assembleReadingArticle(capture.note, item, { kind: 'capture', article: result, resolvedUrl });
   const path = await capturePath(env, current.folder_path, { title, url: item.source_url }, id);
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
-  const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null,
+  const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null, readingPolicy: current, encryptionState: null,
     effects: files => {
       const revision = fileRevisionGuard(files[0]!.path, files[0]!.storageKey);
       return [env.DB.prepare(`DELETE FROM reading_captures WHERE id=? AND generation=? AND ${revision.sql}`).bind(id, generation, ...revision.args)];
@@ -48,7 +49,8 @@ export async function runCapture(env: Env, state: DurableObjectState, enabled: b
   if (await readEncryptionState(env.DB)) return ;
   const capture = await env.DB.prepare('SELECT * FROM reading_captures WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<PendingCapture>();
   if (!capture) return;
-  await env.DB.prepare('UPDATE reading_captures SET available_at=?, attempts=attempts+1 WHERE id=?').bind(Date.now() + 60_000, capture.id).run();
+  // Queued captures are listed in this order.
+  await env.DB.batch([env.DB.prepare('UPDATE reading_captures SET available_at=?, attempts=attempts+1 WHERE id=?').bind(Date.now() + 60_000, capture.id), bumpReadingRevision(env.DB)]);
   await state.storage.setAlarm(Date.now() + 60_000);
   let result: Publication['result'] = null, resolvedUrl: string | undefined;
   if (enabled) {

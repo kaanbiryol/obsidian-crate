@@ -56,7 +56,7 @@ export async function handleServerInfo(env: Env): Promise<Response> {
 	// metadata response tolerates that exact absence; authenticated data handlers
 	// still fail closed on every database error.
 	const encryption = await readEncryptionState(env.DB).catch((error: unknown) => {
-		if (error instanceof Error && /no such table: (?:main\.)?maintenance_state/i.test(error.message)) return null;
+		if (error instanceof Error && /no such table: (?:main\.)?server_state/i.test(error.message)) return null;
 		throw error;
 	});
 	return corsResponse({ ...CRATE_SERVER_INFO,

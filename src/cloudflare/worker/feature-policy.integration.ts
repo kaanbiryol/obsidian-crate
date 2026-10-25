@@ -7,8 +7,6 @@ import { featurePolicy, handleFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
 import { createReadingNote } from '@/reading/core/notes';
 import type { PendingCapture } from './reading/captures';
-import { projectReading } from './reading/projection';
-import { policy } from './reading/common';
 import { publishExtraction, type Publication } from './reading/extraction/jobs';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from './storage';
@@ -57,7 +55,7 @@ it('gates reminder routes on the feature policy loaded with the token', async ()
 it('blocks capture and publication while paused and resumes the retained article job', async () => {
   await reading('policy', { enabled: true, folderPath: 'Reading', revision: null });
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Article.md', createReadingNote({ id: crypto.randomUUID(), url: 'https://example.invalid/article', savedAt: new Date().toISOString() }), null);
-  await projectReading(env, (await policy(env.DB))!);
+  // The note's commit queued its article job.
   const job = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
   const original = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path);
   await toggle('reading', false);

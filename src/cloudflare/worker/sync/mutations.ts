@@ -9,6 +9,7 @@ import { stagedBatchGuard } from './staging/staged-upload-batches';
 import { decodeReceipt, readUploadReceipt, recordUploadReceipt, type UploadOperation } from './upload-operations';
 import type { UploadResult } from '@/protocol/sync-types';
 import { enqueueFileProjection } from '../notifications/projection-queue';
+import { readingIndexStatements, type ReadingIndexPolicy } from '../reading/library-index';
 import type { CommitEffects } from '../commit-effects';
 import { changedRows } from '../db';
 import { portablePathKey } from '../../../protocol/portable-path';
@@ -120,6 +121,8 @@ export interface StagedFileCommitInput {
 	reminderPolicyRevision?: string | null;
 	/** The current reminder folder when the caller already read it under the coordinator lock. */
 	reminderFolder?: string | null;
+	/** The current Reading policy when the caller already read it. */
+	readingPolicy?: ReadingIndexPolicy;
 	path: string;
 	hash: string;
 	size: number;
@@ -157,6 +160,8 @@ export async function commitStagedFile(
 		...recordEncryptedFile(db, params.path, params.objectKey, encryption.descriptor),
 		publishedChangelogStatement(db, params),
 		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, false, Boolean(encryption.state), params.reminderFolder),
+		...await readingIndexStatements(db, [{ path: params.path, storageKey: params.objectKey, hash: params.hash, size: params.size, content: params.content }],
+			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state) }),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
 		finishStagedUpload(db, params.objectKey, params.path),
 		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),
@@ -231,6 +236,7 @@ export async function commitFileDelete(
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
 		...await enqueueFileProjection(db, params.path, null, null),
+		...await readingIndexStatements(db, [{ path: params.path, storageKey: null }]),
 	]);
 
 	if (changedRows(results[2]) !== 1) {

@@ -85,9 +85,9 @@ it('still saves a bookmark when the server cannot download the page', async () =
 
 it('refuses while an encryption reset is in progress and for links with credentials', async () => {
   const h = await setup();
-  await env.DB.prepare('UPDATE maintenance_state SET value=? WHERE key=?').bind(JSON.stringify({ ...h.state, mode: 'resetting' }), 'e2ee:state').run();
+  await env.DB.prepare('UPDATE server_state SET encryption=? WHERE id=1').bind(JSON.stringify({ ...h.state, mode: 'resetting' })).run();
   expect((await h.prepare(link)).status).toBe(423);
-  await env.DB.prepare('UPDATE maintenance_state SET value=? WHERE key=?').bind(JSON.stringify(h.state), 'e2ee:state').run();
+  await env.DB.prepare('UPDATE server_state SET encryption=? WHERE id=1').bind(JSON.stringify(h.state)).run();
   const invalid = await h.prepare('http://user:secret@private.example/');
   expect(invalid.status).toBe(400);
   expect(h.fetch).not.toHaveBeenCalled();

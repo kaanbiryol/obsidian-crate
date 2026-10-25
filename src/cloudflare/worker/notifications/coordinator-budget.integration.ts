@@ -17,21 +17,14 @@ beforeEach(async () => {
 });
 afterEach(async () => { vi.mocked(dispatchNotificationJobs).mockClear(); await reset(); });
 
-const SETUP_ROWS = new Set(['e2ee:state', 'crate_feature_policy']);
-
 async function countStatements(run: () => Promise<void>): Promise<{ total: number; setup: number }> {
   const prepare = env.DB.prepare.bind(env.DB);
   let total = 0, setup = 0;
   env.DB.prepare = (sql: string) => {
     total += 1;
-    if (sql.includes('FROM notification_policy WHERE id = 1')) setup += 1;
-    const statement = prepare(sql);
-    const bind = statement.bind.bind(statement);
-    statement.bind = (...args: unknown[]) => {
-      if (/^SELECT value FROM maintenance_state WHERE key ?= ?\?$/.test(sql) && SETUP_ROWS.has(String(args[0]))) setup += 1;
-      return bind(...args);
-    };
-    return statement;
+    if (sql.includes('FROM notification_policy WHERE id = 1')
+      || /^SELECT (encryption|features) AS value FROM server_state WHERE id = 1$/.test(sql)) setup += 1;
+    return prepare(sql);
   };
   try { await run(); } finally { env.DB.prepare = prepare; }
   return { total, setup };

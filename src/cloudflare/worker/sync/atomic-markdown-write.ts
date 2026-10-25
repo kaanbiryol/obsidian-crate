@@ -5,6 +5,7 @@ import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile }
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
 import { enqueueFileProjection } from '../notifications/projection-queue';
+import { readingIndexStatements } from '../reading/library-index';
 import type { CommitEffects } from '../commit-effects';
 import { changedRows } from '../db';
 import { portablePathKey } from '../../../protocol/portable-path';
@@ -165,6 +166,10 @@ export async function writeCommittedMarkdownFilePair(
 			...previousVersions.map(previous => retainReplacedVersionStatement(db, previous, [source, destination])),
 			...await enqueueFileProjection(db, source.path, source.objectKey, params.source.content, false, Boolean(sourceEncryption.state)),
 			...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, false, Boolean(destinationEncryption.state)),
+			...await readingIndexStatements(db, [
+				{ path: source.path, storageKey: source.objectKey, hash: source.hash, size: source.size, content: params.source.content },
+				{ path: destination.path, storageKey: destination.objectKey, hash: destination.hash, size: destination.size, content: params.destination.content },
+			], { encrypted: Boolean(sourceEncryption.state || destinationEncryption.state) }),
 			finishStagedUpload(db, source.objectKey, source.path),
 			finishStagedUpload(db, destination.objectKey, destination.path),
 			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),

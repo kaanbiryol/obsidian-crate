@@ -7,6 +7,7 @@ import { readInitialImport } from './initial-import';
 import { loadStoredFileRows, parseExpectedFileHash } from '../storage';
 import { trackStagedBatch, finishStagedBatches } from '../staging/staged-upload-batches';
 import { queueReplacedUploadCleanup, uploadMutation } from '../mutations';
+import { readingIndexStatements } from '../../reading/library-index';
 import { readLimitedRequestBody } from '../../body-reader';
 import { isSha256Hex } from '@/platform/validation';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
@@ -102,6 +103,7 @@ async function commitImportFiles(token: string, files: ImportFile[], bucket: R2B
       ...uploads.map(upload => uploadMutation(db, upload)),
       ...finishStagedBatches(db, staged.map(file => ({ ...file, stagingBatchId }))),
       db.prepare("UPDATE initial_import SET generation = generation + 1 WHERE token = ? AND state = 'importing'").bind(token),
+      ...await readingIndexStatements(db, staged.map(file => ({ path: file.path, storageKey: file.objectKey, hash: file.hash, size: file.size, content: file.content }))),
     ]);
     const committed = await loadStoredFileRows(db, staged.map(file => file.path));
     for (const file of staged) {

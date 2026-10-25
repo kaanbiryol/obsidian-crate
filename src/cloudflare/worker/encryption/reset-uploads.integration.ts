@@ -6,7 +6,6 @@ import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { fetchWorkerRequest } from '../request-handler';
 import { readEncryptionState } from './state';
-import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { createEncryptionFixture } from '../test-support/encryption-test-harness';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
@@ -66,7 +65,7 @@ async function enableAndReset(token: string, cycle: number) {
 	const id = `reset-cycle-${cycle}`;
 	await runReset(id, enabled, disabled, state);
 	expect(await readEncryptionState(env.DB)).toBeNull();
-	expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(SYNC_RESET_GENERATION_KEY).first()).toEqual({ value: id });
+	expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 	for (const credential of [token, enabled]) expect((await worker.fetch(new Request('https://test/health', { headers: headers(credential) }), env)).status).toBe(401);
 	return disabled;
 }
@@ -130,7 +129,7 @@ it.each(uploadKinds)('rechecks the reset generation when publishing %s, even wit
 		await Promise.race([ready, pending.then(() => { throw new Error('Upload finished before staging'); })]);
 		// Isolate the publication guard from reset's separate lease invalidation.
 		// Markdown also exercises forwarding this snapshot through the coordinator.
-		await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(SYNC_RESET_GENERATION_KEY, 'new-reset').run();
+		await env.DB.prepare('INSERT INTO server_state(id, reset_generation) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET reset_generation = excluded.reset_generation').bind('new-reset').run();
 	} finally { release(); await pending; }
 	expect(await (await pending).json()).toMatchObject({ success: false });
 	expect(await env.DB.prepare('SELECT 1 FROM files UNION SELECT 1 FROM changelog').first()).toBeNull();

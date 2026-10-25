@@ -15,7 +15,7 @@ afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
 async function setup(encrypted = true, scope = 'reading') {
   const { state } = await createEncryptionFixture('active');
   await env.DB.batch([
-    ...(encrypted ? [env.DB.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?)').bind('e2ee:state', JSON.stringify(state))] : []),
+    ...(encrypted ? [env.DB.prepare('INSERT INTO server_state(id,encryption) VALUES (1,?)').bind(JSON.stringify(state))] : []),
     env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','policy','revision')"),
     env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES ('reader',?,?,'Reading','policy')").bind(await sha256Hex('reader-token'), scope),
   ]);

@@ -4,7 +4,7 @@
     "scheduled_reminders", "notification_jobs", "reminder_projections", "reminder_file_cache",
     "object_cleanup_queue", "staged_uploads", "staged_upload_batches",
     "request_rate_limits", "notification_projection_jobs", "reminder_source_state",
-    "reading_sources", "reading_jobs", "reading_enrollments", "reading_handoffs"
+    "reading_items", "reading_index", "reading_jobs", "reading_enrollments", "reading_handoffs"
   ],
   "resetMaintenanceKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint"],
   "resetMaintenancePrefixes": ["crate_restore_", "reminder_source_scan"],

@@ -124,6 +124,14 @@ CREATE TABLE IF NOT EXISTS maintenance_state (
 	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Read with every authenticated request's token. The first write creates the row.
+CREATE TABLE IF NOT EXISTS server_state (
+	id INTEGER PRIMARY KEY CHECK (id = 1),
+	encryption TEXT,
+	features TEXT,
+	reset_generation TEXT
+);
+
 CREATE TABLE IF NOT EXISTS reminder_file_cache (
 	folder_path TEXT NOT NULL,
 	file_path TEXT NOT NULL,
@@ -261,12 +269,21 @@ CREATE TABLE IF NOT EXISTS reading_policy (
  id INTEGER PRIMARY KEY CHECK (id = 1), enabled INTEGER NOT NULL,
  folder_path TEXT NOT NULL, generation TEXT NOT NULL, revision TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS reading_sources (
- path TEXT PRIMARY KEY, revision TEXT NOT NULL, generation TEXT NOT NULL,
- item_id TEXT, url_identity TEXT, metadata_json TEXT, error TEXT
+-- Reading notes in the Reading folder, written in the same batch as each file commit.
+CREATE TABLE IF NOT EXISTS reading_items (
+ portable_path TEXT PRIMARY KEY, path TEXT NOT NULL, storage_key TEXT NOT NULL,
+ hash TEXT NOT NULL, size INTEGER NOT NULL, item_id TEXT, url_identity TEXT,
+ metadata_json TEXT, error TEXT, article_hash TEXT, article_edited INTEGER NOT NULL DEFAULT 0,
+ duplicate INTEGER NOT NULL DEFAULT 0
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS reading_items_id_idx ON reading_items(item_id);
+CREATE INDEX IF NOT EXISTS reading_items_url_idx ON reading_items(url_identity);
+CREATE INDEX IF NOT EXISTS reading_items_article_idx ON reading_items(article_hash) WHERE article_hash IS NOT NULL;
+CREATE INDEX IF NOT EXISTS reading_items_duplicate_idx ON reading_items(item_id) WHERE duplicate = 1;
+-- The scope reading_items was built for, its rebuild position, and the library revision.
+CREATE TABLE IF NOT EXISTS reading_index (
+ id INTEGER PRIMARY KEY CHECK (id = 1), scope TEXT NOT NULL, revision TEXT NOT NULL, cursor TEXT
 );
-CREATE INDEX IF NOT EXISTS reading_sources_id_idx ON reading_sources(item_id);
-CREATE INDEX IF NOT EXISTS reading_sources_url_idx ON reading_sources(url_identity);
 CREATE TABLE IF NOT EXISTS reading_jobs (
  path TEXT PRIMARY KEY, item_id TEXT NOT NULL, generation TEXT NOT NULL,
  source_revision TEXT NOT NULL, block_hash TEXT NOT NULL, url TEXT NOT NULL,

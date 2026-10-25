@@ -5,19 +5,18 @@ import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
 import { isEmptyReadingCapture, readingUpdateIssue } from '@/reading/core/mutation-policy';
 import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
-import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import { commitStagedFile } from '../sync/mutations';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { beginOperation, operationEffects, operationStatement } from './operations';
-import { ReadingError, readingResponse, sourceById } from './common';
+import { ReadingError, readingResponse, readStoredNote, sourceById } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
-import { projectReading } from './projection';
+import { bumpReadingRevision, ensureReadingIndex } from './library-index';
 
 export async function mutateReading(env: Env, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string): Promise<Response> {
   const op = await beginOperation(env.DB, principal, current, body, action);
   if (op instanceof Response) return op;
-  if (await projectReading(env, current) !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Retry this saved change shortly.', 503);
+  if ((await ensureReadingIndex(env, current, file => readStoredNote(env, file))).state !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Retry this saved change shortly.', 503);
   if (action === 'capture') {
     if (body.destinationFolder !== undefined && body.destinationFolder !== current.folder_path) throw new ReadingError('The Reading folder changed. Restore the original destination to finish this save.', 409);
     let url: string; try { url = readingUrl(body.url); } catch { throw new ReadingError('Enter a complete HTTP or HTTPS link without credentials.'); }
@@ -28,12 +27,11 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
       current = { ...current, enabled: 1 };
     }
 
-    const { results } = await env.DB.prepare(`SELECT s.item_id FROM reading_sources s WHERE s.generation=? AND s.url_identity=?
-      AND (s.path, s.revision) IN (SELECT path, storage_key FROM files WHERE ${FILE_FOLDER_MATCH}) LIMIT 2`)
-      .bind(current.generation, readingUrlIdentity(url), ...fileFolderArgs(current.folder_path)).all<{ item_id: string }>();
+    const { results } = await env.DB.prepare('SELECT item_id FROM reading_items WHERE url_identity=? LIMIT 2')
+      .bind(readingUrlIdentity(url)).all<{ item_id: string }>();
     if (results.length > 1) throw new ReadingError('Several notes use this link. Review them in Obsidian before saving again.', 409);
     if (results[0]) {
-      await sourceById(env, current, results[0].item_id);
+      await sourceById(env, results[0].item_id);
       const response = { saved: true, alreadySaved: true, id: results[0].item_id };
       await env.DB.batch([operationStatement(env.DB, op, response)]);
       return readingResponse(response);
@@ -52,13 +50,14 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
     try { note = createReadingNote({ id, url, title: body.title, savedAt: new Date().toISOString() }); }
     catch { throw new ReadingError('Invalid Reading capture.'); }
     if (parseReadingNote(note)!.crate_reading_id !== id) throw new ReadingError('Use a lowercase Reading ID.');
-    if (await env.DB.prepare('SELECT 1 FROM reading_captures WHERE id=? UNION ALL SELECT 1 FROM reading_sources WHERE item_id=? LIMIT 1').bind(id, id).first()) throw new ReadingError('This Reading ID already exists.', 409);
+    if (await env.DB.prepare('SELECT 1 FROM reading_captures WHERE id=? UNION ALL SELECT 1 FROM reading_items WHERE item_id=? LIMIT 1').bind(id, id).first()) throw new ReadingError('This Reading ID already exists.', 409);
     const response = { saved: true, alreadySaved: false, id };
     if (current.enabled && body.fetchArticle !== false) {
       await env.DB.batch([
         env.DB.prepare('INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES (?,?,?,?,?)')
           .bind(id, current.generation, readingUrlIdentity(url), note, Date.now()),
         operationStatement(env.DB, op, response),
+        bumpReadingRevision(env.DB),
       ]);
       return readingResponse(response);
     }
@@ -66,11 +65,11 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
     const item = parseReadingNote(content)!;
     const path = await capturePath(env, current.folder_path, { title: item.title, url: item.source_url }, id);
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
-    const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null, effects: operationEffects(env.DB, op, response) });
+    const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null, readingPolicy: current, encryptionState: null, effects: operationEffects(env.DB, op, response) });
     if (!result.committed) throw new ReadingError('This note changed. Retry the same save.', 409);
     return readingResponse(response);
   }
-  const source = await sourceById(env, current, body.id);
+  const source = await sourceById(env, body.id);
   let content: string;
   if (action === 'retry') {
     if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before retrying.', 403);
@@ -87,7 +86,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
   }
   const response = { saved: true, id: source.item.crate_reading_id };
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, source.path, content, source.file.hash);
-  const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: source.file, expectedRevision: source.file.storageKey, effects: operationEffects(env.DB, op, response) });
+  const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: source.file, expectedRevision: source.file.storageKey, readingPolicy: current, encryptionState: null, effects: operationEffects(env.DB, op, response) });
   if (!result.committed) throw new ReadingError('This note changed. Refresh before editing it.', 409);
   if (action === 'retry') await env.DB.prepare('DELETE FROM reading_jobs WHERE path=?').bind(source.path).run();
   return readingResponse(response);

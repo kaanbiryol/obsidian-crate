@@ -101,7 +101,7 @@ Encrypted Reading uses the vault key and its own encrypted-file routes. It is pa
 
 The iPhone Shortcut sends shared URLs to the preparation route; encrypted vaults receive notes sealed to the vault seal key. Publish its signed release asset before distributing the PWA.
 
-Reading's derived source index uses projection format 1 (`_highlightIndex: 1`) and derives YouTube
+Reading's derived index (`reading_items`) uses index format 1, part of its rebuild scope, and derives YouTube
 URL identities from notes. Watch, Shorts, live, embed and shortened URLs
 for the same video compare equally.
 Transcript timing is derived from ordinary timestamped Markdown, using Reading

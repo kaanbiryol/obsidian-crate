@@ -4,10 +4,10 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from './routes';
-import { projectReading, READING_PROJECTION_KEY } from './projection';
+import { ensureReadingIndex } from './library-index';
 import { publishExtraction } from './extraction/jobs';
 import type { Publication } from './extraction/jobs';
-import { policy } from './common';
+import { policy, readStoredNote } from './common';
 import { READING_LIST_PAGE } from './queries';
 import { meterD1Usage } from '../d1-usage';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
@@ -29,6 +29,10 @@ beforeEach(async () => {
   expect((await command('policy', { enabled: true, folderPath: 'Reading', revision: null })).status).toBe(200);
 });
 afterEach(reset);
+async function buildIndex() {
+  const current = (await policy(env.DB))!;
+  while ((await ensureReadingIndex(env, current, file => readStoredNote(env, file))).state !== 'complete');
+}
 it('paginates current sources, queues only the first page, and reports duplicate IDs across pages', async () => {
   let last = '';
   const name = (index: number) => `Reading/${String(index).padStart(4, '0')}.md`;
@@ -38,8 +42,7 @@ it('paginates current sources, queues only the first page, and reports duplicate
     await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, last, null);
   }
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, name(READING_LIST_PAGE), last, null);
-  const current = (await policy(env.DB))!;
-  while (await projectReading(env, current) !== 'complete');
+  await buildIndex();
   const saved = await command('capture', { url: 'https://example.com/queued', operationId: id() });
   expect(saved.status).toBe(200);
   const queued = await saved.json() as { id: string };
@@ -47,7 +50,7 @@ it('paginates current sources, queues only the first page, and reports duplicate
   const first = await (await get('list')).json() as { items: ReadingItem[]; cursor: string; issues: Array<{ path: string }> };
   expect(first.items).toHaveLength(READING_LIST_PAGE);
   expect(first.items[0]).toMatchObject({ path: '', crate_reading_id: queued.id });
-  expect(first.cursor).toBe(name(READING_LIST_PAGE - 1));
+  expect(first.cursor).toBe(name(READING_LIST_PAGE - 1).toLowerCase());
   expect(first.issues).toMatchObject([{ path: name(READING_LIST_PAGE - 1) }]);
   expect(await (await get(`list?cursor=${encodeURIComponent(first.cursor)}`)).json()).toMatchObject({ items: [], cursor: null, issues: [{ path: name(READING_LIST_PAGE) }] });
   expect(await (await get(`item?id=${queued.id}`)).json()).toMatchObject({ item: { path: '', crate_reading_id: queued.id }, markdown: '' });
@@ -78,8 +81,8 @@ it('projects folder imports without extraction and syncs their reading metadata'
     const content = await adoptReadingClip(original!, path!, '2026-09-26T00:00:00Z');
     await writeCommittedMarkdownFile(env.BUCKET, env.DB, path!, content, null);
   }
-  await projectReading(env, (await policy(env.DB))!);
-  const { results } = await env.DB.prepare('SELECT item_id, url_identity, metadata_json FROM reading_sources ORDER BY path').all<{ item_id: string; url_identity: string | null; metadata_json: string }>();
+  await buildIndex();
+  const { results } = await env.DB.prepare('SELECT item_id, url_identity, metadata_json FROM reading_items ORDER BY portable_path').all<{ item_id: string; url_identity: string | null; metadata_json: string }>();
   expect(results).toHaveLength(2);
   expect(results[0]!.url_identity).toBe('https://example.com/article');
   expect(results[1]!.url_identity).toBeNull();
@@ -95,7 +98,7 @@ async function capture() {
   // Legacy files and explicit retries retain their original path during extraction.
   const note = createReadingNote({ id: crypto.randomUUID(), url: 'https://example.com/article', savedAt: new Date().toISOString() });
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Existing.md', note, null);
-  await projectReading(env, (await policy(env.DB))!);
+  await buildIndex();
   return (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
 }
 it('publishes extracted text through immutable file versions and ordinary sync changelog', async () => {
@@ -112,7 +115,7 @@ it('renames a note still named after its link once extraction finds the title, a
   const note = createReadingNote({ id: itemId, url: 'https://www.example.com/article', savedAt: new Date().toISOString() });
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/example.com - a1b2c3d4.md', note, null);
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/An article - example.com - a1b2c3d4.md', 'Occupied', null);
-  await projectReading(env, (await policy(env.DB))!);
+  await buildIndex();
   const job = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
   await publishExtraction(env, { job, result: { markdown: 'Useful saved article text.', title: 'An article', author: undefined } });
   const renamed = 'Reading/An article - example.com - a1b2c3d45678.md';
@@ -125,7 +128,7 @@ it('renames a note still named after its link once extraction finds the title, a
   // A name the user chose is never replaced.
   const other = createReadingNote({ id: crypto.randomUUID(), url: 'https://example.com/kept', savedAt: new Date().toISOString() });
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/My pick.md', other, null);
-  await projectReading(env, (await policy(env.DB))!);
+  await buildIndex();
   const kept = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
   await publishExtraction(env, { job: kept, result: { markdown: 'Text.', title: 'Another title', author: undefined } });
   expect(parseReadingNote((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/My pick.md'))!.content)?.title).toBe('Another title');
@@ -145,8 +148,8 @@ it('preserves user notes and metadata already present when extraction starts', a
   const original = await capture(), source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, original.path))!;
   const edited = updateReadingNote(source.content, original.item_id, { favorite: true, tags: ['kept'] }) + '\nPersonal thoughts.\n';
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, original.path, edited, source.hash);
-  await env.DB.prepare('DELETE FROM reading_jobs').run(); await env.DB.prepare('DELETE FROM reading_sources').run();
-  await projectReading(env, (await policy(env.DB))!);
+  await env.DB.prepare('DELETE FROM reading_jobs').run(); await env.DB.prepare('DELETE FROM reading_index').run();
+  await buildIndex();
   const job = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
   await publishExtraction(env, { job, result: { markdown: 'Saved article content, separate from the personal note.', title: undefined, author: undefined } });
   const saved = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))!;
@@ -158,7 +161,7 @@ it('keeps failed extractions as useful bookmarks and never extracts clipper note
   expect(parseReadingNote(saved.content)).toMatchObject({ source_url: job.url, extraction_status: 'unavailable' });
   const clipped = saved.content.replace('"url"', '"web-clipper"').replace('"unavailable"', '"pending"');
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, job.path, clipped, saved.hash);
-  await projectReading(env, (await policy(env.DB))!);
+  await buildIndex();
   expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
 });
 it('replays a lost receipt even after deletion and rejects expired operation identities', async () => {
@@ -209,14 +212,14 @@ it('commits code annotations with replay receipts while preserving literal sourc
   expect(parseReadingNote(removed.content)!.highlights).toEqual([]);
 });
 
-it('rebuilds old projections from native markers and observes subsequent vault edits', async () => {
+it('rebuilds the index from native markers and observes subsequent vault edits', async () => {
   const path = 'Reading/Native.md';
   const content = await adoptReadingClip('Read ==this passage==.', path, '2026-09-26T00:00:00Z');
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
-  await projectReading(env, (await policy(env.DB))!);
-  await env.DB.prepare("UPDATE reading_sources SET metadata_json=json_set(json_remove(metadata_json, '$.highlights'), '$._highlightIndex', 2) WHERE path=?").bind(path).run();
-  // Rows from an older format were recorded under a different projection marker.
-  await env.DB.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(READING_PROJECTION_KEY).run();
+  await buildIndex();
+  await env.DB.prepare("UPDATE reading_items SET metadata_json=json_remove(metadata_json, '$.highlights') WHERE path=?").bind(path).run();
+  // Rows from an older format were recorded under a different index scope.
+  await env.DB.prepare('DELETE FROM reading_index').run();
   const list = () => handleReadingRoute(new Request('https://test/reading/list'), env, principal);
   const projected = await (await list()).json() as { items: { highlights: { text: string }[] }[] };
   expect(projected.items[0]?.highlights.map(highlight => highlight.text)).toEqual(['this passage']);
@@ -252,25 +255,21 @@ it('persists source-sensitive text highlights and notes through replay, projecti
   expect(parseReadingNote(removed.content)!.highlights).toEqual([]);
 });
 
-it('answers an unchanged library from its ETag and skips projection when nothing changed', async () => {
+it('answers an unchanged library from its ETag, also after unrelated vault writes', async () => {
   const path = 'Reading/Kept.md';
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, await adoptReadingClip('Kept.', path, '2026-09-26T00:00:00Z'), null);
   const list = (etag?: string, db = env.DB) => handleReadingRoute(new Request('https://test/reading/list', { headers: etag ? { 'If-None-Match': etag } : {} }), { ...env, DB: db }, principal);
   const first = await list();
   const etag = first.headers.get('ETag')!;
-  expect(etag).toMatch(/^"[a-f0-9]{32}\.[a-f0-9]{32}"$/);
+  expect(etag).toMatch(/^"[a-f0-9]{32}"$/);
   const meter = meterD1Usage(env.DB);
   const unchanged = await list(etag, meter.db);
   expect(unchanged.status).toBe(304);
   expect(meter.usage.rowsRead).toBeLessThan(20);
-  // A complete projection is reused for the next uncached read.
-  const projected = meterD1Usage(env.DB);
-  expect((await list(undefined, projected.db)).status).toBe(200);
-  expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(READING_PROJECTION_KEY).first()).not.toBeNull();
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Notes/Elsewhere.md', 'Unrelated', null);
   const refreshed = await list(etag);
   expect(refreshed.status).toBe(304);
-  expect(refreshed.headers.get('ETag')).not.toBe(etag);
+  expect(refreshed.headers.get('ETag')).toBe(etag);
   const source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, source.content.replace('Kept.', 'Changed.'), source.hash);
   expect((await list(refreshed.headers.get('ETag')!)).status).toBe(200);
