@@ -6,7 +6,7 @@ import { rawTextPlugin } from '../../../../scripts/raw-text-plugin.mjs';
 import { bundlePwaClient } from '../../../../scripts/pwa-client-build.mjs';
 import { bundleServiceWorkerRuntime } from '../../../../scripts/service-worker-build.mjs';
 
-async function readGeneratedPwaClient() {
+export async function readGeneratedPwaClient() {
 	const generatedPath = resolve(process.cwd(), '.generated/cloudflare/pwa-client.json');
 	const payload = JSON.parse(await readFile(generatedPath, 'utf-8'));
 	if (
@@ -29,17 +29,16 @@ export async function buildPwaPreviewAssets({ assetVersion } = {}) {
 		// Serve the app under a distinct asset version for real update tests.
 		pwaClient = { ...await bundlePwaClient(process.cwd()), version: assetVersion };
 	} else {
-		if (process.env.CRATE_PWA_PREBUILT !== '1') {
-			const buildResult = spawnSync(process.execPath, ['scripts/build-worker.mjs'], {
-				cwd: process.cwd(),
-				stdio: 'inherit',
-			});
+		// Under CRATE_WORKER_PREBUILT=1 this verifies the existing build instead of rebuilding.
+		const buildResult = spawnSync(process.execPath, ['scripts/build-worker.mjs'], {
+			cwd: process.cwd(),
+			stdio: 'inherit',
+		});
 
-			if (buildResult.status !== 0) {
-				const error = new Error(`PWA worker build failed with status ${buildResult.status ?? 1}`);
-				error.status = buildResult.status ?? 1;
-				throw error;
-			}
+		if (buildResult.status !== 0) {
+			const error = new Error(`PWA worker build failed with status ${buildResult.status ?? 1}`);
+			error.status = buildResult.status ?? 1;
+			throw error;
 		}
 		pwaClient = await readGeneratedPwaClient();
 	}

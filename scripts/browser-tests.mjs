@@ -143,7 +143,7 @@ export function runBrowserTests(scripts, { run = spawnSync, env = process.env, l
 		for (let attempt = 1; attempt <= attempts; attempt++) {
 			logger.log(`\nRunning ${script}${attempt > 1 ? ` (retry ${attempt - 1})` : ''}`);
 			const started = performance.now();
-			const result = run(process.execPath, [script], { stdio: 'inherit', env: { ...env, CRATE_PWA_PREBUILT: '1' } });
+			const result = run(process.execPath, [script], { stdio: 'inherit', env: { ...env, CRATE_WORKER_PREBUILT: '1' } });
 			logger.log(`${script}: ${((performance.now() - started) / 1000).toFixed(1)}s`);
 			if (result.signal) {
 				logger.error(`${script} terminated by ${result.signal}`);
