@@ -126,7 +126,6 @@ export function startReading(plugin: CratePlugin): void {
 	];
 	// Closing an editor lets deferred highlight records proceed.
 	const layoutRef = plugin.app.workspace.on('layout-change', schedule);
-	for (const ref of [...refs, layoutRef]) plugin.registerEvent(ref);
 	plugin.syncRuntime.addStateChangeListener(schedule);
 	const stop = () => {
 		controller.abort(); window.clearTimeout(timer);
