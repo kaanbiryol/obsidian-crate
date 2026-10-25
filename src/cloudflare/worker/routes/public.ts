@@ -1,5 +1,7 @@
 import { readingShareFallback } from '../../../pwa/shell/share-target';
 import { readingSavePage, readingSaveScript } from '../reading/save-page';
+import { developmentShortcutPage, developmentShortcutResponse } from '../reading/development-shortcut';
+import { DEVELOPMENT_SHORTCUT_FILE_PATH, DEVELOPMENT_SHORTCUT_PATH } from '../../../reading/shortcut';
 import {
 	handleExchangeRemindersEnrollmentToken,
 	handleVapidPublicKey,
@@ -34,6 +36,8 @@ export async function handlePublicRoute(
  if (path === '/notifications/share/reading' && method === 'POST') return readingShareFallback(request);
  if (path === '/notifications/save-reading' && method === 'GET') return readingSavePage();
  if (path === '/notifications/save-reading.js' && method === 'GET') return readingSaveScript({ serverFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT });
+	if (path === DEVELOPMENT_SHORTCUT_PATH && method === 'GET') return developmentShortcutPage();
+	if (path === DEVELOPMENT_SHORTCUT_FILE_PATH && method === 'GET') return developmentShortcutResponse();
 	if (path === '/.well-known/crate' && method === 'GET') return handleServerInfo(env);
 	if (path === '/' && method === 'GET') return handleServerInfo(env);
 	if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);

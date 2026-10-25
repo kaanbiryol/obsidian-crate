@@ -8,6 +8,7 @@ const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const watchedPaths = [
 	path.join(rootDir, 'src'),
 	path.join(rootDir, 'scripts'),
+	path.join(rootDir, 'docs/shortcuts'),
 	...[
 		'.env',
 		'.env.local',

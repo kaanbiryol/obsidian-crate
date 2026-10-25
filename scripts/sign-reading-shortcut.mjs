@@ -11,11 +11,12 @@ const pairing = process.argv.includes('--pairing');
 const firstRunSetup = pairing || process.argv.includes('--first-run-setup');
 if (manualSetup && firstRunSetup) throw new Error('Choose one setup variant.');
 const name = manualSetup ? 'Save to Crate (manual setup)' : 'Save to Crate';
+const outDir = resolve(process.argv.find(arg => arg.startsWith('--out-dir='))?.slice('--out-dir='.length) ?? 'dist');
 const temporary = await mkdtemp(join(tmpdir(), 'crate-shortcut-'));
 try {
   const input = join(temporary, `${name}.shortcut`);
   await copyFile(new URL('../docs/shortcuts/save-to-crate.plist', import.meta.url), input);
-  await mkdir('dist', { recursive: true });
+  await mkdir(outDir, { recursive: true });
   // Provide an editor-configured fallback when import questions stall, keeping
   // the same actions and placeholders.
   const template = JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', input], { encoding: 'utf8' }));
@@ -23,8 +24,8 @@ try {
   if (manualSetup) workflow.WFWorkflowImportQuestions = [];
   await writeFile(input, JSON.stringify(workflow));
   // Retain the exact readable source alongside every signed artifact.
-  execFileSync('plutil', ['-convert', 'xml1', '-o', resolve(`dist/${name}.plist`), input], { stdio: 'inherit' });
+  execFileSync('plutil', ['-convert', 'xml1', '-o', join(outDir, `${name}.plist`), input], { stdio: 'inherit' });
   execFileSync('plutil', ['-convert', 'binary1', input], { stdio: 'inherit' });
   // Only the public template, containing placeholders, is sent to Apple's signing service.
-  execFileSync('shortcuts', ['sign', '--mode', 'anyone', '--input', input, '--output', resolve(`dist/${name}.shortcut`)], { stdio: 'inherit' });
+  execFileSync('shortcuts', ['sign', '--mode', 'anyone', '--input', input, '--output', join(outDir, `${name}.shortcut`)], { stdio: 'inherit' });
 } finally { await rm(temporary, { recursive: true, force: true }); }

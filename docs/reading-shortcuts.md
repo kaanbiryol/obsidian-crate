@@ -90,6 +90,16 @@ Once published, Pages verifies its metadata, signature framing and checksum befo
 showing the download. Incomplete releases, download errors and verification failures
 still stop deployment. The draft release gate remains strict.
 
+To try native changes before a release, run `npm run dev` on macOS and update
+the development Worker from Obsidian. The development build signs the working
+tree's shortcut once per source change and the Worker offers it at
+`/shortcuts/development/`, outside the PWA scope so iOS opens a closable sheet.
+In that Worker's PWA, **Download Save to Crate** opens the page; select
+**Download shortcut**, then open the file from **Files → Downloads** if Shortcuts
+does not open. Release Workers do not embed it and return 404 there. Without
+macOS or when signing fails, the build continues and the PWA links to the
+published download.
+
 Run the native source tests, real-server shortcut tests, Chromium/WebKit tests,
 and the relevant protocol, handoff, and rate-limit suites. The browser suite
 covers diagnostic redaction/copy, malformed replies, expired saves, a reused

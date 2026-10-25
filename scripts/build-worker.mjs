@@ -1,5 +1,6 @@
 import { build } from 'esbuild';
 import { createDevelopmentBuild } from './development-build.mjs';
+import { developmentShortcut } from './development-shortcut.mjs';
 import { builtinModules } from 'node:module';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -31,7 +32,7 @@ function writeGeneratedJson(fileName, payload) {
 	);
 }
 
-async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets, onDemandAssets, serviceWorkerRuntime) {
+async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets, onDemandAssets, serviceWorkerRuntime, shortcut) {
 	const result = await build({
 		absWorkingDir: root,
 		entryPoints: [resolve(root, 'src/cloudflare/worker/index.ts')],
@@ -57,6 +58,7 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 			__CRATE_PWA_STARTUP_ASSETS__: JSON.stringify(startupAssets),
 			__CRATE_PWA_ON_DEMAND_ASSETS__: JSON.stringify(onDemandAssets),
 			__CRATE_SERVICE_WORKER_JS__: JSON.stringify(serviceWorkerRuntime),
+			__CRATE_DEVELOPMENT_SHORTCUT__: JSON.stringify(shortcut),
 		},
 		plugins: [rawTextPlugin(path => rawInputs.add(path)), readingExtractionPlugin()],
 	});
@@ -68,8 +70,8 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 	return result.metafile;
 }
 
-async function buildPwaClientBundle(serviceWorkerRuntime) {
-	const { assets, startupAssets, onDemandAssets, metafile } = await bundlePwaClient(root);
+async function buildPwaClientBundle(serviceWorkerRuntime, shortcut) {
+	const { assets, startupAssets, onDemandAssets, metafile } = await bundlePwaClient(root, { developmentShortcut: shortcut !== null });
 	const version = createPwaAssetVersion({ ...assets, 'service-worker-runtime.js': serviceWorkerRuntime }, root, path => rawInputs.add(path));
 	const script = assets['app.js'];
 	if (!script) throw new Error('PWA client build did not emit app.js');
@@ -85,7 +87,8 @@ async function buildPwaClientBundle(serviceWorkerRuntime) {
 }
 
 const serviceWorkerRuntime = await bundleServiceWorkerRuntime(root);
-const pwaClient = await buildPwaClientBundle(serviceWorkerRuntime.script);
-const workerMetafile = await buildWorkerBundle(pwaClient.assets, pwaClient.version, pwaClient.startupAssets, pwaClient.onDemandAssets, serviceWorkerRuntime.script);
+const shortcut = development ? await developmentShortcut(root) : null;
+const pwaClient = await buildPwaClientBundle(serviceWorkerRuntime.script, shortcut);
+const workerMetafile = await buildWorkerBundle(pwaClient.assets, pwaClient.version, pwaClient.startupAssets, pwaClient.onDemandAssets, serviceWorkerRuntime.script, shortcut);
 writeGeneratedJson('server-inputs.json', await collectServerInputs(root, [workerMetafile, pwaClient.metafile, serviceWorkerRuntime.metafile], rawInputs));
 writeGeneratedJson('build-identity.json', { development: development ?? null, workerSha256: createHash('sha256').update(readFileSync(resolve(generatedDir, 'worker.mjs'))).digest('hex'), release: JSON.parse(readFileSync(resolve(root, 'src/cloudflare/server-release.json'), 'utf8')) });

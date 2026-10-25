@@ -4,11 +4,15 @@ import { PwaButton as Button } from '../components/PwaButton';
 import { SettingsSection } from '../settings/SettingsSection';
 import { SetupStep, SetupSteps } from '../components/SetupSteps';
 import { CopyableText } from '@/ui/shared/CopyableText';
-import { READING_SHORTCUT_URL } from '@/reading/shortcut';
+import { DEVELOPMENT_SHORTCUT_PATH, READING_SHORTCUT_URL } from '@/reading/shortcut';
 import { readingRequest } from './api';
 import { assertReadingSession, type ReadingSession } from './storage';
 
 interface Pairing { pairingCode: string; expiresAt: number }
+
+declare const __CRATE_DEVELOPMENT_SHORTCUT_AVAILABLE__: boolean | undefined;
+// Development Workers serve the shortcut signed from the working tree.
+const shortcutDownloadUrl = typeof __CRATE_DEVELOPMENT_SHORTCUT_AVAILABLE__ === 'boolean' && __CRATE_DEVELOPMENT_SHORTCUT_AVAILABLE__ ? DEVELOPMENT_SHORTCUT_PATH : READING_SHORTCUT_URL;
 
 export function ShortcutSetup({ session }: { session: ReadingSession }) {
   const [pairing, setPairing] = useState<Pairing | null>(null);
@@ -38,7 +42,7 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
     <SettingsSection title="Setup" description="Save articles from the iPhone share sheet. Requires iOS 27 or later and an internet connection.">
       <SetupSteps aria-label="Shortcut setup steps">
         <SetupStep number={1} title="Install the shortcut" extra={
-          <a className="crate-action-button setup-step__action" data-variant="outline" href={READING_SHORTCUT_URL} target="_blank" rel="noopener noreferrer"><Download size={15} aria-hidden="true" />Download Save to Crate</a>
+          <a className="crate-action-button setup-step__action" data-variant="outline" href={shortcutDownloadUrl} target="_blank" rel="noopener noreferrer"><Download size={15} aria-hidden="true" />Download Save to Crate</a>
         }>Select <strong>Add Shortcut</strong> after it downloads. If it opens in Files, look in <strong>Downloads</strong>.</SetupStep>
         <SetupStep number={2} title="Connect your library" extra={<>
           {pairing && !expired ? <div className="crate-reading-shortcut__code">

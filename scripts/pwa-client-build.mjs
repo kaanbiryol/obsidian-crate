@@ -5,7 +5,7 @@ import { readingExtractionPlugin } from './reading-extraction-build.mjs';
 
 // The asset version is read from the shell at runtime, so client output is
 // independent of it and unchanged chunks keep their hashes across deploys.
-export async function bundlePwaClient(root) {
+export async function bundlePwaClient(root, { developmentShortcut = false } = {}) {
 	const result = await build({
 		absWorkingDir: root,
 		// A second build entry gives the editor a stable chunk boundary. App still
@@ -28,6 +28,7 @@ export async function bundlePwaClient(root) {
 		minify: true,
 		define: {
 			'process.env.NODE_ENV': JSON.stringify('production'),
+			__CRATE_DEVELOPMENT_SHORTCUT_AVAILABLE__: JSON.stringify(developmentShortcut),
 		},
 		mainFields: ['browser', 'module', 'main'],
 		conditions: ['browser', 'import', 'production'],
