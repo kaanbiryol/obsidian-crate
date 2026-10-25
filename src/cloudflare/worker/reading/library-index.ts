@@ -26,9 +26,9 @@ export interface ReadingFileChange { path: string; storageKey: string | null; ha
 
 const isReadingNotePath = (path: string, folder: string) => path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md');
 
-/** Decodes for parsing only; the stored bytes are never rewritten from this text. */
+/** Keeps a BOM, like `decodeMarkdownBytes`: Worker Reading writes rebuild the note from this text. */
 export function decodeReadingNote(bytes: ArrayBuffer | Uint8Array): string | null {
-  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return null; }
+  try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); } catch { return null; }
 }
 
 interface IndexRow {

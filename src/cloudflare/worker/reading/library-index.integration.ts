@@ -141,3 +141,19 @@ it.each([
   expect(body.issues).toHaveLength(expectedIssues);
   expect(body.items.map(item => item.crate_reading_id)).toEqual(expectedIssues ? [] : [id]);
 });
+
+it('keeps a byte order mark when the Worker updates the note', async () => {
+  const { id, note, file } = await seed();
+  const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(note)]);
+  await env.BUCKET.put(file.storageKey, bytes);
+  await env.DB.prepare('UPDATE files SET hash = ?, size = ? WHERE path = ?').bind(await sha256Hex(bytes), bytes.byteLength, path).run();
+  expect(await index()).toBe('complete');
+  const response = await handleReadingRoute(new Request('https://test/reading/update', { method: 'POST', body: JSON.stringify({
+    id, changes: { favorite: true }, before: { favorite: false }, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)),
+  }) }), env, principal);
+  expect(response.status, await response.clone().text()).toBe(200);
+  const saved = (await getStoredFileRow(env.DB, path))!;
+  const stored = new Uint8Array(await (await env.BUCKET.get(saved.storageKey))!.arrayBuffer());
+  expect([...stored.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  expect(new TextDecoder('utf-8', { ignoreBOM: true }).decode(stored)).toBe(`\uFEFF${updateReadingNote(note, id, { favorite: true })}`);
+});
