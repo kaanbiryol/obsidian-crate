@@ -1,6 +1,6 @@
 import { build } from 'esbuild';
 import { basename, resolve } from 'node:path';
-import { getPwaClientAssets, getPwaOnDemandAssets, getPwaStartupAssets } from './pwa-startup-assets.mjs';
+import { getPwaClientAssets, getPwaStartupAssets } from './pwa-startup-assets.mjs';
 import { readingExtractionPlugin } from './reading-extraction-build.mjs';
 
 // The asset version is read from the shell at runtime, so client output is
@@ -42,6 +42,5 @@ export async function bundlePwaClient(root, { developmentShortcut = false } = {}
 			.filter(output => reachableAssets.has(basename(output.path)))
 			.map(output => [basename(output.path), output.text])),
 		startupAssets: getPwaStartupAssets(result.metafile),
-		onDemandAssets: getPwaOnDemandAssets(result.metafile),
 	};
 }
