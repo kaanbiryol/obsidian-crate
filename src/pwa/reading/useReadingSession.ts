@@ -37,6 +37,11 @@ export function useReadingSession(connection: ReadingConnection) {
     if (result.completed) setError(null);
     return true;
   }, [isCurrentSession]);
+  const refreshRecovery = useCallback(async () => {
+    const expected = authority.current;
+    const earlier = await hasEarlierReadingChanges(expected?.id);
+    if (alive.current && (!expected || isCurrentSession(expected))) setRecovery(earlier);
+  }, [isCurrentSession]);
   const reportSessionError = useCallback((expected: ReadingSession, message: string | null) => {
     if (isCurrentSession(expected)) setError(message);
   }, [isCurrentSession]);
@@ -120,5 +125,5 @@ export function useReadingSession(connection: ReadingConnection) {
   }, [session, ready, draftReady, url, run]);
   return { ...connection, session, ready, resetSession, cache, pending,
     error: storageError ?? error ?? connection.error, recovery, adding, url, setUrl, share, run,
-    isCurrentSession, publishPending, publishSyncResult, reportSessionError, finishCapture, openCapture, closeCapture };
+    isCurrentSession, publishPending, publishSyncResult, refreshRecovery, reportSessionError, finishCapture, openCapture, closeCapture };
 }

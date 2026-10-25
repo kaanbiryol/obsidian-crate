@@ -55,6 +55,22 @@ export async function queueReading(session: ReadingSession, input: ReadingComman
     return queue;
   });
 }
+/** Removes a change that needs review, and the edits that depend on it, while the
+ * stored change still matches its reviewed export. Returns the remaining queue. */
+export function removeReviewedReading(session: ReadingSession, id: string, reviewed: string): Promise<PendingReading[] | null> {
+  return readingLock(async () => {
+    assertReadingSession(session);
+    const queue = await pendingReading(session);
+    const index = queue.findIndex(op => op.id === id);
+    const op = queue[index];
+    if (!op?.review || JSON.stringify(op) !== reviewed) return null;
+    const dependsOnRemoved = (later: PendingReading) => op.action !== 'capture' && later.action !== 'capture'
+      && later.intent.id === op.intent.id && Boolean(later.review);
+    const next = queue.filter((later, position) => position !== index && !(position > index && dependsOnRemoved(later)));
+    await savePendingReading(session, next);
+    return next;
+  });
+}
 export async function drainReading(session: ReadingSession, mode: ReadingRetryMode = 'automatic', canSend = () => true): Promise<ReadingCache | undefined> {
   if (!navigator.onLine || !canSend()) return undefined;
   return readingDrainLock(async () => {

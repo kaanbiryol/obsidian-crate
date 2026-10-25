@@ -53,6 +53,32 @@ export async function hasEarlierReadingChanges(sessionId?: string): Promise<bool
   }
   return false;
 }
+/** Queues from earlier sign-ins, as exported for review. Their receipts belong to an
+ * earlier credential, so they can never be confirmed by this one. */
+export async function earlierReadingChanges(sessionId?: string): Promise<Array<[string, unknown]>> {
+  const db = await readingDatabase();
+  const changes: Array<[string, unknown]> = [];
+  for (const key of await db.getAllKeys('values')) {
+    if (!isPendingReadingKey(key) || (sessionId !== undefined && key === readingKeys.pending(sessionId))) continue;
+    let value: unknown;
+    try { value = await readReadingValue(key); } catch { value = await db.get('values', key); }
+    changes.push([key, value]);
+  }
+  return changes;
+}
+/** Removes earlier queues only while they still match the reviewed export. */
+export function removeEarlierReadingChanges(sessionId: string | undefined, reviewed: string): Promise<boolean> {
+  return readingLock(async () => {
+    const changes = await earlierReadingChanges(sessionId);
+    if (JSON.stringify(changes) !== reviewed) return false;
+    const db = await readingDatabase(), tx = db.transaction('values', 'readwrite');
+    try {
+      for (const [key] of changes) await tx.store.delete(key);
+      await tx.done;
+    } catch (error) { await abortTransaction(tx); throw error; }
+    return true;
+  });
+}
 export async function pendingReading(session: ReadingSession): Promise<PendingReading[]> {
   const stored = await readReadingValue(readingKeys.pending(session.id));
   const data = stored === undefined ? [] : stored;

@@ -1,5 +1,5 @@
 import { readingUpdateReadiness } from '../update/update-readiness';
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { SettingsRow } from '../settings/SettingsRow';
 import { useSyncFailureToast } from '../hooks/useSyncFailureToast';
 import { useSharedFeatures } from '../shared-features';
@@ -7,14 +7,15 @@ import { useSyncFeedback } from '../sync/SyncFeedback';
 import { useFeatureSettings, useSettingsOpen } from '../settings/settings-context';
 import { readingSyncStatus } from '../sync/reading-status';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
-import { exportReadingData } from './storage/storage';
+import { earlierReadingChanges, exportReadingData, removeEarlierReadingChanges } from './storage/storage';
+import { ReviewedReadingRemoval } from './ReviewedReadingRemoval';
 import { assertReadingSession } from './session/session';
 import { sameReadingSession } from './session/session';
 import { useReadingSession } from './useReadingSession';
 import { useReadingSync } from './useReadingSync';
 import { useReadingMutations } from './useReadingMutations';
 import { readingKeys } from './session/encryption-session';
-import { readingNeedsAttention, readingRetryAt } from './outbox';
+import { readingNeedsAttention, readingRetryAt, removeReviewedReading } from './outbox';
 import { ShortcutSetup } from './ShortcutSetup';
 
 function useReadingController() {
@@ -60,8 +61,26 @@ function useReadingController() {
     onLogout: app.logOut,
     shortcut: session ? <ShortcutSetup session={session} /> : null,
     issues: <>
-      {recovery && <SettingsRow title="Earlier changes need review" description="Changes from an earlier sign-in are still stored on this device." />}
-      {pending.filter(op => op.error || op.review).map(op => <SettingsRow key={op.id} title={op.review ? 'Change needs review' : 'Couldn’t sync'} description={op.error || 'This change is still stored on this device.'} />)}
+      {recovery && <>
+        <SettingsRow title="Earlier changes need review" description="Changes from an earlier sign-in are still stored on this device." />
+        <ReviewedReadingRemoval fileName="crate-reading-earlier-changes.json" exportLabel="Export earlier changes"
+          load={() => earlierReadingChanges(session?.id)}
+          onRemove={async exported => {
+            const removed = await removeEarlierReadingChanges(session?.id, exported);
+            await connection.refreshRecovery();
+            return removed;
+          }} />
+      </>}
+      {pending.filter(op => op.error || op.review).map(op => <Fragment key={op.id}>
+        <SettingsRow title={op.review ? 'Change needs review' : 'Couldn’t sync'} description={op.error || 'This change is still stored on this device.'} />
+        {op.review && session && <ReviewedReadingRemoval fileName="crate-reading-change.json" exportLabel="Export change"
+          load={async () => op}
+          onRemove={async exported => {
+            const next = await removeReviewedReading(session, op.id, exported);
+            if (next) connection.publishPending(session, next);
+            return next !== null;
+          }} />}
+      </Fragment>)}
     </>,
   });
 

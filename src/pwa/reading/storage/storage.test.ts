@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { drainReading } from '../outbox';
-import { exportReadingData, pendingReading, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, readEncryptedReadingIndex, writeEncryptedReadingIndex } from './storage';
+import { earlierReadingChanges, exportReadingData, pendingReading, removeEarlierReadingChanges, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, readEncryptedReadingIndex, writeEncryptedReadingIndex } from './storage';
 import { assertReadingSession, readingSession, READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
@@ -15,7 +15,7 @@ vi.mock('../../storage/single-store-database', () => ({ openSingleStoreDatabase:
   put: async (_store: string, value: unknown, key: string) => { values.set(key, value); },
   delete: async (_store: string, key: string) => { values.delete(key); },
   getAllKeys: async () => [...values.keys()],
-  transaction: () => ({ store: { getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key) } }),
+  transaction: () => ({ store: { getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key), delete: async (key: string) => { values.delete(key); } }, done: Promise.resolve() }),
 }) }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const intent = { id: 'article', changes: { highlights: [] }, before: { highlights: undefined } };
@@ -131,4 +131,15 @@ it('reuses the encrypted Reading index only for the same encryption identity and
   // Entries list server paths, but every note must belong to the plaintext Reading folder.
   await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, item: { ...entry.item, path: 'Elsewhere/Other.md' } }]);
   await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
+});
+
+it('removes queues from earlier sign-ins only while they match the reviewed export', async () => {
+  values.set('pending:earlier', [{ ...command(), sessionId: 'earlier' }]);
+  values.set(`pending:${session.id}`, [command()]);
+  const exported = JSON.stringify(await earlierReadingChanges(session.id));
+  values.set('pending:older', []);
+  expect(await removeEarlierReadingChanges(session.id, exported)).toBe(false);
+  expect(values.has('pending:earlier')).toBe(true);
+  expect(await removeEarlierReadingChanges(session.id, JSON.stringify(await earlierReadingChanges(session.id)))).toBe(true);
+  expect([...values.keys()]).toEqual([`pending:${session.id}`]);
 });

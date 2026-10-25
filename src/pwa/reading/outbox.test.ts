@@ -1,7 +1,7 @@
 import type { PendingReading } from './outbox';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingSession } from './session/session';
-import { drainReading, queueReading } from './outbox';
+import { drainReading, queueReading, removeReviewedReading } from './outbox';
 import { pendingReading, savePendingReading } from './storage/storage';
 
 const storage = vi.hoisted(() => ({ values: new Map<string, unknown>(), current: true }));
@@ -88,6 +88,23 @@ it('retries uncertain bytes before dispatching dependent edits', async () => {
 	expect(bodies[0]).toBe(original?.body);
 	expect(bodies[1]).toBe(original?.body);
 	expect(bodies[2]).not.toBe(original?.body);
+});
+
+it('removes a reviewed rejected edit and its dependents only while the export still matches', async () => {
+	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } });
+	const started = deferred<void>(), release = deferred<Response>();
+	network.mockImplementationOnce(async () => response({ day: 20_000, generation: session.generation }))
+		.mockImplementationOnce(() => { started.resolve(); return release.promise; });
+	const draining = drainReading(session); await started.promise;
+	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { tags: ['essays'] }, before: { tags: [] } } });
+	await queueReading(session, { action: 'update', intent: { id: 'other', changes: { favorite: true }, before: { favorite: false } } });
+	release.resolve(response({ error: 'Changed on another device' }, 409)); await draining;
+	const [rejected] = await pendingReading(session);
+	expect(await removeReviewedReading(session, rejected!.id, JSON.stringify({ ...rejected, error: 'stale' }))).toBeNull();
+	expect(await pendingReading(session)).toHaveLength(3);
+	const remaining = await removeReviewedReading(session, rejected!.id, JSON.stringify(rejected));
+	expect(remaining?.map(op => op.action !== 'capture' && op.intent.id)).toEqual(['other']);
+	expect(await pendingReading(session)).toEqual(remaining);
 });
 
 it('retains rejected edits and their dependents for review without sending dependents', async () => {
