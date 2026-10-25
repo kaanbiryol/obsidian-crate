@@ -356,6 +356,21 @@ describe('optimistic reminder outbox', () => {
 		expect(second.requests).toEqual([]);
 	});
 
+	it('waits for another tab\'s sending lock before discarding a failed change', async () => {
+		const storage = memoryStorage();
+		const change = { ...completion(), status: 'failed' as const, attempts: 1, error: 'Rejected' };
+		storage.put(change);
+		const held = deferred<void>();
+		let tail: Promise<void> = held.promise;
+		const withLock = (work: () => Promise<void>) => { const result = tail.then(work); tail = result.catch(() => {}); return result; };
+		const discarding = harness(storage, withLock).discard(change.operationId);
+		await Promise.resolve();
+		expect(storage.load()).toHaveLength(1);
+		held.resolve();
+		await discarding;
+		expect(storage.load()).toEqual([]);
+	});
+
 	it('preserves a rejected save draft across controller reload', async () => {
 		const state = harness();
 		const change = save();

@@ -89,18 +89,15 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 			ambiguous: change.ambiguous || change.status === 'uncertain' || (change.status === 'pending' && change.attempts > 0) });
 	};
 
-	const discard = (operationId: string, reviewedChange?: string): void | Promise<void> => {
-		const remove = () => {
-			const change = storage.get(operationId);
-			if (!change || change.status === 'pending' || !isCurrent()) return;
-			// A change that may have committed is removed only after its exact export was reviewed.
-			if (change.reviewRequired || change.ambiguous ? reviewedChange !== JSON.stringify(change) : change.status !== 'failed') return;
-			storage.remove(operationId);
-			refresh();
-		};
-		if (reviewedChange !== undefined) return withLock(async () => { remove(); });
-		remove();
-	};
+	// Under the sending lock, so another tab cannot be retrying the change meanwhile.
+	const discard = (operationId: string, reviewedChange?: string): Promise<void> => withLock(async () => {
+		const change = storage.get(operationId);
+		if (!change || change.status === 'pending' || !isCurrent()) return;
+		// A change that may have committed is removed only after its exact export was reviewed.
+		if (change.reviewRequired || change.ambiguous ? reviewedChange !== JSON.stringify(change) : change.status !== 'failed') return;
+		storage.remove(operationId);
+		refresh();
+	});
 
 	const drain = async () => {
 		if (running || !isCurrent()) return;
