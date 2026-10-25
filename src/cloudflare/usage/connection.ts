@@ -59,6 +59,14 @@ export class CloudflareUsageConnection {
 		this.pending = undefined;
 	}
 
+	/** Revokes the saved login best effort and clears it, for example after its server is deleted. */
+	async forget(accountId: string): Promise<void> {
+		const credentials = this.read(accountId);
+		this.options.secrets.set(this.key(accountId), '');
+		++this.revision;
+		if (credentials) await this.revoke(credentials);
+	}
+
 	async connect(): Promise<void> {
 		this.options.signal.throwIfAborted();
 		if (this.busy) throw new Error('Wait for the current usage request to finish.');

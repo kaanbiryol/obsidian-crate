@@ -92,6 +92,16 @@ it('uses setup credentials without a second authorization and renews them on dem
 	expect(h.transport.mock.calls[0]?.[1]?.body).toContain('refresh_token=setup-refresh');
 });
 
+it('revokes both saved tokens and disconnects when the login is forgotten', async () => {
+	const h = setup();
+	h.connection.acceptAuthorization('account-a', { accessToken: 'saved-access', refreshToken: 'saved-refresh', expiresIn: 3600 });
+	await h.connection.forget('account-a');
+	expect(h.transport.mock.calls.map(([url, request]) => [new URL(url).pathname, new URLSearchParams(request?.body as string).get('token')]))
+		.toEqual([['/oauth2/revoke', 'saved-access'], ['/oauth2/revoke', 'saved-refresh']]);
+	expect(h.values.get('crate-usage-oauth-account-a')).toBe('');
+	expect(h.connection.connected).toBe(false);
+});
+
 it('keeps saved results when a later refresh fails and isolates them by account', async () => {
 	const h = setup(); await h.connect();
 	await h.connection.fetchUsage();

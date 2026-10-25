@@ -206,7 +206,7 @@ For paired D1/R2 backup verification and isolated restore commands, use [Backup 
 
 ## Delete a Crate server
 
-**Settings → Crate → Advanced server actions → Delete server and all data** permanently removes this server and its remote data for all devices. Local vault files and other deployments are kept. The confirmation identifies the account, Worker, database, and file bucket. Crate reuses the saved Cloudflare login when available. Cancelling confirmation performs no deletion.
+**Settings → Crate → Advanced server actions → Delete server and all data** permanently removes this server and its remote data for all devices. Local vault files and other deployments are kept. The confirmation identifies the account, Worker, database, and file bucket. Crate reuses the saved Cloudflare login when available, then revokes it and clears it from this device once deletion finishes. Cancelling confirmation performs no deletion.
 
 Deletion is a terminal resource operation, separate from reset, upgrade, and rebuild. It verifies the saved account, exact Worker/database/bucket identities, Worker and bucket creation identities, and resource sharing by other Workers. It does not read application tables, schema markers, protocol numbers, server revisions, semantic versions, or remote file references. Changed or shared resource identities stop deletion to protect other servers; arbitrary binding names, configuration, and Durable Object class names do not impose release-specific restrictions.
 
