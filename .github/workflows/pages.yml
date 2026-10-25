@@ -93,8 +93,9 @@ concurrency:
 
 jobs:
   build:
-    # Template tests use macOS plutil; signing runs only on the maintainer’s Mac.
-    runs-on: macos-26
+    # The shortcut template's plutil check skips here and runs in the macOS visual job;
+    # signing runs only on the maintainer’s Mac.
+    runs-on: ubuntu-latest
     outputs:
       deploy: ${{ steps.website.outputs.deploy }}
     steps:
