@@ -1,4 +1,4 @@
-import { recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrence/recurrenceCalendar';
+import { anchorMonthlyRecurrence, recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrence/recurrenceCalendar';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
 import { rebuildCheckboxLine } from '@/reminders/core/grammar/checkboxParser';
 import { calculateFirstOccurrence, calculateNextOccurrence } from '@/reminders/core/recurrence/recurrenceCalculator';
@@ -75,12 +75,13 @@ export function buildCreatedReminderBlock(params: {
 	completed?: boolean;
 	reminderId: string;
 }): ReminderBlockMutation {
-	const recurrence = normalizeRecurrenceRule(params.recurrence);
-	let dueDate = recurrence && !params.dueDate
-		? calculateFirstOccurrence(recurrence)
+	const rule = normalizeRecurrenceRule(params.recurrence);
+	let dueDate = rule && !params.dueDate
+		? calculateFirstOccurrence(rule)
 		: params.dueDate;
-	const hasTime = params.hasTime ?? (recurrence && !params.dueDate ? recurrence.hour !== undefined : inferHasTimeFromDate(dueDate));
-	if (recurrence && !params.dueDate && dueDate && !hasTime) dueDate = recurrenceCalendarDate(dueDate, recurrence);
+	const hasTime = params.hasTime ?? (rule && !params.dueDate ? rule.hour !== undefined : inferHasTimeFromDate(dueDate));
+	if (rule && !params.dueDate && dueDate && !hasTime) dueDate = recurrenceCalendarDate(dueDate, rule);
+	const recurrence = rule && dueDate ? anchorMonthlyRecurrence(rule, dueDate, hasTime) : rule;
 	const storedDates = buildStoredReminderDates(dueDate, hasTime);
 	return {
 		checkboxLine: rebuildCheckboxLine(
@@ -121,7 +122,7 @@ export function buildUpdatedReminderBlock(
 ): ReminderBlockMutation {
 	const currentDueDate = parseStoredReminderDate(reminder);
 	const currentHasTime = reminderHasTime(reminder);
-	const recurrence = Object.prototype.hasOwnProperty.call(updates, 'recurrence')
+	let recurrence = Object.prototype.hasOwnProperty.call(updates, 'recurrence')
 		? normalizeRecurrenceRule(updates.recurrence ?? undefined)
 		: normalizeRecurrenceRule(reminder.recurrence);
 	let hasTime = Object.prototype.hasOwnProperty.call(updates, 'hasTime')
@@ -134,6 +135,7 @@ export function buildUpdatedReminderBlock(
 		dueDate = calculateFirstOccurrence(recurrence);
 		if (!hasTime) dueDate = recurrenceCalendarDate(dueDate, recurrence);
 	}
+	if (recurrence && dueDate) recurrence = anchorMonthlyRecurrence(recurrence, dueDate, hasTime);
 	const priority = updates.priority ?? reminder.priority;
 	const description = 'description' in updates
 		? (updates.description?.trim() || undefined)
@@ -246,6 +248,7 @@ function completionTransition(
 			line = { kind: 'rebuild', completed: false, due: currentDue };
 		} else line = { kind: 'uncheck' };
 	} else if (recurrence && !reminder.completed) {
+		recurrence = anchorMonthlyRecurrence(recurrence, currentDue, currentHasTime);
 		const completedCount = recurrence.completedCount ?? 0;
 		const nextInstant = calculateNextOccurrence(currentHasTime ? currentDue : recurrenceCalendarInstant(currentDue, recurrence), recurrence, completedCount);
 		const nextDue = nextInstant && !currentHasTime ? recurrenceCalendarDate(nextInstant, recurrence) : nextInstant;

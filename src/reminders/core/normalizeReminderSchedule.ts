@@ -2,7 +2,7 @@ import { parseCheckboxLine, type ParsedCheckbox } from './grammar/checkboxParser
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
 import { formatLocalDateKey } from './dates/reminderDate';
 import { calculateFirstOccurrence } from './recurrence/recurrenceCalculator';
-import { recurrenceCalendarDate } from './recurrence/recurrenceCalendar';
+import { anchorMonthlyRecurrence, recurrenceCalendarDate } from './recurrence/recurrenceCalendar';
 import { appendRecurrenceMetadata } from './recurrence/recurrenceMetadata';
 import { setReminderIdMarker } from './reminderIdentity';
 import { recurrenceToText } from './recurrence/recurrenceText';
@@ -21,7 +21,7 @@ export function normalizeReminderScheduleLine(
 	const checkbox = parseCheckboxLine(line);
 	if (!checkbox) return line;
 	const { parsed } = checkbox;
-	const recurrence = parsed.recurrence;
+	let recurrence = parsed.recurrence;
 	let dueDate = parsed.dueDate;
 	const hasTime = parsed.hasTime ?? (recurrence?.hour !== undefined);
 	if (!dueDate && recurrence) {
@@ -29,6 +29,7 @@ export function normalizeReminderScheduleLine(
 		if (!hasTime) dueDate = recurrenceCalendarDate(dueDate, recurrence);
 	}
 	if (!dueDate) return line;
+	if (recurrence) recurrence = anchorMonthlyRecurrence(recurrence, dueDate, hasTime);
 	const dateText = hasTime ? dueDate.toISOString() : formatLocalDateKey(dueDate);
 	let content = checkbox.rawContent;
 	if (parsed.datePart && parsed.datePart !== parsed.recurrencePart) {
