@@ -115,8 +115,8 @@ export function startReading(plugin: CratePlugin): void {
 	const inFolder = (path: string) => path === folder || path.startsWith(`${folder}/`) || folder.startsWith(`${path}/`);
 	const changed = (path: string) => {
 		if (!inFolder(path)) return;
-		readingVault.changed(path);
-		library.invalidate(path); schedule();
+		// The event changes the file's revision; renamed paths are new cache keys and the scan prunes old ones.
+		readingVault.changed(path); schedule();
 	};
 	const refs = [
 		vault.on('create', file => { changed(file.path); }),

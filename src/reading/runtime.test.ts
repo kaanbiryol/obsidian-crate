@@ -215,6 +215,18 @@ describe('Reading runtime lifecycle', () => {
 		stopReading(h.plugin); expect(getReadingLibrary(h.plugin)).toBeUndefined();
 		for (const listeners of h.events.values()) expect(listeners.size).toBe(0);
 	});
+	it('lists a note at its new path after its folder is renamed', async () => {
+		const h = harness(); h.file.path = 'Reading/Old/article.md'; h.workspace.layoutReady = true; startReading(h.plugin);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(getReadingLibrary(h.plugin)!.getSnapshot().items.map(item => item.path)).toEqual(['Reading/Old/article.md']);
+		h.file.path = 'Reading/New/article.md';
+		const folder = Object.assign(new TFolder(), { path: 'Reading/New', children: [h.file] });
+		for (const listener of h.events.get('rename') ?? []) listener(folder as never, 'Reading/Old');
+		await vi.advanceTimersByTimeAsync(500);
+		expect(getReadingLibrary(h.plugin)!.getSnapshot().items.map(item => item.path)).toEqual(['Reading/New/article.md']);
+		expect(h.vault.read).toHaveBeenCalledTimes(2);
+		stopReading(h.plugin);
+	});
 	it('rejects overlapping or ignored folders before reading or writing any note', () => {
 		const h = harness(); h.plugin.settings.ignorePatterns = ['Reading/'];
 		expect(() => startReading(h.plugin)).toThrow('excluded');
