@@ -1,7 +1,8 @@
-import { Notice, type MarkdownView, type TAbstractFile, TFile, type WorkspaceLeaf } from 'obsidian';
+import { addIcon, Notice, type MarkdownView, type TAbstractFile, TFile, type WorkspaceLeaf } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { READING_VIEW_TYPE, requestReadingItem, startReading, stopReading } from './runtime';
+import { CRATE_READER_ICON_ID, CRATE_READER_ICON_SVG } from '../ui/crate-icon';
 import { AddReadingLinkModal } from './ui/plugin/add-link-modal';
 import { ReadingView } from './ui/plugin/reading-view';
 
@@ -18,19 +19,11 @@ async function openReading(plugin: CratePlugin, itemId?: string, replace?: Works
 }
 
 /** The reading id of a note in the reading folder. The reader verifies the identity when it opens the item. */
-export function readingIdForFile(plugin: CratePlugin, file: TAbstractFile | null): string | undefined {
+function readingIdForFile(plugin: CratePlugin, file: TAbstractFile | null): string | undefined {
 	if (!plugin.settings.reading.enabled || !(file instanceof TFile) || file.extension !== 'md') return;
 	if (!file.path.startsWith(`${plugin.settings.reading.folderPath.trim()}/`)) return;
 	const id: unknown = plugin.app.metadataCache.getFileCache(file)?.frontmatter?.crate_reading_id;
 	return typeof id === 'string' && READING_ID.test(id) ? id.toLowerCase() : undefined;
-}
-
-// Reuses an open reader. Otherwise the reader takes over the note's tab, so the open editor does not hold back highlight writes.
-function openFileInReader(plugin: CratePlugin, file: TAbstractFile | null, leaf?: WorkspaceLeaf): void {
-	const id = readingIdForFile(plugin, file);
-	if (!id) return;
-	const source = leaf?.view.getViewType() === 'markdown' && (leaf.view as MarkdownView).file === file ? leaf : undefined;
-	void openReading(plugin, id, source).catch(() => { new Notice('Could not open reading. Please try again.'); });
 }
 
 function registerReaderHeaderActions(plugin: CratePlugin): void {
@@ -43,7 +36,11 @@ function registerReaderHeaderActions(plugin: CratePlugin): void {
 		}
 		for (const view of views) {
 			if (actions.has(view) || !readingIdForFile(plugin, view.file)) continue;
-			actions.set(view, view.addAction('book-open', 'Open in reader', () => { openFileInReader(plugin, view.file, view.leaf); }));
+			// Reuses an open reader. Otherwise the reader takes over the note's tab, so the open editor does not hold back highlight writes.
+			actions.set(view, view.addAction(CRATE_READER_ICON_ID, 'Open in reader', () => {
+				const id = readingIdForFile(plugin, view.file);
+				if (id) void openReading(plugin, id, view.leaf).catch(() => { new Notice('Could not open reading. Please try again.'); });
+			}));
 		}
 	};
 	plugin.registerEvent(plugin.app.workspace.on('layout-change', refresh));
@@ -67,16 +64,7 @@ export function registerReading(plugin: CratePlugin): void {
 		if (!plugin.settings.reading.enabled) { new Notice('Enable reading in Crate settings first.'); return; }
 		new AddReadingLinkModal(plugin).open();
 	} });
-	plugin.addCommand({ id: 'open-note-in-reader', name: 'Open current note in reader', checkCallback: checking => {
-		const file = plugin.app.workspace.getActiveFile();
-		if (!readingIdForFile(plugin, file)) return false;
-		if (!checking) openFileInReader(plugin, file, plugin.app.workspace.getMostRecentLeaf() ?? undefined);
-		return true;
-	} });
-	plugin.registerEvent(plugin.app.workspace.on('file-menu', (menu, file, _source, leaf) => {
-		if (!readingIdForFile(plugin, file)) return;
-		menu.addItem(item => item.setTitle('Open in reader').setIcon('book-open').onClick(() => { openFileInReader(plugin, file, leaf); }));
-	}));
+	addIcon(CRATE_READER_ICON_ID, CRATE_READER_ICON_SVG);
 	registerReaderHeaderActions(plugin);
 	try { startReading(plugin); }
 	catch (error) { new Notice(error instanceof Error ? error.message : 'Could not start reading.'); }
