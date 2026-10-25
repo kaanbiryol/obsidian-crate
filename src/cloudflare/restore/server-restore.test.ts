@@ -57,7 +57,7 @@ async function fixture(extraRows = 0) {
     }),
     putRecoveryObject: vi.fn(async (_account: string, bucket: string, key: string, bytes: Uint8Array) => { buckets.get(bucket)!.set(key, bytes); }),
     putRestoredObject: vi.fn(async (_account: string, _sourceBucket: string, bucket: string, key: string, bytes: Uint8Array) => { buckets.get(bucket)!.set(key, bytes); }),
-    listR2Objects: vi.fn(async (_account: string, bucket: string) => ({ keys: [...buckets.get(bucket)!.keys()] })),
+    listR2Objects: vi.fn(async (_account: string, bucket: string, _cursor?: string, prefix?: string) => ({ keys: [...buckets.get(bucket)!.keys()].filter(key => key.startsWith(prefix ?? '')) })),
     findD1Database: vi.fn(async (_account: string, name: string) => names.has(name) ? { uuid: names.get(name), name } : null),
     createD1Database: vi.fn(async (_account: string, name: string) => { databases.set(destination, database()); names.set(name, destination); return { uuid: destination, name }; }),
     getD1Database: vi.fn(async (_account: string, id: string) => ({ uuid: id, name: [...names].find(([, value]) => value === id)?.[0] })),
@@ -108,6 +108,13 @@ it('restores launch-baseline checkpoints, keeps history and receipts, and requir
   expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
   expect(f.snapshots.map(state => state.phase)).toEqual(['copying', 'publishing', 'complete']);
   expect(normalizeCrateSettings({ cloudflareRestore: f.state, cloudflareDeployment: f.state.target }, '.obsidian').cloudflareDeployment).toMatchObject({ workerName: f.state.target.workerName });
+});
+
+it('lists backups with one request limited to upgrade backup keys', async () => {
+  const f = await fixture();
+  f.api.listR2Objects.mockClear();
+  expect((await listUpgradeBackups(f.client, source)).map(choice => choice.prefix)).toEqual([f.choice.prefix]);
+  expect(f.api.listR2Objects.mock.calls).toEqual([[source.account, source.bucket, undefined, '__crate__/backups/schema-upgrade-']]);
 });
 
 it('applies the shared CLI/in-app policy fixture without retaining source operation markers', async () => {

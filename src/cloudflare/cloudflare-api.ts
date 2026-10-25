@@ -198,9 +198,10 @@ export class CloudflareApiClient {
 		throw invalid();
 	}
 
-	async listR2Objects(accountId: string, bucketName: string, cursor?: string): Promise<{ keys: string[]; cursor?: string }> {
+	async listR2Objects(accountId: string, bucketName: string, cursor?: string, prefix?: string): Promise<{ keys: string[]; cursor?: string }> {
 		const params = new URLSearchParams({ per_page: '1000' });
 		if (cursor) params.set('cursor', cursor);
+		if (prefix) params.set('prefix', prefix);
 		const response = await this.requestEnvelope<Array<{ key?: string }>>(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects?${params}`);
 		const info = response.result_info;
 		const invalid = (reason: string) => new Error(`Could not verify the complete R2 object listing. ${reason}`);
