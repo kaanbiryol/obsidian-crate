@@ -1,7 +1,7 @@
 import { assertReminderMutationInput } from './reminderMutationInput';
 import type { MarkdownReminderUpdate } from './markdownReminderMutation';
 import type { Priority, Reminder, UpdateReminderParams } from '../types/reminder';
-import { buildStoredReminderDates, parseReminderDateValue } from './dates/reminderDate';
+import { parseReminderDateValue } from './dates/reminderDate';
 import { normalizeRecurrenceRule } from './recurrence/recurrenceRule';
 import { DEFAULT_PROJECT } from './constants';
 
@@ -27,10 +27,6 @@ export function buildCreateReminderArgs(params: {
     Boolean(params.dueDatetime),
   );
   const priority: Priority = params.priority ?? 4;
-  const storedDates = buildStoredReminderDates(
-    dueDate,
-    params.dueDatetime ? true : params.dueDate ? false : undefined,
-  );
 
   return {
     project,
@@ -38,20 +34,11 @@ export function buildCreateReminderArgs(params: {
     recurrence,
     dueDate,
     priority,
-    storedDates,
     hasTime: params.dueDatetime ? true : params.dueDate ? false : undefined,
   };
 }
 
-export function buildReminderUpdate(
-  params: UpdateReminderParams,
-): {
-  updates: UpdateReminderInput;
-  recurrenceUpdate?: Reminder["recurrence"] | null;
-  hasRecurrenceUpdate: boolean;
-  hasDueDateUpdate: boolean;
-  storedDates: { dueDate?: string; dueDatetime?: string };
-} {
+export function buildReminderUpdate(params: UpdateReminderParams): UpdateReminderInput {
   assertReminderMutationInput(params, "update");
   const hasRecurrenceUpdate = Object.prototype.hasOwnProperty.call(params, "recurrence");
   const recurrenceUpdate = hasRecurrenceUpdate
@@ -66,12 +53,6 @@ export function buildReminderUpdate(
   const dueDate = hasDueDateUpdate
     ? parseReminderDateValue(params.dueDatetime ?? params.dueDate, Boolean(params.dueDatetime))
     : undefined;
-  const storedDates = hasDueDateUpdate
-    ? buildStoredReminderDates(
-        dueDate,
-        params.dueDatetime ? true : params.dueDate ? false : undefined,
-      )
-    : {};
 
   const updates: UpdateReminderInput = {
     content: params.content,
@@ -86,11 +67,5 @@ export function buildReminderUpdate(
     updates.hasTime = params.dueDatetime ? true : params.dueDate ? false : undefined;
   }
 
-  return {
-    updates,
-    recurrenceUpdate,
-    hasRecurrenceUpdate,
-    hasDueDateUpdate,
-    storedDates,
-  };
+  return updates;
 }

@@ -60,7 +60,7 @@ describe('buildReminderSubmission', () => {
         })!;
         expect(submission.updatedReminder?.dueDate).toBeUndefined();
         expect(submission.updatedReminder?.dueDatetime).toBeUndefined();
-        const { updates } = buildReminderUpdate(submission.updatedReminder!);
+        const updates = buildReminderUpdate(submission.updatedReminder!);
         const stored = buildUpdatedReminderBlock({ ...reminder, rawLine: '- [ ] Task', lineNumber: 0, filePath: 'Inbox.md' }, updates);
         expect(stored.recurrence).toEqual(recurrence);
         expect(stored.dueDatetime).toBe(dueDatetime);
