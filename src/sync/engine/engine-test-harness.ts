@@ -165,8 +165,6 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 		setEntry: vi.spyOn(manifest, 'setEntry'),
 		removeEntry: vi.spyOn(manifest, 'removeEntry'),
 		recordRename: vi.spyOn(manifest, 'recordRename'),
-		clear: vi.spyOn(manifest, 'clear'),
-		replaceManifest: vi.spyOn(manifest, 'replaceManifest'),
 	};
 	const localManifest: Omit<LocalManifest, keyof typeof spies> & typeof spies = Object.assign(manifest, spies);
 
