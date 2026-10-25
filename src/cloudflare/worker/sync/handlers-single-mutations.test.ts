@@ -2,7 +2,6 @@ import { commitStagedFile } from './mutations';
 import { commitNewFiles } from './staging/bulk-new-file-commit';
 import { describe, expect, it, vi } from 'vitest';
 import {
-	handleDelete,
 	handleUpload,
 } from './index';
 import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
@@ -152,85 +151,6 @@ it('rejects traversal-style upload paths', async () => {
 			path: 'notes/test.md',
 			error: 'Upload outcome is unknown because the metadata response failed; reconcile before retrying: D1 unavailable',
 		});
-		expect(bucket.delete).not.toHaveBeenCalled();
-	});
-
-	it('returns 400 for invalid JSON delete requests instead of throwing 500', async () => {
-		const { bucket } = createMockR2Bucket();
-		const { db } = createMockD1Database();
-
-		const response = await handleDelete(
-			new Request('https://worker.test/sync/delete', {
-				method: 'POST',
-				body: '{invalid',
-				headers: { 'Content-Type': 'application/json' },
-			}),
-			bucket,
-			db,
-		);
-
-		expect(response.status).toBe(400);
-		expect(await responseJson(response)).toEqual({ error: 'Invalid JSON body' });
-	});
-
-	it('leaves single-file deletes uncommitted when the D1 metadata write fails', async () => {
-		const { bucket, store } = createMockR2Bucket({
-			'files/notes/test.md': 'before',
-		});
-		const { db } = createMockD1Database({ failBatch: true,
-			files: { 'notes/test.md': { hash: 'a'.repeat(64), size: 6, storageKey: 'files/notes/test.md' } },
-		});
-
-		const response = await handleDelete(
-			new Request('https://worker.test/sync/delete', {
-				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md', operationId: createTestUploadOperationId(), expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md' }),
-				headers: { 'Content-Type': 'application/json' },
-			}),
-			bucket,
-			db,
-		);
-
-		expect(response.status).toBe(503);
-		expect(await responseJson(response)).toEqual({
-			success: false,
-			path: 'notes/test.md',
-			error: 'Delete outcome is unknown because the metadata response failed; reconcile before retrying: D1 unavailable',
-		});
-		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
-	});
-
-	it('retains deleted content instead of racing another delete cleanup', async () => {
-		const managedKey = '__crate__/files/hash/object-to-delete';
-		const { bucket, store } = createMockR2Bucket({
-			[managedKey]: 'before',
-		});
-		const { db, files } = createMockD1Database({
-			files: {
-				'notes/test.md': { hash: 'a'.repeat(64), size: 6, storageKey: managedKey },
-			},
-		});
-
-		const response = await handleDelete(
-			new Request('https://worker.test/sync/delete', {
-				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md', operationId: createTestUploadOperationId(), expectedHash: 'a'.repeat(64), expectedRevision: managedKey }),
-				headers: { 'Content-Type': 'application/json' },
-			}),
-			bucket,
-			db,
-		);
-
-		expect(response.status).toBe(200);
-		expect(await responseJson(response)).toEqual({
-			success: true,
-			path: 'notes/test.md',
-			consumedRevision: managedKey,
-			revision: expect.stringMatching(/^__crate__\/deletions\//) as string,
-			deleteRequestId: expect.any(String) as string,
-		});
-		expect(files.has('notes/test.md')).toBe(false);
-		expect(new TextDecoder().decode(store.get(managedKey)?.body)).toBe('before');
 		expect(bucket.delete).not.toHaveBeenCalled();
 	});
 });

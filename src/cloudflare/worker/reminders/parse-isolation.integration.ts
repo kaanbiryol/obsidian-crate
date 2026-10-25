@@ -143,7 +143,7 @@ it('permits explicit deletion of a quarantined source to cancel its verified rem
 	const first = await put(path, valid);
 	await drainNotificationProjections(env);
 	const current = await put(path, invalid, first.hash);
-	expect((await request('/sync/delete', { method: 'POST', body: JSON.stringify({ path, expectedHash: current.hash, expectedRevision: current.revision }) })).status).toBe(200);
+	expect(await (await request('/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files: [{ path, expectedHash: current.hash, expectedRevision: current.revision }] }) })).json()).toMatchObject({ deleted: [path] });
 	await drainNotificationProjections(env);
 	expect(await quarantine(path)).toBeNull();
 	expect(await rows('reminder_sources')).toEqual([]);

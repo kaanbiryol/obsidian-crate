@@ -5,7 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleUpload, handleDelete } from './file-handlers';
+import { handleUpload } from './file-handlers';
+import { handleBatchDelete } from './batch/delete';
 import { handleBatchUpload } from './batch/upload';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
@@ -33,8 +34,8 @@ async function upload(operationId: string, batch: boolean, content = 'Original b
 	return body.results?.[0] ?? { ...body, ...(!body.success ? { status: response.status } : {}) };
 }
 async function remove(receipt: UploadResult) {
-	const response = await handleDelete(new Request('https://test/sync/delete', { method: 'POST', body: JSON.stringify({ path: receipt.path, expectedHash: receipt.hash, expectedRevision: receipt.revision }) }), env.BUCKET, env.DB);
-	expect(response.status).toBe(200);
+	const response = await handleBatchDelete(new Request('https://test/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files: [{ path: receipt.path, expectedHash: receipt.hash, expectedRevision: receipt.revision }] }) }), env.BUCKET, env.DB);
+	expect(await response.json()).toMatchObject({ deleted: [receipt.path] });
 }
 
 it.each([false, true])('does not resurrect a deleted file when a committed %s upload is retried', async batch => {

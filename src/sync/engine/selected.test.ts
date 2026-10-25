@@ -39,7 +39,6 @@ async function harness(paths = ['a.md', 'b.md']) {
                 for (const file of body.files) await remote.delete(file);
                 return response({ success: true, deleted: body.files.map(file => file.path) });
             }
-            case '/sync/delete': return response(await remote.delete(JSON.parse(request.body as string) as Parameters<typeof remote.delete>[0]));
             default: throw new Error(`Unexpected request: ${request.url}`);
         }
     });

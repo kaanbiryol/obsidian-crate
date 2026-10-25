@@ -5,7 +5,6 @@ import {
 	handleBatchDelete,
 	handleBatchUpload,
 	handleCheckChanges,
-	handleDelete,
 	handleDownload,
 	handleGetChanges,
 	handleGetFileMetadata,
@@ -71,9 +70,6 @@ export async function handleSyncRoute(
 	}
 	if (path === '/sync/download' && method === 'GET') {
 		return await handleDownload(request, bucket, db);
-	}
-	if (path === '/sync/delete' && method === 'POST') {
-		return await handleDelete(request, bucket, db, audit);
 	}
 	if (path === '/sync/batch-upload' && method === 'POST') {
 		return await handleBatchUpload(request, bucket, db, uploadCommitters, encryption, resetGeneration);

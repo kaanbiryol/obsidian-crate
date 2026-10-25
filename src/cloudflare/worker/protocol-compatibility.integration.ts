@@ -29,7 +29,7 @@ describe('old and future clients against the current Worker', () => {
 		const original = await env.DB.prepare('SELECT * FROM files').all();
 		for (const [path, method, body] of [
 			['/sync/upload?path=Note.md', 'PUT', 'Must not replace bytes'],
-			['/sync/delete', 'POST', JSON.stringify({ path: 'Note.md' })],
+			['/sync/batch-delete', 'POST', JSON.stringify({ files: [{ path: 'Note.md' }] })],
 			['/reminders/create', 'POST', JSON.stringify({ folderPath: 'Reminders', content: 'Must not create' })],
 			['/settings', 'PUT', '{}'],
 			['/notifications/reminders-exchange', 'POST', '{}'],

@@ -41,10 +41,10 @@ async function create(path: string): Promise<UploadedFile> {
 }
 
 async function remove(file: UploadedFile) {
-	const response = await request('/sync/delete', {
-		method: 'POST', body: JSON.stringify({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision }),
+	const response = await request('/sync/batch-delete', {
+		method: 'POST', body: JSON.stringify({ files: [{ path: file.path, expectedHash: file.hash, expectedRevision: file.revision }] }),
 	});
-	expect(response.status).toBe(200);
+	expect(await response.json()).toMatchObject({ deleted: [file.path] });
 }
 
 async function expectConflict(response: Response, path: string, conflictingPath: string) {

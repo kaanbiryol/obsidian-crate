@@ -69,7 +69,6 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /sync/import/prune': { scopes: VAULT, execution: COORDINATOR },
 	'POST /sync/import/upload': { scopes: VAULT },
 	'POST /sync/metadata': { scopes: VAULT },
-	'POST /sync/delete': { scopes: VAULT, execution: COORDINATOR },
 	'POST /sync/batch-upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncBatchUpload } },
 	'POST /sync/batch-download': { scopes: VAULT },
 	'POST /sync/batch-delete': { scopes: VAULT, execution: COORDINATOR },

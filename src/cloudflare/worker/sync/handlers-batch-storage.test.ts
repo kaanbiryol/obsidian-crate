@@ -95,6 +95,61 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
 	});
 
+	it('returns 400 for invalid JSON delete requests instead of throwing 500', async () => {
+		const { bucket } = createMockR2Bucket();
+		const { db } = createMockD1Database();
+
+		const response = await handleBatchDelete(
+			new Request('https://worker.test/sync/batch-delete', {
+				method: 'POST',
+				body: '{invalid',
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket,
+			db,
+		);
+
+		expect(response.status).toBe(400);
+		expect(await responseJson(response)).toEqual({ error: 'Invalid JSON body' });
+	});
+
+	it('retains deleted content instead of racing another delete cleanup', async () => {
+		const managedKey = '__crate__/files/hash/object-to-delete';
+		const { bucket, store } = createMockR2Bucket({
+			[managedKey]: 'before',
+		});
+		const { db, files } = createMockD1Database({
+			files: {
+				'notes/test.md': { hash: 'a'.repeat(64), size: 6, storageKey: managedKey },
+			},
+		});
+
+		const response = await handleBatchDelete(
+			new Request('https://worker.test/sync/batch-delete', {
+				method: 'POST',
+				body: JSON.stringify({ files: [{ path: 'notes/test.md', expectedHash: 'a'.repeat(64), expectedRevision: managedKey }] }),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket,
+			db,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await responseJson(response)).toEqual({
+			success: true,
+			deleted: ['notes/test.md'],
+			results: [{
+				path: 'notes/test.md',
+				consumedRevision: managedKey,
+				revision: expect.stringMatching(/^__crate__\/deletions\//) as string,
+				deleteRequestId: expect.any(String) as string,
+			}],
+		});
+		expect(files.has('notes/test.md')).toBe(false);
+		expect(new TextDecoder().decode(store.get(managedKey)?.body)).toBe('before');
+		expect(bucket.delete).not.toHaveBeenCalled();
+	});
+
 	it('downloads committed files through their D1 storage keys', async () => {
 		const managedKey = '__crate__/files/hash/object-1';
 		const { bucket } = createMockR2Bucket({
