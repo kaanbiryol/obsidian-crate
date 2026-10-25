@@ -29,9 +29,16 @@ export async function checkSaveLinkKeyboard(page) {
 		await expect.poll(async () => { const box = await surface.boundingBox(); return Math.round(box.y + box.height); }).toBe(page.viewportSize().height);
 		assert.deepEqual(await page.locator('.crate-modal-canvas').boundingBox(), baseline);
 		await expect.poll(async () => { const box = await field.boundingBox(); return box.y >= 0 && box.y + box.height <= page.viewportSize().height - 300; }).toBe(true);
-		for (const selector of ['.pwa-modal-sheet', '.pwa-modal-sheet__container', '.pwa-modal-sheet__content', '.pwa-modal-sheet__scroller']) {
-			await expect(page.locator(selector)).toHaveCSS('overflow-y', 'clip');
+		// No wrapper can scroll when WebKit focuses a field. The surface is the
+		// visible sheet: wrappers neither paint a shell nor clip its keyboard motion.
+		await expect(page.locator('.pwa-modal-sheet')).toHaveCSS('overflow-y', 'clip');
+		for (const selector of ['.pwa-modal-sheet__container', '.pwa-modal-sheet__content', '.pwa-modal-sheet__scroller']) {
+			await expect(page.locator(selector)).toHaveCSS('overflow-y', 'visible');
 		}
+		await expect(popup).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+		await expect(popup).toHaveCSS('box-shadow', 'none');
+		assert.equal(await popup.evaluate(element => getComputedStyle(element, '::after').content), 'none');
+		assert.notEqual(await surface.evaluate(element => getComputedStyle(element, '::after').content), 'none');
 		await field.evaluate(element => {
 			element.blur();
 			const focus = element.focus.bind(element);

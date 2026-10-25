@@ -28,9 +28,12 @@
 /* Only each form's content panel scrolls. Hidden overflow still lets WebKit
    pan outer wrappers when focusing a field, lifting the entire sheet. */
 .pwa-modal-sheet,.pwa-modal-sheet__container,.pwa-modal-sheet__content,.pwa-modal-sheet__scroller{overflow:clip!important}
-/* Anchor the grabber to the visible surface, including the moving reminder
-   stage. Let touches reach the header and Base UI's existing swipe handling. */
-.crate-reminders-ui .pwa-modal-sheet__container--settings::after,
+/* Keyboard motion offsets a settings surface from its wrappers' committed
+   layout. Visible overflow is just as unscrollable and never clips it. */
+.pwa-modal-sheet--settings :is(.pwa-modal-sheet__container,.pwa-modal-sheet__content,.pwa-modal-sheet__scroller){overflow:visible!important}
+/* Anchor the grabber to the visible surface that keyboard motion moves.
+   Let touches reach the header and Base UI's existing swipe handling. */
+.crate-reminders-ui .pwa-modal-sheet--settings .pwa-sheet-surface::after,
 .crate-reminders-ui .pwa-reminder-sheet-stage::after{content:"";position:absolute;top:5px;left:50%;z-index:2;width:36px;height:5px;border-radius:999px;background:var(--text-faint);opacity:.4;transform:translateX(-50%);pointer-events:none}
 /* Match Flutter's Cupertino grabber geometry: 5px above, 5px handle, 5px
    below before content. Include this inset in the measured editor header. */
