@@ -61,7 +61,7 @@ Keep PRs focused, explain behavior and recovery implications, and state what was
 
 ## Dependencies and automation
 
-Dependabot is configured to propose weekly npm and GitHub Actions updates. Development minor/patch changes may be grouped; runtime and major changes remain individually reviewable. This configuration creates no auto-merge rule. Its options follow [GitHub's Dependabot reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
+Dependabot is configured to propose weekly npm and GitHub Actions updates. Root development minor/patch changes, standalone server updates and GitHub Actions updates are each grouped into one pull request; other root runtime and major changes remain individually reviewable. This configuration creates no auto-merge rule. Its options follow [GitHub's Dependabot reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
 
 Review upstream changes and newly introduced install scripts, licenses, bundle size and browser/mobile support. Keep `package-lock.json` with dependency changes, run `npm run notices:generate` when needed, and rerun the full gate. Security-sensitive dependencies such as parsing, cryptography, push and build tooling warrant their relevant regressions. Keep Actions pinned to full commit SHAs and review permission changes. Normalize squash commit messages to the repository's lowercase convention.
 
