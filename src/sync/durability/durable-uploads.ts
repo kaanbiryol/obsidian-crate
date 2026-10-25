@@ -10,6 +10,7 @@ import type { UploadApplyPhase, UploadPhase } from '../diagnostics/upload-diagno
 import { isRefusedWrite, isStalePreparedUpload, refusedUploadResult } from '../failures';
 import type { UploadPreconditions } from '../encryption/encrypted-files';
 import { sha256Hex } from '@/platform/sha256';
+import { isSyncRevision } from '@/protocol/sync-validation';
 
 interface UploadTransport {
 	prepareUploadWire?(file: JournalUpload, preconditions?: UploadPreconditions): ReturnType<PrepareUploadWire>;
@@ -150,7 +151,7 @@ export class DurableUploads {
 		return isRefusedWrite(result.status, result.code);
 	}
 	private validate(file: JournalUpload, result?: UploadResult): void {
-		if (!result || result.path !== serverPath(file) || (result.success && (result.hash !== (file.encryptedWire?.hash ?? file.hash) || !result.revision))) throw new Error('Server returned an invalid upload receipt; the original upload is preserved for recovery');
+		if (!result || result.path !== serverPath(file) || (result.success && (result.hash !== (file.encryptedWire?.hash ?? file.hash) || !isSyncRevision(result.revision)))) throw new Error('Server returned an invalid upload receipt; the original upload is preserved for recovery');
 	}
 	private localReceipt(file: JournalUpload, receipt: UploadResult): UploadResult {
 		if (!file.encryptedWire) return receipt;
