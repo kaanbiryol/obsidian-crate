@@ -359,7 +359,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(highlightList.locator('.crate-reading-highlights__note')).toHaveText('A thought worth keeping');
     // Deleting from the list asks first; cancelling keeps the highlight.
     await highlightList.getByRole('button', { name: 'Delete highlight', exact: true }).click();
-    const confirmDelete = page.getByRole('dialog', { name: 'Delete highlight', exact: true });
+    const confirmDelete = page.getByRole('alertdialog', { name: 'Delete highlight', exact: true });
     await expect(confirmDelete).toContainText('This removes the highlight and its note.');
     await confirmDelete.getByRole('button', { name: /^Close/ }).click();
     await expect(confirmDelete).toHaveCount(0);

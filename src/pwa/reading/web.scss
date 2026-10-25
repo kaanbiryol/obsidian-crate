@@ -127,6 +127,11 @@ html.pwa-document-reader {
     @include glass.surface;
     border-radius: 999px;
   }
+  // Outline buttons force their action border; keep the shared material's border.
+  & .crate-reading-reader__highlights-button[data-variant] {
+    --crate-action-border: var(--pwa-glass-border);
+    @media (prefers-contrast: more) { --crate-action-border: var(--text-muted); }
+  }
   &__quick-actions { padding: 2px; gap: 2px; }
   &__quick-actions:empty { display: none; }
   &__quick-actions > button { border-radius: 50%; }

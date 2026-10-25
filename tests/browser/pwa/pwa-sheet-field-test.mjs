@@ -53,7 +53,7 @@ try {
 				await expect(popup).toBeVisible();
 				expect(await field.evaluate(element => [element.selectionStart, element.selectionEnd])).toEqual([8, 15]);
 			}
-			await checkSheetDragPosition(page, popup);
+			await checkSheetDragPosition(page, popup, { recedeCanvas: false });
 			await expect(field).toBeFocused();
 			await expect(field).not.toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
 			// Retarget the keyboard before either displacement finishes. A cancelled

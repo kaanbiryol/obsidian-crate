@@ -63,6 +63,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const readingUrl = await readingAppUrl();
     browser = await engine.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    // Background prefetch would save the article before its first visit. These
+    // checks cover an article that is not on the device yet; prefetch has unit tests.
+    await context.addInitScript(() => Object.defineProperty(navigator, 'connection', { configurable: true, value: { saveData: true } }));
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(readingUrl);
@@ -120,11 +123,17 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button', { name: 'Save a link', exact: true }).click();
     const captureSheet = page.getByRole('dialog', { name: 'Save a link' });
     const headerSave = captureSheet.locator('.reminder-modal-header').getByRole('button', { name: 'Save link', exact: true });
-    await expect(headerSave).toHaveText('Save');
+    await expect(headerSave).toHaveAttribute('title', 'Save');
+    await expect(headerSave.locator('svg[data-icon="arrow-up"]')).toHaveCount(1);
     await expect(headerSave).toBeDisabled();
     await expect(captureSheet.locator('.crate-dialog-actions')).toHaveCount(0);
-    const saveBounds = await headerSave.boundingBox();
-    assert.ok(saveBounds && saveBounds.width >= 44 && saveBounds.height >= 44);
+    // Header controls draw at 40px; an ::after inset extends the touch target to 44px.
+    const saveTarget = await headerSave.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      const outset = -parseFloat(getComputedStyle(element, '::after').top) || 0;
+      return { width: rect.width + 2 * outset, height: rect.height + 2 * outset };
+    });
+    assert.ok(saveTarget.width >= 44 && saveTarget.height >= 44, JSON.stringify(saveTarget));
     await page.getByLabel('Link', { exact: true }).fill('ftp://example.invalid/invalid');
     await expect(page.getByRole('button', { name: 'Save link', exact: true })).toBeDisabled();
     await expect(toast).toHaveCount(0);

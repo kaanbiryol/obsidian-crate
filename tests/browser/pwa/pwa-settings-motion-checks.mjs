@@ -126,11 +126,12 @@ export async function checkSettingsMotion(browser, origin) {
 		await page.getByRole('button', { name: 'Save a link', exact: true }).click();
 		const reading = page.getByRole('dialog', { name: 'Save a link', exact: true });
 		await expect(reading).toHaveCSS('transform', 'none');
-		await expect.poll(scale).toBeCloseTo(.94, 3);
+		// Only full-screen sheets recede the app behind them.
+		await expect(canvas).toHaveCSS('transform', 'none');
 		expect(await reading.evaluate(el => Boolean(el.closest('.crate-modal-canvas')))).toBe(false);
 		await expect(reading).toHaveCSS('transition-duration', '0.42s');
-		await checkSheetDragPosition(page, reading);
-		const checkReadingDismissal = await trackSheetDismissal(reading);
+		await checkSheetDragPosition(page, reading, { recedeCanvas: false });
+		const checkReadingDismissal = await trackSheetDismissal(reading, { recedeCanvas: false });
 		await swipe(page, reading.getByRole('heading', { name: 'Save a link', exact: true }));
 		await checkReadingDismissal();
 		await expect(reading).toHaveCount(0);
