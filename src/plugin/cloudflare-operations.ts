@@ -20,7 +20,6 @@ import { generateSecureToken, hashToken } from '../cloudflare/device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from './deviceInfo';
 import { openCloudflareDeploymentModal, revealCloudflareOperation, type CloudflareDeploymentModal } from '../ui/cloudflare/deployment-modal';
 import { dismissCloudflareAuthorizationModal, openCloudflareAuthorizationModal } from '../ui/cloudflare/authorization-modal';
-import { selectCloudflareServer } from '../ui/cloudflare/server-picker-modal';
 import {
 	CLOUDFLARE_OAUTH_CLIENT_ID,
 	isCloudflareOAuthConfigured,
@@ -53,7 +52,8 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 		transport: obsidianHttpTransport,
 		loadArtifacts: loadEmbeddedCloudflareArtifacts,
 		openExternal: url => openCloudflareAuthorization(plugin, url),
-		selectDeployment: (deployments, missingServer) => selectCloudflareServer(plugin.app, deployments, missingServer),
+		// Every operation passes its deployment dialog's own server picker.
+		selectDeployment: () => Promise.reject(new Error('Choose a server in the Cloudflare deployment dialog.')),
 		beforeServerSwitch: async () => {
 			plugin.clearSettingsUiState();
 			await plugin.syncRuntime.clearSyncConfiguration(signal);

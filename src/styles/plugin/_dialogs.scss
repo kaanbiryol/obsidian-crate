@@ -178,17 +178,6 @@
 }
 
 
-.modal.crate-cloudflare-server-picker-modal {
-	.crate-cloudflare-server-picker-description { margin: 0; line-height: 1.5; }
-	.crate-cloudflare-server-picker-help {
-		margin: 8px 0 var(--crate-dialog-gap);
-		color: var(--text-muted);
-		font-size: var(--font-ui-small);
-		line-height: 1.5;
-	}
-}
-
-
 .modal.crate-shared-modal.crate-file-history-modal {
 	width: min(800px, calc(100vw - 48px));
 	max-width: 800px;
