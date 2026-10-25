@@ -178,6 +178,9 @@
 		},
 		"@tailwindcss/cli": {
 			"@parcel/watcher": "2.5.6"
+		},
+		"linkedom": {
+			"htmlparser2": "$htmlparser2"
 		}
 	}
 }
