@@ -190,6 +190,33 @@ it('retries an interrupted setup with the same keys without starting a normal sy
 	expect(sync).not.toHaveBeenCalled();
 });
 
+it('shows the same recovery key each time setup opens until encryption is turned on', async () => {
+	const { button } = await renderRow();
+	const recoveryKey = () => (body.querySelector('textarea') as FakeElement & { value: string }).value;
+	const openSetup = async () => {
+		await vi.waitFor(() => expect(button.buttonEl.classNames.has('is-disabled')).toBe(false));
+		button.click();
+		await vi.waitFor(() => expect(body.querySelector('textarea')).not.toBeNull());
+		return recoveryKey();
+	};
+	const first = await openSetup();
+	closeModal();
+	read.mockRejectedValueOnce(new Error('Offline'));
+	button.click();
+	await vi.waitFor(() => expect(body.collectText()).toContain('Encryption status unavailable'));
+	MockSetting.instances.at(-1)!.buttons[0]!.click();
+	await vi.waitFor(() => expect(body.querySelector('textarea')).not.toBeNull());
+	expect(recoveryKey()).toBe(first);
+
+	acknowledge(); setting('Enable encryption').buttons[0]!.click();
+	await vi.waitFor(() => expect(body.collectText()).toContain('Your vault is protected'));
+	expect(convert.mock.calls[0]![1]).toBe(first);
+	closeModal();
+	// After encryption is turned off again, a new setup starts with a new key.
+	state = null; values.delete(SECRET_KEYS.ENCRYPTION_KEYS); values.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
+	expect(await openSetup()).not.toBe(first);
+});
+
 it('does not offer setup when the automatic key check fails', async () => {
 	vi.spyOn(await import('../../../encryption/recovery-verification'), 'verifyRecoveryCode').mockRejectedValueOnce(new Error('Recovery verification failed'));
 	await open();
