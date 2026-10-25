@@ -48,7 +48,7 @@ In the Cloudflare dashboard, select the account that will own the OAuth client, 
 
 Enable the `refresh_token` grant so the setup login can renew usage access; Cloudflare adds the `offline_access` protocol scope automatically. Do not enable `openid`, Implicit, or any client-secret authentication method. Crate is a public client and uses a fresh PKCE S256 verifier for each authorization.
 
-Select these five scopes in the dashboard. Keep all five scopes required. Both deployment and usage explicitly request all five; both also request `offline_access`. Retained usage credentials therefore include server management permissions as well as analytics access. The usage panel uses those credentials only to retrieve usage and renew access.
+Select these five scopes in the dashboard. Keep all five scopes required. Deployment explicitly requests all five and `offline_access`, and usage reuses that login. Retained usage credentials therefore include server management permissions as well as analytics access. The usage panel uses those credentials only to retrieve usage and renew access.
 
 | Cloudflare scope label | OAuth scope ID | Why Crate needs it |
 |---|---|---|

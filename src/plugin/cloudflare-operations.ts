@@ -38,7 +38,6 @@ export function createCloudflareUsageConnection(plugin: CratePlugin): Cloudflare
 		},
 		accountId: () => plugin.settings.cloudflareDeployment?.accountId,
 		signal: getPluginLifecycleSignal(plugin),
-		openExternal: url => openCloudflareAuthorization(plugin, url),
 	});
 }
 
@@ -110,16 +109,6 @@ export async function handleCloudflareOAuthProtocol(
 	if (signal.aborted) return;
 	dismissCloudflareAuthorizationModal(plugin.app);
 	plugin.openSettingsTab();
-	if (params.state?.startsWith('usage-')) {
-		try {
-			await plugin.cloudflareUsageConnection.handleCallback(params);
-			if (!signal.aborted) new Notice('Cloudflare usage connected. Refresh to load usage.');
-		} catch (error) {
-			if (!signal.aborted) new Notice(deploymentErrorMessage(error));
-		}
-		if (!signal.aborted) plugin.refreshSettingsTab();
-		return;
-	}
 	await runCloudflareOperation(plugin, params);
 }
 
