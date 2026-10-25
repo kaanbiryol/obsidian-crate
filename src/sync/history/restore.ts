@@ -90,13 +90,13 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
         restore: async () => {
             if (used) throw new Error('Review the restore again before retrying.');
             used = true;
-            await verify();
             if (!items.length) return;
             const folder = `${context.recoveryRoot}/${crypto.randomUUID()}`;
             if (!await vault.adapter.exists(context.recoveryRoot)) await vault.adapter.mkdir(context.recoveryRoot);
             await vault.adapter.mkdir(folder);
             const staged = new Map<string, { original?: string; target?: string }>();
-            // Stage and verify every required byte before altering any vault file.
+            // Stage and verify every required byte before altering any vault file; the
+            // inventory check below then catches any other change since the preview.
             // Originals and the inventory remain on disk across interruption/restart.
             for (const [index, item] of items.entries()) {
                 context.verify();

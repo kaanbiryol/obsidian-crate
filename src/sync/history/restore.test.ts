@@ -112,6 +112,8 @@ describe('whole synced vault restore', () => {
         expect(h.files.get('excluded/keep.md')).toEqual(bytes('private'));
         expect([...h.files].some(([path, content]) => path.endsWith('.original') && new TextDecoder().decode(content) === 'new')).toBe(true);
         expect(h.context.beforeApply).toHaveBeenCalledOnce();
+        // The preview and one check after staging; staging hash-checks each file.
+        expect(h.api.getManifest).toHaveBeenCalledTimes(2);
         await expect(review.restore()).rejects.toThrow('Review the restore again');
     });
 
@@ -160,6 +162,22 @@ describe('whole synced vault restore', () => {
         expect(h.trash).not.toHaveBeenCalled();
         expect(h.process).not.toHaveBeenCalled();
         expect(h.context.beforeApply).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['a local edit', (h: Awaited<ReturnType<typeof harness>>) => { h.files.set('a.md', bytes('edited after preview')); }],
+        ['a new local file', (h: Awaited<ReturnType<typeof harness>>) => { h.files.set('new.md', bytes('added after preview')); }],
+        ['a server change', (h: Awaited<ReturnType<typeof harness>>) => { h.remote['a.md'] = { ...h.remote['a.md']!, revision: 'newer' }; }],
+    ])('changes no file after %s since the preview', async (_change, change) => {
+        const h = await harness({ 'a.md': 'current', 'later.md': 'new' }, { 'a.md': 'old', 'b.md': 'deleted' });
+        const review = await createHistoryRestore(h.context);
+        change(h);
+        await expect(review.restore()).rejects.toThrow();
+        expect(h.trash).not.toHaveBeenCalled();
+        expect(h.process).not.toHaveBeenCalled();
+        expect(h.vault.createBinary).not.toHaveBeenCalled();
+        expect(h.context.beforeApply).not.toHaveBeenCalled();
+        expect(h.files.has('later.md')).toBe(true);
     });
 
     it('refuses corrupt downloaded bytes before applying anything', async () => {
