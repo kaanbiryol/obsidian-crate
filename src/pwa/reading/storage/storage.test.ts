@@ -131,6 +131,9 @@ it('reuses the encrypted Reading index only for the same encryption identity and
   // Entries list server paths, but every note must belong to the plaintext Reading folder.
   await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, item: { ...entry.item, path: 'Elsewhere/Other.md' } }]);
   await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
+  // No index can outgrow the library it describes.
+  await writeEncryptedReadingIndex(session, 'identity-a', Array.from({ length: 10_001 }, () => entry));
+  await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
 });
 
 it('removes queues from earlier sign-ins only while they match the reviewed export', async () => {

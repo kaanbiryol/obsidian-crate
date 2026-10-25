@@ -75,7 +75,8 @@ export async function pruneEncryptedReminderAttempts(scope: { vaultId: string; f
 
 /** One parsed note from the last complete encrypted list, by its server file. */
 export interface IndexedReminderNote { file: { path: string; hash: string; size: number; revision: string }; path: string; reminders: unknown[]; issue?: string }
-const MAX_INDEXED_NOTES = 100_000;
+/** The most notes an encrypted reminder list may hold; its persisted index shares the bound. */
+export const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
 const indexKey = (scope: string) => `index:${scope}`;
 
 function isIndexedNote(value: unknown): value is IndexedReminderNote {
@@ -95,7 +96,7 @@ export async function loadEncryptedReminderIndex(scope: string, identity: string
 		const raw = await db.get('attempts', indexKey(scope));
 		if (raw === undefined) return undefined;
 		const value: unknown = JSON.parse(openPrivateValue(raw, indexKey(scope)));
-		if (!isRecord(value) || value.identity !== identity || !Array.isArray(value.notes) || value.notes.length > MAX_INDEXED_NOTES) return undefined;
+		if (!isRecord(value) || value.identity !== identity || !Array.isArray(value.notes) || value.notes.length > MAX_ENCRYPTED_REMINDER_FILES) return undefined;
 		const notes = value.notes as unknown[];
 		return notes.every(isIndexedNote) ? notes : undefined;
 	} finally { db.close(); }

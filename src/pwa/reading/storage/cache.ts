@@ -1,5 +1,5 @@
 import type { ReadingItem } from '@/reading/core/model';
-import type { EncryptedReadingIndexEntry } from '@/pwa/reading/encrypted-api';
+import { MAX_READING_FILES, type EncryptedReadingIndexEntry } from '@/pwa/reading/encrypted-api';
 import { isRecord } from '@/platform/validation';
 import { decodeReadingValue, encodeReadingValue } from './private-storage';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
@@ -23,8 +23,6 @@ export async function readReadingCache(session: ReadingSession): Promise<Reading
   return value;
 }
 
-const MAX_INDEX_ENTRIES = 100_000;
-
 /**
  * Authenticated metadata from the last encrypted inventory, bound to its
  * encryption identity. A reload reuses entries whose file is unchanged instead
@@ -32,7 +30,7 @@ const MAX_INDEX_ENTRIES = 100_000;
  */
 export async function readEncryptedReadingIndex(session: ReadingSession, identity: string, folder: string): Promise<EncryptedReadingIndexEntry[] | undefined> {
   const value = await readReadingValue(`encrypted-index:${session.id}`);
-  if (!isRecord(value) || value.version !== 1 || value.identity !== identity || !Array.isArray(value.entries) || value.entries.length > MAX_INDEX_ENTRIES) return undefined;
+  if (!isRecord(value) || value.version !== 1 || value.identity !== identity || !Array.isArray(value.entries) || value.entries.length > MAX_READING_FILES) return undefined;
   const entries = value.entries as unknown[];
   return entries.every(isIndexEntry(folder)) ? entries : undefined;
 }

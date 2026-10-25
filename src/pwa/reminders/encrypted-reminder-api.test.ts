@@ -13,7 +13,8 @@ import { derivePathTagKey, PathTags } from '@/encryption/path-tags';
 
 const attempts = vi.hoisted(() => new Map<string, unknown>());
 const indexes = vi.hoisted(() => new Map<string, { identity: string; notes: unknown }>());
-vi.mock('./encrypted-reminder-attempts', () => ({
+vi.mock('./encrypted-reminder-attempts', async importOriginal => ({
+  MAX_ENCRYPTED_REMINDER_FILES: (await importOriginal<typeof import('./encrypted-reminder-attempts')>()).MAX_ENCRYPTED_REMINDER_FILES,
   loadEncryptedReminderAttempt: async (id: string) => attempts.get(id),
   saveEncryptedReminderAttempt: async (id: string, value: unknown) => { attempts.set(id, value); },
   loadEncryptedReminderIndex: async (scope: string, identity: string) => indexes.get(scope)?.identity === identity ? structuredClone(indexes.get(scope)!.notes) : undefined,

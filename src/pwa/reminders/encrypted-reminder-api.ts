@@ -11,7 +11,7 @@ import { ReminderMarkdownContextError } from '../../reminders/core/markdownTaskC
 import { MAX_REMINDER_NOTE_BYTES } from '../../reminders/core/constants';
 import { validateEncryptedSchedules, ENCRYPTED_SCHEDULING_CAPACITY_ISSUE } from '../../encryption/notification-format';
 import { capturePwaSession } from '../connection/session-generation';
-import { loadEncryptedReminderAttempt, loadEncryptedReminderIndex, saveEncryptedReminderAttempt, saveEncryptedReminderIndex, pruneEncryptedReminderAttempts, type EncryptedReminderAttempt as Attempt } from './encrypted-reminder-attempts';
+import { loadEncryptedReminderAttempt, loadEncryptedReminderIndex, saveEncryptedReminderAttempt, saveEncryptedReminderIndex, pruneEncryptedReminderAttempts, MAX_ENCRYPTED_REMINDER_FILES, type EncryptedReminderAttempt as Attempt } from './encrypted-reminder-attempts';
 import { PWA_ASSET_VERSION } from '../shell/version';
 import { requireCompatibleServer } from '../connection/server-compatibility';
 import type { FeatureKeys } from '../encryption/encryption-keys';
@@ -26,7 +26,6 @@ import { trimContentCache } from '@/pwa/storage/content-cache';
 import { resolveEncryptedPath } from '@/encryption/path-binding';
 import { compareCodePoints } from '@/protocol/initial-import';
 
-const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
 const NOTE_CONCURRENCY = 6;
 type ReminderPayload = Awaited<ReturnType<typeof reminderCommandPayload>>;
 /** `file` is listed by server path; `path` is the note's plaintext path. */
