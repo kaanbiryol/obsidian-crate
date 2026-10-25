@@ -1,0 +1,62 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import { applySchema } from '../../test-support/schema-test-harness';
+import { SyncTestDevice } from '../../test-support/sync-engine-test-harness';
+
+const clients: SyncTestDevice[] = [];
+beforeEach(async () => {
+  vi.stubGlobal('window', { setTimeout, clearTimeout });
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+  await applySchema(env.DB);
+});
+afterEach(async () => { for (const client of clients.splice(0)) client.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });
+
+async function device(id: string): Promise<SyncTestDevice> {
+  const client = new SyncTestDevice(id, env); clients.push(client);
+  await client.authorize(); await client.open();
+  return client;
+}
+
+const serverPaths = async () => (await env.DB.prepare('SELECT path FROM files ORDER BY path').all<{ path: string }>()).results.map(row => row.path);
+
+it('keeps the first device\'s unfinished import when a second device connects', async () => {
+  const first = await device('first-import');
+  await first.disk.vault.createFolder('Notes');
+  first.disk.write('Notes/a.md', 'alpha'); first.disk.write('Notes/b.md', 'beta');
+  vi.spyOn(first.api.initialImport, 'finish').mockRejectedValueOnce(new Error('offline'));
+  expect(await first.engine.sync()).toMatchObject({ success: false, uploaded: 2, errors: ['offline'] });
+
+  const second = await device('second-import');
+  const joined = await second.engine.sync();
+  expect(joined.success).toBe(false);
+  expect(joined.errors).toEqual(['Another device is uploading this vault for the first time. Let it finish, then sync.']);
+  expect(await serverPaths()).toEqual(['Notes/a.md', 'Notes/b.md']);
+
+  first.close(); await first.open();
+  expect((await first.engine.sync()).errors).toEqual([]);
+  expect(first.disk.text('Notes/a.md')).toBe('alpha'); expect(first.disk.text('Notes/b.md')).toBe('beta');
+  expect(first.disk.trash.size).toBe(0);
+  expect(await serverPaths()).toEqual(['Notes/a.md', 'Notes/b.md']);
+
+  expect((await second.engine.sync()).errors).toEqual([]);
+  expect(second.disk.text('Notes/a.md')).toBe('alpha'); expect(second.disk.text('Notes/b.md')).toBe('beta');
+});
+
+it('resumes on the first device after its first upload response is lost', async () => {
+  const first = await device('lost-receipt');
+  first.disk.write('note.md', 'first');
+  const paused = first.pauseNextUploadResponse();
+  const interrupted = first.engine.sync();
+  await paused.committed; first.close(); paused.release();
+  expect((await interrupted).outcome).toBe('cancelled');
+  expect(first.checkpoint().files['note.md']).toBeUndefined();
+
+  const second = await device('lost-receipt-second');
+  expect((await second.engine.sync()).errors).toEqual(['Another device is uploading this vault for the first time. Let it finish, then sync.']);
+  await first.open();
+  expect((await first.engine.sync()).errors).toEqual([]);
+  expect(await serverPaths()).toEqual(['note.md']);
+  expect(first.disk.text('note.md')).toBe('first');
+});

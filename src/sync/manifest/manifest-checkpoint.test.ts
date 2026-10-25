@@ -29,6 +29,7 @@ function checkpoint(): ManifestCheckpoint {
 			encryptedWire: { vaultId: 'vault-id', generation: 2, path: 'aaaaaaaaaaaaaaaaaaaaaaaaaa.md', expectedHash: hash, restoredHash: hash },
 		}],
 		initialConfigPull: { configDir: '.obsidian', files: { '.obsidian/app.json': hash } },
+		initialImportToken: '33333333-3333-4333-8333-333333333333',
 	};
 }
 

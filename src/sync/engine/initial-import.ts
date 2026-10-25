@@ -21,7 +21,11 @@ interface ImportContext {
   save(): Promise<void>;
   setLastSeq(seq: number): void;
   report(work: SyncWork): void;
+  getImportToken(): string | undefined;
+  setImportToken(token: string | undefined): void;
 }
+
+export const ANOTHER_DEVICE_IMPORTING = 'Another device is uploading this vault for the first time. Let it finish, then sync.';
 
 /** The committed remote inventory is the checkpoint; initial uploads need no receipt journal. */
 export async function runInitialImport(context: ImportContext, result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null> {
@@ -37,6 +41,15 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
   context.report({ phase: 'scanning' });
   const local = await getAllVaultFiles(transfer.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
   const remote = await context.api.getManifest();
+  // Only the device that started an import prunes or replaces its files. Without the
+  // token, an import is this device's only while it holds every server file's revision:
+  // the import is empty, or this device uploaded those files before tokens were kept.
+  if (context.getImportToken() !== session.token) {
+    const owned = Object.entries(remote.files).every(([path, entry]) => !!entry.revision && transfer.localManifest.getEntry(path)?.revision === entry.revision);
+    if (!owned) throw new Error(ANOTHER_DEVICE_IMPORTING);
+    context.setImportToken(session.token);
+    await context.save();
+  }
   const localPaths = new Set(local.map(file => file.path));
   const obsolete = Object.keys(remote.files).filter(path => !localPaths.has(path));
   await context.api.initialImport.prune(session.token, obsolete.map(path => ({ path, hash: remote.files[path]!.hash })));
@@ -112,6 +125,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
     context.throwIfDestroyed();
     context.report({ phase: 'saving' });
     context.setLastSeq(await context.api.initialImport.finish(session.token, inventory));
+    context.setImportToken(undefined);
     await context.save();
     return result;
   } finally { await context.save(); }
