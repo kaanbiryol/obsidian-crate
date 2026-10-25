@@ -44,11 +44,10 @@ it('keeps raw endpoint calls independent of engine journals after binding file o
 	await restarted.close();
 });
 
-it('protects remote copies for both single and batch deletion while an upload is unresolved', async () => {
+it('protects remote copies from deletion while an upload is unresolved', async () => {
 	const h = await fixture();
 	await expect(h.files.uploadFile('renamed.md', h.content, h.hash, h.content.byteLength, 'text/markdown', null)).rejects.toThrow('Lost response');
 	h.transport.mockClear();
-	await expect(h.files.deleteFile('old.md', h.hash, 'r1')).rejects.toThrow('pending uploads');
 	await expect(h.files.batchDelete(['old.md'], { 'old.md': h.hash }, { 'old.md': 'r1' })).rejects.toThrow('pending uploads');
 	expect(h.transport).not.toHaveBeenCalled();
 	await h.manifest.close();

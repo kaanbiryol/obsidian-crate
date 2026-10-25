@@ -110,7 +110,6 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 			size: number,
 			contentType: string,
 		) => Promise<UploadResult>>(),
-		deleteFile: vi.fn(),
 		downloadFile: vi.fn(),
 		getManifest: vi.fn<() => Promise<FileManifest>>(),
 		getPendingRestores: vi.fn<() => Array<{ path: string }>>(() => []),

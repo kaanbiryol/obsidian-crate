@@ -89,7 +89,7 @@ export class SyncApiClient {
 	private readonly syncApi: SyncWorkerApi;
 	/** Raw writes that bypass the durable upload journal and rename guards. Sync uses
 	 * the engine's file operations; these serve tests and tools acting as another device. */
-	readonly unjournaled: Pick<SyncWorkerApi, 'uploadFile' | 'deleteFile' | 'batchUpload' | 'batchDelete'>;
+	readonly unjournaled: Pick<SyncWorkerApi, 'uploadFile' | 'batchUpload' | 'batchDelete'>;
 	readonly sharedHistory: SharedHistoryApi;
 	private readonly authApi: AuthWorkerApi;
 	private readonly sharedSettingsApi: SharedSettingsWorkerApi;

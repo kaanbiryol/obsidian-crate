@@ -27,7 +27,6 @@ interface PlannerApi {
     cursorExpired?: boolean;
   }>;
   downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }>;
-  deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }>;
   batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>): Promise<{
     success: boolean;
     deleted: string[];

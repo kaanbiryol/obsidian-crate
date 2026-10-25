@@ -279,16 +279,6 @@ export class SyncWorkerApi {
 		return { ...result, content: opened.content, ...opened.metadata, verified: true };
 	}
 
-	async deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }> {
-		if (!expectedRevision) throw new HttpError('Missing remote revision; reconcile before deleting', 409, null, 'version_conflict');
-		if (this.encryption) expectedHash = (await this.encryption.expectedHash(path, expectedHash, expectedRevision))!;
-		const result = await this.http.requestJson<{ success: boolean; path: string }>('/sync/delete', {
-			method: 'POST',
-			body: JSON.stringify({ path: await this.wireFor(path), expectedHash, expectedRevision }),
-		});
-		return { ...result, path };
-	}
-
 	async checkForChanges(since: number): Promise<CheckResponse> {
 		return parseChangesCheck(await this.http.requestJson<unknown>(`/sync/check?since=${since}`), since);
 	}

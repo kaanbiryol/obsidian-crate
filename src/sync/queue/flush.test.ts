@@ -34,7 +34,6 @@ function createFlushHarness(overrides: Partial<{
 		size: number;
 		contentType: string;
 	}) => Promise<{ success: boolean; path: string; hash?: string; error?: string }>;
-	deleteFile: (path: string) => Promise<{ success: boolean; path: string }>;
 	batchDelete: (paths: string[]) => Promise<{ success: boolean; deleted: string[] }>;
 }> = {}) {
 	const pendingKeys = new Set<string>();
@@ -63,10 +62,6 @@ function createFlushHarness(overrides: Partial<{
 		overrides.uploadFile ??
 			(async ({ path }: UploadArgs) => ({ success: true, path })),
 	);
-	const deleteFile = vi.fn(
-		overrides.deleteFile ??
-			(async (path: string) => ({ success: true, path })),
-	);
 	const batchDelete = vi.fn(
 		overrides.batchDelete ??
 			(async (paths: string[]) => ({ success: true, deleted: paths })),
@@ -89,7 +84,6 @@ function createFlushHarness(overrides: Partial<{
 		setLastSync,
 		prepareUploadFromPath,
 		uploadFile,
-		deleteFile,
 		batchDelete,
 		setEntry,
 		removeEntry,
@@ -132,7 +126,6 @@ function createFlushHarness(overrides: Partial<{
 				isConfigured: vi.fn(() => overrides.configured ?? true),
 				uploadFile: (path: string, content: ArrayBuffer, hash: string, size: number, contentType: string) =>
 					uploadFile({ path, content, hash, size, contentType }),
-				deleteFile,
 				batchDelete,
 			},
 			localManifest: {

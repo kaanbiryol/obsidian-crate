@@ -112,7 +112,6 @@ describe('runIncrementalSync', () => {
 					hasMore: false,
 				})),
 				downloadFile: vi.fn(),
-				deleteFile: vi.fn(),
 				batchDelete,
 			},
 			localManifest,
@@ -175,7 +174,6 @@ describe('runIncrementalSync', () => {
 			files: {
 				getChanges: vi.fn(async () => ({ changes: [], lastSeq: 8, hasMore: false })),
 				downloadFile: vi.fn(),
-				deleteFile: vi.fn(),
 				batchDelete: vi.fn(async () => ({
 					success: false,
 					deleted: ['notes/ok.md'],
@@ -286,7 +284,6 @@ describe('runIncrementalSync', () => {
 					hasMore: false,
 				})),
 				downloadFile: vi.fn(),
-				deleteFile: vi.fn(),
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
