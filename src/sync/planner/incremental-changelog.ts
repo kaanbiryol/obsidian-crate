@@ -24,17 +24,14 @@ export async function readIncrementalChangelog(
     changeCount += response.changes.length;
     latestSeq = response.lastSeq;
 
-    if (!response.hasMore || response.changes.length === 0) {
+    if (!response.hasMore) {
       break;
     }
 
-    const lastChange = response.changes[response.changes.length - 1];
-    if (!lastChange) {
-      break;
-    }
-
-    if (lastChange.seq <= since) throw new Error('Changelog cursor did not advance');
-    since = lastChange.seq;
+    // An encrypted page can filter out every entry; keep paging from the raw page.
+    const next = response.nextSince ?? response.changes.at(-1)?.seq;
+    if (next === undefined || next <= since) throw new Error('Changelog cursor did not advance');
+    since = next;
   }
   return { changesByPath, changeCount, latestSeq };
 }
