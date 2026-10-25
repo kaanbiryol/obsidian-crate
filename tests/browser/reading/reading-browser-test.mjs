@@ -932,8 +932,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   const { buildPwaPreviewAssets } = await import('../support/preview/pwa-preview-assets.mjs');
   const { listenPwaPreviewServer } = await import('../support/preview/pwa-preview-server.mjs');
   const { server, origin } = await listenPwaPreviewServer({ port: 0, assets: await buildPwaPreviewAssets() });
-  const browser = await engine.launch();
+  let browser;
   try {
+    browser = await engine.launch();
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', serviceWorkers: 'block' });
     let status = 'pending';
     const item = () => ({ crate_reading_version: 1, crate_reading_id: '67de6c50-c70c-4c85-93f2-a048d9f33b1a', title: 'Extraction fixture',
@@ -956,5 +957,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     status = 'unavailable';
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
-  } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+  } finally {
+    try { await browser?.close(); }
+    finally { await new Promise(resolve => server.close(resolve)); }
+  }
 });
