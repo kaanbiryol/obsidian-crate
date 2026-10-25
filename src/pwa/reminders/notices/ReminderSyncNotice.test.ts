@@ -37,6 +37,14 @@ describe('PWA reminder sync recovery notice', () => {
 		expect(markup).not.toContain('>Edit</button>');
 	});
 
+	it('offers a reviewed export for an unconfirmed change instead of a plain discard', () => {
+		const markup = render([change({ status: 'uncertain', ambiguous: true })]);
+		expect(markup).toContain('aria-label="Retry: Buy milk"');
+		expect(markup).toContain('>Export change</button>');
+		expect(markup).not.toContain('>Discard</button>');
+		expect(markup).not.toContain('>Dismiss</button>');
+	});
+
 	it('offers retry and dismissal for a reverted deletion', () => {
 		const markup = render([{ ...change(), kind: 'delete', method: 'DELETE', path: '/reminders/delete' }]);
 		expect(markup).toContain('Couldn’t delete reminder: Buy milk');

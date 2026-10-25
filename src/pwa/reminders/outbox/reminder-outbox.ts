@@ -92,8 +92,9 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 	const discard = (operationId: string, reviewedChange?: string): void | Promise<void> => {
 		const remove = () => {
 			const change = storage.get(operationId);
-			if (!change || change.status !== 'failed' || !isCurrent()) return;
-			if (change.reviewRequired ? reviewedChange !== JSON.stringify(change) : change.ambiguous) return;
+			if (!change || change.status === 'pending' || !isCurrent()) return;
+			// A change that may have committed is removed only after its exact export was reviewed.
+			if (change.reviewRequired || change.ambiguous ? reviewedChange !== JSON.stringify(change) : change.status !== 'failed') return;
 			storage.remove(operationId);
 			refresh();
 		};

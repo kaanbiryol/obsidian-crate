@@ -297,6 +297,25 @@ describe('optimistic reminder outbox', () => {
 		expect(state.requests[1]?.init).toEqual(state.requests[0]?.init);
 	});
 
+	it('removes an unconfirmed change the server keeps rejecting only after its exact export was reviewed', async () => {
+		const state = harness();
+		const change = completion();
+		state.enqueue(change);
+		const first = state.drain();
+		state.requests[0]!.reject(new Error('Response lost after possible commit'));
+		await first;
+		state.retry(change.operationId);
+		const retry = state.drain();
+		state.requests[1]!.resolve(new Response(JSON.stringify({ code: 'version_conflict', error: 'Changed elsewhere' }), { status: 409 }));
+		await retry;
+		const stuck = state.storage.load()[0]!;
+		expect(stuck).toMatchObject({ status: 'uncertain', ambiguous: true });
+		await state.discard(change.operationId, JSON.stringify({ ...stuck, error: 'stale export' }));
+		expect(state.storage.load()).toHaveLength(1);
+		await state.discard(change.operationId, JSON.stringify(stuck));
+		expect(state.storage.load()).toEqual([]);
+	});
+
 	it.each(['pending', 'uncertain'] as const)('retains uncertainty for a previously dispatched %s command after restart', async status => {
 		const storage = memoryStorage();
 		const change = { ...completion(), status, attempts: 1 };
