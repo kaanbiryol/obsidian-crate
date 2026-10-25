@@ -203,6 +203,16 @@ describe('local article downloads', () => {
     expect(h.files.get(item.path)).toContain('Personal notes.');
     expect(h.library.isCapturing(item)).toBe(false);
   });
+  it('stops reporting a failed download once its note is deleted', async () => {
+    const h = harness(); h.vault.captureArticle = vi.fn().mockRejectedValue(new Error('Offline'));
+    const { item } = await h.library.add('https://example.com/article');
+    await expect(h.library.retryCapture(item)).rejects.toThrow('Offline');
+    await h.library.refresh();
+    expect(h.library.getSnapshot().issues).toHaveLength(1);
+    h.files.delete(item.path); h.library.invalidate(item.path);
+    await h.library.refresh();
+    expect(h.library.getSnapshot().issues).toEqual([]);
+  });
   it('keeps failed/offline bookmarks and allows retry after restarting the library', async () => {
     const h = harness(); h.vault.captureArticle = vi.fn().mockRejectedValue(new Error('Offline'));
     const { item } = await h.library.add('https://example.com/article');
