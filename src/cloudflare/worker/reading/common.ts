@@ -37,8 +37,12 @@ export async function readSource(env: Env, path: string) {
   if (file.size > MAX_READING_BYTES) throw new ReadingError('Reading notes must be smaller than 1 MB.', 413);
   const object = await env.BUCKET.get(file.storageKey);
   if (!object || object.size !== file.size) throw new ReadingError('The saved text is temporarily unavailable.', 503);
-  const content = await object.text();
-  if (await sha256Hex(content) !== file.hash) throw new ReadingError('The saved text could not be verified.', 503);
+  // Verify the stored bytes, then decode; a lossy decode would never match the hash.
+  const bytes = await object.arrayBuffer();
+  if (await sha256Hex(bytes) !== file.hash) throw new ReadingError('The saved text could not be verified.', 503);
+  let content: string;
+  try { content = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch { throw new ReadingError('Save this note as UTF-8 to use it in Reading. The original vault file remains synced.', 422, 'invalid_encoding'); }
   return { file, content };
 }
 export async function sourceById(env: Env, current: ReadingPolicy, id: unknown) {
