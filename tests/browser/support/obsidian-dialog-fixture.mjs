@@ -19,7 +19,7 @@ export const obsidianDomHelpers = `    HTMLElement.prototype.createEl = function
     HTMLElement.prototype.appendText = function(text) { this.append(text); };
 `;
 
-export const obsidianDialogModule = `      export function addIcon() {}      export function setIcon(el) {
+export const obsidianDialogModule = `      export function setIcon(el) {
         const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('viewBox','0 0 24 24');
         svg.setAttribute('width','18');svg.setAttribute('height','18');svg.setAttribute('stroke','currentColor');
         const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','M6 6l12 12M18 6 6 18');svg.append(path);el.append(svg);

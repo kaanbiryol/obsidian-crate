@@ -3,7 +3,6 @@ import { setIcon } from "obsidian";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import type { ThemeIconProps } from "../shared/ThemeIcon";
-import { obsidianIconId } from "./tabler";
 import "./styles.scss";
 
 type Props = ThemeIconProps & Omit<React.HTMLAttributes<HTMLDivElement>, "size" | "id" | "className">;
@@ -15,7 +14,7 @@ export const ObsidianIcon: React.FC<Props> = ({ size, id, className, ...rest }) 
       return;
     }
 
-    setIcon(div.current, obsidianIconId(id));
+    setIcon(div.current, id);
   }, [id]);
 
   return (

@@ -1,4 +1,4 @@
-import { ChevronsUpDown } from '@/ui/shared/icons/TablerIcon';
+import { ChevronsUpDown } from 'lucide-react';
 import { normalizeListStyle } from '@/ui/shared/list-style';
 import type { PwaPreferences } from './preferences';
 import { SettingsRow } from './SettingsRow';

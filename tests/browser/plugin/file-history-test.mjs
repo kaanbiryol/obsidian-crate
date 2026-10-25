@@ -106,7 +106,6 @@ const { outputFiles } = await build({
     setTitle() {} open() {document.body.append(this.modalEl);this.onOpen();if(this.modalEl.classList.contains('crate-file-history-modal')) this.modalEl.querySelector('button')?.focus();} close() {this.onClose();this.modalEl.remove();}
    }
    export class Notice {constructor(message){window.notice=message;}}
-   export function addIcon() {}
    export function setIcon(el,name) {
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
     svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.8');

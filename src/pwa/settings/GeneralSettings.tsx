@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { ListStyleSetting } from './ListStyleSetting';
 import { Button } from '@/ui/shared/Button';
-import { Monitor, Moon, Sun } from '@/ui/shared/icons/TablerIcon';
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';

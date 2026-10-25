@@ -5,6 +5,8 @@ import { NavigationFixture } from './NavigationFixture';
 import { PageTitleContext } from '@/reminders/ui/shared/lexical/pageTitles';
 import { AppDock } from '@/ui/shared/navigation/AppDock';
 import type { TabId } from '@/reminders/ui/shared/layoutConstants';
+import { LoaderCircle, TriangleAlert } from 'lucide-react';
+import type { ThemeIconProps } from '@/ui/shared/ThemeIcon';
 import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
@@ -55,6 +57,11 @@ document.head.append(style);
 // Pin every Reading view to the dock so Reading tests can switch sections directly.
 if (scene === 'reading' && host === 'pwa') savePwaPreferences({ ...loadPwaPreferences(), dockTabs: ['reading', 'favorites', 'archive', 'highlights'] });
 
+function GalleryIcon(props: ThemeIconProps) {
+  if (props.id === 'loader-circle') return <LoaderCircle size={18} aria-hidden="true" />;
+  return props.id === 'triangle-alert' ? <TriangleAlert size={18} aria-hidden="true" /> : <PwaThemeIcon {...props} />;
+}
+
 function Gallery() {
   usePwaInputModality();
   const [result, setResult] = useState('Ready');
@@ -67,7 +74,7 @@ function Gallery() {
   const [recurrence, setRecurrence] = useState<RecurrencePickerState>({ frequency: scene === 'monthly' ? 'monthly' as const : 'weekly' as const, interval: 2, daysOfWeek: [1, 3], dayOfMonth: 15, hour: 9, minute: 30 });
   const titleRef = useRef<HTMLDivElement>(null);
   const richRef = useRef<RichTextInputHandle>(null);
-  if (scene === 'project-interactions') return <ThemeIconProvider renderer={PwaThemeIcon}>
+  if (scene === 'project-interactions') return <ThemeIconProvider renderer={GalleryIcon}>
     <div data-ui-host={host} className={`crate-reminders-ui reminders-shadow-root ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}>
       <ProjectInteractionFixture host={host} isDark={isDark} />
     </div>
@@ -99,7 +106,7 @@ function Gallery() {
   else if (scene === 'cards' || scene === 'flat') content = <div className="reminders-view is-primary"><ReminderCard listStyle={scene} reminder={{ id: '1', content: 'Review the shared UI', description, completed: false, project: 'Work', priority: 1, dueDate: '2026-09-04' }} colorScheme={theme} animationConfig={{ enabled: false }} /><ReminderCard listStyle={scene} reminder={{ id: '2', content: 'Completed reminder', completed: true, project: 'Inbox' }} colorScheme={theme} animationConfig={{ enabled: false }} /></div>;
   else content = <DatePickerContent currentDate={date ? new Date(`${date}T09:30:00`) : null} hasTime isDark={isDark} commitDateOnChange={host === 'pwa'} onClose={noop} onSelectPreset={preset => setResult(preset)} onDateChange={value => { setDate(value); setResult(value); }} onTimeChange={(hour, minute) => setResult(`${hour}:${minute}`)} onTimeClear={() => setResult('Cleared time')} onRemove={() => setResult('Removed')} />;
   if (scene === 'loading' || scene === 'loading-block') content = <RemindersLoading compact={scene === 'loading-block'} />;
-  return <ThemeIconProvider renderer={PwaThemeIcon}><div data-ui-host={host} className={`crate-reminders-ui reminders-shadow-root ${host === 'plugin' && params.has('mobile') ? 'is-mobile' : ''} ${['reading', 'navigation', 'source'].includes(scene) ? `reading-gallery${host === 'pwa' ? ' pwa-reading-root' : ''}` : ''} ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}><main data-testid="visual-surface" className={`visual-surface ${['status', 'progress'].includes(scene) ? `modal crate-shared-modal crate-cloudflare-deployment-modal ${scene === 'progress' ? 'is-working' : ''}` : ''} ${host === 'pwa' ? ['editor', 'metadata'].includes(scene) ? 'modal-card pwa-reminder-editor' : 'pwa-picker-sheet' : 'base-modal-surface'} ${isDark ? 'dark' : ''}`}><div className={`visual-content ${['status', 'progress'].includes(scene) ? 'modal-content' : ''}`}>{content}</div></main><output data-testid="result">{result}</output></div></ThemeIconProvider>;
+  return <ThemeIconProvider renderer={GalleryIcon}><div data-ui-host={host} className={`crate-reminders-ui reminders-shadow-root ${host === 'plugin' && params.has('mobile') ? 'is-mobile' : ''} ${['reading', 'navigation', 'source'].includes(scene) ? `reading-gallery${host === 'pwa' ? ' pwa-reading-root' : ''}` : ''} ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}><main data-testid="visual-surface" className={`visual-surface ${['status', 'progress'].includes(scene) ? `modal crate-shared-modal crate-cloudflare-deployment-modal ${scene === 'progress' ? 'is-working' : ''}` : ''} ${host === 'pwa' ? ['editor', 'metadata'].includes(scene) ? 'modal-card pwa-reminder-editor' : 'pwa-picker-sheet' : 'base-modal-surface'} ${isDark ? 'dark' : ''}`}><div className={`visual-content ${['status', 'progress'].includes(scene) ? 'modal-content' : ''}`}>{content}</div></main><output data-testid="result">{result}</output></div></ThemeIconProvider>;
 }
 
 const app = document.getElementById('app')!;

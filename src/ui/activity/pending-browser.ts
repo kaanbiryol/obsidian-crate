@@ -1,5 +1,4 @@
 import { Notice, setIcon } from 'obsidian';
-import { obsidianIconId } from '../obsidian-icon/tabler';
 import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { isBinaryPreviewPath } from '../../sync/history/preview-format';
 import { decodePendingChange } from '../../sync/pending/pending-change';
@@ -41,7 +40,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     detail.id = `crate-pending-detail-${nextBrowserId}`;
     const toolbar = detail.createDiv({ cls: 'crate-browser-toolbar' });
     const back = toolbar.createEl('button', { cls: 'crate-browser-back', attr: { type: 'button', 'aria-label': 'Back to files' } });
-    setIcon(back.createSpan({ attr: { 'aria-hidden': 'true' } }), obsidianIconId('arrow-left'));
+    setIcon(back.createSpan({ attr: { 'aria-hidden': 'true' } }), 'arrow-left');
     back.createSpan({ text: 'Files' });
     const fileInfo = toolbar.createDiv({ cls: 'crate-browser-file-heading' });
     const fileName = fileInfo.createDiv({ cls: 'crate-browser-file-title' });
@@ -50,7 +49,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     toolbar.hidden = true;
     const preview = detail.createDiv({ cls: 'crate-file-diff' });
     const empty = preview.createDiv({ cls: 'crate-browser-empty' });
-    setIcon(empty.createSpan({ cls: 'crate-browser-empty-icon', attr: { 'aria-hidden': 'true' } }), obsidianIconId('file-diff'));
+    setIcon(empty.createSpan({ cls: 'crate-browser-empty-icon', attr: { 'aria-hidden': 'true' } }), 'file-diff');
     empty.createDiv({ text: 'Select a file', cls: 'crate-browser-empty-title' });
     empty.createDiv({ text: 'Compare this device’s changes with its last-synced copy.' });
 
@@ -144,7 +143,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
         } });
         button.tabIndex = index === 0 ? 0 : -1;
         if (selection) button.setAttribute('aria-keyshortcuts', 'Space');
-        if (!actions) setIcon(button.createSpan({ cls: 'crate-browser-file-icon', attr: { 'aria-hidden': 'true' } }), obsidianIconId(deleted ? 'trash-2' : 'file-text'));
+        if (!actions) setIcon(button.createSpan({ cls: 'crate-browser-file-icon', attr: { 'aria-hidden': 'true' } }), deleted ? 'trash-2' : 'file-text');
         const info = button.createSpan({ cls: 'crate-browser-file-info' });
         info.createSpan({ cls: 'crate-browser-file-name', text: parts.pop() ?? path, attr: { title: path } });
         const meta = info.createSpan({ cls: 'crate-browser-file-meta' });

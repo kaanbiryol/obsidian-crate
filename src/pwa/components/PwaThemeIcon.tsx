@@ -1,6 +1,114 @@
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowUp,
+  ArrowUpRight,
+  Play,
+  Pin,
+  PinOff,
+  FileText,
+  Link,
+  LogOut,
+  Search,
+  Share2,
+  Star,
+  Type,
+  Calendar,
+  BookOpen,
+  Settings,
+  CalendarPlus,
+  Sun,
+  Sunrise,
+  Sunset,
+  Minus,
+  CalendarCheck,
+  CalendarRange,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  CircleCheck,
+  Clock,
+  Copy,
+  MessageSquarePlus,
+  Pencil,
+  Eye,
+  EyeOff,
+  Flag,
+  FolderOpen,
+  Trash2,
+  X,
+  GripVertical,
+  Hash,
+  Highlighter,
+  Inbox,
+  Plus,
+  Repeat,
+  Sparkles,
+  SquarePen,
+  Smartphone,
+  StickyNote,
+  ExternalLink,
+  type LucideIcon,
+} from 'lucide-react';
+
 import type { ThemeIconProps, ThemeIconSize } from '@/ui/shared/ThemeIcon';
-import { TablerIcon } from '@/ui/shared/icons/TablerIcon';
-import { TABLER_ICONS } from '@/ui/shared/icons/tabler-icons.generated';
+
+const ICONS: Record<string, LucideIcon> = {
+  archive: Archive,
+  'archive-restore': ArchiveRestore,
+  'arrow-up': ArrowUp,
+  'arrow-up-right': ArrowUpRight,
+  'play': Play,
+  pin: Pin,
+  'pin-off': PinOff,
+  'file-text': FileText,
+  link: Link,
+  'log-out': LogOut,
+  search: Search,
+  'share-2': Share2,
+  star: Star,
+  type: Type,
+  'book-open': BookOpen,
+  settings: Settings,
+  folder: FolderOpen,
+  'trash-2': Trash2,
+  x: X,
+  calendar: Calendar,
+  'calendar-plus': CalendarPlus,
+  sun: Sun,
+  sunrise: Sunrise,
+  sunset: Sunset,
+  minus: Minus,
+  'calendar-check': CalendarCheck,
+  'calendar-range': CalendarRange,
+  check: Check,
+  copy: Copy,
+  'message-square-plus': MessageSquarePlus,
+  pencil: Pencil,
+  'chevron-down': ChevronDown,
+  'chevron-left': ChevronLeft,
+  'chevron-right': ChevronRight,
+  circle: Circle,
+  'circle-check': CircleCheck,
+  clock: Clock,
+  eye: Eye,
+  'eye-off': EyeOff,
+  flag: Flag,
+  'folder-open': FolderOpen,
+  'grip-vertical': GripVertical,
+  hash: Hash,
+  highlighter: Highlighter,
+  inbox: Inbox,
+  plus: Plus,
+  repeat: Repeat,
+  sparkles: Sparkles,
+  'square-pen': SquarePen,
+  smartphone: Smartphone,
+  'sticky-note': StickyNote,
+  'external-link': ExternalLink,
+};
 
 const ICON_SIZES: Record<ThemeIconSize, number> = {
   xs: 14,
@@ -11,13 +119,13 @@ const ICON_SIZES: Record<ThemeIconSize, number> = {
 };
 
 export function PwaThemeIcon({ id, size, className, ...rest }: ThemeIconProps) {
-  if (!TABLER_ICONS[id]) {
+  const Icon = ICONS[id];
+  if (!Icon) {
     return <span className={className} data-icon={id} data-icon-size={size} {...rest} />;
   }
 
   return (
-    <TablerIcon
-      name={id}
+    <Icon
       className={className}
       data-icon={id}
       data-icon-size={size}

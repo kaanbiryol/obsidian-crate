@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useRef } from 'react';
-import { ChevronsUpDown } from '@/ui/shared/icons/TablerIcon';
+import { ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/ui/shared/Button';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 

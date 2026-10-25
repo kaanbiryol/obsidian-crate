@@ -6,7 +6,7 @@ import { useIsPresent } from 'motion/react';
 import { PwaButton as Button } from './PwaButton';
 import {
 	Bell,
-} from '@/ui/shared/icons/TablerIcon';
+} from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { DataMode } from '../types';
 import { createPwaOpeningScreenHtml } from '../shell/opening-screen';

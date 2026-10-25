@@ -99,7 +99,6 @@ const { outputFiles } = await build({
   plugins: [{ name:'obsidian', setup(builder) {
     builder.onResolve({filter:/^obsidian$/}, () => ({path:'obsidian',namespace:'fixture'}));
     builder.onLoad({filter:/.*/,namespace:'fixture'}, () => ({contents:`
-      export function addIcon() {}
       export function setIcon() {} export function getIcon() { return null; }
       export class Scope { handlers=[]; register(modifiers,key,fn) {this.handlers.push({key,fn});} }
       export class Modal {

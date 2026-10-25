@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, KeyRound } from '@/ui/shared/icons/TablerIcon';
+import { Download, KeyRound } from 'lucide-react';
 import { PwaButton as Button } from '../components/PwaButton';
 import { SettingsSection } from '../settings/SettingsSection';
 import { SetupStep, SetupSteps } from '../components/SetupSteps';

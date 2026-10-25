@@ -577,5 +577,4 @@ export async function requestUrl(): Promise<never> {
 }
 
 export function setIcon(_element: HTMLElement, _icon: string): void {}
-export function addIcon(_iconId: string, _svgContent: string): void {}
 export function getIcon(_icon: string): SVGSVGElement | null { return null; }

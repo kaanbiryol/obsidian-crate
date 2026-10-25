@@ -1,5 +1,4 @@
 import { Notice, Platform, setIcon, type App } from 'obsidian';
-import { obsidianIconId } from '../obsidian-icon/tabler';
 import { SharedModal } from '../plugin/shared-modal';
 import type { FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 import { MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
@@ -232,7 +231,7 @@ class FileHistoryModal extends SharedModal {
 		if (!result.added && !result.removed) {
 			const state = output.createDiv({ cls: 'crate-history-no-diff', attr: { role: 'status' } });
 			const icon = state.createSpan({ cls: 'crate-history-state-icon', attr: { 'aria-hidden': 'true' } });
-			setIcon(icon, obsidianIconId('check'));
+			setIcon(icon, 'check');
 			const copy = state.createDiv();
 			copy.createEl('p', { cls: 'crate-history-state-title', text: 'No differences' });
 			copy.createEl('p', { text: 'This version matches the current local file.' });

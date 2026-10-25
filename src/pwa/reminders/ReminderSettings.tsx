@@ -1,4 +1,4 @@
-import { Check } from '@/ui/shared/icons/TablerIcon';
+import { Check } from 'lucide-react';
 import { PwaButton as Button } from '../components/PwaButton';
 import { SettingsRow } from '../settings/SettingsRow';
 import { SettingsSection } from '../settings/SettingsSection';

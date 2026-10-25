@@ -1,18 +1,18 @@
 import { SPINNER_SPOKES_HTML } from '../../ui/shared/spinner-spokes';
-import { createPwaOpeningDockHtml, tablerSvg } from './opening-dock';
+import { createPwaOpeningDockHtml, openingIconSvg } from './opening-dock';
 import type { resolvePwaOpeningDestination } from '../navigation/opening-destination';
 
 // Match the shared React loading indicator before the app module is available.
 const loadingIndicator = (label: string) => `<div class="crate-content-loading" role="status" aria-label="${label}"><svg class="crate-content-loading__spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">${SPINNER_SPOKES_HTML}</svg></div>`;
 
-const settings = tablerSvg('settings');
+const settings = openingIconSvg('settings', '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>');
 const iconButton = (icon: string, className = '') => `<span class="crate-icon-button ${className}" data-size="large" data-variant="ghost" aria-hidden="true">${icon}</span>`;
 const sync = `<span class="pwa-sync-indicator" aria-hidden="true"><span class="pwa-sync-indicator__button"><svg class="crate-sync-indicator" viewBox="0 0 16 16" data-sync-state="syncing" data-visual-state="syncing" aria-hidden="true" focusable="false"><circle class="crate-sync-indicator__halo" cx="8" cy="8" r="8"/><circle class="crate-sync-indicator__glow" cx="8" cy="8" r="7"/><circle class="crate-sync-indicator__dot" cx="8" cy="8" r="4"/><circle class="crate-sync-indicator__ripple" cx="8" cy="8" r="5.5"/></svg></span></span>`;
 
 function header(reading = false) {
 	return `<div class="view-header${reading ? ' crate-reading__header pwa-reading-opening__header' : ''}">
 		<div class="view-header-copy"><div class="view-header-title-row"><h1 class="view-header-title" data-pwa-launch-title>Reminders</h1></div><div class="view-header-meta is-reserved" aria-hidden="true"></div></div>
-		<div class="view-header-actions"><div class="crate-view-header-actions">${reading ? '<span class="pwa-reading-opening__sync" aria-hidden="true"></span>' : sync}${iconButton(settings, reading ? '' : 'pwa-header-settings-button')}${reading ? iconButton(tablerSvg('circle-check'), 'pwa-feature-switch-button') : ''}</div></div>
+		<div class="view-header-actions"><div class="crate-view-header-actions">${reading ? '<span class="pwa-reading-opening__sync" aria-hidden="true"></span>' : sync}${iconButton(settings, reading ? '' : 'pwa-header-settings-button')}${reading ? iconButton(openingIconSvg('circle-check', '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>'), 'pwa-feature-switch-button') : ''}</div></div>
 	</div>`;
 }
 
@@ -32,11 +32,11 @@ const reading = `<div class="crate-reminders-ui pwa-reading-root" data-pwa-stati
 const project = `<div class="crate-reminders-ui reminders-shadow-root pwa-shadow-root" data-pwa-static-shell><main class="pwa-screen reminders-view is-primary is-modal is-fullscreen pwa-mode-opening pwa-opening-screen is-project-detail">
 	<div class="pwa-project-layer" data-project-open="true"><div class="pwa-navigation-screen pwa-navigation-screen--project">
 		<div class="reminders-content"><div class="flex flex-col h-full relative min-h-0">
-			<div class="project-detail-navigation crate-detail-navigation">${iconButton(tablerSvg('chevron-left', '', 24), 'crate-back-button')}<div class="crate-view-header-actions">${sync}</div></div>
+			<div class="project-detail-navigation crate-detail-navigation">${iconButton(openingIconSvg('chevron-left', '<path d="m15 18-6-6 6-6"/>', '', 24), 'crate-back-button')}<div class="crate-view-header-actions">${sync}</div></div>
 			<div class="project-detail-header"><div class="project-detail-header-top"><div class="project-detail-title-row"><h1 class="project-detail-title" data-pwa-launch-title>Reminders</h1></div></div></div>
 			<div class="flex-1 min-h-0 overflow-y-auto ios-scroll reminders-view-scroll has-fab">${loadingIndicator('Loading reminders')}</div>
 		</div></div>
-		<span class="reminders-fab fab pwa-project-fab" aria-hidden="true">${tablerSvg('plus')}</span>
+		<span class="reminders-fab fab pwa-project-fab" aria-hidden="true">${openingIconSvg('plus', '<path d="M5 12h14"/><path d="M12 5v14"/>')}</span>
 	</div></div>
 </main></div>`;
 

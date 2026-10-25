@@ -94,7 +94,6 @@ const { outputFiles } = await build({
             export const Platform = { isMobile: false };
             export class Setting {}
             export class Notice { constructor(message) { window.notice = message; } }
-            export function addIcon() {}
             export function setIcon(el, name) {
                 const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none');

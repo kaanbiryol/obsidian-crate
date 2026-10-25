@@ -142,7 +142,7 @@ describe('plugin reminder layout styles', () => {
 
     expect(iconStyles).toContain('--icon-size: var(--icon-m');
     expect(iconStyles).toContain('--icon-stroke: var(--icon-m-stroke-width');
-    expect(iconComponent).toContain('setIcon(div.current, obsidianIconId(id))');
+    expect(iconComponent).toContain('setIcon(div.current, id)');
     expect(iconComponent).toContain('data-icon={id}');
   });
 

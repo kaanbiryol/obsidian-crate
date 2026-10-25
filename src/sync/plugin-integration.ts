@@ -1,5 +1,4 @@
 import { registerSyncStatus } from '../plugin/sync-status';
-import { obsidianIconId } from '../ui/obsidian-icon/tabler';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, TFile, type Events, type TAbstractFile } from 'obsidian';
@@ -45,7 +44,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 export function registerSyncCommands(plugin: CratePlugin): void {
 	plugin.registerEvent(plugin.app.workspace.on('file-menu', (menu, file) => {
 		if (!(file instanceof TFile) || !plugin.syncRuntime.isConfigured()) return;
-		menu.addItem(item => item.setTitle('File history').setIcon(obsidianIconId('history')).onClick(() => {
+		menu.addItem(item => item.setTitle('File history').setIcon('history').onClick(() => {
 			openFileHistoryWhenReady(plugin, file.path);
 		}));
 	}));
