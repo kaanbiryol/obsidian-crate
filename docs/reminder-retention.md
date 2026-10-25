@@ -20,6 +20,8 @@ An expired result does not prove that an earlier attempt failed. The PWA keeps t
 
 Select **Export expired change**, save the full JSON, and compare it with current reminders and vault files. After checking the export and current data, select **Remove exported change from device**. Removal runs under the outbox Web Lock and requires the current stored change to match the reviewed export. Changes made by another tab after export require another export. Restore only missing work as a new reminder or an intentional new edit. The application does not generate a replacement command automatically.
 
+A change whose earlier attempt may have committed, and which the server now rejects (for example because the reminder changed in Obsidian), stays retryable. Its notice also offers **Export change** and then **Remove exported change from device**, with the same exact-match and Web Lock rules, so it cannot block reordering or app updates for the rest of its window.
+
 Independently saved drafts with no dispatched attempt can receive a new operation ID when saved.
 
 ## Notification occurrences

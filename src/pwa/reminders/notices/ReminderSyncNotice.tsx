@@ -62,11 +62,13 @@ export function ReminderSyncNotice({
 						actions={change.reviewRequired ? <ExpiredReminderChangeActions change={change} onDiscard={onDiscard} /> : <>
 							<BaseButton variant="ghost" size="touch" type="button" onClick={() => onRetry(change.operationId)} disabled={isOffline} aria-label={`Retry: ${title}`}>Retry</BaseButton>
 							{failedSave && <BaseButton variant="ghost" size="touch" type="button" onClick={() => onEdit(change.operationId)} disabled={isOffline} aria-label={`Edit: ${title}`}>Edit</BaseButton>}
-							{change.status === 'failed' && (
-								<BaseButton variant="ghost" size="touch" type="button" onClick={() => onDiscard(change.operationId)} aria-label={`${failedSave ? 'Discard' : 'Dismiss'}: ${title}`}>
-									{failedSave ? 'Discard' : 'Dismiss'}
-								</BaseButton>
-							)}
+							{change.ambiguous
+								? <ExpiredReminderChangeActions change={change} onDiscard={onDiscard} />
+								: change.status === 'failed' && (
+									<BaseButton variant="ghost" size="touch" type="button" onClick={() => onDiscard(change.operationId)} aria-label={`${failedSave ? 'Discard' : 'Dismiss'}: ${title}`}>
+										{failedSave ? 'Discard' : 'Dismiss'}
+									</BaseButton>
+								)}
 						</>}>
 						<span className="pwa-reminder-change-title">{title}</span>
 						{description && <details><summary>Draft details</summary><p>{description}</p></details>}
