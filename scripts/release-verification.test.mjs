@@ -174,7 +174,8 @@ test('draft attachment depends on the complete verifier, with reproduction gated
 	assert.equal(verify.jobs.reproducible.needs, 'checks');
 	assert.equal(verify.jobs.reproducible.if, "inputs.release-tag != ''");
 	assert.ok(verify.jobs.reproducible.steps.some(step => step.run === 'node scripts/release-artifacts.mjs reproduce'));
-	assert.ok(verify.jobs.checks.steps.some(step => step.run === 'npm run security:check' && !step.if));
+	assert.ok(verify.jobs.checks.steps.some(step => step.run === 'npm run security:audit' && !step.if));
+	assert.ok(verify.jobs.checks.steps.some(step => step.run === 'npm run security:secrets' && step.if === '${{ !cancelled() }}'));
 	assert.ok(verify.jobs.checks.steps.some(step => step.run?.includes('npm run check:server-revision') && step.if === "inputs.reuse-run-id != ''"));
 	// Version-only parent reuse skips test jobs, but the checks, staging and reproducible rebuild still run.
 	for (const [name, job] of Object.entries(verify.jobs)) {
