@@ -542,7 +542,8 @@ API budget. Other requests with unrecognized credentials, plus the sensitive
 Reading/notification actions, use the edge admission binding: 60 requests per
 minute per hashed source address and deployment host. Invalid rotating bearer
 tokens share that budget. The local server replaces client-supplied forwarding
-headers with the socket address.
+headers with the socket address. Behind its managed Cloudflare Tunnel, where every
+request arrives from loopback, it uses the client address Cloudflare forwards.
 
 A successful D1 authentication records only a bounded, 60-second credential-hash
 hint in the isolate. Subsequent ordinary requests use a separate local budget
