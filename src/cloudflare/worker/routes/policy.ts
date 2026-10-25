@@ -13,6 +13,9 @@ interface ApiRoutePolicy {
 }
 
 const COORDINATOR = { kind: 'coordinator', wake: true } as const;
+/** Serialized with mutations but creating no notification or Reading work, so it
+ * neither arms a processing pass nor resets the retry budget of a running one. */
+const COORDINATOR_READ = { kind: 'coordinator', wake: false } as const;
 const READING_GRANT = { kind: 'reading-grant' } as const;
 
 const VAULT: readonly Scope[] = ['vault'];
@@ -28,22 +31,22 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /encryption/pairing': { scopes: LIBRARY },
 	'GET /encryption': { scopes: REMINDERS },
 	'GET /encryption/deletion-precondition': { scopes: VAULT },
-	'GET /encryption/reset': { scopes: VAULT, execution: COORDINATOR },
+	'GET /encryption/reset': { scopes: VAULT, execution: COORDINATOR_READ },
 	'POST /encryption/metadata': { scopes: VAULT },
 	'POST /encryption/reset': { scopes: VAULT, execution: COORDINATOR },
 	'GET /reminders/encrypted-files': { scopes: REMINDERS },
 	'GET /reminders/encrypted-file': { scopes: REMINDERS },
 	'POST /reminders/encrypted-commit': { scopes: REMINDERS, execution: COORDINATOR },
-	'GET /reading/encryption': { scopes: LIBRARY, execution: COORDINATOR },
-	'GET /reading/encrypted-files': { scopes: LIBRARY, execution: COORDINATOR },
-	'GET /reading/encrypted-file': { scopes: LIBRARY, execution: COORDINATOR },
+	'GET /reading/encryption': { scopes: LIBRARY },
+	'GET /reading/encrypted-files': { scopes: LIBRARY },
+	'GET /reading/encrypted-file': { scopes: LIBRARY },
 	'POST /reading/encrypted-commit': { scopes: LIBRARY, execution: COORDINATOR },
 	// Outside the coordinator: a slow page download must not hold the write lock.
 	'POST /reading/encrypted-extract': { scopes: LIBRARY },
 	'GET /health': { scopes: REMINDERS },
 	'GET /diagnostics': { scopes: VAULT },
 	'GET /settings': { scopes: VAULT },
-	'PUT /settings': { scopes: VAULT, execution: COORDINATOR },
+	'PUT /settings': { scopes: VAULT, execution: COORDINATOR_READ },
 	'GET /features': { scopes: LIBRARY },
 	'POST /features': { scopes: VAULT, execution: COORDINATOR },
 	'GET /auth/tokens': { scopes: VAULT },
@@ -96,8 +99,9 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /reading/update': { scopes: LIBRARY, execution: COORDINATOR },
 	'POST /reading/retry': { scopes: LIBRARY, execution: COORDINATOR },
 	'POST /reading/policy': { scopes: VAULT, execution: COORDINATOR },
-	'GET /reading/policy': { scopes: VAULT, execution: COORDINATOR },
-	'GET /reading/session': { scopes: LIBRARY, execution: COORDINATOR },
+	'GET /reading/policy': { scopes: VAULT, execution: COORDINATOR_READ },
+	'GET /reading/session': { scopes: LIBRARY, execution: COORDINATOR_READ },
+	// Plaintext list and item reads project the folder under the lock and can queue extractions.
 	'GET /reading/list': { scopes: LIBRARY, execution: COORDINATOR },
 	'GET /reading/item': { scopes: LIBRARY, execution: COORDINATOR },
 	[`POST ${shortcut.preparePath}`]: { scopes: ['reading_capture'], execution: COORDINATOR },

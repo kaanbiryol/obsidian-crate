@@ -64,4 +64,6 @@ it('does not wake notifications for settings or binary uploads', async () => {
   }), env)).status).toBe(200);
   const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
   expect(await runInDurableObject(coordinator, (_instance, state) => state.storage.getAlarm())).toBeNull();
+  // A wake would also have recorded a processing run with a fresh retry budget.
+  expect(await runInDurableObject(coordinator, (_instance, state) => state.storage.get('notificationRun'))).toBeUndefined();
 });
