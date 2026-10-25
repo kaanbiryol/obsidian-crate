@@ -92,6 +92,8 @@ main { overflow-x:clip; }
 
 /* A soft accent glow behind each section's main visual, echoing the hero. */
 #sync > .reminder-recording .recording-media,#reminders > .reminder-recording .recording-media,.reading-previews { position:relative; isolation:isolate; }
+.reading-desktop { display:block; margin:48px 0 64px; }
+@media(max-width:600px) { .reading-desktop { margin:32px 0 40px; } }
 #sync > .reminder-recording .recording-media::before,#reminders > .reminder-recording .recording-media::before,.reading-previews::before { content:""; position:absolute; inset:-14% -10%; z-index:-1; pointer-events:none; background:radial-gradient(ellipse at center,#8b5cf61c,transparent 62%); }
 
 /* Notification spotlight: the lock screen recording flanked by reminder banners.
