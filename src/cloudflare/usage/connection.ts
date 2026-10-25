@@ -1,8 +1,7 @@
 import type { UsageSnapshot } from './snapshot';
 import type { HttpTransport } from '../http';
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from '../oauth/client';
-import { CLOUDFLARE_OAUTH_AUTHORIZE_URL, CLOUDFLARE_OAUTH_REDIRECT_URL, CLOUDFLARE_ANALYTICS_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
-import { constantTimeEqual, createPkcePair, randomBase64Url } from '../oauth/pkce';
+import { CLOUDFLARE_ANALYTICS_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
 import { fetchCloudflareUsage } from './service';
 import type { SecretKey } from '../../platform/secret-keys';
 
@@ -19,17 +18,15 @@ interface Options {
 	transport: HttpTransport;
 	secrets: Secrets;
 	accountId: () => string | null | undefined;
-	openExternal: (url: string) => void;
 	signal: AbortSignal;
 	now?: () => number;
 	cache?: { read(): UsageSnapshot | null; write(snapshot: UsageSnapshot): Promise<void> };
 }
 
-/** Retains the setup login for on-demand usage; also supports reconnecting older installations. */
+/** Retains the setup login for on-demand usage and saved-login server operations. */
 export class CloudflareUsageConnection {
 	private readonly oauth: CloudflareOAuthClient;
 	private readonly now: () => number;
-	private pending?: { state: string; verifier: string; accountId: string; createdAt: number; revision: number };
 	private revision = 0;
 	private busy = false;
 	private authorizationRequired = false;
@@ -56,7 +53,6 @@ export class CloudflareUsageConnection {
 		this.save(accountId, tokens);
 		this.authorizationRequired = false;
 		++this.revision;
-		this.pending = undefined;
 	}
 
 	/** Revokes the saved login best effort and clears it, for example after its server is deleted. */
@@ -65,62 +61,6 @@ export class CloudflareUsageConnection {
 		this.options.secrets.set(this.key(accountId), '');
 		++this.revision;
 		if (credentials) await this.revoke(credentials);
-	}
-
-	async connect(): Promise<void> {
-		this.options.signal.throwIfAborted();
-		if (this.busy) throw new Error('Wait for the current usage request to finish.');
-		const accountId = this.options.accountId();
-		if (!accountId) throw new Error('Connect a Cloudflare server first.');
-		const revision = ++this.revision;
-		const { verifier, challenge } = await createPkcePair();
-		this.check(accountId, revision);
-		const state = `usage-${randomBase64Url(32)}`;
-		this.pending = { state, verifier, accountId, createdAt: this.now(), revision };
-		const url = new URL(CLOUDFLARE_OAUTH_AUTHORIZE_URL);
-		url.search = new URLSearchParams({
-			response_type: 'code', client_id: this.options.clientId,
-			redirect_uri: CLOUDFLARE_OAUTH_REDIRECT_URL,
-			scope: [...CLOUDFLARE_OAUTH_SCOPES, 'offline_access'].join(' '), state,
-			code_challenge: challenge, code_challenge_method: 'S256',
-		}).toString();
-		this.options.openExternal(url.toString());
-	}
-
-	async handleCallback(params: Record<string, string>): Promise<void> {
-		this.options.signal.throwIfAborted();
-		if (this.busy) throw new Error('A usage request is already in progress.');
-		const pending = this.pending;
-		if (!pending || !params.state || !constantTimeEqual(params.state, pending.state)) {
-			throw new Error('Usage authorization did not match. Connect again.');
-		}
-		this.pending = undefined;
-		this.check(pending.accountId, pending.revision);
-		if (this.now() - pending.createdAt > 600_000) throw new Error('Usage authorization expired. Connect again.');
-		if (params.error || !params.code) throw new Error('Usage authorization was cancelled or denied.');
-		this.busy = true;
-		let tokens: CloudflareOAuthTokens | undefined;
-		try {
-			tokens = await this.oauth.exchangeTokens(params.code, pending.verifier);
-			this.check(pending.accountId, pending.revision);
-			this.validateScope(tokens);
-			// Verify that consent covers this server's account, even when all datasets are empty.
-			const response = await this.options.transport('https://api.cloudflare.com/client/v4/graphql', {
-				method: 'POST', headers: { Authorization: `Bearer ${tokens.accessToken}`, 'Content-Type': 'application/json' },
-				body: JSON.stringify({ query: `query { viewer { accounts(filter: { accountTag: ${JSON.stringify(pending.accountId)} }) { accountTag } } }` }),
-			});
-			this.check(pending.accountId, pending.revision);
-			const data = JSON.parse(response.text) as { errors?: unknown[]; data?: { viewer?: { accounts?: { accountTag: string }[] } } };
-			if (response.status !== 200 || data.errors?.length || !data.data?.viewer?.accounts?.some(a => a.accountTag === pending.accountId)) {
-				throw new Error('Authorize analytics for the account that owns this Crate server.');
-			}
-			this.save(pending.accountId, tokens);
-			this.authorizationRequired = false;
-			tokens = undefined;
-		} finally {
-			if (tokens) await this.revoke(tokens);
-			this.busy = false;
-		}
 	}
 
 	async withAuthorization<T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>): Promise<T> {

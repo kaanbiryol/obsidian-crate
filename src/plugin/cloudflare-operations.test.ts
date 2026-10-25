@@ -98,9 +98,9 @@ afterEach(() => {
 	vi.doUnmock('../cloudflare/http');
 });
 
-it('routes deployment and usage sign-in through a tappable link on mobile', async () => {
+it('routes deployment sign-in through a tappable link on mobile', async () => {
 	platform.isMobile = true;
-	const { createCloudflareDeploymentService, createCloudflareUsageConnection } = await loadPluginIntegration();
+	const { createCloudflareDeploymentService } = await loadPluginIntegration();
 	const plugin = createPlugin();
 	Object.assign(plugin.app, { vault: { getName: () => 'Test vault' } });
 	Object.assign(plugin, {
@@ -109,9 +109,8 @@ it('routes deployment and usage sign-in through a tappable link on mobile', asyn
 	});
 
 	await createCloudflareDeploymentService(plugin as never).startDeployment('create');
-	await createCloudflareUsageConnection(plugin as never).connect();
 
-	expect(openCloudflareAuthorizationModal).toHaveBeenCalledTimes(2);
+	expect(openCloudflareAuthorizationModal).toHaveBeenCalledOnce();
 	for (const [app, url, signal] of openCloudflareAuthorizationModal.mock.calls) {
 		expect(app).toBe(plugin.app);
 		const authorizationUrl = new URL(String(url));

@@ -15,7 +15,7 @@ function harness(status: number, scope = CLOUDFLARE_OAUTH_SCOPES.join(' ')) {
   const transport = vi.fn<HttpTransport>(async () => ({ status, text: JSON.stringify({ success: false, errors: [{ message: 'Denied' }] }) }));
   const secrets = new Map<string, string>();
   const connection = new CloudflareUsageConnection({ clientId: 'client', transport, signal: new AbortController().signal,
-    accountId: () => settings.cloudflareDeployment.accountId, openExternal: vi.fn(),
+    accountId: () => settings.cloudflareDeployment.accountId,
     secrets: { get: key => secrets.get(key), set: (key, value) => { secrets.set(key, value); } } });
   connection.acceptAuthorization(settings.cloudflareDeployment.accountId, { accessToken: 'synthetic', expiresIn: 3600, scope });
   const service = new CloudflareDeploymentService({ clientId: 'client', settingsOwner: { settings, writeSettings: async update => { Object.assign(settings, update); } },
