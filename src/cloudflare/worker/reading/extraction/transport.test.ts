@@ -41,3 +41,9 @@ it('bounds decoded bodies and revalidates redirects without passing credentials'
   await expect(fetchArticle('https://example.com/', async () => new Response('a'.repeat(2*1024*1024+1), { headers: {'Content-Type':'text/html'} }))).rejects.toThrow('large');
   await expect(fetchArticle('https://crate.example.com/', fetcher, 'https://crate.example.com')).rejects.toThrow('own server');
 });
+
+it('decodes a page by its markup charset and skips unknown labels', async () => {
+  const legacy = new Uint8Array([...new TextEncoder().encode('<meta charset="windows-1252"><p>caf'), 0xe9, ...new TextEncoder().encode('</p>')]);
+  expect((await fetchArticle('https://example.com/', async () => new Response(legacy, { headers: { 'Content-Type': 'text/html' } }))).html).toContain('café');
+  expect((await fetchArticle('https://example.com/', async () => new Response('<p>café</p>', { headers: { 'Content-Type': 'text/html; charset=bogus' } }))).html).toContain('café');
+});
