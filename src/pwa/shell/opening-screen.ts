@@ -12,7 +12,7 @@ const sync = `<span class="pwa-sync-indicator" aria-hidden="true"><span class="p
 function header(reading = false) {
 	return `<div class="view-header${reading ? ' crate-reading__header pwa-reading-opening__header' : ''}">
 		<div class="view-header-copy"><div class="view-header-title-row"><h1 class="view-header-title" data-pwa-launch-title>Reminders</h1></div><div class="view-header-meta is-reserved" aria-hidden="true"></div></div>
-		<div class="view-header-actions"><div class="crate-view-header-actions">${reading ? '<span class="pwa-reading-opening__sync" aria-hidden="true"></span>' : sync}${iconButton(settings, reading ? '' : 'pwa-header-settings-button')}${reading ? iconButton(openingIconSvg('circle-check', '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>'), 'pwa-feature-switch-button') : ''}</div></div>
+		<div class="view-header-actions"><div class="crate-view-header-actions">${reading ? '<span class="pwa-reading-opening__sync" aria-hidden="true"></span>' : sync}${iconButton(settings, reading ? '' : 'pwa-header-settings-button')}${reading ? iconButton(openingIconSvg('list-todo', '<rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4M13 6h8M13 10h8M13 16h8M13 20h8"/>'), 'pwa-feature-switch-button') : ''}</div></div>
 	</div>`;
 }
 

@@ -1,7 +1,7 @@
 export const DEFAULT_DOCK_TABS = ['inbox', 'today', 'browse', 'reading'] as const;
 export const DOCK_TABS = [
 	{ id: 'inbox', label: 'Inbox', iconName: 'inbox' },
-	{ id: 'today', label: 'Reminders', iconName: 'circle-check' },
+	{ id: 'today', label: 'Reminders', iconName: 'calendar' },
 	{ id: 'browse', label: 'Projects', iconName: 'folder-open' },
 	{ id: 'reading', label: 'Reading', iconName: 'book-open' },
 	{ id: 'favorites', label: 'Favorites', iconName: 'star' },
