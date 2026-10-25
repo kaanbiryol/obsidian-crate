@@ -6,8 +6,6 @@ import {
 	finalizeSyncResult,
 } from '../sync-result';
 import { createLogger } from '../logger';
-import { errorMessage } from '../../platform/logger';
-import type { LocalManifestView } from '../manifest/manifest';
 import { getPathEntry } from '../../protocol/path-record';
 import type { PreparedUpload, RemoteManifest, SyncResult, SyncState } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
@@ -30,9 +28,8 @@ export interface ForceSyncWorkflowContext {
 	updateState(updates: Partial<SyncState>): void;
 	shouldIgnore(path: string): boolean;
 	getManifest(): Promise<RemoteManifest>;
-	snapshotLocalManifest(): LocalManifestView;
-	clearLocalManifest(): void;
-	replaceLocalManifest(manifest: LocalManifestView): void;
+	getLocalManifestPaths(): string[];
+	removeLocalManifestEntry(path: string): void;
 	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
 	prepareUploadsFromVaultFiles(
 		files: VaultFile[],
@@ -57,15 +54,11 @@ export async function runForceFullSyncWorkflow(
 	const startFailure = beginSyncAttempt(context);
 	if (startFailure) return startFailure;
 	const result = createEmptySyncResult();
-	let previousLocalManifest = context.snapshotLocalManifest();
-	let manifestCommitted = false;
-	let manifestCleared = false;
 	const failures: MutationFailure[] = [];
 
 	try {
 		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
-		previousLocalManifest = context.snapshotLocalManifest();
 		context.throwIfDestroyed();
 		context.updateState({ work: { phase: 'server' } });
 		const remoteManifest = await context.getManifest();
@@ -83,9 +76,8 @@ export async function runForceFullSyncWorkflow(
 		const total = files.length + remoteOnlyPaths.length;
 		let current = 0;
 
-		context.clearLocalManifest();
-		manifestCleared = true;
-
+		// The manifest keeps its baselines while uploading, so an interrupted run
+		// leaves correct entries for every file it has not reached yet.
 		for (const chunk of context.createVaultFileChunks(files)) {
 			context.updateState({ work: { phase: 'preparing' } });
 			const prepared = await context.prepareUploadsFromVaultFiles(chunk, () => {
@@ -118,9 +110,13 @@ export async function runForceFullSyncWorkflow(
 			return { path, hash: entry?.hash, revision: entry?.revision };
 		}), result), result, { onProcessed: count => { current += count; progressCallback?.(current, total); } }));
 
+		if (!result.errors.length) {
+			for (const path of context.getLocalManifestPaths()) {
+				if (!localPaths.has(path)) context.removeLocalManifestEntry(path);
+			}
+		}
 		context.updateState({ work: { phase: 'saving' } });
 		await context.saveLocalManifest();
-		manifestCommitted = result.errors.length === 0;
 
 		logger.info(
 			`Force full sync completed: ${result.uploaded} uploaded, ${result.deleted} remote-only deleted`,
@@ -139,16 +135,6 @@ export async function runForceFullSyncWorkflow(
 			logGenericError: true,
 			failures,
 		});
-	} finally {
-		if (manifestCleared && !manifestCommitted) {
-			context.replaceLocalManifest(previousLocalManifest);
-			try {
-				context.updateState({ work: { phase: 'saving' } });
-		await context.saveLocalManifest();
-			} catch (error) {
-				result.errors.push(`restore local manifest: ${errorMessage(error)}`);
-			}
-		}
 	}
 
 	finalizeSyncResult(result);

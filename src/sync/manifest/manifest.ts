@@ -404,13 +404,4 @@ export class LocalManifest {
 	getFileCount(): number {
 		return Object.keys(this.manifest.files).length;
 	}
-
-	/**
-	 * Clear manifest
-	 */
-	clear(): void {
-		this.manifest = { version: 1, files: createPathRecord() };
-		this.logActive = false;
-		this.markChanged();
-	}
 }

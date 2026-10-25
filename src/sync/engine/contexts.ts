@@ -3,7 +3,7 @@ import type { EngineFileOperations } from './file-operations';
 import { PlannedContent } from '../planner/planned-content';
 import type { FileManager, Vault } from 'obsidian';
 import type { SyncApiClient } from '../worker-api/client';
-import type { LocalManifest, LocalManifestView } from '../manifest/manifest';
+import type { LocalManifest } from '../manifest/manifest';
 import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { ConflictStore } from '../conflict/store';
 import type { DownloadRequest } from '../transfer/download';
@@ -149,11 +149,10 @@ export class SyncEngineContexts {
 			...base,
 			vault: d.vault,
 			shouldIgnore: d.shouldIgnore,
-			snapshotLocalManifest: () => structuredClone(d.localManifest.getManifest()),
-			clearLocalManifest: () => d.localManifest.clear(),
-			replaceLocalManifest: (manifest: LocalManifestView) => d.localManifest.replaceManifest(manifest),
+			getLocalManifestPaths: () => d.localManifest.getAllPaths(),
+			removeLocalManifestEntry: path => d.localManifest.removeEntry(path),
 			prepareUploadsFromVaultFiles: (files, onPrepared) =>
-				transferPrepareUploadsFromVaultFiles(this.transfer, files, PREPARE_CONCURRENCY, onPrepared),
+				transferPrepareUploadsFromVaultFiles(this.transfer, files, PREPARE_CONCURRENCY, onPrepared, { force: true }),
 			createVaultFileChunks: createByteBudgetedVaultFileChunks,
 		};
 	}

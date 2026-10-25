@@ -20,11 +20,12 @@ export async function prepareUploadsFromVaultFiles(
   files: VaultFile[],
   concurrency: number,
   onPrepared?: (completed: number) => void,
+  options?: { force?: boolean },
 ): Promise<PreparedUpload[]> {
   let completed = 0;
 
   const tasks = files.map((file) => async () => {
-    const uploadFile = await prepareUploadFromVaultFile(context, file);
+    const uploadFile = await prepareUploadFromVaultFile(context, file, options);
     completed++;
     onPrepared?.(completed);
     return uploadFile;

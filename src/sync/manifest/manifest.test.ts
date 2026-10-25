@@ -135,7 +135,7 @@ describe('LocalManifest', () => {
 		expect(promoted.files).toEqual(files);
 	});
 
-	it('keeps replacement and cleared manifests free of inherited file entries', () => {
+	it('keeps replacement manifests free of inherited file entries', () => {
 		const entry = { hash: 'f'.repeat(64), size: 1, modified: '2026-09-09T00:00:00Z' };
 		const files = Object.create({ inherited: entry }) as Record<string, typeof entry>;
 		Object.defineProperty(files, '__proto__', { value: entry, enumerable: true });
@@ -144,11 +144,6 @@ describe('LocalManifest', () => {
 		expect(manifest.getEntry('__proto__')).toEqual(entry);
 		expect(manifest.getEntry('inherited')).toBeUndefined();
 		expect(manifest.hasFile('constructor')).toBe(false);
-		manifest.clear();
-		for (const path of ['__proto__', 'constructor', 'toString']) {
-			expect(manifest.hasFile(path)).toBe(false);
-			expect(manifest.getEntry(path)).toBeUndefined();
-		}
 	});
 
 	it('persists mutations made while an earlier checkpoint is being written', async () => {
