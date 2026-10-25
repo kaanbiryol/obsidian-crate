@@ -1,17 +1,7 @@
 import { corsResponse } from './cors';
 import { getSyncPathIssue } from '../../protocol/portable-path';
 import { readLimitedRequestBody } from './body-reader';
-import { isRecord } from '../../platform/validation';
-
-function containsControlCharacters(value: string): boolean {
-	for (const character of value) {
-		const codePoint = character.codePointAt(0);
-		if (codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f)) {
-			return true;
-		}
-	}
-	return false;
-}
+import { containsControlCharacters, isRecord } from '../../platform/validation';
 
 export async function parseJsonObject(
 	request: Request,

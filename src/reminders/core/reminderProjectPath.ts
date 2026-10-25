@@ -1,16 +1,7 @@
+import { containsControlCharacters } from '../../platform/validation';
 import { DEFAULT_PROJECT } from './constants';
 
 const MAX_PROJECT_PATH_LENGTH = 256;
-
-function containsControlCharacters(value: string): boolean {
-	for (const character of value) {
-		const codePoint = character.codePointAt(0);
-		if (codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f)) {
-			return true;
-		}
-	}
-	return false;
-}
 
 export function normalizeReminderProjectPath(value: unknown): string | null {
 	if (typeof value !== 'string') return null;

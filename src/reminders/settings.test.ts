@@ -4,8 +4,8 @@ import {
 	DEFAULT_REMINDERS_SETTINGS,
 	normalizeRemindersFolderPath,
 	normalizeRemindersSettings,
-	normalizeTimeString,
 } from './settings';
+import { normalizeTimeString } from '../platform/validation';
 
 describe('normalizeRemindersSettings', () => {
 	it('normalizes persisted reminders settings defensively', () => {
