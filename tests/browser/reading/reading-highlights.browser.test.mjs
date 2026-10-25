@@ -209,8 +209,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await marks.nth(1).tap();
     await expect(copy).toBeEnabled();
     await page.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); });
-    await share.click();
-    await expect(page.getByRole('status').filter({ hasText: 'Sharing unavailable. Text copied.' })).toBeVisible();
+    await page.locator('.crate-reading-reader__header h1').tap();
+    await expect(actions).toHaveCount(0);
+    await marks.nth(1).tap();
+    await expect(copy).toBeVisible();
+    await expect(share).toHaveCount(0);
     await page.evaluate(() => {
       if (window.clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', window.clipboardDescriptor); else delete navigator.clipboard;
       if (window.shareDescriptor) Object.defineProperty(navigator, 'share', window.shareDescriptor); else delete navigator.share;

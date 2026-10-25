@@ -76,7 +76,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			const current = () => alive && editing.current?.highlight === value.highlight;
 			try {
 				// Invoke directly from the button press, before awaiting anything else.
-				if (share && window.navigator.share) {
+				if (share) {
 					await window.navigator.share({ text: value.highlight.text });
 				} else {
 					if (!window.navigator.clipboard) throw new Error('Clipboard unavailable');
@@ -85,7 +85,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 						if (!share && latest.current.onCopyComplete) {
 							dismiss();
 							latest.current.onCopyComplete();
-						} else setFeedback({ message: share ? 'Sharing unavailable. Text copied.' : 'Text copied.', failed: false });
+						} else setFeedback({ message: 'Text copied.', failed: false });
 					}
 				}
 			} catch (cause) {
@@ -123,6 +123,8 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 	}, [article, body]);
 
 	const note = draft && savedHighlight(highlights, draft.highlight)?.note;
+	// Obsidian desktop has no native share sheet, so offer Copy only.
+	const canShare = typeof article.current?.ownerDocument.defaultView?.navigator.share === 'function';
 	return draft && geometry && <div ref={controls} className="crate-reading-reader__highlight-editor">
 		<div aria-hidden="true">{geometry.boxes.map((box, index) => <span key={index} className="crate-reading-reader__highlight-preview" style={box} />)}</div>
 		{(['start', 'end'] as const).map(edge => {
@@ -132,7 +134,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		})}
 		<div className="crate-reading-reader__selection" role="group" aria-label="Highlight actions" style={geometry.menu}>
 			<Button variant="ghost" aria-label="Copy text" disabled={transferBusy} onClick={() => commands.current.copy()}>Copy</Button>
-			<Button variant="ghost" aria-label="Share text" disabled={transferBusy} onClick={() => commands.current.share()}>Share</Button>
+			{canShare && <Button variant="ghost" aria-label="Share text" disabled={transferBusy} onClick={() => commands.current.share()}>Share</Button>}
 			<Button variant="ghost" aria-label={note ? 'Edit highlight note' : 'Add highlight note'} disabled={busy || disabled} onClick={() => commands.current.annotate()}>Note</Button>
 			<span className="crate-reading-reader__selection-divider" aria-hidden="true" />
 			<IconButton className="crate-reading-reader__delete-highlight" icon="trash-2" size="large" variant="surface" tone="danger" label="Delete highlight" disabled={busy || disabled} onClick={() => commands.current.remove()} />
