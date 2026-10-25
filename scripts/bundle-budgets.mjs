@@ -68,27 +68,6 @@ export const bundleBudgets = {
 		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '380000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
-		startupAssets: true,
-		// Unified settings, offline Reading fallback and complete loading chrome measure
-		// 1.141 MB raw / 380 KB gzip with shared encryption cleanup and settings.
-		// App approval adds about 4 KB gzip; measured 387.1 KB including the
-		// shared connection gate. Retain a small, explicit growth margin.
-		// Includes the editor and recovery UI for synchronous first-tap focus and offline use.
-		// 0.6.0 settings and connection recovery: 1.157 MB raw / 392.7 KB gzip.
-		// Shared inventory/submission rules measure 1.167 MB raw / 397.0 KB gzip,
-		// adding 1.21 KB raw to the preceding build. Retain about 3.5 KB raw margin.
-		// 0.7.0 startup assets measure 397.1 KB gzip; retain less than 1 KB margin.
-		// Loading the encrypted Reading client on demand: 935.3 KB raw / 316.7 KB gzip.
-		// 2026-10 dependency updates measure 956.5 KB raw / 324.9 KB gzip; retain about 1% margin.
-		// Bundling shortcut setup and reminder recovery notices with the app removes their
-		// loading states: 967.7 KB raw / 326.1 KB gzip.
-		// Loading every feature at startup, including encryption and article extraction,
-		// makes startup equal to all assets: 2.912 MB raw / 936.1 KB gzip.
-		// Server-side extraction for encrypted Reading removes Defuddle: 1.864 MB raw / 613.0 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1890000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '622000', 10),
-	}, {
-		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
 		// Every asset now loads at startup. Unified settings brings totals to

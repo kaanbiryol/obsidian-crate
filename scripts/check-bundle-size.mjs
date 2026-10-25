@@ -18,15 +18,11 @@ function formatBytes(value) {
 
 async function getFileSizes(budget) {
 	const { path } = budget;
-	if (budget.assetName || budget.allAssets || budget.startupAssets) {
+	if (budget.assetName || budget.allAssets) {
 		const payload = JSON.parse(await readFile(path, 'utf-8'));
 		const assets = payload?.assets;
 		if (!assets || typeof assets !== 'object') throw new Error(`Missing PWA assets in ${path}`);
-		if (budget.startupAssets && (!Array.isArray(payload.startupAssets) || !payload.startupAssets.includes('app.js'))) {
-			throw new Error(`Missing PWA startup dependency graph in ${path}`);
-		}
-		const sources = budget.allAssets ? Object.values(assets)
-			: budget.startupAssets ? payload.startupAssets.map(name => assets[name]) : [assets[budget.assetName]];
+		const sources = budget.allAssets ? Object.values(assets) : [assets[budget.assetName]];
 		if (sources.some(source => typeof source !== 'string')) throw new Error(`Missing PWA asset in ${path}`);
 		return sources.reduce((sizes, source) => ({
 			rawBytes: sizes.rawBytes + Buffer.byteLength(source),
@@ -46,7 +42,6 @@ for (const budget of budgets) {
 	const { rawBytes, gzipBytes } = await getFileSizes(budget);
 	const label = budget.allAssets
 		? `${budget.path}#all-assets`
-		: budget.startupAssets ? `${budget.path}#startup-assets`
 		: budget.assetName ? `${budget.path}#${budget.assetName}` : budget.path;
 	console.log(
 		`${label}: raw ${formatBytes(rawBytes)} / budget ${formatBytes(budget.maxBytes)}, gzip ${formatBytes(gzipBytes)} / budget ${formatBytes(budget.maxGzipBytes)}`,

@@ -583,7 +583,7 @@ from `tests/visual/baselines`. Normal CI never updates baselines automatically.
 
 The stylesheet is approximately 170 KB raw / 24 KB gzip after the shared Base UI
 migration. `scripts/bundle-budgets.mjs` records measured baselines and explicit
-limits for the plugin, embedded Worker, and PWA startup/deferred assets.
+limits for the plugin, embedded Worker, PWA entry and all PWA assets.
 
 `tests/browser/plugin/base-ui-plugin-test.mjs` checks Dialog/Drawer nesting, keyboard navigation,
 focus return, pending mutations, native Obsidian overlay handoff, touch gestures,
