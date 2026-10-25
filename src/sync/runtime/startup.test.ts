@@ -33,7 +33,6 @@ describe('SyncRuntime startup event handling', () => {
 
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 		vi.spyOn(SyncEngine.prototype, 'sync').mockImplementation(async () => startupSync.promise);
-		vi.spyOn(SyncEngine.prototype, 'saveHistoryCheckpoint').mockResolvedValue(undefined);
         vi.spyOn(SyncEngine.prototype, 'saveSharedHistoryCheckpoint').mockResolvedValue(undefined);
 		vi.spyOn(SyncQueueController.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});

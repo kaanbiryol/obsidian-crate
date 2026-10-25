@@ -15,25 +15,13 @@ interface HistoryCheckpoint {
 export class HistoryCheckpoints {
     constructor(private adapter: DataAdapter, private root: string, private authority: string) {}
 
-    /** Run before accepting sync work; never race an in-flight checkpoint save. */
+    /** Removes inventories no sync history entry references; run before accepting sync work. */
     async prune(retained: string[]): Promise<void> {
         if (!await this.adapter.exists(this.root)) return;
         const keep = new Set(retained.map(id => `${this.root}/${id}.json`));
         for (const path of (await this.adapter.list(this.root)).files) {
             if (/^[a-f0-9]{64}\.json$/.test(path.slice(this.root.length + 1)) && !keep.has(path)) await this.adapter.remove(path);
         }
-    }
-
-    async save(files: Record<string, FileEntry>, ignorePatterns: string[]): Promise<string> {
-        assertPortablePaths(Object.keys(files));
-        const text = JSON.stringify({ version: 1, authority: this.authority, ignorePatterns,
-            files: Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b))) });
-        const id = await sha256Hex(new TextEncoder().encode(text).buffer);
-        if (!await this.adapter.exists(this.root)) await this.adapter.mkdir(this.root);
-        const path = `${this.root}/${id}.json`;
-        await this.adapter.write(path, text);
-        if (await this.adapter.read(path) !== text) throw new Error('Could not verify the history checkpoint.');
-        return id;
     }
 
     async load(id: string, ignorePatterns: string[]): Promise<HistoryCheckpoint> {

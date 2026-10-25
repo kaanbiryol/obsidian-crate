@@ -36,13 +36,6 @@ export function createEngineHistory(context: EngineHistoryContext) {
       if (!context.canCheckpoint() || context.hasPendingMutations()) return undefined;
       return context.api.sharedHistory.save();
     },
-    async saveLocal(): Promise<string | undefined> {
-      if (!context.canCheckpoint() || context.hasPendingMutations()) return undefined;
-      // Clone synchronously, before another sync can advance the baseline.
-      const files = Object.fromEntries(Object.entries(context.getManifest().files)
-        .filter(([path]) => !context.shouldIgnore(path)).map(([path, entry]) => [path, { ...entry }]));
-      return checkpoints().save(files, [...context.getSettings().ignorePatterns]);
-    },
     async compare(checkpoint: string, shared: boolean): Promise<HistoryComparison> {
       const scope = JSON.stringify(context.getSettings().ignorePatterns);
       const verify = () => {

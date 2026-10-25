@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FileEntry, RemoteFileVersion } from '../../protocol/sync-types';
 import { createHistoryRestore } from './restore';
 import { HistoryCheckpoints } from './checkpoint';
+import { writeLegacyCheckpoint } from './checkpoint-test-harness';
 import { sha256Hex } from '../../platform/sha256';
 
 vi.mock('../local/file-discovery', async importOriginal => ({
@@ -214,7 +215,7 @@ describe('history checkpoints', () => {
         const h = await harness({}, {});
         const checkpoints = new HistoryCheckpoints(h.adapter as never, '.crate/checkpoints', 'https://one.test');
         const files = await metadata({ 'a.md': 'one', '__proto__.md': 'two' });
-        const id = await checkpoints.save(files, ['excluded/']);
+        const id = await writeLegacyCheckpoint(h.adapter, '.crate/checkpoints', 'https://one.test', files, ['excluded/']);
         expect((await checkpoints.load(id, ['excluded/'])).files).toEqual(files);
         await expect(checkpoints.load(id, [])).rejects.toThrow('exclusions');
         await expect(new HistoryCheckpoints(h.adapter as never, '.crate/checkpoints', 'https://two.test').load(id, ['excluded/'])).rejects.toThrow('different sync');

@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { createEngineHistory } from './history';
+import { writeLegacyCheckpoint } from '../history/checkpoint-test-harness';
 import { sha256Hex } from '../../platform/sha256';
 
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
@@ -121,10 +122,9 @@ it('looks up only the previewed file when reading a local checkpoint', async () 
         getFileMetadata: vi.fn(async (paths: string[]) => ({ files: Object.fromEntries(paths.map(path => [path, target[path]])) })),
         downloadFile: vi.fn(async () => ({ content: bytes('saved') })),
     });
-    const history = createEngineHistory({ ...h.context, canCheckpoint: () => true, hasPendingMutations: () => false });
-    const id = await history.saveLocal();
+    const id = await writeLegacyCheckpoint(h.adapter, '.obsidian/plugins/crate/history-checkpoints', 'https://example.com', target, ['excluded/']);
 
-    const comparison = await history.compare(id!, false);
+    const comparison = await h.history.compare(id, false);
     expect(await comparison.preview('note.md')).toEqual({ current: 'unsynced', saved: 'saved' });
     expect(api.getFileMetadata).toHaveBeenCalledWith(['note.md']);
     expect(api.getManifest).not.toHaveBeenCalled();

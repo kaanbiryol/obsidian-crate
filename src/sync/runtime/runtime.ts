@@ -616,23 +616,16 @@ export class SyncRuntime {
 			timings: engine.getTimings(),
 			...(api ? { requestDiagnostics: engine.getRequestDiagnostics() } : {}),
 		});
-		const attachCheckpoint = (checkpoint: Pick<SyncHistoryEntry, 'sharedCheckpoint' | 'historyCheckpoint'>) => {
-			if (this.syncEngine !== engine) return;
-			this.lastCheckpointAt = Date.now();
-			updateSyncProgress(this.settings, { syncHistory: this.settings.syncHistory.map(entry => entry === latest ? { ...entry, ...checkpoint } : entry) });
-		};
 		if (result.success && !result.conflicts.length && checkpointDue({
 			type, history: this.settings.syncHistory, latest, lastCheckpointAt: this.lastCheckpointAt,
 			trackedFiles: engine.trackedFileCount(), now: Date.now(),
 		})) {
+			// The server rejects vaults above the shared limits; they get no checkpoint.
 			try {
 				const shared = await engine.saveSharedHistoryCheckpoint();
-				if (this.syncEngine !== engine) return;
-				if (shared) attachCheckpoint({ sharedCheckpoint: shared.id });
-				else {
-					const checkpoint = await engine.saveHistoryCheckpoint();
-					attachCheckpoint({ historyCheckpoint: checkpoint });
-				}
+				if (this.syncEngine !== engine || !shared) return;
+				this.lastCheckpointAt = Date.now();
+				updateSyncProgress(this.settings, { syncHistory: this.settings.syncHistory.map(entry => entry === latest ? { ...entry, sharedCheckpoint: shared.id } : entry) });
 			}
 			catch (error) { if (this.syncEngine === engine) logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
 		}
