@@ -78,3 +78,8 @@ main > .content-panel + .content-panel { border-top: 0; padding-top: 0.5rem; }
 @media (max-width: 50rem) {
   :root { --sl-text-h1: 2rem; --sl-text-h2: 1.45rem; }
 }
+
+/* Doc screenshots: desktop shots span the column; phone shots sit side by side. */
+.sl-markdown-content img { border-radius: 10px; }
+.sl-markdown-content img[src*="phone-"] { display: inline-block; width: calc(50% - 0.75rem); max-width: 16rem; margin-right: 0.75rem; vertical-align: top; }
+.sl-markdown-content img[src*="phone-"] + img[src*="phone-"] { margin-top: 0; margin-right: 0; }

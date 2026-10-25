@@ -7,6 +7,8 @@ The Crate web app puts your reading list and reminders on your phone, no Obsidia
 
 It works with your Reading and Reminders folders only. For your whole vault, use Obsidian with the Crate plugin.
 
+![Reminders in the web app on iPhone](../../../assets/screenshots/phone-reminders-today.png) ![Reading library in the web app on iPhone](../../../assets/screenshots/phone-reading-library.png)
+
 ## Connect for the first time
 
 1. On a connected Obsidian device, finish a sync.

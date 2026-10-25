@@ -11,7 +11,9 @@ Your server keeps replaced and deleted files for 30 days.
 
 1. In Obsidian, open the file's menu and select **File history**, or run **Crate: Show file sync history** for the open file.
 2. Pick an earlier version and compare it with what you have now.
-3. Restore the version you want, check the note, then sync.
+3. Select **Restore this version**, check the note, then sync.
+
+![File history for a note, listing earlier versions with a comparison against the current file and a Restore this version button](../../../assets/screenshots/crate-file-history.png)
 
 **Looking for a deleted file?** Open **Sync activity → History → File history**. Also check your vault's `.trash` folder, where files removed by sync from another device end up.
 
@@ -23,9 +25,11 @@ Crate saves recent snapshots of your synced vault, called checkpoints.
 
 1. Before you start, back up your current vault and let any unsent web app edits finish.
 2. Turn off automatic sync on your other devices while you work.
-3. Open **Sync activity → History** and select a checkpoint.
-4. Select **Return to this state** and review the file-by-file preview.
+3. Open **Sync activity → History**, select **Browse vault history**, and pick a saved state from the list.
+4. Review what would change, then select **Restore to this point**.
 5. Confirm, then check the restored vault before turning automatic sync back on elsewhere.
+
+![Vault history listing recent saved states, with the differences from your current vault and a Restore to this point button](../../../assets/screenshots/crate-vault-history.png)
 
 <details>
 <summary>Good to know</summary>

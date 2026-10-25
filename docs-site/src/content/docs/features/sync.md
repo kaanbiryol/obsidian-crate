@@ -47,8 +47,10 @@ The web app and reminder notifications keep working either way, because they use
 
 Run **Crate: Show sync activity** and open **Pending** to see every file waiting to sync. Select a file to see what you changed since this device last synced it.
 
-- Select **Sync all** to send everything.
-- Uncheck the files you want to hold back, then select **Sync selected**. The rest stay pending for next time.
+![Sync activity with one pending note, showing the line that changed since the last sync](../../../assets/screenshots/crate-sync-pending.png)
+
+- Select **Sync vault** at the top to send everything, including unchecked files.
+- Uncheck the files you want to hold back, then select the **Sync files** button at the bottom. It shows how many files it will send, and the rest stay pending for next time.
 
 Holding files back applies to that one sync. If you want to decide exactly when the rest go, turn off automatic sync first.
 

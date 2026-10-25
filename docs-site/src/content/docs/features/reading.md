@@ -5,6 +5,8 @@ description: Save articles, organize your library, highlight passages, and read 
 
 Save articles to read later, and keep their full text in your Obsidian vault as ordinary notes. Highlight what matters, read offline, and pick up on your phone where you left off.
 
+![An article open in the Crate reading view in Obsidian, with a highlighted passage](../../../assets/screenshots/plugin-reading.png)
+
 ## Save your first article
 
 1. Run **Crate: Add link to reading list** and paste an article link.
@@ -87,6 +89,8 @@ Web Clipper can save a transcript into your Reading folder too. Check its previe
 Select text while reading to highlight it. Tap or select a highlight to copy, share, delete, or resize it. Each article's **Highlights** view shows your notes alongside a **View in article** action.
 
 The library's **Highlights** view collects highlights from your inbox, favorites, and archive in one place. Search them, or filter by article or tag.
+
+![The Highlights view in the web app on iPhone, grouping highlights by article](../../../assets/screenshots/phone-reading-highlights.png)
 
 Highlights are saved in the note, so they sync with it. Most use Obsidian's own `==highlight==` syntax. Selections that can't safely use those markers are stored as annotations that Crate's reader displays. See the [highlight format reference](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/reading-highlights.md) for details.
 

@@ -5,6 +5,8 @@ description: Create reminders, organize projects, and receive notifications whil
 
 Crate reminders are ordinary Markdown checkboxes in your vault. Plan your day in Obsidian or on your phone, and your tasks stay plain text you can read and edit anywhere.
 
+![Obsidian showing today's reminders in a note and upcoming reminders in the Crate sidebar](../../../assets/screenshots/plugin-today.png)
+
 ## Create a reminder
 
 1. Open Obsidian's command palette and run **Crate: Create reminder**.

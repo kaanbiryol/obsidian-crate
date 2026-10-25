@@ -9,6 +9,8 @@ Conflicts happen when the same file changed in two places before they could sync
 
 ## Resolve a conflict in a note
 
+![Review conflict window comparing the current file with the saved copy, with options to keep either version, both, or a custom result](../../../assets/screenshots/crate-conflict-review.png)
+
 1. Open **Sync activity → Conflicts**.
 2. Select **Review** next to the file.
 3. Compare your current file with the saved copy. Red is removed text; green is added text.
