@@ -62,14 +62,15 @@ it('saves a sealed note from the shortcut that the vault opens and the server ca
   const bytes = new Uint8Array(await (await env.BUCKET.get(file.storage_key))!.arrayBuffer());
   expect(parseEncryptedFile(bytes).descriptor).toMatchObject({ keyId: h.state.seal.keyId, seal: { epk: expect.any(String) as string } });
   const opened = await h.open(file);
-  expect(opened.metadata.path).toBe(`Reading/Article - ${body.id.slice(0, 8)}.md`);
+  // The sealed name follows the note's title, like a note saved on a device.
+  expect(opened.metadata.path).toBe(`Reading/Shared title - private.example - ${body.id.slice(0, 8)}.md`);
   const note = parseReadingNote(new TextDecoder().decode(opened.content));
   expect(note).toMatchObject({ crate_reading_id: body.id, source_url: link, title: 'Shared title', extraction_status: 'ready' });
   const stored = await storedText();
   expect(stored).not.toContain('shortcut-article');
   expect(stored).not.toContain('Enough original prose');
   expect(stored).not.toContain('Shared title');
-  expect(stored).not.toContain('Article - ');
+  expect(stored).not.toContain('private.example - ');
 });
 
 it('still saves a bookmark when the server cannot download the page', async () => {

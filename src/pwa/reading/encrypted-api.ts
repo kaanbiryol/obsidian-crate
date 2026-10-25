@@ -6,7 +6,7 @@ import { decryptJson, encryptJson } from '@/encryption/envelope';
 import { createReadingNote, parseReadingNote, updateReadingNote, readingImportId } from '../../reading/core/notes';
 import { readReadingFrontmatter, patchReadingFrontmatter } from '../../reading/core/frontmatter';
 import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } from '../../reading/core/model';
-import { readingCapturePath } from '../../reading/core/filename';
+import { isGeneratedCapturePath, readingCapturePath } from '../../reading/core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '@/encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
@@ -196,7 +196,8 @@ export class EncryptedReadingApi {
       const receipt = await decryptJson(result.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
       if (receipt.requestHash !== requestHash) throw new Error('The encrypted Reading acknowledgment does not match this change.');
       // Other decrypted notes stay valid; `sameFile` rejects any that changed elsewhere.
-      for (const file of (JSON.parse(attempt.body) as { files: Array<{ path: string }> }).files) this.sources.delete(file.path);
+      const committed = JSON.parse(attempt.body) as { files: Array<{ path: string }>; remove?: Array<{ path: string }> };
+      for (const file of [...committed.files, ...committed.remove ?? []]) this.sources.delete(file.path);
       return receipt.response;
     }
   }
@@ -205,7 +206,7 @@ export class EncryptedReadingApi {
   private async prepare(action: string, body: Record<string, unknown>, id: string, rawBody: string, requestHash: string): Promise<{ attempt: Attempt } | { response: unknown }> {
     const list = await this.inventory();
     if (list.issues.length) throw this.options.error('Refresh or resolve unreadable Reading notes before saving changes.', 409, 'reading_conflict');
-    let path: string, wire: string, content: string, previous: WireFile | undefined, itemId: string;
+    let path = '', wire = '', content: string, previous: WireFile | undefined, itemId: string, before: ReadingItem | undefined;
     if (action === 'capture') {
       const link = readingUrl(body.url), matches = list.items.filter(item => item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(link));
       if (matches.length > 1) throw this.options.error('Several notes already save this link.', 409);
@@ -214,13 +215,11 @@ export class EncryptedReadingApi {
       itemId = typeof body.captureId === 'string' ? body.captureId : await readingImportId(id, rawBody);
       content = createReadingNote({ id: itemId, url: link, title: typeof body.title === 'string' ? body.title : undefined, savedAt: new Date().toISOString() });
       if (body.fetchArticle === false) content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' });
-      path = await readingCapturePath(this.options.folderPath, null, itemId, candidate => list.items.some(item => portablePathKey(item.path) === portablePathKey(candidate)));
-      wire = await this.options.paths.wire(path);
     } else {
       const item = list.items.find(item => item.crate_reading_id === body.id);
       if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
       wire = this.wires.get(item.path)!;
-      const source = await this.source(this.files.get(wire)!); path = item.path; previous = source.file; itemId = item.crate_reading_id;
+      const source = await this.source(this.files.get(wire)!); path = item.path; previous = source.file; itemId = item.crate_reading_id; before = item;
       if (action === 'retry') {
         if (!isEmptyReadingCapture(source.content, item)) throw this.options.error('Only empty saved links can be downloaded.', 409);
         content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });
@@ -238,10 +237,24 @@ export class EncryptedReadingApi {
         content = applyLocalArticle(patchReadingFrontmatter(content, { extraction_status: 'unavailable' }), { ...item, path }, article);
       } catch { content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' }); }
     }
+    // Notes are named after the article once its title is known; a name the user chose is kept.
+    const saved = parseReadingNote(content)!, source = { title: saved.title, url: saved.source_url };
+    const occupied = (candidate: string) => list.items.some(item => item.crate_reading_id !== itemId && portablePathKey(item.path) === portablePathKey(candidate));
+    let removed: WireFile | undefined;
+    if (action === 'capture') {
+      path = await readingCapturePath(this.options.folderPath, source, itemId, occupied);
+      wire = await this.options.paths.wire(path);
+    } else if (action === 'retry' && before && saved.title !== before.title
+      && isGeneratedCapturePath(path, this.options.folderPath, { title: before.title, url: before.source_url }, itemId)) {
+      const renamed = await readingCapturePath(this.options.folderPath, source, itemId, occupied);
+      if (renamed !== path) { removed = previous; previous = undefined; path = renamed; wire = await this.options.paths.wire(renamed); }
+    }
     const sealed = await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: null }, this.options.authority);
     const response = { saved: true, id: itemId };
     const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
-    const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id, files: [{ path: wire, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) }], acknowledgment }) };
+    const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id,
+      files: [{ path: wire, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) }],
+      ...(removed ? { remove: [{ path: removed.path, expectedHash: removed.hash, expectedRevision: removed.revision }] } : {}), acknowledgment }) };
     await this.options.writeAttempt(id, attempt);
     return { attempt };
   }

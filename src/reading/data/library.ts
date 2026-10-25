@@ -11,7 +11,6 @@ import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontma
 
 export interface ReadingFile { path: string; size: number; modifiedAt: number; revision?: string }
 export interface ReadingVault {
-	privateFilenames?(): boolean;
 	captureArticle?: (url: string, signal: AbortSignal) => Promise<CapturedArticle>;
 	occupied?(path: string): boolean;
 	/** True while an editor has the note open; background writes wait until it closes. */
@@ -169,7 +168,7 @@ export class ReadingLibrary {
 			const note = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
 			const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
 			const metadata = parseReadingNote(content)!;
-			const path = await readingCapturePath(this.folder, this.vault.privateFilenames?.() ? null : { title: metadata.title, url: metadata.source_url }, id, candidate => this.occupied(candidate));
+			const path = await readingCapturePath(this.folder, { title: metadata.title, url: metadata.source_url }, id, candidate => this.occupied(candidate));
 			this.assertActive();
 			await this.vault.create(path, content);
 			await this.scan();
@@ -235,7 +234,7 @@ export class ReadingLibrary {
 				let path = item.path;
 				// A note still named after its link takes the downloaded title; a user rename is kept.
 				const previous = written.before;
-				if (this.vault.rename && !this.vault.privateFilenames?.() && previous && saved.title !== previous.title
+				if (this.vault.rename && previous && saved.title !== previous.title
 					&& isGeneratedCapturePath(item.path, this.folder, { title: previous.title, url: previous.source_url }, item.crate_reading_id)) {
 					path = await readingCapturePath(this.folder, { title: saved.title, url: saved.source_url }, item.crate_reading_id,
 						candidate => portablePathKey(candidate) !== portablePathKey(item.path) && this.occupied(candidate));

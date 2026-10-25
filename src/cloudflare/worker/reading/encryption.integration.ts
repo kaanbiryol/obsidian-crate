@@ -166,3 +166,22 @@ it.each(['active', 'resetting'] as const)('blocks Shortcut preparation before pa
   }
   expect(await env.DB.prepare('SELECT 1 FROM reading_handoffs').first()).toBeNull();
 });
+
+it('names captures after their title and renames a link-named note once a retry finds the title', async () => {
+  const h = await setup();
+  const titled = await h.api(async () => ({ markdown: 'Article text.', title: 'Private headline' }))
+    .request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://www.private.example/titled' })) as { id: string };
+  const bare = await h.api().request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/later', fetchArticle: false })) as { id: string };
+  const names = async () => {
+    const rows = (await env.DB.prepare('SELECT path, storage_key FROM files').all<{ path: string; storage_key: string }>()).results;
+    return Promise.all(rows.map(async row => (await h.open(row.path, new Uint8Array(await (await env.BUCKET.get(row.storage_key))!.arrayBuffer()))).metadata.path));
+  };
+  expect((await names()).sort()).toEqual([`Reading/Private headline - private.example - ${titled.id.slice(0, 8)}.md`, `Reading/private.example - ${bare.id.slice(0, 8)}.md`]);
+  // The retry creates the titled note and deletes the old one in one commit.
+  await h.api(async () => ({ markdown: 'Later text.', title: 'Later headline' })).request('/reading/retry', JSON.stringify({ operationId: operation(), id: bare.id }));
+  expect((await names()).sort()).toEqual([`Reading/Later headline - private.example - ${bare.id.slice(0, 8)}.md`, `Reading/Private headline - private.example - ${titled.id.slice(0, 8)}.md`]);
+  expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM file_deletion_receipts').first()).toEqual({ count: 1 });
+  const library = await h.api().request('/reading/list') as { items: ReadingItem[] };
+  expect(library.items.find(item => item.crate_reading_id === bare.id)).toMatchObject({ title: 'Later headline', extraction_status: 'ready' });
+  expect(h.requests.join()).not.toContain('headline');
+});

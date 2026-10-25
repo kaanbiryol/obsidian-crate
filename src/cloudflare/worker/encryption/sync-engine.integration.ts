@@ -265,7 +265,7 @@ it('keeps both copies when a new file differs only in letter case from a synced 
 it('syncs a shortcut note under its random server name, keeps that name through edits and deletes it after a restart', async () => {
 	const folder = await paths.wire('Reading');
 	await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,?,'policy','revision')").bind(folder).run();
-	const id = crypto.randomUUID(), name = `Reading/Article - ${id.slice(0, 8)}.md`;
+	const id = crypto.randomUUID(), name = `Reading/Shared - private.example - ${id.slice(0, 8)}.md`;
 	const note = createReadingNote({ id, url: 'https://private.example/a', title: 'Shared', savedAt: '2026-10-01T12:00:00Z' });
 	expect(await commitSealedReadingNote(env, { id, content: note, folder, generation: 'policy' })).toBe(true);
 	const server = async () => (await env.DB.prepare('SELECT path FROM files').all<{ path: string }>()).results.map(row => row.path);

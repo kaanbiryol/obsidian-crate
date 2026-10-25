@@ -1,5 +1,6 @@
 import { sealFileForVault } from '@/encryption/sealed-file';
 import { readingCapturePath } from '@/reading/core/filename';
+import { parseReadingNote } from '@/reading/core/notes';
 import { createOpaqueWireName } from '@/protocol/encrypted-path';
 import { readEncryptionState } from '../encryption/state';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
@@ -17,7 +18,8 @@ export async function commitSealedReadingNote(env: Env, note: SealedReadingNote)
   const state = await readEncryptionState(env.DB);
   const current = await policy(env.DB);
   if (state?.mode !== 'active' || current?.folder_path !== note.folder || current.generation !== note.generation) return false;
-  const sealedPath = await readingCapturePath(current.folder_path, null, note.id, () => false);
+  const item = parseReadingNote(note.content)!;
+  const sealedPath = await readingCapturePath(current.folder_path, { title: item.title, url: item.source_url }, note.id, () => false);
   const path = `${current.folder_path}/${createOpaqueWireName()}`;
   const sealed = await sealFileForVault({ path: sealedPath, content: new TextEncoder().encode(note.content), contentType: 'text/markdown' },
     { vaultId: state.vaultId, keyId: state.seal.keyId, publicKey: state.seal.publicKey });
