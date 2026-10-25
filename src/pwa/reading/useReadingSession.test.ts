@@ -8,7 +8,7 @@ import { READING_SESSION_KEY, readReadingCache, readReadingDraft, saveReadingDra
 import { connectReadingFromReminders } from './api';
 import { prepareReadingEncryption } from './encryption-session';
 
-vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
+vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('../service-worker-registration', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
 vi.mock('./api', async importOriginal => ({
   ...await importOriginal<typeof import('./api')>(), connectReadingFromReminders: vi.fn(async () => null),

@@ -5,7 +5,7 @@ import { drainReading, queueReading } from './outbox';
 import { pendingReading, savePendingReading } from './storage';
 
 const storage = vi.hoisted(() => ({ values: new Map<string, unknown>(), current: true }));
-vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
+vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('./storage', () => ({
 	READING_SESSION_KEY: 'reading-session',
   pruneReadingAttempts: vi.fn(async () => {}),
