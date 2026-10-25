@@ -2,7 +2,7 @@ import { reminderRevision } from '../core/reminderRevision';
 import { createReminderId } from "../core/reminderIdentity";
 import { buildCreateReminderArgs, buildReminderUpdate } from "../core/reminderMutationPlan";
 import { selectTodayReminders } from "../core/reminderSort";
-import type { CreateReminderParams, Priority, Reminder, UpdateReminderParams } from "@/reminders/types/reminder";
+import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/reminder";
 import { getReminderProjectFilePath } from "@/reminders/core/reminderProjectPath";
 import type { MarkdownWriter } from "./markdown-writer";
 import type { IndexedReminder, ReminderIndex } from "./reminder-index";
@@ -73,28 +73,6 @@ function createReminderRepositoryQueries({ index }: ReminderRepositoryContext) {
   };
 }
 
-function buildCreatedReminderFallback(params: {
-  id: string;
-  content: string;
-  description?: string;
-  project: string;
-  priority: Priority;
-  recurrence?: Reminder["recurrence"];
-  storedDates: { dueDate?: string; dueDatetime?: string };
-}): Reminder {
-  return {
-    id: params.id,
-    content: params.content,
-    description: params.description,
-    dueDate: params.storedDates.dueDate,
-    dueDatetime: params.storedDates.dueDatetime,
-    priority: params.priority,
-    completed: false,
-    project: params.project,
-    recurrence: params.recurrence,
-  };
-}
-
 function createReminderRepositoryMutations({ index, writer }: ReminderRepositoryContext) {
   const currentReminder = (id: string) => {
     const current = index.getById(id);
@@ -117,19 +95,9 @@ function createReminderRepositoryMutations({ index, writer }: ReminderRepository
       });
 
       const createdReminder = index.getById(reminderId);
-      if (createdReminder) {
-        return toReminder(createdReminder);
-      }
-
-      return buildCreatedReminderFallback({
-        id: reminderId,
-        content: params.content,
-        description: params.description,
-        project: createArgs.project,
-        priority: createArgs.priority,
-        recurrence: createArgs.recurrence,
-        storedDates: createArgs.storedDates,
-      });
+      // The note was written, but its line did not read back as this reminder.
+      if (!createdReminder) throw new Error('The reminder was saved to its note but could not be read back. Open the note and remove date, repeat or priority text from its title.');
+      return toReminder(createdReminder);
     },
 
     async update(id: string, params: UpdateReminderParams) {

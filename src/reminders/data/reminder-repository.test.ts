@@ -30,6 +30,11 @@ function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 	};
 }
 
+/** An index that reads back what the writer created, as a successful rescan does. */
+function indexReflectingCreates(): ReminderIndex {
+	return createIndex({ getById: id => ({ id, content: 'Created', priority: 4, completed: false, project: 'Inbox', filePath: 'Reminders/Inbox.md', lineNumber: 0, rawLine: '- [ ] Created' }) });
+}
+
 function createWriter(): {
 	writer: MarkdownWriter;
 	spies: {
@@ -106,7 +111,7 @@ describe('reminderRepository.create', () => {
 	});
 
 	it('passes recurrence through on create', async () => {
-		const index = createIndex();
+		const index = indexReflectingCreates();
 		const { writer, spies } = createWriter();
 		const repository = createReminderRepository(index, writer);
 
@@ -131,7 +136,7 @@ describe('reminderRepository.create', () => {
 	});
 
 	it('passes date-only reminders through with hasTime false', async () => {
-		const index = createIndex();
+		const index = indexReflectingCreates();
 		const { writer, spies } = createWriter();
 		const repository = createReminderRepository(index, writer);
 
@@ -149,19 +154,13 @@ describe('reminderRepository.create', () => {
 		expect(input?.hasTime).toBe(false);
 	});
 
-	it('returns the generated reminder id when optimistic state is unavailable', async () => {
+	it('reports a created line that does not read back instead of inventing a reminder', async () => {
 		const index = createIndex();
 		const { writer, spies } = createWriter();
 		const repository = createReminderRepository(index, writer);
 
-		const created = await repository.create({
-			content: 'Task B',
-			project: 'Inbox',
-			priority: 4,
-		});
-
-		expect(created.id).toBe(spies.createReminder.mock.calls[0]?.[0]?.reminderId);
-		expect(created.id).toMatch(
+		await expect(repository.create({ content: 'Task B', project: 'Inbox', priority: 4 })).rejects.toThrow('could not be read back');
+		expect(spies.createReminder.mock.calls[0]?.[0]?.reminderId).toMatch(
 			/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
 		);
 	});
