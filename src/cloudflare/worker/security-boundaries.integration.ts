@@ -40,6 +40,25 @@ it('binds reads, source edits, and enrollment permissions to the original folder
   await token('unbound', 'reminders', null);
   expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'unbound', undefined, 'GET'), env)).status).toBe(401);
 });
+it('moves web app sessions, their push subscriptions and setup links with the reminders folder', async () => {
+  await token('vault', 'vault', null); await token('browser'); await token('stale', 'reminders', 'Old'); await token('reading', 'reading', 'Reminders');
+  await handleSubscribe(request('/notifications/subscribe', 'browser', subscription('moved')), env.DB, 'browser');
+  await env.DB.prepare("INSERT INTO web_enrollment_tokens (token_hash, expires_at, folder_path) VALUES ('link', ?, 'Reminders')").bind(Date.now() + 60_000).run();
+  const policy = { timezone: 'UTC', allDayTime: null };
+  const created = await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Reminders' }), env);
+  const { revision } = (await created.json() as { policy: { revision: string } }).policy;
+  expect((await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Tasks', expectedRevision: 'stale' }, 'PUT'), env)).status).toBe(409);
+  expect(await env.DB.prepare("SELECT folder_path FROM auth_tokens WHERE id = 'browser'").first()).toEqual({ folder_path: 'Reminders' });
+  expect((await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Tasks', expectedRevision: revision }, 'PUT'), env)).status).toBe(200);
+  const folders = async (sql: string) => (await env.DB.prepare(sql).all<{ folder_path: string }>()).results.map(row => row.folder_path);
+  expect(await folders("SELECT folder_path FROM auth_tokens WHERE id IN ('browser', 'stale', 'reading') ORDER BY id")).toEqual(['Tasks', 'Reminders', 'Old']);
+  expect(await folders('SELECT folder_path FROM push_subscriptions')).toEqual(['Tasks']);
+  expect(await folders('SELECT folder_path FROM web_enrollment_tokens')).toEqual(['Tasks']);
+  const moved = await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env);
+  expect(moved.status).toBe(403);
+  expect(await moved.json()).toMatchObject({ code: 'reminders_folder_changed', folderPath: 'Tasks' });
+  expect((await worker.fetch(request('/reminders/list?folderPath=Tasks', 'browser', undefined, 'GET'), env)).status).toBe(200);
+});
 it('keeps the Reading library accessible when article fetching is disabled', async () => {
   await token('browser'); await token('vault', 'vault', null);
   expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(403);

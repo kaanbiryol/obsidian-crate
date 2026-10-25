@@ -1,7 +1,8 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol/server-info';
 import { capturePwaSession } from '../session-generation';
 import { ConnectionError } from '../connection/issues';
-import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
+import { CRATE_WEB_SESSION_NAME_HEADER, REMINDERS_FOLDER_CHANGED } from '@/protocol/web-session';
+import { adoptReminderFolder } from '../config';
 import { CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '@/protocol/http-headers';
 import { detectWebSessionName } from '../session-label';
 import { prepareReminderEncryption } from './encryption-session';
@@ -61,7 +62,17 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		// Without keys, a 428 from a newly encrypted vault retries after a fresh probe.
 		if ((keys || encryptionState === 'on') && response.status === 428 && path !== '/encryption') throw new EncryptionStateChangedError('The vault encryption changed.');
 		if (response.status === 423) requestSharedFeaturesRefresh(true);
+		if (response.status === 403 && path.startsWith('/reminders/')) await followFolderChange(response);
 		return response;
+	}
+	/** Obsidian changed the reminders folder and the server moved this session with it. */
+	async function followFolderChange(response: Response): Promise<void> {
+		const body = await response.clone().json().catch(() => null) as { code?: unknown; folderPath?: unknown } | null;
+		if (body?.code !== REMINDERS_FOLDER_CHANGED || typeof body.folderPath !== 'string' || !body.folderPath) return;
+		// An encrypted folder's name comes from its sealed label, which the refresh opens.
+		if (keys) await ready(true);
+		else adoptReminderFolder(body.folderPath);
+		throw new ConnectionError('unavailable', 'The reminders folder changed in Obsidian. Showing the new folder.');
 	}
 	function ready(refresh = false): Promise<void> {
 		if (!authToken) return Promise.resolve();

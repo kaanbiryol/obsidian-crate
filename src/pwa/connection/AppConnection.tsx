@@ -4,7 +4,7 @@ import { makeApiFetch } from '../reminders/api-fetch';
 import { onConnectionExpired } from './expiration';
 import type { ConnectionIssue } from './issues';
 import { READING_SESSION_KEY, readingSession } from '../reading/storage';
-import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
+import { AUTH_TOKEN_KEY, PWA_FOLDER_CHANGED_EVENT, loadStoredConfig } from '../config';
 import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../reminders/encryption-session';
 import { usePwaBootstrap } from './usePwaBootstrap';
 import { usePwaSessionLifecycle } from './usePwaSessionLifecycle';
@@ -47,6 +47,12 @@ function useConnection() {
     setAuthToken, setConfig, reportError, setSettingsOpen, showToast });
   usePwaBootstrap({ authToken: authority.token, suspendLocalSession: lifecycle.suspendLocalSession,
     setAuthToken, setBootstrapped, setEnrolled, setConfig, reportError, setLaunchReminderId, setSelectedProject, setStartTab, showToast });
+  useEffect(() => {
+    // Folder-scoped views, caches and pending changes reload for the new folder.
+    const follow = () => { resetView(); setConfig(loadStoredConfig()); };
+    window.addEventListener(PWA_FOLDER_CHANGED_EVENT, follow);
+    return () => window.removeEventListener(PWA_FOLDER_CHANGED_EVENT, follow);
+  }, [resetView]);
   const encryption = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot);
   // Finish app enrollment before Reading uses its credential.
   const reading = useReadingConnection(useSharedFeatures().reading, enrolled, authority);

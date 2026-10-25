@@ -38,7 +38,8 @@ export { unlockPrivateStorage } from './src/pwa/reminders/private-storage';
 
 // Plaintext names that may exist only inside ciphertext once the vault is encrypted.
 const PLAINTEXT_NAMES = ['Reminders/', '"Reminders"', 'folder=Reminders', 'folderPath=Reminders', 'Inbox.md', 'Private.md',
-	'Encrypted appointment', 'Private browser task', 'Offline encrypted task', 'Private surrounding', 'secret paragraph', 'Excluded/project'];
+	'Encrypted appointment', 'Private browser task', 'Offline encrypted task', 'Private surrounding', 'secret paragraph', 'Excluded/project',
+	'Tasks/', 'Moved folder task'];
 
 async function verify(type) {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-e2ee-browser-'));
@@ -122,7 +123,9 @@ async function verify(type) {
 			// Upload this device's notes as the plugin does: sealed, at their tagged server paths.
 			http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
 			const notifications = await t.importNotificationKeys(bundle.vaultId, bundle.notifications);
-			const files = await t.EncryptedFiles.create(http, bundle, (path, bytes) => t.createReminderProjection(notifications, ['Reminders'], path, bytes));
+			// Notes carry schedules for the current reminders folder, as the plugin uploads them.
+			const remindersFolders = window.encryptedTestRemindersFolders = ['Reminders'];
+			const files = await t.EncryptedFiles.create(http, bundle, (path, bytes) => t.createReminderProjection(notifications, remindersFolders, path, bytes));
 			const syncApi = new t.SyncWorkerApi(http); syncApi.setEncryption(files);
 			const upload = async (path, text, expectedHash = null) => {
 				const bytes = new TextEncoder().encode(text).buffer, hash = await t.sha256Hex(bytes);
@@ -160,6 +163,7 @@ async function verify(type) {
 			if (restoreBodies[0].includes('Private.md')) throw new Error('Restore named the plaintext path');
 			if (new TextDecoder().decode((await api.downloadFile('Private.md')).content) !== 'Retained secret paragraph') throw new Error('Encrypted restore did not recover the original bytes');
 			window.encryptedTestApi = api;
+			window.encryptedTestUpload = upload;
 			window.encryptedTestKeys = bundle;
 			window.encryptedTestRecovery = recovery;
 			return { ...(await api.createRemindersEnrollmentToken('Reminders')), grant: recovery, vaultId: bundle.vaultId, owner, wires };
@@ -333,6 +337,24 @@ async function verify(type) {
 			await locked.reload();
 			await expect(locked.getByText('Private browser task', { exact: true })).toBeVisible();
 		} finally { await lockedContext.close(); }
+		// Changing the reminders folder in Obsidian moves this session, and the app
+		// follows from a refused request or from its next unlock, without a new link.
+		const moveFolder = folderPath => admin.evaluate(async folderPath => {
+			const api = window.encryptedTestApi;
+			const current = (await api.getNotificationPolicy()).policy
+				?? (await api.ensureNotificationPolicy({ enabled: true, folderPath: 'Reminders', timezone: 'UTC', allDayTime: null })).policy;
+			await api.updateNotificationPolicy({ ...current, folderPath });
+		}, folderPath);
+		await admin.evaluate(() => { window.encryptedTestRemindersFolders[0] = 'Tasks'; return window.encryptedTestUpload('Tasks/Inbox.md', '- [ ] Moved folder task <!-- crate-id:moved -->\n'); });
+		await moveFolder('Tasks');
+		await page.evaluate(() => window.dispatchEvent(new Event('online')));
+		await expect(page.getByText('Moved folder task', { exact: true })).toBeVisible();
+		await expect(page.getByText('Private browser task', { exact: true })).toHaveCount(0);
+		assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-config')).folderPath), 'Tasks');
+		await moveFolder('Reminders');
+		await page.reload();
+		await expect(page.getByText('Private browser task', { exact: true })).toBeVisible();
+		await expect(page.getByText('Moved folder task', { exact: true })).toHaveCount(0);
 		assert.deepEqual(sent.leaks, [], 'The web app sent a plaintext file or folder name');
 		assert.deepEqual(lockedSent.leaks, [], 'The locked web app sent a plaintext file or folder name');
 		assert.ok(sent.count > 0 && lockedSent.count > 0);
@@ -341,7 +363,7 @@ async function verify(type) {
 		await verifyEncryptionReset({ admin, page, origin, owner, runtime });
 		assert.equal(recoverySent, false, 'Recovery key must never be sent to the server');
 		assert.deepEqual(errors, []);
-		console.log(`${type.name()}: destructive setup/resume, tagged paths, recovery, history, enrollment, offline reload, lost-response replay, private storage, no plaintext names in requests, push decryption and separate-app unlock, destructive reset and plaintext re-enrollment passed`);
+		console.log(`${type.name()}: destructive setup/resume, tagged paths, recovery, history, enrollment, offline reload, lost-response replay, private storage, no plaintext names in requests, push decryption and separate-app unlock, reminders folder moves, destructive reset and plaintext re-enrollment passed`);
 	} finally {
 		await context?.close(); await adminContext.close(); await browser.close();
 		await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

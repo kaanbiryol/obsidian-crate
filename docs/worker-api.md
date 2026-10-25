@@ -340,7 +340,7 @@ Response: `{ success: true }`
 
 ### GET / POST / PUT /reminders/notification-policy
 
-Vault credentials only. GET reads the shared folder, IANA timezone, all-day time, enabled state, and revision. POST initializes only an absent policy. PUT changes it explicitly with `expectedRevision`; stale changes receive 409. Starting a client never overwrites another device's policy.
+Vault credentials only. GET reads the shared folder, IANA timezone, all-day time, enabled state, and revision. POST initializes only an absent policy. PUT changes it explicitly with `expectedRevision`; stale changes receive 409. Starting a client never overwrites another device's policy. A PUT that changes the folder moves reminders web app credentials, their push subscriptions and unused enrollment links from the previous folder to the new one in the same transaction. A Reminders credential that then names the previous folder receives `403` with `code: "reminders_folder_changed"` and its current `folderPath`; the web app switches to that folder.
 
 Schedules derive from committed Markdown and the shared notification policy. File commits enqueue projection intent in the same D1 transaction. The Durable Object coordinator drains at most three files and five outbox jobs per alarm, fences stale work with file/policy/job revisions, and rearms while work remains. Maintenance recovers missed wakeups.
 

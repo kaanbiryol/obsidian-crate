@@ -8,6 +8,8 @@ import { parseFolderPath } from '../reminders/requests';
 import { readEncryptionState } from '../encryption/state';
 import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';
 
+const FOLDER_SCOPED_TABLES = ['auth_tokens', 'push_subscriptions', 'web_enrollment_tokens'] as const;
+
 export async function getNotificationPolicy(db: D1Database): Promise<NotificationPolicy | null> {
   const row = await db.prepare('SELECT enabled, folder_path, timezone, all_day_time, revision FROM notification_policy WHERE id = 1')
     .first<{ enabled: number; folder_path: string; timezone: string; all_day_time: string | null; revision: string }>();
@@ -40,7 +42,12 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
   const mutation = request.method === 'POST'
     ? db.prepare('INSERT INTO notification_policy (id, folder_path, timezone, all_day_time, revision, enabled) VALUES (1, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0)
     : db.prepare('UPDATE notification_policy SET folder_path = ?, timezone = ?, all_day_time = ?, revision = ?, enabled = ? WHERE id = 1 AND revision = ?').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0, typeof expectedRevision === 'string' ? expectedRevision : '');
-  const results = await db.batch([mutation,
+  // Web app sessions, their push subscriptions and unused setup links follow a
+  // changed folder. These run first, while the policy still names the old one.
+  const follow = request.method === 'PUT' ? FOLDER_SCOPED_TABLES.map(table => db.prepare(`UPDATE ${table} SET folder_path = ?
+    WHERE folder_path = (SELECT folder_path FROM notification_policy WHERE id = 1 AND revision = ?) AND folder_path != ?
+      ${table === 'auth_tokens' ? "AND scope = 'reminders'" : ''}`).bind(folder, typeof expectedRevision === 'string' ? expectedRevision : '', folder)) : [];
+  const results = await db.batch([...follow, mutation,
     ...(encryption ? [saveFolderLabel(db, folder, parsed.value.folderLabel as string)] : []),
     db.prepare('DELETE FROM notification_file_retries WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)').bind(revision),
     db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
@@ -53,6 +60,6 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
       SELECT DISTINCT file_path, ? FROM reminder_projections WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
       ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, revision),
   ]);
-  if (request.method === 'PUT' && changedRows(results[0]) !== 1) return corsResponse({ error: 'Notification settings changed on another device. Refresh before saving.' }, 409);
+  if (request.method === 'PUT' && changedRows(results[follow.length]) !== 1) return corsResponse({ error: 'Notification settings changed on another device. Refresh before saving.' }, 409);
   return corsResponse({ policy: await labelledNotificationPolicy(db) });
 }
