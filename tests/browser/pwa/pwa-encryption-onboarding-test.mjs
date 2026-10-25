@@ -10,12 +10,20 @@ import { switchFeature } from './pwa-feature-navigation.mjs';
 // Separate browser contexts model iOS storage separation, not OS installation.
 const compiled = await build({ stdin: { resolveDir: process.cwd(), contents: `
 export * from './src/encryption/key-bundle';
-export * from './src/encryption/server-state';` }, bundle: true, write: false, format: 'esm', platform: 'browser' });
+export * from './src/encryption/server-state';
+export { PathTags } from './src/encryption/path-tags';
+export { sealFolderLabel } from './src/encryption/folder-label';
+export { importEncryptionSecret } from './src/encryption/envelope';` }, bundle: true, write: false, format: 'esm', platform: 'browser' });
 const keys = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`);
 const bundle = await keys.createVaultKeyBundle();
 const recovery = await keys.generateRecoveryCode(), wrong = await keys.generateRecoveryCode();
 // Reminders and Reading both receive the vault's full public state.
 const state = { ...keys.createEncryptionState(bundle, await keys.sealRecoveryBundle(bundle, recovery)), mode: 'active' };
+// The server names feature folders by tag; each session also receives its folder's sealed name.
+const sealFolder = async path => keys.sealFolderLabel(path, await keys.PathTags.fromSecret(bundle.vaultId, bundle.vault), await keys.importEncryptionSecret(bundle.vault), bundle.vaultId);
+const remindersFolder = await sealFolder('Reminders'), readingFolder = await sealFolder('Reading');
+const remindersEncryption = { encryption: state, folderPath: remindersFolder.wire, folderLabel: remindersFolder.label };
+const readingEncryption = { encryption: state, folderLabel: readingFolder.label };
 const assets = await buildPwaPreviewAssets();
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1';
@@ -24,15 +32,15 @@ await mkdir('.generated/encryption-onboarding', { recursive: true });
 async function contextFor(browser, { installed = false, reading = false, mobile = true, cookies = [], userAgent = iphone } = {}) {
   const context = await browser.newContext({ serviceWorkers: 'block', reducedMotion: 'reduce', viewport: { width: 390, height: 844 }, ...(mobile ? { userAgent, hasTouch: true } : {}) });
   if (installed) await context.addInitScript(() => Object.defineProperty(navigator, 'standalone', { value: true }));
-  if (reading) await context.addInitScript(() => {
+  if (reading) await context.addInitScript(folderPath => {
     if (!localStorage.getItem('crate-reading-session-v1')) localStorage.setItem('crate-reading-session-v1', JSON.stringify({
-      token: 'preview-reading-token', id: 'reading-test', folderPath: 'Reading', generation: 'policy', expiresAt: Date.now() + 600000,
+      token: 'preview-reading-token', id: 'reading-test', folderPath, generation: 'policy', expiresAt: Date.now() + 600000,
     }));
-  });
+  }, readingFolder.wire);
   await context.addCookies(cookies);
   await context.route('**/notifications/preview-session.js', route => route.fulfill({ contentType: 'application/javascript', body: '' }));
-  await context.route('**/encryption', route => route.fulfill({ json: { encryption: state } }));
-  await context.route('**/reading/encryption', route => route.fulfill({ json: { encryption: state } }));
+  await context.route('**/encryption', route => route.fulfill({ json: remindersEncryption }));
+  await context.route('**/reading/encryption', route => route.fulfill({ json: readingEncryption }));
   await context.route('**/*/encrypted-files?*', route => route.fulfill({ json: { files: [], nextCursor: null, generation: bundle.generation, sequence: 1 } }));
   context.on('request', request => assert.ok(!(request.url() + (request.postData() ?? '')).includes(recovery), 'Recovery key must not reach the server'));
   return context;
@@ -46,7 +54,7 @@ try {
       let installCookies;
       try {
         const page = await safari.newPage();
-        await page.goto(`${origin}/notifications?token=install-onboarding&browserToken=safari-onboarding&folder=Reminders&tab=inbox#crateKey=${encodeURIComponent(recovery)}`);
+        await page.goto(`${origin}/notifications?token=install-onboarding&browserToken=safari-onboarding&tab=inbox#${new URLSearchParams({ crateKey: recovery, crateReadingKey: recovery, crateFolder: 'Reminders' })}`);
         await expect(page.getByRole('heading', { name: 'Welcome to Crate', exact: true })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Continue to web', exact: true })).toBeVisible();
         await expect(page.locator('.crate-feature-panel')).toHaveCount(0);
@@ -166,18 +174,18 @@ try {
         await page.getByRole('button', { name: 'Continue to web', exact: true }).click();
         await expect(page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true })).toBeVisible();
       } finally { await android.close(); }
-      const converting = await contextFor(browser, { installed: true });
+      const settingUp = await contextFor(browser, { installed: true });
       try {
-        await converting.route('**/encryption', route => route.fulfill({ json: { encryption: { ...state, mode: 'converting' } } }));
-        const page = await converting.newPage();
-        await page.goto(`${origin}/notifications?token=converting&folder=Reminders`);
-        await expect(page.getByRole('heading', { name: 'Encryption conversion in progress', exact: true })).toBeVisible();
+        await settingUp.route('**/encryption', route => route.fulfill({ json: { ...remindersEncryption, encryption: { ...state, mode: 'resetting' } } }));
+        const page = await settingUp.newPage();
+        await page.goto(`${origin}/notifications?token=setting-up`);
+        await expect(page.getByRole('heading', { name: 'Encryption setup in progress', exact: true })).toBeVisible();
         await expect(page.getByLabel('Recovery key', { exact: true })).toHaveCount(0);
-      } finally { await converting.close(); }
+      } finally { await settingUp.close(); }
       const desktop = await contextFor(browser, { mobile: false, installed: true });
       try {
         const page = await desktop.newPage();
-        await page.goto(`${origin}/notifications?token=desktop&folder=Reminders`);
+        await page.goto(`${origin}/notifications?token=desktop`);
         await expect(page.getByRole('heading', { name: 'Unlock Crate', exact: true })).toBeVisible();
       } finally { await desktop.close(); }
       // One ordinary app credential: either destination unlocks both sections.
@@ -186,14 +194,14 @@ try {
         const context = await contextFor(browser, { installed: true });
         try {
           await context.route('**/reading/session', route => route.fulfill({ json: {
-            id: 'joined', folderPath: 'Reading', generation: 'g1', expiresAt: Date.now() + 600000,
+            id: 'joined', folderPath: readingFolder.wire, generation: 'g1', expiresAt: Date.now() + 600000,
           } }));
           await context.addInitScript(() => Object.defineProperty(navigator, 'onLine', { get: () => !localStorage.getItem('test-offline') }));
           await context.route('**/*', route => route.request().headers().authorization && offline ? route.abort() : route.fallback());
           let offline = false;
           const page = await context.newPage();
           const errors = []; page.on('pageerror', error => errors.push(error.message));
-          await page.goto(`${origin}/notifications?token=shared-${initial}&folder=Reminders&section=${initial}`);
+          await page.goto(`${origin}/notifications?token=shared-${initial}&section=${initial}`);
           await expect(page.getByRole('heading', { name: 'Finish setting up Crate', exact: true })).toBeVisible();
           await page.getByRole('button', { name: 'Use recovery key instead', exact: true }).click();
           await page.getByLabel('Recovery key', { exact: true }).fill(recovery);
@@ -235,7 +243,7 @@ try {
           await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();
           assert.equal((await savedDraft())?.encryptedReading, 1, 'Reload after expiry retains recovery controls and the encrypted draft');
           await context.route('**/reading/encrypted-files?*', route => route.fulfill({ json: { files: [], nextCursor: null, generation: bundle.generation, sequence: 1 } }));
-          await page.goto(`${origin}/notifications?token=reconnected-${initial}&folder=Reminders&section=reading`);
+          await page.goto(`${origin}/notifications?token=reconnected-${initial}&section=reading`);
           await expect(page.getByRole('textbox', { name: 'Link', exact: true })).toHaveValue('https://example.com/private-draft');
           await expect(page.locator('.crate-feature-panel[data-active="true"] .pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'synced');
           await context.route('**/reading/encryption', route => route.fulfill({ status: 503, json: { error: 'Temporarily unavailable' } }));

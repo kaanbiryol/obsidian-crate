@@ -50,6 +50,7 @@
     "tests/browser/pwa/pwa-capacity-test.mjs": 29.1,
     "tests/browser/pwa/pwa-pagination-test.mjs": 41.9,
     "tests/browser/pwa/pwa-reminder-scroll-test.mjs": 102.4,
+    "tests/browser/pwa/pwa-document-scroll-test.mjs": 10,
     "tests/browser/pwa/pwa-reorder-touch-test.mjs": 15,
     "tests/browser/pwa/pwa-project-transition-test.mjs": 61.1,
     "tests/browser/pwa/pwa-schedule-test.mjs": 30,

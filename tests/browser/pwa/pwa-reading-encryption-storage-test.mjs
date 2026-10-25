@@ -6,6 +6,9 @@ import { chromium, webkit, expect } from '@playwright/test';
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
 export * from './src/encryption/server-state';
+export { PathTags } from './src/encryption/path-tags';
+export { sealFolderLabel } from './src/encryption/folder-label';
+export { importEncryptionSecret } from './src/encryption/envelope';
 export * from './src/pwa/reading/storage';
 export { readingDatabase } from './src/pwa/reading/database';
 export * from './src/pwa/reading/encryption-session';
@@ -42,11 +45,13 @@ for (const engine of [chromium, webkit]) {
       const t = readingEncryption;
       const bundle = await t.createVaultKeyBundle();
       const recovery = await t.generateRecoveryCode();
-      const session = { id: 'reader', token: 'token', folderPath: 'Reading', generation: 'policy', expiresAt: Date.now() + 100000 };
+      // An encrypted vault's Reading session names its folder by tag; the label holds the name.
+      const folder = await t.sealFolderLabel('Reading', await t.PathTags.fromSecret(bundle.vaultId, bundle.vault), await t.importEncryptionSecret(bundle.vault), bundle.vaultId);
+      const session = { id: 'reader', token: 'token', folderPath: folder.wire, generation: 'policy', expiresAt: Date.now() + 100000 };
       localStorage.setItem(t.READING_SESSION_KEY, JSON.stringify(session));
       const state = { ...t.createEncryptionState(bundle, await t.sealRecoveryBundle(bundle, recovery)), mode: 'active' };
       window.fetch = async path => Response.json(String(path).startsWith('/reading/encrypted-files')
-        ? { files: [], sequence: 1, generation: bundle.generation, nextCursor: null } : { encryption: state });
+        ? { files: [], sequence: 1, generation: bundle.generation, nextCursor: null } : { encryption: state, folderLabel: folder.label });
       location.hash = 'crateReadingKey=' + encodeURIComponent(recovery);
       t.consumeReadingKeyFragment();
       const db = await t.readingDatabase();

@@ -11,12 +11,18 @@ import { obsidianDomHelpers, obsidianDialogModule } from '../support/obsidian-di
 // Obsidian's DOM host and HTTP relay are fixtures; D1/auth have Worker coverage.
 const compiled = await build({ stdin: { resolveDir: process.cwd(), contents: `
 export * from './src/encryption/key-bundle';
-export * from './src/encryption/server-state';` }, bundle: true, write: false, format: 'esm', platform: 'browser' });
+export * from './src/encryption/server-state';
+export { PathTags } from './src/encryption/path-tags';
+export { sealFolderLabel } from './src/encryption/folder-label';
+export { importEncryptionSecret } from './src/encryption/envelope';` }, bundle: true, write: false, format: 'esm', platform: 'browser' });
 const keys = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`);
 const bundle = await keys.createVaultKeyBundle();
 const recovery = await keys.generateRecoveryCode();
 // Reminders and Reading both receive the vault's full public state.
 const state = { ...keys.createEncryptionState(bundle, await keys.sealRecoveryBundle(bundle, recovery)), mode: 'active' };
+// The server names feature folders by tag; each session also receives its folder's sealed name.
+const sealFolder = async path => keys.sealFolderLabel(path, await keys.PathTags.fromSecret(bundle.vaultId, bundle.vault), await keys.importEncryptionSecret(bundle.vault), bundle.vaultId);
+const remindersFolder = await sealFolder('Reminders'), readingFolder = await sealFolder('Reading');
 const secrets = [recovery, bundle.vault.secret, bundle.notifications.secret, bundle.seal.privateKey];
 const host = await build({ stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
 import { WebAppPairingModal } from './src/ui/settings/web-app-pairing-modal';
@@ -91,15 +97,15 @@ try {
         try {
           await phone.addInitScript(()=>Object.defineProperty(navigator,'standalone',{value:true}));
           await phone.route('**/notifications/preview-session.js',route=>route.fulfill({contentType:'application/javascript',body:''}));
-          await phone.route('**/encryption',route=>route.fulfill({json:{encryption:state}}));
-          await phone.route('**/reading/encryption',route=>route.fulfill({json:{encryption:state}}));
-          await phone.route('**/reading/session',route=>route.fulfill({json:{id:'paired',folderPath:'Reading',generation:'g1',expiresAt:Date.now()+600000}}));
+          await phone.route('**/encryption',route=>route.fulfill({json:{encryption:state,folderPath:remindersFolder.wire,folderLabel:remindersFolder.label}}));
+          await phone.route('**/reading/encryption',route=>route.fulfill({json:{encryption:state,folderLabel:readingFolder.label}}));
+          await phone.route('**/reading/session',route=>route.fulfill({json:{id:'paired',folderPath:readingFolder.wire,generation:'g1',expiresAt:Date.now()+600000}}));
           await phone.route('**/*/encrypted-files?*',route=>route.fulfill({json:{files:[],nextCursor:null,generation:bundle.generation,sequence:1}}));
           await mac.route('**/pairing-host',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html><head><style>${hostCss}</style><style>${obsidianCss}</style><style>${pluginCss}</style></head><body class="theme-dark"><script>${host.outputFiles[0].text}</script></body></html>`}));
           const p=await phone.newPage(), m=await mac.newPage();
           await m.goto(`${origin}/pairing-host`);
           await m.evaluate(payload=>{window.testPayload=payload;},{bundle});
-          await p.goto(`${origin}/notifications?token=pairing-${initial}&folder=Reminders&section=${initial}`);
+          await p.goto(`${origin}/notifications?token=pairing-${initial}&section=${initial}`);
           await expect(p.getByRole('button',{name:'Connect with Obsidian',exact:true})).toBeVisible();
           await expect(p.getByRole('button',{name:'Retry connection',exact:true})).not.toBeVisible();
           const options=p.locator('.crate-encryption-unlock__options summary');

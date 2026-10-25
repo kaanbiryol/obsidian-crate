@@ -37,6 +37,8 @@ export async function verifyBlockedEncryptionStorage(page) {
 			localStorage.setItem(t.AUTH_TOKEN_KEY, 'blocked-session');
 			// Servers always include the recovery bundle; its shape is all this check needs.
 			const active = { ...t.createEncryptionState(bundle, { version: 1, vaultId: bundle.vaultId, envelope: 'a.b.c.d.e' }), mode: 'active' };
+			// A reminders session also receives its folder's tag and sealed name.
+			const folder = await t.sealFolderLabel('Reminders', await t.PathTags.fromSecret(bundle.vaultId, bundle.vault), await t.importEncryptionSecret(bundle.vault), bundle.vaultId);
 			const rejectBlocked = promise => promise.then(() => { throw new Error('Blocked storage was treated as available or empty'); }, error => {
 				if (!error.message.includes('Close other Crate tabs and retry')) throw error;
 			});
@@ -50,7 +52,7 @@ export async function verifyBlockedEncryptionStorage(page) {
 						rejectBlocked(t.loadEncryptedReminderAttempt(attemptKey)),
 						rejectBlocked(t.saveEncryptedReminderAttempt(attemptKey, { ...attempt, body: 'Must not commit late' }, attempt, () => true)),
 						rejectBlocked(t.clearEncryptedReminderAttempts(() => true)),
-						rejectBlocked(t.prepareReminderEncryption('blocked-session', async () => Response.json({ encryption: active }))),
+						rejectBlocked(t.prepareReminderEncryption('blocked-session', async () => Response.json({ encryption: active, folderPath: folder.wire, folderLabel: folder.label }))),
 						t.decryptPushDisplay(notice).then(display => { if (display !== null) throw new Error('Blocked push did not use the generic fallback'); }),
 					]),
 					new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Blocked encrypted storage did not settle')), 6000); }),
