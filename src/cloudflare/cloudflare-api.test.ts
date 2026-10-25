@@ -43,6 +43,12 @@ describe('CloudflareApiClient', () => {
 		expect(transport).toHaveBeenCalledOnce();
 	});
 
+	it('limits an R2 listing to a key prefix', async () => {
+		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: [] }) }));
+		await new CloudflareApiClient('token', transport).listR2Objects('account', 'crate-bucket', undefined, '__crate__/backups/');
+		expect(new URL(transport.mock.calls[0]![0]).searchParams.get('prefix')).toBe('__crate__/backups/');
+	});
+
 	it('publishes an isolated terminal cleanup helper with only the selected bucket and a hashed capability', async () => {
 		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: {} }) }));
 		const id = 'a'.repeat(32), hash = 'b'.repeat(64), tag = `crate-${crypto.randomUUID()}`;

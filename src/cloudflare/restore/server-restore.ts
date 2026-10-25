@@ -8,11 +8,12 @@ import { workersDevOrigin } from '../deployment/worker-origin';
 import { literal, parseBackupRows, PREFIX, quote, readBackup, type BackupChoice, type BackupRow, type BackupSource } from './archive';
 import { validRestoreState, type ServerRestoreState } from './state';
 import { sha256Hex } from '../../platform/sha256';
+import { UPGRADE_BACKUP_PREFIX } from '../../protocol/storage-keys';
 
 export async function listUpgradeBackups(api: CloudflareApiClient, source: BackupSource): Promise<BackupChoice[]> {
   const choices: BackupChoice[] = [], cursors = new Set<string>(); let cursor: string | undefined;
   do {
-    const page = await api.listR2Objects(source.account, source.bucket, cursor);
+    const page = await api.listR2Objects(source.account, source.bucket, cursor, UPGRADE_BACKUP_PREFIX);
     for (const key of page.keys) {
       const prefix = key.replace(/\/archive\.json$/, '');
       if (key.endsWith('/archive.json') && PREFIX.test(prefix)) choices.push(await readBackup(api, source, prefix));
