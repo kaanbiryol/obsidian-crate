@@ -27,7 +27,6 @@ export interface QueueUploadFailure {
 export interface QueueFlushBatch {
 	readonly paths: readonly string[];
 	requeue(keys: Iterable<string>): void;
-	settle(completedKeys: ReadonlySet<string>): void;
 	release(): void;
 }
 

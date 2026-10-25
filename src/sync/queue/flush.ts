@@ -181,7 +181,6 @@ export async function processPendingChanges(
 
 		context.updateState({ work: { phase: 'saving' } });
 		await context.localManifest.save();
-		batch.settle(completedQueueKeys);
 		if (failures.length > 0) {
 			flushFailed = true;
 			const errors = failures.map(failure => `${failure.path}: ${failure.error}`);
@@ -211,7 +210,6 @@ export async function processPendingChanges(
 	} catch (error) {
 		if (isAbortError(error)) {
 			batch.requeue(paths.filter(path => !completedQueueKeys.has(path)));
-			batch.settle(completedQueueKeys);
 			batch.release();
 			if (!context.isDestroyed()) context.updateState({ status: 'idle', pendingChanges: context.getPendingPathCount() });
 			logger.info('Queue processing aborted');

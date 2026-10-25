@@ -114,12 +114,11 @@ function createFlushHarness(overrides: Partial<{
 				return {
 					paths,
 					requeue: (keys: Iterable<string>) => { for (const key of keys) pendingKeys.add(key); },
-					settle: (completedKeys: ReadonlySet<string>) => {
-						for (const key of completedKeys) {
+					release: vi.fn(() => {
+						for (const key of paths) {
 							if (!pendingKeys.has(key) && pendingRevisions.get(key) === revisions.get(key)) pendingRevisions.delete(key);
 						}
-					},
-					release: vi.fn(),
+					}),
 				};
 			},
 			api: {

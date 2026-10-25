@@ -185,19 +185,19 @@ export class SyncQueueController {
 		return {
 			paths,
 			requeue: keys => { for (const key of keys) this.pendingKeys.add(key); },
-			settle: completedKeys => {
-				for (const key of completedKeys) {
-					if (!this.pendingKeys.has(key) && this.pendingRevisions.get(key) === revisions.get(key)) {
-						this.pendingRevisions.delete(key);
-					}
-				}
-			},
 			release: () => {
 				// Reporting can outlive this batch and overlap a later flush of the
 				// same path. Its finalizer must release this ownership only once.
 				if (released) return;
 				released = true;
-				for (const path of paths) this.inFlightPaths.delete(path);
+				for (const path of paths) {
+					this.inFlightPaths.delete(path);
+					// Every key not requeued is settled, including unchanged files the
+					// flush skipped; a newer event keeps its own revision.
+					if (!this.pendingKeys.has(path) && this.pendingRevisions.get(path) === revisions.get(path)) {
+						this.pendingRevisions.delete(path);
+					}
+				}
 			},
 		};
 	}
