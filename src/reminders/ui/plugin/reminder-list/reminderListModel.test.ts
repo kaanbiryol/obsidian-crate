@@ -103,11 +103,12 @@ describe("buildRemindersListPresentation", () => {
         makeReminder({ id: "c", project: "Inbox", completed: true }),
       ],
       projectFilter: "work",
+      projects: ["Inbox", "Work"],
       effectiveDays: 7,
     });
 
     expect(presentation.supportsReorder).toBe(true);
-    expect(presentation.effectiveProject).toBe("work");
+    expect(presentation.effectiveProject).toBe("Work");
     expect(presentation.reminders.map((reminder) => reminder.id)).toEqual(["a", "b"]);
     expect(presentation.activeCount).toBe(2);
     expect(presentation.completedCount).toBe(0);

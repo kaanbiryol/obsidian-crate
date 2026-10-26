@@ -20,6 +20,8 @@ export interface RemindersListLoadOptions {
 export interface RemindersListPresentationOptions {
   rawReminders: Reminder[];
   projectFilter?: string;
+  /** Existing project names; a block's filter matches them case-insensitively. */
+  projects?: readonly string[];
   showToday?: boolean;
   showUpcoming?: boolean;
   effectiveDays: number;
@@ -64,6 +66,7 @@ export function buildRemindersListPresentation(
   const {
     rawReminders,
     projectFilter,
+    projects = [],
     showToday = false,
     showUpcoming = false,
     effectiveDays,
@@ -71,8 +74,10 @@ export function buildRemindersListPresentation(
   } = options;
 
   const supportsReorder = Boolean(projectFilter && !showToday && !showUpcoming);
-  const effectiveProject = projectFilter?.trim() || DEFAULT_PROJECT;
   const normalizedProject = projectFilter?.toLowerCase().trim();
+  // Writes use the existing note's name, so `work` adds to and reorders `Work`.
+  const effectiveProject = (normalizedProject && projects.find(project => project.toLowerCase() === normalizedProject))
+    || projectFilter?.trim() || DEFAULT_PROJECT;
   const filteredReminders = normalizedProject
     ? rawReminders.filter((reminder) => reminderProject(reminder).toLowerCase() === normalizedProject)
     : [...rawReminders];
