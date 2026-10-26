@@ -12,7 +12,7 @@ function response(value: unknown) {
 	return { status: 200, text, arrayBuffer: new TextEncoder().encode(text).buffer, headers: {} };
 }
 
-it.each(['/sync/upload?path=private.md', '/sync/batch-upload', '/settings', '/reading/capture', '/reading/update', '/reminders/create', '/reminders/update'])('never dispatches plaintext to %s after another device enables encryption', async path => {
+it.each(['/sync/upload?path=private.md', '/sync/batch-upload', '/settings', '/reading/capture', '/reading/update', '/reminders/create', '/reminders/update', '/notifications/reminders-enrollment-token'])('never dispatches plaintext to %s after another device enables encryption', async path => {
 	let enabled = false;
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });

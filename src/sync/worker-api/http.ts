@@ -220,7 +220,8 @@ export class WorkerApiHttpClient {
 			protocol = Math.min(protocol, info.protocol.current);
 			const route = path.split('?')[0]!;
 			if (info.capabilities.includes(ENCRYPTION_CAPABILITY) && !this.encryptionHeaders[ENCRYPTION_VAULT_HEADER] && !this.encryptionOff
-				&& (['/sync/', '/reading/', '/reminders/'].some(prefix => route.startsWith(prefix)) || route === '/settings')) {
+				&& (['/sync/', '/reading/', '/reminders/'].some(prefix => route.startsWith(prefix))
+					|| route === '/settings' || route === '/notifications/reminders-enrollment-token')) {
 				// Another device may have enabled encryption since this client last
 				// synced. Probe without a private body before dispatching plaintext,
 				// unless the previous response already confirmed it is still off; the
