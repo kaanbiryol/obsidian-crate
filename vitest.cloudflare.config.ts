@@ -21,5 +21,8 @@ export default defineConfig({
 	test: {
 		setupFiles: ['./src/test/setup-byte-equality.ts'],
 		include: ['src/cloudflare/worker/**/*.integration.ts'],
+		// The first test in a file pays for loading the Worker and Defuddle (about 2.3 s on CI).
+		// A timed-out body keeps writing into the next test, so leave real headroom.
+		testTimeout: 20_000,
 	},
 });
