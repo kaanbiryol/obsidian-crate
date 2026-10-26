@@ -24,7 +24,7 @@ import { REMINDER_OUTBOX_LOCK } from '@/pwa/reminders/private-storage';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
 import { resolveEncryptedPath } from '@/encryption/path-binding';
-import { compareCodePoints } from '@/protocol/initial-import';
+import { compareCodePoints } from '@/protocol/portable-path';
 
 const NOTE_CONCURRENCY = 6;
 type ReminderPayload = Awaited<ReturnType<typeof reminderCommandPayload>>;

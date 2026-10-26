@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
-import { reminderRequestHash } from '../../../encryption/reminder-receipt';
+import { reminderRequestHash } from '../reminders/request-hash';
 import { prepareEncryptedReceipt, readEncryptedReceipt, pruneEncryptedReceiptChunks, RECEIPT_CHUNK_PAGE } from './receipt-storage';
 import { beginReminderOperation, reminderOperationEffects } from '../reminders/operations';
 

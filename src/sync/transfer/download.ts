@@ -74,7 +74,7 @@ export async function downloadAndSaveFile(
 /** A version already saved for review is not downloaded again only to save the same copy. */
 async function awaitingReview(context: TransferContext, request: DownloadRequest): Promise<string | null> {
 	if (request.expectedLocalHash === null) return null;
-	const review = context.conflictStore?.findIncomingReview?.(request.path, request.expectedRemoteHash, request.expectedLocalHash);
+	const review = context.conflictStore.findIncomingReview(request.path, request.expectedRemoteHash, request.expectedLocalHash);
 	return review && await context.vault.adapter.exists(review.conflictPath) ? incomingReviewMessage(review.conflictPath) : null;
 }
 

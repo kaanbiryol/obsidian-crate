@@ -35,7 +35,7 @@ export async function getLocalChanges(
 ): Promise<LocalChangeScan> {
 	const changes: Array<{ path: string; hash: string }> = [];
 	const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.throwIfDestroyed());
-	await context.verifyContent?.(allFiles);
+	await context.verifyContent(allFiles);
 	context.throwIfDestroyed();
 
 	// Oversized files stay discovered (never local deletes) but are not changes:

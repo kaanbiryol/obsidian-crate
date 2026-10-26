@@ -4,6 +4,7 @@ import { Notice, Platform, Setting, type ButtonComponent } from 'obsidian';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../../cloudflare/deployment/embedded-artifacts';
 import { isCloudflareServerUpdateAvailable } from '../../../cloudflare/deployment/update';
 import { startCloudflareDeployment } from '../../../plugin/cloudflare-operations';
+import { disconnectDevice } from '../../../plugin/sync-connection';
 import { openConfirmationModal } from '../../confirmation-modal';
 import { createSettingsSectionHeading, type SettingsSectionContext } from '../section-helpers';
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
@@ -164,10 +165,7 @@ export function renderAccountSection(context: SettingsSectionContext): void {
 					}
 					button.setDisabled(true);
 					try {
-						if (forgetConnection) plugin.cloudflareDeploymentService.cancelPendingDeployment();
-						plugin.clearSettingsUiState();
-						await plugin.syncRuntime.clearSyncConfiguration();
-						if (forgetConnection) await plugin.writeSettings({ cloudflareDeployment: null });
+						await disconnectDevice(plugin, { forget: forgetConnection });
 						new Notice('This device was disconnected');
 						rerender();
 					} catch {

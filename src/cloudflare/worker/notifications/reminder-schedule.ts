@@ -56,6 +56,11 @@ const MAX_DELIVERY_RETRY_ATTEMPTS = 10;
 const MAX_DELIVERY_RETRY_AGE_MS = NOTIFICATION_DELIVERY_WINDOW_MS;
 const DELIVERY_FAILURE_KEY = 'deliveryFailure';
 const COMPLETED_OCCURRENCE_KEY = 'completedOccurrence';
+const REMINDER_KEY = 'reminder';
+/** Delivery progress of the current occurrence. A new occurrence starts without it. */
+const DELIVERY_STATE_KEYS = [PENDING_SUBSCRIPTION_IDS_KEY, DELIVERY_COMPLETE_KEY, RETRY_ATTEMPT_KEY, DELIVERY_FAILURE_KEY];
+/** Everything a cleared schedule removes. The last completed occurrence is kept. */
+const SCHEDULE_STATE_KEYS = [REMINDER_KEY, ...DELIVERY_STATE_KEYS];
 
 function retryDelayMs(attempt: number): number {
 	return Math.min(RETRY_BASE_DELAY_MS * (2 ** Math.min(attempt, 8)), RETRY_MAX_DELAY_MS);
@@ -65,7 +70,7 @@ function retryDelayMs(attempt: number): number {
 // write checks its schedule token (or occurrence) under the state lock.
 function writeIfCurrent(context: ReminderScheduleContext, token: string, action: () => Promise<unknown>): Promise<boolean> {
 	return context.withStateLock(async () => {
-		if ((await context.state.storage.get<ReminderData>('reminder'))?.scheduleToken !== token) return false;
+		if ((await context.state.storage.get<ReminderData>(REMINDER_KEY))?.scheduleToken !== token) return false;
 		await action();
 		return true;
 	});
@@ -73,7 +78,7 @@ function writeIfCurrent(context: ReminderScheduleContext, token: string, action:
 
 function writeIfOccurrenceCurrent(context: ReminderScheduleContext, dueDatetime: string, action: () => Promise<unknown>): Promise<boolean> {
 	return context.withStateLock(async () => {
-		if ((await context.state.storage.get<ReminderData>('reminder'))?.dueDatetime !== dueDatetime) return false;
+		if ((await context.state.storage.get<ReminderData>(REMINDER_KEY))?.dueDatetime !== dueDatetime) return false;
 		await action();
 		return true;
 	});
@@ -129,13 +134,8 @@ async function scheduleReminder(request: Request, context: ReminderScheduleConte
 		project,
 	};
 	try {
-		if (!sameOccurrence) await Promise.all([
-			state.storage.delete(PENDING_SUBSCRIPTION_IDS_KEY),
-			state.storage.delete(DELIVERY_COMPLETE_KEY),
-			state.storage.delete(RETRY_ATTEMPT_KEY),
-			state.storage.delete(DELIVERY_FAILURE_KEY),
-		]);
-		await state.storage.put('reminder', body);
+		if (!sameOccurrence) await Promise.all(DELIVERY_STATE_KEYS.map(key => state.storage.delete(key)));
+		await state.storage.put(REMINDER_KEY, body);
 		// A repeated command must not reset recipient progress or rearm a
 		// terminal failure. Exact retries repair publication without replay.
 		if (!sameOccurrence || !snapshot.deliveryFailure && (snapshot.alarmTime !== null || snapshot.reminder?.scheduleToken !== body.scheduleToken || parsedBody.value.resume === true)) {
@@ -185,7 +185,7 @@ async function cancelReminder(request: Request, context: ReminderScheduleContext
 
 /** Deliver this object's scheduled reminder, or arm a retry when delivery fails. */
 export async function deliverScheduledReminder(context: ReminderScheduleContext): Promise<void> {
-	const reminder = await context.withStateLock(() => context.state.storage.get<ReminderData>('reminder'));
+	const reminder = await context.withStateLock(() => context.state.storage.get<ReminderData>(REMINDER_KEY));
 	if (!reminder) return;
 
 	try {
@@ -261,7 +261,7 @@ async function scheduleRetryIfCurrent(context: ReminderScheduleContext, reminder
 }
 
 async function scheduleRetry({ state, env }: ReminderScheduleContext, reminder: ReminderData, error: unknown): Promise<void> {
-	const current = await state.storage.get<ReminderData>('reminder');
+	const current = await state.storage.get<ReminderData>(REMINDER_KEY);
 	if (current?.scheduleToken !== reminder.scheduleToken) return;
 
 	const attempt = await state.storage.get<number>(RETRY_ATTEMPT_KEY) ?? 0;
@@ -301,13 +301,12 @@ async function clearStateIfCurrent(context: ReminderScheduleContext, scheduleTok
 }
 
 async function clearScheduleState(state: DurableObjectState): Promise<void> {
-	// Preserve the last completed occurrence even after delivery/cancellation.
-	for (const key of ['reminder', PENDING_SUBSCRIPTION_IDS_KEY, DELIVERY_COMPLETE_KEY, RETRY_ATTEMPT_KEY, DELIVERY_FAILURE_KEY]) await state.storage.delete(key);
+	for (const key of SCHEDULE_STATE_KEYS) await state.storage.delete(key);
 }
 
 async function readSnapshot(state: DurableObjectState): Promise<ReminderAlarmSnapshot> {
 	const [reminder, alarmTime, pendingSubscriptionIds, deliveryComplete, retryAttempt, deliveryFailure] = await Promise.all([
-		state.storage.get<ReminderData>('reminder'),
+		state.storage.get<ReminderData>(REMINDER_KEY),
 		state.storage.getAlarm(),
 		state.storage.get<string[]>(PENDING_SUBSCRIPTION_IDS_KEY),
 		state.storage.get<boolean>(DELIVERY_COMPLETE_KEY),
@@ -321,7 +320,7 @@ async function restoreSnapshot(state: DurableObjectState, snapshot: ReminderAlar
 	try {
 		await state.storage.deleteAlarm();
 		await clearScheduleState(state);
-		if (snapshot.reminder) await state.storage.put('reminder', snapshot.reminder);
+		if (snapshot.reminder) await state.storage.put(REMINDER_KEY, snapshot.reminder);
 		if (snapshot.pendingSubscriptionIds) {
 			await state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, snapshot.pendingSubscriptionIds);
 		}

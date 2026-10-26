@@ -6,7 +6,7 @@ beforeEach(() => { resetObsidianUiMocks(); vi.doMock('obsidian', () => createObs
 afterEach(() => { vi.restoreAllMocks(); vi.resetModules(); vi.doUnmock('obsidian'); });
 
 async function setup(assertCurrent = () => {}) {
-	const { renderRecoveryVerification } = await import('./recovery-verification');
+	const { renderRecoveryVerification } = await import('./recovery-key-setting');
 	const check = vi.spyOn(await import('../../../encryption/recovery-verification'), 'verifyRecoveryCode');
 	const bundle = await createVaultKeyBundle(), code = await generateRecoveryCode();
 	const container = new FakeElement('div'), verified = vi.fn();

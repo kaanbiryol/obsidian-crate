@@ -40,6 +40,7 @@ function createProcessHarness() {
 		downloadFile: vi.fn(),
 		batchUpload: vi.fn(),
 		batchDownload: vi.fn(),
+		recordMergeApplication: vi.fn(async () => {}),
 	};
 	const fileManager = {
 		trashFile: vi.fn(async () => {}),
@@ -60,6 +61,7 @@ function createProcessHarness() {
 		files: api,
 		localManifest,
 		markdownBaseCache,
+		conflictStore: { record: vi.fn(async () => {}), resolveAppliedIncoming: vi.fn(async () => {}), findIncomingReview: vi.fn(() => undefined) },
 		runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 		retryWithBackoff: async <T>(fn: () => Promise<T>) => fn(),
 		getModifiedIso: vi.fn(async () => '2026-02-15T00:00:00.000Z'),

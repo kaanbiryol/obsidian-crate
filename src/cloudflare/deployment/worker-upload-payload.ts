@@ -4,6 +4,7 @@ import serverDeleteWorkerSource from '../worker/standalone/server-delete-worker.
 import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from '../notification-rate-binding';
 import { randomBase64Url } from '../oauth/pkce';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
+import { deletionWorkerMessage, releaseWorkerMessage, resetWorkerMessage } from './discovery';
 
 // Betas 0.4.0 to 0.9.0 created an unused experimental CloudSafety namespace.
 // Cloudflare rejects an upload that drops a provisioned class without a tombstone,
@@ -34,7 +35,7 @@ export function buildWorkerMultipartBody(input: {
 		compatibility_date: '2026-08-18',
 		compatibility_flags: ['global_fetch_strictly_public'],
 		annotations: {
-			'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}`,
+			'workers/message': releaseWorkerMessage(input.artifacts.version, input.artifacts.fingerprint),
 			'workers/tag': input.uploadTag ?? 'crate',
 		},
 		bindings: [
@@ -58,7 +59,7 @@ export function buildResetWorkerMultipartBody(resetId: string, databaseId: strin
 	return buildWorkerModule({
 		main_module: 'worker.mjs', compatibility_date: '2026-08-18',
 		compatibility_flags: ['global_fetch_strictly_public'],
-		annotations: { 'workers/message': `Crate reset ${resetId}`, 'workers/tag': 'crate' },
+		annotations: { 'workers/message': resetWorkerMessage(resetId), 'workers/tag': 'crate' },
 		bindings: [{ type: 'd1', name: 'DB', id: databaseId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName },
 			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: resetId }],
 		exports: {
@@ -72,7 +73,7 @@ export function buildServerDeletionWorkerMultipartBody(deletionId: string, bucke
 	return buildWorkerModule({
 		main_module: 'worker.mjs', compatibility_date: '2026-08-18',
 		compatibility_flags: ['global_fetch_strictly_public'],
-		annotations: { 'workers/message': `Crate deletion ${deletionId}`, 'workers/tag': uploadTag },
+		annotations: { 'workers/message': deletionWorkerMessage(deletionId), 'workers/tag': uploadTag },
 		bindings: [{ type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName },
 			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: deletionId },
 			{ type: 'plain_text', name: 'CRATE_DELETE_TOKEN_HASH', text: tokenHash },

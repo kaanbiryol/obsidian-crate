@@ -2,11 +2,11 @@ import { ResetBlockedError } from './reset-errors';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { workersDevOrigin } from '../deployment/worker-origin';
 import { assertDeploymentIsNotDowngrade } from '../deployment/update';
-import { deployedArtifact } from '../deployment/discovery';
+import { deployedArtifact, resetWorkerMessage } from '../deployment/discovery';
 import { createRandomHexToken } from '../../platform/random-hex';
 import { assertWorkerTarget, assertUnsharedResources, assertOwnedNamespace, readCrateTables, type ResetApi } from './reset-ownership';
 import { createObjectOwnershipCheck, inspectBucketObjects, clearBucketObjects } from './reset-objects';
-import { withDeploymentFence, type DeploymentFence } from '../deployment/fence';
+import { withDeploymentFence, type DeploymentFence, type FenceStep } from '../deployment/fence';
 import { sha256Hex } from '../../platform/sha256';
 
 export async function resetCrateServer(input: {
@@ -31,7 +31,7 @@ export async function resetCrateServer(input: {
 	// Never repeat destructive work after the old resources have been removed.
 	if (metadata.reset?.phase === 'rebuilding') {
 		const current = await api.getWorkerSettings(accountId, name);
-		const ownStub = current.annotations?.['workers/message'] === `Crate reset ${metadata.reset.id}`;
+		const ownStub = current.annotations?.['workers/message'] === resetWorkerMessage(metadata.reset.id);
 		assertWorkerTarget(current, ownStub ? { ...metadata, d1DatabaseId: metadata.reset.databaseId } : metadata, ownStub);
 		if (!ownStub) assertDeploymentIsNotDowngrade(deployedArtifact(current).version, input.version);
 		if (await api.getD1Database(accountId, metadata.reset.databaseId)) {
@@ -42,7 +42,7 @@ export async function resetCrateServer(input: {
 		return;
 	}
 	const worker = await api.getWorkerSettings(accountId, name);
-	const retired = Boolean(metadata.reset && worker.annotations?.['workers/message'] === `Crate reset ${metadata.reset.id}`);
+	const retired = Boolean(metadata.reset && worker.annotations?.['workers/message'] === resetWorkerMessage(metadata.reset.id));
 	assertWorkerTarget(worker, metadata, retired);
 	if (!retired) assertDeploymentIsNotDowngrade(deployedArtifact(worker).version, input.version);
 	const namespaceId = retired ? metadata.reset!.namespaceId
@@ -77,7 +77,7 @@ export async function resetCrateServer(input: {
 
 	const removeVerifiedResources = async (fence?: DeploymentFence) => {
 		// Read-only verification stays unfenced; each provider mutation records its step.
-		const mutate = async (step: string, operation: () => Promise<void>) => {
+		const mutate = async (step: FenceStep, operation: () => Promise<void>) => {
 			if (fence) await fence.mutate(operation, step);
 			else await operation();
 		};
@@ -102,7 +102,7 @@ export async function resetCrateServer(input: {
 		}
 		const verifyTarget = async () => {
 			const current = await api.getWorkerSettings(accountId, name);
-			if (current.annotations?.['workers/message'] !== `Crate reset ${checkpoint.id}`) {
+			if (current.annotations?.['workers/message'] !== resetWorkerMessage(checkpoint.id)) {
 				throw new Error('Reset paused: the Worker changed during reset.');
 			}
 			assertWorkerTarget(current, metadata, true);

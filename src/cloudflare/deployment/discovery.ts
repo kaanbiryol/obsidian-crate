@@ -23,6 +23,22 @@ function findBinding(
 	return settings.bindings?.find(binding => binding.type === type && binding.name === name) ?? null;
 }
 
+/** `workers/message` annotations identifying what Crate uploaded. Readers compare
+ * against these exactly, so the format lives in one place. */
+export const releaseWorkerMessage = (version: string, fingerprint: string): string => `Crate ${version} ${fingerprint}`;
+export const resetWorkerMessage = (resetId: string): string => `Crate reset ${resetId}`;
+export const deletionWorkerMessage = (deletionId: string): string => `Crate deletion ${deletionId}`;
+
+/** The live Worker's storage, when it binds exactly one database as `DB` and one
+ * bucket as `BUCKET`, as every Crate upload does. */
+export function workerStorageBindings(settings: CloudflareWorkerSettings): { databaseId: string; bucketName: string } | null {
+	const databases = settings.bindings?.filter(binding => binding.type === 'd1') ?? [];
+	const buckets = settings.bindings?.filter(binding => binding.type === 'r2_bucket') ?? [];
+	const databaseId = databases.length === 1 && databases[0]?.name === 'DB' ? databases[0].id : undefined;
+	const bucketName = buckets.length === 1 && buckets[0]?.name === 'BUCKET' ? buckets[0].bucket_name : undefined;
+	return databaseId && bucketName ? { databaseId, bucketName } : null;
+}
+
 export function deployedArtifact(settings: CloudflareWorkerSettings): {
 	version: string | null;
 	fingerprint: string | null;

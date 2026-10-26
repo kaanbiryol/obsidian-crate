@@ -1,5 +1,6 @@
 import type { DevelopmentBuild } from '../../protocol/server-build';
 import { sha256Hex } from '../../platform/sha256';
+import { base64ToArrayBuffer } from '../../sync/encoding';
 
 export interface CloudflareDeploymentArtifacts {
 	development?: DevelopmentBuild;
@@ -10,16 +11,6 @@ export interface CloudflareDeploymentArtifacts {
 	d1Schema: string;
 	d1SchemaSha256: string;
 }
-
-function decodeBase64(value: string): Uint8Array<ArrayBuffer> {
-	const binary = atob(value);
-	const decoded = new Uint8Array(binary.length);
-	for (let index = 0; index < binary.length; index++) {
-		decoded[index] = binary.charCodeAt(index);
-	}
-	return decoded;
-}
-
 
 export async function decodeAndVerifyArtifacts(input: {
 	development?: DevelopmentBuild;
@@ -56,7 +47,7 @@ export async function decodeAndVerifyArtifacts(input: {
 }
 
 async function decompressArtifact(gzipBase64: string): Promise<string> {
-	const compressed = decodeBase64(gzipBase64);
+	const compressed = base64ToArrayBuffer(gzipBase64);
 	const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
 	return new Response(stream).text();
 }

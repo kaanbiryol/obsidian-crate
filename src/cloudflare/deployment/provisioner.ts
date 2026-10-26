@@ -6,9 +6,10 @@ import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import type { CloudflareDeploymentMetadata } from './types';
 import { workersDevOrigin } from './worker-origin';
 import { CloudflareApiClient, CloudflareApiError } from '../cloudflare-api';
+import { isDefinitiveRejection } from '../cloudflare-api-error';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { createRandomHexToken } from '../../platform/random-hex';
-import { deployedArtifact } from './discovery';
+import { deployedArtifact, resetWorkerMessage, workerStorageBindings } from './discovery';
 import { assertDeploymentIsNotDowngrade } from './update';
 import { withDeploymentFence, isRejectedWorkerUpload, isSettledStep, parseFenceRecord, type DeploymentFence } from './fence';
 import { assertWorkerTarget } from '../server-reset/reset-ownership';
@@ -33,7 +34,7 @@ async function ensureD1Database(
 		// the original ID in the checkpoint until the replacement ID is persisted,
 		// so a lost creation response can resume by its stable resource name.
 		const worker = await api.getWorkerSettings(accountId, metadata.workerName);
-		if (worker.annotations?.['workers/message'] !== `Crate reset ${reset.id}`) {
+		if (worker.annotations?.['workers/message'] !== resetWorkerMessage(reset.id)) {
 			throw new ResetBlockedError('the Worker changed before rebuilding its database.');
 		}
 		assertWorkerTarget(worker, metadata, true);
@@ -85,20 +86,18 @@ async function checkRemoteDeployment(input: { api: CloudflareApiClient; accountI
 	try {
 		const settings = await input.api.getWorkerSettings(input.accountId, input.metadata.workerName);
 		const message = settings.annotations?.['workers/message'];
-		const ownResetStub = input.metadata.reset?.phase === 'rebuilding' && message === `Crate reset ${input.metadata.reset.id}`;
+		const ownResetStub = input.metadata.reset?.phase === 'rebuilding' && message === resetWorkerMessage(input.metadata.reset.id);
 		if (message?.startsWith('Crate reset ') && !ownResetStub) throw new Error('This server is being reset or deleted. Finish that operation before updating.');
 		if (!ownResetStub) assertDeploymentIsNotDowngrade(deployedArtifact(settings).version, input.artifacts.version);
-		const database = settings.bindings?.filter(binding => binding.type === 'd1');
-		const bucket = settings.bindings?.filter(binding => binding.type === 'r2_bucket');
+		const storage = workerStorageBindings(settings);
 		const expectedDatabase = ownResetStub ? input.metadata.reset!.databaseId : input.metadata.d1DatabaseId;
-		if (!message?.startsWith('Crate ') || database?.length !== 1 || database[0]?.name !== 'DB'
-			|| !database[0]?.id || expectedDatabase && database[0].id !== expectedDatabase
-			|| bucket?.length !== 1 || bucket[0]?.name !== 'BUCKET' || bucket[0]?.bucket_name !== input.metadata.r2BucketName) {
+		if (!message?.startsWith('Crate ') || !storage || expectedDatabase && storage.databaseId !== expectedDatabase
+			|| storage.bucketName !== input.metadata.r2BucketName) {
 			throw new Error('The live Worker bindings do not match this deployment. Reconnect to the correct server before updating.');
 		}
 		const vaultName = readVaultName(settings);
 		if (vaultName) input.metadata.vaultName = vaultName;
-		return JSON.stringify([message, database[0].id, bucket[0].bucket_name, vaultName]);
+		return JSON.stringify([message, storage.databaseId, storage.bucketName, vaultName]);
 	} catch (error) {
 		if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
 		return null;
@@ -124,7 +123,7 @@ async function ensureWorkersSubdomain(
 		try {
 			return await fence.mutate(() => api.createWorkersSubdomain(accountId, candidate), 'create-server-address');
 		} catch (error) {
-			if (!(error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408)) throw error;
+			if (!isDefinitiveRejection(error)) throw error;
 			lastError = error;
 		}
 	}

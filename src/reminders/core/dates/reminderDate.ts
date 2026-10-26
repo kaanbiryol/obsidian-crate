@@ -18,6 +18,20 @@ export function formatReminderDateText(date: Date, hasTime = false): string {
 	return `${day} ${formatReminderTime(date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds())}`;
 }
 
+const STORED_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** A stored all-day date: `YYYY-MM-DD` naming a real calendar day. */
+export function isStoredReminderDate(value: string): boolean {
+	if (!DATE_ONLY_PATTERN.test(value)) return false;
+	const time = Date.parse(value);
+	return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value;
+}
+
+/** A stored instant: an ISO date and time with an explicit offset, on a real calendar day. */
+export function isStoredReminderDatetime(value: string): boolean {
+	return STORED_DATETIME_PATTERN.test(value) && isStoredReminderDate(value.slice(0, 10)) && Number.isFinite(Date.parse(value));
+}
+
 export function isDateOnlyString(value: string | null | undefined): value is string {
 	return !!value && DATE_ONLY_PATTERN.test(value);
 }

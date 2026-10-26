@@ -6,6 +6,7 @@ import { buildSharedSettings } from '../sync/connection/shared-settings';
 import type { SharedSettings } from '../protocol/shared-settings';
 import { createLogger } from '../sync/logger';
 import { errorMessage } from '../platform/logger';
+import { writeSyncSettings } from './sync-connection';
 
 const logger = createLogger('CloudflareConnection');
 
@@ -40,8 +41,7 @@ export async function configureCloudflareAuthorizedDevice(
 	signal.throwIfAborted();
 	if (shared) {
 		// Normalizing adds this device's own workspace exclusion to the server's patterns.
-		await plugin.writeSettings(shared);
-		plugin.syncRuntime.updateSyncSettings();
+		await writeSyncSettings(plugin, shared);
 	} else if (shared === null) {
 		await seedSharedSettings(api, plugin.settings);
 	}

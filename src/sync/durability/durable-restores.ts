@@ -9,7 +9,7 @@ import type { RestoreIntent } from './restore-intent';
 
 interface RestoreTransport {
 	prepareRestoreWire?(intent: RestoreIntent): Promise<RestoreIntent['encryptedWire']>;
-	assertPreparedRestore?(intent: RestoreIntent): void;
+	assertPreparedRestore(intent: RestoreIntent): void;
 	getServerInfo(): Promise<CrateServerInfo>;
 	getFileMetadata(paths: string[]): Promise<FileMetadataResponse>;
 	restoreFileVersion(request: RestoreFileRequest): Promise<UploadResult>;
@@ -45,7 +45,7 @@ export class DurableRestores {
 		// Also retry failed checkpoint writes before dispatching an existing intent.
 		await this.manifest.save();
 		try {
-			this.transport.assertPreparedRestore?.(intent);
+			this.transport.assertPreparedRestore(intent);
 			const request = intent.encryptedWire
 				? { ...intent.request, path: intent.encryptedWire.path, expectedHash: intent.encryptedWire.expectedHash } : intent.request;
 			const result = await this.transport.restoreFileVersion(request);

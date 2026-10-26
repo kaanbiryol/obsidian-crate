@@ -1,6 +1,6 @@
 import { prepareEncryptedReceipt, readEncryptedReceipt } from '../encryption/receipt-storage';
 import { fileRevisionsGuard } from '../sync/file-identity';
-import { reminderRequestHash } from '../../../encryption/reminder-receipt';
+import { reminderRequestHash } from './request-hash';
 import { corsResponse } from '../cors';
 import type { CommitEffects } from '../commit-effects';
 import { reminderOperationDay, isReminderOperationId } from '@/protocol/reminder-operation';

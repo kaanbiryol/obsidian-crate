@@ -2,6 +2,7 @@ import type { ApiFetch } from '../types';
 import type { ReminderRecord, ReminderSourceIssue } from './types';
 import { isReminderList, isScopedReminderList } from './cache/reminder-storage-validation';
 import { parseReminderSourceIssues } from './cache/reminder-source-issues';
+import { compareCodePoints } from '@/protocol/portable-path';
 
 export interface ReminderIndexingProgress {
 	indexedFiles: number;
@@ -59,7 +60,7 @@ function applyReminderDelta(base: ReminderRecord[], delta: { changedPaths: strin
 		const note = notes.get(reminder.filePath);
 		if (note) note.push(reminder); else notes.set(reminder.filePath, [reminder]);
 	}
-	return [...notes.keys()].sort((a, b) => a < b ? -1 : a > b ? 1 : 0).flatMap(path => notes.get(path)!);
+	return [...notes.keys()].sort(compareCodePoints).flatMap(path => notes.get(path)!);
 }
 
 // The Worker asks for one second; a proxy that strips the header must not cause a request burst.

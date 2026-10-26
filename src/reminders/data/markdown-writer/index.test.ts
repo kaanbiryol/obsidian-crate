@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createMarkdownWriter } from '@/reminders/data/markdown-writer';
 import type { ReminderIndex, IndexedReminder } from '@/reminders/data/reminder-index';
 import { createMockAppWithVault } from '@/test/factories/obsidian';
+import { applyReminderFileCommand } from '@/reminders/core/reminderFileCommand';
 
 function createMockIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 	return {
@@ -545,6 +546,16 @@ describe('markdownWriter', () => {
 		expect(newContent).toContain('Task Move');
 		expect(newContent).toContain('daily');
 	});
+});
+
+it('refuses a create where the shared reminder command refuses it', async () => {
+	const marked = '# Inbox\n\n- [ ] <!-- crate-id:retry-id -->\n';
+	const { app, files } = createMockAppWithVault({ 'Reminders/Inbox.md': marked });
+	const writer = createMarkdownWriter(app, createMockIndex());
+	await expect(writer.createReminder({ project: 'Inbox', content: 'Task', priority: 4, hasTime: false, reminderId: 'retry-id' })).rejects.toThrow('already exists');
+	await expect(applyReminderFileCommand('create', { folderPath: 'Reminders', operationId: 'retry-id', id: 'retry-id', content: 'Task', project: 'Inbox' }, 'Reminders', async () => marked))
+		.rejects.toMatchObject({ reason: 'exists' });
+	expect(files.get('Reminders/Inbox.md')).toBe(marked);
 });
 
 it('does not duplicate a local create after a lost disk acknowledgement', async () => {

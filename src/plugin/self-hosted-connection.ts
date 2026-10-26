@@ -7,6 +7,7 @@ import { exchangeSelfHostedPairingCode } from '../sync/connection/self-hosted-pa
 import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { isSha256Hex } from '../platform/validation';
 import { SECRET_KEYS } from '../platform/secret-keys';
+import { writeSyncSettings } from './sync-connection';
 
 const connecting = new WeakSet<CratePlugin>();
 
@@ -88,8 +89,7 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 		signal.throwIfAborted();
 		if (shared.settings) {
 			// Normalizing adds this device's own workspace exclusion to the server's patterns.
-			await plugin.writeSettings(shared.settings);
-			plugin.syncRuntime.updateSyncSettings();
+			await writeSyncSettings(plugin, shared.settings);
 		}
 	} finally {
 		connecting.delete(plugin);

@@ -1,5 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import { openConfirmationModal } from '../../confirmation-modal';
+import { disconnectDevice } from '../../../plugin/sync-connection';
 import type { SettingsSectionContext } from '../section-helpers';
 
 export function renderForgetServerSetting({ containerEl, plugin, rerender }: SettingsSectionContext): void {
@@ -17,10 +18,7 @@ export function renderForgetServerSetting({ containerEl, plugin, rerender }: Set
 			if (!confirmed) return;
 			button.setDisabled(true);
 			try {
-				plugin.cloudflareDeploymentService.cancelPendingDeployment();
-				plugin.clearSettingsUiState();
-				await plugin.syncRuntime.clearSyncConfiguration();
-				await plugin.writeSettings({ cloudflareDeployment: null });
+				await disconnectDevice(plugin, { forget: true });
 				rerender();
 			} catch {
 				new Notice('Could not forget the saved connection. Wait for any Cloudflare operation to finish and try again.');

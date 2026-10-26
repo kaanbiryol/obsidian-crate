@@ -4,15 +4,13 @@
 
 import { Notice, type Vault } from 'obsidian';
 import { createLogger } from '../logger';
-import { ensureParentFolder } from '../local/file-discovery';
+import { ensureParentFolder, insertBeforeExtension } from '../local/file-discovery';
 
 const logger = createLogger('Conflict');
 const CONFLICT_TAG_PATTERN = / \(conflict (?:\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} [a-z0-9]{4}|remote [a-f0-9]{64}(?:-\d+)?)\)(?=\.[^/]+$|$)/;
 
 export function getIncomingConflictFileName(path: string, hash: string, variant = 0): string {
-	const dot = path.lastIndexOf('.');
-	const extension = dot > path.lastIndexOf('/') + 1 ? dot : path.length;
-	return `${path.slice(0, extension)} (conflict remote ${hash}${variant ? `-${variant}` : ''})${path.slice(extension)}`;
+	return insertBeforeExtension(path, ` (conflict remote ${hash}${variant ? `-${variant}` : ''})`);
 }
 
 /**
@@ -28,16 +26,7 @@ export function getConflictFileName(originalPath: string): string {
 		.substring(0, 19); // YYYY-MM-DD HH-mm-ss
 
 	const suffix = Math.random().toString(36).substring(2, 6);
-	const tag = `conflict ${timestamp} ${suffix}`;
-
-	const lastDot = originalPath.lastIndexOf('.');
-	if (lastDot <= originalPath.lastIndexOf('/') + 1) {
-		return `${originalPath} (${tag})`;
-	}
-
-	const name = originalPath.substring(0, lastDot);
-	const ext = originalPath.substring(lastDot);
-	return `${name} (${tag})${ext}`;
+	return insertBeforeExtension(originalPath, ` (conflict ${timestamp} ${suffix})`);
 }
 
 /**

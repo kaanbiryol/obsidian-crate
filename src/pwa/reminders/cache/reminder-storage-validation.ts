@@ -1,14 +1,10 @@
 import * as v from 'valibot';
 import { validateRecurrence } from '@/reminders/core/recurrence/validateRecurrence';
+import { isStoredReminderDate, isStoredReminderDatetime } from '@/reminders/core/dates/reminderDate';
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 import type { ModalDraft, ModalPickerId, ReminderRecord } from '../types';
 import { isSyncPath } from '@/protocol/sync-validation';
 import { isMarkdownPath } from '../../../protocol/note-paths';
-
-function isStoredCalendarDate(value: string): boolean {
-	return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value))
-		&& new Date(value).toISOString().slice(0, 10) === value;
-}
 
 const prioritySchema = v.picklist([1, 4]);
 // Validate existing metadata without normalizing or replacing the stored value.
@@ -36,10 +32,8 @@ export const reminderRecordSchema = v.object({
 	description: optionalString,
 	revision: optionalString,
 	lineNumber: v.optional(v.pipe(v.number(), v.check(value => Number.isSafeInteger(value) && value >= 0))),
-	dueDate: v.optional(v.pipe(v.string(), v.check(isStoredCalendarDate))),
-	dueDatetime: v.optional(v.pipe(v.string(), v.check(value =>
-		/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
-		&& isStoredCalendarDate(value.slice(0, 10)) && Number.isFinite(Date.parse(value))))),
+	dueDate: v.optional(v.pipe(v.string(), v.check(isStoredReminderDate))),
+	dueDatetime: v.optional(v.pipe(v.string(), v.check(isStoredReminderDatetime))),
 	recurrence: recurrenceSchema,
 });
 

@@ -151,6 +151,21 @@ describe('ConflictStore', () => {
 		expect(harness.files.has('.obsidian/plugins/crate/conflicts.json.tmp')).toBe(false);
 	});
 
+	it('records the same discovered incoming copy from live events and vault recovery', async () => {
+		const conflictPath = `notes/shared (conflict remote ${'a'.repeat(64)}).md`;
+		const live = createHarness();
+		await live.store.load();
+		await live.store.registerDiscovered(conflictPath);
+		getAllVaultFilesMock.mockResolvedValue([{ path: conflictPath, size: 1, mtime: 1, extension: 'md' }]);
+		const recovered = createHarness({ [conflictPath]: 'copy' });
+		await recovered.store.load();
+		await recovered.store.recoverFromVault(() => false);
+
+		const expected = { originalPath: 'notes/shared.md', conflictPath, cause: 'unknown', copySide: 'remote', status: 'active' };
+		expect(live.store.getActiveConflicts()).toMatchObject([expected]);
+		expect(recovered.store.getActiveConflicts()).toMatchObject([expected]);
+	});
+
 	it('marks a conflict resolved when its copy is deleted', async () => {
 		const harness = createHarness();
 		await harness.store.load();

@@ -32,6 +32,14 @@ function writeGeneratedJson(fileName, payload) {
 	);
 }
 
+// The Worker serves the PWA shell from shared modules. Lint checks direct imports;
+// this also catches host UI or React reached through a shared module.
+const FORBIDDEN_WORKER_INPUTS = [/(^|\/)node_modules\/(react|react-dom|obsidian)\//, /^src\/(ui|reminders\/ui|reading\/ui)\/plugin\//];
+function assertWorkerInputs(metafile) {
+	const forbidden = Object.keys(metafile.inputs).filter(path => FORBIDDEN_WORKER_INPUTS.some(pattern => pattern.test(path)));
+	if (forbidden.length) throw new Error(`The Worker bundle includes plugin UI or React code:\n${forbidden.map(path => `  ${path}`).join('\n')}`);
+}
+
 async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets, serviceWorkerRuntime, shortcut) {
 	const result = await build({
 		absWorkingDir: root,
@@ -62,6 +70,7 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 		plugins: [rawTextPlugin(path => rawInputs.add(path)), readingExtractionPlugin()],
 	});
 
+	assertWorkerInputs(result.metafile);
 	const code = result.outputFiles[0].text;
 	mkdirSync(generatedDir, { recursive: true });
 	writeFileSync(resolve(generatedDir, 'worker.mjs'), code, 'utf-8');

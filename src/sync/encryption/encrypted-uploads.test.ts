@@ -84,6 +84,7 @@ it('does not dispatch when persisting the encrypted wire fails', async () => {
 	vi.spyOn(disk.vault.adapter, 'write').mockRejectedValue(new Error('Disk full'));
 	const uploadFile = vi.fn();
 	await expect(new DurableUploads(manifest, {
+		assertPreparedUpload: async () => {},
 		getServerInfo: async () => ({ reminderOperationDay: 20000 }), prepareUploadWire: file => encryption.prepare(file),
 		uploadFile, batchUpload: vi.fn(),
 	}, { putBase: vi.fn() } as never, crypto.randomUUID()).single(file)).rejects.toThrow('Disk full');
@@ -114,6 +115,7 @@ it('reconciles a stale encrypted precondition without blocking the rest of its b
 		results: files.map(file => ({ path: file.path, hash: file.hash, revision: `revision-${file.path}`, success: true })) }));
 	const files = ['before.md', 'stale.md', 'after.md'].map(path => ({ ...file, path }));
 	const result = await new DurableUploads(manifest, {
+		assertPreparedUpload: async () => {},
 		getServerInfo: async () => ({ reminderOperationDay: 20000 }), prepareUploadWire: file => encryption.prepare(file),
 		batchUpload, uploadFile: vi.fn(),
 	}, { putBase: vi.fn(async () => {}) } as never, crypto.randomUUID()).batch(files);
@@ -135,6 +137,7 @@ it.each([409, 401, 503])('only handles version conflicts when encrypted batch pr
 	const manifest = create(), batchUpload = vi.fn();
 	const error = new HttpError('Preparation failed', status, null, status === 409 ? 'version_conflict' : undefined);
 	const result = new DurableUploads(manifest, {
+		assertPreparedUpload: async () => {},
 		getServerInfo: async () => ({ reminderOperationDay: 20000 }), prepareUploadWire: async () => { throw error; },
 		batchUpload, uploadFile: vi.fn(),
 	}, { putBase: vi.fn() } as never, crypto.randomUUID()).batch([file]);

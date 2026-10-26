@@ -12,7 +12,7 @@ import { createLogger } from '../../../sync/logger';
 import { errorMessage } from '../../../platform/logger';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
 import { EncryptionResetModal } from './encryption-reset-modal';
-import { renderRecoveryVerification } from './recovery-verification';
+import { renderRecoveryVerification } from './recovery-key-setting';
 import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-setup-ui';
 import { renderEncryptionManagement } from './encryption-manage-ui';
 import { WebAppPairingModal } from '../web-app-pairing-modal';

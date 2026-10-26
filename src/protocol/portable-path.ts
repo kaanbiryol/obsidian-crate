@@ -25,6 +25,18 @@ export function getSyncPathIssue(path: string): string | null {
 	return null;
 }
 
+/** UTF-8 byte order, as the server's binary collation sorts paths: surrogate pairs
+ * encode code points above every BMP character. */
+export function compareCodePoints(a: string, b: string): number {
+	for (let index = 0; index < Math.min(a.length, b.length); index++) {
+		const left = a.charCodeAt(index), right = b.charCodeAt(index);
+		if (left === right) continue;
+		const rank = (unit: number) => unit >= 0xe000 ? unit - 0x800 : unit >= 0xd800 ? unit + 0x2000 : unit;
+		return rank(left) - rank(right);
+	}
+	return a.length - b.length;
+}
+
 export function portablePathKey(path: string): string {
 	return path.normalize('NFC').toLowerCase();
 }

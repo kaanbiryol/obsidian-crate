@@ -36,6 +36,16 @@ export function createTransferHarness() {
 		downloadFile: vi.fn(),
 		batchUpload: vi.fn(),
 		batchDownload: vi.fn(),
+		recordMergeApplication: vi.fn(async () => {}),
+	};
+	const markdownBaseCache = {
+		readBase: vi.fn(async (): Promise<ArrayBuffer | null> => null),
+		putBase: vi.fn(async () => {}),
+	};
+	const conflictStore = {
+		record: vi.fn(async () => {}),
+		resolveAppliedIncoming: vi.fn(async () => {}),
+		findIncomingReview: vi.fn((): { conflictPath: string } | undefined => undefined),
 	};
 		const localManifest = {
 			getEntry: vi.fn(),
@@ -61,6 +71,8 @@ export function createTransferHarness() {
 				fileManager,
 				files: api,
 				localManifest,
+				markdownBaseCache,
+				conflictStore,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				retryWithBackoff: retryWithBackoffTyped,
 				getModifiedIso,

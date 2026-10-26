@@ -196,11 +196,13 @@ export class SyncEngineContexts {
 			uploadDiffs: async (diffs, result) => {
 				const retryPaths: string[] = [];
 				const failures = await uploadFullSyncPlan({
-					...this.syncWorkflow,
-					uploadPreparedFiles: (prepared, syncResult, options) => this.uploadPreparedFiles(prepared, syncResult, {
-						...options,
-						onVersionConflicts: async paths => { retryPaths.push(...paths); },
-					}),
+					reportWork: work => d.updateState({ work }),
+					prepareFullSyncUpload: diff => this.syncWorkflow.prepareFullSyncUpload(diff),
+					uploadPreparedFiles: this.uploadPreparedFiles,
+					// Conflicted paths return to the queue pass for a fresh reconciliation.
+					reconcileVersionConflicts: async paths => { retryPaths.push(...paths); },
+					getLocalManifestEntry: path => d.localManifest.getEntry(path),
+					throwIfDestroyed: d.throwIfDestroyed,
 				}, diffs, createPathRecord<FileEntry>(), result, () => {});
 				for (const failure of failures) onFailure?.(failure);
 				return retryPaths;

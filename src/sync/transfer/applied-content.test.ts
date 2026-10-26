@@ -36,7 +36,7 @@ it.each(['single', 'batch', 'merge'])('syncs an edit made after %s apply even af
 	const plugin = { dir: '.obsidian/plugins/crate' };
 	const manifest = new LocalManifest(app as never, plugin as never);
 	manifest.setEntry(path, { hash: await sha256Hex(base), size: base.byteLength, modified: new Date(1000).toISOString() });
-	const context = { ...h.context, localManifest: manifest, throwIfDestroyed: () => {}, shouldIgnore: () => false,
+	const context = { ...h.context, localManifest: manifest, throwIfDestroyed: () => {}, shouldIgnore: () => false, verifyContent: async () => false,
 		markdownBaseCache: { readBase: async () => base, putBase: vi.fn(async () => {}) } };
 	const remoteHash = await sha256Hex(remote);
 	h.api.downloadFile.mockResolvedValue({ content: remote, hash: remoteHash, size: remote.byteLength, revision: 'remote-revision' });
@@ -70,7 +70,9 @@ it('records a baseline without a revision the server sent in an invalid form', a
 		vault: { adapter: { readBinary: async () => content } },
 		getModifiedIso: async () => '2026-10-01T00:00:00.000Z',
 		localManifest: { setEntry },
-		files: {},
+		markdownBaseCache: { putBase: async () => {} },
+		conflictStore: { resolveAppliedIncoming: async () => {} },
+		files: { recordMergeApplication: async () => {} },
 	};
 	await recordAppliedContent(context as never, 'image.bin', content, 'bad\\revision');
 	expect(setEntry).toHaveBeenCalledWith('image.bin', expect.objectContaining({ revision: undefined }));

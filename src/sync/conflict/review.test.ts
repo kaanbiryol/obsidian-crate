@@ -4,9 +4,11 @@ import { TFile } from 'obsidian';
 import { createConflictReview } from './review';
 import type { ConflictRecord } from '../types';
 
-function fixture(hidden = false) {
-	const original = Object.assign(new TFile(), { path: hidden ? '.obsidian/daily-notes.json' : 'Note.md', extension: hidden ? 'json' : 'md' });
-	const saved = Object.assign(new TFile(), { path: hidden ? '.obsidian/daily-notes (conflict).json' : 'Note (conflict).md', extension: hidden ? 'json' : 'md' });
+function fixture(hidden = false, paths = hidden
+	? { original: '.obsidian/daily-notes.json', saved: '.obsidian/daily-notes (conflict).json' }
+	: { original: 'Note.md', saved: 'Note (conflict).md' }) {
+	const original = Object.assign(new TFile(), { path: paths.original, extension: hidden ? 'json' : 'md' });
+	const saved = Object.assign(new TFile(), { path: paths.saved, extension: hidden ? 'json' : 'md' });
 	const encode = (text: string) => new TextEncoder().encode(text).buffer;
 	const files = new Map<string, ArrayBuffer>([[original.path, encode('Current')], [saved.path, encode('Saved')]]);
 	const resolved = vi.fn(async () => {});
@@ -165,6 +167,15 @@ describe('hidden configuration conflict review', () => {
 			expect(kept).toBeDefined();
 			expect(read(kept!)).toBe(saved);
 		}
+	});
+
+	it('keeps both copies of a dotfile with the suffix after its name', async () => {
+		const h = fixture(true, { original: 'notes/.env', saved: 'notes/.env (conflict 2026-01-01 00-00-00 abcd)' });
+		const review = await h.open();
+		await review.resolve('both');
+		const kept = [...h.files.keys()].filter(path => path.startsWith('notes/.env (saved copy '));
+		expect(kept).toHaveLength(1);
+		expect(kept[0]).toMatch(/^notes\/\.env \(saved copy [0-9a-f]{8}\)$/);
 	});
 
 	it.each(['originalPath', 'conflictPath'] as const)('preserves changes made during review to %s', async key => {

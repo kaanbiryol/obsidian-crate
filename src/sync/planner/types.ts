@@ -50,7 +50,7 @@ export interface LocalDiffPlannerContext {
 	vault: Vault;
 	localManifest: PlannerManifest;
 	shouldIgnore(path: string): boolean;
-	verifyContent?(files: VaultFile[]): Promise<boolean>;
+	verifyContent(files: VaultFile[]): Promise<boolean>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 }
 

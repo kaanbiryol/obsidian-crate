@@ -55,6 +55,15 @@ export function getExtensionFromPath(path: string): string {
 	return basename.substring(dotIndex + 1);
 }
 
+/** Inserts text before the extension, with the same rule as `getExtensionFromPath`:
+ * `notes/.env` gets `notes/.env (copy)`, and `a.tar.gz` gets `a.tar (copy).gz`. */
+export function insertBeforeExtension(path: string, text: string): string {
+	const nameStart = path.lastIndexOf('/') + 1;
+	const dot = path.lastIndexOf('.');
+	const end = dot > nameStart ? dot : path.length;
+	return `${path.slice(0, end)}${text}${path.slice(end)}`;
+}
+
 /**
  * Convert a TFile to a VaultFile.
  */

@@ -7,12 +7,13 @@ import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild
 import { SERVER_RELEASE } from './database-upgrades';
 import {
 	awaitsPublicationVerification, type DeploymentFenceRecord, DeploymentRecoveryRequiredError, isPendingAddressActivation,
-	isRejectedWorkerUpload, isSettledStep, parseFenceRecord, readStoredFence, withDeploymentFence,
+	isRejectedWorkerUpload, isSettledStep, parseFenceRecord, readStoredFence, UPDATE_STEPS, withDeploymentFence,
 } from './fence';
 import { provisionCloudflareDeployment } from './provisioner';
 import type { CloudflareDeploymentMetadata } from './types';
 import { releaseUpgradeGuards } from './upgrade-checkpoint';
 import { workersDevOrigin } from './worker-origin';
+import { releaseWorkerMessage, workerStorageBindings } from './discovery';
 
 type RecoveryApi = Pick<CloudflareApiClient, 'queryD1' | 'getWorkerSettings'>;
 export interface DeploymentRecoveryResult {
@@ -22,7 +23,7 @@ export interface DeploymentRecoveryResult {
 	message: string;
 	diagnostics: string;
 }
-const confirmedSteps = new Set(['freeze-upgrade-data', 'verify-upgrade-checkpoint', 'resume-upgraded-server', 'acquire-deployment', 'prepare-database', 'create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker', 'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment']);
+const confirmedSteps = new Set<string>(UPDATE_STEPS);
 
 /** A confirmed checkpoint can be removed conditionally: the old updater must CAS
  * it to "started" before dispatching its next mutation. Pending address activation
@@ -40,9 +41,8 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 		if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
 		settings = null; // First installation may stop before creating the Worker.
 	}
-	const db = settings?.bindings?.find(binding => binding.name === 'DB');
-	const bucket = settings?.bindings?.find(binding => binding.name === 'BUCKET');
-	if (settings && (db?.type !== 'd1' || db.id !== database || bucket?.type !== 'r2_bucket' || bucket.bucket_name !== target.r2BucketName)) {
+	const storage = settings && workerStorageBindings(settings);
+	if (settings && (storage?.databaseId !== database || storage.bucketName !== target.r2BucketName)) {
 		return result('blocked', 'The live server uses different storage. Recovery stopped without changing it.');
 	}
 	const message = settings?.annotations?.['workers/message'] ?? '';
@@ -153,10 +153,9 @@ export async function completePublishedDeployment(
 	}, async fence => {
 		await verifyAddress();
 		const settings = await api.getWorkerSettings(accountId, target.workerName);
-		const db = settings.bindings?.find(binding => binding.name === 'DB');
-		const bucket = settings.bindings?.find(binding => binding.name === 'BUCKET');
-		if (settings.annotations?.['workers/message'] !== `Crate ${version} ${fingerprint}`
-			|| db?.type !== 'd1' || db.id !== databaseId || bucket?.type !== 'r2_bucket' || bucket.bucket_name !== target.r2BucketName) {
+		const storage = workerStorageBindings(settings);
+		if (settings.annotations?.['workers/message'] !== releaseWorkerMessage(version, fingerprint)
+			|| storage?.databaseId !== databaseId || storage.bucketName !== target.r2BucketName) {
 			throw new Error('The published Worker or its storage changed. Recovery stopped.');
 		}
 		const live = await api.verifyPublishedWorkerDeployment(workersDevOrigin(target.workerName, target.workersSubdomain!), fingerprint);

@@ -55,7 +55,7 @@ async function sealNotification(vaultId: string, key: EncryptionKey, fingerprint
 	const notice: EncryptedNotification = { version: 1, vaultId, scopeId: NOTIFICATION_SCOPE,
 		keyId: key.id, reminderId: reminder.id, fingerprint: '', envelope: '' };
 	const display = { title: trimDisplay(readableLinkText(reminder.content), 800),
-		body: trimDisplay(readableLinkText(reminder.project), 160) };
+		body: trimDisplay(reminder.project, 160) };
 	while (new TextEncoder().encode(JSON.stringify(display)).length > 1024) display.title = Array.from(display.title).slice(0, -1).join('');
 	notice.fingerprint = encodeBase64Url(new Uint8Array(await crypto.subtle.sign('HMAC', fingerprintKey,
 		new TextEncoder().encode(JSON.stringify([reminder.id, display])))));

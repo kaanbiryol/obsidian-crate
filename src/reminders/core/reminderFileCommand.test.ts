@@ -29,6 +29,16 @@ it('moves a reminder with two conditional file replacements and preserves both n
 	expect(result.response).toMatchObject({ reminder: { filePath: 'Reminders/Work.md' } });
 });
 
+it('counts a marked task line the scanner cannot read as an existing reminder', async () => {
+	const operationId = op();
+	const marked = `# Inbox\n\n- [ ] <!-- crate-id:${operationId} -->\n`;
+	await expect(applyReminderFileCommand('create', { folderPath: folder, operationId, id: operationId, content: 'New', project: 'Inbox' }, folder, async () => marked))
+		.rejects.toMatchObject({ status: 409, reason: 'exists' });
+	const moved = `# Work\n\n- [ ] <!-- crate-id:r1 -->\n`;
+	await expect(applyReminderFileCommand('update', { ...await request(), project: 'Work' }, folder, async name => name === path ? note : moved))
+		.rejects.toMatchObject({ status: 409, reason: 'duplicate' });
+});
+
 it('rejects stale reminder revisions and scope traversal before editing', async () => {
 	const body = await request();
 	await expect(applyReminderFileCommand('update', { ...body, content: 'Stale' }, folder, async () => note.replace('Buy bread', 'Already changed'))).rejects.toThrow('changed on another device');

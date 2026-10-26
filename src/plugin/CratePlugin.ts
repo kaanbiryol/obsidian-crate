@@ -17,13 +17,13 @@ import type { CrateSettingTab } from '../ui/settings-tab';
 import { configureSyncLogger } from '../sync/logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';
-import { publishSavedSettings } from './settings-persistence';
 import { createSettingsUiState, type SettingsUiState } from './settings-ui-state';
 import { SecretStorageService } from './secret-storage';
 import {
 	buildPersistedCrateSettings,
 	normalizeCrateSettings,
 	normalizePersistedCrateSettings,
+	publishSavedSettings,
 	type CrateSettings,
 	type PersistedCrateSettings,
 } from './settings';

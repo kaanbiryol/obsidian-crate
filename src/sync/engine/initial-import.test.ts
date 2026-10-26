@@ -25,6 +25,7 @@ it('prepares the next chunk of an initial import while the current one uploads',
 	const result = await runInitialImport({
 		transfer: {
 			vault: {}, localManifest: { setEntry: vi.fn(), removeEntry: vi.fn() },
+			markdownBaseCache: { putBase: async () => {} },
 			runConcurrent: async (tasks: Array<() => Promise<void>>) => { for (const task of tasks) await task(); },
 		} as never,
 		api: {
@@ -45,6 +46,7 @@ function importContext(token: string | undefined, revision: string | undefined) 
 	const context = {
 		transfer: {
 			vault: {}, localManifest: { getEntry: () => revision ? { revision } : undefined, setEntry: vi.fn(), removeEntry: vi.fn() },
+			markdownBaseCache: { putBase: async () => {} },
 			runConcurrent: async (tasks: Array<() => Promise<void>>) => { for (const task of tasks) await task(); },
 		} as never,
 		api: {
@@ -86,6 +88,7 @@ it('records verified modification times, so the next scan does not reread the im
 	await runInitialImport({
 		transfer: {
 			vault: {}, localManifest: { setEntry, removeEntry: vi.fn() },
+			markdownBaseCache: { putBase: async () => {} },
 			runConcurrent: async (tasks: Array<() => Promise<void>>) => { for (const task of tasks) await task(); },
 		} as never,
 		api: {

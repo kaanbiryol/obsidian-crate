@@ -83,7 +83,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 			if (existing?.hash === upload.hash && existing.size === upload.size && existing.revision) {
 				inventory[file.path] = existing;
 				transfer.localManifest.setEntry(file.path, { ...existing, modified: verifiedModified(upload) });
-				await transfer.markdownBaseCache?.putBase(file.path, upload.hash, upload.content);
+				await transfer.markdownBaseCache.putBase(file.path, upload.hash, upload.content);
 				completed++;
 				return null;
 			}
@@ -115,7 +115,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 					const entry = { hash: upload.hash, size: upload.size, revision: receipt.revision, modified: verifiedModified(upload) };
 					transfer.localManifest.setEntry(upload.path, entry);
 					inventory[upload.path] = entry;
-					await transfer.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
+					await transfer.markdownBaseCache.putBase(upload.path, upload.hash, upload.content);
 					result.uploaded++;
 					result.uploadedPaths.push(upload.path);
 					completed++;

@@ -1,5 +1,6 @@
 import { normalizeReminderProjectPath } from './reminderProjectPath';
 import { validateRecurrence } from './recurrence/validateRecurrence';
+import { isStoredReminderDate, isStoredReminderDatetime } from './dates/reminderDate';
 import type { RecurrenceRule, UpdateReminderParams } from '../types/reminder';
 
 const REMINDER_TITLE_MAX_LENGTH = 1024;
@@ -26,12 +27,6 @@ function containsControl(value: string, multiline = false): boolean {
 	});
 }
 
-function validDateKey(value: string): boolean {
-	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-	const time = Date.parse(value);
-	return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value;
-}
-
 /** Validate before normalization: omitted, explicitly cleared and invalid are distinct. */
 export function assertReminderMutationInput(
 	input: { content?: unknown; description?: unknown; project?: unknown; priority?: unknown; dueDate?: unknown; dueDatetime?: unknown },
@@ -55,9 +50,8 @@ export function assertReminderMutationInput(
 	for (const field of ['dueDate', 'dueDatetime'] as const) {
 		const value = input[field];
 		if (value === undefined || value === null || value === '') continue;
-		if (typeof value !== 'string' || !validDateKey(value.slice(0, 10))) invalid(field, 'Choose a valid reminder date.');
-		if (field === 'dueDate' ? value.length !== 10
-			: !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) {
+		if (typeof value !== 'string' || !isStoredReminderDate(value.slice(0, 10))) invalid(field, 'Choose a valid reminder date.');
+		if (field === 'dueDate' ? value.length !== 10 : !isStoredReminderDatetime(value)) {
 			invalid(field, field === 'dueDate' ? 'Choose a date without a time.' : 'Choose a valid reminder time and timezone.');
 		}
 	}

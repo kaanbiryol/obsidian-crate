@@ -4,6 +4,7 @@ import { shouldIgnoreSyncPath } from './ignore';
 import {
 	getAllVaultFiles,
 	getExtensionFromPath,
+	insertBeforeExtension,
 	isHiddenPath,
 } from './file-discovery';
 
@@ -18,6 +19,14 @@ describe('file-discovery helpers', () => {
 		expect(getExtensionFromPath('.gitignore')).toBe('');
 		expect(getExtensionFromPath('notes/archive.tar.gz')).toBe('gz');
 		expect(getExtensionFromPath('notes/README')).toBe('');
+	});
+
+	it('inserts text before the extension with the same rule', () => {
+		expect(insertBeforeExtension('.env', ' (copy)')).toBe('.env (copy)');
+		expect(insertBeforeExtension('notes/.env', ' (copy)')).toBe('notes/.env (copy)');
+		expect(insertBeforeExtension('notes/archive.tar.gz', ' (copy)')).toBe('notes/archive.tar (copy).gz');
+		expect(insertBeforeExtension('v1.2/README', ' (copy)')).toBe('v1.2/README (copy)');
+		expect(insertBeforeExtension('.obsidian/app.json', ' (copy)')).toBe('.obsidian/app (copy).json');
 	});
 });
 

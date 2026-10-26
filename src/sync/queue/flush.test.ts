@@ -104,6 +104,8 @@ function createFlushHarness(overrides: Partial<{
 				vault: { getAbstractFileByPath: () => null, adapter: { exists: async (path: string) => { await harnessContext.assertLocalFileAbsent(path); return false; } } } as never,
 				reportWork: work => updateState({ work }),
 			}, files, result, options)) satisfies QueueFlushContext['deleteRemoteFiles'],
+			retryAfterFailure: vi.fn(),
+			flushSucceeded: vi.fn(),
 			finishInitialSetup: vi.fn(async () => {}),
 			recoverUploads: vi.fn(async () => {}),
 			getPendingPathCount: () => pendingKeys.size,
@@ -180,8 +182,7 @@ it('backs off after a failed flush and resets after a successful one', async () 
 		},
 		uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
 	});
-	const retryAfterFailure = vi.fn(), flushSucceeded = vi.fn();
-	Object.assign(h.context, { retryAfterFailure, flushSucceeded });
+	const { retryAfterFailure, flushSucceeded } = h.context;
 	h.pendingKeys.add('note.md');
 	await processPendingChanges(h.context);
 	expect(retryAfterFailure).toHaveBeenCalledOnce();
@@ -313,7 +314,8 @@ describe('processPendingChanges', () => {
 		expect(harness.state.status).toBe('error');
 		expect(harness.state.lastError).toContain('quota exceeded');
 		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
-		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
+		expect(harness.context.retryAfterFailure).toHaveBeenCalledTimes(1);
+		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 		expect(harness.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
 			success: false,
 			uploaded: 0,
@@ -524,7 +526,8 @@ describe('processPendingChanges', () => {
 		expect(harness.state.status).toBe('error');
 		expect(harness.state.lastError).toContain('notes/fail.md');
 		expect(harness.save).toHaveBeenCalledTimes(1);
-		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
+		expect(harness.context.retryAfterFailure).toHaveBeenCalledTimes(1);
+		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 	});
 });
 

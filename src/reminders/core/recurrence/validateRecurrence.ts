@@ -1,5 +1,6 @@
 import type { RecurrenceRule } from '../../types/reminder';
 import { normalizeRecurrenceRule } from './recurrenceRule';
+import { isStoredReminderDate, isStoredReminderDatetime } from '../dates/reminderDate';
 
 export function validateRecurrence(value: unknown): { rule: RecurrenceRule } | { error: string } {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return { error: 'Invalid recurrence' };
@@ -28,7 +29,7 @@ export function validateRecurrence(value: unknown): { rule: RecurrenceRule } | {
 	}
 	if (raw.endDate !== undefined) {
 		const date = raw.endDate;
-		if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2}))?$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date.slice(0, 10)).toISOString().slice(0, 10) !== date.slice(0, 10)) return { error: 'Invalid recurrence end date' };
+		if (typeof date !== 'string' || !(isStoredReminderDate(date) || isStoredReminderDatetime(date))) return { error: 'Invalid recurrence end date' };
 		rule.endDate = date;
 	}
 	return { rule: normalizeRecurrenceRule(rule) };

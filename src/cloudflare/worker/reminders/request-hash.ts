@@ -1,4 +1,4 @@
-import { sha256Hex } from '../platform/sha256';
+import { sha256Hex } from '../../../platform/sha256';
 /** Shared with the pre-encryption server contract, for recovering accepted edits whose
  * response was lost before encryption was enabled. */
 function canonical(value: unknown): unknown {

@@ -143,7 +143,7 @@ describe('renderNotificationsSection', () => {
 		expect(setting.texts[0]?.inputEl.type).toBe('time');
 		setting.buttons[0]?.click();
 		await flushMicrotasks();
-		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ allDayNotificationTime: null });
+		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ allDayNotificationTime: null }, expect.any(Function));
 		expect(setting.texts[0]?.inputEl.value).toBe('');
 	});
 
@@ -166,10 +166,31 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(updateNotificationPolicy).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, revision: 'policy-1' }));
-		expect(plugin.writeSettings).toHaveBeenCalledWith({ pushEnabled: false });
+		expect(plugin.writeSettings).toHaveBeenCalledWith({ pushEnabled: false }, expect.any(Function));
 		expect(updateNotificationPolicy.mock.invocationCallOrder[0]).toBeLessThan(
 			plugin.writeSettings.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
 		);
+	});
+
+	it('does not save the local preference after the server connection changes', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({ getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })) }) as unknown as {
+			settings: { pushEnabled: boolean; workerUrl: string };
+			writeSettings: ReturnType<typeof vi.fn>;
+		};
+		// The real write checks the connection before saving.
+		plugin.writeSettings.mockImplementationOnce((_update: unknown, assertCurrent: () => void) => { assertCurrent(); });
+		updateNotificationPolicy.mockImplementationOnce(async (policy: Record<string, unknown>) => {
+			plugin.settings.workerUrl = 'https://other.example.com';
+			return { policy: { ...policy, revision: 'policy-2' } };
+		});
+
+		renderNotificationsSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		getSettingByName('Push notifications').toggles[0]?.change(false);
+		await flushMicrotasks();
+
+		expect(plugin.settings.pushEnabled).toBe(true);
+		expect(noticeMessages.some(message => message.includes('server connection changed'))).toBe(true);
 	});
 
 	it('retains the shared server choice when saving the local preference fails', async () => {

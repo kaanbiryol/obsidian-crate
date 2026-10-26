@@ -16,6 +16,8 @@ interface ApiRoutePolicy {
 	readonly duringEncryptionReset?: true;
 	/** A GET an encrypted vault serves without its keys: public feature state, not vault content. */
 	readonly keylessEncryptedRead?: true;
+	/** Answered before authentication by `routes/public.ts`, so no token scope applies. */
+	readonly public?: true;
 }
 
 const COORDINATOR = { kind: 'coordinator', wake: true } as const;
@@ -29,6 +31,7 @@ const VAULT: readonly Scope[] = ['vault'];
 const REMINDERS: readonly Scope[] = ['vault', 'reminders'];
 const LIBRARY: readonly Scope[] = ['vault', 'reminders', 'reading'];
 const ALL_SCOPES: readonly Scope[] = ['vault', 'reminders', 'reading', 'reading_capture'];
+const PUBLIC = { scopes: [], public: true } as const;
 
 /** Worker-local admission, token scope and execution policy. Dispatch, folder
  * authority, feature state and encryption guards are not declared here.
@@ -82,12 +85,12 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /sync/restore-version': { scopes: VAULT, execution: COORDINATOR },
 	'PUT /sync/upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncUpload } },
 	'PUT /sync/import/upload': { scopes: VAULT },
-	'POST /notifications/reminders-exchange': { scopes: VAULT, rateLimit: 10 },
+	'POST /notifications/reminders-exchange': { ...PUBLIC, rateLimit: 10 },
 	'POST /notifications/reminders-enrollment-token': { scopes: VAULT, execution: COORDINATOR_READ, rateLimit: 10 },
 	'POST /notifications/subscribe': { scopes: REMINDERS, execution: COORDINATOR_READ, rateLimit: 30 },
 	'POST /notifications/test': { scopes: VAULT, rateLimit: 3 },
-	'POST /notifications/share/reading': { scopes: VAULT, rateLimit: 30 },
-	'GET /notifications/vapid-public-key': { scopes: VAULT },
+	'POST /notifications/share/reading': { ...PUBLIC, rateLimit: 30 },
+	'GET /notifications/vapid-public-key': { ...PUBLIC },
 	'GET /notifications/subscriptions': { scopes: VAULT },
 	'DELETE /notifications/subscribe': { scopes: REMINDERS, execution: COORDINATOR_READ, rateLimit: 30 },
 	'GET /reminders/list': { scopes: REMINDERS, initializeProjection: true },

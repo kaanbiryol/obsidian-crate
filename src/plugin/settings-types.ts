@@ -1,7 +1,7 @@
 import type { ServerRestoreState } from '../cloudflare/restore/state';
 import type { UsageSnapshot } from '../cloudflare/usage/snapshot';
 import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment/types';
-import type { PersistedSyncSettings } from '../sync/settings';
+import { DEFAULT_SYNC_SETTINGS, type PersistedSyncSettings } from '../sync/settings';
 import type { SharedSettings } from '../protocol/shared-settings';
 import { DEFAULT_READING_SETTINGS, type ReadingSettings } from '../reading/settings';
 
@@ -22,18 +22,10 @@ export interface CrateSettings extends PersistedCrateSettings {
 }
 
 export const DEFAULT_SETTINGS: CrateSettings = {
+	...DEFAULT_SYNC_SETTINGS,
 	reading: { ...DEFAULT_READING_SETTINGS },
 	usageSnapshot: null,
-	automaticSync: false,
-	workerUrl: '',
 	cloudflareDeployment: null,
-	lastSync: null,
-	lastSeq: 0,
 	deviceId: '',
-	ignorePatterns: ['.git/', '.trash/', '*.tmp', '.DS_Store', '._*', 'Thumbs.db', 'desktop.ini', '*.swp', '*.swo'],
-	syncInterval: 300,
-	syncHistory: [],
-	pushEnabled: false,
 	debugLogging: false,
-	debounceDelay: 5,
 };

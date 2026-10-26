@@ -44,6 +44,17 @@ function lineMatchesReminder(line: string, reminder: ReminderLineRecord): boolea
 		&& recurrenceKey(parsed.parsed.recurrence) === recurrenceKey(reminder.recurrence);
 }
 
+/** Checks the task lines the scanner reads, so a marker quoted in a code fence
+ * is not an existing reminder. Any marked task line counts, even one the
+ * scanner cannot parse yet, so a retry never appends a second copy. */
+export function noteContainsReminderId(content: string, id: string): boolean {
+	const lines = content.split('\n');
+	for (const index of markdownTaskContexts(lines).keys()) {
+		if (extractReminderId(lines[index]!) === id) return true;
+	}
+	return false;
+}
+
 export function findReminderLineNumber(lines: string[], reminder: ReminderLineRecord): number {
 	const taskLines = markdownTaskContexts(lines);
 	const owners = [...taskLines.keys()].filter(index => extractReminderId(lines[index]!) === reminder.id);

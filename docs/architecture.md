@@ -506,22 +506,28 @@ server captures still drain through their original path.
 
 ## Secret Storage
 
-The plugin stores two local values through `SecretStorageService`:
+The plugin stores these local values through `SecretStorageService`. `platform/secret-keys.ts` lists them:
 
-| Key | Value |
-|---|---|
-| `crate-auth-token` | Bearer token for worker authentication |
-| `crate-device-id` | Local device identity; kept out of vault-synced settings |
+| Key | Value | Scoped by server |
+|---|---|---|
+| `crate-auth-token` | Bearer token for worker authentication | Yes |
+| `crate-encryption-keys` | This vault's encryption key bundle | Yes |
+| `crate-encryption-reset` | Progress of an unfinished encryption reset | Yes |
+| `crate-encryption-recovery` | This device's copy of the recovery key, which settings can copy again | Yes |
+| `crate-device-id` | Local device identity; kept out of vault-synced settings | No |
+| `crate-usage-oauth-<account>` | Saved Cloudflare login for one account (`cloudflare/saved-login.ts`) | No |
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.
 
-The service uses Obsidian's official `App.secretStorage` type and scopes the sync bearer token by Worker URL so credentials cannot leak between deployments.
+The service uses Obsidian's official `App.secretStorage` type. Server-scoped keys are stored under a hash of the managed deployment ID, or of the Worker URL for a self-hosted server (`plugin/lifecycle.ts`), so credentials and keys cannot leak between deployments.
 
 `plugin/settings-types.ts` separates persisted settings from the runtime device ID.
-Loading initializes settings before hydrating that ID from secret storage. Queued
-settings writes use `plugin/settings-persistence.ts` to publish only requested
-normalized fields after saving; snapshot saves do not republish captured state.
-The same module exposes a narrow synchronous sync-progress update with bounded,
+Loading initializes settings before hydrating that ID from secret storage. Sync owns
+its settings slice, defaults and validation in `sync/settings.ts`; `plugin/settings.ts`
+composes it with the Reading, Reminders and deployment slices. Queued settings writes
+use `publishSavedSettings` in `plugin/settings.ts` to publish only requested normalized
+fields after saving; snapshot saves do not republish captured state. `updateSyncProgress`
+in `sync/settings.ts` is a narrow synchronous sync-progress update with bounded,
 immutable history. Sync retains cursor/checkpoint ordering and persists at operation
 completion. This preserves newer progress during unrelated settings saves, the
 hydrated device identity and the existing shared settings object.

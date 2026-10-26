@@ -6,6 +6,7 @@ import { recoverDeployment } from './update-recovery';
 import type { CloudflareApiClient } from '../cloudflare-api';
 import { provisionCloudflareDeployment } from './provisioner';
 import { createFenceQueryHarness } from './fence-test-harness';
+import { UPDATE_STEPS } from './fence';
 
 function createMetadata(): CloudflareDeploymentMetadata {
 	return {
@@ -195,6 +196,25 @@ describe('provisionCloudflareDeployment', () => {
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
 		expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
 		expect(api.verifyWorkerDeployment).toHaveBeenCalledWith('https://crate-0123456789abcdef.personal-crate.workers.dev', artifacts.fingerprint);
+	});
+
+	it('records only steps that update recovery can resume from', async () => {
+		const api = createApi();
+		// A first installation creates its resources; the second run is an ordinary update.
+		api.getR2Bucket.mockResolvedValueOnce(null);
+		api.getWorkersSubdomain.mockResolvedValueOnce(null as never);
+		api.createWorkersSubdomain.mockImplementation(async (_account: string, name: string) => name);
+		const query = api.queryD1.getMockImplementation()!;
+		const steps = new Set<string>();
+		api.queryD1.mockImplementation(async (account, database, sql, params) => {
+			if (sql.startsWith('UPDATE maintenance_state SET value = ?') && params?.[0]) steps.add(String((JSON.parse(params[0]) as { step?: string }).step));
+			return query(account, database, sql, params);
+		});
+		const metadata = createMetadata();
+		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+		expect([...steps]).toEqual(expect.arrayContaining(['create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker', 'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment']));
+		expect([...steps].filter(step => !(UPDATE_STEPS as readonly string[]).includes(step))).toEqual([]);
 	});
 
 	it('explains how to activate R2 when the account is not entitled', async () => {

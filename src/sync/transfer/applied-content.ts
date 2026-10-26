@@ -32,8 +32,8 @@ export async function recordAppliedContent(
 	// invalid one would make the saved checkpoint unreadable after a restart.
 	const entry = { hash, size: content.byteLength, modified, revision: isSyncRevision(revision) ? revision : undefined };
 	context.localManifest.setEntry(path, entry);
-	if (isMarkdownPath(path)) await context.markdownBaseCache?.putBase(path, hash, content);
-	await context.conflictStore?.resolveAppliedIncoming?.(path, hash);
-	await context.files.recordMergeApplication?.(path, hash, 'local-applied');
+	if (isMarkdownPath(path)) await context.markdownBaseCache.putBase(path, hash, content);
+	await context.conflictStore.resolveAppliedIncoming(path, hash);
+	await context.files.recordMergeApplication(path, hash, 'local-applied');
 	return entry;
 }

@@ -4,7 +4,7 @@ import { buildSharedSettings, rebaseSharedSettings, sameSharedSettings, saveShar
 import { normalizeSharedSettingsValue, type SharedSettings } from '../protocol/shared-settings';
 import { createLogger } from '../sync/logger';
 import { errorMessage } from '../platform/logger';
-import { normalizeIgnorePatterns } from './settings';
+import { normalizeIgnorePatterns } from '../sync/settings';
 
 const logger = createLogger('SharedSettings');
 

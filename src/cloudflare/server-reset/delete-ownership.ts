@@ -1,6 +1,7 @@
 import { CloudflareApiError, type CloudflareApiClient, type CloudflareWorkerSettings } from '../cloudflare-api';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { isSha256Hex } from '../../platform/validation';
+import { deletionWorkerMessage } from '../deployment/discovery';
 
 export type DeleteApi = Pick<CloudflareApiClient,
 	'getWorkerSettings' | 'listWorkers' | 'listDurableObjectNamespaces' | 'deleteWorker'
@@ -35,7 +36,7 @@ export async function deletionWorkerSettings(api: DeleteApi, accountId: string, 
 export function assertDeletionHelper(settings: CloudflareWorkerSettings, metadata: CloudflareDeploymentMetadata, tokenHash?: string): void {
 	const job = metadata.deletion!;
 	const bindings = settings.bindings;
-	if (settings.annotations?.['workers/message'] !== `Crate deletion ${job.id}` || !Array.isArray(bindings)
+	if (settings.annotations?.['workers/message'] !== deletionWorkerMessage(job.id) || !Array.isArray(bindings)
 		|| bindings.length !== 4 || new Set(bindings.map(binding => binding.name)).size !== 4
 		|| !bindings.some(binding => binding.type === 'r2_bucket' && binding.name === 'BUCKET' && binding.bucket_name === metadata.r2BucketName)
 		|| !bindings.some(binding => binding.type === 'plain_text' && binding.name === 'CRATE_RESET_ID' && binding.text === job.id)

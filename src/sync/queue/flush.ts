@@ -58,9 +58,9 @@ export interface QueueFlushContext {
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
 	triggerDebouncedSync(): void;
 	/** Schedule the next attempt after a failed flush, backing off while it keeps failing. */
-	retryAfterFailure?(): void;
+	retryAfterFailure(): void;
 	/** Reset the failure backoff after a flush succeeds. */
-	flushSucceeded?(): void;
+	flushSucceeded(): void;
 	requestReconciliation(queueKeys: string[]): void;
 	onFlushResult?(result: SyncResult): void | Promise<void>;
 }
@@ -267,7 +267,7 @@ export async function processPendingChanges(
 		}
 
 		batch.release();
-		context.flushSucceeded?.();
+		context.flushSucceeded();
 		const didWork = uploads.length > 0 || deletes.length > 0 || skipped.length > 0;
 		await context.finishInitialSetup();
 		if (!didWork) {
@@ -321,7 +321,7 @@ export async function processPendingChanges(
 			&& reconciliationPaths.size === 0
 			&& !state.hasTerminalFailure
 		) {
-			if (flushFailed && context.retryAfterFailure) context.retryAfterFailure();
+			if (flushFailed) context.retryAfterFailure();
 			else context.triggerDebouncedSync();
 		}
 	}

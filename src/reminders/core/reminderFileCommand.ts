@@ -5,7 +5,7 @@ import { getReminderProjectFilePath, normalizeReminderProjectPath } from './remi
 import { buildCreateReminderArgs, buildReminderUpdate } from './reminderMutationPlan';
 import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildMovedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, unreadableReminderTitle } from './markdownReminderMutation';
 import { setReminderCompletionInContent } from './reminderCompletion';
-import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderReminderBlocksInContent } from './markdownReminderFile';
+import { deleteReminderBlockFromContent, getInitialProjectFileContent, noteContainsReminderId, reorderReminderBlocksInContent } from './markdownReminderFile';
 import { DEFAULT_PROJECT, MAX_REMINDER_NOTE_BYTES, MAX_REMINDERS_PER_NOTE } from './constants';
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
 import { isMarkdownNoteInFolder } from '../../protocol/note-paths';
@@ -68,6 +68,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		if (content !== null) checkSize(content);
 		return content;
 	};
+	// Notes are scanned before an edit too, so an unreadable existing line fails first.
 	const scan = (path: string, content: string) => scanReminderMarkdownContent(path, content, folderPath).reminders;
 	const scanChange = (path: string) => {
 		let reminders: ScannedReminderRecord[];
@@ -84,7 +85,8 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		if (typeof body.id !== 'string' || body.id !== body.operationId) throw new ReminderCommandError('A new reminder must use its operation identity', 400, 'invalid_reminder_input');
 		const name = project(body.project), path = getReminderProjectFilePath(folderPath, name);
 		const content = await load(path) ?? getInitialProjectFileContent(name);
-		if (scan(path, content).some(item => item.id === body.id)) throw new ReminderCommandError('This reminder already exists. Refresh its saved state.', 409, 'version_conflict', 'exists');
+		scan(path, content);
+		if (noteContainsReminderId(content, body.id)) throw new ReminderCommandError('This reminder already exists. Refresh its saved state.', 409, 'version_conflict', 'exists');
 		const args = buildCreateReminderArgs({ content: text(body.content)!, description: text(body.description), project: name,
 			priority: body.priority === 1 ? 1 : 4, recurrence: parseReminderRecurrenceInput(body.recurrence) ?? undefined,
 			dueDate: text(body.dueDate), dueDatetime: text(body.dueDatetime), id: body.id });
@@ -116,7 +118,8 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 			if (update.project && update.project !== current.project) {
 				const destination = getReminderProjectFilePath(folderPath, update.project);
 				const before = await load(destination) ?? getInitialProjectFileContent(update.project);
-				if (scan(destination, before).some(item => item.id === current.id)) throw new ReminderCommandError('The destination already contains this reminder', 409, 'version_conflict', 'duplicate');
+				scan(destination, before);
+				if (noteContainsReminderId(before, current.id)) throw new ReminderCommandError('The destination already contains this reminder', 409, 'version_conflict', 'duplicate');
 				const next = appendCreatedReminderBlock(before, buildMovedReminderBlock(current, update));
 				changes.set(path, deleteReminderBlockFromContent(content, current).content);
 				changes.set(destination, next);

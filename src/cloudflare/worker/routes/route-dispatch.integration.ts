@@ -33,7 +33,8 @@ it('dispatches every declared API route to a handler', async () => {
 	const reading = (await policy(env.DB))!;
 	const unhandled: string[] = [];
 	for (const { method, path } of apiRoutes()) {
-		const scope = apiRoutePolicy(path, method)!.scopes[0]!;
+		// Public routes answer before any principal is consulted.
+		const scope = apiRoutePolicy(path, method)!.scopes[0] ?? 'vault';
 		const principal: AuthPrincipal = scope === 'vault' ? { tokenId: 'route-dispatch', scope }
 			: { tokenId: 'route-dispatch', scope, folderPath: reading.folder_path, readingGeneration: reading.generation };
 		const request = new Request(`https://worker.test${path}`, {
@@ -66,6 +67,17 @@ it('serves shared settings from the store that matches the vault encryption', as
 	expect(await read()).toEqual({ settings: null, settingsVersion: plaintext.etag });
 	await storeEncryptionState(env.DB, (await createEncryptionFixture('active')).state);
 	expect(await read()).toEqual({ settings: null, settingsVersion: null });
+});
+
+it('answers before authentication exactly the API routes declared public', async () => {
+	const mismatched: string[] = [];
+	for (const { method, path } of apiRoutes()) {
+		let answered: boolean;
+		try { answered = await handlePublicRoute(new Request(`https://worker.test${path}`, { method }), env, path, method) !== null; }
+		catch { answered = true; }
+		if (answered !== Boolean(apiRoutePolicy(path, method)?.public)) mismatched.push(`${method} ${path}`);
+	}
+	expect(mismatched).toEqual([]);
 });
 
 it('serves every public asset admitted before authentication', async () => {

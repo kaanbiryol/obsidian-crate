@@ -81,6 +81,7 @@ it.each([3, 17])('checkpoints recovered receipts before another interruption (%i
 		let dispatched = 0;
 		const save = vi.spyOn(manifest, 'save');
 		const recovery = new DurableUploads(manifest, {
+				assertPreparedUpload: async () => {},
 				getServerInfo: async () => ({ reminderOperationDay: day }),
 				batchUpload: async files => ({ success: false, results: files.map(file => {
 						dispatched++;
@@ -114,7 +115,7 @@ it('recovers 24 small uploads in three requests using their original identities 
 	const original = await manifest.uploadJournal.prepare(Array.from({ length: 24 }, (_, i) => ({ ...file, path: `${i}.md` })), 20000);
 	const batchUpload = vi.fn(async (files: typeof original) => ({ success: true, results: files.map(f => ({ path: f.path, success: true, hash: f.hash, revision: 'r' })) }));
 	const uploadFile = vi.fn(); const getServerInfo = vi.fn(); const progress = vi.fn();
-	const recovery = new DurableUploads(manifest, { batchUpload, uploadFile, getServerInfo }, { putBase: async () => {} } as never, crypto.randomUUID());
+	const recovery = new DurableUploads(manifest, { assertPreparedUpload: async () => {}, batchUpload, uploadFile, getServerInfo }, { putBase: async () => {} } as never, crypto.randomUUID());
 	await recovery.recover(progress);
 	expect(batchUpload.mock.calls.map(([files]) => files.length)).toEqual([8, 8, 8]);
 	expect(batchUpload.mock.calls.flatMap(([files]) => files.map(f => [f.operationId, f.content, f.expectedHash]))).toEqual(original.map(f => [f.operationId, f.content, f.expectedHash]));
@@ -128,6 +129,7 @@ it('checkpoints healthy batch members while retaining only the unresolved upload
 	const { create, file } = fixture(); const manifest = create();
 	await manifest.uploadJournal.prepare(['a', 'b', 'c'].map(path => ({ ...file, path: `${path}.md` })), 20000);
 	const recovery = new DurableUploads(manifest, {
+		assertPreparedUpload: async () => {},
 		getServerInfo: vi.fn(), uploadFile: vi.fn(),
 		batchUpload: async files => ({ success: false, results: files.map(f => f.path === 'b.md'
 			? { path: f.path, success: false as const, status: 503, error: 'Retry needed' }
@@ -143,7 +145,7 @@ it('checkpoints healthy batch members while retaining only the unresolved upload
 it('keeps the whole batch when its receipt list is invalid', async () => {
 	const { create, file } = fixture(); const manifest = create();
 	await manifest.uploadJournal.prepare(['a', 'b'].map(path => ({ ...file, path: `${path}.md` })), 20000);
-	const recovery = new DurableUploads(manifest, { getServerInfo: vi.fn(), uploadFile: vi.fn(),
+	const recovery = new DurableUploads(manifest, { assertPreparedUpload: async () => {}, getServerInfo: vi.fn(), uploadFile: vi.fn(),
 		batchUpload: async () => ({ success: true, results: [{ path: 'a.md', hash: file.hash, success: true, revision: 'r' }] }),
 	}, { putBase: async () => {} } as never, crypto.randomUUID());
 	const progress = vi.fn();
@@ -156,6 +158,7 @@ it('refuses a receipt with an invalid revision instead of saving it to the check
 	const { create, file } = fixture();
 	const manifest = create();
 	const uploads = new DurableUploads(manifest, {
+		assertPreparedUpload: async () => {},
 		getServerInfo: async () => ({ reminderOperationDay: 20000 }),
 		uploadFile: async (path: string, _content: ArrayBuffer, hash: string) => ({ success: true, path, hash, revision: 5 as never }),
 		batchUpload: vi.fn(),
@@ -170,6 +173,7 @@ it('prunes journal copies periodically during a long run of uploads', async () =
 	const { disk, create, file } = fixture();
 	const manifest = create();
 	const uploads = new DurableUploads(manifest, {
+		assertPreparedUpload: async () => {},
 		getServerInfo: async () => ({ reminderOperationDay: 20000 }),
 		uploadFile: async (path: string, _content: ArrayBuffer, hash: string) => ({ success: true, path, hash, revision: `revision-${path}` }),
 		batchUpload: vi.fn(),
@@ -203,7 +207,7 @@ it('records a merge base only for Markdown uploads', async () => {
 	await manifest.uploadJournal.prepare([file, { ...file, path: 'scan.pdf', contentType: 'application/pdf' }], 20000);
 	const batchUpload = vi.fn(async (files: Array<{ path: string; hash: string }>) => ({ success: true, results: files.map(f => ({ path: f.path, success: true, hash: f.hash, revision: 'r' })) }));
 	const putBase = vi.fn(async () => {});
-	await new DurableUploads(manifest, { batchUpload, uploadFile: vi.fn(), getServerInfo: vi.fn() }, { putBase } as never, crypto.randomUUID()).recover();
+	await new DurableUploads(manifest, { assertPreparedUpload: async () => {}, batchUpload, uploadFile: vi.fn(), getServerInfo: vi.fn() }, { putBase } as never, crypto.randomUUID()).recover();
 	expect(putBase).toHaveBeenCalledExactlyOnceWith('note.md', file.hash, expect.any(ArrayBuffer));
 	expect(manifest.getEntry('scan.pdf')).toMatchObject({ hash: file.hash, revision: 'r' });
 	await manifest.close();

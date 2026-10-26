@@ -1,4 +1,7 @@
 import { isRecord, isSha256Hex, normalizeNonNegativeInteger, normalizeNullableString, normalizeStringArray } from '../platform/validation';
+import { MAX_TIMER_SECONDS } from '../protocol/shared-settings';
+import { isCheckpointId } from '../protocol/history-checkpoints';
+import { normalizeWorkerUrl } from './connection/worker-url';
 import { normalizeSyncTimings } from './diagnostics/timings';
 import { normalizeRequestDiagnostics } from './diagnostics/request-diagnostics';
 import { normalizeSyncIssues } from './issues';
@@ -35,6 +38,52 @@ interface ManagedServerIdentity {
 /** The runtime's view of plugin settings: sync fields plus whether Crate manages the server. */
 export interface SyncRuntimeSettings extends SyncSettings {
 	cloudflareDeployment: ManagedServerIdentity | null;
+}
+
+export const DEFAULT_SYNC_SETTINGS: PersistedSyncSettings = {
+	automaticSync: false,
+	workerUrl: '',
+	lastSync: null,
+	lastSeq: 0,
+	ignorePatterns: ['.git/', '.trash/', '*.tmp', '.DS_Store', '._*', 'Thumbs.db', 'desktop.ini', '*.swp', '*.swo'],
+	syncInterval: 300,
+	syncHistory: [],
+	pushEnabled: false,
+	debounceDelay: 5,
+};
+
+/** Every device also excludes its own workspace files, whatever its shared patterns say. */
+export function normalizeIgnorePatterns(ignorePatterns: string[], configDir: string): string[] {
+	const normalizedConfigDir = configDir.replace(/^\/+|\/+$/g, '');
+	const workspacePattern = normalizedConfigDir ? `${normalizedConfigDir}/workspace*` : null;
+	return !workspacePattern || ignorePatterns.includes(workspacePattern)
+		? ignorePatterns
+		: [...ignorePatterns, workspacePattern];
+}
+
+const normalizeString = (value: unknown): string => typeof value === 'string' ? value.trim() : '';
+const normalizeBoolean = (value: unknown, fallback: boolean): boolean => typeof value === 'boolean' ? value : fallback;
+
+export function normalizePersistedSyncSettings(
+	value: Partial<PersistedSyncSettings> | null | undefined,
+	configDir: string,
+): PersistedSyncSettings {
+	const defaults = DEFAULT_SYNC_SETTINGS;
+	const workerUrl = normalizeWorkerUrl(normalizeString(value?.workerUrl));
+	const scopeUrl = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.workerUrl));
+	const authority = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.authority));
+	return {
+		workerUrl,
+		...(workerUrl && scopeUrl === workerUrl && authority ? { checkpointScope: { workerUrl, authority } } : {}),
+		lastSync: normalizeNullableString(value?.lastSync),
+		lastSeq: normalizeNonNegativeInteger(value?.lastSeq, defaults.lastSeq),
+		ignorePatterns: normalizeIgnorePatterns(normalizeStringArray(value?.ignorePatterns, defaults.ignorePatterns), configDir),
+		automaticSync: normalizeBoolean(value?.automaticSync, defaults.automaticSync),
+		syncInterval: Math.min(normalizeNonNegativeInteger(value?.syncInterval, defaults.syncInterval), MAX_TIMER_SECONDS),
+		syncHistory: normalizeSyncHistory(value?.syncHistory),
+		pushEnabled: normalizeBoolean(value?.pushEnabled, defaults.pushEnabled),
+		debounceDelay: Math.min(normalizeNonNegativeInteger(value?.debounceDelay, defaults.debounceDelay), MAX_TIMER_SECONDS),
+	};
 }
 
 export const MAX_SYNC_HISTORY = 20;
@@ -85,7 +134,7 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 			errors: value.errors.filter((error): error is string => typeof error === 'string').slice(0, MAX_SYNC_HISTORY_PATHS),
 		} : {}),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
-		...(typeof value.sharedCheckpoint === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value.sharedCheckpoint) ? { sharedCheckpoint: value.sharedCheckpoint } : {}),
+		...(isCheckpointId(value.sharedCheckpoint) ? { sharedCheckpoint: value.sharedCheckpoint } : {}),
 		...(isSha256Hex(value.historyCheckpoint)
 			? { historyCheckpoint: value.historyCheckpoint } : {}),
 		...(requestDiagnostics ? { requestDiagnostics } : {}),

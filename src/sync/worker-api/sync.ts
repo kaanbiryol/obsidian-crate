@@ -12,6 +12,7 @@ import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
 import { errorMessage } from '../../platform/logger';
 import { refusedUploadResult } from '../failures';
+import { insertBeforeExtension } from '../local/file-discovery';
 import type {
 	BatchDeleteResponse,
 	BatchDeleteFile,
@@ -69,8 +70,7 @@ export function assignPlainPaths(entries: ReadonlyArray<{ path: string; wire: st
 		const { wire } = entries[index]!;
 		let { path } = entries[index]!;
 		if (claimed.has(portablePathKey(path))) {
-			const name = path.lastIndexOf('/') + 1, dot = path.lastIndexOf('.') > name ? path.lastIndexOf('.') : path.length;
-			path = `${path.slice(0, dot)} - ${wire.slice(wire.lastIndexOf('/') + 1, wire.lastIndexOf('/') + 9)}${path.slice(dot)}`;
+			path = insertBeforeExtension(path, ` - ${wire.slice(wire.lastIndexOf('/') + 1, wire.lastIndexOf('/') + 9)}`);
 		}
 		claimed.add(portablePathKey(path));
 		return { index, path };

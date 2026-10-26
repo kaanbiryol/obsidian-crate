@@ -5,6 +5,7 @@ import { errorMessage } from '../../platform/logger';
 import { openConfirmationModal } from '../confirmation-modal';
 import { normalizeTimeString } from '../../platform/validation';
 import { saveNotificationPolicy } from '../../reminders/notification-policy-sync';
+import { captureSyncApiConnection } from '../../plugin/server-request';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import type { SyncApiClient } from '../../sync/worker-api/client';
 import type { SettingsSectionContext } from './section-helpers';
@@ -15,7 +16,9 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 	const isActive = () => active;
 
 
-	const policyApi = plugin.syncRuntime.getApiClient();
+	// The policy and the local copy of its settings must come from the same server.
+	const connection = captureSyncApiConnection(plugin);
+	const policyApi = connection.api;
 	let policy: NotificationPolicy | null = null;
 	let loadError: unknown;
 	const openedPolicy = policyApi ? policyApi.getNotificationPolicy().then(result => { policy = result.policy; }).catch(error => { loadError = error; }) : Promise.resolve();
@@ -23,6 +26,7 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 		await openedPolicy;
 		if (loadError) throw new Error(errorMessage(loadError));
 		if (!policyApi) throw new Error('Connect to the sync server before changing notifications');
+		connection.assertCurrent();
 		await saveNotificationPolicy(policyApi, plugin, policy, patch, saved => { policy = saved; });
 	};
 	const content = createSettingsDisclosure(containerEl, 'Notifications', {
@@ -39,7 +43,7 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 						toggle.setDisabled(true);
 						try {
 							await savePolicy({ enabled: value });
-							await plugin.writeSettings({ pushEnabled: value });
+							await plugin.writeSettings({ pushEnabled: value }, connection.assertCurrent);
 							if (active) context.rerender();
 						} catch (error) {
 							new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
@@ -56,7 +60,7 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 			});
 			const saveAllDayTime = async (time: string | null) => {
 				await savePolicy({ allDayTime: time });
-				await plugin.writeRemindersSettings({ allDayNotificationTime: time });
+				await plugin.writeRemindersSettings({ allDayNotificationTime: time }, connection.assertCurrent);
 			};
 			let timeInput: TextComponent;
 			const timeSetting = new Setting(options)

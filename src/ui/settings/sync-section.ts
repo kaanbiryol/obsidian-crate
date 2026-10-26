@@ -6,6 +6,8 @@ import { renderSyncInterval } from './sync-interval';
 import { renderEncryptionSection } from './encryption/encryption-section';
 import { renderExclusionsSetting } from './exclusions-setting';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
+import { MAX_TIMER_SECONDS } from '../../protocol/shared-settings';
+import { writeSyncSettings } from '../../plugin/sync-connection';
 import type { SettingsSectionContext } from './section-helpers';
 
 export function renderSyncSection(context: SettingsSectionContext): () => void {
@@ -13,7 +15,7 @@ export function renderSyncSection(context: SettingsSectionContext): () => void {
 	const cleanup = renderEncryptionSection(containerEl, plugin);
 	const persistSettings = async (update: Partial<CrateSettings>): Promise<boolean> => {
 		try {
-			await plugin.writeSettings(update);
+			await writeSyncSettings(plugin, update);
 			return true;
 		} catch (error) {
 			new Notice(`Failed to save sync settings: ${errorMessage(error)}`);
@@ -29,10 +31,7 @@ export function renderSyncSection(context: SettingsSectionContext): () => void {
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.automaticSync)
 			.onChange(async automaticSync => {
-				if (await persistSettings({ automaticSync })) {
-					plugin.syncRuntime.updateSyncSettings();
-					rerender();
-				}
+				if (await persistSettings({ automaticSync })) rerender();
 			}));
 
 	const options = createSettingsDisclosure(containerEl, 'Sync options', { summary: plugin.settings.automaticSync ? `After edits: ${plugin.settings.debounceDelay}s · Interval: ${plugin.settings.syncInterval}s` : 'Excluded files' });
@@ -43,15 +42,14 @@ export function renderSyncSection(context: SettingsSectionContext): () => void {
 			.setDesc('This device · when automatic sync is on, wait this many seconds after a file changes before syncing. Set to 0 to sync immediately.')
 			.addText(text => {
 				text.setValue(String(plugin.settings.debounceDelay));
-				const maximum = Math.floor(2_147_483_647 / 1000);
-				configureIntegerInput(text, 0, maximum);
+				configureIntegerInput(text, 0, MAX_TIMER_SECONDS);
 				bindCommittedText(text, () => String(plugin.settings.debounceDelay), async value => {
-					if (await persistSettings({ debounceDelay: Number(value) })) { plugin.syncRuntime.updateSyncSettings(); rerender(); }
-				}, value => parseSettingInteger(value, 0, maximum) !== null);
+					if (await persistSettings({ debounceDelay: Number(value) })) rerender();
+				}, value => parseSettingInteger(value, 0, MAX_TIMER_SECONDS) !== null);
 			});
 
 		renderSyncInterval(options, () => plugin.settings.syncInterval, async syncInterval => {
-			if (await persistSettings({ syncInterval })) { plugin.syncRuntime.updateSyncSettings(); rerender(); }
+			if (await persistSettings({ syncInterval })) rerender();
 		});
 	}
 
@@ -60,7 +58,7 @@ export function renderSyncSection(context: SettingsSectionContext): () => void {
 		.setDesc('Other plugins and their settings sync with your vault. Settings can contain credentials or device-specific values; exclude any files you want to keep local below. Restart Obsidian after syncing to load changes. Crate itself stays local.');
 
 	renderExclusionsSetting(options, plugin, async ignorePatterns => {
-		if (await persistSettings({ ignorePatterns })) plugin.syncRuntime.updateSyncSettings();
+		await persistSettings({ ignorePatterns });
 	});
 	return cleanup;
 }

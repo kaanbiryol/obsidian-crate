@@ -82,6 +82,12 @@ describe('readReminderListBody', () => {
 		expect(dropDeltaBase).toBe(false);
 	});
 
+	it('orders merged notes by code point, as the server sorts paths', () => {
+		const notes = [record('emoji', 'Reminders/😀.md'), record('kana', 'Reminders/ｱ.md')];
+		const body = { delta: true, changedPaths: ['Reminders/😀.md'], reminders: [record('emoji2', 'Reminders/😀.md')], projects: ['Inbox'], issues: [] };
+		expect(readReminderListBody(body, 'Reminders', notes, '7.base').result?.reminders.map(item => item.id)).toEqual(['kana', 'emoji2']);
+	});
+
 	it('drops the delta base for an unrequested or invalid delta', () => {
 		const body = { delta: true, changedPaths: ['Reminders/B.md'], reminders: [], projects: ['Inbox'], issues: [] };
 		expect(readReminderListBody(body, 'Reminders', base, undefined)).toEqual({ result: null, dropDeltaBase: true });

@@ -19,12 +19,12 @@ interface TransferMarkdownBaseCache {
 
 interface TransferConflictStore {
 	record(conflict: RecordConflictInput): Promise<void>;
-	resolveAppliedIncoming?(path: string, hash: string): Promise<void>;
-	findIncomingReview?(originalPath: string, remoteHash: string, localHash: string): { conflictPath: string } | undefined;
+	resolveAppliedIncoming(path: string, hash: string): Promise<void>;
+	findIncomingReview(originalPath: string, remoteHash: string, localHash: string): { conflictPath: string } | undefined;
 }
 
 interface TransferApi {
-	recordMergeApplication?(path: string, hash: string, phase: UploadApplyPhase): Promise<void>;
+	recordMergeApplication(path: string, hash: string, phase: UploadApplyPhase): Promise<void>;
 	uploadFile(
 		path: string,
 		content: ArrayBuffer,
@@ -49,8 +49,8 @@ export interface TransferContext {
 	/** The engine's journaled file operations. */
 	files: TransferApi;
 	localManifest: TransferManifest;
-	markdownBaseCache?: TransferMarkdownBaseCache;
-	conflictStore?: TransferConflictStore;
+	markdownBaseCache: TransferMarkdownBaseCache;
+	conflictStore: TransferConflictStore;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	retryWithBackoff<T>(fn: () => Promise<T>): Promise<T>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;

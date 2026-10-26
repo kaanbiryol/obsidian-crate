@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMarkdownLinks, isSafeUrl, readableLinkText } from './markdownLinks';
+import { parseMarkdownLinks, isSafeUrl, readableLinkText, readableWikiLinks } from './markdownLinks';
 
 describe('parseMarkdownLinks', () => {
 		it('parses a single markdown link', () => {
@@ -82,5 +82,22 @@ describe('reminder links', () => {
 	it('uses labels in notifications and preserves direct URLs with no label', () => {
 		expect(readableLinkText('Check [this article](https://example.com) !')).toBe('Check this article !');
 		expect(readableLinkText('Visit https://example.com')).toBe('Visit https://example.com');
+	});
+
+	it('displays note links as reminder cards do', () => {
+		expect(readableLinkText('Read [[Notes/Plan|the plan]] and [the brief](https://example.com/[[x]])'))
+			.toBe('Read the plan and the brief');
+		expect(readableLinkText('Update [[Notes/Plan#Next steps]]')).toBe('Update Plan › Next steps');
+	});
+});
+
+describe('readable wiki links', () => {
+	it('displays note names, aliases, and headings within reminder text', () => {
+		expect(readableWikiLinks('Update [[Notes/Feature tours/Reminder feature.md]]')).toBe('Update Reminder feature');
+		expect(readableWikiLinks('Read [[Notes/Plan|the plan]] and [[Notes/Plan#Next steps]]')).toBe('Read the plan and Plan › Next steps');
+	});
+	it('preserves ordinary text and incomplete links during editing', () => {
+		expect(readableWikiLinks('Update [[Notes/Plan')).toBe('Update [[Notes/Plan');
+		expect(readableWikiLinks('Call Alex')).toBe('Call Alex');
 	});
 });

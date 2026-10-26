@@ -59,6 +59,14 @@ it('rejects mismatched live storage before reading or releasing a lock', async (
 		expect((await recoverDeployment(h.api, target)).status).toBe('blocked');
 		expect(h.api.queryD1).not.toHaveBeenCalled();
 });
+it('rejects a live Worker with storage bindings Crate never uploads', async () => {
+		const h = harness();
+		h.api.getWorkerSettings.mockResolvedValue({ annotations: { 'workers/message': 'Crate 0.1.0 ' + 'a'.repeat(64) }, bindings: [
+				{ name: 'DB', type: 'd1', id: 'database' }, { name: 'OTHER', type: 'd1', id: 'other' }, { name: 'BUCKET', type: 'r2_bucket', bucket_name: 'bucket' },
+		] });
+		expect((await recoverDeployment(h.api, target)).status).toBe('blocked');
+		expect(h.api.queryD1).not.toHaveBeenCalled();
+});
 it('does not report recovery if the owner advances while checking', async () => {
 		const h = harness();
 		const query = h.api.queryD1.getMockImplementation()!;

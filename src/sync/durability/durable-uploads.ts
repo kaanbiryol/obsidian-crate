@@ -17,7 +17,7 @@ interface UploadTransport {
 	prepareUploadWire?(file: JournalUpload, preconditions?: UploadPreconditions): ReturnType<PrepareUploadWire>;
 	/** Resolve encrypted preconditions for a batch in one request instead of one per file. */
 	preloadUploadPreconditions?(files: Array<{ path: string; expectedHash: string | null }>): Promise<UploadPreconditions | undefined>;
-	assertPreparedUpload?(file: JournalUpload): Promise<void>;
+	assertPreparedUpload(file: JournalUpload): Promise<void>;
 	getServerInfo(): Promise<{ reminderOperationDay?: number }>;
 	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
 	uploadFile(path: string, content: ArrayBuffer, hash: string, size: number, contentType: string, expectedHash: string | null, operationId?: string): Promise<UploadResult>;
@@ -57,7 +57,7 @@ export class DurableUploads {
 	private async sendBatch(durable: JournalUpload[], onSettled?: () => Promise<void>): Promise<BatchUploadResponse> {
 		for (const file of durable) this.active.add(file.operationId);
 		try {
-			for (const file of durable) await this.transport.assertPreparedUpload?.(file);
+			for (const file of durable) await this.transport.assertPreparedUpload(file);
 			const response = await this.transport.batchUpload(durable.map(uploadWire));
 			if (response.results.length !== durable.length || new Set(response.results.map(file => file.path)).size !== durable.length) throw new Error('Invalid upload receipt batch');
 			const receipts = new Map(response.results.map(result => [result.path, result]));
@@ -136,7 +136,7 @@ export class DurableUploads {
 		try {
 			let result: UploadResult;
 			try {
-				await this.transport.assertPreparedUpload?.(file);
+				await this.transport.assertPreparedUpload(file);
 				const wire = uploadWire(file);
 				result = await this.transport.uploadFile(wire.path, base64ToArrayBuffer(wire.content), wire.hash, wire.size, wire.contentType, wire.expectedHash, wire.operationId);
 			} catch (error) {

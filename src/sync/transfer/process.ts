@@ -64,7 +64,7 @@ export async function processDiff(
 			};
 			context.localManifest.setEntry(uploadFile.path, entry);
 			if (isMarkdownPath(uploadFile.path)) {
-				await context.markdownBaseCache?.putBase(uploadFile.path, uploadFile.hash, uploadFile.content);
+				await context.markdownBaseCache.putBase(uploadFile.path, uploadFile.hash, uploadFile.content);
 			}
 			localFiles[uploadFile.path] = entry;
 			if (diff.cause === "remote-deleted") {
@@ -133,7 +133,7 @@ export async function processDiff(
 				remoteContent,
 				async (copy) => {
 					recordUnresolvedConflict(result, diff.path, copy.path);
-					await context.conflictStore?.record({
+					await context.conflictStore.record({
 						originalPath: diff.path,
 						conflictPath: copy.path,
 						cause: diff.cause,
@@ -182,7 +182,7 @@ async function tryAutoMergeMarkdownConflict(
 	localFiles: Record<string, FileEntry>,
 	result: SyncResult,
 ): Promise<DiffApplyOutcome | null> {
-	if (!isMarkdownPath(diff.path) || !context.markdownBaseCache) {
+	if (!isMarkdownPath(diff.path)) {
 		return null;
 	}
 
@@ -229,11 +229,11 @@ async function tryAutoMergeMarkdownConflict(
 		mergedContent,
 		plannedLocalHash,
 	).catch(async (error: unknown) => {
-		await context.files.recordMergeApplication?.(diff.path, mergedHash, 'local-apply-failed');
+		await context.files.recordMergeApplication(diff.path, mergedHash, 'local-apply-failed');
 		throw error;
 	});
 	if (localApplyOutcome.status === "deferred") {
-		await context.files.recordMergeApplication?.(diff.path, mergedHash, 'local-deferred');
+		await context.files.recordMergeApplication(diff.path, mergedHash, 'local-deferred');
 		// The uploaded merge already contains this local snapshot. Keep that
 		// snapshot as a virtual common ancestor so the next reconciliation can
 		// merge only the newer local edits into the remote merge without

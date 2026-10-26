@@ -38,6 +38,14 @@ it('publishes scheduling facts without reminder text and decrypts only with the 
 	expect(notice.envelope.length).toBeLessThanOrEqual(2800);
 });
 
+it('seals reminder text as the app displays it', async () => {
+	const { bundle, keys } = await notificationKeys();
+	const bytes = new TextEncoder().encode('- [ ] Review [[Projects/Launch|launch]] [notes](https://example.com) 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->').buffer;
+	const projection = await createReminderProjection(keys, folders, 'Reminders/Work.md', bytes);
+	expect(await openNotification(projection!.reminders[0]!.notification, await importEncryptionSecret(bundle.notifications), bundle.vaultId))
+		.toEqual({ title: 'Review launch notes', body: 'Work' });
+});
+
 it('re-encrypts only reminders whose notification fingerprint changed', async () => {
 	const { keys } = await notificationKeys();
 	const note = (changed: string) => new TextEncoder().encode(Array.from({ length: 20 }, (_, index) =>

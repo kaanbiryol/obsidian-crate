@@ -28,6 +28,18 @@ export interface RecordConflictInput {
 	baseHash?: string;
 }
 
+/** A conflict copy found in the vault without recorded metadata. */
+function discoveredConflictRecord(conflictPath: string): ConflictRecord {
+	return {
+		originalPath: getOriginalPathFromConflictFile(conflictPath) ?? conflictPath,
+		conflictPath,
+		createdAt: new Date().toISOString(),
+		cause: 'unknown',
+		...(conflictPath.includes('(conflict remote ') ? { copySide: 'remote' as const } : {}),
+		status: 'active',
+	};
+}
+
 export class ConflictStore {
 	private readonly storePath: string;
 	private readonly tmpPath: string;
@@ -117,14 +129,7 @@ export class ConflictStore {
 
 			for (const conflictPath of discoveredPaths) {
 				if (!this.data.conflicts.some((conflict) => conflict.conflictPath === conflictPath)) {
-					this.data.conflicts.push({
-						originalPath: getOriginalPathFromConflictFile(conflictPath) ?? conflictPath,
-						conflictPath,
-						createdAt: new Date().toISOString(),
-						cause: 'unknown',
-						...(conflictPath.includes('(conflict remote ') ? { copySide: 'remote' as const } : {}),
-						status: 'active',
-					});
+					this.data.conflicts.push(discoveredConflictRecord(conflictPath));
 					this.dirty = true;
 					changed = true;
 				}
@@ -251,13 +256,7 @@ export class ConflictStore {
 				return;
 			}
 
-			this.data.conflicts.push({
-				originalPath: getOriginalPathFromConflictFile(conflictPath) ?? conflictPath,
-				conflictPath,
-				createdAt: new Date().toISOString(),
-				cause: 'unknown',
-				status: 'active',
-			});
+			this.data.conflicts.push(discoveredConflictRecord(conflictPath));
 			this.dirty = true;
 			await this.save();
 			this.notifyCountChanged();

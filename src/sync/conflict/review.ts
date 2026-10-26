@@ -2,6 +2,7 @@ import { FileSystemAdapter, Platform, type App } from 'obsidian';
 import type { ConflictRecord } from '../types';
 import { conflictReviewFile } from './review-file';
 import { decodePreviewText, isBinaryPreviewPath } from '../history/preview-format';
+import { insertBeforeExtension } from '../local/file-discovery';
 
 export type ConflictChoice = 'current' | 'saved' | 'both' | 'manual';
 export interface ConflictReview {
@@ -82,10 +83,7 @@ export async function createConflictReview(
 				// an offline retry cannot create a duplicate copy each attempt.
 				if (choice === 'current' || choice === 'both') await recovery.beforeKeepLocal();
 				if (choice === 'both') {
-					const dot = original.path.lastIndexOf('.');
-					const stem = dot > original.path.lastIndexOf('/') ? original.path.slice(0, dot) : original.path;
-					const ext = dot > original.path.lastIndexOf('/') ? original.path.slice(dot) : '';
-					await app.vault.createBinary(`${stem} (saved copy ${crypto.randomUUID().slice(0, 8)})${ext}`, savedBytes);
+					await app.vault.createBinary(insertBeforeExtension(original.path, ` (saved copy ${crypto.randomUUID().slice(0, 8)})`), savedBytes);
 				} else if (choice === 'saved' || choice === 'manual') {
 					if (choice === 'manual' && (!text || editedText === undefined)) throw new Error('Edited text is required.');
 					if (text) {

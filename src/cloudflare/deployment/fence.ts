@@ -1,4 +1,5 @@
-import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
+import type { CloudflareApiClient } from '../cloudflare-api';
+import { isDefinitiveRejection } from '../cloudflare-api-error';
 import { CloudflareReauthorizationRequired } from '../oauth/client';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 
@@ -12,6 +13,20 @@ export class DeploymentRecoveryRequiredError extends Error {
 
 type FenceApi = Pick<CloudflareApiClient, 'queryD1'>;
 
+/** Steps an update records. Recovery resumes after any of them once it settles. */
+export const UPDATE_STEPS = [
+	'acquire-deployment', 'freeze-upgrade-data', 'verify-upgrade-checkpoint', 'resume-upgraded-server',
+	'prepare-database', 'create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker',
+	'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment',
+] as const;
+/** Deletion steps that only remove resources, so deletion may repeat them while one is in flight. */
+export const REPEATABLE_DELETION_STEPS = ['delete-worker', 'deleteR2Objects', 'deleteR2Bucket', 'deleteD1Database', 'enable-deletion-address'] as const;
+/** Every step a fence records. Recovery code checks steps against the lists above,
+ * so a new step must join one of them. Migration steps are resumable while the
+ * release still registers that migration. */
+export type FenceStep = typeof UPDATE_STEPS[number] | `migrate-${string}`
+	| typeof REPEATABLE_DELETION_STEPS[number] | 'retireCrateWorker';
+
 export interface DeploymentFenceRecord {
 	owner: string;
 	worker: string;
@@ -20,7 +35,7 @@ export interface DeploymentFenceRecord {
 	fingerprint?: string;
 	startedAt: string;
 	recoveryProtocol?: 1;
-	step?: string;
+	step?: FenceStep;
 	stepState?: 'started' | 'confirmed' | 'rejected' | 'settled';
 	verificationPending?: boolean;
 	completionOnly?: boolean;
@@ -103,7 +118,7 @@ export class DeploymentFence {
 		this.deletionPending = record.kind === 'delete' && record.deletionPending === true;
 	}
 
-	async mutate<T>(operation: () => Promise<T>, step = 'server-change', batchHash?: string, uploadTag?: string): Promise<T> {
+	async mutate<T>(operation: () => Promise<T>, step: FenceStep, batchHash?: string, uploadTag?: string): Promise<T> {
 		const stored = await readStoredFence(this.api, this.account, this.database);
 		if (stored.state !== 'held' || stored.value !== this.value) throw new DeploymentRecoveryRequiredError('Deployment ownership changed. Start again after reviewing the deployment fence.');
 		await this.recordStep(step, 'started', batchHash, uploadTag);
@@ -117,8 +132,7 @@ export class DeploymentFence {
 			return result;
 		} catch (error) {
 			// A saved login surfaces Cloudflare's 401/403 refusal as reauthorization.
-			if (error instanceof CloudflareReauthorizationRequired
-				|| error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408) {
+			if (error instanceof CloudflareReauthorizationRequired || isDefinitiveRejection(error)) {
 				await this.recordStep(step, 'rejected');
 				this.uncertain = false;
 			}
@@ -127,7 +141,7 @@ export class DeploymentFence {
 	}
 
 
-	private async recordStep(step: string, stepState: 'started' | 'confirmed' | 'rejected' | 'settled', batchHash?: string, uploadTag?: string): Promise<void> {
+	private async recordStep(step: FenceStep, stepState: 'started' | 'confirmed' | 'rejected' | 'settled', batchHash?: string, uploadTag?: string): Promise<void> {
 		if (this.databaseRemoved) return;
 		const record = JSON.parse(this.value) as DeploymentFenceRecord;
 		const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(uploadTag ? { uploadTag } : {}), ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
@@ -150,7 +164,7 @@ export class DeploymentFence {
 	}
 
 	// Once storage or code changes, keep the lock until both have been verified.
-	async checkpoint(step: string): Promise<void> { await this.recordStep(step, 'confirmed'); }
+	async checkpoint(step: FenceStep): Promise<void> { await this.recordStep(step, 'confirmed'); }
 	requireVerification(): void { this.verificationPending = true; }
 	async completeVerification(): Promise<void> {
 		this.verificationPending = false;
@@ -200,7 +214,7 @@ export async function withDeploymentFence<T>(input: {
 		// A definite rejection (quota, permissions, or invalid SQL) did not
 		// acquire ownership. Preserve the provider's actionable error instead
 		// of sending users to recovery for a lock that was never created.
-		if (error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408) throw error;
+		if (isDefinitiveRejection(error)) throw error;
 		throw new DeploymentRecoveryRequiredError('Could not confirm deployment ownership. Inspect the deployment fence with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');
 	}
 	if (acquired.length !== 1 || acquired[0]?.value !== value) {

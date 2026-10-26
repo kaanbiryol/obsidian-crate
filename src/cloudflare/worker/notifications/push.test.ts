@@ -34,6 +34,10 @@ describe('createDeclarativePushPayload', () => {
 		expect(createDeclarativePushPayload({ title: 'Check [this article](https://example.com) !', body: '' }, 'https://worker.test').notification.title)
 			.toBe('Check this article !');
 	});
+	it('displays note links in the notification title as the app does', () => {
+		expect(createDeclarativePushPayload({ title: 'Review [[Projects/Launch plan|the plan]] and [[Notes/Brief.md]]', body: '' }, 'https://worker.test').notification.title)
+			.toBe('Review the plan and Brief');
+	});
 	it('creates an iOS declarative web push payload with a reminder deep link', () => {
 		expect(createDeclarativePushPayload({
 			title: 'Review release notes',

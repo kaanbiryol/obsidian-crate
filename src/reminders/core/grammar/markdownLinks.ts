@@ -40,11 +40,25 @@ export function isSafeUrl(url: string): boolean {
 	}
 }
 
-/** Notification surfaces display labels without exposing Markdown destinations. */
+/** Display note links without changing the stored reminder or external link targets. */
+export function readableWikiLinks(content: string): string {
+	return content.replace(/\[\[([^\]\n[]+)\]\]/g, (_match, target: string) => {
+		const [path = '', alias] = target.split('|');
+		if (alias?.trim()) return alias.trim();
+		const [note = '', heading] = path.split('#');
+		const title = (note.split('/').pop() || '').replace(/\.md$/i, '');
+		return heading ? [title, heading].filter(Boolean).join(' › ') : title;
+	});
+}
+
+/** Notification surfaces display reminder text as reminder cards do: link labels
+ * and readable note links, without exposing Markdown destinations. */
 export function readableLinkText(content: string): string {
-	let result = content;
-	for (const link of parseMarkdownLinks(content).reverse()) {
-		result = result.slice(0, link.index) + (link.text || link.url) + result.slice(link.index + link.fullMatch.length);
+	let result = '';
+	let lastIndex = 0;
+	for (const link of parseMarkdownLinks(content)) {
+		result += readableWikiLinks(content.slice(lastIndex, link.index)) + (link.text || link.url);
+		lastIndex = link.index + link.fullMatch.length;
 	}
-	return result;
+	return result + readableWikiLinks(content.slice(lastIndex));
 }
