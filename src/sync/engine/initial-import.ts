@@ -26,6 +26,13 @@ interface ImportContext {
 }
 
 export const ANOTHER_DEVICE_IMPORTING = 'Another device is uploading this vault for the first time. Let it finish, then sync.';
+export const FIRST_UPLOAD_UNFINISHED = 'The first upload of this vault has not finished. Select Sync now on the device that started it, then sync here.';
+
+/** Resuming a first upload prunes server files the importing device lacks, so
+ * ordinary uploads and deletes wait until it finishes. */
+export async function assertNoOpenInitialImport(api: { initialImport?: Pick<SyncApiClient['initialImport'], 'begin'> }): Promise<void> {
+  if ((await api.initialImport?.begin())?.state === 'importing') throw new Error(FIRST_UPLOAD_UNFINISHED);
+}
 
 /** The committed remote inventory is the checkpoint; initial uploads need no receipt journal. */
 export async function runInitialImport(context: ImportContext, result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null> {

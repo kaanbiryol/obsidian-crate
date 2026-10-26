@@ -47,6 +47,7 @@ import { mergeSyncResults } from '../sync-result';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { LocalContentVerifier } from './content-verifier';
 import { verifyUnchangedPendingPaths } from '../pending/pending-verification';
+import { assertNoOpenInitialImport } from './initial-import';
 import { MAX_DEBOUNCE_WAIT_MS, type SyncSettings } from '../settings';
 
 const logger = createLogger('SyncEngine');
@@ -176,6 +177,7 @@ export class SyncEngine {
 			automaticSyncEnabled: () => this.settings.automaticSync,
 			recoverUploads: async () => {
 				void this.retryReminderScope();
+				await assertNoOpenInitialImport(this.api);
 				await this.contexts.recoverUploads();
 				this.updateState({ work: { phase: 'applying' } });
 			},
@@ -716,6 +718,7 @@ export class SyncEngine {
 	}
 
 	private async reconcilePaths(queueKeys: string[], recover = true, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> {
+		await assertNoOpenInitialImport(this.api);
 		if (recover) await this.contexts.recoverUploads();
 		this.lifecycle.throwIfDestroyed();
 		return reconcileQueuePaths({

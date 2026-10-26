@@ -4,6 +4,8 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../../test-support/schema-test-harness';
 import { SyncTestDevice } from '../../test-support/sync-engine-test-harness';
+import { FIRST_UPLOAD_UNFINISHED } from '../../../../sync/engine/initial-import';
+import { pendingChangeKey } from '../../../../sync/pending/pending-change';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -59,4 +61,30 @@ it('resumes on the first device after its first upload response is lost', async 
   expect((await first.engine.sync()).errors).toEqual([]);
   expect(await serverPaths()).toEqual(['note.md']);
   expect(first.disk.text('note.md')).toBe('first');
+});
+
+it('holds another device\'s queued and selected uploads until the first upload finishes', async () => {
+  const first = await device('import-owner');
+  first.disk.write('a.md', 'alpha');
+  vi.spyOn(first.api.initialImport, 'finish').mockRejectedValueOnce(new Error('offline'));
+  expect((await first.engine.sync()).success).toBe(false);
+
+  const second = await device('queued-uploader');
+  second.settings.automaticSync = true; second.settings.debounceDelay = 0;
+  second.disk.write('b.md', 'beta');
+  second.engine.onFileChange(second.disk.vault.getAbstractFileByPath('b.md')!);
+  await vi.waitFor(() => expect(second.engine.getState().lastError).toContain(FIRST_UPLOAD_UNFINISHED), { timeout: 10_000 });
+  const selected = await second.engine.syncSelected([pendingChangeKey('upload', 'b.md')]);
+  expect(selected.success).toBe(false);
+  expect(selected.errors.join('\n')).toContain(FIRST_UPLOAD_UNFINISHED);
+  expect(await serverPaths()).toEqual(['a.md']);
+
+  // The owner's resumed upload would prune a file another device uploaded meanwhile.
+  first.close(); await first.open();
+  expect((await first.engine.sync()).errors).toEqual([]);
+  second.settings.automaticSync = false;
+  expect((await second.engine.sync()).errors).toEqual([]);
+  expect(second.disk.text('b.md')).toBe('beta');
+  expect(second.disk.trash.size).toBe(0);
+  expect(await serverPaths()).toEqual(['a.md', 'b.md']);
 });

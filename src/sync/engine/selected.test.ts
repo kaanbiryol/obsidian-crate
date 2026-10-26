@@ -149,7 +149,8 @@ describe('selected sync with durable file operations', () => {
         expect(result.success).toBe(true);
         expect(result.settledPaths).toEqual(['a.md']);
         expect(h.remote.metadata).toHaveBeenCalledWith(['a.md']);
-        expect(h.transport).toHaveBeenCalledTimes(1);
+        // The open-import check reads the cached server capabilities first.
+        expect(h.transport.mock.calls.map(([request]) => new URL(request.url).pathname)).toEqual(['/.well-known/crate', '/sync/metadata']);
         expect(h.engine.getPendingKeys()).toEqual(['b.md']);
         expect(h.settings.lastSeq).toBe(42);
         const restarted = await h.restart();
