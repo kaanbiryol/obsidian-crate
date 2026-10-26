@@ -4,12 +4,15 @@ import { bundleServiceWorkerRuntime } from '../../../scripts/service-worker-buil
 
 /** The production push listener and crypto run inside an actual service worker.
  * Only push transport and native notification display are simulated. */
+// The worker installs only for the version it was built with (99edb335).
+const ENCRYPTED_PUSH_TEST_VERSION = 'encrypted-push-test';
+
 export async function buildEncryptedPushWorker() {
   const runtime = await bundleServiceWorkerRuntime(process.cwd());
   const module = (await build({ entryPoints: ['src/cloudflare/worker/pwa/service-worker.ts'], bundle: true,
     write: false, format: 'esm', platform: 'node', target: 'es2022',
     define: { __CRATE_SERVICE_WORKER_JS__: JSON.stringify(runtime.script), __CRATE_PWA_CLIENT_ASSETS__: '{}',
-      __CRATE_PWA_ASSET_VERSION__: JSON.stringify('encrypted-push-test') },
+      __CRATE_PWA_ASSET_VERSION__: JSON.stringify(ENCRYPTED_PUSH_TEST_VERSION) },
   })).outputFiles[0].text;
   const { SERVICE_WORKER_JS } = await import(`data:text/javascript;base64,${Buffer.from(module).toString('base64')}`);
   return `
@@ -41,7 +44,7 @@ addListener('message', event => {
 }
 
 export async function verifyEncryptedPushWorker(page, origin) {
-  const result = await page.evaluate(async origin => {
+  const result = await page.evaluate(async ({ origin, version }) => {
     const t = window.encryptionStorageTest;
     const bundle = await t.createVaultKeyBundle();
     await t.rememberVaultKeys(bundle);
@@ -49,7 +52,7 @@ export async function verifyEncryptedPushWorker(page, origin) {
     const projection = await t.createReminderProjection(notifications, ['Reminders'], 'Reminders/Inbox.md',
       new TextEncoder().encode('- [ ] Private background title 2099-01-02 <!-- crate-id:background-push -->').buffer);
     const notice = projection.reminders[0].notification;
-    const registration = await navigator.serviceWorker.register('/encrypted-push-worker.js', { scope: '/' });
+    const registration = await navigator.serviceWorker.register(`/encrypted-push-worker.js?v=${version}`, { scope: '/' });
     await navigator.serviceWorker.ready;
     const notification = { title: 'Crate reminder', body: 'Open Crate to view your reminder.',
       navigate: origin + '/notifications?reminderId=background-push', tag: 'background-push',
@@ -73,7 +76,7 @@ export async function verifyEncryptedPushWorker(page, origin) {
       const locked = await deliver(true);
       return { declarative, legacy, substituted, locked, navigate: notification.navigate };
     } finally { await registration.unregister(); }
-  }, origin);
+  }, { origin, version: ENCRYPTED_PUSH_TEST_VERSION });
   for (const display of [result.declarative, result.legacy]) {
     assert.equal(display.title, 'Private background title');
     assert.equal(display.body, 'Inbox');
