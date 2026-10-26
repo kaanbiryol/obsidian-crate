@@ -31,6 +31,18 @@ export type WithCloudflareAuthorization = <T>(operation: (tokens: CloudflareOAut
 
 type DeploymentAccount = Awaited<ReturnType<typeof resolveDeploymentTarget>>['account'];
 
+/** The saved server operation that must finish before `intent` can run. A deletion,
+ * including a delete-only reset saved by an earlier release, admits only deletion.
+ * A reset admits resuming it, or deleting the server instead. */
+export function blockingServerOperation(saved: CloudflareDeploymentMetadata | null | undefined, intent: DeploymentIntent): 'deletion' | 'reset' | null {
+	if ((saved?.deletion || saved?.reset?.deleteOnly) && intent !== 'delete') return 'deletion';
+	if (saved?.reset && intent !== 'reset' && intent !== 'delete') return 'reset';
+	return null;
+}
+
+const resumeBeforeStarting = { deletion: 'Resume server deletion before connecting or updating.', reset: 'Resume the server reset before connecting or updating.' };
+const resumeBeforeContinuing = { deletion: 'Resume server deletion before continuing.', reset: 'Resume the server reset or deletion before continuing.' };
+
 export interface CloudflareDeploymentServiceOptions {
 	clientId: string;
 	getVaultName?: () => string;
@@ -66,8 +78,8 @@ export class CloudflareDeploymentService {
 	async startDeployment(intent: DeploymentIntent = 'connect'): Promise<void> {
 		this.assertIdle();
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
-		if ((existingMetadata?.deletion || existingMetadata?.reset?.deleteOnly) && intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
-		if (existingMetadata?.reset && intent !== 'reset' && intent !== 'delete') throw new Error('Resume the server reset before connecting or updating.');
+		const blocking = blockingServerOperation(existingMetadata, intent);
+		if (blocking) throw new Error(resumeBeforeStarting[blocking]);
 		if ((intent === 'reset' || intent === 'delete') && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) {
 			throw new Error('Connect to a Crate server before resetting its remote data.');
 		}
@@ -149,8 +161,8 @@ export class CloudflareDeploymentService {
 	/** Refuse a request whose saved server changed or gained a pending reset or deletion during authorization. */
 	private assertRequestCurrent(request: DeploymentRequest): void {
 		const saved = this.options.settingsOwner.settings.cloudflareDeployment;
-		if (saved?.deletion && request.intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
-		if (request.intent !== 'reset' && request.intent !== 'delete' && saved?.reset) throw new Error('Resume the server reset before connecting or updating.');
+		const blocking = blockingServerOperation(saved, request.intent);
+		if (blocking) throw new Error(resumeBeforeStarting[blocking]);
 		if ((request.intent === 'reset' || request.intent === 'delete') && stableJson(request.metadata) !== stableJson(saved)) {
 			throw new Error('Server settings changed during authorization. Confirm the reset again.');
 		}
@@ -346,8 +358,8 @@ export class CloudflareDeploymentService {
 
 	private checkSavedTarget(expected: CloudflareDeploymentMetadata, intent: DeploymentIntent): void {
 		const current = this.options.settingsOwner.settings.cloudflareDeployment;
-		if (current?.deletion && intent !== 'delete') throw new Error('Resume server deletion before continuing.');
-		if (current?.reset && intent !== 'delete' && intent !== (current.reset.deleteOnly ? 'delete' : 'reset')) throw new Error('Resume the server reset or deletion before continuing.');
+		const blocking = blockingServerOperation(current, intent);
+		if (blocking) throw new Error(resumeBeforeContinuing[blocking]);
 		if (!current || current.accountId !== expected.accountId || current.workerName !== expected.workerName
 			|| current.d1DatabaseId !== expected.d1DatabaseId || current.r2BucketName !== expected.r2BucketName
 			|| expected.deletion && current.deletion?.id !== expected.deletion.id) {

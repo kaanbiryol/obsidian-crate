@@ -58,7 +58,8 @@ vi.mock('../cloudflare-api', () => ({
 
 vi.mock('./provisioner', () => ({ provisionCloudflareDeployment }));
 
-import { CloudflareDeploymentService, type CloudflareDeploymentServiceOptions } from './service';
+import { blockingServerOperation, CloudflareDeploymentService, type CloudflareDeploymentServiceOptions } from './service';
+import type { CloudflareDeploymentMetadata, DeploymentIntent } from './types';
 
 const CLIENT_ID = '0123456789abcdef0123456789abcdef';
 
@@ -733,4 +734,23 @@ it('allows deletion to supersede an interrupted reset without loading artifacts'
 	expect(deleteCrateServer).toHaveBeenCalledOnce();
 	expect(resetCrateServer).not.toHaveBeenCalled();
 	expect(h.loadArtifacts).not.toHaveBeenCalled();
+});
+
+describe('pending server operations', () => {
+	const reset = { id: 'a'.repeat(32), phase: 'clearing' as const, databaseId: 'old-db', bucketCreatedAt: 'date', namespaceId: 'c'.repeat(32) };
+	const deletion = { id: 'b'.repeat(32), phase: 'removing-worker' as const, databaseId: 'old-db', bucketCreatedAt: null, workerCreatedAt: null, helperName: `crate-delete-${'b'.repeat(32)}` };
+	const saved = (pending: Partial<CloudflareDeploymentMetadata>): CloudflareDeploymentMetadata => ({ ...savedServer(), ...pending });
+	const intents: DeploymentIntent[] = ['reconnect', 'connect', 'switch', 'create', 'update', 'reset', 'delete'];
+	const cases: Array<[string, CloudflareDeploymentMetadata | null, Partial<Record<DeploymentIntent, 'deletion' | 'reset'>>]> = [
+		['no saved server', null, {}],
+		['no pending operation', saved({}), {}],
+		['a reset', saved({ reset }), { reconnect: 'reset', connect: 'reset', switch: 'reset', create: 'reset', update: 'reset' }],
+		['a deletion', saved({ deletion }), { reconnect: 'deletion', connect: 'deletion', switch: 'deletion', create: 'deletion', update: 'deletion', reset: 'deletion' }],
+		['an earlier release’s delete-only reset', saved({ reset: { ...reset, deleteOnly: true } }),
+			{ reconnect: 'deletion', connect: 'deletion', switch: 'deletion', create: 'deletion', update: 'deletion', reset: 'deletion' }],
+	];
+	it.each(cases)('admits only resuming or deleting with %s', (_label, metadata, blocked) => {
+		expect(Object.fromEntries(intents.map(intent => [intent, blockingServerOperation(metadata, intent)])))
+			.toEqual(Object.fromEntries(intents.map(intent => [intent, blocked[intent] ?? null])));
+	});
 });
