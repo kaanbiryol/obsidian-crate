@@ -1,9 +1,7 @@
-import { Notice, Setting, type ButtonComponent } from 'obsidian';
-import { errorMessage } from '../../platform/logger';
+import { Setting, type ButtonComponent } from 'obsidian';
 
 interface RunButtonTaskContext {
 	setButtonText: (text: string) => void;
-	setProgress: (message: string) => void;
 }
 
 export interface RunButtonTaskOptions<T> {
@@ -16,12 +14,7 @@ export interface RunButtonTaskOptions<T> {
 	onStart?: () => void | Promise<void>;
 	onSuccess?: (result: T) => void | Promise<void>;
 	onError?: (error: unknown) => void | Promise<void>;
-	errorNoticePrefix?: string;
 	onFinally?: () => void | Promise<void>;
-}
-
-export function getErrorMessage(error: unknown): string {
-	return errorMessage(error);
 }
 
 export async function runButtonTask<T>(options: RunButtonTaskOptions<T>): Promise<void> {
@@ -35,7 +28,6 @@ export async function runButtonTask<T>(options: RunButtonTaskOptions<T>): Promis
 		onStart,
 		onSuccess,
 		onError,
-		errorNoticePrefix,
 		onFinally,
 	} = options;
 
@@ -53,11 +45,6 @@ export async function runButtonTask<T>(options: RunButtonTaskOptions<T>): Promis
 		setButtonText: (text: string) => {
 			button.setButtonText(text);
 		},
-		setProgress: (message: string) => {
-			if (progressEl) {
-				progressEl.textContent = message;
-			}
-		},
 	};
 
 	try {
@@ -71,8 +58,6 @@ export async function runButtonTask<T>(options: RunButtonTaskOptions<T>): Promis
 	} catch (error) {
 		if (onError) {
 			await onError(error);
-		} else if (errorNoticePrefix) {
-			new Notice(`${errorNoticePrefix}: ${getErrorMessage(error)}`);
 		}
 	} finally {
 		button.setDisabled(false);
