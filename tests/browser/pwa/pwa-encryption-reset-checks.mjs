@@ -42,7 +42,7 @@ async function resetAndReconnect({ admin, page, peer, origin, owner, runtime }) 
 	}, { origin, token: owner.token });
 	assert.equal((await fetch(`${origin}/health`, { headers: { Authorization: `Bearer ${owner.token}` } })).status, 401);
 	if (oldWebToken) assert.equal((await fetch(`${origin}/health`, { headers: { Authorization: `Bearer ${oldWebToken}` } })).status, 401);
-	assert.equal(await runtime.db.prepare("SELECT 1 FROM maintenance_state WHERE key = 'e2ee:state'").first(), null);
+	assert.equal((await runtime.db.prepare('SELECT encryption FROM server_state WHERE id = 1').first())?.encryption ?? null, null);
 	assert.equal(await runtime.db.prepare('SELECT 1 FROM file_versions').first(), null);
 	await page.reload();
 	await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();

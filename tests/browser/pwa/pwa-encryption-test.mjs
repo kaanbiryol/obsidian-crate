@@ -322,14 +322,14 @@ async function verify(type) {
 			await locked.getByLabel('Recovery key', { exact: true }).fill(enrolled.grant);
 			await locked.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
 			await expect(locked.getByText('Private browser task', { exact: true })).toBeVisible();
-			const state = JSON.parse((await runtime.db.prepare("SELECT value FROM maintenance_state WHERE key = 'e2ee:state'").first()).value);
-			await runtime.db.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify({ ...state, mode: 'resetting' })).run();
+			const state = JSON.parse((await runtime.db.prepare('SELECT encryption FROM server_state WHERE id = 1').first()).encryption);
+			await runtime.db.prepare('UPDATE server_state SET encryption = ? WHERE id = 1').bind(JSON.stringify({ ...state, mode: 'resetting' })).run();
 			try {
 				await locked.waitForLoadState('networkidle');
 				await locked.reload();
 				await expect(locked.getByRole('heading', { name: 'Encryption setup in progress' })).toBeVisible();
 				await expect(locked.getByRole('button', { name: 'Unlock Crate', exact: true })).toHaveCount(0);
-			} finally { await runtime.db.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify(state)).run(); }
+			} finally { await runtime.db.prepare('UPDATE server_state SET encryption = ? WHERE id = 1').bind(JSON.stringify(state)).run(); }
 			// Background verification may already have dismissed the setup gate.
 			// Reload checks durable recovery without racing that dismissal.
 			await locked.waitForLoadState('networkidle');
