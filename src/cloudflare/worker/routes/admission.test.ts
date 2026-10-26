@@ -32,7 +32,7 @@ it.each([
 	['POST', '/features', ['vault'], { kind: 'coordinator', wake: true }],
 	['DELETE', '/auth/tokens', ['vault'], { kind: 'coordinator', wake: true }],
 	['DELETE', '/auth/session', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: true }],
-	['GET', '/reading/list', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: true }],
+	['GET', '/reading/list', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: false }],
 	['GET', '/reading/encrypted-file', ['vault', 'reminders', 'reading'], undefined],
 	['GET', '/reading/session', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: false }],
 	['POST', '/reading/capture', scopes, { kind: 'coordinator', wake: true }],

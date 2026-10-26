@@ -67,3 +67,19 @@ it('does not wake notifications for settings or binary uploads', async () => {
   // A wake would also have recorded a processing run with a fresh retry budget.
   expect(await runInDurableObject(coordinator, (_instance, state) => state.storage.get('notificationRun'))).toBeUndefined();
 });
+
+it('wakes notifications from Reading reads only while they rebuild the library index', async () => {
+  const headers = { Authorization: 'Bearer event-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) };
+  await env.DB.prepare("INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, 0, 'Reading', 'g', 'r')").run();
+  const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
+  const run = () => runInDurableObject(coordinator, (_instance, state) => state.storage.get('notificationRun'));
+  const read = (path: string) => worker.fetch(new Request(`https://event.test${path}`, { headers }), env);
+  // The first read builds the index, which can queue article extraction.
+  expect((await read('/reading/list')).status).toBe(200);
+  expect(await run()).toBeDefined();
+  await runInDurableObject(coordinator, async (_instance, state) => { await state.storage.delete('notificationRun'); await state.storage.deleteAlarm(); });
+  expect((await read('/reading/list')).status).toBe(200);
+  await read('/reading/item?id=missing');
+  expect(await run()).toBeUndefined();
+  expect(await runInDurableObject(coordinator, (_instance, state) => state.storage.getAlarm())).toBeNull();
+});

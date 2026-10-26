@@ -100,9 +100,10 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /reading/policy': { scopes: VAULT, execution: COORDINATOR },
 	'GET /reading/policy': { scopes: VAULT, execution: COORDINATOR_READ },
 	'GET /reading/session': { scopes: LIBRARY, execution: COORDINATOR_READ },
-	// Plaintext list and item reads project the folder under the lock and can queue extractions.
-	'GET /reading/list': { scopes: LIBRARY, execution: COORDINATOR },
-	'GET /reading/item': { scopes: LIBRARY, execution: COORDINATOR },
+	// Plaintext list and item reads may continue an index rebuild under the lock; they wake
+	// notification processing only when that rebuild ran.
+	'GET /reading/list': { scopes: LIBRARY, execution: COORDINATOR_READ },
+	'GET /reading/item': { scopes: LIBRARY, execution: COORDINATOR_READ },
 	[`POST ${shortcut.preparePath}`]: { scopes: ['reading_capture'], execution: COORDINATOR },
 	[`POST ${shortcut.exchangePath}`]: { scopes: VAULT, execution: READING_GRANT },
 };
