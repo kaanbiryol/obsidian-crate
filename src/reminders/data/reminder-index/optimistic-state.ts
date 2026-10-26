@@ -50,6 +50,8 @@ export function createReminderOptimisticState(): ReminderOptimisticState {
 			for (const reminder of persistedReminders) {
 				updatedReminders.delete(reminder.id);
 				deletedReminderIds.delete(reminder.id);
+				// A renamed note indexes its created reminder under the new path.
+				createdReminders.delete(reminder.id);
 			}
 
 			for (const [id, reminder] of createdReminders) {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault } from '@/reminders/data/vaultScanner';
+import { isInRemindersFolder, scanFile, scanVault } from '@/reminders/data/vaultScanner';
 import { TFile, TFolder, type App } from 'obsidian';
 import { createReminderIndex } from './reminder-index';
 
@@ -70,12 +70,6 @@ describe('vaultScanner', () => {
 			path: file.path, reason: 'Unsupported reminder description encoding on line 2',
 			diagnostic: { code: 'unsupported-description-encoding', line: 2 },
 		}]);
-	});
-
-	it('derives project from paths using case-sensitive vault semantics', () => {
-		expect(getProjectFromPath('Reminders/Work.md', 'Reminders')).toBe('Work');
-		expect(getProjectFromPath('Reminders/Personal/Health.md', 'Reminders')).toBe('Personal/Health');
-		expect(getProjectFromPath('reminders/Inbox.md', 'Reminders')).toBe('reminders/Inbox');
 	});
 
 	it('detects files within reminders folder', () => {

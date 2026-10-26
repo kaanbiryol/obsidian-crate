@@ -39,7 +39,7 @@ export interface RemindersListPresentation {
 	emptyMessage: string;
 }
 
-export async function loadRemindersListData(options: RemindersListLoadOptions): Promise<Reminder[]> {
+export function loadRemindersListData(options: RemindersListLoadOptions): Reminder[] {
 	const {
 		repository,
 		showToday = false,

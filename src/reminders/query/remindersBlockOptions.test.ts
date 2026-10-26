@@ -46,6 +46,19 @@ describe('reminders block options', () => {
 		].join('\n'));
 	});
 
+	it.each([
+		['~~~', '~~~'],
+		['````', '````'],
+	])('finds the closing %s fence', (open, close) => {
+		expect(setRemindersBlockShowCompleted([`${open}reminders`, '```', close].join('\n'), true))
+			.toBe([`${open}reminders`, '```', 'show-completed: true', close].join('\n'));
+	});
+
+	it('cannot update a block without its fences', () => {
+		expect(setRemindersBlockShowCompleted(['> ```reminders', '> ```'].join('\n'), true)).toBeNull();
+		expect(setRemindersBlockShowCompleted(['~~~reminders', 'project: Work', '```'].join('\n'), true)).toBeNull();
+	});
+
 	it('replaces the show-completed option and preserves its indentation', () => {
 		expect(setRemindersBlockShowCompleted([
 			'```reminders',

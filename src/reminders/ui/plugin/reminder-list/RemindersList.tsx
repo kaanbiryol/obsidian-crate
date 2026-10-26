@@ -61,30 +61,19 @@ const ActiveRemindersList: React.FC<Props> = ({
 	// Subscribe to index changes for automatic refresh
 	const { refreshToken, triggerRefresh } = useIndexRefresh();
 
-	// State for reminders (needed because getAll is async when showCompleted is true)
-	const [{ rawReminders, isInitialLoadComplete }, setLoadedReminders] = useState<{ rawReminders: Reminder[]; isInitialLoadComplete: boolean }>({ rawReminders: [], isInitialLoadComplete: false });
-	const clock = useReminderClock(rawReminders);
+	const clock = useReminderClock();
 	// Only Today and Upcoming queries depend on the current time.
 	const loadClock = showToday || showUpcoming ? clock : null;
 
-	// Load reminders - always use markdown index (markdown-first mode)
-	useEffect(() => {
-		let active = true;
-		const loadReminders = async () => {
-			if (!plugin.reminders) return;
-			const ready = plugin.reminders.index.isInitialLoadComplete;
-			const loaded = await loadRemindersListData({
-				repository: plugin.reminders.repository,
-				showToday,
-				showUpcoming,
-				showCompleted: showCompletedState,
-				effectiveDays,
-			});
-			if (active) setLoadedReminders({ rawReminders: loaded, isInitialLoadComplete: ready });
-		};
-		void loadReminders();
-		return () => { active = false; };
-	}, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, loadClock]);
+	// The index answers synchronously; its change token and the clock mark when to query again.
+	const { rawReminders, isInitialLoadComplete } = useMemo(() => plugin.reminders ? {
+		rawReminders: loadRemindersListData({ repository: plugin.reminders.repository, showToday, showUpcoming, showCompleted: showCompletedState, effectiveDays }),
+		isInitialLoadComplete: plugin.reminders.index.isInitialLoadComplete,
+	} : { rawReminders: [], isInitialLoadComplete: false },
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- The token and clock mark index and time changes.
+	[plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, loadClock]);
+	// Due times in the whole result, not only rendered cards, can change the overdue count.
+	useReminderClock(rawReminders);
 
 	const presentation = useMemo(() => buildRemindersListPresentation({
 		rawReminders,
@@ -103,15 +92,8 @@ const ActiveRemindersList: React.FC<Props> = ({
 
 	const handleReorderCommit = useCallback(async (orderedIds: string[]) => {
 		await persistReminderOrder(requireReminderBackend(plugin).repository, presentation.effectiveProject, orderedIds, triggerRefresh);
-		const loaded = await loadRemindersListData({
-			repository: requireReminderBackend(plugin).repository,
-			showToday,
-			showUpcoming,
-			showCompleted: showCompletedState,
-			effectiveDays,
-		});
-		setLoadedReminders({ rawReminders: loaded, isInitialLoadComplete: requireReminderBackend(plugin).index.isInitialLoadComplete });
-	}, [plugin, presentation.effectiveProject, triggerRefresh, showToday, showUpcoming, showCompletedState, effectiveDays]);
+		triggerRefresh();
+	}, [plugin, presentation.effectiveProject, triggerRefresh]);
 	const order = useReminderOrder(presentation.activeReminders, handleReorderCommit);
 	const pagination = useReminderPagination(presentation.reminders);
 	const pagedDateGroups = useMemo(() => showUpcoming ? groupRemindersByDate(pagination.items) : null, [showUpcoming, pagination.items]);

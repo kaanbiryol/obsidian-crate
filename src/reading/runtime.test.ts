@@ -23,10 +23,12 @@ function harness() {
 	let status = 'idle';
 	const vault = {
 		configDir: '.obsidian', getAbstractFileByPath: (path: string) => path === root.path ? root : path === file.path ? file : null,
-		read: vi.fn(async () => content), process: vi.fn(async (_file: TFile, update: (content: string) => string) => { content = update(content); return content; }),
+		read: vi.fn(async (_file?: TFile) => content), process: vi.fn(async (_file: TFile, update: (content: string) => string) => { content = update(content); return content; }),
 		on: (name: string, callback: (file: TFile, oldPath?: string) => void) => {
 			if (!events.has(name)) events.set(name, new Set()); events.get(name)!.add(callback); return { name, callback };
 		}, offref: (ref: { name: string; callback: (file: TFile, oldPath?: string) => void }) => { events.get(ref.name)!.delete(ref.callback); },
+		// Reading verifies note bytes; they encode whatever `read` returns for the file.
+		adapter: { readBinary: async (path: string) => new TextEncoder().encode(await vault.read(Object.assign(new TFile(), { path }))).buffer },
 	};
 	const workspace = { layoutReady: false, on: () => ({}), offref: vi.fn(), getLeavesOfType: () => [], onLayoutReady: (callback: () => void) => { callbacks.push(callback); if (workspace.layoutReady) callback(); } };
 	const plugin = { secretStorage: { get: () => null }, settings: normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading' } }, '.obsidian'),
@@ -146,7 +148,7 @@ describe('Reading runtime lifecycle', () => {
 		if (!(root instanceof TFolder)) throw new Error('Missing test folder');
 		const lookup = h.vault.getAbstractFileByPath;
 		Object.assign(h.vault, {
-			adapter: { exists: async () => false },
+			adapter: { ...h.vault.adapter, exists: async () => false },
 			getAllLoadedFiles: () => root.children,
 			getAbstractFileByPath: (path: string) => root.children.find(file => file.path === path) ?? lookup(path),
 			create: async (path: string, content: string) => {

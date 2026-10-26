@@ -143,14 +143,15 @@ export function readingDocument(markdown: string): MarkdownDocument {
 		},
 	}] });
 	const result: MarkdownDocument = { text: '', html: unmarkedMarkdown.parser(tokens), characters: [], marks: [], codes: [], autolinks: [] };
-	const stack: { start: number; leaf?: number; mark?: number; code: boolean; inlineCode?: number; autolink?: number; hidden: boolean; raw: boolean }[] = [];
+	// A leaf collects its own text: slicing the growing document text per tag is quadratic.
+	const stack: { start: number; leaf?: number; text?: string; mark?: number; code: boolean; inlineCode?: number; autolink?: number; hidden: boolean; raw: boolean }[] = [];
 	let hidden = 0;
 	const parserHtml = new HtmlParser({
 		onopentag(name, attributes) {
 			const drop = READING_DROP_CONTENTS.includes(name) && !READING_HTML_TAGS.includes(name);
 			if (drop) hidden++;
 			stack.push({ start: result.text.length, hidden: drop, code: name === 'code', raw: attributes[rawAttribute] !== undefined,
-				...(attributes[sourceAttribute] === undefined ? {} : { leaf: Number(attributes[sourceAttribute]) }),
+				...(attributes[sourceAttribute] === undefined ? {} : { leaf: Number(attributes[sourceAttribute]), text: '' }),
 				...(attributes[markAttribute] === undefined ? {} : { mark: Number(attributes[markAttribute]) }),
 				...(attributes[codeAttribute] === undefined ? {} : { inlineCode: Number(attributes[codeAttribute]) }),
 				...(attributes[linkAttribute] === undefined ? {} : { autolink: Number(attributes[linkAttribute]) }),
@@ -159,6 +160,7 @@ export function readingDocument(markdown: string): MarkdownDocument {
 		ontext(text) {
 			if (hidden) return;
 			result.text += text;
+			for (const entry of stack) if (entry.text !== undefined) entry.text += text;
 			for (let i = 0; i < text.length; i++) result.characters.push(undefined);
 		},
 		onclosetag() {
@@ -167,7 +169,7 @@ export function readingDocument(markdown: string): MarkdownDocument {
 			if (entry.hidden) hidden--;
 			const raw = entry.raw || stack.some(parent => parent.raw);
 			const leaf = entry.leaf === undefined ? undefined : leaves[entry.leaf];
-			if (!raw && leaf?.text === result.text.slice(entry.start)) for (let i = 0; i < leaf.characters.length; i++) result.characters[entry.start + i] = leaf.characters[i];
+			if (!raw && leaf && leaf.text === entry.text) for (let i = 0; i < leaf.characters.length; i++) result.characters[entry.start + i] = leaf.characters[i];
 			const mark = entry.mark === undefined ? undefined : native[entry.mark];
 			if (mark) result.marks.push({ start: entry.start, end: result.text.length, ...mark });
 			if (entry.code && !hidden) result.codes.push({ start: entry.start, end: result.text.length,

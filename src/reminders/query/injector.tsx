@@ -12,42 +12,34 @@ import {
 } from "@/ui/plugin/shadowReactMount";
 import { PluginRoot } from "@/ui/plugin/PluginRoot";
 import { RemindersList } from "@/reminders/ui/plugin/reminder-list/RemindersList";
-import { processVaultMarkdown } from "@/reminders/data/vault-markdown";
+import { processVaultMarkdown } from "@/sync/local/vault-markdown";
 import { parseRemindersBlockOptions, setRemindersBlockShowCompleted, type RemindersBlockType } from "./remindersBlockOptions";
 
-export class ReminderQueryInjector {
-	private readonly plugin: CratePlugin;
+export function renderRemindersBlock(plugin: CratePlugin, type: RemindersBlockType, source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
+	const options = parseRemindersBlockOptions({ type, content: source });
 
-	constructor(plugin: CratePlugin) {
-		this.plugin = plugin;
-	}
+	// In Reading view and Live Preview, the toggle rewrites the block's own show-completed option.
+	const toggleShowCompleted = ctx.sourcePath && ctx.getSectionInfo(el)
+		? (showCompleted: boolean) => {
+			void writeShowCompleted(plugin, el, ctx, showCompleted).catch((error: unknown) => {
+				new Notice(`Failed to save reminder view preference: ${errorMessage(error)}`);
+			});
+		}
+		: undefined;
 
-	onBlock(type: RemindersBlockType, source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-		const options = parseRemindersBlockOptions({ type, content: source });
-
-		// In Reading view and Live Preview, the toggle rewrites the block's own show-completed option.
-		const toggleShowCompleted = ctx.sourcePath && ctx.getSectionInfo(el)
-			? (showCompleted: boolean) => {
-				void writeShowCompleted(this.plugin, el, ctx, showCompleted).catch((error: unknown) => {
-					new Notice(`Failed to save reminder view preference: ${errorMessage(error)}`);
-				});
-			}
-			: undefined;
-
-		const child = new ReactRenderer(
-			el,
-			this.plugin,
-			RemindersList,
-			{
-				projectFilter: options.projectFilter,
-				showCompleted: options.showCompleted,
-				showToday: options.showToday,
-				showUpcoming: options.showUpcoming,
-				onToggleShowCompleted: toggleShowCompleted,
-			}
-		);
-		ctx.addChild(child);
-	}
+	const child = new ReactRenderer(
+		el,
+		plugin,
+		RemindersList,
+		{
+			projectFilter: options.projectFilter,
+			showCompleted: options.showCompleted,
+			showToday: options.showToday,
+			showUpcoming: options.showUpcoming,
+			onToggleShowCompleted: toggleShowCompleted,
+		}
+	);
+	ctx.addChild(child);
 }
 
 async function writeShowCompleted(
@@ -62,8 +54,8 @@ async function writeShowCompleted(
 	if (!section || !(file instanceof TFile)) throw new Error("This reminders block is no longer in the note.");
 	const block = section.text.split("\n").slice(section.lineStart, section.lineEnd + 1).join("\n");
 	const updated = setRemindersBlockShowCompleted(block, showCompleted);
-	if (!updated) return;
-	await processVaultMarkdown(plugin.app, file, content => {
+	if (!updated) throw new Error("This block cannot be updated here. Edit its show-completed line in the note.");
+	await processVaultMarkdown(plugin.app.vault, file, content => {
 		const lines = content.split("\n");
 		if (lines.slice(section.lineStart, section.lineEnd + 1).join("\n") !== block) {
 			throw new Error("This reminders block changed. Try again.");
@@ -77,6 +69,7 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
 	private readonly props: T;
 	private readonly component: React.FC<T>;
 	private reactRoot: Root | null = null;
+	private mount: ShadowRootMount | null = null;
 	private shadowRoot: ShadowRoot | null = null;
 	private isDisposed = false;
 
@@ -102,6 +95,7 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
 				}
 			},
 		});
+		this.mount = mount;
 		this.shadowRoot = mount.shadowRoot;
 
 		void this.initializeReactRoot(mount);
@@ -112,6 +106,8 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
 		if (this.reactRoot) {
 			this.reactRoot.unmount();
 		}
+		this.mount?.disconnectTheme();
+		this.mount = null;
 		this.shadowRoot = null;
 	}
 

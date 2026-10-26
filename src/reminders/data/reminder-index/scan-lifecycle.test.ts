@@ -6,7 +6,6 @@ import { scanFile, scanVault, type FileScanResult, type ScanResult } from '../va
 vi.mock('../vaultScanner', () => ({
 	scanFile: vi.fn(), scanVault: vi.fn(),
 	isInRemindersFolder: (path: string) => path.startsWith('Reminders/'),
-	getProjectFromPath: (path: string) => path.split('/').pop()!.replace(/\.md$/, ''),
 }));
 const oldPath = 'Reminders/Old.md', newPath = 'Reminders/New.md';
 function reminder(filePath = oldPath): IndexedReminder {

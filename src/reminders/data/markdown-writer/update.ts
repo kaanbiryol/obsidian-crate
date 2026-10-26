@@ -1,5 +1,5 @@
 import type { UpdateReminderInput } from '../../core/reminderMutationPlan';
-import { processVaultMarkdown, readVaultMarkdown } from '../vault-markdown';
+import { processVaultMarkdown, readVaultMarkdown } from '@/sync/local/vault-markdown';
 import type { IndexedReminder } from "../reminder-index";
 import {
 	appendReminderBlockToContent,
@@ -28,7 +28,7 @@ async function rollbackDestinationReminder(
 	reminder: IndexedReminder,
 ): Promise<void> {
 	let removed = false;
-	await processVaultMarkdown(context.app, file, (fileContent) => {
+	await processVaultMarkdown(context.app.vault, file, (fileContent) => {
 		context.moveJournal?.assertActive();
 		const deletion = deleteReminderBlockFromContent(fileContent, reminder);
 		removed = deletion.found;
@@ -65,7 +65,7 @@ export async function updateReminderInMarkdown(
 		// Check the source block can be removed before writing anything, as the
 		// shared web command does. Nested tasks or supporting text reject the move
 		// here instead of leaving the reminder in both notes.
-		if (!deleteReminderBlockFromContent(await readVaultMarkdown(context.app, oldFile), reminder).found) {
+		if (!deleteReminderBlockFromContent(await readVaultMarkdown(context.app.vault, oldFile), reminder).found) {
 			throw new Error(`Cannot safely locate reminder line in ${reminder.filePath}. The file may have been modified.`);
 		}
 
@@ -85,7 +85,7 @@ export async function updateReminderInMarkdown(
 		const applyMove = async () => {
 			let destinationWritten = false;
 			try {
-			await processVaultMarkdown(context.app, newFile, (fileContent) => {
+			await processVaultMarkdown(context.app.vault, newFile, (fileContent) => {
 				context.moveJournal?.assertActive();
 				if (findReminderLineNumber(fileContent.split("\n"), movedReminder) !== -1) {
 					throw new Error(`Reminder ${reminder.id} already exists in ${newFile.path}`);
@@ -98,7 +98,7 @@ export async function updateReminderInMarkdown(
 			});
 			destinationWritten = true;
 
-			await processVaultMarkdown(context.app, oldFile, (fileContent) => {
+			await processVaultMarkdown(context.app.vault, oldFile, (fileContent) => {
 				context.moveJournal?.assertActive();
 				const deletion = deleteReminderBlockFromContent(fileContent, reminder);
 				if (!deletion.found) {
@@ -157,7 +157,7 @@ export async function updateReminderInMarkdown(
 
 	try {
 		let replacementLineNumber = -1;
-		await processVaultMarkdown(context.app, file, (fileContent) => {
+		await processVaultMarkdown(context.app.vault, file, (fileContent) => {
 			context.moveJournal?.assertActive();
 			const replacement = replaceUpdatedReminderBlock(fileContent, reminder, mutation);
 			replacementLineNumber = replacement.lineNumber;

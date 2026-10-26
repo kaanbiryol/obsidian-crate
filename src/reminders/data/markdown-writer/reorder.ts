@@ -1,4 +1,4 @@
-import { processVaultMarkdown } from '../vault-markdown';
+import { processVaultMarkdown } from '@/sync/local/vault-markdown';
 import { reorderReminderBlocksInContent } from "../../core/markdownReminderFile";
 import type { MarkdownWriterContext } from "./types";
 import { markdownWriterLog } from "./helpers";
@@ -13,7 +13,7 @@ export async function reorderRemindersInMarkdown(
 		throw new Error(`File not found: ${filePath}`);
 	}
 
-	await processVaultMarkdown(context.app, file, (fileContent) => {
+	await processVaultMarkdown(context.app.vault, file, (fileContent) => {
 		context.moveJournal?.assertActive();
 		return reorderReminderBlocksInContent(fileContent, orderedIds);
 	});

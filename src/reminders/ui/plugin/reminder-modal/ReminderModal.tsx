@@ -4,8 +4,8 @@ import { Notice } from "obsidian";
 import { AddReminderModal } from "./AddReminderModal";
 import type { NewReminder } from "./reminderMutation";
 import { createLogger } from "@/reminders/logger";
+import { errorMessage } from "@/platform/logger";
 import { DEFAULT_PROJECT, projectOptionsWithDefault } from '../../../core/constants';
-import { ReminderInputError } from '../../../core/reminderMutationInput';
 
 const log = createLogger('ReminderModal');
 
@@ -85,13 +85,13 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 				recurrence: updatedReminder.recurrence ?? null,
 			});
 			if (!saved) {
-				throw new Error(`Reminder not found: ${updatedReminder.id}`);
+				throw new Error("Reminder no longer exists. Refresh to continue.");
 			}
 
 			new Notice("Reminder updated!");
 			onSave?.(saved);
 		} catch (err) {
-			new Notice(err instanceof ReminderInputError ? err.message : "Failed to update reminder");
+			new Notice(errorMessage(err));
 			log.error("Failed to update reminder", err);
 			throw err;
 		}
@@ -103,16 +103,12 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
 		try {
 			const deleted = await requireReminderBackend(plugin).repository.delete(reminderToDelete.id, await reminderRevision(reminderToDelete));
-			if (!deleted) {
-				new Notice("Reminder not found");
-				log.warn(" Reminder not found:", reminderToDelete.id);
-				throw new Error("Reminder no longer exists. Refresh to continue.");
-			}
+			if (!deleted) throw new Error("Reminder no longer exists. Refresh to continue.");
 
 			new Notice("Reminder deleted");
 			onDelete?.(reminderToDelete);
 		} catch (err) {
-			new Notice("Failed to delete reminder");
+			new Notice(errorMessage(err));
 			log.error("Failed to delete reminder", err);
 			throw err;
 		}
