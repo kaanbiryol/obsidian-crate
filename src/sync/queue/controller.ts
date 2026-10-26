@@ -4,9 +4,9 @@ import type { SyncResult } from '../types';
 import { createEmptySyncResult } from '../sync-result';
 import {
 	processPendingChanges as flushPendingQueueChanges,
+	type QueueFlushBatch,
 	type QueueFlushContext,
 } from './flush';
-import type { QueueFlushBatch } from './flush-types';
 
 /** The engine supplies the flush members; the controller adds its batch and scheduling ones. */
 export interface SyncQueueControllerContext extends Pick<QueueFlushContext,

@@ -1,12 +1,17 @@
 import type { SyncResult, SyncState } from '../types';
 import { createAbortError, isAbortError } from '../abort';
-import { LOCAL_CONTENT_CHECK_INTERVAL_MS, MAX_CHECK_BACKOFF_MULTIPLIER, MAX_RETRIES, RETRY_BASE_DELAY_MS } from './constants';
 import { notifyConflicts } from '../conflict/conflict';
 import { retryWithBackoff, runConcurrentTasks } from '../concurrency';
 import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
 
 const logger = createLogger('SyncEngine');
+
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 1000;
+const MAX_CHECK_BACKOFF_MULTIPLIER = 32;
+// Local-only content checks while automatic sync is off (the default interval).
+export const LOCAL_CONTENT_CHECK_INTERVAL_MS = 300_000;
 
 interface SyncEngineLifecycleDependencies {
 	automaticSyncEnabled?(): boolean;

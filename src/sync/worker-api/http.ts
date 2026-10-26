@@ -1,4 +1,3 @@
-import { D1_USAGE_HEADER, parseD1Usage } from '@/protocol/d1-usage';
 import { emptyRequestTimings } from '../diagnostics/timings';
 import type { CrateServerInfo } from '../../protocol/server-info';
 import { normalizeUploadOperationIds } from '../diagnostics/request-diagnostics';
@@ -9,7 +8,7 @@ import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
 import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../connection/worker-url';
-import { diagnosticRoute, MAX_REQUEST_DIAGNOSTICS, normalizeRequestDiagnostics, type RequestDiagnostic, type RequestDiagnostics } from '../diagnostics/request-diagnostics';
+import { normalizeRequestDiagnostics, recordRequestDiagnostic, type RequestDiagnostic, type RequestDiagnostics } from '../diagnostics/request-diagnostics';
 import { isAbortError } from '../abort';
 import { ENCRYPTION_CAPABILITY, ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '../../encryption/server-state';
 
@@ -67,6 +66,21 @@ export class SyncTransportError extends Error {
 		super(message, options);
 		this.name = 'SyncTransportError';
 	}
+}
+
+/** Raises a failed response as an HttpError with its status, retry delay, code and request ID. */
+function throwForErrorResponse(response: ApiHttpResponse, method: string, path: string): void {
+	if (response.status < 400) return;
+	const details = parseErrorDetails(response.status, response.text);
+	logger.error(`Request failed: ${method} ${path} -> ${details.message}`);
+	throw new HttpError(
+		details.message,
+		response.status,
+		parseRetryAfter(response.headers),
+		details.code,
+		details.currentHash,
+		getHeader(response.headers, REQUEST_ID_HEADER) ?? undefined,
+	);
 }
 
 export function getHeader(headers: Record<string, string>, headerName: string): string | null {
@@ -242,26 +256,10 @@ export class WorkerApiHttpClient {
 		const timings = this.requestTimings;
 		const uploadOperationIds = normalizeUploadOperationIds((getHeader(options.headers ?? {}, UPLOAD_OPERATION_HEADER)
 			?? getHeader(options.headers ?? {}, UPLOAD_OPERATIONS_HEADER) ?? '').split(','));
-		const record = (outcome: RequestDiagnostic['outcome'], response?: ApiHttpResponse) => {
-			const durationMs = Math.max(0, performance.now() - started);
-			const header = response ? getHeader(response.headers, 'Server-Timing') : null;
-			const match = header?.match(/(?:^|,)\s*crate;dur=([0-9.]+)/);
-			const serverMs = match ? Number(match[1]) : NaN;
-			timings.count++; timings.totalMs += durationMs; timings.maxMs = Math.max(timings.maxMs, durationMs);
-			if (Number.isFinite(serverMs) && serverMs >= 0) { timings.serverCount++; timings.serverMs += serverMs; }
-
-      const usage = response ? parseD1Usage(getHeader(response.headers, D1_USAGE_HEADER)) : undefined;
-      if (usage) {
-        const d1 = timings.d1 ??= { rowsRead: 0, rowsWritten: 0, reportedRequests: 0, completeRequests: 0 };
-        d1.rowsRead += usage.rowsRead; d1.rowsWritten += usage.rowsWritten;
-        d1.reportedRequests++; if (usage.complete) d1.completeRequests++;
-      }
-
-			this.requestDiagnostics.push({ at: new Date().toISOString(), operationId, method: options.method ?? 'GET',
-				...(uploadOperationIds.length ? { uploadOperationIds } : {}), route: diagnosticRoute(path), status: response?.status ?? 0, outcome,
-				requestId: response ? getHeader(response.headers, REQUEST_ID_HEADER) ?? undefined : undefined });
-			if (this.requestDiagnostics.length > MAX_REQUEST_DIAGNOSTICS) this.requestDiagnostics.shift();
-		};
+		const diagnosed = { operationId, method: options.method ?? 'GET', path, uploadOperationIds, started };
+		const record = (outcome: RequestDiagnostic['outcome'], response?: ApiHttpResponse) => recordRequestDiagnostic(
+			{ timings, requests: this.requestDiagnostics }, diagnosed, outcome,
+			response && { status: response.status, header: name => getHeader(response.headers, name) });
 
 		return await new Promise<ApiHttpResponse>((resolve, reject) => {
 			let settled = false;
@@ -334,19 +332,7 @@ export class WorkerApiHttpClient {
 			contentType: options.contentType ?? getHeader(options.headers ?? {}, 'Content-Type') ?? 'application/json',
 		}, timeout);
 		this.assertRequestCurrent(generation);
-
-		if (response.status >= 400) {
-			const details = parseErrorDetails(response.status, response.text);
-			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} -> ${details.message}`);
-			throw new HttpError(
-				details.message,
-				response.status,
-				parseRetryAfter(response.headers),
-				details.code,
-				details.currentHash,
-				getHeader(response.headers, REQUEST_ID_HEADER) ?? undefined,
-			);
-		}
+		throwForErrorResponse(response, options.method ?? 'GET', path);
 
 		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, REQUEST_ID_HEADER) ?? 'unavailable'}]`);
 		return parseJsonResponse<T>(response.text, path);
@@ -361,19 +347,7 @@ export class WorkerApiHttpClient {
 		logger.info(`${options.method ?? 'GET'} ${path} (binary)`);
 		const response = await this.runRequest(path, options, timeout);
 		this.assertRequestCurrent(generation);
-
-		if (response.status >= 400) {
-			const details = parseErrorDetails(response.status, response.text);
-			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} -> ${details.message}`);
-			throw new HttpError(
-				details.message,
-				response.status,
-				parseRetryAfter(response.headers),
-				details.code,
-				details.currentHash,
-				getHeader(response.headers, REQUEST_ID_HEADER) ?? undefined,
-			);
-		}
+		throwForErrorResponse(response, options.method ?? 'GET', path);
 
 		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, REQUEST_ID_HEADER) ?? 'unavailable'}] (binary)`);
 		return { body: response.arrayBuffer, headers: response.headers };

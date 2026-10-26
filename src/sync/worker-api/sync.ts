@@ -59,6 +59,24 @@ export interface DownloadedBatch { files: DownloadedBatchFile[] }
 /** Encrypted pages leave out deletes this device never synced, so `nextSince` is the raw page's last sequence. */
 export type ChangesPage = ChangesResponse & { nextSince?: number };
 
+/** Gives each decrypted server file a unique plaintext path, in the order they should
+ * be recorded. Files stored at their name's own tag claim it first; a later file
+ * claiming the same name gets a distinct local name from its server path. */
+export function assignPlainPaths(entries: ReadonlyArray<{ path: string; wire: string }>, tagged: readonly boolean[]): Array<{ index: number; path: string }> {
+	const claimed = new Set<string>();
+	const order = entries.map((_, index) => index).sort((a, b) => Number(tagged[b]) - Number(tagged[a]));
+	return order.map(index => {
+		const { wire } = entries[index]!;
+		let { path } = entries[index]!;
+		if (claimed.has(portablePathKey(path))) {
+			const name = path.lastIndexOf('/') + 1, dot = path.lastIndexOf('.') > name ? path.lastIndexOf('.') : path.length;
+			path = `${path.slice(0, dot)} - ${wire.slice(wire.lastIndexOf('/') + 1, wire.lastIndexOf('/') + 9)}${path.slice(dot)}`;
+		}
+		claimed.add(portablePathKey(path));
+		return { index, path };
+	});
+}
+
 export class SyncWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
 	private encryption?: EncryptedFiles;
@@ -98,18 +116,12 @@ export class SyncWorkerApi {
 		const wires = Object.keys(files).sort();
 		const entries = await encryption.metadata(wires.map(path => ({ path, entry: files[path]! })));
 		const tagged = await Promise.all(entries.map(async item => await encryption.paths.tags.wire(item.path).catch(() => null) === item.wire));
-		const plain = createPathRecord<FileEntry>(), claimed = new Set<string>();
-		const order = entries.map((_, index) => index).sort((a, b) => Number(tagged[b]) - Number(tagged[a]));
-		for (const index of order) {
+		const plain = createPathRecord<FileEntry>();
+		for (const { index, path } of assignPlainPaths(entries, tagged)) {
 			const { wire, entry } = entries[index]!;
-			let { path } = entries[index]!;
-			if (claimed.has(portablePathKey(path))) {
-				const name = path.lastIndexOf('/') + 1, dot = path.lastIndexOf('.') > name ? path.lastIndexOf('.') : path.length;
-				path = `${path.slice(0, dot)} - ${wire.slice(wire.lastIndexOf('/') + 1, wire.lastIndexOf('/') + 9)}${path.slice(dot)}`;
-				await encryption.paths.learn(path, wire);
-			}
-			claimed.add(portablePathKey(path));
-			plain[path] = tagged[index] && path === entries[index]!.path ? entry : { ...entry, wire };
+			const renamed = path !== entries[index]!.path;
+			if (renamed) await encryption.paths.learn(path, wire);
+			plain[path] = tagged[index] && !renamed ? entry : { ...entry, wire };
 		}
 		return plain;
 	}

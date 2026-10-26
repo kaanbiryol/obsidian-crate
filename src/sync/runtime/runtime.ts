@@ -1,4 +1,4 @@
-import { pendingChangeKey, type PendingChange } from '../pending/pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { createAbortError } from '../abort';
 import type { ConnectionTestResult } from '../types';
 import { createRuntimeHistoryRestore, loadRuntimeHistoryComparison } from './history-workflow';
@@ -7,7 +7,7 @@ import { loadFileHistoryPreview, loadCurrentSyncedPreview } from '../history/fil
 import type { CrateServerInfo } from '../../protocol/server-info';
 import { createConflictReview } from '../conflict/review';
 import type { SyncActivityProgress } from '../types';
-import { TFolder, type Plugin, type TAbstractFile } from 'obsidian';
+import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
@@ -20,7 +20,6 @@ import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from '../types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 import { SyncApiClient } from '../worker-api/client';
-import { isConflictFile } from '../conflict/conflict';
 import { SyncEngine } from '../engine/engine';
 import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';
 import { deleteManifestFile, type ApplyInfrastructureConfigInput } from './config';
@@ -29,6 +28,7 @@ import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { RuntimeServerStatus } from './server-status';
 import { ForegroundSyncScheduler, type ForegroundSyncReason } from './foreground-sync';
 import { runStartupSync } from './startup-sync';
+import { VaultEventGate } from './vault-event-gate';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import { updateSyncProgress, type SyncRuntimeSettings, type SyncSettings } from '../settings';
 import { buildSharedSettings } from '../connection/shared-settings';
@@ -52,10 +52,7 @@ export class SyncRuntime {
 	private stateChangeListeners = new Set<(state: SyncState) => void>();
 	private activityProgress: SyncActivityProgress | null = null;
 	private progressListeners = new Set<(current: number, total: number) => void>();
-	private acceptingEvents = false;
-	/** Latest change implied by each vault event that arrived during the startup sync,
-	 * which does not take events; queued once it finishes. */
-	private startupEvents: Map<string, PendingChange['kind'] | 'raw'> | null = null;
+	private readonly vaultEvents = new VaultEventGate(() => this.syncEngine, () => this.plugin.app.workspace.layoutReady !== false);
 	private initializing: boolean;
 	private initializationError: string | null = null;
 	private initializationRevision = 0;
@@ -64,7 +61,7 @@ export class SyncRuntime {
 	private configurationChain: Promise<void> = Promise.resolve();
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private readonly foregroundSync = new ForegroundSyncScheduler({
-		canSync: () => this.settings.automaticSync && this.acceptingEvents && this.isConfigured()
+		canSync: () => this.settings.automaticSync && this.vaultEvents.isOpen && this.isConfigured()
 			&& this.syncEngine !== null && this.syncEngine.getState().status !== 'syncing',
 		sync: () => this.sync(),
 	});
@@ -275,8 +272,7 @@ export class SyncRuntime {
 		const initializationRevision = ++this.initializationRevision;
 		this.initializing = true;
 		this.initializationError = null;
-		this.acceptingEvents = false;
-		this.startupEvents = null;
+		this.vaultEvents.close();
 		this.startupSyncTask = Promise.resolve(false);
 		this.foregroundSync.cancel();
 		this.serverStatus.reset();
@@ -340,14 +336,12 @@ export class SyncRuntime {
 		this.emitCurrentState();
 
 		if (this.settings.automaticSync && !options.skipStartupSync) {
-			// The startup sync scans the vault after this point; later events are replayed.
-			this.startupEvents = new Map();
+			this.vaultEvents.recordForStartupSync();
 			this.startupSyncTask = runStartupSync({
 				sync: () => this.sync(),
 				isCurrent: () => this.initializationRevision === initializationRevision && this.syncEngine === syncEngine,
 				finish: () => {
-					this.acceptingEvents = true;
-					this.queueStartupEvents(syncEngine);
+					this.vaultEvents.openAfterStartupSync(syncEngine);
 					this.initializing = false;
 					this.emitCurrentState();
 				},
@@ -355,7 +349,7 @@ export class SyncRuntime {
 			return;
 		}
 
-		this.acceptingEvents = true;
+		this.vaultEvents.open();
 		this.initializing = false;
 		this.emitCurrentState();
 		if (!this.settings.automaticSync) this.scheduleServerCheck();
@@ -364,8 +358,7 @@ export class SyncRuntime {
 	destroy(): void {
 		this.initializationRevision++;
 		this.initializing = false;
-		this.acceptingEvents = false;
-		this.startupEvents = null;
+		this.vaultEvents.close();
 		this.startupSyncTask = Promise.resolve(false);
 		this.foregroundSync.cancel();
 		this.serverStatus.reset();
@@ -448,7 +441,7 @@ export class SyncRuntime {
 			transition, persistSettings: this.persistSettings,
 			clearLocalState: () => deleteManifestFile(this.plugin, signal),
 			getResetEngine: () => {
-				this.acceptingEvents = false;
+				this.vaultEvents.pause();
 				if (!this.syncEngine || !this.apiClient) throw new Error('Could not start the new sync connection');
 				return this.syncEngine;
 			},
@@ -460,7 +453,7 @@ export class SyncRuntime {
 					throw new Error('Sync this device without errors or conflicts first, so no server-only changes are lost.');
 				}
 			},
-			resumeEvents: () => { this.acceptingEvents = true; },
+			resumeEvents: () => { this.vaultEvents.open(); },
 			reportError: message => { this.initializationError = message; this.emitCurrentState(); },
 		}, request, progress, expected, signal), signal);
 	}
@@ -489,57 +482,10 @@ export class SyncRuntime {
 		if (this.initializationRevision !== revision) throw createAbortError('Sync configuration changed during reset');
 	}
 
-	onRawFileChange(path: string): void {
-		if (this.plugin.app.workspace.layoutReady === false) return;
-		if (!this.acceptingEvents) {
-			// Raw notifications stand in for hidden files only; a vault event for the path wins.
-			if (!this.startupEvents?.has(path)) this.startupEvents?.set(path, 'raw');
-			return;
-		}
-		void this.syncEngine?.onRawFileChange(path);
-	}
-
-	onFileChange(file: TAbstractFile): void {
-		if (this.plugin.app.workspace.layoutReady === false) return;
-		if (!this.acceptingEvents && !isConflictFile(file.path)) {
-			if (!(file instanceof TFolder)) this.startupEvents?.set(file.path, 'upload');
-			return;
-		}
-		this.syncEngine?.onFileChange(file);
-	}
-
-	onFileDelete(file: TAbstractFile): void {
-		if (this.plugin.app.workspace.layoutReady === false) return;
-		if (!this.acceptingEvents && !isConflictFile(file.path)) {
-			if (!(file instanceof TFolder)) this.startupEvents?.set(file.path, 'delete');
-			return;
-		}
-		this.syncEngine?.onFileDelete(file);
-	}
-
-
-	onFileRename(file: TAbstractFile, oldPath: string): void {
-		if (this.plugin.app.workspace.layoutReady === false) return;
-		if (!this.acceptingEvents && !isConflictFile(file.path) && !isConflictFile(oldPath)) {
-			if (!(file instanceof TFolder)) this.startupEvents?.set(oldPath, 'delete').set(file.path, 'upload');
-			return;
-		}
-		this.syncEngine?.onFileRename(file, oldPath);
-	}
-
-	/** Replays events the startup sync dropped; pending verification settles download
-	 * echoes and other files that still match their baseline. */
-	private queueStartupEvents(engine: SyncEngine): void {
-		const events = this.startupEvents;
-		this.startupEvents = null;
-		if (!events) return;
-		const keys: string[] = [];
-		for (const [path, kind] of events) {
-			if (kind === 'raw') void engine.onRawFileChange(path);
-			else keys.push(pendingChangeKey(kind, path));
-		}
-		engine.restoreDroppedEvents(keys);
-	}
+	onRawFileChange(path: string): void { this.vaultEvents.onRawFileChange(path); }
+	onFileChange(file: TAbstractFile): void { this.vaultEvents.onFileChange(file); }
+	onFileDelete(file: TAbstractFile): void { this.vaultEvents.onFileDelete(file); }
+	onFileRename(file: TAbstractFile, oldPath: string): void { this.vaultEvents.onFileRename(file, oldPath); }
 
 	triggerForegroundSync(reason: ForegroundSyncReason): void {
 		if (!this.settings.automaticSync) this.scheduleServerCheck();
@@ -607,7 +553,7 @@ export class SyncRuntime {
 	}
 
 	private scheduleServerCheck(): void {
-		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
+		if (!this.vaultEvents.isOpen || !this.isConfigured() || !this.syncEngine) return;
 		this.serverStatus.scheduleCheck();
 	}
 

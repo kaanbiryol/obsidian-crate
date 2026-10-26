@@ -3,12 +3,12 @@ import { errorMessage } from '../../platform/logger';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import { uploadPipelined } from '../transfer/upload-pipeline';
-import type { UploadDiff, PreparedUpload, SyncResult } from '../types';
+import type { UploadDiff, PreparedUpload, SyncResult, SyncWork } from '../types';
 import { recordResolvedRace } from '../sync-result';
 import { isAbortError } from '../abort';
 
 export interface FullSyncUploadContext {
-	reportWork?(phase: import('../types').SyncWork['phase'], current?: number, total?: number): void;
+	reportWork?(work: SyncWork): void;
 	prepareFullSyncUpload(diff: UploadDiff): Promise<PreparedUpload | null>;
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
 	reconcileVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
@@ -49,16 +49,16 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 		} } : {}),
 		beforeChunk: () => {
 			context.throwIfDestroyed();
-			context.reportWork?.('uploading', processed, diffs.length);
+			context.reportWork?.({ phase: 'uploading', current: processed, total: diffs.length });
 		},
 		onProcessed: count => {
 			processed += count;
-			context.reportWork?.('uploading', processed, diffs.length);
+			context.reportWork?.({ phase: 'uploading', current: processed, total: diffs.length });
 			for (let index = 0; index < count; index++) onCompleted();
 		},
 		afterChunk: unreported => {
 			for (let index = 0; index < unreported; index++) { processed++; onCompleted(); }
-			context.reportWork?.('uploading', processed, diffs.length);
+			context.reportWork?.({ phase: 'uploading', current: processed, total: diffs.length });
 		},
 	});
 	const uploaded = new Set(result.uploadedPaths);

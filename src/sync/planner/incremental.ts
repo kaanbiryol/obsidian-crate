@@ -31,7 +31,7 @@ export async function runIncrementalSync(
 
   const result = createEmptySyncResult();
   try {
-    context.reportWork?.('server');
+    context.reportWork?.({ phase: 'server' });
     const changelog = await readIncrementalChangelog(context.files, context.settings.lastSeq, () => context.throwIfDestroyed());
     if (!changelog) {
       logger.warn("Changelog cursor expired - pruned entries detected, falling back to full sync");
@@ -41,7 +41,7 @@ export async function runIncrementalSync(
 
     logger.info(`Incremental sync: ${changeCount} remote changes since seq ${context.settings.lastSeq}`);
 
-    context.reportWork?.('scanning');
+    context.reportWork?.({ phase: 'scanning' });
     const unchangedPaths: string[] = [];
     const { changes: localChanges, discoveredPaths, skippedPaths } = await context.getLocalChanges(path => unchangedPaths.push(path));
     if (skippedPaths?.length) (result.issues ??= []).push(...skippedPaths.map(skippedFileIssue));
@@ -83,11 +83,11 @@ export async function runIncrementalSync(
 
     if (downloadRequests.length > 0) {
       let downloadsProcessed = 0;
-      context.reportWork?.('downloading', downloadsProcessed, downloadRequests.length);
+      context.reportWork?.({ phase: 'downloading', current: downloadsProcessed, total: downloadRequests.length });
       await context.parallelDownloadAndSaveFiles(downloadRequests, result, () => {
         downloadsProcessed++;
         current++;
-        context.reportWork?.('downloading', downloadsProcessed, downloadRequests.length);
+        context.reportWork?.({ phase: 'downloading', current: downloadsProcessed, total: downloadRequests.length });
         options.progressCallback?.(current, total);
       }, options.onFailure);
       const downloaded = new Set(result.downloadedPaths);
@@ -100,18 +100,18 @@ export async function runIncrementalSync(
 
     await applyDiffs(context, conflicts, result, {
       localFiles: () => createPathRecord<FileEntry>(),
-      beforeDiff: () => context.reportWork?.('applying'),
+      beforeDiff: () => context.reportWork?.({ phase: 'applying' }),
       onFailure: options.onFailure,
     });
 
     current = changesByPath.size;
     options.progressCallback?.(current, total);
 
-    if (localOnlyChanges.length) context.reportWork?.('preparing');
+    if (localOnlyChanges.length) context.reportWork?.({ phase: 'preparing' });
     let uploadsProcessed = 0;
     const reportUploads = (count: number) => {
       uploadsProcessed += count;
-      context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
+      context.reportWork?.({ phase: 'uploading', current: uploadsProcessed, total: localOnlyChanges.length });
       current += count;
       options.progressCallback?.(current, total);
     };
@@ -143,7 +143,7 @@ export async function runIncrementalSync(
       } : {}),
       beforeChunk: () => {
         context.throwIfDestroyed();
-        context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
+        context.reportWork?.({ phase: 'uploading', current: uploadsProcessed, total: localOnlyChanges.length });
       },
       onProcessed: reportUploads,
       afterChunk: reportUploads,
@@ -163,7 +163,7 @@ export async function runIncrementalSync(
       for (const failure of deleteFailures) options.onFailure?.(failure);
     }
 
-    context.reportWork?.('saving');
+    context.reportWork?.({ phase: 'saving' });
     await context.localManifest.save();
     if (finalizeSyncResult(result)) {
       context.setLastSeq(latestSeq);
@@ -202,7 +202,7 @@ async function applyIncrementalLocalDeletes(
     const entry = context.localManifest.getEntry(path);
     return { path, hash: entry?.hash, revision: entry?.revision };
   }), result);
-  return deleteRemoteFiles({ ...context, reportWork: work => context.reportWork?.(work.phase, work.current, work.total) }, files, result, {
+  return deleteRemoteFiles(context, files, result, {
     onProcessed,
     onVersionConflicts: context.reconcileVersionConflicts,
   });

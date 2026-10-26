@@ -32,6 +32,9 @@ import { updateSyncProgress, type SyncSettings } from '../settings';
 import type { ReconnectNotice } from '../sync-outcome';
 import type { SyncWorkflowContext } from './standard-sync-workflow';
 import type { ForceSyncWorkflowContext } from './force-sync-workflow';
+import { reconcileQueuePaths } from './reconcile-paths';
+import { uploadFullSyncPlan } from './full-sync-upload';
+import { createPathRecord } from '../../protocol/path-record';
 
 interface SyncEngineContextDependencies {
 	prepareReminderScope?: () => Promise<void>;
@@ -93,7 +96,7 @@ export class SyncEngineContexts {
 		const base = {
 			finishInitialSetup: this.finishInitialSetup,
 			apiConfigured: () => d.api.isConfigured(),
-			reportWork: this.reportWork,
+			reportWork: (work: SyncWork) => d.updateState({ work }),
 			recoverUploads: this.recoverUploads,
 			getStatus: d.getStatus,
 			updateState: d.updateState,
@@ -180,6 +183,33 @@ export class SyncEngineContexts {
 		reportWork: work => this.dependencies.updateState({ work }),
 	}, files, result, options);
 
+	/** Reconciles queued paths with the server. Version conflicts return their paths for another pass. */
+	readonly reconcileQueuePaths = (queueKeys: string[], onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> => {
+		const d = this.dependencies;
+		return reconcileQueuePaths({
+			reportWork: work => d.updateState({ work }),
+			vault: d.vault,
+			localManifest: d.localManifest,
+			getRemoteEntries: async (paths) => (await d.api.getFileMetadata(paths)).files,
+			deleteRemoteFiles: this.deleteRemoteFiles,
+			shouldIgnore: d.shouldIgnore,
+			uploadDiffs: async (diffs, result) => {
+				const retryPaths: string[] = [];
+				const failures = await uploadFullSyncPlan({
+					...this.syncWorkflow,
+					uploadPreparedFiles: (prepared, syncResult, options) => this.uploadPreparedFiles(prepared, syncResult, {
+						...options,
+						onVersionConflicts: async paths => { retryPaths.push(...paths); },
+					}),
+				}, diffs, createPathRecord<FileEntry>(), result, () => {});
+				for (const failure of failures) onFailure?.(failure);
+				return retryPaths;
+			},
+			processDiff: this.processDiff,
+			onFailure,
+		}, queueKeys);
+	};
+
 	readonly processDiff = (diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult): Promise<DiffApplyOutcome> =>
 		transferProcessDiff(this.transfer, diff, localFiles, result);
 
@@ -197,12 +227,9 @@ export class SyncEngineContexts {
 		return finishInitialSetup({
 			manifest: d.localManifest, lastSeq: d.getSettings().lastSeq,
 			initialImport: d.api.initialImport, prepareReminderScope: d.prepareReminderScope,
-			reportWork: work => d.updateState({ work }), assertActive: d.throwIfDestroyed,
+			reportWork: work => d.updateState({ work }), throwIfDestroyed: d.throwIfDestroyed,
 		});
 	};
-
-	private readonly reportWork = (phase: SyncWork['phase'], current?: number, total?: number): void =>
-		this.dependencies.updateState({ work: { phase, current, total } });
 
 	/** The planner reads the settings object current when the sync starts. */
 	async incrementalSync(progressCallback?: (current: number, total: number) => void, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult | null> {
@@ -210,7 +237,7 @@ export class SyncEngineContexts {
 		return runIncrementalSync({
 			settings: d.getSettings(),
 			setLastSeq: (lastSeq: number) => updateSyncProgress(d.getSettings(), { lastSeq }),
-			reportWork: this.reportWork,
+			reportWork: work => d.updateState({ work }),
 			throwIfDestroyed: d.throwIfDestroyed,
 			vault: d.vault,
 			fileManager: d.fileManager,

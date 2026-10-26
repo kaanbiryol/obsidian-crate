@@ -21,7 +21,7 @@ interface EnginePendingChangesContext {
     cache: Pick<MarkdownBaseCache, 'readBase'>;
     queue: Pick<SyncQueueController, 'getPendingKeys' | 'snapshotPendingRevisions' | 'clearSyncedPendingPaths'>;
     backupRoot: string;
-    assertActive(): void;
+    throwIfDestroyed(): void;
     isDestroyed(): boolean;
     beforeBinaryReplace(path: string): Promise<void>;
 }
@@ -54,7 +54,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
                 readBase: async (path, baseline) => await context.cache.readBase(path, baseline.hash)
                     ?? loadRemotePendingBase(context.api, path, baseline, MAX_FILE_SIZE_BYTES),
                 backupRoot: context.backupRoot,
-                verify: () => context.assertActive(),
+                verify: () => context.throwIfDestroyed(),
                 beforeBinaryReplace: path => context.beforeBinaryReplace(path),
                 applied: async (path, remote, content) => {
                     if (remote && content) {

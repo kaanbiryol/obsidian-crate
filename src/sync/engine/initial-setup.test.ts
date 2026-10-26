@@ -15,7 +15,7 @@ function setup() {
 	const context = {
 		manifest, lastSeq: 0,
 		initialImport: { isPreparingReminders: () => true, finishReminderSetup: vi.fn<InitialImportApi['finishReminderSetup']>(async () => {}) },
-		prepareReminderScope: vi.fn(async () => {}), reportWork: vi.fn(), assertActive: () => controller.signal.throwIfAborted(),
+		prepareReminderScope: vi.fn(async () => {}), reportWork: vi.fn(), throwIfDestroyed: () => controller.signal.throwIfAborted(),
 	};
 	return { context, controller };
 }

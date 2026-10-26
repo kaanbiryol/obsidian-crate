@@ -41,7 +41,7 @@ async function harness(local: Record<string, string>, saved: Record<string, stri
         // A deliberately stale sync baseline must never hide unsynced edits.
         getManifest: vi.fn(() => ({ version: 1, files: target })),
         shouldIgnore: (path: string) => path.startsWith('excluded/'),
-        assertActive: vi.fn(), hasPendingMutations: () => true, canCheckpoint: () => false,
+        throwIfDestroyed: vi.fn(), hasPendingMutations: () => true, canCheckpoint: () => false,
         runExclusive: vi.fn(), applied: vi.fn(),
     };
     return { files, adapter, api, settings, context, history: createEngineHistory(context) };

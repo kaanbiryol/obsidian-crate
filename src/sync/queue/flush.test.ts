@@ -1,7 +1,7 @@
 import { uploadPreparedFiles } from '../transfer/upload';
 import { deleteRemoteFiles } from '../transfer/delete';
 import { runConcurrentTasks } from '../concurrency';
-import type { QueueFlushContext } from './flush-types';
+import type { QueueFlushContext } from './flush';
 import { base64ToArrayBuffer } from '../encoding';
 import { pendingChangeKey } from '../pending/pending-change';
 import { Notice } from '../../test/mocks/obsidian';

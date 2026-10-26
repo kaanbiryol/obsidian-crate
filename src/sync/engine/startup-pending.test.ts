@@ -5,7 +5,7 @@ import { createHarness, createSyncResult, runPeriodicCheck, spyOnConflictRecover
 import { createDeferred } from '../runtime/runtime-test-harness';
 import { normalizeCrateSettings } from '../../plugin/settings';
 import { VERIFICATION_FILE_BUDGET } from './content-verifier';
-import { LOCAL_CONTENT_CHECK_INTERVAL_MS } from './constants';
+import { LOCAL_CONTENT_CHECK_INTERVAL_MS } from './lifecycle';
 import { sha256Hex } from '../../platform/sha256';
 
 async function setup() {

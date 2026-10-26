@@ -8,7 +8,7 @@ interface ExclusionCleanupContext {
 	getManifest(): Promise<FileManifest>;
 	getIgnorePatterns(): readonly string[];
 	shouldIgnore(path: string): boolean;
-	assertActive(): void;
+	throwIfDestroyed(): void;
 	runExclusive<T>(operation: () => Promise<T>): Promise<T>;
 	retryWithBackoff<T>(operation: () => Promise<T>): Promise<T>;
 	batchDelete: EngineFileOperations['batchDelete'];
@@ -19,7 +19,7 @@ interface ExclusionCleanupContext {
 export async function createExclusionCleanupReview(context: ExclusionCleanupContext) {
 	const exclusions = JSON.stringify(context.getIgnorePatterns());
 	const verify = () => {
-		context.assertActive();
+		context.throwIfDestroyed();
 		if (exclusions !== JSON.stringify(context.getIgnorePatterns())) {
 			throw createAbortError('Sync exclusions changed. Review the excluded server files again.');
 		}

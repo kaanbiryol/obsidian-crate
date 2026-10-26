@@ -105,7 +105,19 @@ export async function runSyncWorkflow(
 	}
 
 	logger.info('Running full sync');
+	await runFullSync(context, result, recovering, progressCallback);
+	finalizeSyncResult(result);
+	return result;
+}
 
+/** Compares the vault with the server manifest and applies every change. The
+ * planned baseline entries and the changelog cursor advance only when all of them applied. */
+async function runFullSync(
+	context: SyncWorkflowContext,
+	result: SyncResult,
+	recovering: boolean,
+	progressCallback?: (current: number, total: number) => void,
+): Promise<void> {
 	try {
 		context.throwIfDestroyed();
 		context.updateState({ work: { phase: 'server' } });
@@ -248,7 +260,4 @@ export async function runSyncWorkflow(
 			logGenericError: true,
 		});
 	}
-
-	finalizeSyncResult(result);
-	return result;
 }

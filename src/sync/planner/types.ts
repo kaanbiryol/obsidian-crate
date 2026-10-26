@@ -1,7 +1,7 @@
 import type { PlannedContent } from './planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, FileEntry, MutationFailure } from '../../protocol/sync-types';
-import type { DownloadDiff, FileDiff, PreparedUpload, SyncResult, UploadDiff } from '../types';
+import type { DownloadDiff, FileDiff, PreparedUpload, SyncResult, SyncWork, UploadDiff } from '../types';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
@@ -55,7 +55,7 @@ export interface LocalDiffPlannerContext {
 }
 
 export interface IncrementalSyncPlannerContext {
-  reportWork?(phase: import('../types').SyncWork['phase'], current?: number, total?: number): void;
+  reportWork?(work: SyncWork): void;
   throwIfDestroyed(): void;
   settings: Readonly<Pick<SyncSettings, 'lastSeq'>>;
   setLastSeq(value: number): void;
