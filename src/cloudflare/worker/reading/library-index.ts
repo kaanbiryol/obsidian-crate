@@ -130,7 +130,8 @@ export function queueReadingArticles(db: D1Database): D1PreparedStatement {
 }
 
 export interface StoredReadingFile { path: string; storageKey: string; hash: string; size: number }
-export type ReadingIndexState = { state: 'complete' | 'pending' | 'unavailable'; revision: string };
+/** `rebuilt` marks a call that indexed files, which can queue article extraction. */
+export type ReadingIndexState = { state: 'complete' | 'pending' | 'unavailable'; revision: string; rebuilt?: boolean };
 
 /** The index state for `current`. While the index is being rebuilt, each call indexes
  * the next files from R2; a failed read keeps the position and reports `unavailable`. */
@@ -168,5 +169,5 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
     ...await readingIndexStatements(db, changes, { policy: current }),
     db.prepare('UPDATE reading_index SET cursor = ?, revision = ? WHERE id = 1 AND scope = ?').bind(next, revision, scope),
   ]);
-  return { state: unavailable ? 'unavailable' : next === null ? 'complete' : 'pending', revision };
+  return { state: unavailable ? 'unavailable' : next === null ? 'complete' : 'pending', revision, rebuilt: true };
 }

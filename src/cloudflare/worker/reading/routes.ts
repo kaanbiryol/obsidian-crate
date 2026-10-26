@@ -67,6 +67,8 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     if (path === '/reading/retry' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'retry');
     if (request.method === 'GET' && (path === '/reading/item' || path === '/reading/list')) {
       const index = await ensureReadingIndex(env, current, file => readStoredNote(env, file));
+      // Reads wake notification processing only to continue a rebuild or extract what it queued.
+      if (index.rebuilt && state) await armNotificationCoordinator(state);
       if (index.state !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Try refreshing shortly.', 503);
       if (path === '/reading/item') return readingResponse(await readingItem(env, current, url.searchParams.get('id')));
       // The first list page is conditional, so an unchanged library is one cheap request.

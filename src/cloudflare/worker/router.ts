@@ -45,13 +45,14 @@ interface AuthenticatedRouteContext {
 	requestId?: string;
 	encryption?: EncryptionServerState | null;
 	featurePolicyValue?: string | null;
+	coordinatorState?: DurableObjectState;
 }
 
 /** Dispatch a request whose principal the caller has already checked with isAuthenticatedRouteAllowed. */
 export async function handleAuthenticatedRoute(
 	request: Request,
 	env: Env,
-	{ uploadCommitters, path, method, principal, resetGeneration, requestId, encryption, featurePolicyValue }: AuthenticatedRouteContext,
+	{ uploadCommitters, path, method, principal, resetGeneration, requestId, encryption, featurePolicyValue, coordinatorState }: AuthenticatedRouteContext,
 ): Promise<Response | null> {
 	if (path === '/features' && ['GET', 'POST'].includes(method)) {
 		const limited = await limitNotificationAction(request, env.DB, principal.tokenId);
@@ -72,7 +73,7 @@ export async function handleAuthenticatedRoute(
 		// Sessions follow reminders folder changes; the web app switches to the folder named here.
 		if (folder !== principal.folderPath) return corsResponse({ error: 'The reminders folder changed', code: REMINDERS_FOLDER_CHANGED, folderPath: principal.folderPath }, 403);
 	}
-	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, undefined, encryption, featurePolicyValue);
+	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, coordinatorState, encryption, featurePolicyValue);
 	const db = env.DB;
 	const limited = await limitNotificationAction(request, db, principal.tokenId);
 	if (limited) return limited;

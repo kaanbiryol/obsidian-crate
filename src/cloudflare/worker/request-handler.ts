@@ -161,6 +161,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	const response = await handleAuthenticatedRoute(request, env, {
 		uploadCommitters, path, method, principal: authResult.principal, resetGeneration: authResult.resetGeneration,
 		requestId: context.requestId, encryption, featurePolicyValue: authResult.featurePolicyValue,
+		coordinatorState: execution.kind === 'coordinator' ? execution.state : undefined,
 	}) ?? corsResponse({ error: 'Not found' }, 404);
 	if (mutation) await logMutation(request, response, context.requestId, authResult.principal);
 	return response;
