@@ -16,7 +16,6 @@ export interface ManifestCheckpoint {
 	authority: string | undefined;
 	settledUploads: string[];
 	renames: ReadonlyMap<string, string>;
-	appliedRename: string | undefined;
 	uploadDiagnostics: UploadDiagnostic[];
 	restoreIntents: RestoreIntent[];
 	initialConfigPull: InitialConfigPull | undefined;
@@ -33,14 +32,12 @@ export function parseCheckpoint(value: unknown): ManifestCheckpoint {
 		|| (value.authority !== undefined && (typeof value.authority !== 'string' || !value.authority))
 		|| (value.truncated !== undefined && value.truncated !== false)) throw new Error('Invalid manifest checkpoint. Preserve this vault and its metadata before recovering sync.');
 	const settled = value.settledUploads ?? [];
-	if (value.appliedRename !== undefined && (typeof value.appliedRename !== 'string' || !value.appliedRename || value.appliedRename.length > 128)) throw new Error('Invalid rename receipt checkpoint');
 	if (!Array.isArray(settled) || !settled.every((id: unknown): id is string => typeof id === 'string' && reminderOperationDay(id) !== null)
 		|| new Set(settled).size !== settled.length) throw new Error('Invalid upload receipt checkpoint');
 	if (value.initialImportToken !== undefined && (typeof value.initialImportToken !== 'string' || !value.initialImportToken || value.initialImportToken.length > 128)) throw new Error('Invalid initial import checkpoint');
 	return {
 		manifest: parseLocalManifest(value), generation: value.generation, authority: value.authority,
 		settledUploads: settled, renames: parseRenameDependencies(value.renameDependencies),
-		appliedRename: value.appliedRename,
 		uploadDiagnostics: normalizeUploadDiagnostics(value.uploadDiagnostics),
 		restoreIntents: parseRestoreIntents(value.restoreIntents),
 		initialConfigPull: parseInitialConfigPull(value.initialConfigPull),
@@ -53,7 +50,6 @@ export function encodeCheckpoint(checkpoint: ManifestCheckpoint): string {
 	return JSON.stringify({
 		...checkpoint.manifest,
 		version: CHECKPOINT_VERSION,
-		...(checkpoint.appliedRename ? { appliedRename: checkpoint.appliedRename } : {}),
 		...(checkpoint.initialConfigPull ? { initialConfigPull: checkpoint.initialConfigPull } : {}),
 		...(checkpoint.initialImportToken ? { initialImportToken: checkpoint.initialImportToken } : {}),
 		...(checkpoint.restoreIntents.length ? { restoreIntents: checkpoint.restoreIntents } : {}),
@@ -73,7 +69,6 @@ export function sameCheckpointRecoveryState(left: ManifestCheckpoint, right: Man
 		&& JSON.stringify(left.restoreIntents) === JSON.stringify(right.restoreIntents)
 		&& JSON.stringify(left.initialConfigPull) === JSON.stringify(right.initialConfigPull)
 		&& left.initialImportToken === right.initialImportToken
-		&& left.appliedRename === right.appliedRename
 		&& JSON.stringify([...left.renames]) === JSON.stringify([...right.renames]);
 }
 

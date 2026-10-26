@@ -51,7 +51,6 @@ it.each([
 	['cursor', { lastSeq: 11 }],
 	['upload receipts', { settledUploads: ['e1_00020000_11111111-1111-1111-1111-111111111111'] }],
 	['rename dependencies', { renameDependencies: { 'note.md': 'renamed.md' } }],
-	['applied rename', { appliedRename: 'folder-move-1' }],
 	['initial settings pull', { initialConfigPull: { configDir: '.obsidian', files: { '.obsidian/app.json': 'b'.repeat(64) } } }],
 	['initial import', { initialImportToken: '33333333-3333-4333-8333-333333333333' }],
 	['restore intent', { restoreIntents: [{
