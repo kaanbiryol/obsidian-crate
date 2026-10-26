@@ -13,8 +13,9 @@ interface ApiRoutePolicy {
 }
 
 const COORDINATOR = { kind: 'coordinator', wake: true } as const;
-/** Serialized with mutations but creating no notification or Reading work, so it
- * neither arms a processing pass nor resets the retry budget of a running one. */
+/** Serialized with mutations but creating no notification or Reading work (token and
+ * subscription changes, checkpoints), so it neither arms a processing pass nor resets
+ * the retry budget of a running one. Delivery checks recipients when it sends. */
 const COORDINATOR_READ = { kind: 'coordinator', wake: false } as const;
 const READING_GRANT = { kind: 'reading-grant' } as const;
 
@@ -50,8 +51,8 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /features': { scopes: LIBRARY },
 	'POST /features': { scopes: VAULT, execution: COORDINATOR },
 	'GET /auth/tokens': { scopes: VAULT },
-	'DELETE /auth/tokens': { scopes: VAULT, execution: COORDINATOR },
-	'DELETE /auth/session': { scopes: LIBRARY, execution: COORDINATOR },
+	'DELETE /auth/tokens': { scopes: VAULT, execution: COORDINATOR_READ },
+	'DELETE /auth/session': { scopes: LIBRARY, execution: COORDINATOR_READ },
 	'POST /links/title': { scopes: REMINDERS },
 	'GET /sync/checkpoints': { scopes: VAULT },
 	'GET /sync/checkpoint': { scopes: VAULT },
@@ -62,7 +63,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /sync/download': { scopes: VAULT },
 	'GET /sync/version-preview': { scopes: VAULT },
 	'GET /sync/versions': { scopes: VAULT },
-	'POST /sync/checkpoints': { scopes: VAULT, execution: COORDINATOR },
+	'POST /sync/checkpoints': { scopes: VAULT, execution: COORDINATOR_READ },
 	'POST /sync/import': { scopes: VAULT },
 	'POST /sync/import/complete': { scopes: VAULT, execution: COORDINATOR },
 	'POST /sync/import/readiness': { scopes: VAULT },
@@ -76,13 +77,13 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'PUT /sync/upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncUpload } },
 	'PUT /sync/import/upload': { scopes: VAULT },
 	'POST /notifications/reminders-exchange': { scopes: VAULT },
-	'POST /notifications/reminders-enrollment-token': { scopes: VAULT, execution: COORDINATOR },
-	'POST /notifications/subscribe': { scopes: REMINDERS, execution: COORDINATOR },
+	'POST /notifications/reminders-enrollment-token': { scopes: VAULT, execution: COORDINATOR_READ },
+	'POST /notifications/subscribe': { scopes: REMINDERS, execution: COORDINATOR_READ },
 	'POST /notifications/test': { scopes: VAULT },
 	'POST /notifications/share/reading': { scopes: VAULT },
 	'GET /notifications/vapid-public-key': { scopes: VAULT },
 	'GET /notifications/subscriptions': { scopes: VAULT },
-	'DELETE /notifications/subscribe': { scopes: REMINDERS, execution: COORDINATOR },
+	'DELETE /notifications/subscribe': { scopes: REMINDERS, execution: COORDINATOR_READ },
 	'GET /reminders/list': { scopes: REMINDERS, initializeProjection: true },
 	'DELETE /reminders/delete': { scopes: REMINDERS, execution: COORDINATOR },
 	'POST /reminders/create': { scopes: REMINDERS, execution: COORDINATOR },
@@ -93,7 +94,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /reminders/notification-policy': { scopes: VAULT, execution: COORDINATOR },
 	'PUT /reminders/notification-policy': { scopes: VAULT, execution: COORDINATOR },
 	'POST /reading/handoff': { scopes: VAULT, execution: READING_GRANT },
-	'POST /reading/shortcut-pairing': { scopes: LIBRARY, execution: COORDINATOR },
+	'POST /reading/shortcut-pairing': { scopes: LIBRARY, execution: COORDINATOR_READ },
 	'POST /reading/capture': { scopes: ALL_SCOPES, execution: COORDINATOR },
 	'POST /reading/update': { scopes: LIBRARY, execution: COORDINATOR },
 	'POST /reading/retry': { scopes: LIBRARY, execution: COORDINATOR },

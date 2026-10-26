@@ -51,8 +51,14 @@ it('processes a saved reminder without cron and leaves both coordinators idle', 
     .toBe(Date.parse('2099-01-02T10:00:00.000Z'));
 });
 
-it('does not wake notifications for settings or binary uploads', async () => {
+it('does not wake notifications for settings, binary uploads or notes outside the feature folders', async () => {
   const headers = { Authorization: 'Bearer event-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) };
+  await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
+  await env.DB.prepare("INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, 1, 'Reading', 'g', 'r')").run();
+  expect((await worker.fetch(new Request('https://event.test/sync/upload?path=Notes/plain.md', {
+    method: 'PUT', headers: { ...headers, 'X-Crate-Expected-Hash': 'absent',
+      'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)) }, body: '- [ ] Not a reminder note',
+  }), env)).status).toBe(200);
   expect((await worker.fetch(new Request('https://event.test/settings', {
     method: 'PUT', headers, body: JSON.stringify({ expectedVersion: null, settings: {
       ignorePatterns: [], syncInterval: 60, pushEnabled: false,

@@ -3,6 +3,7 @@ import { armNotificationCoordinator } from '../../notifications/lifecycle';
 import { FileNamespaceConflictError } from '../file-namespace';
 import type { Env } from '../../types';
 import { isReminderPath } from '../../reminders/scope';
+import { isReadingNotePath } from '../../reading/library-index';
 import { getNotificationPolicy } from '../../notifications/policy';
 import { readEncryptionState } from '../../encryption/state';
 import type { UploadCommitInput, UploadCommitters } from './upload-committers';
@@ -89,6 +90,12 @@ export async function prepareCoordinatedUpload(request: Request, env: Env): Prom
   return { ...metadata, content };
 }
 
+/** Only reminder notes and plaintext Reading notes queue projection or index work.
+ * Arming for others would add a full notification pass per commit. */
+export function createsNotificationWork(paths: readonly string[], reminderFolder: string | null, readingFolder: string | null): boolean {
+  return paths.some(path => isReminderPath(path, reminderFolder) || (readingFolder !== null && isReadingNotePath(path, readingFolder)));
+}
+
 export async function commitCoordinatedUpload(params: UploadParams, state: DurableObjectState, env: Env): Promise<Response> {
   // One read under the lock covers the policy fence and the folders used by the
   // reminder projection and the Reading index.
@@ -98,7 +105,7 @@ export async function commitCoordinatedUpload(params: UploadParams, state: Durab
   if (params.reminderPolicyRevision !== undefined && params.reminderPolicyRevision !== (current?.revision ?? null)) {
     return Response.json({ error: 'Reminder folder changed during upload. Retry the upload.' }, { status: 503 });
   }
-  await armNotificationCoordinator(state);
+  if (createsNotificationWork([params.path], current?.folder_path ?? null, current?.reading_folder ?? null)) await armNotificationCoordinator(state);
   try {
     return Response.json(await commitStagedFile(env.BUCKET, env.DB, { ...params, reminderFolder: current?.folder_path ?? null,
       readingPolicy: current?.reading_folder ? { folder_path: current.reading_folder } : null }));

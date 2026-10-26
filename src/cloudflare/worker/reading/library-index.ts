@@ -24,7 +24,7 @@ export type ReadingIndexPolicy = Pick<ReadingPolicy, 'folder_path'> | null;
 /** A committed file revision, or a removed path when `storageKey` is null. */
 export interface ReadingFileChange { path: string; storageKey: string | null; hash?: string; size?: number; content?: string | ArrayBuffer | null }
 
-const isReadingNotePath = (path: string, folder: string) => path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md');
+export const isReadingNotePath = (path: string, folder: string) => path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md');
 
 /** Keeps a BOM, like `decodeMarkdownBytes`: Worker Reading writes rebuild the note from this text. */
 export function decodeReadingNote(bytes: ArrayBuffer | Uint8Array): string | null {
