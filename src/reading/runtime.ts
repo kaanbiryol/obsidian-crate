@@ -14,28 +14,28 @@ const runtimes = new WeakMap<CratePlugin, { library: ReadingLibrary; stop: () =>
 const stopping = new WeakMap<CratePlugin, Promise<void>>();
 const listeners = new WeakMap<CratePlugin, Set<() => void>>();
 export function subscribeReadingRuntime(plugin: CratePlugin, listener: () => void): () => void {
-  let current = listeners.get(plugin);
-  if (!current) { current = new Set(); listeners.set(plugin, current); }
-  current.add(listener);
-  return () => { current.delete(listener); };
+	let current = listeners.get(plugin);
+	if (!current) { current = new Set(); listeners.set(plugin, current); }
+	current.add(listener);
+	return () => { current.delete(listener); };
 }
 function notifyRuntime(plugin: CratePlugin): void { listeners.get(plugin)?.forEach(listener => listener()); }
 // A saved article may arrive by sync after the link opens Obsidian, so the request waits briefly for it.
 const requestedItems = new WeakMap<CratePlugin, { id: string; until: number }>();
 export function requestReadingItem(plugin: CratePlugin, id: string): void {
-  requestedItems.set(plugin, { id, until: Date.now() + 120_000 }); notifyRuntime(plugin);
+	requestedItems.set(plugin, { id, until: Date.now() + 120_000 }); notifyRuntime(plugin);
 }
 export function requestedReadingItem(plugin: CratePlugin): string | undefined {
-  const request = requestedItems.get(plugin);
-  if (request && request.until <= Date.now()) requestedItems.delete(plugin);
-  return requestedItems.get(plugin)?.id;
+	const request = requestedItems.get(plugin);
+	if (request && request.until <= Date.now()) requestedItems.delete(plugin);
+	return requestedItems.get(plugin)?.id;
 }
 export function clearRequestedReadingItem(plugin: CratePlugin): void { requestedItems.delete(plugin); }
 export function getReadingLibrary(plugin: CratePlugin): ReadingLibrary | undefined { return runtimes.get(plugin)?.library; }
 export function stopReading(plugin: CratePlugin): void {
-  const runtime = runtimes.get(plugin);
-  if (runtime) stopping.set(plugin, Promise.allSettled([stopping.get(plugin), runtime.stop()]).then(() => {}));
-  runtimes.delete(plugin); notifyRuntime(plugin);
+	const runtime = runtimes.get(plugin);
+	if (runtime) stopping.set(plugin, Promise.allSettled([stopping.get(plugin), runtime.stop()]).then(() => {}));
+	runtimes.delete(plugin); notifyRuntime(plugin);
 }
 export async function waitForStoppedReading(plugin: CratePlugin): Promise<void> { await stopping.get(plugin); }
 
@@ -87,7 +87,7 @@ export function startReading(plugin: CratePlugin): void {
 		fileManager: plugin.app.fileManager,
 	});
 	let policyChecked = !plugin.settings.workerUrl;
- let checkedAt = 0;
+	let checkedAt = 0;
 	const canAdopt = () => policyChecked && plugin.app.workspace.layoutReady && !['syncing', 'error', 'offline'].includes(plugin.syncRuntime.getState().status);
 	// Keep replacement views synchronous, but start their vault work after the old library drains.
 	const library = new ReadingLibrary({ ...readingVault,
@@ -100,7 +100,7 @@ export function startReading(plugin: CratePlugin): void {
 	}, folder, controller.signal, canAdopt, stopping.get(plugin));
 	let timer: number | undefined;
 	let lastErrorAt = 0;
-  const refreshes = new Set<Promise<void>>();
+	const refreshes = new Set<Promise<void>>();
 	const refresh = () => {
 		if (controller.signal.aborted || !plugin.app.workspace.layoutReady || plugin.syncRuntime.getState().status === 'syncing') return;
 
@@ -113,7 +113,7 @@ export function startReading(plugin: CratePlugin): void {
 			}).catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
 		}
 		const work = library.refresh().catch(error => { if (!controller.signal.aborted && Date.now() - lastErrorAt > 60_000) { lastErrorAt = Date.now(); new Notice(error instanceof Error ? error.message : 'Could not refresh Reading.'); } });
-    refreshes.add(work); void work.finally(() => refreshes.delete(work));
+		refreshes.add(work); void work.finally(() => refreshes.delete(work));
 	};
 	const schedule = () => {
 		if (controller.signal.aborted) return;
@@ -140,9 +140,9 @@ export function startReading(plugin: CratePlugin): void {
 		plugin.app.workspace.offref(layoutRef);
 		plugin.syncRuntime.removeStateChangeListener(schedule);
 		lifetime.removeEventListener('abort', onAbort);
-    return Promise.allSettled([library.close(), ...refreshes]).then(() => {});
+		return Promise.allSettled([library.close(), ...refreshes]).then(() => {});
 	};
-  const onAbort = () => { void stop(); };
+	const onAbort = () => { void stop(); };
 	lifetime.addEventListener('abort', onAbort, { once: true });
 	runtimes.set(plugin, { library, stop });
 	notifyRuntime(plugin);

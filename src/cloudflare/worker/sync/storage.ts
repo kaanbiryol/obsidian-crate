@@ -129,7 +129,7 @@ export const CHANGELOG_BOUNDS_SQL = `SELECT ${LAST_SEQ_SQL} AS lastSeq,
 export async function getChangelogBounds(db: D1Database): Promise<{
 	lastSeq: number;
 	minSeq: number | null;
-  snapshotSeq: number;
+	snapshotSeq: number;
 }> {
 	const rows = await queryRows<{ lastSeq: number | null; minSeq: number | null; snapshotSeq: number }>(
 		db.prepare(CHANGELOG_BOUNDS_SQL),
@@ -137,6 +137,6 @@ export async function getChangelogBounds(db: D1Database): Promise<{
 	return {
 		lastSeq: rows[0]?.lastSeq ?? 0,
 		minSeq: rows[0]?.minSeq ?? null,
-    snapshotSeq: rows[0]?.snapshotSeq ?? 0,
+		snapshotSeq: rows[0]?.snapshotSeq ?? 0,
 	};
 }

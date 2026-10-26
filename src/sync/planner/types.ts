@@ -11,99 +11,99 @@ import type { LocalManifestView } from '../manifest/manifest';
 import type { SyncSettings } from '../settings';
 
 interface PlannerManifest {
-  getEntry(path: string): Readonly<FileEntry> | undefined;
-  getAllPaths(): string[];
-  getManifest(): LocalManifestView;
-  setEntry(path: string, entry: FileEntry): void;
-  removeEntry(path: string): void;
-  save(): Promise<void>;
+	getEntry(path: string): Readonly<FileEntry> | undefined;
+	getAllPaths(): string[];
+	getManifest(): LocalManifestView;
+	setEntry(path: string, entry: FileEntry): void;
+	removeEntry(path: string): void;
+	save(): Promise<void>;
 }
 
 interface PlannerApi {
-  getChanges(since: number): Promise<{
-    changes: ChangelogEntry[];
-    lastSeq: number;
-    hasMore: boolean;
-    cursorExpired?: boolean;
-    /** Where the next page starts when filtering left out entries; defaults to the last change. */
-    nextSince?: number;
-  }>;
-  downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }>;
-  batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>): Promise<{
-    success: boolean;
-    deleted: string[];
-    errors?: MutationFailure[];
-  }>;
+	getChanges(since: number): Promise<{
+		changes: ChangelogEntry[];
+		lastSeq: number;
+		hasMore: boolean;
+		cursorExpired?: boolean;
+		/** Where the next page starts when filtering left out entries; defaults to the last change. */
+		nextSince?: number;
+	}>;
+	downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }>;
+	batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>): Promise<{
+		success: boolean;
+		deleted: string[];
+		errors?: MutationFailure[];
+	}>;
 }
 
 export interface LocalChangeScan {
-  changes: Array<{ path: string; hash: string }>;
-  discoveredPaths: ReadonlySet<string>;
-  /** Local files left out of sync, such as those over the size limit. */
-  skippedPaths?: string[];
+	changes: Array<{ path: string; hash: string }>;
+	discoveredPaths: ReadonlySet<string>;
+	/** Local files left out of sync, such as those over the size limit. */
+	skippedPaths?: string[];
 }
 
 export interface LocalDiffPlannerContext {
-  throwIfDestroyed(): void;
-  pendingKeys?: ReadonlySet<string>;
-  plannedContent?: PlannedContent;
-  vault: Vault;
-  localManifest: PlannerManifest;
-  shouldIgnore(path: string): boolean;
-  verifyContent?(files: VaultFile[]): Promise<boolean>;
-  runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
+	throwIfDestroyed(): void;
+	pendingKeys?: ReadonlySet<string>;
+	plannedContent?: PlannedContent;
+	vault: Vault;
+	localManifest: PlannerManifest;
+	shouldIgnore(path: string): boolean;
+	verifyContent?(files: VaultFile[]): Promise<boolean>;
+	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 }
 
 export interface IncrementalSyncPlannerContext {
-  reportWork?(work: SyncWork): void;
-  throwIfDestroyed(): void;
-  settings: Readonly<Pick<SyncSettings, 'lastSeq'>>;
-  setLastSeq(value: number): void;
-  vault: Vault;
-  fileManager: {
-    trashFile(file: TAbstractFile): Promise<void>;
-  };
-  /** The engine's journaled file operations. */
-  files: PlannerApi;
-  localManifest: PlannerManifest;
-  shouldIgnore(path: string): boolean;
-  getLocalChanges(onUnchanged?: (path: string) => void): Promise<LocalChangeScan>;
-  getLocalDeletes(discoveredPaths: ReadonlySet<string>): Promise<string[]>;
-  parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void>;
-  processDiff(
-    diff: FileDiff,
-    localFiles: Record<string, FileEntry>,
-    result: SyncResult,
-  ): Promise<DiffApplyOutcome>;
-  prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
-  uploadPreparedFiles(
-    prepared: PreparedUpload[],
-    result: SyncResult,
-    options: UploadPreparedFilesOptions,
-  ): Promise<void>;
+	reportWork?(work: SyncWork): void;
+	throwIfDestroyed(): void;
+	settings: Readonly<Pick<SyncSettings, 'lastSeq'>>;
+	setLastSeq(value: number): void;
+	vault: Vault;
+	fileManager: {
+		trashFile(file: TAbstractFile): Promise<void>;
+	};
+	/** The engine's journaled file operations. */
+	files: PlannerApi;
+	localManifest: PlannerManifest;
+	shouldIgnore(path: string): boolean;
+	getLocalChanges(onUnchanged?: (path: string) => void): Promise<LocalChangeScan>;
+	getLocalDeletes(discoveredPaths: ReadonlySet<string>): Promise<string[]>;
+	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void>;
+	processDiff(
+		diff: FileDiff,
+		localFiles: Record<string, FileEntry>,
+		result: SyncResult,
+	): Promise<DiffApplyOutcome>;
+	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
+	uploadPreparedFiles(
+		prepared: PreparedUpload[],
+		result: SyncResult,
+		options: UploadPreparedFilesOptions,
+	): Promise<void>;
 	reconcileVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
 }
 
 export interface FullSyncPlannerContext {
-  initialConfigPull?: {
-    firstSync: boolean;
-    get(): InitialConfigPull | undefined;
-    save(state: InitialConfigPull): Promise<void>;
-  };
-  throwIfDestroyed(): void;
-  plannedContent?: PlannedContent;
-  vault: Vault;
-  localManifest: PlannerManifest;
-  shouldIgnore(path: string): boolean;
-  runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
+	initialConfigPull?: {
+		firstSync: boolean;
+		get(): InitialConfigPull | undefined;
+		save(state: InitialConfigPull): Promise<void>;
+	};
+	throwIfDestroyed(): void;
+	plannedContent?: PlannedContent;
+	vault: Vault;
+	localManifest: PlannerManifest;
+	shouldIgnore(path: string): boolean;
+	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 }
 
 export interface FullSyncPlan {
 	issues?: import('../types').SyncIssue[];
-  localFiles: Record<string, FileEntry>;
-  diffs: FileDiff[];
-  uploadDiffs: UploadDiff[];
-  downloadDiffs: DownloadDiff[];
-  remainingDiffs: FileDiff[];
-  errors: string[];
+	localFiles: Record<string, FileEntry>;
+	diffs: FileDiff[];
+	uploadDiffs: UploadDiff[];
+	downloadDiffs: DownloadDiff[];
+	remainingDiffs: FileDiff[];
+	errors: string[];
 }

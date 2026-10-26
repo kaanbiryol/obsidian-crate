@@ -4,10 +4,10 @@ import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 
 
 export class DeploymentRecoveryRequiredError extends Error {
-    constructor(message: string, options?: ErrorOptions) {
-        super(message, options);
-        this.name = 'DeploymentRecoveryRequiredError';
-    }
+	constructor(message: string, options?: ErrorOptions) {
+		super(message, options);
+		this.name = 'DeploymentRecoveryRequiredError';
+	}
 }
 
 type FenceApi = Pick<CloudflareApiClient, 'queryD1'>;
@@ -22,8 +22,8 @@ export interface DeploymentFenceRecord {
 	recoveryProtocol?: 1;
 	step?: string;
 	stepState?: 'started' | 'confirmed' | 'rejected' | 'settled';
-  verificationPending?: boolean;
-  completionOnly?: boolean;
+	verificationPending?: boolean;
+	completionOnly?: boolean;
 	deletionPending?: true;
 	uploadTag?: string;
 	resetId?: string;
@@ -78,30 +78,30 @@ export function awaitsPublicationVerification(record: Record<string, unknown>): 
  * alter data. Recovery must read both flags and verify the published build.
  * This exception must never be used for uploads, schema writes or deletion. */
 export function isPendingAddressActivation(record: {
-    kind?: unknown; recoveryProtocol?: unknown; step?: unknown; stepState?: unknown; verificationPending?: unknown;
+	kind?: unknown; recoveryProtocol?: unknown; step?: unknown; stepState?: unknown; verificationPending?: unknown;
 }): boolean {
-    return record.kind === 'update' && record.recoveryProtocol === 1 && record.verificationPending === true
-        && record.step === 'enable-server-address' && record.stepState === 'started';
+	return record.kind === 'update' && record.recoveryProtocol === 1 && record.verificationPending === true
+		&& record.step === 'enable-server-address' && record.stepState === 'started';
 }
 
 /** A definitive provider rejection cannot later publish the rejected artifact.
  * A replacement still takes ownership by CAS and revalidates storage and schema. */
 export function isRejectedWorkerUpload(record: Record<string, unknown>): boolean {
-    return record.kind === 'update' && record.recoveryProtocol === 1
-        && record.verificationPending === true && record.step === 'upload-worker'
-        && record.stepState === 'rejected';
+	return record.kind === 'update' && record.recoveryProtocol === 1
+		&& record.verificationPending === true && record.step === 'upload-worker'
+		&& record.stepState === 'rejected';
 }
 
 export class DeploymentFence {
 	private uncertain = false;
-  private verificationPending = false;
+	private verificationPending = false;
 	private databaseRemoved = false;
 	private readonly deletionPending: boolean;
 	constructor(private api: FenceApi, private account: string, private database: string, private value: string) {
 		const record = JSON.parse(value) as DeploymentFenceRecord;
 		this.verificationPending = record.verificationPending === true;
 		this.deletionPending = record.kind === 'delete' && record.deletionPending === true;
-  }
+	}
 
 	async mutate<T>(operation: () => Promise<T>, step = 'server-change', batchHash?: string, uploadTag?: string): Promise<T> {
 		const stored = await readStoredFence(this.api, this.account, this.database);
@@ -119,44 +119,44 @@ export class DeploymentFence {
 			// A saved login surfaces Cloudflare's 401/403 refusal as reauthorization.
 			if (error instanceof CloudflareReauthorizationRequired
 				|| error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408) {
-        await this.recordStep(step, 'rejected');
-        this.uncertain = false;
-      }
+				await this.recordStep(step, 'rejected');
+				this.uncertain = false;
+			}
 			throw error;
 		}
 	}
 
 
-    private async recordStep(step: string, stepState: 'started' | 'confirmed' | 'rejected' | 'settled', batchHash?: string, uploadTag?: string): Promise<void> {
-        if (this.databaseRemoved) return;
-        const record = JSON.parse(this.value) as DeploymentFenceRecord;
-        const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(uploadTag ? { uploadTag } : {}), ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
-        try {
-            const rows = (await this.api.queryD1(this.account, this.database,
-                `UPDATE maintenance_state SET value = ?${record.kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
-                [next, DEPLOYMENT_FENCE_KEY, this.value])).flatMap(result => result.results ?? []);
-            if (rows.length !== 1 || rows[0]?.value !== next) throw new Error('Deployment ownership changed');
-            this.value = next;
-        } catch (error) {
-            this.uncertain = true;
-            throw new DeploymentRecoveryRequiredError('Could not checkpoint the server operation. Keep the deployment fence held and inspect its recorded step before recovery.', { cause: error });
-        }
-    }
+	private async recordStep(step: string, stepState: 'started' | 'confirmed' | 'rejected' | 'settled', batchHash?: string, uploadTag?: string): Promise<void> {
+		if (this.databaseRemoved) return;
+		const record = JSON.parse(this.value) as DeploymentFenceRecord;
+		const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(uploadTag ? { uploadTag } : {}), ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
+		try {
+			const rows = (await this.api.queryD1(this.account, this.database,
+				`UPDATE maintenance_state SET value = ?${record.kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
+				[next, DEPLOYMENT_FENCE_KEY, this.value])).flatMap(result => result.results ?? []);
+			if (rows.length !== 1 || rows[0]?.value !== next) throw new Error('Deployment ownership changed');
+			this.value = next;
+		} catch (error) {
+			this.uncertain = true;
+			throw new DeploymentRecoveryRequiredError('Could not checkpoint the server operation. Keep the deployment fence held and inspect its recorded step before recovery.', { cause: error });
+		}
+	}
 
-  /** Each dispatch has a fresh provider-visible receipt; never retry this request. */
-  async uploadWorker(operation: (tag: string) => Promise<void>): Promise<void> {
-    const tag = `crate-${crypto.randomUUID()}`;
-    await this.mutate(() => operation(tag), 'upload-worker', undefined, tag);
-  }
+	/** Each dispatch has a fresh provider-visible receipt; never retry this request. */
+	async uploadWorker(operation: (tag: string) => Promise<void>): Promise<void> {
+		const tag = `crate-${crypto.randomUUID()}`;
+		await this.mutate(() => operation(tag), 'upload-worker', undefined, tag);
+	}
 
-  // Once storage or code changes, keep the lock until both have been verified.
-  async checkpoint(step: string): Promise<void> { await this.recordStep(step, 'confirmed'); }
-  requireVerification(): void { this.verificationPending = true; }
-  async completeVerification(): Promise<void> {
-    this.verificationPending = false;
-    try { await this.recordStep('verify-deployment', 'confirmed'); }
-    catch (error) { this.verificationPending = true; throw error; }
-  }
+	// Once storage or code changes, keep the lock until both have been verified.
+	async checkpoint(step: string): Promise<void> { await this.recordStep(step, 'confirmed'); }
+	requireVerification(): void { this.verificationPending = true; }
+	async completeVerification(): Promise<void> {
+		this.verificationPending = false;
+		try { await this.recordStep('verify-deployment', 'confirmed'); }
+		catch (error) { this.verificationPending = true; throw error; }
+	}
 
 	removedDatabase(): void { this.databaseRemoved = true; }
 
@@ -179,7 +179,7 @@ export async function withDeploymentFence<T>(input: {
 	record: Omit<DeploymentFenceRecord, 'owner' | 'startedAt'>;
 	/** Exact inspected predecessor of a deletion; replacing it prevents the old client advancing. */
 	recoverDeletionValue?: string;
-  resumeUpdateValue?: string;
+	resumeUpdateValue?: string;
 }, operation: (fence: DeploymentFence) => Promise<T>): Promise<T> {
 	const recoveredValue = input.resumeUpdateValue ?? input.recoverDeletionValue;
 	// Acquisition itself dispatches no provider mutation. Persist its checkpoint

@@ -18,9 +18,9 @@ export async function handleBatchUpload(
 	request: Request,
 	bucket: R2Bucket,
 	db: D1Database,
-  committers: UploadCommitters,
-  expectedEncryption?: EncryptionServerState | null,
-  resetGeneration?: string | null,
+	committers: UploadCommitters,
+	expectedEncryption?: EncryptionServerState | null,
+	resetGeneration?: string | null,
 ): Promise<Response> {
 	const prepared = await prepareBatchUpload(request, expectedEncryption);
 	if (prepared instanceof Response) return prepared;

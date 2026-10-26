@@ -74,26 +74,26 @@ export class MarkdownBaseCache {
 			return;
 		}
 
-        if (this.writtenHashes.has(hash)) return;
-        const pending = this.pendingWrites.get(hash);
-        if (pending) return pending;
-        const write = (async () => {
-            try {
-                await this.ensureCacheDir();
-                await this.app.vault.adapter.writeBinary(this.getCachePath(hash), content);
-                this.invalidHashes.delete(hash);
-                this.writtenHashes.add(hash);
-                // Bound session bookkeeping; an evicted hash can safely be written again.
-                if (this.writtenHashes.size > 4096) {
-                    const oldest = this.writtenHashes.values().next();
-                    if (!oldest.done) this.writtenHashes.delete(oldest.value);
-                }
-            } catch (error) {
-                logger.warn(`Failed to write Markdown base cache for ${path}:`, errorMessage(error));
-            }
-        })();
-        this.pendingWrites.set(hash, write);
-        try { await write; } finally { this.pendingWrites.delete(hash); }
+		if (this.writtenHashes.has(hash)) return;
+		const pending = this.pendingWrites.get(hash);
+		if (pending) return pending;
+		const write = (async () => {
+			try {
+				await this.ensureCacheDir();
+				await this.app.vault.adapter.writeBinary(this.getCachePath(hash), content);
+				this.invalidHashes.delete(hash);
+				this.writtenHashes.add(hash);
+				// Bound session bookkeeping; an evicted hash can safely be written again.
+				if (this.writtenHashes.size > 4096) {
+					const oldest = this.writtenHashes.values().next();
+					if (!oldest.done) this.writtenHashes.delete(oldest.value);
+				}
+			} catch (error) {
+				logger.warn(`Failed to write Markdown base cache for ${path}:`, errorMessage(error));
+			}
+		})();
+		this.pendingWrites.set(hash, write);
+		try { await write; } finally { this.pendingWrites.delete(hash); }
 	}
 
 	async seedFromManifest(
@@ -185,9 +185,9 @@ export class MarkdownBaseCache {
 			listing
 				.filter((path) => !referencedHashes.has(getHashFromCachePath(path)))
 				.map(async (path) => {
-                        this.writtenHashes.delete(getHashFromCachePath(path));
-                        await this.app.vault.adapter.remove(path);
-                    }),
+					this.writtenHashes.delete(getHashFromCachePath(path));
+					await this.app.vault.adapter.remove(path);
+				}),
 		);
 	}
 

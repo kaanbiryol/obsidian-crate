@@ -64,12 +64,12 @@ async function ensureR2Bucket(
 	api: CloudflareApiClient,
 	accountId: string,
 	bucketName: string,
-  allowCreate: boolean,
+	allowCreate: boolean,
 	fence: DeploymentFence,
 ): Promise<void> {
 	try {
 		if (await api.getR2Bucket(accountId, bucketName)) return;
-    if (!allowCreate) throw new Error('The saved server file bucket is missing. Restore its data or explicitly create a new server.');
+		if (!allowCreate) throw new Error('The saved server file bucket is missing. Restore its data or explicitly create a new server.');
 		await fence.mutate(() => api.createR2Bucket(accountId, bucketName), 'create-file-bucket');
 	} catch (error) {
 		if (error instanceof CloudflareApiError && error.code === 10042) {
@@ -139,16 +139,16 @@ export async function provisionCloudflareDeployment(input: {
 	artifacts: CloudflareDeploymentArtifacts;
 	onMetadataChanged: () => Promise<void>;
 	onProgress?: (message: string) => void;
-  beforeDatabaseUpgrade?: (migrations: readonly DatabaseMigration[]) => Promise<void>;
-  resumeUpdateValue?: string;
+	beforeDatabaseUpgrade?: (migrations: readonly DatabaseMigration[]) => Promise<void>;
+	resumeUpdateValue?: string;
 }): Promise<string> {
-  if (input.artifacts.development && input.artifacts.development.worker !== input.metadata.workerName) throw new Error('This development build is restricted to its designated Worker.');
-  if (input.resumeUpdateValue) {
-    const record = parseFenceRecord(input.resumeUpdateValue);
-    if (!record || record.kind !== 'update' || record.worker !== input.metadata.workerName
-      || (record.fingerprint !== input.artifacts.fingerprint && !isRejectedWorkerUpload(record)) || record.recoveryProtocol !== 1
-      || !isSettledStep(record)) throw new Error('This update cannot be safely resumed by this build.');
-  }
+	if (input.artifacts.development && input.artifacts.development.worker !== input.metadata.workerName) throw new Error('This development build is restricted to its designated Worker.');
+	if (input.resumeUpdateValue) {
+		const record = parseFenceRecord(input.resumeUpdateValue);
+		if (!record || record.kind !== 'update' || record.worker !== input.metadata.workerName
+			|| (record.fingerprint !== input.artifacts.fingerprint && !isRejectedWorkerUpload(record)) || record.recoveryProtocol !== 1
+			|| !isSettledStep(record)) throw new Error('This update cannot be safely resumed by this build.');
+	}
 	const previousVaultName = input.metadata.vaultName;
 	const expectedRemote = await checkRemoteDeployment(input);
 	input.onProgress?.('Preparing the server database…');
@@ -168,7 +168,7 @@ export async function provisionCloudflareDeployment(input: {
 	await inspectDeploymentDatabase(schemaInput);
 	return withDeploymentFence({ api: input.api, accountId: input.accountId, databaseId,
 		record: { worker: input.metadata.workerName, kind: 'update', version: input.artifacts.version, fingerprint: input.artifacts.fingerprint, verificationPending: Boolean(input.resumeUpdateValue) },
-    resumeUpdateValue: input.resumeUpdateValue,
+		resumeUpdateValue: input.resumeUpdateValue,
 	}, async fence => {
 		// Recheck after acquiring ownership: another device may have completed an
 		// update after the initial read but before this attempt acquired the fence.
@@ -177,15 +177,15 @@ export async function provisionCloudflareDeployment(input: {
 		input.onProgress?.('Preparing the remote file bucket…');
 		await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName, schemaVersion === null, fence);
 		await prepareDeploymentDatabase(schemaInput, schemaVersion, fence, async migrations => {
- await createUpgradeCheckpoint({ api: input.api, accountId: input.accountId, databaseId, bucketName: input.metadata.r2BucketName, fence, onProgress: input.onProgress });
- await input.beforeDatabaseUpgrade?.(migrations);
- });
-    await fence.checkpoint('prepare-database');
+			await createUpgradeCheckpoint({ api: input.api, accountId: input.accountId, databaseId, bucketName: input.metadata.r2BucketName, fence, onProgress: input.onProgress });
+			await input.beforeDatabaseUpgrade?.(migrations);
+		});
+		await fence.checkpoint('prepare-database');
 		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
 		input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
-    fence.requireVerification();
+		fence.requireVerification();
 		await fence.uploadWorker(uploadTag => input.api.uploadWorker({
-      uploadTag,
+			uploadTag,
 			publicOrigin: workersDevOrigin(input.metadata.workerName, workersSubdomain),
 			accountId: input.accountId,
 			workerName: input.metadata.workerName,
@@ -213,17 +213,17 @@ export async function provisionCloudflareDeployment(input: {
 			await fence.mutate(() => input.api.enableWorkerSubdomain(input.accountId, input.metadata.workerName), 'enable-server-address');
 		}
 
-    input.onProgress?.('Verifying the updated server…');
-    const settings = await input.api.getWorkerSettings(input.accountId, input.metadata.workerName);
-    if (deployedArtifact(settings).fingerprint !== input.artifacts.fingerprint) throw new Error('The expected Worker is not live yet. Check and recover this update.');
-    await checkRemoteDeployment(input);
-    const versions = (await input.api.queryD1(input.accountId, databaseId, 'SELECT version FROM crate_schema WHERE id = 1;')).flatMap(result => result.results ?? []);
-    if (versions.length !== 1 || versions[0]?.version !== SERVER_RELEASE.schemaVersion) throw new Error('The updated database could not be verified.');
-    await input.api.queryD1(input.accountId, databaseId, 'SELECT path, storage_key FROM files LIMIT 1; SELECT id FROM auth_tokens LIMIT 1;');
-    await input.api.verifyWorkerDeployment(workersDevOrigin(input.metadata.workerName, workersSubdomain), input.artifacts.fingerprint);
-    await releaseUpgradeGuards(input.api, input.accountId, databaseId, fence);
-    await recordDeploymentRelease(schemaInput, fence);
-    await fence.completeVerification();
+		input.onProgress?.('Verifying the updated server…');
+		const settings = await input.api.getWorkerSettings(input.accountId, input.metadata.workerName);
+		if (deployedArtifact(settings).fingerprint !== input.artifacts.fingerprint) throw new Error('The expected Worker is not live yet. Check and recover this update.');
+		await checkRemoteDeployment(input);
+		const versions = (await input.api.queryD1(input.accountId, databaseId, 'SELECT version FROM crate_schema WHERE id = 1;')).flatMap(result => result.results ?? []);
+		if (versions.length !== 1 || versions[0]?.version !== SERVER_RELEASE.schemaVersion) throw new Error('The updated database could not be verified.');
+		await input.api.queryD1(input.accountId, databaseId, 'SELECT path, storage_key FROM files LIMIT 1; SELECT id FROM auth_tokens LIMIT 1;');
+		await input.api.verifyWorkerDeployment(workersDevOrigin(input.metadata.workerName, workersSubdomain), input.artifacts.fingerprint);
+		await releaseUpgradeGuards(input.api, input.accountId, databaseId, fence);
+		await recordDeploymentRelease(schemaInput, fence);
+		await fence.completeVerification();
 
 		if (
 			input.metadata.lastKnownRevision !== SERVER_RELEASE.revision

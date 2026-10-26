@@ -292,51 +292,51 @@ export class CloudflareDeploymentService {
 		});
 	}
 
-    private async restoreBackups<T>(withAuthorization: WithCloudflareAuthorization,
-        operation: (api: CloudflareApiClient, source: CloudflareDeploymentMetadata) => Promise<T>): Promise<T> {
-        this.assertIdle();
-        const source = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
-        if (!source?.accountId || !source.d1DatabaseId || source.reset || source.deletion) throw new Error('Select the source Cloudflare server and finish any deletion first.');
-        return this.exclusive(() => withAuthorization(tokens => operation(this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(source, 'update')), source)));
-    }
+	private async restoreBackups<T>(withAuthorization: WithCloudflareAuthorization,
+		operation: (api: CloudflareApiClient, source: CloudflareDeploymentMetadata) => Promise<T>): Promise<T> {
+		this.assertIdle();
+		const source = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
+		if (!source?.accountId || !source.d1DatabaseId || source.reset || source.deletion) throw new Error('Select the source Cloudflare server and finish any deletion first.');
+		return this.exclusive(() => withAuthorization(tokens => operation(this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(source, 'update')), source)));
+	}
 
-    async listRestoreBackups(withAuthorization: WithCloudflareAuthorization): Promise<BackupChoice[]> {
-        return this.restoreBackups(withAuthorization, async (api, source) => {
-            const { listUpgradeBackups } = await import('../restore/server-restore');
-            return listUpgradeBackups(api, { account: source.accountId!, database: source.d1DatabaseId!, bucket: source.r2BucketName });
-        });
-    }
+	async listRestoreBackups(withAuthorization: WithCloudflareAuthorization): Promise<BackupChoice[]> {
+		return this.restoreBackups(withAuthorization, async (api, source) => {
+			const { listUpgradeBackups } = await import('../restore/server-restore');
+			return listUpgradeBackups(api, { account: source.accountId!, database: source.d1DatabaseId!, bucket: source.r2BucketName });
+		});
+	}
 
-    async restoreBackup(withAuthorization: WithCloudflareAuthorization,
-        choice: BackupChoice | null, onProgress: (message: string) => void): Promise<string> {
-        return this.restoreBackups(withAuthorization, async (api, source) => {
-            const artifacts = await this.whileActive(this.options.loadArtifacts);
-            return runRestoreWorkflow({
-                api, source, artifacts, choice, now: this.now, onProgress,
-                saved: this.options.settingsOwner.settings.cloudflareRestore,
-                persist: state => this.whileActive(() => {
-                    this.checkSavedTarget(source, 'update');
-                    return this.options.settingsOwner.writeSettings({ cloudflareRestore: structuredClone(state) });
-                }),
-            });
-        });
-    }
+	async restoreBackup(withAuthorization: WithCloudflareAuthorization,
+		choice: BackupChoice | null, onProgress: (message: string) => void): Promise<string> {
+		return this.restoreBackups(withAuthorization, async (api, source) => {
+			const artifacts = await this.whileActive(this.options.loadArtifacts);
+			return runRestoreWorkflow({
+				api, source, artifacts, choice, now: this.now, onProgress,
+				saved: this.options.settingsOwner.settings.cloudflareRestore,
+				persist: state => this.whileActive(() => {
+					this.checkSavedTarget(source, 'update');
+					return this.options.settingsOwner.writeSettings({ cloudflareRestore: structuredClone(state) });
+				}),
+			});
+		});
+	}
 
-    async recoverUpdate(withAuthorization: WithCloudflareAuthorization): Promise<DeploymentRecoveryResult> {
-        this.assertIdle();
-        const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
-        if (!metadata?.accountId) throw new Error('Connect to your Cloudflare account first.');
-        this.checkSavedTarget(metadata, 'update');
-        return this.exclusive(() => withAuthorization(async tokens => {
-            const api = this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(metadata, 'update'));
-            const artifacts = await this.whileActive(this.options.loadArtifacts);
-            return resumeInterruptedUpdate({
-                api, metadata, artifacts,
-                whileActive: operation => this.whileActive(operation),
-                persist: () => this.persistMetadata(metadata),
-            });
-        }));
-    }
+	async recoverUpdate(withAuthorization: WithCloudflareAuthorization): Promise<DeploymentRecoveryResult> {
+		this.assertIdle();
+		const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
+		if (!metadata?.accountId) throw new Error('Connect to your Cloudflare account first.');
+		this.checkSavedTarget(metadata, 'update');
+		return this.exclusive(() => withAuthorization(async tokens => {
+			const api = this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(metadata, 'update'));
+			const artifacts = await this.whileActive(this.options.loadArtifacts);
+			return resumeInterruptedUpdate({
+				api, metadata, artifacts,
+				whileActive: operation => this.whileActive(operation),
+				persist: () => this.persistMetadata(metadata),
+			});
+		}));
+	}
 
 	private createGuardedApi(tokens: CloudflareOAuthTokens, authorization: 'saved' | 'temporary', checkTarget?: () => void): CloudflareApiClient {
 		if (authorization === 'saved' && tokens.scope !== undefined) {

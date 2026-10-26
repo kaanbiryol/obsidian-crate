@@ -30,8 +30,8 @@ const logger = createLogger('SyncEngine');
 
 export interface SyncWorkflowContext extends FullSyncUploadContext {
 	deleteRemoteFiles: DeleteRemoteFiles;
-  finishInitialSetup(): Promise<void>;
-  tryInitialImport?(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
+	finishInitialSetup(): Promise<void>;
+	tryInitialImport?(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
 	apiConfigured(): boolean;
 	recoverUploads(): Promise<void>;
 	getStatus(): SyncStatus;
@@ -76,13 +76,13 @@ export async function runSyncWorkflow(
 	try {
 		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
-    const imported = await context.tryInitialImport?.(result, progressCallback);
-    if (imported) {
-      result = imported;
-      if (finalizeSyncResult(imported)) await context.finishInitialSetup();
-      completeWorkflowResult(context, imported, { errorFallback: 'Initial sync completed with errors' });
-      return imported;
-    }
+		const imported = await context.tryInitialImport?.(result, progressCallback);
+		if (imported) {
+			result = imported;
+			if (finalizeSyncResult(imported)) await context.finishInitialSetup();
+			completeWorkflowResult(context, imported, { errorFallback: 'Initial sync completed with errors' });
+			return imported;
+		}
 		context.updateState({ work: { phase: 'server' } });
 		context.throwIfDestroyed();
 		recovering = context.hasSyncCursor?.() ?? false;

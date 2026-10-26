@@ -33,61 +33,61 @@ export function renderConfigSection(context: SettingsSectionContext, showHeading
 					void startCloudflareDeployment(plugin);
 				}));
 		renderSelfHostedSetting(context);
-        renderServerBackupSetting(context);
+		renderServerBackupSetting(context);
 	}
 }
 
 export function renderServerUpdateNotice(context: SettingsSectionContext): void {
-    const { containerEl, plugin } = context;
-    const deployment = plugin.settings.cloudflareDeployment;
-    if (!plugin.syncRuntime.isConfigured() || !deployment
-        || !isCloudflareServerUpdateAvailable(deployment, EMBEDDED_CLOUDFLARE_ARTIFACT)) return;
+	const { containerEl, plugin } = context;
+	const deployment = plugin.settings.cloudflareDeployment;
+	if (!plugin.syncRuntime.isConfigured() || !deployment
+		|| !isCloudflareServerUpdateAvailable(deployment, EMBEDDED_CLOUDFLARE_ARTIFACT)) return;
 
-    let needsVerification = false;
-    let canUpdate = false;
-    let updateButton: ButtonComponent;
-    const update = new Setting(containerEl)
-        .setName('Cloudflare update available')
-        .setDesc('Update your sync server and reminders web app to the version included with this Crate plugin.')
-        .addButton(button => {
-            updateButton = button;
-            button.setButtonText('Update server').setCta().onClick(() => {
-                if (!needsVerification && !canUpdate) return;
-                if (needsVerification) void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); });
-                else void startCloudflareDeployment(plugin);
-            });
-        });
-    renderUpdateVersions(update, plugin, () => {
-        needsVerification = true;
-        update.setName('Verify server update')
-            .setDesc('The live server matches this plugin, but the saved update has not been confirmed. Check its status and recover any interrupted update.');
-        updateButton.setButtonText('Check and recover update').setDisabled(false);
-        updateButton.buttonEl.show();
-    }, available => {
-        canUpdate = available;
-        updateButton.setDisabled(!available);
-        if (available) updateButton.buttonEl.show();
-        else updateButton.buttonEl.hide();
-    });
+	let needsVerification = false;
+	let canUpdate = false;
+	let updateButton: ButtonComponent;
+	const update = new Setting(containerEl)
+		.setName('Cloudflare update available')
+		.setDesc('Update your sync server and reminders web app to the version included with this Crate plugin.')
+		.addButton(button => {
+			updateButton = button;
+			button.setButtonText('Update server').setCta().onClick(() => {
+				if (!needsVerification && !canUpdate) return;
+				if (needsVerification) void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); });
+				else void startCloudflareDeployment(plugin);
+			});
+		});
+	renderUpdateVersions(update, plugin, () => {
+		needsVerification = true;
+		update.setName('Verify server update')
+			.setDesc('The live server matches this plugin, but the saved update has not been confirmed. Check its status and recover any interrupted update.');
+		updateButton.setButtonText('Check and recover update').setDisabled(false);
+		updateButton.buttonEl.show();
+	}, available => {
+		canUpdate = available;
+		updateButton.setDisabled(!available);
+		if (available) updateButton.buttonEl.show();
+		else updateButton.buttonEl.hide();
+	});
 }
 
 export function renderServerSection(context: SettingsSectionContext): void {
-    const { containerEl, plugin } = context;
-    const deployment = plugin.settings.cloudflareDeployment;
-    renderVersionSettings(containerEl, plugin);
-    if (plugin.syncRuntime.isConfigured() && deployment?.accountId && !deployment.vaultName) {
-        new Setting(containerEl).setName('Vault name')
-            .setDesc('Save this vault’s name so you can recognize its server on other devices. This updates the Cloudflare server.')
-            .addButton(button => button.setButtonText('Save vault name')
-                .onClick(() => { void startCloudflareDeployment(plugin, 'update'); }));
-    }
-    if (plugin.syncRuntime.isConfigured() && deployment?.accountId && deployment.d1DatabaseId) {
-        new Setting(containerEl).setName('Interrupted server update')
-            .setDesc('Check an interrupted update and recover it when Cloudflare has confirmed the operation.')
-            .addButton(button => button.setButtonText('Check and recover update')
-                .onClick(() => { void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); }); }));
-    }
-    renderServerBackupSetting(context);
+	const { containerEl, plugin } = context;
+	const deployment = plugin.settings.cloudflareDeployment;
+	renderVersionSettings(containerEl, plugin);
+	if (plugin.syncRuntime.isConfigured() && deployment?.accountId && !deployment.vaultName) {
+		new Setting(containerEl).setName('Vault name')
+			.setDesc('Save this vault’s name so you can recognize its server on other devices. This updates the Cloudflare server.')
+			.addButton(button => button.setButtonText('Save vault name')
+				.onClick(() => { void startCloudflareDeployment(plugin, 'update'); }));
+	}
+	if (plugin.syncRuntime.isConfigured() && deployment?.accountId && deployment.d1DatabaseId) {
+		new Setting(containerEl).setName('Interrupted server update')
+			.setDesc('Check an interrupted update and recover it when Cloudflare has confirmed the operation.')
+			.addButton(button => button.setButtonText('Check and recover update')
+				.onClick(() => { void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); }); }));
+	}
+	renderServerBackupSetting(context);
 	const details = containerEl;
 	const serverAddress = plugin.settings.workerUrl;
 	new Setting(details).setName('Server address').setDesc(serverAddress || 'Not connected on this device')
@@ -180,12 +180,12 @@ export function renderAccountSection(context: SettingsSectionContext): void {
 }
 
 function renderServerBackupSetting({ containerEl, plugin }: SettingsSectionContext): void {
-    const deployment = plugin.settings.cloudflareDeployment;
-    if (deployment?.accountId && deployment.d1DatabaseId && !deployment.reset && !deployment.deletion) {
-        const restore = plugin.settings.cloudflareRestore;
-        new Setting(containerEl).setName('Server backup recovery')
-            .setDesc(restore ? 'Review or resume your saved restore. The original server and backup are retained.' : 'Restore an upgrade backup into a separate server, keeping your current files and connection.')
-            .addButton(button => button.setButtonText(restore?.phase === 'complete' ? 'View restored server' : restore ? 'Resume restore' : 'Restore backup…')
-                .onClick(() => { void import('../../../plugin/cloudflare-restore').then(({ openServerRestore }) => openServerRestore(plugin)); }));
-    }
+	const deployment = plugin.settings.cloudflareDeployment;
+	if (deployment?.accountId && deployment.d1DatabaseId && !deployment.reset && !deployment.deletion) {
+		const restore = plugin.settings.cloudflareRestore;
+		new Setting(containerEl).setName('Server backup recovery')
+			.setDesc(restore ? 'Review or resume your saved restore. The original server and backup are retained.' : 'Restore an upgrade backup into a separate server, keeping your current files and connection.')
+			.addButton(button => button.setButtonText(restore?.phase === 'complete' ? 'View restored server' : restore ? 'Resume restore' : 'Restore backup…')
+				.onClick(() => { void import('../../../plugin/cloudflare-restore').then(({ openServerRestore }) => openServerRestore(plugin)); }));
+	}
 }
