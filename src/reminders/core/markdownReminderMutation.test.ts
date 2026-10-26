@@ -76,17 +76,15 @@ it('drops the repeat time when a timed repeat becomes date-only', () => {
 	});
 });
 
-it.each(['Read pages 13-19', 'Slides 10-20'])('refuses a date-only title the saved-line parser would reject: %s', content => {
+it.each(['Lunch at 1pm', 'Meet at noon'])('refuses a date-only title the saved-line parser would read differently: %s', content => {
 	const build = () => buildCreatedReminderBlock({ content, priority: 4, dueDate: new Date(2026, 9, 30), hasTime: false, reminderId: 'one' });
 	expect(build).toThrow(ReminderInputError);
 	expect(build).toThrow('This title cannot be saved as a reminder');
-	// The timed form keeps an ISO date, which reads back.
-	expect(buildCreatedReminderBlock({ content, priority: 4, dueDate: new Date('2026-10-30T09:00:00Z'), hasTime: true, reminderId: 'one' }).content).toBe(content);
 	const timed = { ...saved(false), content, rawLine: `- [ ] ${content} 2026-09-21T09:00:00.000Z <!-- crate-id:one -->` };
 	expect(() => buildUpdatedReminderBlock(timed, { dueDate: new Date(2026, 9, 30), hasTime: false })).toThrow(ReminderInputError);
 });
 
-it.each(['Pages 20-30', 'Sprint 14-28'])('writes a date-only due as an ISO date when only that form reads back: %s', content => {
+it.each(['Read pages 13-19', 'Pages 20-30', 'Sprint 14-28'])('writes a date-only due as an ISO date when only that form reads back: %s', content => {
 	const created = buildCreatedReminderBlock({ content, priority: 4, dueDate: new Date(2026, 9, 30), hasTime: false, reminderId: 'one' });
 	expect(created.checkboxLine).toBe(`- [ ] ${content} 2026-10-30 <!-- crate-id:one -->`);
 	expect(scanReminderMarkdownContent('Reminders/Inbox.md', created.checkboxLine, 'Reminders').reminders[0]).toMatchObject({ content, dueDate: '2026-10-30' });

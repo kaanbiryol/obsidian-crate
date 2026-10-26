@@ -9,6 +9,7 @@ import { buildInitialReminderContent } from '../core/reminderDraft';
 import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
 import { buildRichTextSegments } from '../ui/reminder-editor/richTextRenderer';
 import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
+import { parseCheckboxLine } from '@/reminders/core/grammar/checkboxParser';
 
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -95,4 +96,17 @@ it.each([
             content: 'Compare Monday to', dueDatetime: instant,
         });
     }
+});
+
+describe('number ranges before a date', () => {
+    it.each([
+        ['Exercises 5-10 tomorrow', 'Exercises 5-10', 'tomorrow'],
+        ['Read pages 13-19 tomorrow', 'Read pages 13-19', 'tomorrow'],
+        ['Verses 1-10 friday', 'Verses 1-10', 'friday'],
+    ])('keep the range end in the title: %s', (text, cleanContent, datePart) => {
+        expect(parseReminderContent(text)).toMatchObject({ cleanContent, datePart, hasTime: false });
+        const normalized = normalizeReminderScheduleLine(`- [ ] ${text}`);
+        expect(normalized).toMatch(new RegExp(`^- \\[ \\] ${cleanContent} \\d{4}-\\d{2}-\\d{2}$`));
+        expect(parseCheckboxLine(normalized, { persisted: true })?.parsed.cleanContent).toBe(cleanContent);
+    });
 });
