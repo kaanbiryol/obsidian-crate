@@ -9,7 +9,9 @@ prunes or uploads for it: it saves the import token in its local checkpoint befo
 first prune or upload. Another device that finds files in the open import stops with
 "Another device is uploading this vault for the first time. Let it finish, then sync."
 A device without a saved token, for example one updated mid-import, continues only
-while its checkpoint holds the revision of every file already imported. Shared staging leases cover at most 32 files per initial-import request, and
+while its checkpoint holds the revision of every file already imported. While an import is open, ordinary
+uploads and deletes from automatic sync and **Sync selected** wait on every device, because
+resuming the import prunes server files the importing device lacks. Shared staging leases cover at most 32 files per initial-import request, and
 durable object cleanup protects interrupted puts. The decoded request size remains
 limited to 10 MiB; large files use individual binary requests. Completion verifies the inventory, records a
 single baseline, and permanently closes import writes. Normal history and recovery
