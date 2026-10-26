@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { chromium, webkit } from '@playwright/test';
 
 const { outputFiles } = await build({
-	stdin: { contents: `export * from './src/pwa/reminders/cache/reminder-cache'; export { requirePrivateStorageUnlock, useUnencryptedStorage } from './src/pwa/reminders/private-storage';`, resolveDir: process.cwd(), loader: 'ts' },
+	stdin: { contents: `export * from './src/pwa/reminders/cache/reminder-cache'; export { requirePrivateStorageUnlock, unlockPrivateStorage, useUnencryptedStorage } from './src/pwa/reminders/private-storage'; export { LocalStateCipher } from './src/encryption/local-state';`, resolveDir: process.cwd(), loader: 'ts' },
 	bundle: true,
 	format: 'iife',
 	globalName: 'reminderCache',
@@ -158,14 +158,20 @@ for (const browserType of [chromium, webkit]) {
 			await cache.saveCachedReminderSnapshot({ folderPath: 'Private', reminders: [{ id: 'p', content: 'Plaintext task', priority: 4, completed: false, project: 'Inbox', filePath: 'Private/Inbox.md' }], projects: ['Inbox'], savedAt: 700, etag: 'plain' });
 			await cache.refreshCachedReminderSnapshot('Private', 800, 'plain');
 			const before = { notes: await count('notes'), freshness: await count('freshness') };
+			// Merely locked, for example after an unavailable encryption check, keeps the offline copy.
 			cache.requirePrivateStorageUnlock();
+			const locked = await cache.loadCachedReminderSnapshot('Private');
+			const whileLocked = { notes: await count('notes'), freshness: await count('freshness') };
+			cache.unlockPrivateStorage(new cache.LocalStateCipher('vault', 'scope', crypto.getRandomValues(new Uint8Array(32))), 'Private', localStorage, sessionStorage);
 			const loaded = await cache.loadCachedReminderSnapshot('Private');
 			const after = { notes: await count('notes'), freshness: await count('freshness') };
 			cache.useUnencryptedStorage();
-			return { loaded, before, after };
+			return { locked, whileLocked, loaded, before, after };
 		});
+		assert.equal(privacy.locked?.reminders[0]?.content, 'Plaintext task');
+		assert.deepEqual(privacy.whileLocked, privacy.before);
 		assert.equal(privacy.loaded, null);
-		assert.ok(privacy.before.notes > privacy.after.notes, 'Plaintext notes are removed once private storage is required');
+		assert.ok(privacy.before.notes > privacy.after.notes, 'Plaintext notes are removed once private storage is unlocked');
 		assert.ok(privacy.before.freshness > privacy.after.freshness, 'Plaintext freshness records are removed too');
 		console.log(`${browserType.name()}: cache creation, per-note partial writes, peer-replaced notes, metadata-only refresh, revision guards, clearing and private storage cleanup passed`);
 	} finally {
