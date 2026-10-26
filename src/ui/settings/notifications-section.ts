@@ -2,6 +2,7 @@ import { Notice, Setting, type TextComponent, type ToggleComponent, type ButtonC
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../platform/logger';
+import { openConfirmationModal } from '../confirmation-modal';
 import { normalizeTimeString } from '../../platform/validation';
 import { saveNotificationPolicy } from '../../reminders/notification-policy-sync';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
@@ -231,12 +232,19 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin, is
 					button.setButtonText('Remove notification subscription');
 					button.setDestructive();
 					button.onClick(async () => {
+						const confirmed = await openConfirmationModal(plugin.app, {
+							title: 'Remove notification subscription',
+							message: `Stop sending reminder notifications to ${sub.device_name || 'this device'}?`,
+							confirmText: 'Remove',
+							warning: true,
+						});
+						if (!confirmed || !isActive()) return;
 						try {
 							await apiClient.deletePushSubscription(sub.id);
 							container.empty();
 							await refresh();
-						} catch {
-							new Notice('Failed to remove subscription');
+						} catch (error) {
+							new Notice(`Failed to remove subscription: ${errorMessage(error)}`);
 						}
 					});
 				});

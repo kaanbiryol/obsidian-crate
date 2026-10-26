@@ -33,6 +33,7 @@ export function renderServerDeleteSetting(containerEl: HTMLElement, plugin: Crat
                     ],
                     confirmText: 'Delete server',
                     warning: true,
+                    typedConfirmation: 'delete',
                 });
                 if (!confirmed) return;
                 if (JSON.stringify(plugin.settings.cloudflareDeployment) !== snapshot) {

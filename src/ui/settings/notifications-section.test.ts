@@ -16,6 +16,7 @@ async function flushMicrotasks(): Promise<void> {
 	for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 
+const confirmRemoval = vi.fn(async (_app: unknown, _options: { title: string }) => true);
 async function loadNotificationsSectionModule(expand = true) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../qr-modal', () => ({
@@ -27,6 +28,7 @@ async function loadNotificationsSectionModule(expand = true) {
 		},
 	}));
 	vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
+	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal: confirmRemoval }));
 
 	const notifications = await import('./notifications-section');
 	return { ...await import('./reminders-web-app'), renderNotificationsSection: (context: Parameters<typeof notifications.renderNotificationsSection>[0]) => {
@@ -218,6 +220,12 @@ describe('renderNotificationsSection', () => {
 			rerender: vi.fn(),
 		});
 		await flushMicrotasks();
+
+		confirmRemoval.mockResolvedValueOnce(false);
+		getSettingByName('iPhone').buttons[0]?.click();
+		await flushMicrotasks();
+		expect(confirmRemoval).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ title: 'Remove notification subscription' }));
+		expect(deletePushSubscription).not.toHaveBeenCalled();
 
 		getSettingByName('iPhone').buttons[0]?.click();
 		await flushMicrotasks();
