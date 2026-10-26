@@ -1,5 +1,4 @@
 import { ResetBlockedError } from './reset-errors';
-import { inspectResumableDeletion } from './delete-recovery';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { workersDevOrigin } from '../deployment/worker-origin';
 import { assertDeploymentIsNotDowngrade } from '../deployment/update';
@@ -7,7 +6,7 @@ import { deployedArtifact } from '../deployment/discovery';
 import { createRandomHexToken } from '../../platform/random-hex';
 import { assertWorkerTarget, assertUnsharedResources, assertOwnedNamespace, readCrateTables, type ResetApi } from './reset-ownership';
 import { createObjectOwnershipCheck, inspectBucketObjects, clearBucketObjects } from './reset-objects';
-import { fenceResetMutations, withDeploymentFence, type DeploymentFence } from '../deployment/fence';
+import { withDeploymentFence, type DeploymentFence } from '../deployment/fence';
 import { sha256Hex } from '../../platform/sha256';
 
 export async function resetCrateServer(input: {
@@ -15,13 +14,11 @@ export async function resetCrateServer(input: {
 	accountId: string;
 	metadata: CloudflareDeploymentMetadata;
 	version: string;
-	deleteOnly?: true;
 	beforeDelete: () => Promise<void>;
 	persist: () => Promise<void>;
 	onProgress?: (message: string) => void;
 }): Promise<void> {
-	const { accountId, metadata } = input;
-	let api = input.api;
+	const { api, accountId, metadata } = input;
 	input.onProgress?.('Checking server identity and saved reset progress…');
 	const name = `crate-${metadata.deploymentId}`;
 	const databaseId = metadata.d1DatabaseId;
@@ -79,10 +76,15 @@ export async function resetCrateServer(input: {
 	const origin = workersDevOrigin(name, subdomain!);
 
 	const removeVerifiedResources = async (fence?: DeploymentFence) => {
+		// Read-only verification stays unfenced; each provider mutation records its step.
+		const mutate = async (step: string, operation: () => Promise<void>) => {
+			if (fence) await fence.mutate(operation, step);
+			else await operation();
+		};
 		input.onProgress?.('Stopping sync on this device before removing remote data…');
 		await input.beforeDelete();
 		if (!metadata.reset) {
-			metadata.reset = { id: resetId, phase: 'clearing', databaseId, bucketCreatedAt: bucket!.creation_date!, namespaceId, ...(input.deleteOnly ? { deleteOnly: true as const } : {}) };
+			metadata.reset = { id: resetId, phase: 'clearing', databaseId, bucketCreatedAt: bucket!.creation_date!, namespaceId };
 			await input.persist();
 		}
 		const checkpoint = metadata.reset;
@@ -96,7 +98,7 @@ export async function resetCrateServer(input: {
 			// Cloudflare refuses the deleted-class export if another Worker binds the
 			// namespace. The stub has no Durable Object class and cannot serve vault data.
 			input.onProgress?.('Taking the server offline and removing reminder alarms…');
-			await api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, retired);
+			await mutate('retireCrateWorker', () => api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, retired));
 		}
 		const verifyTarget = async () => {
 			const current = await api.getWorkerSettings(accountId, name);
@@ -119,31 +121,30 @@ export async function resetCrateServer(input: {
 				input.onProgress?.('Updating the cleanup Worker to remove recovery backups…');
 				// Keep the same reset identity and existing fence. The namespace is
 				// already retired; this only refreshes the temporary cleanup code.
-				await api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, true);
+				await mutate('retireCrateWorker', () => api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, true));
 				await api.verifyResetWorker(origin, checkpoint.id, true);
 			}
-			await clearBucketObjects(input.api, accountId, name, check, verifyTarget,
-				async keys => fence.mutate(() => input.api.deleteR2Objects(origin, checkpoint.id, cleanupToken, keys),
+			await clearBucketObjects(api, accountId, name, check, verifyTarget,
+				async keys => fence.mutate(() => api.deleteR2Objects(origin, checkpoint.id, cleanupToken, keys),
 					'deleteR2Objects', await sha256Hex(JSON.stringify(keys))), objectCount, input.onProgress);
 			input.onProgress?.('Removing the empty file bucket…');
-			await api.deleteR2Bucket(accountId, name);
+			await mutate('deleteR2Bucket', () => api.deleteR2Bucket(accountId, name));
 		}
 		await verifyTarget();
 		input.onProgress?.('Removing the old database…');
-		if (database) await api.deleteD1Database(accountId, databaseId);
+		if (database) {
+			await mutate('deleteD1Database', async () => {
+				await api.deleteD1Database(accountId, databaseId);
+				fence?.removedDatabase();
+			});
+		}
 		metadata.reset = { ...checkpoint, phase: 'rebuilding' };
 		await input.persist();
 	};
 	// Once the old database is gone, the checkpointed reset stub blocks updates
 	// from other devices; there is no remaining database fence to acquire.
 	if (!database) return removeVerifiedResources();
-	const recoverDeletionValue = input.deleteOnly && metadata.reset?.deleteOnly && retired
-		? await inspectResumableDeletion(api, metadata) : undefined;
-	return withDeploymentFence({ api, accountId, databaseId, recoverDeletionValue,
-		record: { worker: name, kind: input.deleteOnly ? 'delete' : 'reset', version: input.version, resetId,
-			cleanupTokenHash: await sha256Hex(cleanupToken) },
-	}, async fence => {
-		api = fenceResetMutations(api, fence);
-		await removeVerifiedResources(fence);
-	});
+	return withDeploymentFence({ api, accountId, databaseId,
+		record: { worker: name, kind: 'reset', version: input.version, resetId, cleanupTokenHash: await sha256Hex(cleanupToken) },
+	}, removeVerifiedResources);
 }

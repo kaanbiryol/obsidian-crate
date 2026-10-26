@@ -183,20 +183,3 @@ export async function withDeploymentFence<T>(input: {
 	if (!outcome.ok) throw outcome.error;
 	return outcome.value;
 }
-
-/** Keep reset's read-only verification separate from its fenced mutations. */
-export function fenceResetMutations<T extends object>(api: T, fence: DeploymentFence): T {
-	const methods = new Set(['retireCrateWorker', 'deleteR2Bucket', 'deleteD1Database']);
-	return new Proxy(api, {
-		get(target, property, receiver) {
-			const value: unknown = Reflect.get(target, property, receiver);
-			if (typeof value !== 'function') return value;
-			if (!methods.has(String(property))) return value.bind(target) as unknown;
-			return (...args: unknown[]) => fence.mutate(async () => {
-				const result: unknown = await value.apply(target, args);
-				if (property === 'deleteD1Database') fence.removedDatabase();
-				return result;
-			}, String(property));
-		},
-	});
-}
