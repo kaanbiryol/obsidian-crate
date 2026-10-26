@@ -199,6 +199,9 @@ export class LocalManifest {
 				if (!await this.appendChanges(changed)) await this.compact();
 			} catch (error) {
 				for (const path of changed) this.changedPaths.add(path);
+				// A failed append may have left partial bytes. Appending after them
+				// would join the next record to that torn line, so compact instead.
+				this.logActive = false;
 				throw error;
 			}
 			if (this.closed) return;

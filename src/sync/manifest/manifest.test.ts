@@ -429,6 +429,28 @@ describe('LocalManifest', () => {
 			expect((await reload()).getAllPaths().sort()).toEqual(['a.md', 'b.md', 'd.md']);
 		});
 
+		it('compacts after a partial append instead of joining the next record to its torn bytes', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			manifest.setEntry('a.md', entry('a'));
+			await manifest.save();
+			manifest.setEntry('b.md', entry('b'));
+			await manifest.save();
+			adapter.append.mockImplementationOnce(async (path, data) => {
+				disk.set(path, (disk.get(path) ?? '') + data.slice(0, 10));
+				throw new Error('ENOSPC');
+			});
+			manifest.setEntry('c.md', entry('c'));
+			await expect(manifest.save()).rejects.toThrow('ENOSPC');
+			manifest.setEntry('d.md', entry('d'));
+			await manifest.save();
+			const restored = await reload();
+			expect(restored.getAllPaths().sort()).toEqual(['a.md', 'b.md', 'c.md', 'd.md']);
+			restored.setEntry('e.md', entry('e'));
+			await restored.save();
+			expect((await reload()).getAllPaths().sort()).toEqual(['a.md', 'b.md', 'c.md', 'd.md', 'e.md']);
+		});
+
 		it('ignores a log left from before a completed compaction', async () => {
 			const disk = new Map<string, string>();
 			diskAdapter(disk);
