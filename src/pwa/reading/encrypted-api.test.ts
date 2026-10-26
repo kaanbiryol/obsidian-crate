@@ -248,6 +248,21 @@ it('keeps an edit retryable while an unrelated note fails to download', async ()
 	expect(request.mock.calls.some(([path]) => path === '/reading/encrypted-commit')).toBe(false);
 });
 
+it('names a failed note by its plaintext path and retries it at the same sequence', async () => {
+	const { api, request } = harness(), saved = await notes(2), edited = [saved[0]!, (await notes(2, 'r2'))[1]!];
+	serve(request, saved, 1);
+	await api.request('/reading/list');
+	serve(request, edited, 2);
+	const serveFile = request.getMockImplementation()!;
+	request.mockImplementation(async path => path.startsWith('/reading/encrypted-file?') ? new Response(null, { status: 503 }) : serveFile(path));
+	for (let attempt = 0; attempt < 2; attempt++) {
+		await expect(api.request('/reading/list')).resolves.toMatchObject({ issues: [{ path: 'Reading/Note 001.md' }] });
+	}
+	// The server recovers without a new vault sequence.
+	request.mockImplementation(serveFile);
+	await expect(api.request('/reading/list')).resolves.toMatchObject({ issues: [], items: [{ title: 'Note 0' }, { title: 'Note 1' }] });
+});
+
 it('rejects an oversized encrypted note before downloading it', async () => {
 	const { api, request } = harness(), saved = await article('Saved');
 	request.mockImplementation(async () => Response.json(page([{ ...saved.file, size: 4 * 1024 * 1024 + 1 }])));
