@@ -128,6 +128,9 @@ export function selectGroup(name) {
 	return browserGroups[name];
 }
 
+// The slowest script takes about three minutes on CI; a hang must fail its step, not the job timeout.
+const SCRIPT_TIMEOUT_MS = 6 * 60_000;
+
 export function runBrowserTests(scripts, { run = spawnSync, env = process.env, logger = console, buildWorker = true } = {}) {
 	// A shard owns its checkout: build fresh assets before any child can reuse them.
 	// Plugin groups use the plugin build instead of the Worker/PWA assets.
@@ -143,10 +146,10 @@ export function runBrowserTests(scripts, { run = spawnSync, env = process.env, l
 		for (let attempt = 1; attempt <= attempts; attempt++) {
 			logger.log(`\nRunning ${script}${attempt > 1 ? ` (retry ${attempt - 1})` : ''}`);
 			const started = performance.now();
-			const result = run(process.execPath, [script], { stdio: 'inherit', env: { ...env, CRATE_WORKER_PREBUILT: '1' } });
+			const result = run(process.execPath, [script], { stdio: 'inherit', env: { ...env, CRATE_WORKER_PREBUILT: '1' }, timeout: SCRIPT_TIMEOUT_MS });
 			logger.log(`${script}: ${((performance.now() - started) / 1000).toFixed(1)}s`);
 			if (result.signal) {
-				logger.error(`${script} terminated by ${result.signal}`);
+				logger.error(`${script} terminated by ${result.signal}${result.error?.code === 'ETIMEDOUT' ? ' after timing out' : ''}`);
 				return 1;
 			}
 			if (!result.error && result.status === 0) {
