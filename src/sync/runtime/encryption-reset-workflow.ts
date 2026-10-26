@@ -129,6 +129,15 @@ export async function runEncryptionReset(
 			verify();
 			await persistSettings({ automaticSync: reset.automaticSync });
 			verify();
+			// A refused setup encrypted nothing. Keys left behind would make the next start
+			// upload encrypted files to the plaintext server.
+			if (reset.target === 'encrypted') {
+				secretStorage.delete(SECRET_KEYS.ENCRYPTION_KEYS);
+				secretStorage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
+				if (secretStorage.get(SECRET_KEYS.ENCRYPTION_KEYS) || secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY)) {
+					throw new Error('Could not clear the refused setup keys. Resume to retry.');
+				}
+			}
 			secretStorage.delete(SECRET_KEYS.ENCRYPTION_RESET);
 			if (secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Could not clear the rejected reset checkpoint. Resume to retry.');
 			settings.automaticSync = reset.automaticSync;
