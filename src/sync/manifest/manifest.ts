@@ -1,9 +1,10 @@
-import { encodeCheckpoint, parseCheckpoint, parseLocalManifest, sameCheckpointRecoveryState } from './manifest-checkpoint';
+import { encodeCheckpoint, parseCheckpoint, sameCheckpointRecoveryState } from './manifest-checkpoint';
 import { encodeLogHeader, encodeLogRecord, encodeLogState, replayManifestLog, type EncodedLogState } from './manifest-log';
 import { UploadJournal } from '../durability/upload-journal';
 import { parseRestoreIntents, type RestoreIntent } from '../durability/restore-intent';
 import { parseInitialConfigPull, type InitialConfigPull } from './initial-config-pull';
 import { MAX_UPLOAD_DIAGNOSTICS, normalizeUploadDiagnostics, type UploadDiagnostic } from '../diagnostics/upload-diagnostics';
+import { createAbortError } from '../abort';
 /**
  * Local manifest management for tracking file state.
  * Stored in its own file (file-manifest.json) in the plugin directory,
@@ -23,6 +24,7 @@ const logger = createLogger('Manifest');
 // Compact into a full checkpoint once replaying the log costs about as much as
 // a small rewrite; the log also caps the work of the next load.
 const MAX_LOG_BYTES = 8 * 1024 * 1024;
+const closedError = () => createAbortError('Sync manifest closed');
 
 /** Live baseline view. Only the owner may replace entries and mark them dirty. */
 export type LocalManifestView = Readonly<Omit<FileManifest, 'files'>> & {
@@ -51,6 +53,8 @@ export class LocalManifest {
 	private loadTask: Promise<void> = Promise.resolve();
 	private closed = false;
 	private uploadDiagnostics: UploadDiagnostic[] = [];
+	/** Diagnostic rows already on disk; a log record carries only the others. */
+	private persistedDiagnostics: ReadonlySet<UploadDiagnostic> = new Set();
 	private restoreIntents: RestoreIntent[] = [];
 	private initialConfigPull?: InitialConfigPull;
 	private initialImportToken?: string;
@@ -123,6 +127,7 @@ export class LocalManifest {
 			}
 			this.manifest = selected.manifest;
 			this.uploadDiagnostics = selected.uploadDiagnostics;
+			this.persistedDiagnostics = new Set(this.uploadDiagnostics);
 			this.restoreIntents = selected.restoreIntents;
 			this.initialConfigPull = selected.initialConfigPull;
 			this.initialImportToken = selected.initialImportToken;
@@ -146,9 +151,10 @@ export class LocalManifest {
 		logger.info(`Manifest loaded with ${this.getFileCount()} files`);
 	}
 
-	/** Serialize checkpoints and include changes made while disk writes await. */
+	/** Serialize checkpoints and include changes made while disk writes await. Rejects
+	 * with an AbortError once closed, so no caller treats a dropped checkpoint as durable. */
 	save(): Promise<void> {
-		if (this.closed) return Promise.resolve();
+		if (this.closed) return Promise.reject(closedError());
 		const save = this.saveChain.catch(() => {}).then(async () => {
 			const completed = this.uploadJournal.completedSnapshot();
 			for (const id of completed) {
@@ -156,7 +162,8 @@ export class LocalManifest {
 				if (prior && prior.phase !== 'checkpointed') this.recordUploadDiagnostic({ ...prior, at: undefined, phase: 'checkpointed' });
 			}
 			await this.persist();
-			if (!this.closed) await this.uploadJournal.pruneCompleted(completed);
+			if (this.closed) throw closedError();
+			await this.uploadJournal.pruneCompleted(completed);
 		});
 		this.saveChain = save;
 		return save;
@@ -217,7 +224,9 @@ export class LocalManifest {
 			else deleted.push(path);
 		}
 		const state = encodeLogState(this.recoveryState());
-		const record = encodeLogRecord({ generation: this.generation + 1, set, deleted, state, previous: this.persistedState });
+		const diagnostics = [...this.uploadDiagnostics];
+		const record = encodeLogRecord({ generation: this.generation + 1, set, deleted, state, previous: this.persistedState,
+			uploadDiagnostics: diagnostics.filter(row => !this.persistedDiagnostics.has(row)) });
 		if (this.logBytes + record.length > MAX_LOG_BYTES) return false;
 		// The first record after a compaction replaces any older log with its header.
 		if (this.logBytes === 0) {
@@ -228,6 +237,7 @@ export class LocalManifest {
 		this.generation++;
 		this.logBytes += record.length;
 		this.persistedState = state;
+		this.persistedDiagnostics = new Set(diagnostics);
 		return true;
 	}
 
@@ -237,6 +247,7 @@ export class LocalManifest {
 		this.logActive = false;
 		this.generation++;
 		const state = encodeLogState(this.recoveryState());
+		const diagnostics = [...this.uploadDiagnostics];
 		const data = this.serialize();
 		await adapter.write(this.tmpPath, data);
 		if (this.closed) return;
@@ -247,6 +258,7 @@ export class LocalManifest {
 		// older base, so loading ignores it.
 		this.logBytes = 0;
 		this.persistedState = state;
+		this.persistedDiagnostics = new Set(diagnostics);
 		this.logActive = true;
 	}
 
@@ -266,15 +278,17 @@ export class LocalManifest {
 		return getPathEntry(this.manifest.files, path);
 	}
 
-	/**
-	 * Set file entry
-	 */
+	/** Set a file entry. An equal entry keeps the current object and writes nothing, so
+	 * readers see an unchanged baseline and a full sync does not rewrite the checkpoint. */
 	setEntry(path: string, entry: Readonly<FileEntry>): void {
 		const previous = this.getEntry(path);
 		// A note keeps its random server name until it is deleted or renamed.
 		const wire = entry.wire ?? previous?.wire ?? this.pendingWires.get(path);
 		this.pendingWires.delete(path);
-		this.manifest.files[path] = { ...entry, revision: entry.revision ?? (previous?.hash === entry.hash ? previous.revision : undefined), ...(wire ? { wire } : {}) };
+		const next = { ...entry, revision: entry.revision ?? (previous?.hash === entry.hash ? previous.revision : undefined), ...(wire ? { wire } : {}) };
+		if (previous && previous.hash === next.hash && previous.size === next.size && previous.modified === next.modified
+			&& previous.revision === next.revision && previous.wire === next.wire) return;
+		this.manifest.files[path] = next;
 		this.changedPaths.add(path);
 		this.markChanged();
 	}
@@ -282,12 +296,6 @@ export class LocalManifest {
 	/** The server path of an encrypted note whose server name is random, if known. */
 	wireOf(path: string): string | undefined {
 		return this.getEntry(path)?.wire ?? this.pendingWires.get(path);
-	}
-
-	pathOfWire(wire: string): string | undefined {
-		for (const [path, entry] of Object.entries(this.manifest.files)) if (entry.wire === wire) return path;
-		for (const [path, pending] of this.pendingWires) if (pending === wire) return path;
-		return undefined;
 	}
 
 	noteWire(path: string, wire: string): void {
@@ -382,15 +390,6 @@ export class LocalManifest {
 	/** Return the live baseline without permitting writes around revision tracking. */
 	getManifest(): LocalManifestView {
 		return this.manifest;
-	}
-
-	/**
-	 * Replace entire manifest (used after remote sync)
-	 */
-	replaceManifest(manifest: LocalManifestView): void {
-		this.manifest = parseLocalManifest(manifest);
-		this.logActive = false;
-		this.markChanged();
 	}
 
 	/**

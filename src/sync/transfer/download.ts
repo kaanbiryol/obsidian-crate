@@ -2,13 +2,14 @@ import { recordSyncError } from '../issues';
 import { isAbortError } from "../abort";
 import { base64ToArrayBuffer } from "../encoding";
 import { applyRemoteContentIfUnchanged, incomingReviewMessage } from "../local/local-apply";
+import { unsupportedLocalPathIssue } from '../local/local-path-safety';
 import { recordAppliedContent } from './applied-content';
 import type { DiffApplyOutcome, TransferContext } from "./types";
 import { createLogger } from "../logger";
 import { errorMessage } from "../../platform/logger";
 import type { SyncResult } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
-import { fileFailure } from '../failures';
+import { fileFailure, isAuthError, isTransientSyncFailure } from '../failures';
 import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 
@@ -88,8 +89,22 @@ export async function parallelDownloadAndSaveFiles(
 ): Promise<void> {
 	const batchable: DownloadRequest[] = [];
 	const individual: DownloadRequest[] = [];
+	let stopped: unknown;
+	const failRequests = (failed: readonly DownloadRequest[], error: unknown) => {
+		for (const request of failed) {
+			recordSyncError(result, error, request.path);
+			onFailure?.(fileFailure(request.path, error));
+			onProcessed?.();
+		}
+	};
 
 	for (const request of requests) {
+		const unsupported = unsupportedLocalPathIssue(request.path);
+		if (unsupported) {
+			(result.issues ??= []).push(unsupported);
+			onProcessed?.();
+			continue;
+		}
 		const review = await awaitingReview(context, request);
 		if (review) {
 			recordSyncError(result, review, request.path);
@@ -117,6 +132,7 @@ export async function parallelDownloadAndSaveFiles(
 		if (currentChunk.length > 0) chunks.push(currentChunk);
 
 		await context.runConcurrent(chunks.map(chunk => async () => {
+			if (stopped !== undefined) return failRequests(chunk, stopped);
 			try {
 				const response = await context.files.batchDownload(chunk.map((request) => request.path));
 				const requestsByPath = new Map(chunk.map((request) => [request.path, request] as const));
@@ -181,6 +197,13 @@ export async function parallelDownloadAndSaveFiles(
 				if (isAbortError(error)) {
 					throw error;
 				}
+				// A timeout, busy server or revoked access would fail one request per file
+				// the same way, so stop as delete batches do. Only a malformed response or
+				// another refusal falls back to individual downloads.
+				if (isTransientSyncFailure(error) || isAuthError(error)) {
+					stopped = error;
+					return failRequests(chunk, error);
+				}
 
 				logger.warn("Batch download failed, falling back to individual downloads:", errorMessage(error));
 				individual.push(...chunk);
@@ -189,7 +212,8 @@ export async function parallelDownloadAndSaveFiles(
 	}
 
 	if (individual.length > 0) {
-		await downloadFilesIndividually(context, individual, result, concurrency, onProcessed, onFailure);
+		if (stopped !== undefined) failRequests(individual, stopped);
+		else await downloadFilesIndividually(context, individual, result, concurrency, onProcessed, onFailure);
 	}
 }
 

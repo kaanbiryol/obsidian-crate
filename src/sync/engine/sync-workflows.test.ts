@@ -42,6 +42,23 @@ describe('SyncEngine incremental sync cursor/state safeguards', () => {
 		expect(state.lastError).toBe('notes/remote.md: network down');
 		expect(harness.settings.lastSeq).toBe(1);
 	});
+
+	it('reports a persistent local scan error without reading the whole server inventory', async () => {
+		const harness = createHarness({ lastSeq: 1 });
+		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 2, hasMore: false });
+		// Names that collide on a case-insensitive device fail every scan until renamed.
+		harness.vault.getFiles.mockReturnValue(['notes/A.md', 'notes/a.md'].map(path => ({ path, extension: 'md', stat: { size: 1, mtime: 1 } })));
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+
+		const result = await harness.engine.sync();
+
+		expect(result).toMatchObject({ success: false, outcome: 'failed' });
+		expect(result.errors).toEqual([expect.stringContaining('Paths collide')]);
+		expect(harness.engine.getState().status).toBe('error');
+		expect(harness.api.getManifest).not.toHaveBeenCalled();
+		expect(harness.settings.lastSeq).toBe(1);
+		harness.engine.destroy();
+	});
 });
 describe('SyncEngine full sync safeguards', () => {
 	it('skips ignored remote paths during full sync reconciliation', async () => {

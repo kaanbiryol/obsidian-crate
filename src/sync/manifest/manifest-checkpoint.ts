@@ -72,7 +72,7 @@ export function sameCheckpointRecoveryState(left: ManifestCheckpoint, right: Man
 		&& JSON.stringify([...left.renames]) === JSON.stringify([...right.renames]);
 }
 
-export function parseLocalManifest(value: unknown): FileManifest {
+function parseLocalManifest(value: unknown): FileManifest {
 	if (!isRecord(value) || value.version !== CHECKPOINT_VERSION
 		|| (value.lastSeq !== undefined && !isSyncSequence(value.lastSeq))
 		|| (value.truncated !== undefined && value.truncated !== false)) throw new Error('Invalid manifest checkpoint');

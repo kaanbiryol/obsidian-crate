@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload } from '../types';
 import { runIncrementalSync } from './incremental';
-import { createSettings } from './planner-test-harness';
+import { createIncrementalHarness, createSettings } from './planner-test-harness';
+import { SyncIssueError } from '../issues';
 import { HttpError, SyncTransportError } from '../worker-api/client';
 import { sha256Hex } from '../../platform/sha256';
 
@@ -279,6 +280,24 @@ it('falls back to full sync when cursor is expired', async () => {
 
 		const result = await runIncrementalSync(context, {});
 		expect(result).toBeNull();
+	});
+
+	it('records a local scan error as a failed result instead of falling back to full sync', async () => {
+		const harness = createIncrementalHarness({ settings: { lastSeq: 2 }, lastSeq: 3 });
+		const issue = { path: 'locked', message: 'Vault scan incomplete: locked', code: 'vault-scan-incomplete' as const };
+		harness.context.getLocalChanges = vi.fn(async () => { throw new SyncIssueError(issue.message, [issue]); });
+
+		const result = await runIncrementalSync(harness.context, {});
+
+		expect(result).toMatchObject({ success: false, outcome: 'failed', issues: [issue] });
+		expect(harness.settings.lastSeq).toBe(2);
+	});
+
+	it('leaves revoked access after the changelog read to the workflow', async () => {
+		const harness = createIncrementalHarness({ settings: { lastSeq: 2 }, lastSeq: 3 });
+		harness.context.getLocalChanges = vi.fn(async () => { throw new HttpError('Unauthorized', 401); });
+		await expect(runIncrementalSync(harness.context, {})).rejects.toMatchObject({ status: 401 });
+		expect(harness.settings.lastSeq).toBe(2);
 	});
 
 	it('retries incrementally after SyncTransportError instead of falling back', async () => {

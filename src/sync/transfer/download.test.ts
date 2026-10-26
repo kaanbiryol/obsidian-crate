@@ -4,6 +4,10 @@ import { parallelDownloadAndSaveFiles } from './download';
 import { processDiff } from './process';
 import { createNamedAbortError, createTransferHarness, emptyResult } from './transfer-test-harness';
 import { sha256Hex } from '../../platform/sha256';
+import { Platform } from 'obsidian';
+import { runConcurrentTasks } from '../concurrency';
+import { HttpError, SyncTransportError } from '../worker-api/http';
+import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
@@ -377,4 +381,59 @@ it('reports every file across concurrent download batches', async () => {
 	await parallelDownloadAndSaveFiles(harness.context, requests, result, 2, onProcessed);
 	expect(result.downloaded).toBe(51);
 	expect(onProcessed).toHaveBeenCalledTimes(51);
+});
+
+const runConcurrent = <T>(tasks: Array<() => Promise<T>>, concurrency: number) => runConcurrentTasks(tasks, concurrency, () => false);
+
+it.each([
+	['a timeout', () => new SyncTransportError('Request timed out after 120000ms')],
+	['revoked access', () => new HttpError('Unauthorized', 401)],
+	['rate limiting', () => new HttpError('Too many requests', 429, 30_000)],
+])('fails the remaining downloads without sending them after a batch fails with %s', async (_name, error) => {
+	const harness = createTransferHarness();
+	harness.api.batchDownload.mockRejectedValue(error());
+	const onProcessed = vi.fn();
+	const onFailure = vi.fn();
+	const requests = [
+		...Array.from({ length: 250 }, (_, index) => ({ path: `notes/${index}.md`, expectedLocalHash: null, expectedRemoteHash: 'a'.repeat(64), remoteSize: 10 })),
+		{ path: 'large.bin', expectedLocalHash: null, expectedRemoteHash: 'b'.repeat(64), remoteSize: BATCH_FILE_SIZE_LIMIT },
+	];
+	const result = emptyResult();
+	await parallelDownloadAndSaveFiles({ ...harness.context, runConcurrent }, requests, result, 2, onProcessed, onFailure);
+	// Only the two batches already in flight were sent.
+	expect(harness.api.batchDownload).toHaveBeenCalledTimes(2);
+	expect(harness.api.downloadFile).not.toHaveBeenCalled();
+	expect(result.errors).toHaveLength(251);
+	expect(onProcessed).toHaveBeenCalledTimes(251);
+	expect(onFailure).toHaveBeenCalledTimes(251);
+	const thrown = error();
+	if (thrown instanceof HttpError) expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ path: 'large.bin', status: thrown.status }));
+});
+
+it('still downloads each file when a batch response does not match its request', async () => {
+	const harness = createTransferHarness();
+	harness.vault.getAbstractFileByPath.mockReturnValue(null);
+	const content = new TextEncoder().encode('ok').buffer;
+	harness.api.batchDownload.mockResolvedValue({ files: [] });
+	harness.api.downloadFile.mockResolvedValue({ content, contentType: 'text/plain', size: 2 });
+	const result = emptyResult();
+	await parallelDownloadAndSaveFiles({ ...harness.context, runConcurrent }, [{ path: 'fallback.md', expectedLocalHash: null, expectedRemoteHash: await sha256Hex(content), remoteSize: 2 }], result, 2);
+	expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md');
+	expect(result.downloaded).toBe(1);
+});
+
+it('skips a remote file whose name this Windows device cannot store', async () => {
+	const previous = Platform.isWin;
+	Object.assign(Platform, { isWin: true });
+	try {
+		const harness = createTransferHarness();
+		const onProcessed = vi.fn();
+		const result = emptyResult();
+		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'notes/a:b.md', expectedLocalHash: null, expectedRemoteHash: 'a'.repeat(64), remoteSize: 2 }], result, 2, onProcessed);
+		expect(harness.api.batchDownload).not.toHaveBeenCalled();
+		expect(harness.adapter.exists).not.toHaveBeenCalled();
+		expect(result.errors).toEqual([]);
+		expect(result.issues).toEqual([expect.objectContaining({ path: 'notes/a:b.md', code: 'unsupported-device-path' })]);
+		expect(onProcessed).toHaveBeenCalledOnce();
+	} finally { Object.assign(Platform, { isWin: previous }); }
 });

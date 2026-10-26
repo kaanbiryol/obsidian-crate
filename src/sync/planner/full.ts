@@ -39,7 +39,6 @@ export async function createFullSyncPlan(
 			return { path: file.path, hash, size: content.byteLength, mtime: file.mtime };
 		}));
 	const hashed = await context.runConcurrent(hashTasks, prepareConcurrency);
-	context.throwIfDestroyed();
 	for (const entry of hashed) {
 		localFiles[entry.path] = {
 			hash: entry.hash,

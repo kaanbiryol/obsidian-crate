@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Platform } from 'obsidian';
 import type { PreparedUpload, SyncResult } from '../types';
 import { runIncrementalSync } from './incremental';
 import { createIncrementalHarness, createSettings } from './planner-test-harness';
@@ -300,6 +301,7 @@ describe('runIncrementalSync', () => {
 			],
 			lastSeq: 6,
 		});
+		harness.localManifest.getEntry.mockReturnValue({ hash: 'a'.repeat(64), size: 1, modified: '2026-02-06T12:00:00.000Z' });
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.vault.adapter.exists.mockResolvedValue(false);
 
@@ -310,6 +312,20 @@ describe('runIncrementalSync', () => {
 		expect(harness.vault.delete).not.toHaveBeenCalled();
 		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/missing.md');
+		expect(harness.settings.lastSeq).toBe(6);
+	});
+
+	it('skips a remote delete of a path this device never synced without touching the filesystem', async () => {
+		const harness = createIncrementalHarness({ settings: { lastSeq: 4 }, lastSeq: 6,
+			changes: [{ seq: 6, path: 'notes/never-synced.md', action: 'delete', hash: '', size: 0, created_at: '2026-02-06T12:00:00.000Z' }],
+		});
+
+		const result = await runIncrementalSync(harness.context, {});
+
+		expect(result?.success).toBe(true);
+		expect(harness.vault.getAbstractFileByPath).not.toHaveBeenCalled();
+		expect(harness.vault.adapter.exists).not.toHaveBeenCalled();
+		expect(harness.localManifest.removeEntry).not.toHaveBeenCalled();
 		expect(harness.settings.lastSeq).toBe(6);
 	});
 
@@ -488,5 +504,27 @@ describe('runIncrementalSync', () => {
 
 		expect(harness.api.batchDelete).toHaveBeenCalledWith([path], { [path]: 'base' }, { [path]: 'version-1' });
 		expect(result?.deletedPaths).toContain(path);
+	});
+
+	describe('on a Windows device', () => {
+		const previous = Platform.isWin;
+		beforeEach(() => { Object.assign(Platform, { isWin: true }); });
+		afterEach(() => { Object.assign(Platform, { isWin: previous }); });
+
+		it.each(['put', 'delete'] as const)('skips a remote %s of a name it cannot store and advances the cursor', async action => {
+			const harness = createIncrementalHarness({ settings: { lastSeq: 10 }, lastSeq: 12, changes: [
+				{ seq: 11, path: 'notes/a:b.md', action, hash: action === 'put' ? 'a'.repeat(64) : '', size: 3, revision: 'r1', created_at: '2026-02-06T12:00:00Z' },
+				{ seq: 12, path: 'notes/other.md', action: 'put', hash: 'b'.repeat(64), size: 3, revision: 'r2', created_at: '2026-02-06T12:00:00Z' },
+			] });
+			const download = vi.fn(async () => {});
+			harness.context.parallelDownloadAndSaveFiles = download;
+
+			const result = await runIncrementalSync(harness.context, {});
+
+			expect(result).toMatchObject({ success: true, errors: [], issues: [{ path: 'notes/a:b.md', code: 'unsupported-device-path' }] });
+			expect(download).toHaveBeenCalledWith(
+				[expect.objectContaining({ path: 'notes/other.md' })], expect.anything(), expect.any(Function), undefined);
+			expect(harness.settings.lastSeq).toBe(12);
+		});
 	});
 });

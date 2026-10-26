@@ -36,6 +36,10 @@ const VAULT_SCAN_INCOMPLETE: IssueExplanation = {
 	summary: 'Crate could not finish reading the vault.',
 	recovery: 'Check that the listed file or folder is available on this device and Obsidian has permission to read it. Then select Sync vault.',
 };
+const INCOMPATIBLE_PATH: IssueExplanation = {
+	summary: 'This file’s name or location is not compatible with sync on this device.',
+	recovery: 'Review the filename details below. Rename the affected file on the source device to resolve the invalid name or collision, then sync again.',
+};
 const TRANSFER_UNVERIFIED: IssueExplanation = {
 	summary: 'Crate could not verify the file transfer.',
 	recovery: 'Select Sync vault to retry. If this repeats, update the plugin and server, then run sync diagnostics in Crate settings.',
@@ -52,6 +56,7 @@ const EXPLANATIONS_BY_CODE: Record<SyncIssueCode, IssueExplanation> = {
 	'file-too-large': FILE_TOO_LARGE,
 	'vault-scan-incomplete': VAULT_SCAN_INCOMPLETE,
 	'transfer-unverified': TRANSFER_UNVERIFIED,
+	'unsupported-device-path': INCOMPATIBLE_PATH,
 };
 
 /** Message matching for OS, HTTP and transport errors, and for issues saved or
@@ -85,9 +90,7 @@ const MESSAGE_RULES: Array<[RegExp, IssueExplanation]> = [
 	[/quota|storage limit|D1.*limit|too many (?:SQL|subrequests)/i, {
 		summary: 'A storage or server limit stopped this sync.',
 		recovery: 'Check available device storage and the server’s usage limits in Crate settings. After freeing space or resolving the limit, sync again.' }],
-	[/Invalid sync path|Cannot access .* on this Windows device|portable path|parent folder|case.fold|filename collision/i, {
-		summary: 'This file’s name or location is not compatible with sync on this device.',
-		recovery: 'Review the filename details below. Rename the affected file on the source device to resolve the invalid name or collision, then sync again.' }],
+	[/Invalid sync path|Cannot access .* on this Windows device|portable path|parent folder|case.fold|filename collision/i, INCOMPATIBLE_PATH],
 	[/Vault scan incomplete/i, VAULT_SCAN_INCOMPLETE],
 	[/\bEACCES\b|\bEPERM\b|permission denied|read.only/i, {
 		summary: 'Crate could not access this file.',

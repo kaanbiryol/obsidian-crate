@@ -280,4 +280,31 @@ describe('multiple real sync engines across Worker and storage boundaries', () =
 		expect(second.engine.getActiveConflicts()).toHaveLength(1);
 		expect(new Uint8Array((await first.api.downloadFile('image.bin')).content)).toEqual(new Uint8Array([0, 2]));
 	});
+
+	it('downloads every remote change after sync stops between incremental download batches', async () => {
+		const [first, second] = await replicas('seed.md', 'seed\n');
+		for (let index = 0; index < 150; index++) first.disk.write(`note-${index}.md`, `note ${index}\n`);
+		await sync(first);
+		const create = second.disk.vault.createBinary.bind(second.disk.vault);
+		let creates = 0;
+		let releaseFirstBatch!: () => void;
+		const firstBatchHeld = new Promise<void>(resolve => { releaseFirstBatch = resolve; });
+		vi.spyOn(second.disk.vault, 'createBinary').mockImplementation(async (path, content) => {
+			// Stop sync once both batches in flight are writing their files: no request is
+			// pending and the third batch has not started.
+			if (++creates === 1) await firstBatchHeld;
+			else if (creates === 2) { second.close(); releaseFirstBatch(); }
+			return create(path, content);
+		});
+		const cursor = second.settings.lastSeq;
+		const stopped = await second.engine.sync();
+		expect(stopped.outcome).toBe('cancelled');
+		expect(stopped.downloaded).toBeLessThan(150);
+		expect(second.settings.lastSeq).toBe(cursor);
+		await second.engine.waitForIdle();
+		await second.open();
+		await sync(second);
+		expect(second.disk.paths()).toEqual(first.disk.paths());
+		expect(Object.keys(second.checkpoint().files).sort()).toEqual(first.disk.paths());
+	});
 });

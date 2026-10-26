@@ -2,6 +2,7 @@ import { isRecord } from '../../platform/validation';
 import { isSyncSequence, isSyncPath, parseSyncFiles } from '../../protocol/sync-validation';
 import type { FileEntry } from '../../protocol/sync-types';
 import { CHECKPOINT_VERSION, parseCheckpoint, type ManifestCheckpoint } from './manifest-checkpoint';
+import { MAX_UPLOAD_DIAGNOSTICS, normalizeUploadDiagnostics, type UploadDiagnostic } from '../diagnostics/upload-diagnostics';
 
 /**
  * Append-only changes since a full manifest checkpoint. A save writes only the
@@ -20,8 +21,13 @@ const STATE_FIELDS = {
 	uploadDiagnostics: 'uploadDiagnostics', settledUploads: 'settledUploads', renameDependencies: 'renames',
 } as const satisfies Record<string, keyof ManifestLogState>;
 
-/** Each recovery field as JSON text, with `null` for an absent or empty value. */
-export type EncodedLogState = Record<keyof typeof STATE_FIELDS, string>;
+/** Each recovery field as JSON text, with `null` for an absent or empty value. Upload
+ * diagnostics are left out: records append only their new rows. */
+export type EncodedLogState = Record<Exclude<keyof typeof STATE_FIELDS, 'uploadDiagnostics'>, string>;
+
+/** Replay appends a record's new diagnostic rows. Older plugins ignore this key and keep
+ * the diagnostics of the checkpoint. */
+const APPENDED_DIAGNOSTICS = 'appendedUploadDiagnostics';
 
 export function encodeLogState(state: ManifestLogState): EncodedLogState {
 	const json = (value: unknown, present: unknown) => present ? JSON.stringify(value) : 'null';
@@ -29,7 +35,6 @@ export function encodeLogState(state: ManifestLogState): EncodedLogState {
 		initialConfigPull: json(state.initialConfigPull, state.initialConfigPull),
 		initialImportToken: json(state.initialImportToken, state.initialImportToken),
 		restoreIntents: json(state.restoreIntents, state.restoreIntents.length),
-		uploadDiagnostics: json(state.uploadDiagnostics, state.uploadDiagnostics.length),
 		settledUploads: json(state.settledUploads, state.settledUploads.length),
 		renameDependencies: state.renames.size ? JSON.stringify(Object.fromEntries(state.renames)) : 'null',
 	};
@@ -46,6 +51,8 @@ export interface ManifestLogRecord {
 	 */
 	state: EncodedLogState;
 	previous: EncodedLogState | undefined;
+	/** Diagnostic rows recorded since the previous record. */
+	uploadDiagnostics: readonly UploadDiagnostic[];
 }
 
 export function encodeLogHeader(base: number, authority: string | undefined): string {
@@ -56,6 +63,7 @@ export function encodeLogRecord(record: ManifestLogRecord): string {
 	const changes = (Object.keys(record.state) as Array<keyof EncodedLogState>)
 		.filter(key => record.state[key] !== record.previous?.[key])
 		.map(key => `${JSON.stringify(key)}:${record.state[key]}`);
+	if (record.uploadDiagnostics.length) changes.push(`"${APPENDED_DIAGNOSTICS}":${JSON.stringify(record.uploadDiagnostics)}`);
 	const head = JSON.stringify({ generation: record.generation, set: record.set, deleted: record.deleted });
 	return `${head.slice(0, -1)},"changes":{${changes.join(',')}}}\n`;
 }
@@ -85,6 +93,7 @@ export function replayManifestLog(checkpoint: ManifestCheckpoint, text: string):
 		for (const [path, entry] of Object.entries(record.set)) checkpoint.manifest.files[path] = entry;
 		for (const path of record.deleted) delete checkpoint.manifest.files[path];
 		Object.assign(checkpoint, record.state, { generation: record.generation });
+		if (record.appendedDiagnostics.length) checkpoint.uploadDiagnostics = [...checkpoint.uploadDiagnostics, ...record.appendedDiagnostics].slice(-MAX_UPLOAD_DIAGNOSTICS);
 		applied++;
 	}
 	return { applied, appendable: text.endsWith('\n') };
@@ -94,7 +103,9 @@ function parseLine(line: string): unknown {
 	try { return JSON.parse(line) as unknown; } catch { return undefined; }
 }
 
-function parseRecord(value: unknown, checkpoint: ManifestCheckpoint): { generation: number; set: Record<string, FileEntry>; deleted: string[]; state: Partial<ManifestLogState> } {
+function parseRecord(value: unknown, checkpoint: ManifestCheckpoint): {
+	generation: number; set: Record<string, FileEntry>; deleted: string[]; state: Partial<ManifestLogState>; appendedDiagnostics: UploadDiagnostic[];
+} {
 	const changes = isRecord(value) ? value.changes ?? value.state : undefined;
 	if (!isRecord(value) || !isSyncSequence(value.generation) || !Array.isArray(value.deleted)
 		|| !value.deleted.every((path: unknown) => typeof path === 'string' && isSyncPath(path)) || !isRecord(changes)) {
@@ -109,5 +120,6 @@ function parseRecord(value: unknown, checkpoint: ManifestCheckpoint): { generati
 	// A full `state` record replaces every field; a `changes` record only the ones it names.
 	const state = 'changes' in value ? Object.fromEntries((Object.keys(STATE_FIELDS) as Array<keyof typeof STATE_FIELDS>)
 		.filter(key => key in changes).map(key => [STATE_FIELDS[key], parsed[STATE_FIELDS[key]]])) as Partial<ManifestLogState> : parsed;
-	return { generation: value.generation, set: parseSyncFiles(value.set, true), deleted: value.deleted, state };
+	return { generation: value.generation, set: parseSyncFiles(value.set, true), deleted: value.deleted, state,
+		appendedDiagnostics: normalizeUploadDiagnostics(changes[APPENDED_DIAGNOSTICS]) };
 }

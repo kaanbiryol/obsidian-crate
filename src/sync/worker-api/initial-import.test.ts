@@ -79,3 +79,19 @@ it('reports live remaining work while polling and accepts older servers without 
 	await vi.advanceTimersByTimeAsync(2000); await waiting;
 	expect(progress).toHaveBeenCalledExactlyOnceWith(counts);
 });
+
+it('polls every second for the first minute, then every 5 seconds, and still stops within a second', async () => {
+	vi.useFakeTimers();
+	const { api, requestJson } = harness();
+	requestJson.mockResolvedValue({ ready: false });
+	let cancelled = false;
+	const pending = api.waitUntilReady('token', () => { if (cancelled) throw new Error('cancelled'); });
+	const rejected = expect(pending).rejects.toThrow('cancelled');
+	await vi.advanceTimersByTimeAsync(60_000);
+	expect(requestJson).toHaveBeenCalledTimes(61);
+	await vi.advanceTimersByTimeAsync(20_000);
+	expect(requestJson).toHaveBeenCalledTimes(65);
+	cancelled = true;
+	await vi.advanceTimersByTimeAsync(1000); await rejected;
+	expect(requestJson).toHaveBeenCalledTimes(65);
+});

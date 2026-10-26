@@ -53,7 +53,7 @@ Primary sync mode. Fetches only changelog entries since `lastSeq`:
 5. Execute operations, preparing and uploading local files in bounded chunks
 6. Update local manifest and `lastSeq`
 
-Returns `null` to signal fallback to full sync (on cursor expiry or a non-transient error). Transport failures and retryable server statuses (408, 425, 429, 5xx) return a failed result instead, so the next sync retries incrementally without re-reading the vault.
+Returns `null` to signal fallback to full sync only when the changelog cannot be used: on cursor expiry or a non-transient error while reading it. Transport failures and retryable server statuses (408, 425, 429, 5xx) return a failed result instead, so the next sync retries incrementally without re-reading the vault. Any other error after the changelog is read, such as a local scan, apply or save error, also returns a failed result: a full sync would read the whole server inventory and then fail on the same local error.
 
 Entry point: `planner/incremental.ts:runIncrementalSync()`.
 The coordinator retains phase ordering, progress, manifest saves and cursor
@@ -64,7 +64,7 @@ local deletions only after earlier uploads and reconciliation succeed.
 
 ### 4. Full Sync (Fallback)
 
-Triggered when incremental sync fails or `lastSeq` is 0:
+Triggered when the changelog cannot be read incrementally or `lastSeq` is 0:
 
 1. Discover all local vault files
 2. Fetch the remote manifest in 2,000-file pages, then replay changes that landed after the first-page snapshot
@@ -214,7 +214,7 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
    - Non-hidden folders are walked iteratively at any depth while looking for nested hidden subfolders
 3. **Deduplication:** via Set to avoid processing the same file twice
 4. **Early filtering:** ignore patterns applied during discovery, before hashing
-5. **Portability validation:** reject Windows-incompatible names plus case and Unicode-normalization collisions before any upload begins
+5. **Portability validation:** reject invalid sync paths (empty, `.` or `..` segments, control characters, backslashes) plus case and Unicode-normalization collisions before any upload begins. Names Windows cannot store (`< > : " | ? *`, a trailing dot or space, reserved names) are checked only before local file access on Windows. There, a remote file with such a name is skipped with an `unsupported-device-path` issue, like an oversized file, so it never fails a sync or holds back the changelog cursor. A remote delete of a path this device never synced is skipped without touching the filesystem
 
 The active Obsidian configuration folder's entire `plugins/` tree is always excluded, including plugin JavaScript, manifests, styles, and data files.
 
@@ -264,7 +264,7 @@ Accepted sibling requests drain before cancellation returns; acknowledged
 deletions are checkpointed. Activity reports **Deleting X of Y files** as batches
 complete. Queue settlement and conflict retries remain with the calling mode.
 
-Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable.
+Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch response does not match its request or the server refuses it with a non-retryable status. A transport failure, retryable status (408, 425, 429, 5xx) or 401 instead fails that batch and every request not yet sent, as delete batches do; batch uploads stop the same way.
 
 Implementation: `transfer/upload.ts`, `transfer/upload-pipeline.ts`, `transfer/prepare.ts`, `transfer/delete.ts`, `delete-batches.ts`
 
@@ -330,9 +330,12 @@ included in a follow-up checkpoint before that save finishes.
 
 **Change log:** after a full checkpoint, saves append one JSON line to
 `file-manifest.log` with only the changed or removed entries and the recovery state
-fields (renames, upload receipts, diagnostics, restore intents) that changed since the
-previous record, with `null` clearing a field. A queue flush in a large vault rewrites
-neither the whole baseline nor unchanged recovery state. The
+fields (renames, upload receipts, restore intents) that changed since the
+previous record, with `null` clearing a field. Upload diagnostics are appended:
+a record carries only the rows recorded since the previous one, and loading keeps
+the newest 50. Older plugins ignore those rows, so a downgrade loses only
+diagnostics. A queue flush in a large vault rewrites neither the whole baseline
+nor unchanged recovery state. The
 log's header names the base checkpoint generation; loading applies its consecutive
 records only when that base is the selected main checkpoint, so a log left behind by
 an interrupted compaction is ignored. An interrupted append can only tear the final
@@ -352,10 +355,10 @@ Implementation: `manifest.ts:LocalManifest`
 ## Error Recovery
 
 - **Retry:** failed uploads retry up to 3 times with exponential backoff (1s base delay)
-- **Cancellation:** abort and timeout stop the caller's wait and ignore late responses. Vault discovery checks cancellation before and after every directory listing and hidden-file stat; a cancelled scan never returns a partial inventory. Local hashing also checks cancellation before updating a baseline. Obsidian's HTTP transport may still finish and commit a mutation remotely. Uncertain queued paths remain pending; retries use expected-hash writes and reconciliation, and cancelled incremental runs do not advance the changelog cursor. Concurrent workers and filesystem reads already in progress are drained before a failed operation unwinds. **Stop sync** clears displayed progress immediately, then waits for local work, saves automatic sync as off, and reloads the idle engine.
+- **Cancellation:** abort and timeout stop the caller's wait and ignore late responses. Stopping the engine rejects concurrent transfers that have not started yet and any manifest save after the manifest closes, so a partial run can never be reported as a completed one. Vault discovery checks cancellation before and after every directory listing and hidden-file stat; a cancelled scan never returns a partial inventory. Local hashing also checks cancellation before updating a baseline. Obsidian's HTTP transport may still finish and commit a mutation remotely. Uncertain queued paths remain pending; retries use expected-hash writes and reconciliation, and cancelled incremental runs do not advance the changelog cursor. Concurrent workers and filesystem reads already in progress are drained before a failed operation unwinds. **Stop sync** clears displayed progress immediately, then waits for local work, saves automatic sync as off, and reloads the idle engine.
 - **Local deletion recovery:** visible files use Obsidian's local vault trash (`vault.trash(file, false)`); hidden/unindexed files use the adapter's local trash. The vault's `.trash/` directory is always excluded from sync. A trash failure never falls back to permanent removal. The hash check and deletion are not atomic: an edit arriving between them remains recoverable in trash.
 - **Upload memory:** incremental and queued uploads reserve room for the next maximum-size file before preparation, using the 48 MiB mobile / 128 MiB desktop budget and a 128-file cap. Chunks finish uploading before further contents are prepared; history retains paths rather than file buffers. These budgets cover prepared binary contents, not total process memory or request encoding overhead.
-- **Incremental-to-full fallback:** if incremental sync returns `null` (error/cursor expiry), engine runs full sync
+- **Incremental-to-full fallback:** if incremental sync returns `null` (changelog read error or cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
 - **Startup event recovery:** the startup sync scans the vault itself, and vault events that arrive while it runs are queued once it finishes, keeping the latest change per path. Pending verification settles download echoes and other files that still match their baseline; real edits flush like live events
 - **Conflict recovery:** the durable conflict registry recovers from `.tmp` and discovers visible or hidden conflict copies that were created before their metadata was committed

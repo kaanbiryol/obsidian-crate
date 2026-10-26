@@ -24,7 +24,6 @@ export async function getLocalDeletes(
 	});
 
 	const results = await context.runConcurrent(tasks, prepareConcurrency);
-	context.throwIfDestroyed();
 	return results.filter((path): path is string => path !== null);
 }
 
@@ -68,7 +67,6 @@ export async function getLocalChanges(
 	});
 
 	const results = await context.runConcurrent(tasks, prepareConcurrency);
-	context.throwIfDestroyed();
 	for (const result of results) {
 		if (result) {
 			changes.push(result);

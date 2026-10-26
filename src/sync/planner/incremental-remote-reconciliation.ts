@@ -10,7 +10,7 @@ import type { ChangelogEntry, FileEntry } from '../../protocol/sync-types';
 import type { FileDiff, SyncResult } from '../types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { isVaultTFileLike } from '../local/local-delete';
-import { assertLocalSyncPath } from '../local/local-path-safety';
+import { assertLocalSyncPath, unsupportedLocalPathIssue } from '../local/local-path-safety';
 
 export interface IncrementalRemoteReconciliation {
 	discoveredLocalChanges: Array<{ path: string; hash: string }>;
@@ -45,6 +45,8 @@ export async function reconcileIncrementalRemoteChanges(
 
 	for (const [path, entry] of changesByPath) {
 		if (context.shouldIgnore(path)) continue;
+		const unsupported = unsupportedLocalPathIssue(path);
+		if (unsupported) { (result.issues ??= []).push(unsupported); continue; }
 
 		try {
 			if (entry.action === 'delete') {
@@ -64,8 +66,11 @@ export async function reconcileIncrementalRemoteChanges(
 					}
 				}
 
-				const expectedLocalHash = context.localManifest.getEntry(path)?.hash ?? null;
-				const localDelete = await deletePathLocallyIfUnchanged(context, path, expectedLocalHash);
+				const baseline = context.localManifest.getEntry(path);
+				// This device never synced the path, so there is nothing to delete here. A
+				// local file created at it is a local change for the scan to upload.
+				if (!baseline) continue;
+				const localDelete = await deletePathLocallyIfUnchanged(context, path, baseline.hash);
 				if (localDelete.status === 'changed') {
 					resurrectPaths.add(path);
 					localChangedPaths.add(path);
