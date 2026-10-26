@@ -8,3 +8,10 @@ condition = "AND"
 paths = ['''(?:^|/)vite\.config\.mts$''']
 regexTarget = "secret"
 regexes = ['''^9c474af284e49ff0201106f3b42cca05$''']
+
+[[allowlists]]
+description = "Synthetic path tag secrets (the bytes 0-31) in a unit test"
+condition = "AND"
+paths = ['''(?:^|/)src/encryption/path-tags\.test\.ts$''']
+regexTarget = "secret"
+regexes = ['''^A[AQ]ECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8$''']
