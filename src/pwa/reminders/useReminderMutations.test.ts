@@ -32,7 +32,7 @@ function harness() {
 	const outbox = {
 		enqueue: vi.fn((change: PendingReminderChange) => { changes.push(change); }),
 		drain: vi.fn(() => new Promise<void>(() => {})),
-		retry: vi.fn(), discard: vi.fn(), refresh: vi.fn(() => changes),
+		retry: vi.fn(), resume: vi.fn(async () => {}), discard: vi.fn(), refresh: vi.fn(() => changes),
 	};
 	const state = { changes, ready: true, outboxRef: { current: outbox }, storageError: null, retryInitialization: vi.fn(), recoveryChanges: [], recoverChanges: vi.fn(), quarantinedChanges: [], removeQuarantinedChanges: vi.fn(async () => true) };
 	vi.mocked(useReminderOutbox).mockImplementation(() => ({ ...state, changes: [...changes] }));

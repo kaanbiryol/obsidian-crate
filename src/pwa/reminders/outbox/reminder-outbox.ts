@@ -89,6 +89,13 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 			ambiguous: change.ambiguous || change.status === 'uncertain' || (change.status === 'pending' && change.attempts > 0) });
 	};
 
+	// Explicit refresh: resend every unconfirmed change with its original identity
+	// and bytes, including those past their automatic retry budget.
+	const resume = () => {
+		for (const change of storage.load()) if (change.status === 'uncertain') retry(change.operationId);
+		return drain();
+	};
+
 	// Under the sending lock, so another tab cannot be retrying the change meanwhile.
 	const discard = (operationId: string, reviewedChange?: string): Promise<void> => withLock(async () => {
 		const change = storage.get(operationId);
@@ -159,5 +166,5 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 		}
 	};
 
-	return { enqueue, retry, discard, drain, refresh };
+	return { enqueue, retry, resume, discard, drain, refresh };
 }

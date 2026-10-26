@@ -26,8 +26,9 @@ Explicit logout still deletes the whole private cache and clears pending command
 
 Reminder commands retain their automatic retry deadline and attempt count through
 reloads, foreground changes and reconnection. After three uncertain attempts,
-automatic sending pauses. Explicit retry or **Resume saved changes** for an earlier
-session starts another attempt budget with the same operation ID and request body.
+automatic sending pauses. Explicit retry, a pull to refresh or sync refresh, or
+**Resume saved changes** for an earlier session starts another attempt budget with
+the same operation ID and request body.
 Rejected commands remain available for review.
 
 ## Damaged pending commands

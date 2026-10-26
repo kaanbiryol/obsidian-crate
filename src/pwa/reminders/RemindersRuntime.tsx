@@ -105,8 +105,6 @@ function useRemindersController() {
 		return false;
 	}, [enabled, readOnlyMessage, showToast]);
 
-	const handlePullRefresh = useCallback(() => loadReminders({ silent: true }), [loadReminders]);
-
 
 	const toggleSettings = useCallback(() => setSettingsOpen(open => !open), [setSettingsOpen]);
 
@@ -142,6 +140,10 @@ function useRemindersController() {
 		quarantinedChanges,
 		removeQuarantinedChanges,
 	} = mutations;
+
+	const { resumeChanges } = mutations;
+	// An explicit refresh also resends changes paused after their automatic retries.
+	const handlePullRefresh = useCallback(() => { resumeChanges(); return loadReminders({ silent: true }); }, [resumeChanges, loadReminders]);
 
 	const initialContentReady = isInitialPwaContentReady({
 		notificationPromptReady: !isStandaloneApp() || initialCheckComplete,
