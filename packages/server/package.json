@@ -35,5 +35,5 @@
     "workerd": "1.20261019.1",
     "@cspotcode/source-map-support": "0.8.1"
   },
-  "crateServerRuntime": "5.20261019.1-beta"
+  "crateServerRuntime": "5.20261019.2-beta"
 }

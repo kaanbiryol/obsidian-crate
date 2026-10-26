@@ -101,7 +101,7 @@
 	],
 	"license": "MIT",
 	"devDependencies": {
-		"@cloudflare/vitest-plugin": "^1.4.6",
+		"@cloudflare/vitest-plugin": "^1.4.7",
 		"@codemirror/state": "6.7.6",
 		"@codemirror/view": "6.43.13",
 		"@eslint/js": "^10.0.1",
@@ -123,7 +123,7 @@
 		"fast-check": "^4.10.2",
 		"globals": "17.13.0",
 		"knip": "^6.43.0",
-		"miniflare": "5.20261019.1-beta",
+		"miniflare": "5.20261019.2-beta",
 		"obsidian": "1.14.4",
 		"postcss": "^8.5.31",
 		"sass": "^1.106.1",
