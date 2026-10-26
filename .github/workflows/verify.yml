@@ -123,7 +123,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: npm run check:server-revision && node scripts/release-artifacts.mjs restore
       - name: Check visual and editor types
-        if: inputs.reuse-run-id == ''
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm run typecheck:visual
       - name: Build plugin
         if: inputs.reuse-run-id == ''

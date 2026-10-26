@@ -36,7 +36,7 @@ export function NavigationFixture({ isDark, onAdd }: { isDark: boolean; onAdd: (
     headerRightContent={<IconButton icon="settings" size="large" iconSize="l" label="Crate settings" onClick={() => onAdd("settings")} />}
     initialTab={compact ? 'browse' : undefined} initialProject={compact ? 'Project 01' : undefined}
     upcomingDays={7} onAdd={project => onAdd(project)} onReorder={() => {}}
-    renderCard={({ reminder, hideProject }) => <ReminderCard reminder={reminder} hideProject={hideProject} animationConfig={{ enabled: false }} />} />;
+    renderCard={({ reminder, hideProject }) => <ReminderCard reminder={reminder} hideProject={hideProject} colorScheme={isDark ? 'dark' : 'light'} animationConfig={{ enabled: false }} />} />;
   if (compact) return renderShell();
   return <PluginWorkspaceNavigation tabs={tabs} onTabsChange={setTabs} remindersEnabled readingEnabled={readingEnabled}
     renderReminders={(tab, onChange, renderNavigation) => renderShell({ activeTab: tab, onTabChange: onChange, renderNavigation })}
