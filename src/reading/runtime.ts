@@ -10,34 +10,48 @@ import { validateReadingFolder, type ReadingSettings } from './settings';
 
 export const READING_VIEW_TYPE = 'crate-reading';
 
-const runtimes = new WeakMap<CratePlugin, { library: ReadingLibrary; stop: () => Promise<void> }>();
-const stopping = new WeakMap<CratePlugin, Promise<void>>();
-const listeners = new WeakMap<CratePlugin, Set<() => void>>();
-export function subscribeReadingRuntime(plugin: CratePlugin, listener: () => void): () => void {
-	let current = listeners.get(plugin);
-	if (!current) { current = new Set(); listeners.set(plugin, current); }
-	current.add(listener);
-	return () => { current.delete(listener); };
+/** Reading state of one plugin instance. Only `runtime` ends with a stop; the rest outlives restarts. */
+interface ReadingPluginState {
+	/** The running library, replaced by every restart. */
+	runtime?: { library: ReadingLibrary; stop: () => Promise<void> };
+	/** Settles once every stopped library has drained, so a replacement starts after it. */
+	stopping?: Promise<void>;
+	listeners: Set<() => void>;
+	/** A saved article may arrive by sync after the link opens Obsidian, so the request waits briefly for it. */
+	requested?: { id: string; until: number };
 }
-function notifyRuntime(plugin: CratePlugin): void { listeners.get(plugin)?.forEach(listener => listener()); }
-// A saved article may arrive by sync after the link opens Obsidian, so the request waits briefly for it.
-const requestedItems = new WeakMap<CratePlugin, { id: string; until: number }>();
+const states = new WeakMap<CratePlugin, ReadingPluginState>();
+function readingState(plugin: CratePlugin): ReadingPluginState {
+	let state = states.get(plugin);
+	if (!state) { state = { listeners: new Set() }; states.set(plugin, state); }
+	return state;
+}
+export function subscribeReadingRuntime(plugin: CratePlugin, listener: () => void): () => void {
+	const { listeners } = readingState(plugin);
+	listeners.add(listener);
+	return () => { listeners.delete(listener); };
+}
+function notifyRuntime(plugin: CratePlugin): void { states.get(plugin)?.listeners.forEach(listener => listener()); }
 export function requestReadingItem(plugin: CratePlugin, id: string): void {
-	requestedItems.set(plugin, { id, until: Date.now() + 120_000 }); notifyRuntime(plugin);
+	readingState(plugin).requested = { id, until: Date.now() + 120_000 }; notifyRuntime(plugin);
 }
 export function requestedReadingItem(plugin: CratePlugin): string | undefined {
-	const request = requestedItems.get(plugin);
-	if (request && request.until <= Date.now()) requestedItems.delete(plugin);
-	return requestedItems.get(plugin)?.id;
+	const state = states.get(plugin);
+	if (state?.requested && state.requested.until <= Date.now()) state.requested = undefined;
+	return state?.requested?.id;
 }
-export function clearRequestedReadingItem(plugin: CratePlugin): void { requestedItems.delete(plugin); }
-export function getReadingLibrary(plugin: CratePlugin): ReadingLibrary | undefined { return runtimes.get(plugin)?.library; }
+export function clearRequestedReadingItem(plugin: CratePlugin): void {
+	const state = states.get(plugin);
+	if (state) state.requested = undefined;
+}
+export function getReadingLibrary(plugin: CratePlugin): ReadingLibrary | undefined { return states.get(plugin)?.runtime?.library; }
 export function stopReading(plugin: CratePlugin): void {
-	const runtime = runtimes.get(plugin);
-	if (runtime) stopping.set(plugin, Promise.allSettled([stopping.get(plugin), runtime.stop()]).then(() => {}));
-	runtimes.delete(plugin); notifyRuntime(plugin);
+	const state = states.get(plugin);
+	if (state?.runtime) state.stopping = Promise.allSettled([state.stopping, state.runtime.stop()]).then(() => {});
+	if (state) state.runtime = undefined;
+	notifyRuntime(plugin);
 }
-export async function waitForStoppedReading(plugin: CratePlugin): Promise<void> { await stopping.get(plugin); }
+export async function waitForStoppedReading(plugin: CratePlugin): Promise<void> { await states.get(plugin)?.stopping; }
 
 // Compiled patterns are keyed by their text, so one cache serves every check.
 const readingPatternCache = new Map<string, RegExp>();
@@ -97,7 +111,7 @@ export function startReading(plugin: CratePlugin): void {
 			const { captureDesktopArticle } = await import('./desktop-capture');
 			return captureDesktopArticle(url, signal);
 		} },
-	}, folder, controller.signal, canAdopt, stopping.get(plugin));
+	}, folder, controller.signal, canAdopt, states.get(plugin)?.stopping);
 	let timer: number | undefined;
 	let lastErrorAt = 0;
 	const refreshes = new Set<Promise<void>>();
@@ -146,7 +160,7 @@ export function startReading(plugin: CratePlugin): void {
 	};
 	const onAbort = () => { void stop(); };
 	lifetime.addEventListener('abort', onAbort, { once: true });
-	runtimes.set(plugin, { library, stop });
+	readingState(plugin).runtime = { library, stop };
 	notifyRuntime(plugin);
 	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) schedule(); });
 }

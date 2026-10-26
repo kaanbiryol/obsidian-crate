@@ -18,15 +18,23 @@ export interface ReminderBackend {
 }
 
 const remindersLogger = createLogger('Reminders');
-// The newest setup's lifetime, including a setup that has not published its backend yet.
-const backends = new WeakMap<CratePlugin, AbortController>();
-// Views subscribe once and follow every backend that replaces the current one.
-const backendListeners = new WeakMap<CratePlugin, Set<() => void>>();
+/** Reminder backend state of one plugin instance; the backend itself is `plugin.reminders`. */
+interface ReminderPluginState {
+	/** The newest setup's lifetime, including a setup that has not published its backend yet. */
+	setup?: AbortController;
+	/** Views subscribe once and follow every backend that replaces the current one. */
+	listeners: Set<() => void>;
+}
+const states = new WeakMap<CratePlugin, ReminderPluginState>();
+function reminderState(plugin: CratePlugin): ReminderPluginState {
+	let state = states.get(plugin);
+	if (!state) { state = { listeners: new Set() }; states.set(plugin, state); }
+	return state;
+}
 
 /** Open views read the plugin's index and repository, which a folder change replaces. */
 export function subscribeReminderBackend(plugin: CratePlugin, listener: () => void): () => void {
-	let listeners = backendListeners.get(plugin);
-	if (!listeners) { listeners = new Set(); backendListeners.set(plugin, listeners); }
+	const { listeners } = reminderState(plugin);
 	listeners.add(listener);
 	return () => { listeners.delete(listener); };
 }
@@ -51,8 +59,9 @@ function createMoveRecoveryReporter(): (issues: string[]) => void {
 }
 
 export function stopReminderBackend(plugin: CratePlugin): void {
-	backends.get(plugin)?.abort();
-	backends.delete(plugin);
+	const state = states.get(plugin);
+	state?.setup?.abort();
+	if (state) state.setup = undefined;
 	plugin.reminders?.watcher.unregister();
 	plugin.reminders = undefined;
 }
@@ -61,9 +70,10 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	if (plugin.settings.reading?.enabled) validateReadingFolder(plugin.settings.reading.folderPath, folderPath, plugin.app.vault.configDir);
 	const lifetime = getPluginLifecycleSignal(plugin);
 	if (lifetime.aborted) return undefined;
-	backends.get(plugin)?.abort();
+	const state = reminderState(plugin);
+	state.setup?.abort();
 	const controller = new AbortController();
-	backends.set(plugin, controller);
+	state.setup = controller;
 	const abort = () => controller.abort();
 	lifetime.addEventListener('abort', abort, { once: true });
 	controller.signal.addEventListener('abort', () => lifetime.removeEventListener('abort', abort), { once: true });
@@ -129,6 +139,6 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 			});
 		});
 	}
-	backendListeners.get(plugin)?.forEach(listener => listener());
+	state.listeners.forEach(listener => listener());
 	return backend;
 }
