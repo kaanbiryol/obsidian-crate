@@ -4,7 +4,8 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../../test-support/schema-test-harness';
 import { SyncTestDevice } from '../../test-support/sync-engine-test-harness';
-import { FIRST_UPLOAD_UNFINISHED } from '../../../../sync/engine/initial-import';
+import { ANOTHER_DEVICE_IMPORTING, FIRST_UPLOAD_UNFINISHED } from '../../../../sync/engine/initial-import';
+import { TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { pendingChangeKey } from '../../../../sync/pending/pending-change';
 
 const clients: SyncTestDevice[] = [];
@@ -33,7 +34,7 @@ it('keeps the first device\'s unfinished import when a second device connects', 
   const second = await device('second-import');
   const joined = await second.engine.sync();
   expect(joined.success).toBe(false);
-  expect(joined.errors).toEqual(['Another device is uploading this vault for the first time. Let it finish, then sync.']);
+  expect(joined.errors).toEqual([ANOTHER_DEVICE_IMPORTING]);
   expect(await serverPaths()).toEqual(['Notes/a.md', 'Notes/b.md']);
 
   first.close(); await first.open();
@@ -56,7 +57,7 @@ it('resumes on the first device after its first upload response is lost', async 
   expect(first.checkpoint().files['note.md']).toBeUndefined();
 
   const second = await device('lost-receipt-second');
-  expect((await second.engine.sync()).errors).toEqual(['Another device is uploading this vault for the first time. Let it finish, then sync.']);
+  expect((await second.engine.sync()).errors).toEqual([ANOTHER_DEVICE_IMPORTING]);
   await first.open();
   expect((await first.engine.sync()).errors).toEqual([]);
   expect(await serverPaths()).toEqual(['note.md']);
@@ -87,4 +88,20 @@ it('holds another device\'s queued and selected uploads until the first upload f
   expect(second.disk.text('b.md')).toBe('beta');
   expect(second.disk.trash.size).toBe(0);
   expect(await serverPaths()).toEqual(['a.md', 'b.md']);
+});
+
+it('lets the device that started an import replace server files after losing its checkpoint', async () => {
+  const first = await device('lost-checkpoint');
+  first.disk.write('note.md', 'first');
+  vi.spyOn(first.api.initialImport, 'finish').mockRejectedValueOnce(new Error('offline'));
+  expect((await first.engine.sync()).success).toBe(false);
+  // Disconnecting or reinstalling removes the checkpoint and its import token.
+  first.close();
+  first.disk.remove(`${TEST_PLUGIN_DIR}/file-manifest.json`); first.disk.remove(`${TEST_PLUGIN_DIR}/file-manifest.log`);
+  await first.open();
+  expect((await first.engine.sync()).errors).toEqual([ANOTHER_DEVICE_IMPORTING]);
+  expect((await first.engine.forceFullSync()).errors).toEqual([]);
+  expect((await first.engine.sync()).errors).toEqual([]);
+  expect(first.settings.lastSeq).toBeGreaterThan(0);
+  expect(await serverPaths()).toEqual(['note.md']);
 });
