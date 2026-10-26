@@ -106,8 +106,10 @@ export function startReading(plugin: CratePlugin): void {
 
 		if (plugin.settings.workerUrl && Date.now() - checkedAt > 60_000) {
 			checkedAt = Date.now();
-			const connection = captureServerConnection(plugin);
-			void reconcileReadingPolicy(plugin, folder, () => { controller.signal.throwIfAborted(); connection.assertCurrent(); }).then(adopted => {
+			void (async () => {
+				const connection = captureServerConnection(plugin);
+				return reconcileReadingPolicy(plugin, folder, () => { controller.signal.throwIfAborted(); connection.assertCurrent(); });
+			})().then(adopted => {
 				if (adopted) startReading(plugin);
 				else { policyChecked = true; schedule(); }
 			}).catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
