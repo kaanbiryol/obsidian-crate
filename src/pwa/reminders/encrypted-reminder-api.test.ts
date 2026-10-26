@@ -208,6 +208,9 @@ it('commits a semantic revision to the listed note sealed with the vault key', a
   expect(commits[0]!.files[0]!.path).toBe(liveWire);
   const opened = await openFile(new TextEncoder().encode(commits[0]!.files[0]!.content), livePath, authority);
   expect(new TextDecoder().decode(opened.content)).toContain('- [x] Queued task');
+  // The acknowledged attempt keeps no sealed note bytes for its retry window.
+  const saved = [...attempts.values()] as Array<{ body: string; acknowledgment?: string }>;
+  expect(saved.map(attempt => [attempt.body, typeof attempt.acknowledgment])).toEqual([['', 'string']]);
 });
 
 it('downloads only changed notes even when the folder exceeds the content cache', async () => {
