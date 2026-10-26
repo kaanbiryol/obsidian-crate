@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from './routes';
-import { ensureReadingIndex } from './library-index';
+import { ensureReadingIndex, queueReadingArticles } from './library-index';
 import { publishExtraction } from './extraction/jobs';
 import type { Publication } from './extraction/jobs';
 import { policy, readStoredNote } from './common';
@@ -154,6 +154,22 @@ it('preserves user notes and metadata already present when extraction starts', a
   await publishExtraction(env, { job, result: { markdown: 'Saved article content, separate from the personal note.', title: undefined, author: undefined } });
   const saved = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))!;
   expect(saved.content).toContain('Personal thoughts.'); expect(parseReadingNote(saved.content)).toMatchObject({ favorite: true, tags: ['kept'], extraction_status: 'ready' });
+});
+it('keeps a failed publication leased so the article queue cannot restart its fetch attempts', async () => {
+  const original = await capture(), source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, original.path))!;
+  // Personal text plus a near-limit article cannot fit one Reading note.
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, original.path, `${source.content}\n${'Personal text. '.repeat(5000)}\n`, source.hash);
+  await env.DB.prepare('DELETE FROM reading_jobs').run(); await env.DB.prepare('DELETE FROM reading_index').run();
+  await buildIndex();
+  const job = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
+  await env.DB.prepare('UPDATE reading_jobs SET attempts = 1').run();
+  await expect(publishExtraction(env, { job, result: { markdown: 'x'.repeat(980_000), title: undefined, author: undefined } })).rejects.toThrow();
+  await queueReadingArticles(env.DB).run();
+  expect(await env.DB.prepare('SELECT path, source_revision, attempts FROM reading_jobs').all()).toMatchObject({ results: [{ path: job.path, source_revision: job.source_revision, attempts: 1 }] });
+  // Once its fetches are spent, the job keeps the bookmark without an article.
+  await publishExtraction(env, { job, result: null });
+  expect(parseReadingNote((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))!.content)?.extraction_status).toBe('unavailable');
+  expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
 });
 it('keeps failed extractions as useful bookmarks and never extracts clipper notes', async () => {
   const job = await capture(); await publishExtraction(env, { job, result: null });
