@@ -268,3 +268,36 @@ Plausible, outside any area: **Update server address** on an encrypted vault poi
 - Real Cloudflare CPU use of a Reading index rebuild page; restores of backups taken before the D1 refactor (pre-launch schema policy).
 - Native IME, dictation and keyboard behavior; service-worker activation timing on iOS.
 - Whether Obsidian secret storage is shared across vaults on each platform.
+
+## 7. Results
+
+Fixed on `feat/engineering-audit-38a854` in this worktree, one commit per change, after this report (`c0e6ff71`). Every Critical, High and Medium finding is addressed; Low findings are left as listed.
+
+| Finding | Commit | Notes |
+| --- | --- | --- |
+| C1 | `1b9c68db` | Queue flushes, queued reconciliation and **Sync selected** check for an open first upload and wait; force full sync stays the escape. Reproduced with a two-device Worker-runtime test first. |
+| C2 | `2398f03a` | Fails without the fix in `reset-runtime.integration.ts`. |
+| H1 | `c99654e3` | The outbox hook itself waits for Reminders to unlock, so every caller gets the gate. |
+| H2 | `e265e457` | `security:secrets` passes; it reports both leaks without the allowlist. |
+| H3 | `9ad2e942` | Also lets the CI step report independently (`!cancelled()`). |
+| H4 | `4344c8db`, `6166a423`, `5b8a26fb`, `f855bfa5`, `03585ce5`, `426801b8` | Root causes: the PWA cache test expected the pre-H2 deletion on lock; the plugin's delete confirmation never passed its `alertdialog` role (a product fix); four assertions predated the flat chrome (664edde7), native-only Share (33b342e6), arrow submit (2de280d2) and 6px buttons (7131b27c); the encrypted push test registered its worker without the version f514893f requires, which crashed and then hung CI's PWA shard 1; background prefetch (cd755eb3) cached the touch test's articles; WebKit samples the update handoff bars 1-2px apart, so the bound is now 3px (a rewind differs by tens). Eight screenshots still differ (see below). |
+| M1 | `ab725071`, `f79e19a7` | Reads arm the coordinator only when they ran an index rebuild step; the second commit makes its runtime test deterministic. |
+| M2 | `29b3c99e` | Updates and retries return `library: { before, after }` (additive). A client whose cache chains re-reads only the edited items. |
+| M3 | `7b8187ab` | The encryption browser test passes in Chromium and WebKit. |
+| M4 | `dc74fc2f` | The message names **Replace server files**. |
+| M5 | `67708aee` | |
+| M6 | `881fdb45` | |
+| M7 | `ef66fdd7` | Date-only dues fall back to `2026-10-30` when only that form reads back. |
+| M8 | `82926331` | Reminder parser version 2; a number right after a range dash stays in the title. Together with M7, "Read pages 13-19" now saves; titles ending in a time ("Lunch at 1pm") are still refused. |
+| M9 | `d81fe5fa` | Local, base and server settings are compared with this device's own workspace pattern applied. |
+| M10 | `ca853677` | Confirmed in the local run: the hanging script failed after six minutes and the runner continued. |
+| M11 | `12ee972c` | |
+| M12 | `1de6d0a4` | |
+
+Checks on the final branch: `lint` (0 errors), `typecheck`, `typecheck:worker`, `typecheck:service-worker`, `typecheck:visual`, `deadcode`, `build`, `size-check`, `security:audit` (0 vulnerabilities) and `check:server-revision` (revision 1, pre-launch baseline) pass. `npm test` passes 5,446 of 5,446, `npm run test:worker-runtime` 863 of 863, `npm run test:pwa-browser` 58 of 58 scripts, the editor contract suite 536 of 536, `test:reading-server` 24 of 24 and both Reading browser groups (28 and 5). `test:visual` passes 559 of 567.
+
+Not done:
+
+- The eight failing visual cases are screenshot comparisons only: `shared-ui` PWA editor, cards and flat scenes (7) and `reading-appearance-pwa` (1). Their diffs are the completed-reminder and project chip icons (79b4f481, a1ad95f4) and the compact sheet header (2de280d2). Baselines were not replaced; regenerate them through the reviewed `update_baselines` workflow.
+- macOS-native PWA shards and CI runners were not run; device behavior (Save-Data prefetch, service worker activation, IME) is unverified.
+- The plugin now ships reminder parser version 2, which revalidates every reminder source once after the Worker update (`docs/deployment.md`).
