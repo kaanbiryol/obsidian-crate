@@ -66,6 +66,7 @@ export function createPendingActions(
     update();
     return {
         toggleChecked: (key: string) => { checkboxes.get(key)?.click(); },
+        removeRow: (key: string) => { checkboxes.delete(key); },
         addCheckbox: (row: HTMLElement, key: string) => {
             const { path } = decodePendingChange(key);
             const label = row.createEl('label', { cls: 'crate-browser-file-check' });

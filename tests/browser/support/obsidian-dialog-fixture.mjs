@@ -17,6 +17,7 @@ export const obsidianDomHelpers = `    HTMLElement.prototype.createEl = function
     Object.defineProperty(HTMLElement.prototype,'win',{get:()=>window});
     HTMLElement.prototype.removeClass = function(...names) { this.classList.remove(...names); };
     HTMLElement.prototype.appendText = function(text) { this.append(text); };
+    HTMLElement.prototype.setCssProps = function(props) { for (const [name,value] of Object.entries(props)) this.style.setProperty(name,value); };
 `;
 
 export const obsidianDialogModule = `      export function setIcon(el) {
