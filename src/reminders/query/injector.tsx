@@ -3,14 +3,14 @@ import { MarkdownRenderChild, Notice, Platform, TFile } from "obsidian";
 import type React from "react";
 import type { Root } from "react-dom/client";
 
-import type CratePlugin from "@/main";
+import type CratePlugin from "@/plugin/CratePlugin";
 import { errorMessage } from "@/platform/logger";
 import {
   createShadowReactRoot,
   createShadowRootMount,
   type ShadowRootMount,
 } from "@/ui/plugin/shadowReactMount";
-import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
+import { PluginRoot } from "@/ui/plugin/PluginRoot";
 import { RemindersList } from "@/reminders/ui/plugin/reminder-list/RemindersList";
 import { processVaultMarkdown } from "@/reminders/data/vault-markdown";
 import { parseRemindersBlockOptions, setRemindersBlockShowCompleted, type RemindersBlockType } from "./remindersBlockOptions";
@@ -126,9 +126,9 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
     this.reactRoot = root;
     const Component = this.component;
     this.reactRoot.render(
-      <PluginContext.Provider value={this.plugin}>
+      <PluginRoot plugin={this.plugin}>
         <Component {...this.props} />
-      </PluginContext.Provider>,
+      </PluginRoot>,
     );
   }
 }

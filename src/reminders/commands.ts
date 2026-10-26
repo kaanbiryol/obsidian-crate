@@ -1,5 +1,5 @@
 import { FuzzySuggestModal, Notice } from "obsidian";
-import type CratePlugin from "@/main";
+import type CratePlugin from "@/plugin/CratePlugin";
 import { openReminderCreationModal } from "@/reminders/ui/plugin/reminderEditorModals";
 import { openCompactReminderModal } from "@/reminders/ui/plugin/remindersViewModals";
 

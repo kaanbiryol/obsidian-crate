@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import type CratePlugin from "@/main";
+import type { Plugin } from "obsidian";
 import { attachPluginStylesheet } from "./shadowStyles";
 
 export interface ShadowRootMount {
@@ -54,7 +54,7 @@ export function createShadowRootMount(
 }
 
 export async function createShadowReactRoot(
-  plugin: CratePlugin,
+  plugin: Plugin,
   mount: ShadowRootMount,
   options: ShadowReactRootOptions = {},
 ): Promise<Root | null> {
@@ -68,7 +68,7 @@ export async function createShadowReactRoot(
 }
 
 export async function createShadowReactMount(
-  plugin: CratePlugin,
+  plugin: Plugin,
   host: HTMLElement,
   options: ShadowReactMountOptions = {},
 ): Promise<ShadowReactMount | null> {

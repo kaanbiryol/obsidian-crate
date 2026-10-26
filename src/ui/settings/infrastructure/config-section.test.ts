@@ -27,8 +27,8 @@ async function flushMicrotasks(): Promise<void> {
 
 async function loadConfigSectionModule(mobile = false) {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: mobile } }));
-	vi.doMock('../../cloudflare/restore-ui', () => ({ openServerRestore }));
-	vi.doMock('../../cloudflare/recovery-ui', () => ({ checkAndRecoverUpdate }));
+	vi.doMock('../../../plugin/cloudflare-restore', () => ({ openServerRestore }));
+	vi.doMock('../../../plugin/cloudflare-recovery', () => ({ checkAndRecoverUpdate }));
 	vi.doMock('../../../plugin/cloudflare-operations', () => ({ startCloudflareDeployment }));
 	vi.doMock('../../../cloudflare/deployment/embedded-artifacts', () => ({
 		EMBEDDED_CLOUDFLARE_ARTIFACT: embeddedArtifact,

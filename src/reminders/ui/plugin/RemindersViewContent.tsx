@@ -1,13 +1,13 @@
 import { useRemindersSettingsStore } from '@/reminders/settings';
 import React, { useCallback, useEffect, useState } from "react";
 import { TFile } from 'obsidian';
-import type CratePlugin from "@/main";
 import { useIndexRefresh } from "@/reminders/ui/plugin/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/plugin/hooks/useObsidianDarkMode";
 import type { TabId } from "@/reminders/ui/shared/layoutConstants";
 import { openReminderCreationModal } from "@/reminders/ui/plugin/reminderEditorModals";
 import { ReminderCardWrapper } from "@/reminders/ui/plugin/ReminderCardWrapper";
 import { RemindersViewCloseButton } from "@/reminders/ui/plugin/RemindersViewCloseButton";
+import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
 import {
     PluginRemindersAppShell,
     type PluginReminderCardRenderer,
@@ -18,11 +18,8 @@ import { PluginReminderSourceNotice } from './PluginReminderSourceNotice';
 import { RemindersLoading } from "./RemindersLoading";
 import "../reminders-view.scss";
 
-import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
-import { ObsidianIcon } from '@/ui/obsidian-icon';
 interface RemindersViewContentProps {
-    plugin: CratePlugin;
     isFullScreen?: boolean;
     isModal?: boolean;
     onClose?: () => void;
@@ -35,7 +32,8 @@ interface RemindersViewContentProps {
     renderHeader?: React.ComponentProps<typeof PluginRemindersAppShell>['renderHeader'];
 }
 
-export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, isFullScreen = false, onClose, isModal = Boolean(onClose), initialTab, initialProject, hideTabBar = false, renderHeader, activeTab, onTabChange, renderNavigation }) => {
+export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ isFullScreen = false, onClose, isModal = Boolean(onClose), initialTab, initialProject, hideTabBar = false, renderHeader, activeTab, onTabChange, renderNavigation }) => {
+    const plugin = PluginContext.use();
     const listStyle = useRemindersSettingsStore(state => state.listStyle);
     const upcomingDays = useRemindersSettingsStore(state => state.upcomingDaysDefault);
     const isDarkMode = useObsidianDarkMode();
@@ -87,7 +85,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
 
     return (
         // Large folders render in pages, matching the web app.
-        <ReminderPageSizeContext.Provider value={200}><ThemeIconProvider renderer={ObsidianIcon}><PluginRemindersAppShell
+        <ReminderPageSizeContext.Provider value={200}><PluginRemindersAppShell
             listStyle={listStyle}
             activeTab={activeTab}
             onTabChange={onTabChange}
@@ -124,6 +122,6 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
                     />
                 </>
             ) : undefined}
-        /></ThemeIconProvider></ReminderPageSizeContext.Provider>
+        /></ReminderPageSizeContext.Provider>
     );
 };

@@ -114,7 +114,7 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	const backend: ReminderBackend = {
 		index,
 		repository: createReminderRepository(index, createMarkdownWriter(plugin.app, index, journal)),
-		watcher: new VaultWatcher(plugin, index),
+		watcher: new VaultWatcher(plugin.app.vault, index),
 	};
 	plugin.reminders = backend;
 	backend.watcher.register();

@@ -1,9 +1,9 @@
-import type CratePlugin from '@/main';
+import type { Plugin } from 'obsidian';
 
-const cssCache = new WeakMap<CratePlugin, Promise<string>>();
-const sheetCache = new WeakMap<CratePlugin, WeakMap<Document, CSSStyleSheet>>();
+const cssCache = new WeakMap<Plugin, Promise<string>>();
+const sheetCache = new WeakMap<Plugin, WeakMap<Document, CSSStyleSheet>>();
 
-function getPluginCss(plugin: CratePlugin): Promise<string> {
+function getPluginCss(plugin: Plugin): Promise<string> {
 	const cached = cssCache.get(plugin);
 	if (cached) return cached;
 	const css = plugin.app.vault.adapter.read(`${plugin.manifest.dir}/styles.css`);
@@ -15,7 +15,7 @@ function getPluginCss(plugin: CratePlugin): Promise<string> {
 
 /** A constructed stylesheet belongs to the document that created it, so each
  * window, including Obsidian popouts, adopts its own copy of the plugin CSS. */
-export async function attachPluginStylesheet(plugin: CratePlugin, shadowRoot: ShadowRoot): Promise<void> {
+export async function attachPluginStylesheet(plugin: Plugin, shadowRoot: ShadowRoot): Promise<void> {
 	const cssText = await getPluginCss(plugin);
 	const doc = shadowRoot.ownerDocument;
 	let sheets = sheetCache.get(plugin);

@@ -4,10 +4,7 @@ import type CratePlugin from '@/plugin/CratePlugin';
 import { getReadingLibrary, subscribeReadingRuntime } from '@/reading/runtime';
 import { LocalReadingLibrary } from '@/reading/ui/plugin/LocalReadingLibrary';
 import { RemindersViewContent } from '@/reminders/ui/plugin/RemindersViewContent';
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 import { useRemindersSettingsStore } from '@/reminders/settings';
-import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
-import { ObsidianIcon } from '@/ui/obsidian-icon';
 import { normalizeDockTabs, type DockTab } from '../shared/navigation/dock-destinations';
 import { PluginWorkspaceNavigation } from './PluginWorkspaceNavigation';
 import type { TabId } from '@/reminders/ui/shared/layoutConstants';
@@ -32,11 +29,9 @@ export function PluginWorkspace({ plugin, shadowRoot, initialSection, initialRem
     try { plugin.app.saveLocalStorage(DOCK_KEY, next); setTabs(next); }
     catch { new Notice('Could not save navigation tabs on this device.'); }
   };
-  return <PluginContext.Provider value={plugin}><ThemeIconProvider renderer={ObsidianIcon}>
-    <PluginWorkspaceNavigation isFullScreen={isFullScreen} initialSection={initialSection} initialReminderTab={initialProject ? 'browse' : initialReminderTab}
-      remindersEnabled={remindersEnabled} readingEnabled={Boolean(library)} tabs={tabs} onTabsChange={saveTabs}
-      renderReminders={(tab, onChange, renderNavigation) => <RemindersViewContent plugin={plugin}
-        isFullScreen={isFullScreen} initialProject={initialProject} activeTab={tab} onTabChange={onChange} renderNavigation={renderNavigation} />}
-      renderReading={renderNavigation => library && <LocalReadingLibrary plugin={plugin} library={library} renderNavigation={renderNavigation} />} />
-  </ThemeIconProvider></PluginContext.Provider>;
+  return <PluginWorkspaceNavigation isFullScreen={isFullScreen} initialSection={initialSection} initialReminderTab={initialProject ? 'browse' : initialReminderTab}
+    remindersEnabled={remindersEnabled} readingEnabled={Boolean(library)} tabs={tabs} onTabsChange={saveTabs}
+    renderReminders={(tab, onChange, renderNavigation) => <RemindersViewContent
+      isFullScreen={isFullScreen} initialProject={initialProject} activeTab={tab} onTabChange={onChange} renderNavigation={renderNavigation} />}
+    renderReading={renderNavigation => library && <LocalReadingLibrary plugin={plugin} library={library} renderNavigation={renderNavigation} />} />;
 }

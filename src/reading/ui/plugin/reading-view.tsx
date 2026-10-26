@@ -3,6 +3,7 @@ import type CratePlugin from '../../../plugin/CratePlugin';
 import { createShadowReactMount, type ShadowReactMount } from '../../../ui/plugin/shadowReactMount';
 import { getReadingLibrary, READING_VIEW_TYPE } from '../../runtime';
 import { PluginWorkspace } from '@/ui/plugin/PluginWorkspace';
+import { PluginRoot } from '@/ui/plugin/PluginRoot';
 export class ReadingView extends ItemView {
 	private mount: ShadowReactMount | null = null;
 	private active = false;
@@ -17,7 +18,7 @@ export class ReadingView extends ItemView {
 		this.contentEl.empty(); this.contentEl.addClass('crate-reading-view');
 		const host = this.contentEl.createDiv({ cls: 'crate-reading-view' });
 		this.mount = await createShadowReactMount(this.plugin, host, { mountClassName: 'crate-reading-mount', isActive: () => this.active });
-		if (this.mount) this.mount.render(<PluginWorkspace plugin={this.plugin} shadowRoot={this.mount.shadowRoot} initialSection="reading" isFullScreen={Platform.isMobile} />);
+		if (this.mount) this.mount.render(<PluginRoot plugin={this.plugin}><PluginWorkspace plugin={this.plugin} shadowRoot={this.mount.shadowRoot} initialSection="reading" isFullScreen={Platform.isMobile} /></PluginRoot>);
 	}
 	async onClose(): Promise<void> { this.active = false; this.mount?.unmount(); this.mount = null; }
 }

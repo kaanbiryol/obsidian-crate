@@ -1,16 +1,16 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { FakeElement, MockModal, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
-import type CratePlugin from '../../plugin/CratePlugin';
-import type { BackupChoice } from '../../cloudflare/restore/archive';
+import { FakeElement, MockModal, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../test/fakes/obsidian-ui';
+import type CratePlugin from './CratePlugin';
+import type { BackupChoice } from '../cloudflare/restore/archive';
 const { progress, confirm, connect } = vi.hoisted(() => ({ progress: { dismiss: vi.fn(), setWorking: vi.fn(), fail: vi.fn() }, confirm: vi.fn(), connect: vi.fn() }));
 vi.mock('obsidian', () => createObsidianUiModule());
-vi.mock('../plugin/shared-modal', () => ({ SharedModal: class extends MockModal { bodyEl = new FakeElement('div'); openLayout() {} } }));
-vi.mock('./deployment-modal', () => ({ openCloudflareDeploymentModal: () => progress, revealCloudflareOperation: () => false }));
-vi.mock('../confirmation-modal', () => ({ openConfirmationModal: confirm }));
-vi.mock('../../plugin/cloudflare-operations', () => ({ startCloudflareDeployment: connect }));
-vi.mock('../../plugin/lifecycle-state', () => ({ getPluginLifecycleSignal: () => new AbortController().signal }));
-import { openServerRestore } from './restore-ui';
-import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';
+vi.mock('../ui/plugin/shared-modal', () => ({ SharedModal: class extends MockModal { bodyEl = new FakeElement('div'); openLayout() {} } }));
+vi.mock('../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal: () => progress, revealCloudflareOperation: () => false }));
+vi.mock('../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
+vi.mock('./cloudflare-operations', () => ({ startCloudflareDeployment: connect }));
+vi.mock('./lifecycle-state', () => ({ getPluginLifecycleSignal: () => new AbortController().signal }));
+import { openServerRestore } from './cloudflare-restore';
+import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
 const backup = { prefix: 'backup', hash: 'hash', manifest: { createdAt: '2026-09-01T00:00:00Z', objects: [] } } as unknown as BackupChoice;
 function harness(saved?: unknown) {
   const plugin = { app: {}, settings: { cloudflareRestore: saved }, getSettingsDocument: vi.fn(), refreshSettingsTab: vi.fn(), cloudflareSavedLogin: { withAuthorization: vi.fn() }, cloudflareDeploymentService: { isBusy: false, listRestoreBackups: vi.fn(async () => [backup]), restoreBackup: vi.fn(async () => 'https://restored.test.workers.dev') } };

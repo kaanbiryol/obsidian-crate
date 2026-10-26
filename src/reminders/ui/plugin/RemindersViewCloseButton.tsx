@@ -1,5 +1,5 @@
 import React from "react";
-import { IconButton } from "@/reminders/ui/plugin/IconButton";
+import { IconButton } from "@/ui/shared/IconButton";
 
 interface RemindersViewCloseButtonProps {
   onClose: () => void;

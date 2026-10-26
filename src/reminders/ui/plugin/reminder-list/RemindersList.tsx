@@ -15,7 +15,6 @@ import { useReminderOrder } from "@/reminders/ui/shared/hooks/useReminderOrder";
 import { ReorderableReminderList } from "@/reminders/ui/shared/ReorderableReminderList";
 import { ShadowDOMButton } from "@/reminders/ui/plugin/ShadowDOMButton";
 import { ObsidianIcon } from "@/ui/obsidian-icon";
-import { ThemeIconProvider } from "@/ui/shared/ThemeIcon";
 import { openReminderCreationModal } from "@/reminders/ui/plugin/reminderEditorModals";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import { requireReminderBackend } from "@/reminders/runtime";
@@ -141,7 +140,6 @@ const ActiveRemindersList: React.FC<Props> = ({
   if (!isInitialLoadComplete) return <RemindersLoading compact />;
 
   return (
-    <ThemeIconProvider renderer={ObsidianIcon}>
       <div className="reminders-list-container">
       <div className="reminders-list-header">
         <div className="reminders-count">
@@ -258,6 +256,5 @@ const ActiveRemindersList: React.FC<Props> = ({
         </div>
       )}
       </div>
-    </ThemeIconProvider>
   );
 };

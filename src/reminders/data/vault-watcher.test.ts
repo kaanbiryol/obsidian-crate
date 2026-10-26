@@ -28,10 +28,7 @@ function createHarness() {
 		removeFile: vi.fn(),
 		renameFile: vi.fn(),
 	};
-	const watcher = new VaultWatcher(
-		{ app: { vault } } as never,
-		index as never,
-	);
+	const watcher = new VaultWatcher(vault as never, index as never);
 	watcher.register();
 	return { handlers, index, vault, watcher };
 }

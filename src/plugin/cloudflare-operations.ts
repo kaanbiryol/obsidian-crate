@@ -4,7 +4,8 @@ import { supportsSavedAuthorization, type CloudflareDeploymentResult, type Deplo
 import type { CloudflareAuthorizedDevice } from '../cloudflare/deployment/device-registration';
 import type { ConnectionTestResult } from '../sync/types';
 import { SyncApiClient, HttpError } from '../sync/worker-api/client';
-import { checkAndRecoverUpdate } from '../ui/cloudflare/recovery-ui';
+import { checkAndRecoverUpdate } from './cloudflare-recovery';
+import { beginCloudflareOperation } from './cloudflare-operation-guard';
 import { DeploymentRecoveryRequiredError } from '../cloudflare/deployment/fence';
 import { Notice, Platform } from 'obsidian';
 import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
@@ -147,13 +148,8 @@ interface DeviceCredential {
 async function executeCloudflareOperation(
 	plugin: CratePlugin, params: Record<string, string>, savedIntent?: SavedDeploymentIntent,
 ): Promise<void> {
-	const signal = getPluginLifecycleSignal(plugin);
-	if (signal.aborted) return;
-	if (revealCloudflareOperation(plugin.app, plugin.getSettingsDocument())) return;
-	if (plugin.cloudflareDeploymentService.isBusy) {
-		new Notice('A Cloudflare operation is still running. Wait for its result before starting another.');
-		return;
-	}
+	const signal = beginCloudflareOperation(plugin, 'A Cloudflare operation is still running. Wait for its result before starting another.');
+	if (!signal) return;
 	const operation = beginOperation(plugin, signal, params, savedIntent);
 	const accountId = plugin.settings.cloudflareDeployment?.accountId;
 	let credential: DeviceCredential;

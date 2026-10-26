@@ -2,7 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { IconButton } from './plugin/IconButton';
+import { IconButton } from '../../ui/shared/IconButton';
 import { ProgressMeter } from './shared/ProgressMeter';
 import { PickerFieldRow } from './reminder-editor/PickerFieldRow';
 import { PickerSection } from './reminder-editor/PickerSection';

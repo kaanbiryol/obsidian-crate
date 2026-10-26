@@ -1,6 +1,6 @@
 import { ItemView, Platform, WorkspaceLeaf, type ViewStateResult } from 'obsidian';
-import type CratePlugin from '@/main';
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import type CratePlugin from '@/plugin/CratePlugin';
+import { PluginRoot } from '@/ui/plugin/PluginRoot';
 import { createShadowReactMount, type ShadowReactMount } from '../../../ui/plugin/shadowReactMount';
 import { CRATE_ICON_ID } from '@/ui/crate-icon';
 import { PluginWorkspace } from '@/ui/plugin/PluginWorkspace';
@@ -81,7 +81,7 @@ export class RemindersView extends ItemView {
         const isFullScreen = Platform.isMobile && this.isInMainContent();
 
         shadowMount.render(
-            <PluginContext.Provider value={this.plugin}>
+            <PluginRoot plugin={this.plugin}>
                 <PluginWorkspace
                     key={this.navigationVersion}
                     initialProject={this.initialProject}
@@ -90,7 +90,7 @@ export class RemindersView extends ItemView {
                     isFullScreen={isFullScreen}
                     initialReminderTab={this.plugin.remindersSettings.sidebarDefaultTab}
                 />
-            </PluginContext.Provider>
+            </PluginRoot>
         );
     }
 

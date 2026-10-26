@@ -1,17 +1,15 @@
 import { useState } from "react";
 import { Platform } from "obsidian";
-import type CratePlugin from "@/main";
 import { BaseModal } from "@/ui/shared/BaseModal";
-import { ModalHeader } from "@/reminders/ui/plugin/ModalHeader";
+import { ModalHeader } from "@/ui/shared/ModalHeader";
 import { RemindersViewContent } from "./RemindersViewContent";
 
 interface ProjectSheetProps {
-  plugin: CratePlugin;
   initialProject?: string;
   onClose: () => void;
 }
 
-export function ProjectSheet({ plugin, initialProject, onClose }: ProjectSheetProps) {
+export function ProjectSheet({ initialProject, onClose }: ProjectSheetProps) {
   const [isOpen, setIsOpen] = useState(true);
   const close = () => setIsOpen(false);
 
@@ -29,7 +27,6 @@ export function ProjectSheet({ plugin, initialProject, onClose }: ProjectSheetPr
       ariaLabel="Projects"
     >
       <RemindersViewContent
-        plugin={plugin}
         isFullScreen
         isModal
         initialTab="browse"

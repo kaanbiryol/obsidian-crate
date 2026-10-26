@@ -8,7 +8,7 @@ import {
 } from './infrastructure-helpers';
 import { renderDiagnostics } from './infrastructure-diagnostics';
 import type { InfrastructureSectionContext } from './infrastructure-types';
-import { buildDiagnosticsSettingsStateKey } from '../settings-ui-state';
+import { buildDiagnosticsSettingsStateKey } from '../../../plugin/settings-ui-state';
 import { errorMessage } from '../../../platform/logger';
 
 export function renderInfrastructureManagementSection(context: InfrastructureSectionContext): void {

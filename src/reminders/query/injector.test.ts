@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type { MarkdownPostProcessorContext, MarkdownSectionInformation } from 'obsidian';
-import type CratePlugin from '@/main';
+import type CratePlugin from '@/plugin/CratePlugin';
 import { Notice } from '@/test/mocks/obsidian';
 import { createReminderByteVault } from '@/test/factories/reminder-byte-vault';
 

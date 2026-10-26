@@ -6,8 +6,6 @@ import type { ReminderDraft } from './useReminderDraft';
 import { getProjectColor } from '../../format/projectColors';
 import { ReminderActionChips } from '../../reminder-editor/ReminderActionChips';
 import { PluginReminderEditorFields as ReminderEditorFields } from '../PluginReminderEditorFields';
-import { ThemeIconProvider } from '../../../../ui/shared/ThemeIcon';
-import { ObsidianIcon } from '../../../../ui/obsidian-icon';
 
 interface AddReminderModalBodyProps {
     isDark: boolean;
@@ -47,41 +45,39 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     const projectColor = getProjectColor(draft.project || defaultProject)[isDark ? 'dark' : 'light'].accent;
 
     return (
-        <ThemeIconProvider renderer={ObsidianIcon}>
-            <div
-                className="reminder-modal-body"
-                data-base-ui-swipe-ignore=""
-                style={{ '--reminder-project-color': projectColor } as React.CSSProperties}
-            >
-                <PageTitleContext.Provider value={plugin.syncRuntime.getApiClient() ? resolvePageTitle : undefined}>
-                    <ReminderEditorFields
-                        content={draft.content}
-                        onContentChange={draft.setContent}
-                        description={draft.description}
-                        onDescriptionChange={draft.setDescription}
-                        onKeyDown={onKeyDown}
-                        allowAutoFocus={allowAutoFocus}
-                        projects={projects}
-                        isDark={isDark}
-                        textareaRef={textareaRef}
-                        richTextInputRef={richTextInputRef}
-                        descriptionInputRef={descriptionInputRef}
-                    />
-                </PageTitleContext.Provider>
-
-                <ReminderActionChips
-                    dueDate={draft.dueDate}
-                    hasTime={draft.hasTime}
-                    project={draft.project}
-                    defaultProject={defaultProject}
-                    priority={draft.priority}
-                    recurrence={draft.recurrence}
-                    onOpenDatePicker={onOpenDatePicker}
-                    onOpenProjectPicker={onOpenProjectPicker}
-                    onOpenRecurrencePicker={onOpenRecurrencePicker}
-                    onTogglePriority={onTogglePriority}
+        <div
+            className="reminder-modal-body"
+            data-base-ui-swipe-ignore=""
+            style={{ '--reminder-project-color': projectColor } as React.CSSProperties}
+        >
+            <PageTitleContext.Provider value={plugin.syncRuntime.getApiClient() ? resolvePageTitle : undefined}>
+                <ReminderEditorFields
+                    content={draft.content}
+                    onContentChange={draft.setContent}
+                    description={draft.description}
+                    onDescriptionChange={draft.setDescription}
+                    onKeyDown={onKeyDown}
+                    allowAutoFocus={allowAutoFocus}
+                    projects={projects}
+                    isDark={isDark}
+                    textareaRef={textareaRef}
+                    richTextInputRef={richTextInputRef}
+                    descriptionInputRef={descriptionInputRef}
                 />
-            </div>
-        </ThemeIconProvider>
+            </PageTitleContext.Provider>
+
+            <ReminderActionChips
+                dueDate={draft.dueDate}
+                hasTime={draft.hasTime}
+                project={draft.project}
+                defaultProject={defaultProject}
+                priority={draft.priority}
+                recurrence={draft.recurrence}
+                onOpenDatePicker={onOpenDatePicker}
+                onOpenProjectPicker={onOpenProjectPicker}
+                onOpenRecurrencePicker={onOpenRecurrencePicker}
+                onTogglePriority={onTogglePriority}
+            />
+        </div>
     );
 };

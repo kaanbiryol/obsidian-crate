@@ -1,5 +1,5 @@
 import { createContext, type Provider, useContext } from "react";
-import type CratePlugin from "@/main";
+import type CratePlugin from "@/plugin/CratePlugin";
 
 type Context<T> = {
   Provider: Provider<T | undefined>;

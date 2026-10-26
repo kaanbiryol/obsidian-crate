@@ -1,5 +1,5 @@
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
-import type { CachedDevicesState } from './settings-ui-state';
+import type { CachedDevicesState } from '../../plugin/settings-ui-state';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { openConfirmationModal } from '../confirmation-modal';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';

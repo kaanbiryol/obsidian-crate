@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { renderHook } from '@/test/react-hooks';
 import { createReminderByteVault } from '@/test/factories/reminder-byte-vault';
 import type { Reminder } from '@/reminders/types/reminder';
-import type CratePlugin from '@/main';
+import type CratePlugin from '@/plugin/CratePlugin';
 
 vi.mock('@/reminders/ui/plugin/ReminderCardWrapper', () => ({
   ReminderCardWrapper: ({ reminder }: { reminder: Reminder }) => React.createElement('div', { className: 'card' }, reminder.content),

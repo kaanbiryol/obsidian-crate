@@ -3,11 +3,12 @@ import { useRemindersSettingsStore } from "../../settings";
 import { Platform } from "obsidian";
 import type { ReactElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
-import type CratePlugin from "@/main";
+import type CratePlugin from "@/plugin/CratePlugin";
 import { createLogger } from "@/reminders/logger";
 import type { Reminder } from "@/reminders/types/reminder";
 import { ReminderModal } from "./createReminderModal";
-import { ModalContext, PluginContext } from "./reminders-context";
+import { ModalContext } from "./reminders-context";
+import { PluginRoot } from "../../../ui/plugin/PluginRoot";
 import { hideNativeModalCloseButton } from "../../../ui/plugin/shared-modal";
 
 const log = createLogger("ReminderEditModal");
@@ -41,13 +42,13 @@ abstract class BaseReminderModal extends BaseUiModal {
 
     this.root = createRoot(contentEl);
     this.root.render(
-      <PluginContext.Provider value={this.plugin}>
+      <PluginRoot plugin={this.plugin}>
         <div className={isDarkMode ? "dark" : "light"}>
           <ModalContext.Provider value={{ close, isMobile }}>
             {this.renderContent()}
           </ModalContext.Provider>
         </div>
-      </PluginContext.Provider>,
+      </PluginRoot>,
     );
   }
 

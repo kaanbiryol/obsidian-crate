@@ -18,7 +18,7 @@ import { configureSyncLogger } from '../sync/logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { publishSavedSettings } from './settings-persistence';
-import { createSettingsUiState, type SettingsUiState } from '../ui/settings/settings-ui-state';
+import { createSettingsUiState, type SettingsUiState } from './settings-ui-state';
 import { SecretStorageService } from './secret-storage';
 import {
 	buildPersistedCrateSettings,

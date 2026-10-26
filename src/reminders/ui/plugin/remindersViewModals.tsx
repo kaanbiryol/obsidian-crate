@@ -1,7 +1,7 @@
 import { useRemindersSettingsStore } from "../../settings";
 import { BaseUiModal } from "../../../ui/plugin/BaseUiModal";
-import type CratePlugin from "@/main";
-import { PluginContext } from "./reminders-context";
+import type CratePlugin from "@/plugin/CratePlugin";
+import { PluginRoot } from "../../../ui/plugin/PluginRoot";
 import { ProjectSheet } from "./ProjectSheet";
 import { hideNativeModalCloseButton } from "../../../ui/plugin/shared-modal";
 import { createShadowReactMount, type ShadowReactMount } from "../../../ui/plugin/shadowReactMount";
@@ -40,13 +40,9 @@ class CompactReminderModal extends BaseUiModal {
 
     const close = () => this.close();
     shadowMount.render(
-      <PluginContext.Provider value={this.plugin}>
-        <ProjectSheet
-          plugin={this.plugin}
-          onClose={close}
-          initialProject={this.initialProject}
-        />
-      </PluginContext.Provider>,
+      <PluginRoot plugin={this.plugin}>
+        <ProjectSheet onClose={close} initialProject={this.initialProject} />
+      </PluginRoot>,
     );
   }
 

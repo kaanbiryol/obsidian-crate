@@ -20,7 +20,7 @@ describe('reminder edit and rename events', () => {
 		const index = createReminderIndex(h.app, 'Reminders');
 		await index.load();
 		const rescan = vi.spyOn(index, 'rescanFile');
-		const watcher = new VaultWatcher({ app: h.app } as never, index);
+		const watcher = new VaultWatcher(h.app.vault, index);
 		watcher.register();
 		const file = await h.put(initial, '- [ ] Edited title Jan 12, 2027 <!-- crate-id:one -->\n');
 		handlers.get('modify')!(file as never);

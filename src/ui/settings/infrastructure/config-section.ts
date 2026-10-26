@@ -1,5 +1,5 @@
 import { renderVersionSettings, renderUpdateVersions } from '../version-settings';
-import { checkAndRecoverUpdate } from '../../cloudflare/recovery-ui';
+import { checkAndRecoverUpdate } from '../../../plugin/cloudflare-recovery';
 import { Notice, Platform, Setting, type ButtonComponent } from 'obsidian';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../../cloudflare/deployment/embedded-artifacts';
 import { isCloudflareServerUpdateAvailable } from '../../../cloudflare/deployment/update';
@@ -186,6 +186,6 @@ function renderServerBackupSetting({ containerEl, plugin }: SettingsSectionConte
         new Setting(containerEl).setName('Server backup recovery')
             .setDesc(restore ? 'Review or resume your saved restore. The original server and backup are retained.' : 'Restore an upgrade backup into a separate server, keeping your current files and connection.')
             .addButton(button => button.setButtonText(restore?.phase === 'complete' ? 'View restored server' : restore ? 'Resume restore' : 'Restore backup…')
-                .onClick(() => { void import('../../cloudflare/restore-ui').then(({ openServerRestore }) => openServerRestore(plugin)); }));
+                .onClick(() => { void import('../../../plugin/cloudflare-restore').then(({ openServerRestore }) => openServerRestore(plugin)); }));
     }
 }

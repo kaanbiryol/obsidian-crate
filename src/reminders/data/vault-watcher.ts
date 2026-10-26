@@ -8,15 +8,14 @@
  * - rename: Update file paths in the index
  */
 
-import { TFile, type TAbstractFile, type EventRef } from "obsidian";
+import { TFile, type TAbstractFile, type EventRef, type Vault } from "obsidian";
 import { createLogger } from "@/reminders/logger";
-import type CratePlugin from "@/main";
 import type { ReminderIndex } from "@/reminders/data/reminder-index";
 
 const log = createLogger('VaultWatcher');
 
 export class VaultWatcher {
-  private plugin: CratePlugin;
+  private vault: Vault;
   private index: ReminderIndex;
   private eventRefs: EventRef[] = [];
 
@@ -25,10 +24,10 @@ export class VaultWatcher {
   private static DEBOUNCE_MS = 1500;
 
   constructor(
-    plugin: CratePlugin,
+    vault: Vault,
     index: ReminderIndex,
   ) {
-    this.plugin = plugin;
+    this.vault = vault;
     this.index = index;
   }
 
@@ -38,28 +37,28 @@ export class VaultWatcher {
   register(): void {
     // File modified
     this.eventRefs.push(
-      this.plugin.app.vault.on("modify", (file) => {
+      this.vault.on("modify", (file) => {
         this.handleModify(file);
       })
     );
 
     // File created
     this.eventRefs.push(
-      this.plugin.app.vault.on("create", (file) => {
+      this.vault.on("create", (file) => {
         void this.handleCreate(file);
       })
     );
 
     // File deleted
     this.eventRefs.push(
-      this.plugin.app.vault.on("delete", (file) => {
+      this.vault.on("delete", (file) => {
         this.handleDelete(file);
       })
     );
 
     // File renamed
     this.eventRefs.push(
-      this.plugin.app.vault.on("rename", (file, oldPath) => {
+      this.vault.on("rename", (file, oldPath) => {
         void this.handleRename(file, oldPath);
       })
     );
@@ -72,7 +71,7 @@ export class VaultWatcher {
    */
   unregister(): void {
     for (const ref of this.eventRefs) {
-      this.plugin.app.vault.offref(ref);
+      this.vault.offref(ref);
     }
     this.eventRefs = [];
 

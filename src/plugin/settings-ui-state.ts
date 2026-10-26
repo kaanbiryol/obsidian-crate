@@ -1,7 +1,7 @@
-import type { RegisteredDevice } from '../../protocol/sync-types';
-import type { SyncApiClient } from '../../sync/worker-api/client';
-import type { DiagnosticResult } from '../../sync/diagnostics/checks';
-import type { CrateSettings } from '../../plugin/settings-types';
+import type { RegisteredDevice } from '../protocol/sync-types';
+import type { SyncApiClient } from '../sync/worker-api/client';
+import type { DiagnosticResult } from '../sync/diagnostics/checks';
+import type { CrateSettings } from './settings-types';
 
 interface CachedDiagnosticsState {
 	key: string;

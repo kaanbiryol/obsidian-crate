@@ -6,10 +6,10 @@ const mocks = vi.hoisted(() => ({
     copy: vi.fn(async (_text: string) => {}),
 }));
 vi.mock('obsidian', () => ({ Notice: class {} }));
-vi.mock('./deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal, revealCloudflareOperation: mocks.reveal }));
-import { checkAndRecoverUpdate } from './recovery-ui';
-import { DeploymentRecoveryRequiredError } from '../../cloudflare/deployment/fence';
-import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';
+vi.mock('../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal, revealCloudflareOperation: mocks.reveal }));
+import { checkAndRecoverUpdate } from './cloudflare-recovery';
+import { DeploymentRecoveryRequiredError } from '../cloudflare/deployment/fence';
+import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
 
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
 function plugin(status: 'blocked' | 'recovered') {
