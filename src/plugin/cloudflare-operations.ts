@@ -8,7 +8,7 @@ import { checkAndRecoverUpdate } from '../ui/cloudflare/recovery-ui';
 import { DeploymentRecoveryRequiredError } from '../cloudflare/deployment/fence';
 import { Notice, Platform } from 'obsidian';
 import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
-import { CloudflareUsageConnection } from '../cloudflare/usage/connection';
+import { CloudflareSavedLogin } from '../cloudflare/saved-login';
 import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { CloudflareDeploymentService } from '../cloudflare/deployment/service';
@@ -27,8 +27,8 @@ import {
 import { SECRET_KEYS } from '../platform/secret-keys';
 import { stableJson } from '../platform/stable-json';
 
-export function createCloudflareUsageConnection(plugin: CratePlugin): CloudflareUsageConnection {
-	return new CloudflareUsageConnection({
+export function createCloudflareSavedLogin(plugin: CratePlugin): CloudflareSavedLogin {
+	return new CloudflareSavedLogin({
 		clientId: CLOUDFLARE_OAUTH_CLIENT_ID,
 		transport: obsidianHttpTransport,
 		secrets: plugin.secretStorage,
@@ -47,7 +47,7 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 		clientId: CLOUDFLARE_OAUTH_CLIENT_ID,
 		getVaultName: () => plugin.app.vault.getName(),
 		settingsOwner: plugin,
-		onAuthorized: (accountId, tokens) => plugin.cloudflareUsageConnection.acceptAuthorization(accountId, tokens),
+		onAuthorized: (accountId, tokens) => plugin.cloudflareSavedLogin.acceptAuthorization(accountId, tokens),
 		transport: obsidianHttpTransport,
 		loadArtifacts: loadEmbeddedCloudflareArtifacts,
 		openExternal: url => openCloudflareAuthorization(plugin, url),
@@ -171,7 +171,7 @@ async function executeCloudflareOperation(
 
 	if (deployment.status === 'deleted') {
 		// This vault no longer has a server, so drop its account-wide management login.
-		if (accountId) await plugin.cloudflareUsageConnection.forget(accountId);
+		if (accountId) await plugin.cloudflareSavedLogin.forget(accountId);
 		plugin.refreshSettingsTab();
 		operation.presentation.deleted();
 		return;
@@ -247,7 +247,7 @@ function runDeployment(
 	const selectDeployment = (deployments: Parameters<typeof progress.selectVault>[0], missingServer?: boolean) => progress.selectVault(deployments, missingServer);
 	return savedIntent
 		? plugin.cloudflareDeploymentService.deployWithSavedAuthorization(savedIntent,
-			operation => plugin.cloudflareUsageConnection.withAuthorization(operation), selectDeployment, device, onProgress)
+			operation => plugin.cloudflareSavedLogin.withAuthorization(operation), selectDeployment, device, onProgress)
 		: plugin.cloudflareDeploymentService.handleCallback(params, selectDeployment, device, onProgress);
 }
 

@@ -14,7 +14,7 @@ function setup(snapshot: UsageSnapshot | null = null) {
 	const connection = { snapshot, connected: true, needsAuthorization: false, fetchUsage, connect: vi.fn(), disconnect: vi.fn() };
 	const root = new FakeElement('div');
 	const cleanup = renderUsageSection({ containerEl: root as never, plugin: {
-		settings: { cloudflareDeployment: { accountId: 'account-a' } }, cloudflareUsageConnection: connection,
+		settings: { cloudflareDeployment: { accountId: 'account-a' } }, cloudflareSavedLogin: connection,
 	} as never });
 	const actions = MockSetting.instances.find(s => s.nameEl.textContent === 'Usage metrics')!;
 	return { connection, root, cleanup, actions };

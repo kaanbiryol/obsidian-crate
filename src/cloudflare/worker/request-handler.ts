@@ -1,7 +1,7 @@
 import { handleReadingRoute } from './reading/routes';
 import { shortcutLaunchResponse, shortcutTransport } from './reading/shortcut-transport';
 import { captureSealedReading } from './reading/sealed-capture';
-import { ReadingError, readingResponse } from './reading/common';
+import { ReadingError } from './reading/common';
 import { isD1DailyLimitError, withD1Usage } from './d1-usage';
 import { coordinatedNewFiles } from './sync/staging/bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
@@ -13,6 +13,7 @@ import { limitNotificationRequest } from './rate-limit';
 import { rememberAuthenticatedRequest } from './auth/admission-state';
 import { coordinatedUpload } from './sync/staging/staged-upload-dispatch';
 import { apiRoutePolicy } from './routes/policy';
+import { requestPlacement } from './routes/placement';
 import { armNotificationCoordinator } from './notifications/lifecycle';
 import { isCrateMutation } from '../../protocol/server-info';
 import { corsHeaders, corsResponse } from './cors';
@@ -108,15 +109,15 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	// and authorize before entering the coordinator below.
 	const routePolicy = apiRoutePolicy(path, method);
 	const routeExecution = routePolicy?.execution;
-	const readingGrant = routeExecution?.kind === 'reading-grant';
-	if (readingGrant && execution.kind !== 'coordinator') return forwardedResponse(await forwardToCoordinator(env, request), context);
-	if (execution.kind === 'coordinator' && readingGrant) return handleReadingRoute(request, env, undefined, execution.state);
+	const placement = requestPlacement(routeExecution, execution.kind, shortcut?.kind === 'prepare');
+	if (placement === 'forward-grant') return forwardedResponse(await forwardToCoordinator(env, request), context);
+	if (placement === 'redeem-grant' && execution.kind === 'coordinator') return handleReadingRoute(request, env, undefined, execution.state);
 	const publicResponse = await handlePublicRoute(request, env, path, method);
 	if (publicResponse) return publicResponse;
 	// Coordinator routes authenticate once, under the coordinator lock that every
 	// revocation also takes. The encrypted shortcut capture downloads its page here
 	// before entering the coordinator, so it still authenticates at the edge.
-	if (routeExecution?.kind === 'coordinator' && execution.kind !== 'coordinator' && shortcut?.kind !== 'prepare') {
+	if (placement === 'forward-before-auth') {
 		const response = await forwardToCoordinator(env, request);
 		// Only an authenticated coordinator response carries the encryption state.
 		if (response.headers.has(ENCRYPTION_STATE_HEADER)) await rememberAuthenticatedRequest(request, admissionDb, true);
@@ -135,7 +136,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	const encryption = authResult.encryption ?? null;
 	context.encryptionState = encryption ? 'on' : 'off';
 	assertRequestEncryption(request, encryption);
-	if (execution.kind === 'public' && routeExecution?.kind === 'transfer') {
+	if (placement === 'forward-transfer' && routeExecution?.kind === 'transfer') {
 		// Stream without decoding or hashing on the public Worker's CPU budget.
 		// The transfer object reauthenticates after queuing, before reading bytes.
 		return forwardedResponse(await forwardTransferRequest(request, env, routeExecution.path), context);
@@ -144,9 +145,9 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	// Download outside the coordinator; only the sealed commit takes its lock.
 	if (shortcut?.kind === 'prepare' && encryption && execution.kind !== 'coordinator') {
 		try { return await captureSealedReading(request, env, authResult.principal, encryption); }
-		catch (error) { if (error instanceof ReadingError) return readingResponse({ error: error.message, code: error.code }, error.status); throw error; }
+		catch (error) { if (error instanceof ReadingError) return error.toResponse(); throw error; }
 	}
-	if (routeExecution?.kind === 'coordinator' && execution.kind !== 'coordinator') return forwardedResponse(await forwardToCoordinator(env, request), context);
+	if (placement === 'forward-after-auth') return forwardedResponse(await forwardToCoordinator(env, request), context);
 	if (!mutation && execution.kind !== 'coordinator' && routePolicy?.initializeProjection && !ensuredProjections.has(projectionBinding)) {
 		if (!await ensureProjection(env)) throw new Error('Unable to initialize notification processing');
 		ensuredProjections.add(projectionBinding);
@@ -169,7 +170,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 
 /** Domain errors keep their status and code; anything else is logged and hidden. */
 function errorResponse(error: unknown, request: Request, requestId: string): Response {
-	if (error instanceof EncryptionStateError) return corsResponse({ error: error.message, code: 'encryption_required' }, error.status);
+	if (error instanceof EncryptionStateError) return error.toResponse();
 	if (error instanceof MarkdownEncodingError) return corsResponse({ error: error.message, code: 'unsupported_markdown_encoding' }, 409);
 	if (error instanceof ReminderInputError) return corsResponse({ error: error.message, field: error.field, code: 'invalid_reminder_input' }, 400);
 	if (error instanceof ReminderMarkdownContextError) return corsResponse({ error: error.message, code: 'reminder_markdown_context' }, 409);

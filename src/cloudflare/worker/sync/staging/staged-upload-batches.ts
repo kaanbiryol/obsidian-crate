@@ -2,7 +2,7 @@ import { portablePathKey } from '../../../../protocol/portable-path';
 import type { ObjectReference } from '../../storage-references';
 import { STAGED_UPLOAD_TTL_MS } from './staged-uploads';
 import { EncryptionStateError, encryptionWriteGuard } from '../../encryption/state';
-import { changedRows } from '../../db';
+import { changedRows, type SqlGuard } from '../../db';
 import { syncResetGenerationGuard } from '../reset-generation';
 
 /** Each request attempt owns distinct immutable keys, including failed R2 puts. */
@@ -18,7 +18,7 @@ export async function trackStagedBatch(db: D1Database, storageKeys: ObjectRefere
   return id;
 }
 
-export function stagedBatchGuard(id: string, storageKey: string): { sql: string; args: string[] } {
+export function stagedBatchGuard(id: string, storageKey: string): SqlGuard {
   return { sql: `EXISTS (SELECT 1 FROM staged_upload_batches b WHERE b.id = ?
     AND b.state = 'pending' AND b.expires_at > unixepoch('now') * 1000
     AND EXISTS (SELECT 1 FROM json_each(b.storage_keys) WHERE json_extract(value, '$.storageKey') = ?))`, args: [id, storageKey] };

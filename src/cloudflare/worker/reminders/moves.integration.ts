@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleUpdateReminder } from './routes/update';
+import { handleUpdateReminder } from './routes/existing-reminder';
 import { scanReminderMarkdownFile } from './scan';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 

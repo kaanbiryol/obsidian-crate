@@ -1,5 +1,5 @@
 import { MAX_ENCRYPTED_REMINDER_ACK } from '../../../encryption/receipt-format';
-import { putMaintenanceValue } from '../db';
+import { putMaintenanceValue, type SqlGuard } from '../db';
 
 const CHUNK_SIZE = 512 * 1024;
 const MAX_CHUNKS = Math.ceil((MAX_ENCRYPTED_REMINDER_ACK + 4096) / CHUNK_SIZE);
@@ -14,7 +14,7 @@ function chunkKey(kind: ReceiptKind, id: string, index: number): string {
  * Ciphertext is ASCII; each row stays below D1's value/row limit. The caller's
  * commit predicate also guards the chunks, so rejected writes publish neither. */
 export function prepareEncryptedReceipt(db: D1Database, kind: ReceiptKind, id: string, response: Record<string, unknown>,
-	guard: { sql: string; args: (string | number)[] }): { json: string; statements: D1PreparedStatement[] } {
+	guard: SqlGuard<string | number>): { json: string; statements: D1PreparedStatement[] } {
 	const json = JSON.stringify(response);
 	if (json.length <= CHUNK_SIZE) return { json, statements: [] };
 	if (!/^[A-Za-z0-9_-]{1,128}$/.test(id) || !/^[\x20-\x7e]*$/.test(json)) throw new Error('Invalid encrypted receipt');

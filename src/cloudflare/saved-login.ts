@@ -1,9 +1,9 @@
-import type { UsageSnapshot } from './snapshot';
-import type { HttpTransport } from '../http';
-import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from '../oauth/client';
-import { CLOUDFLARE_ANALYTICS_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
-import { fetchCloudflareUsage } from './service';
-import type { SecretKey } from '../../platform/secret-keys';
+import type { UsageSnapshot } from './usage/snapshot';
+import type { HttpTransport } from './http';
+import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from './oauth/client';
+import { CLOUDFLARE_ANALYTICS_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from './oauth/config';
+import { fetchCloudflareUsage } from './usage/service';
+import type { SecretKey } from '../platform/secret-keys';
 
 const USAGE_SCOPE = CLOUDFLARE_ANALYTICS_SCOPE;
 // Renew early so a long deployment or reset does not outlive its access token.
@@ -24,7 +24,7 @@ interface Options {
 }
 
 /** Retains the setup login for on-demand usage and saved-login server operations. */
-export class CloudflareUsageConnection {
+export class CloudflareSavedLogin {
 	private readonly oauth: CloudflareOAuthClient;
 	private readonly now: () => number;
 	private revision = 0;
@@ -66,7 +66,7 @@ export class CloudflareUsageConnection {
 	async withAuthorization<T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>): Promise<T> {
 		const accountId = this.options.accountId();
 		if (!accountId) throw new Error('Connect a Cloudflare server first.');
-		if (this.busy) throw new Error('A usage request is already in progress.');
+		if (this.busy) throw new Error('A Cloudflare request is already in progress.');
 		const revision = this.revision;
 		this.check(accountId, revision);
 		let credentials = this.read(accountId);
@@ -120,6 +120,7 @@ export class CloudflareUsageConnection {
 		});
 	}
 
+	// The key predates server operations reusing this login; renaming it would drop saved logins.
 	private key(account: string): SecretKey { return `crate-usage-oauth-${account}`; }
 	private read(account: string): Credentials | undefined {
 		try {

@@ -12,6 +12,9 @@ export {
 } from '../../../protocol/sync-limits';
 const MAX_D1_BOUND_PARAMETERS = 100;
 export const FILE_VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+/** A retained version's `expires_at`. Bind `Date.now() + FILE_VERSION_RETENTION_MS`;
+ * the database clock, rounded up to the next second, wins when it is later. */
+export const FILE_VERSION_EXPIRES_AT_SQL = `MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS})`;
 
 export interface FileStorageRow {
 	hash: string;

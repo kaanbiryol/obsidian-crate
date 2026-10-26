@@ -17,7 +17,7 @@ function plugin(status: 'blocked' | 'recovered') {
         app: {},
         getSettingsDocument: () => undefined,
         refreshSettingsTab: vi.fn(),
-        cloudflareUsageConnection: { withAuthorization: vi.fn() },
+        cloudflareSavedLogin: { withAuthorization: vi.fn() },
         cloudflareDeploymentService: {
             recoverUpdate: vi.fn(async () => ({ status, message: 'Result', diagnostics: '{"step":"upload-worker"}' })),
         },

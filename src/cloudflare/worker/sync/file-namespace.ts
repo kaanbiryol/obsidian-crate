@@ -1,7 +1,8 @@
 import { portablePathKey } from '../../../protocol/portable-path';
 import { corsResponse } from '../cors';
+import type { SqlGuard } from '../db';
 
-export function namespacePredicate(path: string): { sql: string; args: string[] } {
+export function namespacePredicate(path: string): SqlGuard {
 	const key = portablePathKey(path);
 	const prefixLengths: number[] = [];
 	let length = 0;
@@ -22,7 +23,7 @@ export function namespacePredicate(path: string): { sql: string; args: string[] 
 }
 
 /** Evaluate inside the publication statement, never as a separate preflight. */
-export function fileNamespaceGuard(path: string): { sql: string; args: string[] } {
+export function fileNamespaceGuard(path: string): SqlGuard {
 	const predicate = namespacePredicate(path);
 	return { sql: `NOT EXISTS (SELECT 1 FROM files WHERE ${predicate.sql})`, args: predicate.args };
 }

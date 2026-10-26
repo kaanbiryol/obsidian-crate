@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { CloudflareDeploymentService } from './service';
-import { CloudflareUsageConnection } from '../usage/connection';
+import { CloudflareSavedLogin } from '../saved-login';
 import { CloudflareReauthorizationRequired } from '../oauth/client';
 import { CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
 import { DEFAULT_SETTINGS } from '../../plugin/settings';
@@ -14,7 +14,7 @@ function harness(status: number, scope = CLOUDFLARE_OAUTH_SCOPES.join(' ')) {
     workersSubdomain: 'test', lastDeployedVersion: null, lastDeployedFingerprint: null } };
   const transport = vi.fn<HttpTransport>(async () => ({ status, text: JSON.stringify({ success: false, errors: [{ message: 'Denied' }] }) }));
   const secrets = new Map<string, string>();
-  const connection = new CloudflareUsageConnection({ clientId: 'client', transport, signal: new AbortController().signal,
+  const connection = new CloudflareSavedLogin({ clientId: 'client', transport, signal: new AbortController().signal,
     accountId: () => settings.cloudflareDeployment.accountId,
     secrets: { get: key => secrets.get(key), set: (key, value) => { secrets.set(key, value); } } });
   connection.acceptAuthorization(settings.cloudflareDeployment.accountId, { accessToken: 'synthetic', expiresIn: 3600, scope });

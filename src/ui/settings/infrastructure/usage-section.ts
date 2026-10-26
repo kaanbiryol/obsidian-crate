@@ -8,7 +8,7 @@ export function renderUsageSection({ containerEl, plugin }: Omit<SettingsSection
 	const accountId = plugin.settings.cloudflareDeployment?.accountId;
 	if (!accountId) return () => {};
 	const container = containerEl;
-	const connection = plugin.cloudflareUsageConnection;
+	const connection = plugin.cloudflareSavedLogin;
 	let active = true;
 	const current = () => active && plugin.settings.cloudflareDeployment?.accountId === accountId;
 	container.createEl('p', { cls: 'setting-item-description', text: 'Usage reported by Cloudflare across your account, including other apps. Saved results stay visible until you refresh.' });

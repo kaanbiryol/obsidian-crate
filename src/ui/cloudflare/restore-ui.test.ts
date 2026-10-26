@@ -13,7 +13,7 @@ import { openServerRestore } from './restore-ui';
 import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';
 const backup = { prefix: 'backup', hash: 'hash', manifest: { createdAt: '2026-09-01T00:00:00Z', objects: [] } } as unknown as BackupChoice;
 function harness(saved?: unknown) {
-  const plugin = { app: {}, settings: { cloudflareRestore: saved }, getSettingsDocument: vi.fn(), refreshSettingsTab: vi.fn(), cloudflareUsageConnection: { withAuthorization: vi.fn() }, cloudflareDeploymentService: { isBusy: false, listRestoreBackups: vi.fn(async () => [backup]), restoreBackup: vi.fn(async () => 'https://restored.test.workers.dev') } };
+  const plugin = { app: {}, settings: { cloudflareRestore: saved }, getSettingsDocument: vi.fn(), refreshSettingsTab: vi.fn(), cloudflareSavedLogin: { withAuthorization: vi.fn() }, cloudflareDeploymentService: { isBusy: false, listRestoreBackups: vi.fn(async () => [backup]), restoreBackup: vi.fn(async () => 'https://restored.test.workers.dev') } };
   return { plugin, open: () => openServerRestore(plugin as unknown as CratePlugin) };
 }
 beforeEach(() => { resetObsidianUiMocks(); vi.clearAllMocks(); });

@@ -53,7 +53,7 @@ export async function handleBatchUpload(
 		if (bulkNew) stagingBatchId = await trackStagedBatch(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })), resetGeneration);
 		else encryptionState = await trackStagedUploads(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })), uploads.every(file => file.contentType === ENCRYPTED_FILE_CONTENT_TYPE), validatedEncryption, resetGeneration);
 	} catch (error) {
-		if (error instanceof EncryptionStateError) return corsResponse({ error: error.message, code: 'encryption_required' }, error.status);
+		if (error instanceof EncryptionStateError) return error.toResponse();
 		return corsResponse({ success: false, results: results.concat(uploads.map(file => ({
 			path: file.safePath, success: false as const, code: 'storage' as const, status: 503,
 			error: formatMetadataCommitFailure('Upload', formatMutationError(error)),

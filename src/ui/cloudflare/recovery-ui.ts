@@ -17,7 +17,7 @@ export async function checkAndRecoverUpdate(plugin: CratePlugin, onUpdate: () =>
     progress.setWorking('Checking server update', 'Checking Cloudflare and the interrupted operation. Keep Obsidian open until this check finishes.');
     try {
         const result = await plugin.cloudflareDeploymentService.recoverUpdate(
-            operation => plugin.cloudflareUsageConnection.withAuthorization(operation),
+            operation => plugin.cloudflareSavedLogin.withAuthorization(operation),
         );
         if (signal.aborted) return;
         plugin.refreshSettingsTab();

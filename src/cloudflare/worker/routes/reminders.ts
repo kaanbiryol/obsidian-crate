@@ -1,10 +1,8 @@
 import { handleNotificationPolicy } from '../notifications/policy';
-import { handleSetReminderCompleted } from '../reminders/routes/complete';
 import { handleCreateReminder } from '../reminders/routes/create';
-import { handleDeleteReminder } from '../reminders/routes/delete';
+import { handleDeleteReminder, handleSetReminderCompleted, handleUpdateReminder } from '../reminders/routes/existing-reminder';
 import { handleListReminders } from '../reminders/routes/list';
 import { handleReorderReminders } from '../reminders/routes/reorder';
-import { handleUpdateReminder } from '../reminders/routes/update';
 import type { Env } from '../types';
 
 export async function handleRemindersRoute(

@@ -5,6 +5,8 @@ import { validateEncryptedSchedules } from '../../../encryption/notification-for
 import { isWirePath } from '../../../protocol/encrypted-path';
 import { readServerState, saveServerState, serverStateValue } from '../server-state';
 import { isMarkdownPath } from '../../../protocol/note-paths';
+import { corsResponse } from '../cors';
+import type { SqlGuard } from '../db';
 
 /** The stored state JSON, or NULL for a plaintext vault. */
 export const ENCRYPTION_STATE_SQL = serverStateValue('encryption');
@@ -12,6 +14,10 @@ export const ENCRYPTION_FILE_PREFIX = 'e2ee:file:';
 
 export class EncryptionStateError extends Error {
 	constructor(message: string, readonly status = 409) { super(message); this.name = 'EncryptionStateError'; }
+
+	toResponse(): Response {
+		return corsResponse({ error: this.message, code: 'encryption_required' }, this.status);
+	}
 }
 
 export async function readEncryptionState(db: D1Database): Promise<EncryptionServerState | null> {
@@ -33,7 +39,7 @@ export function hasEncryptionAuthority(request: Request, state: EncryptionServer
 
 /** Use in the SAME transaction as publishing bytes. A request authorized before
  * encryption is turned on must not be able to commit a late plaintext upload. */
-export function encryptionWriteGuard(state: EncryptionServerState | null): { sql: string; args: string[] } {
+export function encryptionWriteGuard(state: EncryptionServerState | null): SqlGuard {
 	if (!state) return { sql: `${ENCRYPTION_STATE_SQL} IS NULL`, args: [] };
 	if (state.mode !== 'active') throw new EncryptionStateError('An encryption reset is in progress. Resume it on the device that started it.');
 	return { sql: `EXISTS (SELECT 1 FROM server_state WHERE id = 1 AND json_extract(encryption, '$.mode') = 'active'

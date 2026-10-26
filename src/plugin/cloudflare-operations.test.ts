@@ -48,7 +48,7 @@ function createPlugin(configured = false) {
 		app: {},
 		secretStorage: { get: vi.fn(() => 'existing-token') },
 		settings: { workerUrl: 'https://crate.example.workers.dev', deviceId: 'device-id', cloudflareDeployment: { accountId: 'account-a' } },
-		cloudflareUsageConnection: { withAuthorization: vi.fn(), forget: vi.fn(async () => {}) },
+		cloudflareSavedLogin: { withAuthorization: vi.fn(), forget: vi.fn(async () => {}) },
 		syncRuntime: { isConfigured: vi.fn(() => configured), sync },
 		openSettingsTab: vi.fn(),
 		getSettingsDocument: vi.fn(() => undefined),
@@ -243,7 +243,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(generateSecureToken).not.toHaveBeenCalled();
 		expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
 		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
-		expect(plugin.cloudflareUsageConnection.forget).toHaveBeenCalledWith('account-a');
+		expect(plugin.cloudflareSavedLogin.forget).toHaveBeenCalledWith('account-a');
 		expect(progress.succeed).toHaveBeenCalledWith('Crate server deleted', expect.stringContaining('local vault files are kept'));
 	});
 
@@ -305,7 +305,7 @@ it.each(['connect', 'update', 'reset', 'delete'] as const)('uses saved login for
 	expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mock.calls[0]?.[0]).toBe(intent);
 	expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
 	expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledTimes(intent === 'connect' || intent === 'reset' ? 1 : 0);
-	expect(plugin.cloudflareUsageConnection.forget).toHaveBeenCalledTimes(intent === 'delete' ? 1 : 0);
+	expect(plugin.cloudflareSavedLogin.forget).toHaveBeenCalledTimes(intent === 'delete' ? 1 : 0);
 	expect(progress.succeed).toHaveBeenCalledOnce();
 });
 

@@ -79,7 +79,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     }
     return readingResponse({ error: 'Not found' }, 404);
   } catch (error) {
-    if (error instanceof ReadingError) return readingResponse({ error: error.message, code: error.code }, error.status);
+    if (error instanceof ReadingError) return error.toResponse();
     throw error;
   }
 }

@@ -11,12 +11,13 @@ import type { UploadResult } from '@/protocol/sync-types';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { readingIndexStatements, type ReadingIndexPolicy } from '../reading/library-index';
 import type { CommitEffects } from '../commit-effects';
-import { changedRows } from '../db';
+import { allGuards, changedRows, type SqlGuard } from '../db';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { assertFileNamespaceAvailable, FileNamespaceConflictError, fileNamespaceGuard } from './file-namespace';
 import { findFileDeletionReceipt, recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
 import type { MutationAuditContext } from '../request-diagnostics';
 import {
+	FILE_VERSION_EXPIRES_AT_SQL,
 	FILE_VERSION_RETENTION_MS,
 	getStoredFileRow,
 	type ExpectedFileHash,
@@ -40,30 +41,19 @@ interface UploadMutationInput {
 
 function uploadGuard({
 	path, objectKey, operation, stagingBatchId, importToken, encryptionState = null, resetGeneration,
-}: UploadMutationInput): { sql: string; args: unknown[] } {
-	const namespace = fileNamespaceGuard(path);
-	const encryption = encryptionWriteGuard(encryptionState);
-	namespace.sql += ` AND ${encryption.sql}`;
-	namespace.args.push(...encryption.args);
-	const resetGuard = syncResetGenerationGuard(resetGeneration);
-	namespace.sql += ` AND ${resetGuard.sql}`;
-	namespace.args.push(...resetGuard.args);
-  const lease = stagingBatchId ? stagedBatchGuard(stagingBatchId, objectKey) : stagedUploadGuard(objectKey);
-  namespace.sql += ` AND ${lease.sql}`;
-  namespace.args.push(...lease.args);
-  if (importToken) {
-    namespace.sql += " AND EXISTS (SELECT 1 FROM initial_import WHERE token = ? AND state = 'importing')";
-    namespace.args.push(importToken);
-  }
-	if (operation) {
-		namespace.sql += ' AND NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)';
-		namespace.args.push(operation.id);
-	}
-	return namespace;
+}: UploadMutationInput): SqlGuard {
+	return allGuards(
+		fileNamespaceGuard(path),
+		encryptionWriteGuard(encryptionState),
+		syncResetGenerationGuard(resetGeneration),
+		stagingBatchId ? stagedBatchGuard(stagingBatchId, objectKey) : stagedUploadGuard(objectKey),
+		...importToken ? [{ sql: "EXISTS (SELECT 1 FROM initial_import WHERE token = ? AND state = 'importing')", args: [importToken] }] : [],
+		...operation ? [{ sql: 'NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)', args: [operation.id] }] : [],
+	);
 }
 
 /** The row an update replaces: exactly what its UPDATE matches. */
-function replacedRow(input: UploadMutationInput & { expectedHash: string }): { sql: string; args: unknown[] } {
+function replacedRow(input: UploadMutationInput & { expectedHash: string }): SqlGuard {
 	const namespace = uploadGuard(input);
 	const revisionGuard = input.expectedRevision === undefined ? '' : ' AND storage_key = ?';
 	return {
@@ -94,7 +84,7 @@ function retainReplacedUpload(db: D1Database, input: UploadMutationInput): D1Pre
 	if (input.expectedHash === null) return [];
 	const replaced = replacedRow({ ...input, expectedHash: input.expectedHash });
 	return [db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, expires_at)
-		SELECT storage_key, path, hash, size, 'replaced', MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS})
+		SELECT storage_key, path, hash, size, 'replaced', ${FILE_VERSION_EXPIRES_AT_SQL}
 		FROM files WHERE ${replaced.sql} AND storage_key != ?`)
 		.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...replaced.args, input.objectKey)];
 }
@@ -232,7 +222,7 @@ export async function commitFileDelete(
 			.bind(revision, ...predicateArgs),
 		db.prepare(`INSERT OR IGNORE INTO file_versions
 			(storage_key, path, hash, size, reason, expires_at)
-			SELECT storage_key, path, hash, size, 'deleted', MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS}) FROM files WHERE ${expectedPredicate}`)
+			SELECT storage_key, path, hash, size, 'deleted', ${FILE_VERSION_EXPIRES_AT_SQL} FROM files WHERE ${expectedPredicate}`)
 			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...predicateArgs),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),

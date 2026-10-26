@@ -108,7 +108,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 			}
 		} catch (error: unknown) {
 			// The transaction may have committed before its response was lost.
-			if (error instanceof EncryptionStateError) return corsResponse({ error: error.message, code: 'encryption_required' }, error.status);
+			if (error instanceof EncryptionStateError) return error.toResponse();
 			if (error instanceof FileNamespaceConflictError) return error.toResponse();
 			// Only the age-delayed, reference-aware orphan sweep may reclaim it.
 			return corsResponse({
@@ -120,7 +120,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 
 		return corsResponse({ success: true, path: safePath, hash, revision });
 	} catch (err: unknown) {
-		if (err instanceof EncryptionStateError) return corsResponse({ error: err.message, code: 'encryption_required' }, err.status);
+		if (err instanceof EncryptionStateError) return err.toResponse();
 		const message = formatMutationError(err);
 		return corsResponse({ success: false, path: safePath, error: message }, 500);
 	}

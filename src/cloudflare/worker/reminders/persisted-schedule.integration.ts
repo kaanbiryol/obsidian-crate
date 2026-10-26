@@ -6,7 +6,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../storage';
 import { handleListReminders } from './routes/list';
-import { handleUpdateReminder } from './routes/update';
+import { handleUpdateReminder } from './routes/existing-reminder';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';
 import { normalizeReminderScheduleLine } from '@/reminders/core/normalizeReminderSchedule';

@@ -1,8 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { CloudflareUsageConnection } from './connection';
-import { CLOUDFLARE_ANALYTICS_SCOPE as USAGE_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
-import type { UsageSnapshot } from './snapshot';
-import type { HttpTransport } from '../http';
+import { CloudflareSavedLogin } from './saved-login';
+import { CLOUDFLARE_ANALYTICS_SCOPE as USAGE_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from './oauth/config';
+import type { UsageSnapshot } from './usage/snapshot';
+import type { HttpTransport } from './http';
 
 function setup() {
 	let time = 1_000_000;
@@ -15,7 +15,7 @@ function setup() {
 		if (url.endsWith('/revoke')) return { status: 200, text: '{}' };
 		return { status: 200, text: JSON.stringify({ data: { viewer: { accounts: [{ accountTag: account, usage: [] }] } } }) };
 	});
-	const connection = new CloudflareUsageConnection({
+	const connection = new CloudflareSavedLogin({
 		cache: { read: () => snapshot, write: async value => { snapshot = value; } },
 		clientId: 'client', transport, signal: abort.signal,
 		accountId: () => account, now: () => time,

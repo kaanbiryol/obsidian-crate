@@ -39,7 +39,7 @@ export async function openServerRestore(plugin: CratePlugin, chooseAnother = fal
   const progress = openCloudflareDeploymentModal(plugin.app, 'update', plugin.getSettingsDocument(), signal);
   progress.setWorking('Finding server backups', 'Reading completed upgrade backups from your Cloudflare account…');
   try {
-    const backups = await plugin.cloudflareDeploymentService.listRestoreBackups(operation => plugin.cloudflareUsageConnection.withAuthorization(operation));
+    const backups = await plugin.cloudflareDeploymentService.listRestoreBackups(operation => plugin.cloudflareSavedLogin.withAuthorization(operation));
     if (signal.aborted) return;
     progress.dismiss();
     new BackupPicker(plugin, backups, backup => { void confirmRestore(plugin, backup); }).open();
@@ -64,7 +64,7 @@ async function runRestore(plugin: CratePlugin, backup: BackupChoice | null): Pro
   const progress = openCloudflareDeploymentModal(plugin.app, 'update', plugin.getSettingsDocument(), signal);
   progress.setWorking('Restoring server backup', 'Verifying the backup. Keep Obsidian open until the restore finishes.');
   try {
-    const url = await plugin.cloudflareDeploymentService.restoreBackup(operation => plugin.cloudflareUsageConnection.withAuthorization(operation), backup,
+    const url = await plugin.cloudflareDeploymentService.restoreBackup(operation => plugin.cloudflareSavedLogin.withAuthorization(operation), backup,
       message => { if (!signal.aborted) progress.setWorking('Restoring server backup', message); });
     if (signal.aborted) return;
     plugin.refreshSettingsTab();

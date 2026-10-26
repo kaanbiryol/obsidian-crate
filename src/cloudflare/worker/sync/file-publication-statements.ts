@@ -1,5 +1,5 @@
 import { fileRevisionGuard, fileRevisionsGuard } from './file-identity';
-import { FILE_VERSION_RETENTION_MS, type FileStorageRow } from './storage';
+import { FILE_VERSION_EXPIRES_AT_SQL, FILE_VERSION_RETENTION_MS, type FileStorageRow } from './storage';
 
 interface PublishedRevision {
 	path: string;
@@ -26,7 +26,7 @@ export function retainReplacedVersionStatement(
 	const guard = fileRevisionsGuard(requiredRevisions.map(file => ({ path: file.path, storageKey: file.objectKey })));
 	return db.prepare(`INSERT OR IGNORE INTO file_versions
 		(storage_key, path, hash, size, reason, expires_at)
-		SELECT ?, ?, ?, ?, 'replaced', MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS})
+		SELECT ?, ?, ?, ?, 'replaced', ${FILE_VERSION_EXPIRES_AT_SQL}
 		WHERE ${guard.sql}`)
 		.bind(previous.storageKey, previous.path, previous.hash, previous.size, Date.now() + FILE_VERSION_RETENTION_MS,
 			...guard.args);

@@ -3,6 +3,7 @@ import type { ObjectReference } from '../../storage-references';
 import { ENCRYPTION_STATE_SQL, EncryptionStateError, encryptionWriteGuard } from '../../encryption/state';
 import { validateEncryptionState, type EncryptionServerState } from '../../../../encryption/server-state';
 import { syncResetGenerationGuard } from '../reset-generation';
+import type { SqlGuard } from '../../db';
 /** A publication lease. Cleanup may claim it after 24 hours, never before. */
 export const STAGED_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -13,7 +14,7 @@ export async function trackStagedUpload(db: D1Database, storageKey: string, path
   await trackStagedUploads(db, [{ storageKey, path }], encrypted);
 }
 
-export function stagedUploadGuard(storageKey: string): { sql: string; args: string[] } {
+export function stagedUploadGuard(storageKey: string): SqlGuard {
   return { sql: `EXISTS (SELECT 1 FROM staged_uploads WHERE storage_key = ?
     AND state = 'pending' AND expires_at > unixepoch('now') * 1000)`, args: [storageKey] };
 }

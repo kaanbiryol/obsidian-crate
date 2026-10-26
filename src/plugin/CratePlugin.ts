@@ -3,7 +3,7 @@
  */
 
 import { Plugin } from 'obsidian';
-import type { CloudflareUsageConnection } from '../cloudflare/usage/connection';
+import type { CloudflareSavedLogin } from '../cloudflare/saved-login';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment/service';
 import {
 	type RemindersSettings,
@@ -37,7 +37,7 @@ export default class CratePlugin extends Plugin {
 	secretStorage!: SecretStorageService;
 	syncRuntime!: SyncRuntime;
 	cloudflareDeploymentService!: CloudflareDeploymentService;
-	cloudflareUsageConnection!: CloudflareUsageConnection;
+	cloudflareSavedLogin!: CloudflareSavedLogin;
 	readonly settingsUiState: SettingsUiState = createSettingsUiState();
 	private settingTab?: CrateSettingTab;
 	private settingsWriteQueue: Promise<void> = Promise.resolve();

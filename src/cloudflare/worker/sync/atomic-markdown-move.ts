@@ -13,7 +13,7 @@ import { FileVersionConflictError } from '../storage';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import { recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
 import type { MutationAuditContext } from '../request-diagnostics';
-import { FILE_VERSION_RETENTION_MS, getStoredFileRow } from './storage';
+import { FILE_VERSION_EXPIRES_AT_SQL, FILE_VERSION_RETENTION_MS, getStoredFileRow } from './storage';
 
 /** Publish `content` at a new path and delete the exact source revision in one
  * transaction, so a rename never leaves both files or neither. */
@@ -52,7 +52,7 @@ export async function writeCommittedMarkdownMove(
 		finishStagedUpload(db, destination.objectKey, destination.path),
 		sourceStatement(`INSERT INTO changelog (path, action, hash, size, revision) SELECT path, 'delete', '', 0, ? FROM files`, deletion),
 		sourceStatement(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, expires_at)
-			SELECT storage_key, path, hash, size, 'deleted', MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS}) FROM files`,
+			SELECT storage_key, path, hash, size, 'deleted', ${FILE_VERSION_EXPIRES_AT_SQL} FROM files`,
 		Date.now() + FILE_VERSION_RETENTION_MS),
 	];
 	const results: unknown[] = await db.batch([

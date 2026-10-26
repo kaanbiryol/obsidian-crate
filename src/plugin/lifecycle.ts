@@ -18,7 +18,7 @@ import { ensurePluginDeviceId } from "./deviceId";
 import type CratePlugin from "./CratePlugin";
 import {
   createCloudflareDeploymentService,
-  createCloudflareUsageConnection,
+  createCloudflareSavedLogin,
   handleCloudflareOAuthProtocol,
 } from "./cloudflare-operations";
 import { showCloudflareServerUpdateNotice } from "../ui/cloudflare/update-notice";
@@ -84,7 +84,7 @@ async function initializePluginCore(plugin: CratePlugin, signal: AbortSignal): P
     await restoreManagedWorkerConnection(plugin);
     if (signal.aborted) return false;
     plugin.cloudflareDeploymentService = createCloudflareDeploymentService(plugin);
-    plugin.cloudflareUsageConnection = createCloudflareUsageConnection(plugin);
+    plugin.cloudflareSavedLogin = createCloudflareSavedLogin(plugin);
     initializeSyncManagers(plugin);
     ensurePluginDeviceId(plugin);
     return true;

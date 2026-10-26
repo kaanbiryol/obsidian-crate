@@ -1,5 +1,16 @@
 const CHANGELOG_RETENTION_DAYS = 30;
 
+/** A SQL condition and its bound values, composed into larger statements. */
+export interface SqlGuard<Value = string> {
+	sql: string;
+	args: Value[];
+}
+
+/** All guards must hold. Conditions and values stay in order, so placeholders keep their values. */
+export function allGuards<Value>(...guards: ReadonlyArray<SqlGuard<Value>>): SqlGuard<Value> {
+	return { sql: guards.map(guard => guard.sql).join(' AND '), args: guards.flatMap(guard => guard.args) };
+}
+
 interface D1MutationResult {
 	meta?: {
 		changes?: number;

@@ -80,7 +80,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 	}));
 	vi.doMock('./cloudflare-operations', () => ({
 		createCloudflareDeploymentService,
-		createCloudflareUsageConnection: vi.fn(() => ({})),
+		createCloudflareSavedLogin: vi.fn(() => ({})),
 		handleCloudflareOAuthProtocol,
 	}));
 	vi.doMock('../ui/cloudflare/update-notice', () => ({ showCloudflareServerUpdateNotice }));
