@@ -7,7 +7,7 @@ import type { CloudflareDeploymentMetadata } from './types';
 import { workersDevOrigin } from './worker-origin';
 import { CloudflareApiClient, CloudflareApiError } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
-import { randomHex } from '../oauth/pkce';
+import { createRandomHexToken } from '../../platform/random-hex';
 import { deployedArtifact } from './discovery';
 import { assertDeploymentIsNotDowngrade } from './update';
 import { withDeploymentFence, isRejectedWorkerUpload, type DeploymentFence } from './fence';
@@ -117,7 +117,7 @@ async function ensureWorkersSubdomain(
 	const candidates = [
 		metadata.workersSubdomain,
 		`crate-${metadata.deploymentId}`,
-		`crate-${metadata.deploymentId}-${randomHex(2)}`,
+		`crate-${metadata.deploymentId}-${createRandomHexToken(2)}`,
 	].filter((value): value is string => Boolean(value));
 	let lastError: unknown = null;
 	for (const candidate of candidates) {

@@ -1,7 +1,7 @@
 import type { CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
-import { randomHex } from '../oauth/pkce';
+import { createRandomHexToken } from '../../platform/random-hex';
 import type { BackupChoice } from './archive';
 import type { ServerRestoreState } from './state';
 
@@ -21,7 +21,7 @@ export async function runRestoreWorkflow(input: {
   if (saved && (saved.phase !== 'complete' || !choice)) state = structuredClone(saved);
   else {
     if (!choice) throw new Error('Select a backup first');
-    const id = randomHex(8), resourceName = `crate-${id}`;
+    const id = createRandomHexToken(8), resourceName = `crate-${id}`;
     state = {
       id,
       source: { account: source.accountId!, database: source.d1DatabaseId!, bucket: source.r2BucketName },

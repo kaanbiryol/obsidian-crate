@@ -2,7 +2,7 @@ import type { CloudflareApiClient, CloudflareAccount } from '../cloudflare-api';
 import { discoverCloudflareDeployments, type DiscoveredCloudflareDeployment } from './discovery';
 import type { CloudflareDeploymentMetadata, DeploymentRequest } from './types';
 import { normalizeVaultName } from '../vault-name';
-import { randomHex } from '../oauth/pkce';
+import { createRandomHexToken } from '../../platform/random-hex';
 import { DEVELOPMENT_BUILD } from '../../protocol/server-build';
 
 export type SelectDeployment = (deployments: DiscoveredCloudflareDeployment[], missingServer?: boolean)
@@ -10,7 +10,7 @@ export type SelectDeployment = (deployments: DiscoveredCloudflareDeployment[], m
 
 export function createCloudflareDeploymentMetadata(vaultName?: string): CloudflareDeploymentMetadata {
 	// A development build is fenced to one Worker, so a new server must be created under that name.
-	const deploymentId = DEVELOPMENT_BUILD ? DEVELOPMENT_BUILD.worker.slice('crate-'.length) : randomHex(8);
+	const deploymentId = DEVELOPMENT_BUILD ? DEVELOPMENT_BUILD.worker.slice('crate-'.length) : createRandomHexToken(8);
 	const resourceName = `crate-${deploymentId}`;
 	return {
 		deploymentId,

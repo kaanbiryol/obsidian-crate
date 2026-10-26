@@ -55,8 +55,4 @@ export class QRModal extends SharedModal {
 				}
 			}));
 	}
-
-	onClose(): void {
-		super.onClose();
-	}
 }
