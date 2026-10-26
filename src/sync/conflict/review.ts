@@ -1,8 +1,7 @@
 import { FileSystemAdapter, Platform, type App } from 'obsidian';
 import type { ConflictRecord } from '../types';
 import { conflictReviewFile } from './review-file';
-import { TEXT_PATH } from '../local/local-apply';
-import { decodePreviewText } from '../history/preview-format';
+import { decodePreviewText, isBinaryPreviewPath } from '../history/preview-format';
 
 export type ConflictChoice = 'current' | 'saved' | 'both' | 'manual';
 export interface ConflictReview {
@@ -30,7 +29,7 @@ export async function createConflictReview(
     const currentBytes = await original.read();
     const savedBytes = await saved.read();
     let currentText: string | undefined, savedText: string | undefined;
-    if (TEXT_PATH.test(original.path) && Math.max(currentBytes.byteLength, savedBytes.byteLength) <= 1_000_000) {
+    if (!isBinaryPreviewPath(original.path) && Math.max(currentBytes.byteLength, savedBytes.byteLength) <= 1_000_000) {
         try {
             const current = decodePreviewText(currentBytes, { preserveBom: true });
             const other = decodePreviewText(savedBytes, { preserveBom: true });

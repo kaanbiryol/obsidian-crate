@@ -9,7 +9,8 @@ import { getAllVaultFiles } from '../local/file-discovery';
 import { assertLocalSyncPath } from '../local/local-path-safety';
 import { readLocalFileEntry } from '../local/local-file-entry';
 import { deletePathLocallyIfUnchanged } from '../local/local-delete';
-import { applyRemoteContentIfUnchanged, TEXT_PATH } from '../local/local-apply';
+import { applyRemoteContentIfUnchanged } from '../local/local-apply';
+import { isUtf8Text } from './preview-format';
 import { loadHistoryRestorePreview, type HistoryRestorePreview } from './restore-preview';
 import { sha256Hex } from '../../platform/sha256';
 
@@ -132,7 +133,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
                         const content = await vault.adapter.readBinary(staged.get(item.path)!.target!);
                         if (await sha256Hex(content) !== target[item.path]!.hash) throw new Error('The staged restore copy is damaged.');
                         const original = staged.get(item.path)!.original;
-                        const text = TEXT_PATH.test(item.path) && isUtf8(content) && (!original || isUtf8(await vault.adapter.readBinary(original)));
+                        const text = isUtf8Text(item.path, content) && (!original || isUtf8Text(item.path, await vault.adapter.readBinary(original)));
                         let expected = originalHash;
                         if (originalHash !== null && !text) {
                             const outcome = await deletePathLocallyIfUnchanged({ vault }, item.path, originalHash);
@@ -176,7 +177,3 @@ async function stage(vault: Vault, path: string, bytes: ArrayBuffer, hash: strin
     if (await sha256Hex(await vault.adapter.readBinary(path)) !== hash) throw new Error('Could not verify a recovery copy. No files were changed.');
 }
 
-function isUtf8(bytes: ArrayBuffer): boolean {
-    try { new TextDecoder('utf-8', { fatal: true }).decode(bytes); return true; }
-    catch { return false; }
-}

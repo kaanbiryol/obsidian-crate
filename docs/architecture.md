@@ -699,7 +699,7 @@ The repeat grammar owns the cadence, weekday lists/ranges and monthly day. `remi
 
 One-off calendar recognition also belongs to Chrono. Dates, times and timestamps are not prevalidated or partially masked: when Chrono returns no match, the full phrase remains title text. Durable reads use the same recognition and require recognized schedules to be absolute.
 
-Sync deletes require both the acknowledged content hash and opaque file revision. Recreating the same bytes produces a new revision, so an old delete cannot remove the new file. Missing revisions require reconciliation. Local remote-deletion application always uses vault trash so bytes written after the hash check remain recoverable. Supported text updates use Obsidian's atomic process API. Existing binary files are preserved and incoming bytes saved as conflict copies for explicit review because Obsidian exposes no atomic binary compare-and-swap.
+Sync deletes require both the acknowledged content hash and opaque file revision. Recreating the same bytes produces a new revision, so an old delete cannot remove the new file. Missing revisions require reconciliation. Local remote-deletion application always uses vault trash so bytes written after the hash check remain recoverable. Updates whose old and new bytes are both strict UTF-8, outside known binary formats, use Obsidian's atomic process API, whatever the extension. Existing binary files are preserved and incoming bytes saved as conflict copies for explicit review because Obsidian exposes no atomic binary compare-and-swap.
 
 See [the protocol contract](protocol.md) and [backup and recovery](recovery.md).
 

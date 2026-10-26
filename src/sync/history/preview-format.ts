@@ -6,6 +6,14 @@ export function isBinaryPreviewPath(path: string): boolean {
     return BINARY_PATH.test(path);
 }
 
+/** Strict UTF-8 outside known binary formats: Obsidian's string `process()`
+ * writer replaces these bytes exactly, so they can be updated atomically. */
+export function isUtf8Text(path: string, bytes: ArrayBuffer): boolean {
+    if (isBinaryPreviewPath(path)) return false;
+    try { new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); return true; }
+    catch { return false; }
+}
+
 /** Decode display text; callers retain their own read, size and integrity checks. */
 export function decodePreviewText(bytes: ArrayBuffer, options: { preserveBom: boolean }): string {
     const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: options.preserveBom }).decode(bytes);

@@ -5,7 +5,8 @@ import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { assertLocalSyncPath } from '../local/local-path-safety';
 import { isHiddenPath } from '../local/file-discovery';
 import { deletePathLocallyIfUnchanged } from '../local/local-delete';
-import { applyRemoteContentIfUnchanged, TEXT_PATH } from '../local/local-apply';
+import { applyRemoteContentIfUnchanged } from '../local/local-apply';
+import { isUtf8Text } from '../history/preview-format';
 import { replaceLocalFileWithRecovery } from '../local/local-recovery-write';
 import { sha256Hex } from '../../platform/sha256';
 
@@ -106,7 +107,7 @@ async function discardOne(context: DiscardContext, item: DiscardSnapshot): Promi
         const outcome = await deletePathLocallyIfUnchanged({ vault }, item.path, item.localHash);
         if (outcome.status === 'changed') throw new Error(`${item.path} changed. Its contents were kept.`);
     } else {
-        const atomicText = original && TEXT_PATH.test(item.path) && isUtf8(original) && isUtf8(content);
+        const atomicText = original && isUtf8Text(item.path, original) && isUtf8Text(item.path, content);
         if (atomicText || !isHiddenPath(item.path) && item.localHash === null) {
             const outcome = await applyRemoteContentIfUnchanged({ vault }, item.path, content, item.localHash);
             if (outcome.status === 'deferred') throw new Error(outcome.reason);
@@ -128,11 +129,6 @@ async function discardOne(context: DiscardContext, item: DiscardSnapshot): Promi
     }
     context.verify();
     await context.applied(item.path, item.remote, content);
-}
-
-function isUtf8(bytes: ArrayBuffer): boolean {
-    try { new TextDecoder('utf-8', { fatal: true }).decode(bytes); return true; }
-    catch { return false; }
 }
 
 async function readBaseline(context: DiscardContext, path: string, baseline: Readonly<FileEntry>): Promise<ArrayBuffer> {
