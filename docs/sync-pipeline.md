@@ -238,8 +238,8 @@ Release and transfer values are also checked against source in [current contract
 | Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer/budget.ts` |
 | `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
 | `BATCH_DELETE_CONCURRENCY` | 2 | `transfer/constants.ts` |
-| `MAX_RETRIES` | 3 | `engine/constants.ts` |
-| `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine/constants.ts` |
+| `MAX_RETRIES` | 3 | `engine/lifecycle.ts` |
+| `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine/lifecycle.ts` |
 
 ## Batching Strategy
 

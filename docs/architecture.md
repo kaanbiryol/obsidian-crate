@@ -145,8 +145,9 @@ settling an earlier upload cannot silently bypass the guard for a newer local ed
 `sync/runtime/history-workflow.ts` keeps pause, persistence, application, sync,
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper. `sync/runtime/startup-sync.ts` runs the startup
-sync; the runtime keeps initialization revision checks and queues the vault events
-that arrived during it.
+sync, and the runtime keeps initialization revision checks. `sync/runtime/vault-event-gate.ts`
+admits vault events to the current engine; it records the events that arrive during the
+startup sync and replays them when the sync finishes.
 
 `sync/history/preview-format.ts` owns text decoding and binary control-character rejection.
 `protocol/sync-limits.ts` owns the 256 KB preview limit shared with the Worker's version
@@ -535,7 +536,7 @@ exclusion, lifetime guards and guarded settings/transport access.
 
 The browser-facing PWA source lives in `src/pwa/`, while its Worker-served HTML, styles, install assets, and service worker live in `src/cloudflare/worker/pwa/`. `scripts/build-worker.mjs` builds the PWA client first, injects that bundle into the Worker build, and writes the deployable module to `.generated/cloudflare/worker.mjs`.
 
-The Obsidian plugin and PWA share dock presentation, the Today/Upcoming switcher, tab dissolves, and project push/pop transitions in `src/ui/shared/navigation/`, alongside reminder panels, cards, and view-model logic. Host adapters retain viewport, safe-area, modal, persistence, and history behavior. `PluginWorkspace` keeps visited Reminders and Reading screens mounted in the same Obsidian pane, reads local vault repositories, and stores dock choices in Obsidian device-local storage. Existing view types and commands remain supported. Reading runtime subscriptions replace or remove the mounted library when its configuration changes. Both hosts compile the same semantic theme tokens; see [Shared plugin and PWA UI](ui-styling.md) for ownership and validation.
+The Obsidian plugin and PWA share dock presentation, the Today/Upcoming switcher, tab dissolves, and project push/pop transitions in `src/ui/shared/navigation/`, alongside reminder panels, cards, and view-model logic. Host adapters retain viewport, safe-area, modal, persistence, and history behavior. Every plugin React root renders inside `PluginRoot` (`src/ui/plugin/PluginRoot.tsx`), which provides the plugin and Obsidian's icon renderer to shared components. `PluginWorkspace` keeps visited Reminders and Reading screens mounted in the same Obsidian pane, reads local vault repositories, and stores dock choices in Obsidian device-local storage. Existing view types and commands remain supported. Reading runtime subscriptions replace or remove the mounted library when its configuration changes. Both hosts compile the same semantic theme tokens; see [Shared plugin and PWA UI](ui-styling.md) for ownership and validation.
 
 Reading and Reminders share the feature-independent view header, navigation bar,
 buttons, icon buttons, and modal header under `src/ui/shared/`. Feature adapters
