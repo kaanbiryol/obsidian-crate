@@ -4,6 +4,7 @@ import { buildSharedSettings, rebaseSharedSettings, sameSharedSettings, saveShar
 import { normalizeSharedSettingsValue, type SharedSettings } from '../protocol/shared-settings';
 import { createLogger } from '../sync/logger';
 import { errorMessage } from '../platform/logger';
+import { normalizeIgnorePatterns } from './settings';
 
 const logger = createLogger('SharedSettings');
 
@@ -25,10 +26,13 @@ interface SharedSettingsSync {
  * The reconciled settings are saved with plugin data, so a change that could not be saved
  * stays pending for the next close, also after a restart. Pulling adopts other devices'
  * changes while keeping this device's unsaved ones. */
-export function createSharedSettingsSync(plugin: SharedSettingsPlugin): SharedSettingsSync {
+export function createSharedSettingsSync(plugin: SharedSettingsPlugin, configDir = ''): SharedSettingsSync {
+	// Local settings always carry this device's own workspace pattern. Compare the server's
+	// settings the same way, or every change from another device would read as a conflict.
+	const normalize = (settings: SharedSettings): SharedSettings => ({ ...settings, ignorePatterns: normalizeIgnorePatterns(settings.ignorePatterns, configDir) });
 	const track = () => {
 		const { workerUrl, sharedSettingsBase: saved } = plugin.settings;
-		return { workerUrl, base: saved?.workerUrl === workerUrl ? saved.settings : buildSharedSettings(plugin.settings) };
+		return { workerUrl, base: saved?.workerUrl === workerUrl ? normalize(saved.settings) : buildSharedSettings(plugin.settings) };
 	};
 	let tracked = track();
 	let editing = false;
@@ -57,7 +61,7 @@ export function createSharedSettingsSync(plugin: SharedSettingsPlugin): SharedSe
 		const local = buildSharedSettings(plugin.settings);
 		if (!api || sameSharedSettings(local, tracked.base)) return;
 		const current = tracked;
-		const result = await saveSharedSettingsChanges(api, current.base, local);
+		const result = await saveSharedSettingsChanges(api, current.base, local, normalize);
 		if (tracked !== current || !result.settings) return;
 		// Adopt the server's settings, keeping any edit made while saving.
 		const now = buildSharedSettings(plugin.settings);
@@ -75,7 +79,8 @@ export function createSharedSettingsSync(plugin: SharedSettingsPlugin): SharedSe
 		const current = tracked;
 		const stored = (await api.getSharedSettings()).settings;
 		// A locked encrypted vault reads an envelope; there is nothing to adopt yet.
-		const remote = stored && normalizeSharedSettingsValue(stored);
+		const readable = stored && normalizeSharedSettingsValue(stored);
+		const remote = readable && normalize(readable);
 		if (tracked !== current || !remote || editing) return;
 		const now = buildSharedSettings(plugin.settings);
 		// A setting both devices changed stays local; the next save reports the conflict.
@@ -107,7 +112,7 @@ const instances = new WeakMap<CratePlugin, SharedSettingsSync>();
 export function sharedSettingsSync(plugin: CratePlugin): SharedSettingsSync {
 	let sync = instances.get(plugin);
 	if (!sync) {
-		sync = createSharedSettingsSync(plugin);
+		sync = createSharedSettingsSync(plugin, plugin.app.vault.configDir);
 		instances.set(plugin, sync);
 	}
 	return sync;

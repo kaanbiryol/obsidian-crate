@@ -57,8 +57,11 @@ export async function saveSharedSettingsChanges(
 	api: Pick<SyncApiClient, 'getKnownSharedSettings' | 'getSharedSettings' | 'putSharedSettings'>,
 	base: SharedSettings,
 	local: SharedSettings,
+	/** Applies this device's local normalization to the server's settings before comparing. */
+	normalize: (settings: SharedSettings) => SharedSettings = settings => settings,
 ): Promise<SharedSettingsSave> {
-	const remote = readableSharedSettings((await api.getKnownSharedSettings()).settings);
+	const known = readableSharedSettings((await api.getKnownSharedSettings()).settings);
+	const remote = known && normalize(known);
 	const next = remote ? rebaseSharedSettings(base, local, remote) : local;
 	if (!next) return { status: 'conflict', settings: remote };
 	if (remote && sameSharedSettings(next, remote)) return { status: 'saved', settings: remote };
@@ -67,7 +70,8 @@ export async function saveSharedSettingsChanges(
 		return { status: 'saved', settings: next };
 	} catch (error) {
 		if (!(error instanceof HttpError) || error.status !== 409) throw error;
-		return { status: 'conflict', settings: readableSharedSettings((await api.getSharedSettings()).settings) };
+		const current = readableSharedSettings((await api.getSharedSettings()).settings);
+		return { status: 'conflict', settings: current && normalize(current) };
 	}
 }
 

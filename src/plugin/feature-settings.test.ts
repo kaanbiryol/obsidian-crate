@@ -16,7 +16,7 @@ function fixture() {
     settings: { workerUrl: 'https://crate.example', reading: { enabled: true, folderPath: 'Reading' } },
     remindersSettings: { enabled: true },
     secretStorage: { get: () => 'synthetic' },
-    app: { workspace: { detachLeavesOfType: vi.fn() } }, refreshSettingsTab: vi.fn(),
+    app: { vault: { configDir: '.obsidian' }, workspace: { detachLeavesOfType: vi.fn() } }, refreshSettingsTab: vi.fn(),
     writeSettings: vi.fn(async (value: { reading: { enabled: boolean; folderPath: string } }) => { plugin.settings.reading = value.reading; }),
     writeRemindersSettings: vi.fn(async (value: { enabled: boolean }) => { plugin.remindersSettings = value; }),
   };
