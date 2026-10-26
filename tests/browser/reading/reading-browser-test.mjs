@@ -894,7 +894,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const readingUrl = await readingAppUrl();
     browser = await engine.launch({ headless: true });
-    const page = await browser.newPage({ viewport: { width: 1280, height: 844 } });
+    // Linux WebKit stalls a desktop page while this service worker installs
+    // (the page stops answering and nothing is busy). Layout needs no offline shell.
+    const page = await browser.newPage({ viewport: { width: 1280, height: 844 }, serviceWorkers: 'block' });
     await page.goto(readingUrl);
     await expect(page.getByRole('heading', { name: 'Save something worth your time' })).toBeVisible();
     for (const width of [1280, 900, 390]) {

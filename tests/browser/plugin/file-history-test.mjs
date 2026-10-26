@@ -117,7 +117,7 @@ const { outputFiles } = await build({
     constructor(el) {this.settingEl=el.createDiv({cls:'setting-item'});this.info=this.settingEl.createDiv({cls:'setting-item-info'});this.control=this.settingEl.createDiv({cls:'setting-item-control'});this.controlEl=this.control;}
     setClass(name){this.settingEl.classList.add(name);return this;}
     addText(build){const input=this.control.createEl('input');const api={inputEl:input,setValue:v=>{input.value=v;return api;},setPlaceholder:v=>{input.placeholder=v;return api;},onChange:fn=>{input.oninput=()=>fn(input.value);return api;}};build(api);return this;}
-    addButton(build){const button=this.control.createEl('button');const api={buttonEl:button,setButtonText:v=>{button.textContent=v;return api;},onClick:fn=>{button.onclick=fn;return api;},setCta:()=>{button.classList.add('mod-cta');return api;},setDestructive:()=>api};build(api);return this;}
+    addButton(build){const button=this.control.createEl('button');const api={buttonEl:button,setButtonText:v=>{button.textContent=v;return api;},setDisabled:v=>{button.disabled=v;return api;},onClick:fn=>{button.onclick=fn;return api;},setCta:()=>{button.classList.add('mod-cta');return api;},setDestructive:()=>api};build(api);return this;}
    }
   `}));
  }}], bundle:true,write:false,format:'iife',platform:'browser',loader:{'.scss':'empty'},

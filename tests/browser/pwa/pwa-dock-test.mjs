@@ -504,6 +504,12 @@ function indicatorScenario(engine) {
       await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'no-preference' });
       await expect(dock().locator('.pwa-dock__indicator')).toBeVisible();
       await expect(dock().getByRole('button', { name: 'Projects', exact: true })).toBeVisible();
+      // Mount each tab's screen first. A cold mount on a slow runner can block
+      // the frame after the click for longer than the whole slide.
+      for (const label of ['Projects', 'Inbox', 'Reminders']) {
+        await dock().getByRole('button', { name: label, exact: true }).click();
+        await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+      }
       for (const label of ['Projects', 'Reminders', 'Inbox', 'Reminders', 'Inbox']) {
         const animation = await dock().evaluateHandle(async (element, label) => {
           const indicator = element.querySelector('.pwa-dock__indicator');
@@ -511,9 +517,14 @@ function indicatorScenario(engine) {
           const start = position();
           const tab = element.querySelector(`[aria-label="${label}"]`);
           tab.click();
-          await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
-          const slide = indicator.getAnimations().find(animation => animation.transitionProperty === 'transform');
-          if (!slide) throw new Error('Expected a sliding tab indicator');
+          // Take the slide on the first frame that has it: a slow runner frame can
+          // otherwise advance the timeline past the whole 300ms transition.
+          const findSlide = () => indicator.getAnimations().find(animation => animation.transitionProperty === 'transform');
+          let slide;
+          for (let frame = 0; frame < 2 && !slide; frame++) { await new Promise(requestAnimationFrame); slide = findSlide(); }
+          if (!slide) throw new Error(`Expected a sliding tab indicator to ${label}: ${JSON.stringify({ start, now: position(),
+            animations: indicator.getAnimations().map(animation => [animation.transitionProperty, animation.playState]),
+            transition: getComputedStyle(indicator).transition })}`);
           slide.pause();
           const duration = Number(slide.effect.getTiming().duration);
           slide.currentTime = duration;

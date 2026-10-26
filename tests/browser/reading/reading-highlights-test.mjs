@@ -474,8 +474,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const unchangedBody = async () => { const note = await (await download()).text(); return note.slice(note.indexOf('\n---\n') + 5); };
     assert.equal(await unchangedBody(), `\n<!-- crate:article:start -->\n${codeMarkdown}\n<!-- crate:article:end -->\n`);
     await inlineParagraph.evaluate(element => element.scrollIntoView({ block: 'center' }));
-    await marks.tap();
-    await page.getByRole('button', { name: 'Delete highlight', exact: true }).tap();
+    // Without the Chromium reload the highlight is still being edited and shows
+    // its actions. Its handles' touch areas then cover the short mark.
+    const deleteHighlight = page.getByRole('button', { name: 'Delete highlight', exact: true });
+    if (!await deleteHighlight.isVisible()) await marks.tap();
+    await deleteHighlight.tap();
     await expect.poll(async () => (await api(`/reading/item?id=${saved.id}`)).item.highlights).toEqual([]);
 
     await code.evaluate(element => element.scrollIntoView({ block: 'center' }));

@@ -88,7 +88,9 @@ async function checkSeamless(path, scroller, ready) {
     const [document, embedded] = [await pixels(ios.page), await pixels(desktop.page)];
     let changed = 0;
     for (let index = 0; index < document.length; index++) if (Math.abs(document[index] - embedded[index]) > 8) changed++;
-    assert.equal(changed, 0, `${scroller}: document scrolling must not move the header, rows or dock`);
+    // Linux WebKit draws one antialiased pixel differently in the two scrollers (3 bytes on CI).
+    // Moved chrome or rows change tens of thousands.
+    assert.ok(changed <= 12, `${scroller}: document scrolling must not move the header, rows or dock (${changed} bytes differ)`);
     assert.deepEqual([...ios.errors, ...desktop.errors], []);
   } finally {
     await ios.context.close();
