@@ -139,6 +139,15 @@ it('stops sending after a failure that may affect every change', async () => {
 	expect((await pendingReading(session)).map(op => op.review)).toEqual([false, undefined]);
 });
 
+it('saves a short error when a gateway answers with HTML', async () => {
+	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } });
+	network.mockImplementationOnce(async () => response({ day: 20_000, generation: session.generation }))
+		.mockImplementationOnce(async () => new Response('<!doctype html><title>502 Bad Gateway</title>', { status: 502 }));
+	await drainReading(session);
+	// Before: the JSON parse error of the HTML page was saved with the change.
+	expect(await pendingReading(session)).toMatchObject([{ error: 'Reading request failed.', review: false }]);
+});
+
 it('rejects stale peer edits and failed persistence before accepting work', async () => {
 	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } });
 	await expect(queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } })).rejects.toThrow('another tab');

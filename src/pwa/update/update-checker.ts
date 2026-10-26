@@ -28,7 +28,8 @@ export function startUpdateChecks(check: () => Promise<void>): () => void {
 }
 
 export async function fetchPwaAssetVersion(): Promise<string | null> {
-	const response = await fetch(`/notifications/version.json?ts=${Date.now()}`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+	// The launch splash waits for this check, so a stalled server must fail it promptly.
+	const response = await fetch(`/notifications/version.json?ts=${Date.now()}`, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
 	if (!response.ok) return null;
 	const result = await response.json() as { assetVersion?: string };
 	return typeof result.assetVersion === 'string' && result.assetVersion.trim() ? result.assetVersion : null;

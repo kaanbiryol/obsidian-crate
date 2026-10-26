@@ -71,18 +71,32 @@ async function verify(browser) {
 			request.onerror = () => reject(request.error);
 		}));
 		await expect.poll(async () => (await rawCache())?.sessionScope).toBe(sessionScope);
-		// An unanswered encryption check is a connection problem, not a locked vault,
-		// and the failing list load must keep the unencrypted offline copy.
+		// An unanswered encryption check is a connection problem, not a locked vault. Without
+		// encryption evidence the unencrypted offline copy stays visible, read-only.
 		let checks = 0, checkAvailable = false;
+		const writes = [];
+		page.on('request', request => { if (request.method() !== 'GET' && new URL(request.url()).pathname.startsWith('/reminders/')) writes.push(request.url()); });
 		await page.route(url => url.pathname === '/encryption', route => {
 			checks++;
-			return checkAvailable ? route.continue() : route.fulfill({ status: 503, body: 'Injected deploy' });
+			if (checkAvailable) return route.continue();
+			// The startup check stalls; it must give up promptly instead of after 30 seconds.
+			if (checks > 1) return route.fulfill({ status: 503, body: 'Injected deploy' });
 		});
+		const reloaded = Date.now();
 		await page.reload();
-		await expect(page.getByRole('heading', { name: 'Unable to connect', exact: true })).toBeVisible();
+		const unavailable = page.getByRole('region', { name: 'Unable to connect', exact: true });
+		await expect(unavailable).toBeVisible({ timeout: 12_000 });
+		expect(Date.now() - reloaded).toBeLessThan(12_000);
+		const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
+		await expect(card).toBeVisible();
 		await expect(page.getByText('Unlock Crate')).toHaveCount(0);
-		await expect.poll(() => checks).toBeGreaterThan(1);
+		await card.getByRole('checkbox').click();
+		await expect(page.getByRole('status').filter({ hasText: 'Refresh before editing.' })).toBeVisible();
+		await unavailable.getByRole('button', { name: 'Try again', exact: true }).click();
+		await expect.poll(() => checks).toBeGreaterThan(2);
+		await expect(unavailable).toBeVisible();
 		await page.waitForTimeout(250);
+		expect(writes).toEqual([]);
 		expect((await rawCache())?.sessionScope).toBe(sessionScope);
 		// Locked storage cannot write, so the damaged copy below is not overwritten.
 		available = false;

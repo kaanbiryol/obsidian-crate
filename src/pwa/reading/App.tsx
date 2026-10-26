@@ -40,7 +40,7 @@ function ReadingAppContent() {
 	const featureNavigation = useContext(FeatureNavigationContext);
 	const active = featureNavigation?.active !== false;
 	const { connection, sync, showToast, saving, saveLink, updateItem, retryArticle } = useReadingRuntime();
-	const { session, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, share, run, connect,
+	const { session, readOnly, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, run, connect,
 		isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture } = connection;
 	const { refreshManually, isOffline } = sync;
 	const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, isCurrentSession, reportSessionError, run });
@@ -65,9 +65,11 @@ function ReadingAppContent() {
 
 	if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
 	const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
+	// A share stays staged until a connected Reading session copies it into its draft.
+	const share = new URL(location.href).searchParams.has('share');
 	const syncIssue = pending.find(op => op.error || op.review);
 	const notices = <>{recovery && <p className="crate-reading__notice">Changes from an earlier sign-in are still stored here. <Button variant="outline" onClick={() => void run(exportReadingData)}>Export earlier changes</Button></p>}
-		{error && !readingDisabled && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => { if (session) void run(refreshManually); else void connect(); }}>Retry</Button></p>}
+		{error && !readingDisabled && !adding && <p className="crate-reading__notice" role="alert">{readOnly && <strong>Unable to connect. </strong>}{error} <Button variant="outline" onClick={() => { if (session) void run(refreshManually); else void connect(); }}>{readOnly ? 'Try again' : 'Retry'}</Button></p>}
 		{!error && syncIssue && <p className="crate-reading__notice" role="alert">{syncIssue.error || 'A Reading change needs review.'} <Button variant="outline" onClick={() => setSettingsOpen(true)}>Review changes</Button></p>}
 	</>;
 	return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>

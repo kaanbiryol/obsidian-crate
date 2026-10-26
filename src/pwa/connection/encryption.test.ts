@@ -65,6 +65,15 @@ describe('encryption verification', () => {
 		await expect(load(async () => new Response(null, { status: 401 }))).rejects.not.toBeInstanceOf(EncryptionVerificationUnavailableError);
 	});
 
+	it('offers the plaintext offline copy for an unanswered check only without encryption evidence', async () => {
+		const unanswered = async () => { throw new TypeError('network'); };
+		await expect(load(unanswered)).rejects.toMatchObject({ offlineCopy: true });
+		await expect(loadEncryptionState({ token: 'token', purpose: 'reading', fragment: 'e2ee', request: unanswered, current: () => true }))
+			.rejects.toMatchObject({ offlineCopy: false });
+		await load(async () => Response.json({ encryption: await encryptionState() }));
+		await expect(load(async () => Response.json({ error: 'Deploying' }, { status: 503 }))).rejects.toMatchObject({ offlineCopy: false });
+	});
+
 	it('requires one online verification for an encrypted session link', async () => {
 		vi.stubGlobal('navigator', { onLine: false });
 		await expect(loadEncryptionState({ token: 'token', purpose: 'reminders', fragment: 'e2ee', request: async () => { throw new TypeError('offline'); }, current: () => true }))

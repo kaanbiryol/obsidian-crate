@@ -4,12 +4,11 @@ import { readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingI
 import { youtubeVideoId } from '@/reading/core/youtube';
 import { queueReading, type ReadingCommand } from './outbox';
 import { presentReadingItems } from './pending-view';
-import { removeReadingShare } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import type { useReadingSession } from './useReadingSession';
 
 type ReadingMutationSession = Pick<ReturnType<typeof useReadingSession>,
-	'session' | 'cache' | 'pending' | 'url' | 'share' | 'run' | 'isCurrentSession' |
+	'session' | 'cache' | 'pending' | 'url' | 'run' | 'isCurrentSession' |
 	'publishPending' | 'reportSessionError' | 'finishCapture'>;
 interface ReadingMutationOptions {
 	refresh: (session: ReadingSession) => Promise<void>;
@@ -18,7 +17,7 @@ interface ReadingMutationOptions {
 
 /** The mounted runtime owns commands and update guards, independently of its screen. */
 export function useReadingMutations(connection: ReadingMutationSession, { refresh, showToast }: ReadingMutationOptions) {
-	const { session, cache, pending, url, share, run, isCurrentSession, publishPending, reportSessionError, finishCapture } = connection;
+	const { session, cache, pending, url, run, isCurrentSession, publishPending, reportSessionError, finishCapture } = connection;
 	const [saving, setSaving] = useState(false);
 	const savingRef = useRef(false);
 	const preparingChanges = useRef(0);
@@ -70,14 +69,12 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
 			if (saved.kind === 'one') {
 				await openSaved(saved.item);
 				assertReadingSession(session);
-				if (share) await removeReadingShare(session, share);
 				if (!finishCapture(session)) return false;
 				showToast('info', 'Opened your saved link');
 				return true;
 			}
 			await queueChange({ action: 'capture', intent: { url: link, fetchArticle: true } });
 			assertReadingSession(session);
-			if (share) await removeReadingShare(session, share);
 			if (!finishCapture(session)) return false;
 			showToast('success', navigator.onLine ? 'Link saved' : 'Link saved on this device');
 			void run(() => refresh(session));

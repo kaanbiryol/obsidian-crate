@@ -24,6 +24,8 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 	const [readerMotion, setReaderMotion] = useState<'slide' | 'none'>('none');
 	const [requestedItem, setRequestedItem] = useState(new URL(location.href).searchParams.get('item'));
 	const navigation = useRef(0), appBack = useRef<'closing' | 'traversing' | null>(null), articleStack = useRef<string | null>(null);
+	// The navigation whose opening download is in flight; it already fetches the current article.
+	const opening = useRef(0);
 	useEffect(() => {
 		const requests = navigation;
 		requests.current++;
@@ -53,6 +55,7 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 			return;
 		}
 		setReader({ item, markdown: null, availableOffline: false }); reportSessionError(session, null);
+		opening.current = request;
 		void (async () => {
 			let cached = false;
 			try {
@@ -82,10 +85,11 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 				if (cached) reportSessionError(session, `Showing saved copy. ${message}`);
 				else setReader({ item, markdown: null, availableOffline: false, error: message });
 			}
-		})();
+		})().finally(() => { if (opening.current === request) opening.current = 0; });
 	}, [session, isCurrentSession, reportSessionError]);
 	useEffect(() => {
-		if (!session || !reader || reader.markdown === null || reader.sourceHighlights === undefined || !navigator.onLine
+		// A stale offline copy shown while opening is replaced by that open's own download.
+		if (!session || !reader || reader.markdown === null || reader.sourceHighlights === undefined || !navigator.onLine || opening.current === navigation.current
 			|| (reader.sourceHighlights === JSON.stringify(reader.item.highlights ?? []) && reader.sourceExtractionStatus === reader.item.extraction_status)) return;
 		let active = true;
 		const request = navigation.current;

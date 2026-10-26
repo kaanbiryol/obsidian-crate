@@ -76,7 +76,7 @@ describe('PWA reminder refresh around local writes', () => {
 		act(() => { window.dispatchEvent(new window.Event('online')); });
 		const pending = load();
 		await warming(0, 3);
-		await settle(1, new Response('Index unavailable', { status: 503 }), pending);
+		await settle(1, Response.json({ error: 'Index unavailable' }, { status: 503 }), pending);
 		expect(rendered.current.indexingProgress).toBeNull();
 		expect(rendered.current.error).toBe('Index unavailable');
 		expect(reminderSyncStatus({ ...rendered.current, changes: [], storageError: null }).state).toBe('error');
@@ -166,10 +166,11 @@ describe('PWA reminder refresh around local writes', () => {
 		const issues = [{ path: 'Reminders/Copy.md', reason: 'Duplicate reminder ID' }];
 		act(() => rendered.current.resetReminderState());
 		vi.mocked(loadCachedReminderSnapshot).mockResolvedValueOnce({ folderPath: 'Reminders', reminders: [original], projects: ['Inbox'], savedAt: 123, issues });
-		await settle(0, new Response('Offline', { status: 503 }), load());
+		await settle(0, new Response('<html>Bad gateway</html>', { status: 502 }), load());
 		expect(rendered.current.reminders).toEqual([original]);
 		expect(rendered.current.issues).toEqual(issues);
-		expect(rendered.current.error).toBe('Offline');
+		// Before: the gateway's HTML page became the visible error.
+		expect(rendered.current.error).toBe('Could not load reminders.');
 		act(() => rendered.current.resetReminderState());
 		expect(rendered.current.issues).toEqual([]);
 		expect(rendered.current.hasHydratedCache()).toBe(false);
@@ -256,7 +257,7 @@ describe('PWA reminder refresh around local writes', () => {
 		expect(rendered.current.reminders).toEqual([confirmed]);
 		expect(rendered.current.lastUpdatedAt).toBe(savedAt);
 		expect(rendered.current.dataMode).toBe('cached');
-		expect(rendered.current.error).toBe('Offline');
+		expect(rendered.current.error).toBe('Could not load reminders.');
 		vi.mocked(loadCachedReminderSnapshot).mockReset();
 	});
 

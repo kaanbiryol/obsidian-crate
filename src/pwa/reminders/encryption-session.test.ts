@@ -91,8 +91,8 @@ it.each([[200, 'no longer reports'], [404, 'Could not verify encryption']] as co
 	localStorage.setItem('crate-encryption-session:previous-session', 'encrypted enrollment');
 	await expect(prepareReminderEncryption('session', async () => Response.json({ encryption: null }, { status })))
 		.rejects.toThrow(message);
-	// Only a definite answer offers the recovery-key card.
-	expect(reminderEncryptionSnapshot()).toMatchObject({ status: 'locked', unavailable: status !== 200 });
+	// Only a definite answer offers the recovery-key card; evidence hides the plaintext copy.
+	expect(reminderEncryptionSnapshot()).toMatchObject({ status: 'locked', unavailable: status !== 200, offlineCopy: false });
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 });
 
@@ -106,7 +106,8 @@ it.each([200, 404])('rejects plaintext mode for a fresh encrypted setup link whe
 
 it('keeps storage locked after an unavailable check and permits writes after a successful plaintext retry', async () => {
 	await expect(prepareReminderEncryption('session', async () => Response.json({}, { status: 503 }))).rejects.toThrow('Could not verify encryption');
-	expect(reminderEncryptionSnapshot()).toMatchObject({ status: 'locked', unavailable: true });
+	// No encryption evidence on this device: the plaintext offline copy stays visible, read-only.
+	expect(reminderEncryptionSnapshot()).toMatchObject({ status: 'locked', unavailable: true, offlineCopy: true });
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 	await prepareReminderEncryption('session', async () => Response.json({ encryption: null }));
 	expect(sealPrivateValue('new draft', 'draft')).toBe('new draft');

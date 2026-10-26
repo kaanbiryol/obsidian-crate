@@ -71,14 +71,16 @@ export function removeReviewedReading(session: ReadingSession, id: string, revie
 		return next;
 	});
 }
-export async function drainReading(session: ReadingSession, mode: ReadingRetryMode = 'automatic', canSend = () => true): Promise<ReadingCache | undefined> {
+/** `verified` is a `/reading/session` answer the caller just received for this session. */
+export async function drainReading(session: ReadingSession, mode: ReadingRetryMode = 'automatic', canSend = () => true,
+	verified?: { day: number; generation: string }): Promise<ReadingCache | undefined> {
 	if (!navigator.onLine || !canSend()) return undefined;
 	return readingDrainLock(async () => {
 		assertReadingSession(session);
 		const queue = await pendingReading(session);
 		if (!queue.some(op => canDispatch(op, mode))) return undefined;
 		if (!canSend()) return undefined;
-		const info = await readingRequest<{ day: number; generation: string }>('/reading/session', session);
+		const info = verified ?? await readingRequest<{ day: number; generation: string }>('/reading/session', session);
 		if (info.generation !== session.generation) throw new Error('Reading destination changed. Export and review pending work.');
 		const confirmed = new Set<string>();
 		const writes: ReadingWrite[] = [];

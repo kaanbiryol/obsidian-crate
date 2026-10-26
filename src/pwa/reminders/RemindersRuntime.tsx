@@ -31,8 +31,11 @@ function exportPendingChanges(changes: PendingReminderChange[]): void {
 function useRemindersController() {
 	const enabled = useSharedFeatures().reminders;
 	const connection = useAppConnection();
-	const { authority, authToken, apiFetch, config: storedConfig, logOut, loggingOut,
+	const { authority, authToken, apiFetch, config: storedConfig, logOut, loggingOut, encryption,
 		selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId, registerPushCleanup } = connection;
+	// An unanswered check on a device without encryption evidence shows the plaintext
+	// offline copy read-only. The outbox stays locked, so it cannot hold back the list.
+	const unavailableMessage = encryption.status === 'locked' && encryption.offlineCopy ? encryption.message : null;
 	const { colorScheme } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
 	const { preferences } = usePwaPreferences();
@@ -142,7 +145,7 @@ function useRemindersController() {
 		authToken,
 		bootstrapped,
 		loading,
-		pendingChangesReady: mutationsReady || Boolean(storageError),
+		pendingChangesReady: mutationsReady || Boolean(storageError) || unavailableMessage !== null,
 	});
 
 	const editorActions = useReminderEditorActions({
@@ -175,7 +178,7 @@ function useRemindersController() {
 	});
 
 	return {
-		connection: { authToken, bootstrapped, config, selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId },
+		connection: { authToken, bootstrapped, config, selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId, unavailableMessage },
 		sync: reminderSync,
 		mutations,
 		editor: { ...editor, ...editorActions },

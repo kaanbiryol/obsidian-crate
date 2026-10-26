@@ -2,7 +2,7 @@ import { rememberEncryptionUnlock } from '../../encryption/encryption-onboarding
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
-import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../../connection/encryption';
+import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError, ENCRYPTION_CHECK_TIMEOUT_MS } from '../../connection/encryption';
 import type { EncryptionServerState } from '@/encryption/server-state';
 import { unlockLocalState, type FeatureKeys } from '../../encryption/encryption-keys';
 import { pendingReadingKey, forgetReadingKey } from '../../encryption/encryption-fragments';
@@ -35,7 +35,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 	const current = () => { try { assertReadingSession(session); return pending?.promise === work; } catch { return false; } };
 	const work = (async () => {
 		const verified = await loadEncryptionState({ token: session.token, purpose: 'reading', fragment: pendingReadingKey(), current,
-			request: () => fetch('/reading/encryption', { cache: 'no-store', signal: AbortSignal.timeout(20_000), headers: { Authorization: `Bearer ${session.token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } }) });
+			request: () => fetch('/reading/encryption', { cache: 'no-store', signal: AbortSignal.timeout(ENCRYPTION_CHECK_TIMEOUT_MS), headers: { Authorization: `Bearer ${session.token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } }) });
 		const state = verified?.state ?? null;
 		expected = state;
 		if (!state) { verifiedIdentity = identity; currentKeys = null; lockReadingStorage(false); return null; }
@@ -71,7 +71,8 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 			// The request still fails, so no unverified plaintext reaches the server.
 			// Reminders deliberately lock instead (see reminders/encryption-session.ts).
 			if (!(error instanceof EncryptionVerificationUnavailableError) || verifiedIdentity !== identity) {
-				lockReadingStorage(true, error instanceof Error ? error.message : undefined);
+				// Without encryption evidence the plaintext offline copy stays readable, never writable.
+				lockReadingStorage(true, error instanceof Error ? error.message : undefined, error instanceof EncryptionVerificationUnavailableError && error.offlineCopy);
 				currentKeys = null; verifiedIdentity = undefined;
 			}
 			pending = undefined;

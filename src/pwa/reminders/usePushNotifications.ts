@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../config';
 import { capturePwaSession } from '../connection/session-generation';
+import { responseError } from '../connection/response-error';
 import type { ApiFetch, ShowToast } from '../types';
 import type { PushState } from './types';
 import { getPwaPushManager, urlBase64ToUint8Array } from '../service-worker-registration';
@@ -92,7 +93,7 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 				const response = await apiFetch('/notifications/subscribe', {
 					method: 'POST', body: JSON.stringify({ endpoint: body.endpoint, keys: body.keys, deviceName: detectDeviceName() }),
 				});
-				if (!response.ok) throw new Error(await response.text());
+				if (!response.ok) throw new Error((await responseError(response, 'Could not register notifications. Try again.')).message);
 				const result = await response.json() as { id?: unknown; notificationsEnabled?: unknown };
 				if (typeof result.id !== 'string' || !result.id) throw new Error('The server did not confirm notification registration.');
 				if (typeof result.notificationsEnabled !== 'boolean') throw new Error('The server did not confirm this vault’s notification settings.');

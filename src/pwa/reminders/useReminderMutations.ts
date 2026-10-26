@@ -30,7 +30,6 @@ export function useReminderMutations(options: {
 	});
 	const { ensureCanMutate, projects, selectedProject, refreshPresentation, showToast } = options;
 	const { getSnapshot } = sync;
-	const preparingRef = useRef(false);
 	const pendingPreparations = useRef(0);
 	const [, setPreparationCount] = useState(0);
 	const beginPreparation = () => {
@@ -48,10 +47,10 @@ export function useReminderMutations(options: {
 		void outboxRef.current.drain();
 	};
 
+	// The editor's own saving guard prevents a second submission of the same draft.
 	const saveReminder = async (modal: ModalState): Promise<boolean> => {
-		if (!ensureCanMutate() || preparingRef.current) return false;
+		if (!ensureCanMutate()) return false;
 		const sessionCurrent = capturePwaSession();
-		preparingRef.current = true;
 		const finishPreparation = beginPreparation();
 		try {
 			if (!sessionCurrent()) return false;
@@ -61,7 +60,7 @@ export function useReminderMutations(options: {
 			enqueue(change);
 			return true;
 		} catch (error) { if (sessionCurrent()) report(error); return false; }
-		finally { preparingRef.current = false; finishPreparation(); }
+		finally { finishPreparation(); }
 	};
 
 	const recordChange = async (id: string, kind: 'delete' | 'complete', extra: Record<string, unknown>, optimistic?: ReminderRecord, expectedRevision?: string, filePath?: string): Promise<PendingReminderChange> => {
@@ -156,5 +155,5 @@ export function useReminderMutations(options: {
 	const stableToggleCompleted = useCallback((id: string, completed: boolean) => latest.current.toggleReminderCompleted(id, completed), []);
 	const stablePersistReorder = useCallback((project: string, orderedIds: string[]) => latest.current.persistReorder(project, orderedIds), []);
 	const visible = useMemo(() => applyReminderChanges(options.reminders, projects, changes), [options.reminders, projects, changes]);
-	return { isPreparingMutation: () => preparingRef.current || pendingPreparations.current > 0, saveReminder, toggleReminderCompleted: stableToggleCompleted, deleteReminder, persistReorder: stablePersistReorder, ...visible, changes, ready, resumeChanges, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
+	return { isPreparingMutation: () => pendingPreparations.current > 0, saveReminder, toggleReminderCompleted: stableToggleCompleted, deleteReminder, persistReorder: stablePersistReorder, ...visible, changes, ready, resumeChanges, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
 }

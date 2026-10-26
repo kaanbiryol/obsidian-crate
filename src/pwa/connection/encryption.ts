@@ -15,8 +15,15 @@ function parseEncryptionState(value: unknown): EncryptionServerState {
 }
 
 /** The check got no answer: the request failed, the server returned an error or
- * the reply was not an encryption status. It says nothing about encryption. */
-export class EncryptionVerificationUnavailableError extends Error {}
+ * the reply was not an encryption status. It says nothing about encryption.
+ * `offlineCopy`: this device has no encryption evidence, so its plaintext offline
+ * copy may be shown read-only. Writes stay locked either way. */
+export class EncryptionVerificationUnavailableError extends Error {
+	constructor(message: string, options?: ErrorOptions, readonly offlineCopy = false) { super(message, options); }
+}
+
+/** Startup waits on this check, so a stalled server must fail it promptly. */
+export const ENCRYPTION_CHECK_TIMEOUT_MS = 8_000;
 
 const UNVERIFIED = 'Could not verify encryption. Check your connection and retry.';
 
@@ -34,14 +41,15 @@ export async function loadEncryptionState({ token, purpose, fragment, request, c
 	const remembered = localStorage.getItem(marker);
 	let expected: EncryptionServerState | null;
 	let folderLabel: string | null = null, folderPath: string | null = null;
+	const offlineCopy = !hasEncryptedSessionEvidence(remembered, fragment);
 	try {
 		const response = await request().catch((cause: unknown) => {
-			throw new EncryptionVerificationUnavailableError(UNVERIFIED, { cause });
+			throw new EncryptionVerificationUnavailableError(UNVERIFIED, { cause }, offlineCopy);
 		});
 		if (response.status === 401 && current()) reportExpiredConnection(token);
-		if (!response.ok) throw response.status === 401 ? new Error(UNVERIFIED) : new EncryptionVerificationUnavailableError(UNVERIFIED);
+		if (!response.ok) throw response.status === 401 ? new Error(UNVERIFIED) : new EncryptionVerificationUnavailableError(UNVERIFIED, undefined, offlineCopy);
 		const data = await response.json().catch(() => null) as { encryption: unknown; folderLabel?: unknown; folderPath?: unknown } | null;
-		if (!data || typeof data !== 'object' || !('encryption' in data)) throw new EncryptionVerificationUnavailableError(UNVERIFIED);
+		if (!data || typeof data !== 'object' || !('encryption' in data)) throw new EncryptionVerificationUnavailableError(UNVERIFIED, undefined, offlineCopy);
 		expected = data.encryption === null ? null : parseEncryptionState(data.encryption);
 		folderLabel = typeof data.folderLabel === 'string' ? data.folderLabel : null;
 		folderPath = typeof data.folderPath === 'string' ? data.folderPath : null;

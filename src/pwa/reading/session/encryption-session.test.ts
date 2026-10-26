@@ -73,6 +73,11 @@ it('keeps unverified Reading storage locked after a network failure', async () =
 	vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
 	await expect(prepareReadingEncryption(session)).rejects.toThrow('Could not verify encryption');
 	expect(() => encodeReadingValue('pending:session', [])).toThrow('Could not verify encryption');
+	// Without encryption evidence the plaintext offline copy stays readable, never writable.
+	expect(decodeReadingValue('list:session', { items: [] })).toEqual({ items: [] });
+	localStorage.setItem('crate-encryption-session:reading:other', '{}');
+	await expect(prepareReadingEncryption(session)).rejects.toThrow('Could not verify encryption');
+	expect(() => decodeReadingValue('list:session', { items: [] })).toThrow('Could not verify encryption');
 });
 
 it('keeps this link\'s Reading key through sign-in and forgets it on logout', () => {

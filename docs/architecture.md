@@ -337,7 +337,9 @@ and settings actions; already dispatched operations can still settle safely.
 credential changes, service-worker registration and logout. Reading connects with
 the existing app credential after enrollment completes. `AppConnectionGate` presents
 one unlock/reconnect surface above the feature screens; a failure confined to one
-feature still allows opening the other. Scope-specific encryption adapters share
+feature still allows opening the other. When the startup encryption check gets no
+answer on a device without encryption evidence, both features show their plaintext
+offline copy read-only under an **Unable to connect** notice; writes stay locked. Scope-specific encryption adapters share
 verification and key-import policy through `connection/encryption.ts`, retaining
 their local storage migration and cache responsibilities. Expired credentials are
 matched against the current connection before suspension; expiry preserves drafts

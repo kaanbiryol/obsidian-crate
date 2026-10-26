@@ -44,11 +44,11 @@ it('reuses unchanged hashed chunks from an earlier version and downloads the res
 	const changed = ['/notifications/assets/chunk-NEW00001.js', '/notifications/assets/chunk-NEW00002.js'];
 	const { result, fetched, peak, cached } = await install([...chunks.slice(2), ...changed], chunks);
 	expect(result).toBe('installed');
-	// Before: all 81 files, one at a time. Versioned files always come from the network.
-	expect(fetched).toHaveLength(9);
+	// Before: all 80 files, one at a time. Versioned files always come from the network.
+	expect(fetched).toHaveLength(8);
 	expect(fetched.filter(url => url.includes('chunk-'))).toEqual(changed);
 	expect(peak).toBe(4);
-	expect(cached.size).toBe(81);
+	expect(cached.size).toBe(80);
 });
 
 it('still fails the install when any asset is unavailable', async () => {
@@ -61,7 +61,7 @@ it('bypasses the HTTP cache only for the unversioned shell', async () => {
 	const { init } = await install(chunks.slice(0, 2), []);
 	expect(init.get('/notifications')).toEqual({ cache: 'reload' });
 	expect([...init].filter(([url, options]) => url !== '/notifications' && options !== undefined)).toEqual([]);
-	expect(init.size).toBe(9);
+	expect(init.size).toBe(8);
 });
 
 it('refuses to install a version its registration did not request', async () => {

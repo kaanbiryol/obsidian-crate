@@ -14,33 +14,41 @@ export { ReadingApiError } from './session/api-error';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './storage/record-validation';
 import { checkEncryptionSignals, EncryptionStateChangedError, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
+import { responseError } from '../connection/response-error';
 
 /** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
 const noteFolder = (session: ReadingSession) => readingKeys()?.folderPath ?? session.folderPath;
 
-export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
+/** The Reminders credential's Reading session. `day` is the server's operation day
+ * from the same response, so a drain right after it need not ask again. */
+export async function connectReadingFromReminders(): Promise<{ session: ReadingSession; day?: number } | null> {
 	const token = localStorage.getItem(AUTH_TOKEN_KEY);
 	if (!token) return null;
 	const sessionCurrent = capturePwaSession();
 	const response = await fetch('/reading/session', { cache: 'no-store', signal: AbortSignal.timeout(20_000),
 		headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } });
-	const data = await response.json() as { id?: unknown; folderPath?: unknown; generation?: unknown; expiresAt?: unknown; error?: string; code?: string };
-	if (!sessionCurrent() || localStorage.getItem(AUTH_TOKEN_KEY) !== token) return readingSession();
+	const failure = response.ok ? null : await responseError(response, 'Reading is unavailable.');
+	const data = failure ? null : await response.json().catch(() => null) as { id?: unknown; folderPath?: unknown; generation?: unknown; expiresAt?: unknown; day?: unknown } | null;
+	if (!sessionCurrent() || localStorage.getItem(AUTH_TOKEN_KEY) !== token) {
+		const stored = readingSession();
+		return stored && { session: stored };
+	}
 	if (response.status === 401) reportExpiredConnection(token);
 	if (response.status === 423) requestSharedFeaturesRefresh(true);
-	if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading is unavailable.', response.status, data.code);
-	if (typeof data.id !== 'string' || !data.id || typeof data.folderPath !== 'string' || !data.folderPath
+	if (failure) throw new ReadingApiError(failure.message, response.status, failure.code);
+	if (!data || typeof data.id !== 'string' || !data.id || typeof data.folderPath !== 'string' || !data.folderPath
 		|| typeof data.generation !== 'string' || !data.generation || typeof data.expiresAt !== 'number' || !Number.isFinite(data.expiresAt)) {
 		throw new Error('The server returned an invalid Reading session.');
 	}
+	const day = typeof data.day === 'number' && Number.isSafeInteger(data.day) && data.day >= 0 ? data.day : undefined;
 	const existing = readingSession();
-	if (existing && existing.source !== 'reminders') return existing;
-	if (existing?.token === token && existing.generation === data.generation) return existing;
+	if (existing && existing.source !== 'reminders') return { session: existing };
+	if (existing?.token === token && existing.generation === data.generation) return { session: existing, day };
 	const next: ReadingSession = { token, id: `reminders:${data.id}:${data.generation}`, folderPath: data.folderPath,
 		generation: data.generation, expiresAt: data.expiresAt, source: 'reminders' };
 	localStorage.setItem(READING_SESSION_KEY, JSON.stringify(next));
 	window.dispatchEvent(new Event(READING_CHANGED_EVENT));
-	return next;
+	return { session: next, day };
 }
 let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;
 onReadingEncryptionReset(() => { encryptedClient = undefined; });
@@ -81,10 +89,11 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
 		if (!keys) encryptedClient = undefined;
 	}
 	const response = await rawReadingRequest(path, session, body);
-	const data = await response.json() as T & { error?: string; code?: string };
+	const failure = response.ok ? null : await responseError(response, 'Reading request failed.');
+	const data = failure ? null : await response.json() as T;
 	if (session) assertReadingSession(session);
-	if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading request failed.', response.status, data.code);
-	return data;
+	if (failure) throw new ReadingApiError(failure.message, response.status, failure.code);
+	return data as T;
 }
 export const MAX_READING_LIST_ITEMS = 100_000;
 export const MAX_READING_LIST_ISSUES = 10_000;
@@ -106,9 +115,10 @@ async function firstReadingListPage(session: ReadingSession, previous?: ReadingC
 	try { response = await rawReadingRequest('/reading/list', session, undefined, previous?.revision ? { 'If-None-Match': previous.revision } : {}); }
 	catch (error) { if (error instanceof EncryptionStateChangedError) return unconditional(); throw error; }
 	if (response.status === 304 && previous) return { unchanged: true };
-	const data = await response.json() as { error?: string; code?: string };
+	const failure = response.ok ? null : await responseError(response, 'Reading request failed.');
+	const data: unknown = failure ? null : await response.json();
 	assertReadingSession(session);
-	if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading request failed.', response.status, data.code);
+	if (failure) throw new ReadingApiError(failure.message, response.status, failure.code);
 	const revision = response.headers.get('ETag');
 	return { unchanged: false, response: data, ...(revision && revision.length <= 128 ? { revision } : {}) };
 }

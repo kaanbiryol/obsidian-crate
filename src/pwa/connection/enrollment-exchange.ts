@@ -2,6 +2,7 @@ import { CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { ConnectionError } from './issues';
 import { detectWebSessionName } from './session-label';
 import { requireCompatibleProtocol } from './server-compatibility';
+import { responseError } from './response-error';
 
 export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
 	const protocol = await requireCompatibleProtocol();
@@ -13,8 +14,8 @@ export async function exchangeEnrollmentToken(token: string, previousAuthToken: 
 	});
 
 	if (!response.ok) {
-		const body = await response.text().catch(() => '');
-		throw new ConnectionError(response.status === 401 ? 'reconnect' : 'unavailable', body || response.statusText);
+		const { message } = await responseError(response, response.status === 401 ? 'This app link is invalid or expired. Open a fresh link from Crate.' : 'Could not connect to Crate. Try again.');
+		throw new ConnectionError(response.status === 401 ? 'reconnect' : 'unavailable', message);
 	}
 
 	const result = await response.json() as { authToken?: string };

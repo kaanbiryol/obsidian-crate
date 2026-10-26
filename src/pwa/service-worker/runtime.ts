@@ -38,7 +38,6 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 	const precacheUrls = [
 		shellUrl,
 		`/notifications/app.js?v=${config.version}`,
-		`/notifications/theme-bootstrap.js?v=${config.version}`,
 		`/notifications/crate-icon-192.png?v=${config.version}`,
 		`/notifications/crate-icon-512.png?v=${config.version}`,
 		`/notifications/crate-mark-256.png?v=${config.version}`,
@@ -121,8 +120,6 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 		}
 		if (url.pathname === '/notifications/app.js'
 			|| url.pathname.startsWith('/notifications/assets/')
-			|| url.pathname === '/notifications/theme-bootstrap.js'
-			|| url.pathname === '/notifications/icon.svg'
 			|| url.pathname === '/notifications/crate-icon-192.png'
 			|| url.pathname === '/notifications/crate-icon-512.png'
 			|| url.pathname === '/notifications/crate-mark-256.png'

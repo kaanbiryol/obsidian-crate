@@ -5,7 +5,7 @@ import { SettingsContext } from '../settings/settings-context';
 import { createSettingsStore } from '../settings/settings-store';
 import { pwaSyncState } from '../sync/state';
 import { ReadingRuntimeProvider, useReadingRuntime } from './ReadingRuntime';
-import { readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, readingLock, savePendingReading } from './storage/storage';
+import { readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, readingLock, saveReadingDraft, savePendingReading } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import type { PendingReading, ReadingCommand } from './outbox';
 import type { ReadingItem } from '@/reading/core/model';
@@ -175,20 +175,28 @@ it.each([false, true])('opens an existing shared link and guards delayed complet
 	const hook = renderHook(useReadingRuntime, undefined, children => createElement(SettingsContext.Provider,
 		{ value: createSettingsStore() }, createElement(ReadingRuntimeProvider, { children })));
 	await act(async () => {});
+	// The draft keeps the shared link, so its staged copy is removed at once.
+	expect(saveReadingDraft).toHaveBeenCalledWith(session, { url: `${article.source_url}#section` });
+	expect(removeReadingShare).toHaveBeenCalledWith(session, 'shared');
+	const draftWrite = vi.mocked(saveReadingDraft).mock.calls.findIndex(([, draft]) => draft.url === `${article.source_url}#section`);
+	expect(vi.mocked(saveReadingDraft).mock.invocationCallOrder[draftWrite]).toBeLessThan(vi.mocked(removeReadingShare).mock.invocationCallOrder[0]!);
 	let release!: () => void;
-	const cleanup = new Promise<void>(resolve => { release = resolve; });
-	vi.mocked(removeReadingShare).mockImplementation(async () => { await cleanup; });
-	const open = vi.fn(async () => {});
+	const opening = new Promise<void>(resolve => { release = resolve; });
+	const open = vi.fn(async () => { await opening; });
 	let saved!: Promise<boolean>;
 	await act(async () => { saved = hook.current.saveLink(open); });
 	expect(open).toHaveBeenCalledWith(article);
-	expect(removeReadingShare).toHaveBeenCalledWith(session, 'shared');
 	expect(hook.current.saving).toBe(true);
 	if (replaced) currentSession = null;
-	await act(async () => { release(); expect(await saved).toBe(!replaced); });
+	await act(async () => {
+		release();
+		if (replaced) await expect(saved).rejects.toThrow('Reading sign-in');
+		else expect(await saved).toBe(true);
+	});
 	expect(hook.current.connection.url).toBe(replaced ? `${article.source_url}#section` : '');
 	if (replaced) expect(showToast).not.toHaveBeenCalled();
 	else expect(showToast).toHaveBeenCalledWith('info', 'Opened your saved link');
+	expect(removeReadingShare).toHaveBeenCalledOnce();
 	expect(hook.current.connection.pending).toEqual([]);
 });
 

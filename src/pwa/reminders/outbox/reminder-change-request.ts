@@ -2,6 +2,7 @@ import type { ApiFetch } from '../../types';
 import type { ReminderRecord } from '../types';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import { isReminderRecord } from '../cache/reminder-storage-validation';
+import { responseError } from '../../connection/response-error';
 
 export class RejectedReminderChange extends Error {}
 export class ExpiredReminderChange extends Error {}
@@ -13,12 +14,10 @@ export function isConfirmedReminder(value: unknown, id: string | undefined): val
 export async function submitReminderChange(apiFetch: ApiFetch, change: PendingReminderChange): Promise<ReminderChangeResult> {
 	const response = await apiFetch(change.path, { method: change.method, body: change.body });
 	if (!response.ok) {
-		const text = await response.text();
-		let details: { code?: string; error?: string } = {};
-		try { details = JSON.parse(text) as typeof details; } catch { /* Proxies may return plain text. */ }
-		const message = details.error || text || 'Could not sync this change.';
-		if (response.status === 410 && details.code === 'operation_expired') throw new ExpiredReminderChange(message);
-		if ([400, 403, 404, 409, 413, 428].includes(response.status) && details.code !== 'operation_mismatch') {
+		// Saved with the pending change, so proxy pages become the short fallback.
+		const { message, code } = await responseError(response, 'Could not sync this change.');
+		if (response.status === 410 && code === 'operation_expired') throw new ExpiredReminderChange(message);
+		if ([400, 403, 404, 409, 413, 428].includes(response.status) && code !== 'operation_mismatch') {
 			throw new RejectedReminderChange(message);
 		}
 		throw new Error(message);

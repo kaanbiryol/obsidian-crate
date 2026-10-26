@@ -185,7 +185,7 @@ it.each([1, 3])('preserves a saved retry deadline and %i attempts across mountin
 
 it('waits for Reminders to unlock before opening pending changes', async () => {
 	const session = await import('./encryption-session');
-	const locked = { status: 'locked' as const, message: 'Unlock Crate', converting: false, setupRequired: false, unavailable: true };
+	const locked = { status: 'locked' as const, message: 'Unlock Crate', converting: false, setupRequired: false, unavailable: true, offlineCopy: false };
 	let view: typeof locked | { status: 'ready'; folderPath: string } = locked;
 	const listeners = new Set<() => void>();
 	vi.spyOn(session, 'reminderEncryptionSnapshot').mockImplementation(() => view);

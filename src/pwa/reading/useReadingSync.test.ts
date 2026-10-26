@@ -36,7 +36,7 @@ vi.mock('./storage/storage', async importOriginal => ({
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'one', folderPath: 'Reading', expiresAt: 1 };
 const cache: ReadingCache = { items: [], issues: [], savedAt: 1 };
 const resetSession = vi.fn();
-const connection: ReadingConnection = { session, ready: true, lockedSession: null, verificationUnavailable: false, encryptionSetupRequired: false,
+const connection: ReadingConnection = { session, ready: true, lockedSession: null, verificationUnavailable: false, offlineCopy: false, retryVerification: vi.fn(async () => {}), encryptionSetupRequired: false,
 	converting: false, expire: vi.fn(), connecting: false, connect: vi.fn(), resetSession, issue: null, error: null, connectionState: 'available' };
 function renderSync(enabled = () => true, currentConnection = connection) {
 	return renderHook(() => {
@@ -51,7 +51,7 @@ beforeEach(() => {
 	stored.queue = [{ id: 'operation', sessionId: session.id, action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } }];
 	vi.stubGlobal('navigator', { onLine: true });
 	vi.stubGlobal('location', { href: 'https://example.test/notifications' });
-	vi.mocked(connectReadingFromReminders).mockImplementation(async () => stored.session);
+	vi.mocked(connectReadingFromReminders).mockImplementation(async () => stored.session && { session: stored.session });
 	vi.mocked(loadReading).mockResolvedValue(cache);
 	vi.mocked(readingRequest).mockImplementation(async path => {
 		if (path === '/reading/session') return { generation: session.generation, day: 20_000 };
@@ -126,7 +126,7 @@ it('coalesces event bursts throughout enrollment checks and list refreshes', asy
 	const linked = { ...session, source: 'reminders' as const };
 	stored.session = linked;
 	stored.queue = [];
-	const checks: Array<(value: ReadingSession | null) => void> = [];
+	const checks: Array<(value: { session: ReadingSession } | null) => void> = [];
 	vi.mocked(connectReadingFromReminders).mockImplementation(() => new Promise(resolve => { checks.push(resolve); }));
 	let releaseList!: (value: ReadingCache) => void;
 	vi.mocked(loadReading).mockImplementationOnce(() => new Promise(resolve => { releaseList = resolve; }));
@@ -141,14 +141,14 @@ it('coalesces event bursts throughout enrollment checks and list refreshes', asy
 	await act(async () => events());
 	expect(connectReadingFromReminders).toHaveBeenCalledOnce();
 	expect(loadReading).not.toHaveBeenCalled();
-	await act(async () => { checks[0]!(linked); });
+	await act(async () => { checks[0]!({ session: linked }); });
 	expect(loadReading).toHaveBeenCalledOnce();
 	await act(async () => events());
 	expect(connectReadingFromReminders).toHaveBeenCalledOnce();
 	await act(async () => { releaseList(cache); });
 	expect(connectReadingFromReminders).toHaveBeenCalledTimes(2);
 	expect(loadReading).toHaveBeenCalledOnce();
-	await act(async () => { checks[1]!(linked); });
+	await act(async () => { checks[1]!({ session: linked }); });
 	expect(connectReadingFromReminders).toHaveBeenCalledTimes(2);
 	expect(loadReading).toHaveBeenCalledTimes(2);
 	expect(rendered.current.syncedSession).toBe(linked);
@@ -157,7 +157,7 @@ it('coalesces event bursts throughout enrollment checks and list refreshes', asy
 it.each(['paused', 'unmounted', 'replaced'])('does not act on a delayed enrollment check when %s', async state => {
 	const linked = { ...session, source: 'reminders' as const };
 	stored.session = linked;
-	let release!: (value: ReadingSession | null) => void;
+	let release!: (value: { session: ReadingSession } | null) => void;
 	vi.mocked(connectReadingFromReminders).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
 	let enabled = true;
 	const rendered = renderSync(() => enabled, { ...connection, session: linked });
@@ -166,7 +166,7 @@ it.each(['paused', 'unmounted', 'replaced'])('does not act on a delayed enrollme
 	if (state === 'paused') { enabled = false; rendered.rerender(); }
 	else if (state === 'unmounted') rendered.unmount();
 	else stored.session = { ...linked, token: 'replacement' };
-	await act(async () => { release(state === 'replaced' ? null : linked); });
+	await act(async () => { release(state === 'replaced' ? null : { session: linked }); });
 	expect(connectReadingFromReminders).toHaveBeenCalledOnce();
 	expect(readingRequest).not.toHaveBeenCalled();
 	expect(loadReading).not.toHaveBeenCalled();
@@ -298,4 +298,32 @@ it('reuses a refresh completed within 30 seconds when shown again, but not when 
 	await act(async () => vi.advanceTimersByTimeAsync(30_000));
 	await act(async () => document.dispatchEvent(new window.Event('visibilitychange')));
 	expect(loadReading).toHaveBeenCalledTimes(3);
+});
+
+it('reuses the enrollment check for the drain, so one sync reads the Reading session once', async () => {
+	const linked = { ...session, source: 'reminders' as const };
+	stored.session = linked;
+	vi.mocked(connectReadingFromReminders).mockImplementation(async () => ({ session: linked, day: 20_000 }));
+	vi.mocked(readingRequest).mockImplementation(async path => {
+		if (path === '/reading/update') return { library: null };
+		throw new ReadingApiError('Unexpected request', 500);
+	});
+	renderSync(() => true, { ...connection, session: linked });
+	await act(async () => {});
+	expect(connectReadingFromReminders).toHaveBeenCalledOnce();
+	// Before: the drain read /reading/session again behind the vault-wide coordinator.
+	expect(vi.mocked(readingRequest).mock.calls.map(([path]) => path)).not.toContain('/reading/session');
+	expect((JSON.parse(sent()[0]![2]!) as { operationId: string }).operationId).toMatch(/^e1_00020000_/);
+});
+
+it('retries the encryption check instead of sending from a read-only offline copy', async () => {
+	const retryVerification = vi.fn(async () => {});
+	const rendered = renderSync(() => true, { ...connection, session: null, lockedSession: session, verificationUnavailable: true, offlineCopy: true, retryVerification });
+	await act(async () => {});
+	expect(rendered.current.pending).toHaveLength(1);
+	await act(async () => window.dispatchEvent(new window.Event('online')));
+	await act(async () => rendered.current.refreshManually());
+	expect(retryVerification).toHaveBeenCalledTimes(2);
+	expect(readingRequest).not.toHaveBeenCalled();
+	expect(loadReading).not.toHaveBeenCalled();
 });

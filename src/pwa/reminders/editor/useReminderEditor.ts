@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { buildModalDraft } from './reminder-drafts';
 import type { ModalMode, ModalState, ReminderRecord } from '../types';
 import { useSheetTransition } from '../../hooks/useSheetTransition';
+import { refreshReminderOperationDay } from '../outbox/reminder-operation-id';
 
 /** Owns editor presentation; callers decide whether the reminder can be edited. */
 export function useReminderEditor(setSettingsOpen: (open: boolean) => void) {
@@ -29,6 +30,8 @@ export function useReminderEditor(setSettingsOpen: (open: boolean) => void) {
 		// A tap must mount the editor before its synchronous keyboard/focus window ends.
 		if (synchronous) flushSync(() => setModal(draft));
 		else setModal(draft);
+		// Its save then issues an operation ID without waiting on the server.
+		refreshReminderOperationDay();
 	}, [cancelClose, setSettingsOpen]);
 	const openReminder = useCallback((mode: ModalMode, reminder: ReminderRecord | null, defaultProject: string | null, synchronous = true) => {
 		openEditor({

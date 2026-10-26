@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { submitReminderChange } from './reminder-change-request';
+import { ExpiredReminderChange, RejectedReminderChange, submitReminderChange } from './reminder-change-request';
 import type { PendingReminderChange } from './reminder-outbox-types';
 
 const reminder = { id: 'one', content: 'Task', project: 'Inbox', completed: false, priority: 4,
@@ -14,6 +14,15 @@ it.each([
 ])('keeps an invalid acknowledgement uncertain: %j', async patch => {
 	const api = vi.fn(async () => Response.json({ reminder: { ...reminder, ...patch } }));
 	await expect(submitReminderChange(api, change)).rejects.toThrow('did not confirm this reminder');
+});
+
+it('keeps proxy pages out of the saved error and still recognizes server codes', async () => {
+	const page = async () => new Response('<html><body>502 Bad Gateway</body></html>', { status: 502 });
+	await expect(submitReminderChange(page, change)).rejects.toThrow(/^Could not sync this change\.$/);
+	const expired = async () => Response.json({ error: 'This change expired.', code: 'operation_expired' }, { status: 410 });
+	await expect(submitReminderChange(expired, change)).rejects.toThrow(ExpiredReminderChange);
+	const rejected = async () => Response.json({ error: 'Reminder changed in Obsidian.' }, { status: 409 });
+	await expect(submitReminderChange(rejected, change)).rejects.toThrow(RejectedReminderChange);
 });
 
 it('preserves confirmed extension fields without normalizing the receipt', async () => {
