@@ -44,7 +44,7 @@ Pushes to any branch and pull requests run `lint.yml` ("Node.js build"), and the
 | `pwa-native` (2 shards) | macOS | `test:pwa-browser -- --platform=macos --shard=N/2`. Failed scripts retry once on CI and are logged as flaky. |
 | `visual` (2 shards) | macOS | `scripts/reading-shortcut.test.mjs` (the native shortcut parser), then `scripts/visual-test-run.mjs --shard=N/2`. |
 | `reading` (2 groups) | Linux, Playwright container | `test:reading-browser:library` or `test:reading-browser:annotations`. |
-| `reproducible` | Linux | Only when a release tag is supplied: a clean-install `npm run build` compared with the checked artifacts. |
+| `reproducible` | Linux | Only when a release tag is supplied: a clean-install Worker and plugin build (`build:worker` and `build:plugin`, without the repeated type check) compared with the checked artifacts. |
 
 `release:check` covers the same suites except `test:docker` and the `reproducible` rebuild, which run only in CI. A release run that reuses a successful push build of the tag commit, or of its version-only parent, skips the test jobs; see [Release verification](#release-verification).
 

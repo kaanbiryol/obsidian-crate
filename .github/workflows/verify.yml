@@ -170,7 +170,8 @@ jobs:
           name: release-assets
           path: release
       - name: Rebuild from a clean install
-        run: npm ci && npm run build
+        # Types were checked in the checks job and cannot change the compared artifacts.
+        run: npm ci && npm run build:worker && npm run build:plugin
       - name: Compare original and reproduced artifacts
         run: node scripts/release-artifacts.mjs reproduce
 
