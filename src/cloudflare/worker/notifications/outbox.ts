@@ -78,7 +78,7 @@ async function processNotificationJob(env: Env, job: NotificationJobRow): Promis
 }
 
 export async function drainNotificationJobs(env: Env, limit = OUTBOX_BATCH_SIZE, remindersEnabled?: boolean): Promise<void> {
-  if (!(remindersEnabled ?? await featureEnabled(env.DB, 'reminders'))) return;
+	if (!(remindersEnabled ?? await featureEnabled(env.DB, 'reminders'))) return;
 	const jobs = await queryRows<NotificationJobRow>(
 		env.DB.prepare(`SELECT reminder_id, job_token, operation, payload_json, attempts FROM notification_jobs
 			WHERE available_at >= 0 AND available_at <= ? ORDER BY available_at ASC LIMIT ?`)

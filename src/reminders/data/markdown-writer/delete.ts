@@ -5,35 +5,35 @@ import type { MarkdownWriterContext } from "./types";
 import { markdownWriterLog } from "./helpers";
 
 export async function deleteReminderInMarkdown(
-  context: MarkdownWriterContext,
-  reminder: IndexedReminder,
+	context: MarkdownWriterContext,
+	reminder: IndexedReminder,
 ): Promise<void> {
-  const file = await context.getFile(reminder.filePath);
-  if (!file) {
-    throw new Error(`File not found: ${reminder.filePath}`);
-  }
+	const file = await context.getFile(reminder.filePath);
+	if (!file) {
+		throw new Error(`File not found: ${reminder.filePath}`);
+	}
 
-  context.index.applyOptimisticDelete(reminder.id);
+	context.index.applyOptimisticDelete(reminder.id);
 
-  try {
-    let deletedLineNumber = -1;
-    await processVaultMarkdown(context.app, file, (fileContent) => {
-      context.moveJournal?.assertActive();
-      const deletion = deleteReminderBlockFromContent(fileContent, reminder);
-      deletedLineNumber = deletion.lineNumber;
-      return deletion.content;
-    });
+	try {
+		let deletedLineNumber = -1;
+		await processVaultMarkdown(context.app, file, (fileContent) => {
+			context.moveJournal?.assertActive();
+			const deletion = deleteReminderBlockFromContent(fileContent, reminder);
+			deletedLineNumber = deletion.lineNumber;
+			return deletion.content;
+		});
 
-    if (deletedLineNumber === -1) {
-      markdownWriterLog.warn(" Reminder line not found, may already be deleted");
-      context.index.clearOptimistic(reminder.id);
-      return;
-    }
+		if (deletedLineNumber === -1) {
+			markdownWriterLog.warn(" Reminder line not found, may already be deleted");
+			context.index.clearOptimistic(reminder.id);
+			return;
+		}
 
-    markdownWriterLog.info(`Deleted reminder from ${reminder.filePath} at line ${deletedLineNumber}`);
-    await context.index.rescanFile(file);
-  } catch (error) {
-    context.index.clearOptimistic(reminder.id);
-    throw error;
-  }
+		markdownWriterLog.info(`Deleted reminder from ${reminder.filePath} at line ${deletedLineNumber}`);
+		await context.index.rescanFile(file);
+	} catch (error) {
+		context.index.clearOptimistic(reminder.id);
+		throw error;
+	}
 }

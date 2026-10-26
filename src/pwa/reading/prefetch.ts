@@ -11,10 +11,10 @@ const PREFETCH_PER_REFRESH = 10;
  * first visit. Stops at the first failure and waits for the next refresh.
  */
 export async function prefetchReadingArticles(session: ReadingSession, items: ReadingItem[], isCurrent: () => boolean) {
-  if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
-  for (const item of await readingArticlesToPrefetch(session, items, PREFETCH_PER_REFRESH)) {
-    if (!navigator.onLine || !isCurrent()) return;
-    const article = await loadReadingArticle(session, item.crate_reading_id);
-    if (!isCurrent() || !await cacheReadingArticle(session, article.item, article.markdown, { prefetched: true })) return;
-  }
+	if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+	for (const item of await readingArticlesToPrefetch(session, items, PREFETCH_PER_REFRESH)) {
+		if (!navigator.onLine || !isCurrent()) return;
+		const article = await loadReadingArticle(session, item.crate_reading_id);
+		if (!isCurrent() || !await cacheReadingArticle(session, article.item, article.markdown, { prefetched: true })) return;
+	}
 }

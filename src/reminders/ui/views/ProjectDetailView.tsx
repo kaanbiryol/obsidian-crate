@@ -16,30 +16,30 @@ import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 
 
 export interface ProjectDetailViewProps {
-  project: string;
-  hideTitle?: boolean;
-  backLabel?: string;
-  backControl?: React.ReactNode;
-  navigationRightContent?: React.ReactNode;
-  headerRightContent?: React.ReactNode;
-  headerTitleContent?: React.ReactNode;
-  headerMetaContent?: React.ReactNode;
-  belowHeaderContent?: React.ReactNode;
-  loadingContent?: React.ReactNode;
-  reminders: Reminder[];
-  onBack: () => void;
-  animationConfig?: AnimationConfig;
-  /** Custom render function for reminder cards (for platform-specific wrappers) */
-  renderCard?: (reminder: Reminder, index: number) => React.ReactNode;
-  /** Whether to use fixed bottom padding (for views with FAB) */
-  hasFab?: boolean;
-  /** Custom class name for the container */
-  className?: string;
-  /** Callback when reminders are reordered via drag */
-  onReorder?: (orderedIds: string[]) => Promise<void> | void;
-  onReorderDragActiveChange?: (active: boolean) => void;
-  reorderInteraction?: 'drag' | 'long-press';
-  colorScheme: ProjectColorScheme;
+	project: string;
+	hideTitle?: boolean;
+	backLabel?: string;
+	backControl?: React.ReactNode;
+	navigationRightContent?: React.ReactNode;
+	headerRightContent?: React.ReactNode;
+	headerTitleContent?: React.ReactNode;
+	headerMetaContent?: React.ReactNode;
+	belowHeaderContent?: React.ReactNode;
+	loadingContent?: React.ReactNode;
+	reminders: Reminder[];
+	onBack: () => void;
+	animationConfig?: AnimationConfig;
+	/** Custom render function for reminder cards (for platform-specific wrappers) */
+	renderCard?: (reminder: Reminder, index: number) => React.ReactNode;
+	/** Whether to use fixed bottom padding (for views with FAB) */
+	hasFab?: boolean;
+	/** Custom class name for the container */
+	className?: string;
+	/** Callback when reminders are reordered via drag */
+	onReorder?: (orderedIds: string[]) => Promise<void> | void;
+	onReorderDragActiveChange?: (active: boolean) => void;
+	reorderInteraction?: 'drag' | 'long-press';
+	colorScheme: ProjectColorScheme;
 }
 
 
@@ -49,91 +49,91 @@ export interface ProjectDetailViewProps {
  * Uses host-theme surfaces with a theme-adjusted project accent.
  */
 export const ProjectDetailView = memo(function ProjectDetailView({
-  project,
-  hideTitle = false,
-  backLabel = 'Projects',
-  backControl,
-  navigationRightContent,
-  headerRightContent,
-  headerTitleContent,
-  headerMetaContent,
-  belowHeaderContent,
-  loadingContent,
-  reminders,
-  onBack,
-  animationConfig = { enabled: true },
-  renderCard,
-  hasFab = true,
-  className = '',
-  onReorder,
-  onReorderDragActiveChange,
-  reorderInteraction = 'drag',
-  colorScheme,
+	project,
+	hideTitle = false,
+	backLabel = 'Projects',
+	backControl,
+	navigationRightContent,
+	headerRightContent,
+	headerTitleContent,
+	headerMetaContent,
+	belowHeaderContent,
+	loadingContent,
+	reminders,
+	onBack,
+	animationConfig = { enabled: true },
+	renderCard,
+	hasFab = true,
+	className = '',
+	onReorder,
+	onReorderDragActiveChange,
+	reorderInteraction = 'drag',
+	colorScheme,
 }: ProjectDetailViewProps) {
-  const detail = useMemo(() => {
-    return buildProjectDetailViewModel(reminders, project, colorScheme);
-  }, [colorScheme, reminders, project]);
-  const header = useMemo(() => buildProjectDetailHeaderViewModel(detail), [detail]);
-  const { active, completed } = detail;
+	const detail = useMemo(() => {
+		return buildProjectDetailViewModel(reminders, project, colorScheme);
+	}, [colorScheme, reminders, project]);
+	const header = useMemo(() => buildProjectDetailHeaderViewModel(detail), [detail]);
+	const { active, completed } = detail;
 
-  const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);
+	const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);
 
-  const hasContent = Boolean(loadingContent) || active.length > 0 || completed.length > 0;
+	const hasContent = Boolean(loadingContent) || active.length > 0 || completed.length > 0;
 
-  // Default card renderer
-  const defaultRenderCard = (reminder: Reminder, index: number) => (
-    <ReminderCard
-      reminder={reminder}
-      index={index}
-      animationConfig={{ enabled: false }}
-      hideProject // Hide project tag since we're already in project view
-      colorScheme={colorScheme}
-    />
-  );
+	// Default card renderer
+	const defaultRenderCard = (reminder: Reminder, index: number) => (
+		<ReminderCard
+			reminder={reminder}
+			index={index}
+			animationConfig={{ enabled: false }}
+			hideProject // Hide project tag since we're already in project view
+			colorScheme={colorScheme}
+		/>
+	);
 
-  const cardRenderer = renderCard || defaultRenderCard;
+	const cardRenderer = renderCard || defaultRenderCard;
 
-  return (
-    <ReminderListLayout
-      className={className}
-      hasFab={hasFab}
-      hasContent={hasContent}
-      renderCard={cardRenderer}
-      animationConfig={animationConfig}
-      completed={completed}
-      isDragging={order.isDragging}
-      header={
-        <>
-          <div className="project-detail-navigation crate-detail-navigation">
-            {backControl ?? <Button onClick={onBack} className="premium-back-button">
-              <ThemeIcon size="xs" id="chevron-left" />
-              <span>{backLabel}</span>
-            </Button>}
-            {navigationRightContent}
-          </div>
-          <ProjectDetailHeader project={project} header={header} hideTitle={hideTitle} titleContent={headerTitleContent} rightContent={headerRightContent} metaContent={headerMetaContent} />
-          {belowHeaderContent}
-        </>
-      }
-      emptyState={
-        <EmptyState
-          icon="folder-open"
-          title="No reminders"
-          description="Add a reminder to this project"
-          iconColor="primary"
-          animationConfig={animationConfig}
-        />
-      }
-    >
-      {loadingContent ?? <ReorderableReminderList
-        reminders={order.displayedOrder}
-        onReorder={order.onReorder}
-        onReorderCommit={order.onCommit}
-        onDragActiveChange={order.onDragChange}
-        renderCard={cardRenderer}
-        interaction={reorderInteraction}
-        animationsEnabled={animationConfig.enabled}
-      />}
-    </ReminderListLayout>
-  );
+	return (
+		<ReminderListLayout
+			className={className}
+			hasFab={hasFab}
+			hasContent={hasContent}
+			renderCard={cardRenderer}
+			animationConfig={animationConfig}
+			completed={completed}
+			isDragging={order.isDragging}
+			header={
+				<>
+					<div className="project-detail-navigation crate-detail-navigation">
+						{backControl ?? <Button onClick={onBack} className="premium-back-button">
+							<ThemeIcon size="xs" id="chevron-left" />
+							<span>{backLabel}</span>
+						</Button>}
+						{navigationRightContent}
+					</div>
+					<ProjectDetailHeader project={project} header={header} hideTitle={hideTitle} titleContent={headerTitleContent} rightContent={headerRightContent} metaContent={headerMetaContent} />
+					{belowHeaderContent}
+				</>
+			}
+			emptyState={
+				<EmptyState
+					icon="folder-open"
+					title="No reminders"
+					description="Add a reminder to this project"
+					iconColor="primary"
+					animationConfig={animationConfig}
+				/>
+			}
+		>
+			{loadingContent ?? <ReorderableReminderList
+				reminders={order.displayedOrder}
+				onReorder={order.onReorder}
+				onReorderCommit={order.onCommit}
+				onDragActiveChange={order.onDragChange}
+				renderCard={cardRenderer}
+				interaction={reorderInteraction}
+				animationsEnabled={animationConfig.enabled}
+			/>}
+		</ReminderListLayout>
+	);
 });

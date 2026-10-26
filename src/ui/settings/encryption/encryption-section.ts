@@ -182,7 +182,7 @@ class EncryptionModal extends SharedModal {
 	}
 	private ready(keys: VaultKeyBundle, state: EncryptionServerState): void {
 		this.disposeContent = renderEncryptionManagement(this.bodyEl, {
-      connectApp: () => { this.assertCurrentConnection(); this.close(); new WebAppPairingModal(this.plugin).open(); },
+			connectApp: () => { this.assertCurrentConnection(); this.close(); new WebAppPairingModal(this.plugin).open(); },
 			copyRecovery: async () => {
 				this.assertCurrentConnection();
 				const recovery = this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);

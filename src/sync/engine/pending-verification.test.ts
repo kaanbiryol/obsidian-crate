@@ -263,8 +263,8 @@ it('keeps deletion of a synced file pending', async () => {
 
 it('preserves a file recreated during absent-file verification', async () => {
  h.vault.adapter.stat.mockImplementationOnce(async () => {
-  touch('temporary.md');
-  return null;
+	touch('temporary.md');
+	return null;
  });
  h.engine.onFileDelete({ path: 'temporary.md' } as never);
  await verify();

@@ -87,7 +87,7 @@ it('rejects traversal-style upload paths', async () => {
 			success: true,
 			path: 'notes/test.md',
 			hash: expectedHash,
-      revision: files.get('notes/test.md')?.storageKey,
+			revision: files.get('notes/test.md')?.storageKey,
 		});
 		expect(files.get('notes/test.md')?.hash).toBe(expectedHash);
 		expect(Array.from(store.values()).some(object => object.customMetadata?.hash === expectedHash)).toBe(true);

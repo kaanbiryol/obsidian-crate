@@ -7,124 +7,124 @@ import { useProjectAutocomplete } from './useProjectAutocomplete';
 import { parseReminderContent } from '../../core/grammar/reminderParser';
 
 interface ReminderEditorFieldsProps {
-    content: string;
-    onContentChange: (value: string) => void;
-    description: string;
-    onDescriptionChange: (value: string) => void;
-    onKeyDown?: (event: React.KeyboardEvent) => void;
-    allowAutoFocus: boolean;
-    projects: string[];
-    /** Hosts own their theme source: Obsidian body classes or the PWA color scheme. */
-    isDark: boolean;
-    textareaRef: React.RefObject<HTMLDivElement | null>;
-    richTextInputRef: React.RefObject<RichTextInputHandle | null>;
-    containerRef?: React.RefObject<HTMLDivElement | null>;
-    descriptionRef?: React.RefObject<HTMLDivElement | null>;
-    descriptionInputRef?: React.RefObject<RichTextInputHandle | null>;
-    disabled?: boolean;
-    titleInputProps?: Pick<React.ComponentProps<typeof RichTextInput>,
-        'onFocus' | 'onBlur' | 'focusRequestKey' | 'preserveSelection' | 'externalChangeCursor'
-        | 'syncContentBeforePaint' | 'autoComplete' | 'autoCorrect' | 'spellCheck' | 'className'>;
-    descriptionInputProps?: Pick<React.ComponentProps<typeof RichTextInput>,
-        'onFocus' | 'onBlur' | 'autoComplete' | 'autoCorrect' | 'spellCheck' | 'className'>;
+	content: string;
+	onContentChange: (value: string) => void;
+	description: string;
+	onDescriptionChange: (value: string) => void;
+	onKeyDown?: (event: React.KeyboardEvent) => void;
+	allowAutoFocus: boolean;
+	projects: string[];
+	/** Hosts own their theme source: Obsidian body classes or the PWA color scheme. */
+	isDark: boolean;
+	textareaRef: React.RefObject<HTMLDivElement | null>;
+	richTextInputRef: React.RefObject<RichTextInputHandle | null>;
+	containerRef?: React.RefObject<HTMLDivElement | null>;
+	descriptionRef?: React.RefObject<HTMLDivElement | null>;
+	descriptionInputRef?: React.RefObject<RichTextInputHandle | null>;
+	disabled?: boolean;
+	titleInputProps?: Pick<React.ComponentProps<typeof RichTextInput>,
+		'onFocus' | 'onBlur' | 'focusRequestKey' | 'preserveSelection' | 'externalChangeCursor'
+		| 'syncContentBeforePaint' | 'autoComplete' | 'autoCorrect' | 'spellCheck' | 'className'>;
+	descriptionInputProps?: Pick<React.ComponentProps<typeof RichTextInput>,
+		'onFocus' | 'onBlur' | 'autoComplete' | 'autoCorrect' | 'spellCheck' | 'className'>;
 }
 
 export function ReminderEditorFields({
-    content,
-    onContentChange,
-    description,
-    onDescriptionChange,
-    onKeyDown,
-    allowAutoFocus,
-    projects,
-    isDark,
-    textareaRef,
-    richTextInputRef,
-    containerRef: externalContainerRef,
-    descriptionRef: externalDescriptionRef,
-    descriptionInputRef,
-    disabled = false,
-    titleInputProps,
-    descriptionInputProps,
+	content,
+	onContentChange,
+	description,
+	onDescriptionChange,
+	onKeyDown,
+	allowAutoFocus,
+	projects,
+	isDark,
+	textareaRef,
+	richTextInputRef,
+	containerRef: externalContainerRef,
+	descriptionRef: externalDescriptionRef,
+	descriptionInputRef,
+	disabled = false,
+	titleInputProps,
+	descriptionInputProps,
 }: ReminderEditorFieldsProps) {
-    const resolvePageTitle = useContext(PageTitleContext);
-    const localContainerRef = useRef<HTMLDivElement>(null);
-    const localDescriptionRef = useRef<HTMLDivElement>(null);
-    const containerRef = externalContainerRef ?? localContainerRef;
-    const descriptionRef = externalDescriptionRef ?? localDescriptionRef;
-    const inputError = useMemo(() => {
-        try {
-            const parsed = parseReminderContent(content, projects);
-            if (parsed.dateError) return parsed.dateError;
-            assertReminderMutationInput({ content: content.trim() ? parsed.cleanContent || content : undefined, description }, 'update');
-            return null;
-        } catch (error) { return error instanceof Error ? error.message : 'Check the reminder fields.'; }
-    }, [content, description, projects]);
+	const resolvePageTitle = useContext(PageTitleContext);
+	const localContainerRef = useRef<HTMLDivElement>(null);
+	const localDescriptionRef = useRef<HTMLDivElement>(null);
+	const containerRef = externalContainerRef ?? localContainerRef;
+	const descriptionRef = externalDescriptionRef ?? localDescriptionRef;
+	const inputError = useMemo(() => {
+		try {
+			const parsed = parseReminderContent(content, projects);
+			if (parsed.dateError) return parsed.dateError;
+			assertReminderMutationInput({ content: content.trim() ? parsed.cleanContent || content : undefined, description }, 'update');
+			return null;
+		} catch (error) { return error instanceof Error ? error.message : 'Check the reminder fields.'; }
+	}, [content, description, projects]);
 
-    const autocomplete = useProjectAutocomplete({
-        content,
-        projects,
-        onContentChange,
-        richTextInputRef,
-    });
+	const autocomplete = useProjectAutocomplete({
+		content,
+		projects,
+		onContentChange,
+		richTextInputRef,
+	});
 
-    const handleAutocompleteQuery = autocomplete.updateAutocomplete;
+	const handleAutocompleteQuery = autocomplete.updateAutocomplete;
 
-    return (
-        <div
-            ref={containerRef}
-            className="reminder-editor-fields relative"
-        >
-            {inputError && <p role="alert" style={{ color: 'var(--text-error, #d33)' }}>{inputError}</p>}
-            <RichTextInput
-                {...titleInputProps}
-                resolvePageTitle={resolvePageTitle}
-                readOnly={disabled}
-                ariaLabel="Reminder title"
-                ref={richTextInputRef}
-                value={content}
-                onChange={onContentChange}
-                onKeyDown={onKeyDown}
-                placeholder="Reminder title"
-                inputRef={textareaRef}
-                autoFocus={allowAutoFocus}
-                knownProjects={projects}
-                onAutocompleteQuery={handleAutocompleteQuery}
-                onAutocompleteKeyDown={autocomplete.handleKeyDown}
-                ariaControls={autocomplete.isOpen ? 'project-autocomplete-listbox' : undefined}
-                ariaActiveDescendant={autocomplete.isOpen
-                    ? `project-autocomplete-option-${autocomplete.highlightedIndex}`
-                    : undefined}
-                ariaExpanded={autocomplete.isOpen}
-                className={`reminder-title-input ios-scroll ${titleInputProps?.className ?? ''}`}
-            />
-            {!disabled && autocomplete.isOpen && (
-                <ProjectAutocompleteDropdown
-                    filteredProjects={autocomplete.filteredProjects}
-                    highlightedIndex={autocomplete.highlightedIndex}
-                    anchorRect={autocomplete.rect}
-                    containerRef={containerRef}
-                    isDark={isDark}
-                    onSelect={autocomplete.selectProject}
-                />
-            )}
+	return (
+		<div
+			ref={containerRef}
+			className="reminder-editor-fields relative"
+		>
+			{inputError && <p role="alert" style={{ color: 'var(--text-error, #d33)' }}>{inputError}</p>}
+			<RichTextInput
+				{...titleInputProps}
+				resolvePageTitle={resolvePageTitle}
+				readOnly={disabled}
+				ariaLabel="Reminder title"
+				ref={richTextInputRef}
+				value={content}
+				onChange={onContentChange}
+				onKeyDown={onKeyDown}
+				placeholder="Reminder title"
+				inputRef={textareaRef}
+				autoFocus={allowAutoFocus}
+				knownProjects={projects}
+				onAutocompleteQuery={handleAutocompleteQuery}
+				onAutocompleteKeyDown={autocomplete.handleKeyDown}
+				ariaControls={autocomplete.isOpen ? 'project-autocomplete-listbox' : undefined}
+				ariaActiveDescendant={autocomplete.isOpen
+					? `project-autocomplete-option-${autocomplete.highlightedIndex}`
+					: undefined}
+				ariaExpanded={autocomplete.isOpen}
+				className={`reminder-title-input ios-scroll ${titleInputProps?.className ?? ''}`}
+			/>
+			{!disabled && autocomplete.isOpen && (
+				<ProjectAutocompleteDropdown
+					filteredProjects={autocomplete.filteredProjects}
+					highlightedIndex={autocomplete.highlightedIndex}
+					anchorRect={autocomplete.rect}
+					containerRef={containerRef}
+					isDark={isDark}
+					onSelect={autocomplete.selectProject}
+				/>
+			)}
 
-            <div className="reminder-description-wrap">
-                <RichTextInput
-                    {...descriptionInputProps}
-                    resolvePageTitle={resolvePageTitle}
-                    readOnly={disabled}
-                    markers={false}
-                    ref={descriptionInputRef}
-                    ariaLabel="Reminder description"
-                    inputRef={descriptionRef}
-                    value={description}
-                    onChange={onDescriptionChange}
-                    placeholder="Description"
-                    className={`reminder-description-input ios-scroll ${descriptionInputProps?.className ?? ''}`}
-                />
-            </div>
+			<div className="reminder-description-wrap">
+				<RichTextInput
+					{...descriptionInputProps}
+					resolvePageTitle={resolvePageTitle}
+					readOnly={disabled}
+					markers={false}
+					ref={descriptionInputRef}
+					ariaLabel="Reminder description"
+					inputRef={descriptionRef}
+					value={description}
+					onChange={onDescriptionChange}
+					placeholder="Description"
+					className={`reminder-description-input ios-scroll ${descriptionInputProps?.className ?? ''}`}
+				/>
+			</div>
 
-        </div>
-    );
+		</div>
+	);
 }

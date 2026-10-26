@@ -18,26 +18,26 @@ const READY_SQL = `NOT EXISTS (SELECT 1 FROM notification_policy) OR (
 
 /** Acknowledge readiness atomically. Repeated probes write nothing while work remains. */
 export async function finishInitialReminderSetup(request: Request, db: D1Database): Promise<Response> {
-  const parsed = await parseJsonObject(request);
-  if (!parsed.ok) return parsed.response;
-  const current = await db.prepare('SELECT token, state FROM initial_import WHERE id = 1').first<{ token: string; state: string }>();
-  if (!current || current.token !== parsed.value.token || current.state !== 'complete') {
-    return corsResponse({ error: 'Initial upload is not complete' }, 409);
-  }
-  const result = await db.batch<{ results: Array<{ ready: number; error: string | null }> }>([
-    db.prepare(`DELETE FROM maintenance_state WHERE key = ? AND value = ? AND (${READY_SQL})`)
-      .bind(INITIAL_REMINDERS_PENDING, current.token),
-    db.prepare(`SELECT NOT EXISTS(SELECT 1 FROM maintenance_state WHERE key = ? AND value = ?) AS ready,
+	const parsed = await parseJsonObject(request);
+	if (!parsed.ok) return parsed.response;
+	const current = await db.prepare('SELECT token, state FROM initial_import WHERE id = 1').first<{ token: string; state: string }>();
+	if (!current || current.token !== parsed.value.token || current.state !== 'complete') {
+		return corsResponse({ error: 'Initial upload is not complete' }, 409);
+	}
+	const result = await db.batch<{ results: Array<{ ready: number; error: string | null }> }>([
+		db.prepare(`DELETE FROM maintenance_state WHERE key = ? AND value = ? AND (${READY_SQL})`)
+			.bind(INITIAL_REMINDERS_PENDING, current.token),
+		db.prepare(`SELECT NOT EXISTS(SELECT 1 FROM maintenance_state WHERE key = ? AND value = ?) AS ready,
       COALESCE((SELECT path || ': ' || error FROM notification_file_retries ORDER BY path LIMIT 1),
         (SELECT last_error FROM notification_jobs ORDER BY available_at LIMIT 1)) AS error`)
-      .bind(INITIAL_REMINDERS_PENDING, current.token),
-  ]);
-  const status = result[1]!.results[0]!;
-  // Return enough context to repair several notes without an unbounded error payload.
-  const sourceIssues = status.ready ? [] : (await db.prepare(
-    'SELECT path, error AS message FROM notification_file_retries ORDER BY path LIMIT 21',
-  ).all<{ path: string; message: string }>()).results.map(issue => ({ ...issue, ...reminderSourceIssueCode(issue.message) }));
-  const progress = status.ready ? undefined : await db.prepare(`SELECT
+			.bind(INITIAL_REMINDERS_PENDING, current.token),
+	]);
+	const status = result[1]!.results[0]!;
+	// Return enough context to repair several notes without an unbounded error payload.
+	const sourceIssues = status.ready ? [] : (await db.prepare(
+		'SELECT path, error AS message FROM notification_file_retries ORDER BY path LIMIT 21',
+	).all<{ path: string; message: string }>()).results.map(issue => ({ ...issue, ...reminderSourceIssueCode(issue.message) }));
+	const progress = status.ready ? undefined : await db.prepare(`SELECT
     NOT EXISTS (SELECT 1 FROM notification_policy p JOIN maintenance_state m
       ON m.key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:' || p.folder_path AND m.value = '') AS scanning,
     (SELECT COUNT(*) FROM (
@@ -46,11 +46,11 @@ export async function finishInitialReminderSetup(request: Request, db: D1Databas
       UNION SELECT path FROM notification_projection_jobs
     )) AS remainingFiles,
     (SELECT COUNT(*) FROM notification_jobs) AS remainingSchedules`).first<{
-      scanning: number; remainingFiles: number; remainingSchedules: number;
-    }>();
-  return corsResponse({ ready: Boolean(status.ready),
-    ...(progress ? { progress: { ...progress, scanning: Boolean(progress.scanning) } } : {}),
-    ...(!status.ready && status.error ? { error: status.error } : {}),
-    ...(sourceIssues.length ? { issues: sourceIssues.slice(0, 20), moreIssues: sourceIssues.length > 20 } : {}),
-  });
+			scanning: number; remainingFiles: number; remainingSchedules: number;
+		}>();
+	return corsResponse({ ready: Boolean(status.ready),
+		...(progress ? { progress: { ...progress, scanning: Boolean(progress.scanning) } } : {}),
+		...(!status.ready && status.error ? { error: status.error } : {}),
+		...(sourceIssues.length ? { issues: sourceIssues.slice(0, 20), moreIssues: sourceIssues.length > 20 } : {}),
+	});
 }

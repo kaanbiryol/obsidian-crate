@@ -305,49 +305,49 @@ describe('reinitializeReminders', () => {
 });
 
 it('does not publish a reminder backend or register UI after shutdown during index load', async () => {
-  const { initializeReminders } = await loadPluginIntegrationModule();
-  let finish!: () => void;
-  reminderIndexLoad.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
-  const plugin = createPlugin();
-  const starting = initializeReminders(plugin as never);
-  const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
-  endPluginLifecycle(plugin as never);
-  finish();
-  await starting;
-  expect(plugin.reminders).toBeUndefined();
-  expect(latestWatcher.register).not.toHaveBeenCalled();
-  expect(createMarkdownWriter).not.toHaveBeenCalled();
-  expect(plugin.registerView).not.toHaveBeenCalled();
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	let finish!: () => void;
+	reminderIndexLoad.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+	const plugin = createPlugin();
+	const starting = initializeReminders(plugin as never);
+	const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+	endPluginLifecycle(plugin as never);
+	finish();
+	await starting;
+	expect(plugin.reminders).toBeUndefined();
+	expect(latestWatcher.register).not.toHaveBeenCalled();
+	expect(createMarkdownWriter).not.toHaveBeenCalled();
+	expect(plugin.registerView).not.toHaveBeenCalled();
 });
 
 it('keeps the newer folder backend when an older scan finishes last', async () => {
-  const { initializeReminders, reinitializeReminders } = await loadPluginIntegrationModule();
-  let finish!: () => void;
-  let entered!: () => void;
-  const loading = new Promise<void>(resolve => { entered = resolve; });
-  reminderIndexLoad.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; entered(); }));
-  const plugin = createPlugin();
-  const first = initializeReminders(plugin as never);
-  await loading;
-  await reinitializeReminders(plugin as never, 'NewFolder');
-  const current = plugin.reminders;
-  finish();
-  await first;
-  expect(plugin.reminders).toBe(current);
-  expect(latestWatcher.register).toHaveBeenCalledOnce();
-  expect(plugin.registerView).toHaveBeenCalledOnce();
-  expect(registerReminderCommands).toHaveBeenCalledOnce();
-  expect(indexOptions().signal?.aborted).toBe(true);
+	const { initializeReminders, reinitializeReminders } = await loadPluginIntegrationModule();
+	let finish!: () => void;
+	let entered!: () => void;
+	const loading = new Promise<void>(resolve => { entered = resolve; });
+	reminderIndexLoad.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; entered(); }));
+	const plugin = createPlugin();
+	const first = initializeReminders(plugin as never);
+	await loading;
+	await reinitializeReminders(plugin as never, 'NewFolder');
+	const current = plugin.reminders;
+	finish();
+	await first;
+	expect(plugin.reminders).toBe(current);
+	expect(latestWatcher.register).toHaveBeenCalledOnce();
+	expect(plugin.registerView).toHaveBeenCalledOnce();
+	expect(registerReminderCommands).toHaveBeenCalledOnce();
+	expect(indexOptions().signal?.aborted).toBe(true);
 });
 
 it('does not auto-open the view after unloading before layout is ready', async () => {
-  const { initializeReminders } = await loadPluginIntegrationModule();
-  const plugin = createPlugin();
-  await initializeReminders(plugin as never);
-  const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
-  endPluginLifecycle(plugin as never);
-  plugin.getLayoutReadyHandler()?.();
-  expect(activateOrRevealRemindersLeaf).not.toHaveBeenCalled();
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	await initializeReminders(plugin as never);
+	const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+	endPluginLifecycle(plugin as never);
+	plugin.getLayoutReadyHandler()?.();
+	expect(activateOrRevealRemindersLeaf).not.toHaveBeenCalled();
 });
 
 it('flushes deferred scans on sync state changes and removes the listener on unload', async () => {
@@ -459,44 +459,44 @@ it('does not start normalization when unloaded during journal recovery', async (
 });
 
  it('defers scanning the vault until Obsidian has loaded its file list', async () => {
-  const { initializeReminders } = await loadPluginIntegrationModule();
-  const plugin = createPlugin();
-  await initializeReminders(plugin as never);
-  const defer = indexOptions().shouldDeferScan!;
-  expect(defer()).toBe(true);
-  expect(defer('Reminders/Inbox.md')).toBe(true);
-  expect(plugin.registerView).toHaveBeenCalled();
-  expect(reminderIndexFlushDeferredScans).not.toHaveBeenCalled();
-  plugin.app.workspace.layoutReady = true;
-  for (const [onReady] of plugin.app.workspace.onLayoutReady.mock.calls) onReady();
-  await flushMicrotasks();
-  expect(defer()).toBe(false);
-  expect(reminderIndexFlushDeferredScans).toHaveBeenCalledOnce();
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	await initializeReminders(plugin as never);
+	const defer = indexOptions().shouldDeferScan!;
+	expect(defer()).toBe(true);
+	expect(defer('Reminders/Inbox.md')).toBe(true);
+	expect(plugin.registerView).toHaveBeenCalled();
+	expect(reminderIndexFlushDeferredScans).not.toHaveBeenCalled();
+	plugin.app.workspace.layoutReady = true;
+	for (const [onReady] of plugin.app.workspace.onLayoutReady.mock.calls) onReady();
+	await flushMicrotasks();
+	expect(defer()).toBe(false);
+	expect(reminderIndexFlushDeferredScans).toHaveBeenCalledOnce();
  });
 
  it('does not run a deferred startup scan after the backend is unloaded', async () => {
-  const { initializeReminders } = await loadPluginIntegrationModule();
-  const plugin = createPlugin();
-  await initializeReminders(plugin as never);
-  const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
-  endPluginLifecycle(plugin as never);
-  plugin.app.workspace.layoutReady = true;
-  for (const [onReady] of plugin.app.workspace.onLayoutReady.mock.calls) onReady();
-  await flushMicrotasks();
-  expect(reminderIndexFlushDeferredScans).not.toHaveBeenCalled();
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	await initializeReminders(plugin as never);
+	const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+	endPluginLifecycle(plugin as never);
+	plugin.app.workspace.layoutReady = true;
+	for (const [onReady] of plugin.app.workspace.onLayoutReady.mock.calls) onReady();
+	await flushMicrotasks();
+	expect(reminderIndexFlushDeferredScans).not.toHaveBeenCalled();
  });
 
 it('stops the backend signal and watcher when reminders are disabled', async () => {
-  const { initializeReminders } = await loadPluginIntegrationModule();
-  const { stopReminderBackend } = await import('./runtime');
-  const plugin = createPlugin();
-  await initializeReminders(plugin as never);
-  const signal = indexOptions().signal!;
-  expect(signal.aborted).toBe(false);
-  stopReminderBackend(plugin as never);
-  expect(signal.aborted).toBe(true);
-  expect(latestWatcher.unregister).toHaveBeenCalledOnce();
-  expect(plugin.reminders).toBeUndefined();
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const { stopReminderBackend } = await import('./runtime');
+	const plugin = createPlugin();
+	await initializeReminders(plugin as never);
+	const signal = indexOptions().signal!;
+	expect(signal.aborted).toBe(false);
+	stopReminderBackend(plugin as never);
+	expect(signal.aborted).toBe(true);
+	expect(latestWatcher.unregister).toHaveBeenCalledOnce();
+	expect(plugin.reminders).toBeUndefined();
 });
 
 describe('setRemindersEnabled', () => {

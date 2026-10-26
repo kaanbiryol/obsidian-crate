@@ -7,5 +7,5 @@ import type { PropsWithChildren } from 'react';
  * belong to the main content flow.
  */
 export function PickerContent({ children }: PropsWithChildren) {
-    return <div className="picker-content">{children}</div>;
+	return <div className="picker-content">{children}</div>;
 }

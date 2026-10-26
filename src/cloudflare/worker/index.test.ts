@@ -23,13 +23,13 @@ function createDb(
 		if (sql.startsWith('CREATE TABLE')) {
 			return { meta: { changes: 0 } };
 		}
-    if (sql.includes('INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name, owner_token_id, folder_path)')) {
-      if (failSubscriptionInsert) throw new Error('subscription insert failed');
-      const endpoint = String(args[1]);
-      const id = [...state.subscriptions.values()].find(row => row.endpoint === endpoint)?.id ?? String(args[0]);
-      state.subscriptions.set(id, { id, endpoint });
-      return { meta: { changes: 1 } };
-    }
+		if (sql.includes('INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name, owner_token_id, folder_path)')) {
+			if (failSubscriptionInsert) throw new Error('subscription insert failed');
+			const endpoint = String(args[1]);
+			const id = [...state.subscriptions.values()].find(row => row.endpoint === endpoint)?.id ?? String(args[0]);
+			state.subscriptions.set(id, { id, endpoint });
+			return { meta: { changes: 1 } };
+		}
 
 		if (sql.includes('DELETE FROM push_subscriptions WHERE endpoint = ?')) {
 			const endpoint = String(args[0]);
@@ -94,25 +94,25 @@ function createDb(
 }
 
 function createEnv(overrides?: Partial<Env>): Env {
-  const env = { ...createEnvDefaults(), ...overrides };
-  const objects = new Map<string, ReminderAlarm>();
-  env.REMINDER_ALARMS = {
-    idFromName: (name: string) => name,
-    get: (name: string) => {
-      if (!objects.has(name)) {
-        const values = new Map<string, unknown>();
-        let alarm: number | null = null;
-        objects.set(name, new ReminderAlarm({ storage: {
-          get: async (key: string) => values.get(key),
-          put: async (key: string, value: unknown) => { values.set(key, value); },
-          getAlarm: async () => alarm,
-          setAlarm: async (time: number) => { alarm = time; },
-        } } as never, env));
-      }
-      return { fetch: (input: RequestInfo, init?: RequestInit) => objects.get(name)!.fetch(new Request(input, init)) };
-    },
-  } as never;
-  return env;
+	const env = { ...createEnvDefaults(), ...overrides };
+	const objects = new Map<string, ReminderAlarm>();
+	env.REMINDER_ALARMS = {
+		idFromName: (name: string) => name,
+		get: (name: string) => {
+			if (!objects.has(name)) {
+				const values = new Map<string, unknown>();
+				let alarm: number | null = null;
+				objects.set(name, new ReminderAlarm({ storage: {
+					get: async (key: string) => values.get(key),
+					put: async (key: string, value: unknown) => { values.set(key, value); },
+					getAlarm: async () => alarm,
+					setAlarm: async (time: number) => { alarm = time; },
+				} } as never, env));
+			}
+			return { fetch: (input: RequestInfo, init?: RequestInit) => objects.get(name)!.fetch(new Request(input, init)) };
+		},
+	} as never;
+	return env;
 }
 
 function createEnvDefaults(): Env {
@@ -226,7 +226,7 @@ describe('worker entrypoint', () => {
 			new Request('https://worker.test/notifications/reminders-enrollment-token', {
 				method: 'POST',
 				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer secret-token' },
-        body: JSON.stringify({ folderPath: 'Reminders' }),
+				body: JSON.stringify({ folderPath: 'Reminders' }),
 			}),
 			createEnv({ DB: db.db as unknown as D1Database }),
 		);

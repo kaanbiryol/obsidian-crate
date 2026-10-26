@@ -13,319 +13,319 @@ import { parseReminderContent } from '../../../core/grammar/reminderParser';
 // Portals do not render during SSR; keep these assertions focused on the editor's content.
 // Modal lifecycle, focus and keyboard behavior run in base-ui-plugin-test.mjs.
 vi.mock('../../../../ui/shared/BaseModal', () => ({
-    BaseModal: ({ children, isOpen = true, className, role = 'dialog', ariaLabel, ariaLabelledBy, ariaDescribedBy }: {
-        children: React.ReactNode; isOpen?: boolean; className?: string; role?: string;
-        ariaLabel?: string; ariaLabelledBy?: string; ariaDescribedBy?: string;
-    }) => isOpen ? React.createElement('div', {
-        className, role, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy,
-    }, children) : null,
+	BaseModal: ({ children, isOpen = true, className, role = 'dialog', ariaLabel, ariaLabelledBy, ariaDescribedBy }: {
+		children: React.ReactNode; isOpen?: boolean; className?: string; role?: string;
+		ariaLabel?: string; ariaLabelledBy?: string; ariaDescribedBy?: string;
+	}) => isOpen ? React.createElement('div', {
+		className, role, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy,
+	}, children) : null,
 }));
 
 describe('reminder editor chrome', () => {
-    it.each([
-        ['Reading', 'Reading', 'Reading', true],
-        ['', 'Reading', 'Reading', true],
-        ['Reading', 'Inbox', 'Reading', true],
-        ['Inbox', 'Reading', 'Inbox', false],
-        ['Inbox', 'Inbox', 'Inbox', false],
-        ['', '', 'Inbox', false],
-    ])('colors the selected project independently of the starting project (%j, %j)', (project, defaultProject, label, active) => {
-        const markup = renderToStaticMarkup(React.createElement(ReminderActionChips, {
-            dueDate: null, project, defaultProject, priority: 4,
-            onOpenDatePicker: vi.fn(), onOpenProjectPicker: vi.fn(),
-            onOpenRecurrencePicker: vi.fn(), onTogglePriority: vi.fn(),
-        }));
-        const chip = markup.match(/<button[^>]*data-picker="project"[^>]*>[\s\S]*?<\/button>/)?.[0];
-        expect(chip).toBeDefined();
-        expect(chip).toContain(`>${label}</span>`);
-        expect(chip?.includes('tone-secondary is-active')).toBe(active);
-    });
+	it.each([
+		['Reading', 'Reading', 'Reading', true],
+		['', 'Reading', 'Reading', true],
+		['Reading', 'Inbox', 'Reading', true],
+		['Inbox', 'Reading', 'Inbox', false],
+		['Inbox', 'Inbox', 'Inbox', false],
+		['', '', 'Inbox', false],
+	])('colors the selected project independently of the starting project (%j, %j)', (project, defaultProject, label, active) => {
+		const markup = renderToStaticMarkup(React.createElement(ReminderActionChips, {
+			dueDate: null, project, defaultProject, priority: 4,
+			onOpenDatePicker: vi.fn(), onOpenProjectPicker: vi.fn(),
+			onOpenRecurrencePicker: vi.fn(), onTogglePriority: vi.fn(),
+		}));
+		const chip = markup.match(/<button[^>]*data-picker="project"[^>]*>[\s\S]*?<\/button>/)?.[0];
+		expect(chip).toBeDefined();
+		expect(chip).toContain(`>${label}</span>`);
+		expect(chip?.includes('tone-secondary is-active')).toBe(active);
+	});
 
-    it.each([
-        ['monthly on the 32nd', 'Choose a monthly day from 1 to 31'],
-        ['every 0 days', 'Repeat intervals must be positive'],
-    ])('shows an invalid schedule as an editor error: %s', (schedule, error) => {
-        const markup = renderToStaticMarkup(React.createElement(ReminderEditorFields, {
-            content: `Task ${schedule}`, onContentChange: vi.fn(), description: '', onDescriptionChange: vi.fn(),
-            allowAutoFocus: false, projects: [], isDark: false, textareaRef: { current: null }, richTextInputRef: { current: null },
-        }));
-        expect(markup).toContain('role="alert"');
-        expect(markup).toContain(error);
-    });
+	it.each([
+		['monthly on the 32nd', 'Choose a monthly day from 1 to 31'],
+		['every 0 days', 'Repeat intervals must be positive'],
+	])('shows an invalid schedule as an editor error: %s', (schedule, error) => {
+		const markup = renderToStaticMarkup(React.createElement(ReminderEditorFields, {
+			content: `Task ${schedule}`, onContentChange: vi.fn(), description: '', onDescriptionChange: vi.fn(),
+			allowAutoFocus: false, projects: [], isDark: false, textareaRef: { current: null }, richTextInputRef: { current: null },
+		}));
+		expect(markup).toContain('role="alert"');
+		expect(markup).toContain(error);
+	});
 
-    it('shows no calendar error when Chrono leaves a phrase as text', () => {
-        const markup = renderToStaticMarkup(React.createElement(ReminderEditorFields, {
-            content: 'Task February 30 at 9 in the morning', onContentChange: vi.fn(), description: '', onDescriptionChange: vi.fn(),
-            allowAutoFocus: false, projects: [], isDark: false, textareaRef: { current: null }, richTextInputRef: { current: null },
-        }));
-        expect(markup).not.toContain('role="alert"');
-    });
+	it('shows no calendar error when Chrono leaves a phrase as text', () => {
+		const markup = renderToStaticMarkup(React.createElement(ReminderEditorFields, {
+			content: 'Task February 30 at 9 in the morning', onContentChange: vi.fn(), description: '', onDescriptionChange: vi.fn(),
+			allowAutoFocus: false, projects: [], isDark: false, textareaRef: { current: null }, richTextInputRef: { current: null },
+		}));
+		expect(markup).not.toContain('role="alert"');
+	});
 
-    it.each([' ', '\u00a0'])('keeps the date chip unset when typing a time into a repeat rule (%j)', space => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-09-20T12:00:00Z'));
-        try {
-            const initial = parseReminderContent('Plan next week every Fri #Work', ['Work']);
-            const edited = parseReminderContent(`Plan next week every Fri${space}09:00 #Work`, ['Work']);
-            expect(initial.recurrence).toMatchObject({ frequency: 'weekly', daysOfWeek: [5] });
-            expect(edited.recurrence).toMatchObject({ frequency: 'weekly', daysOfWeek: [5], hour: 9, minute: 0 });
-            expect(edited.dueDate).toBeUndefined();
-            const markup = renderToStaticMarkup(React.createElement(ReminderActionChips, {
-                dueDate: null, recurrence: edited.recurrence, project: 'Work', defaultProject: 'Inbox', priority: 4,
-                onOpenDatePicker: vi.fn(), onOpenProjectPicker: vi.fn(),
-                onOpenRecurrencePicker: vi.fn(), onTogglePriority: vi.fn(),
-            }));
-            expect(markup).toContain('>Date<');
-            expect(markup).not.toContain('tone-primary is-active');
-        } finally {
-            vi.useRealTimers();
-        }
-    });
+	it.each([' ', '\u00a0'])('keeps the date chip unset when typing a time into a repeat rule (%j)', space => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-09-20T12:00:00Z'));
+		try {
+			const initial = parseReminderContent('Plan next week every Fri #Work', ['Work']);
+			const edited = parseReminderContent(`Plan next week every Fri${space}09:00 #Work`, ['Work']);
+			expect(initial.recurrence).toMatchObject({ frequency: 'weekly', daysOfWeek: [5] });
+			expect(edited.recurrence).toMatchObject({ frequency: 'weekly', daysOfWeek: [5], hour: 9, minute: 0 });
+			expect(edited.dueDate).toBeUndefined();
+			const markup = renderToStaticMarkup(React.createElement(ReminderActionChips, {
+				dueDate: null, recurrence: edited.recurrence, project: 'Work', defaultProject: 'Inbox', priority: 4,
+				onOpenDatePicker: vi.fn(), onOpenProjectPicker: vi.fn(),
+				onOpenRecurrencePicker: vi.fn(), onTogglePriority: vi.fn(),
+			}));
+			expect(markup).toContain('>Date<');
+			expect(markup).not.toContain('tone-primary is-active');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 
-    it('uses sentence case and an explicit save action', () => {
-        const markup = renderToStaticMarkup(React.createElement(AddReminderModalHeader, {
-            isEditing: true,
-            canSubmit: true,
-            onDelete: vi.fn(),
-            onClose: vi.fn(),
-            onSubmit: vi.fn(),
-        }));
+	it('uses sentence case and an explicit save action', () => {
+		const markup = renderToStaticMarkup(React.createElement(AddReminderModalHeader, {
+			isEditing: true,
+			canSubmit: true,
+			onDelete: vi.fn(),
+			onClose: vi.fn(),
+			onSubmit: vi.fn(),
+		}));
 
-        expect(markup).toContain('Edit reminder');
-        expect(markup).toContain('Save');
-        expect(markup).toContain('aria-label="Save reminder"');
-        expect(markup).toContain('aria-label="Close reminder editor"');
-        expect(markup).toContain('aria-label="Delete reminder"');
-        expect(markup).toContain('reminder-modal-header');
-        expect(markup).toContain('reminder-modal-header-side is-right');
-        expect(markup).toContain('<h2 class="reminder-modal-header-title">');
-        expect(markup).not.toContain('data-icon="check"');
-        expect(markup).not.toContain('w-16');
-    });
+		expect(markup).toContain('Edit reminder');
+		expect(markup).toContain('Save');
+		expect(markup).toContain('aria-label="Save reminder"');
+		expect(markup).toContain('aria-label="Close reminder editor"');
+		expect(markup).toContain('aria-label="Delete reminder"');
+		expect(markup).toContain('reminder-modal-header');
+		expect(markup).toContain('reminder-modal-header-side is-right');
+		expect(markup).toContain('<h2 class="reminder-modal-header-title">');
+		expect(markup).not.toContain('data-icon="check"');
+		expect(markup).not.toContain('w-16');
+	});
 
-    it('uses the picker close control in the new-reminder header', () => {
-        const markup = renderToStaticMarkup(React.createElement(AddReminderModalHeader, {
-            isEditing: false,
-            canSubmit: false,
-            onDelete: vi.fn(),
-            onClose: vi.fn(),
-            onSubmit: vi.fn(),
-        }));
+	it('uses the picker close control in the new-reminder header', () => {
+		const markup = renderToStaticMarkup(React.createElement(AddReminderModalHeader, {
+			isEditing: false,
+			canSubmit: false,
+			onDelete: vi.fn(),
+			onClose: vi.fn(),
+			onSubmit: vi.fn(),
+		}));
 
-        expect(markup).toContain('aria-label="Close reminder editor"');
-        expect(markup).toContain('crate-icon-button reminder-modal-header-close');
-        expect(markup).not.toContain('reminder-header-close');
-    });
+		expect(markup).toContain('aria-label="Close reminder editor"');
+		expect(markup).toContain('crate-icon-button reminder-modal-header-close');
+		expect(markup).not.toContain('reminder-header-close');
+	});
 
-    it('labels unset priority and recurrence actions', () => {
-        const markup = renderToStaticMarkup(React.createElement(ReminderActionChips, {
-            dueDate: null,
-            project: 'Inbox',
-            defaultProject: 'Inbox',
-            priority: 4,
-            recurrence: undefined,
-            onOpenDatePicker: vi.fn(),
-            onOpenProjectPicker: vi.fn(),
-            onOpenRecurrencePicker: vi.fn(),
-            onTogglePriority: vi.fn(),
-        }));
+	it('labels unset priority and recurrence actions', () => {
+		const markup = renderToStaticMarkup(React.createElement(ReminderActionChips, {
+			dueDate: null,
+			project: 'Inbox',
+			defaultProject: 'Inbox',
+			priority: 4,
+			recurrence: undefined,
+			onOpenDatePicker: vi.fn(),
+			onOpenProjectPicker: vi.fn(),
+			onOpenRecurrencePicker: vi.fn(),
+			onTogglePriority: vi.fn(),
+		}));
 
-        expect(markup).toContain('Priority');
-        expect(markup).toContain('Repeat');
-        expect(markup.match(/aria-haspopup="dialog"/g)).toHaveLength(3);
-        expect(markup).toContain('aria-pressed="false"');
-        expect(markup).not.toContain('data-icon="chevron-down"');
-    });
+		expect(markup).toContain('Priority');
+		expect(markup).toContain('Repeat');
+		expect(markup.match(/aria-haspopup="dialog"/g)).toHaveLength(3);
+		expect(markup).toContain('aria-pressed="false"');
+		expect(markup).not.toContain('data-icon="chevron-down"');
+	});
 
-    it('offers removal actions for an existing schedule and recurrence', () => {
-        const dateMarkup = renderToStaticMarkup(React.createElement(DatePickerModal, {
-            isOpen: true,
-            onClose: vi.fn(),
-            animationConfig: { enabled: false },
-            pickerMode: 'replace',
-            dueDate: '2026-08-29',
-            hasTime: false,
-            isDark: true,
-            onDateTimeChange: vi.fn(),
-        }));
-        const recurrenceMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
-            isOpen: true,
-            onClose: vi.fn(),
-            animationConfig: { enabled: false },
-            pickerMode: 'replace',
-            isDark: true,
-            recurrence: { frequency: 'daily', hour: 9, minute: 0 },
-            onApply: vi.fn(),
-        }));
+	it('offers removal actions for an existing schedule and recurrence', () => {
+		const dateMarkup = renderToStaticMarkup(React.createElement(DatePickerModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			animationConfig: { enabled: false },
+			pickerMode: 'replace',
+			dueDate: '2026-08-29',
+			hasTime: false,
+			isDark: true,
+			onDateTimeChange: vi.fn(),
+		}));
+		const recurrenceMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			animationConfig: { enabled: false },
+			pickerMode: 'replace',
+			isDark: true,
+			recurrence: { frequency: 'daily', hour: 9, minute: 0 },
+			onApply: vi.fn(),
+		}));
 
-        expect(dateMarkup).toContain('Remove schedule');
-        expect(dateMarkup).toMatch(/picker-section-heading[^]*?<h4 id="plugin-custom-schedule-title">Custom<\/h4><button[^>]*class="picker-schedule-remove"[^>]*>Remove schedule<\/button><\/div>/);
-        expect(dateMarkup).not.toContain('picker-footer');
-        expect(dateMarkup).toContain('>Schedule<');
-        expect(dateMarkup).toContain('Quick options');
-        expect(dateMarkup).toContain('This evening');
-        expect(dateMarkup).toContain('Next week');
-        expect(dateMarkup).toContain('crate-reminder-picker-surface is-date-picker');
-        expect(dateMarkup).toContain('role="dialog"');
-        expect(dateMarkup).toContain('aria-label="Schedule reminder"');
-        expect(dateMarkup).toContain('reminder-modal-header-action is-enabled');
-        expect(dateMarkup).not.toContain('picker-current-label');
-        expect(dateMarkup).not.toContain('picker-current-value');
-        expect(dateMarkup).toContain('class="picker-content"');
-        expect(dateMarkup).toContain('data-icon="sun"');
-        expect(dateMarkup).toContain('data-icon="sunrise"');
-        expect(dateMarkup).toContain('data-icon="sunset"');
-        expect(dateMarkup).toContain('data-icon="calendar-plus"');
-        expect(dateMarkup).toContain('picker-schedule-fields');
-        expect(dateMarkup.match(/picker-control-row/g)).toHaveLength(2);
-        expect(dateMarkup.match(/class="picker-native-control(?: has-value)?"/g)).toHaveLength(2);
-        expect(dateMarkup).toContain('data-icon="calendar"');
-        expect(dateMarkup).toContain('data-icon="clock"');
-        expect(dateMarkup).not.toContain('data-icon="chevron-down"');
-        expect(dateMarkup).toContain('Add time');
-        expect(dateMarkup).toContain('<small>Optional</small>');
-        expect(dateMarkup).not.toContain('Add date');
-        expect(dateMarkup).not.toContain('type="text"');
-        expect(dateMarkup).toContain('type="date"');
-        expect(dateMarkup).not.toContain('data-picker-proxy');
-        expect(dateMarkup).toContain('type="time"');
-        expect(dateMarkup.match(/has-value/g)).toHaveLength(1);
-        expect(dateMarkup).not.toContain('date-calendar-grid');
-        expect(dateMarkup).toContain('>Done<');
-        expect(recurrenceMarkup).toContain('Remove repeat');
-        expect(recurrenceMarkup).toContain('crate-reminder-picker-surface is-recurrence-picker');
-        expect(recurrenceMarkup).toContain('>Repeat<');
-        expect(recurrenceMarkup).toContain('>Repeats<');
-        expect(recurrenceMarkup).toContain('class="picker-current-value"');
-        expect(recurrenceMarkup).not.toContain('tone-warning');
-        expect(recurrenceMarkup).toContain('class="picker-content"');
-        expect(recurrenceMarkup).toContain('data-icon="repeat"');
-        expect(recurrenceMarkup).not.toContain('>Frequency<');
-        expect(recurrenceMarkup).not.toContain('>Interval<');
-        expect(recurrenceMarkup).toContain('>Reminder time<');
-        expect(recurrenceMarkup).toContain('data-icon="minus"');
-        expect(recurrenceMarkup).toContain('data-icon="plus"');
-        expect(recurrenceMarkup).toContain('picker-native-control has-value');
-        expect(recurrenceMarkup).toContain('data-icon="clock"');
-        expect(recurrenceMarkup).toContain('class="picker-time-input"');
-        expect(recurrenceMarkup).toContain('<small> day</small>');
-        expect(recurrenceMarkup.match(/picker-control-row/g)).toHaveLength(2);
-        expect(recurrenceMarkup).toContain('role="tabpanel"');
-        expect(recurrenceMarkup).toContain('tabindex="-1"');
-        expect(recurrenceMarkup).toContain('>Done<');
-    });
+		expect(dateMarkup).toContain('Remove schedule');
+		expect(dateMarkup).toMatch(/picker-section-heading[^]*?<h4 id="plugin-custom-schedule-title">Custom<\/h4><button[^>]*class="picker-schedule-remove"[^>]*>Remove schedule<\/button><\/div>/);
+		expect(dateMarkup).not.toContain('picker-footer');
+		expect(dateMarkup).toContain('>Schedule<');
+		expect(dateMarkup).toContain('Quick options');
+		expect(dateMarkup).toContain('This evening');
+		expect(dateMarkup).toContain('Next week');
+		expect(dateMarkup).toContain('crate-reminder-picker-surface is-date-picker');
+		expect(dateMarkup).toContain('role="dialog"');
+		expect(dateMarkup).toContain('aria-label="Schedule reminder"');
+		expect(dateMarkup).toContain('reminder-modal-header-action is-enabled');
+		expect(dateMarkup).not.toContain('picker-current-label');
+		expect(dateMarkup).not.toContain('picker-current-value');
+		expect(dateMarkup).toContain('class="picker-content"');
+		expect(dateMarkup).toContain('data-icon="sun"');
+		expect(dateMarkup).toContain('data-icon="sunrise"');
+		expect(dateMarkup).toContain('data-icon="sunset"');
+		expect(dateMarkup).toContain('data-icon="calendar-plus"');
+		expect(dateMarkup).toContain('picker-schedule-fields');
+		expect(dateMarkup.match(/picker-control-row/g)).toHaveLength(2);
+		expect(dateMarkup.match(/class="picker-native-control(?: has-value)?"/g)).toHaveLength(2);
+		expect(dateMarkup).toContain('data-icon="calendar"');
+		expect(dateMarkup).toContain('data-icon="clock"');
+		expect(dateMarkup).not.toContain('data-icon="chevron-down"');
+		expect(dateMarkup).toContain('Add time');
+		expect(dateMarkup).toContain('<small>Optional</small>');
+		expect(dateMarkup).not.toContain('Add date');
+		expect(dateMarkup).not.toContain('type="text"');
+		expect(dateMarkup).toContain('type="date"');
+		expect(dateMarkup).not.toContain('data-picker-proxy');
+		expect(dateMarkup).toContain('type="time"');
+		expect(dateMarkup.match(/has-value/g)).toHaveLength(1);
+		expect(dateMarkup).not.toContain('date-calendar-grid');
+		expect(dateMarkup).toContain('>Done<');
+		expect(recurrenceMarkup).toContain('Remove repeat');
+		expect(recurrenceMarkup).toContain('crate-reminder-picker-surface is-recurrence-picker');
+		expect(recurrenceMarkup).toContain('>Repeat<');
+		expect(recurrenceMarkup).toContain('>Repeats<');
+		expect(recurrenceMarkup).toContain('class="picker-current-value"');
+		expect(recurrenceMarkup).not.toContain('tone-warning');
+		expect(recurrenceMarkup).toContain('class="picker-content"');
+		expect(recurrenceMarkup).toContain('data-icon="repeat"');
+		expect(recurrenceMarkup).not.toContain('>Frequency<');
+		expect(recurrenceMarkup).not.toContain('>Interval<');
+		expect(recurrenceMarkup).toContain('>Reminder time<');
+		expect(recurrenceMarkup).toContain('data-icon="minus"');
+		expect(recurrenceMarkup).toContain('data-icon="plus"');
+		expect(recurrenceMarkup).toContain('picker-native-control has-value');
+		expect(recurrenceMarkup).toContain('data-icon="clock"');
+		expect(recurrenceMarkup).toContain('class="picker-time-input"');
+		expect(recurrenceMarkup).toContain('<small> day</small>');
+		expect(recurrenceMarkup.match(/picker-control-row/g)).toHaveLength(2);
+		expect(recurrenceMarkup).toContain('role="tabpanel"');
+		expect(recurrenceMarkup).toContain('tabindex="-1"');
+		expect(recurrenceMarkup).toContain('>Done<');
+	});
 
-    it('keeps time before compact frequency-specific controls and the summary last', () => {
-        const weeklyMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
-            isOpen: true,
-            onClose: vi.fn(),
-            animationConfig: { enabled: false },
-            pickerMode: 'replace',
-            isDark: true,
-            recurrence: { frequency: 'weekly', interval: 2, daysOfWeek: [1], hour: 9, minute: 0 },
-            onApply: vi.fn(),
-        }));
-        const monthlyMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
-            isOpen: true,
-            onClose: vi.fn(),
-            animationConfig: { enabled: false },
-            pickerMode: 'replace',
-            isDark: true,
-            recurrence: { frequency: 'monthly', interval: 2, dayOfMonth: 15, hour: 9, minute: 0 },
-            onApply: vi.fn(),
-        }));
+	it('keeps time before compact frequency-specific controls and the summary last', () => {
+		const weeklyMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			animationConfig: { enabled: false },
+			pickerMode: 'replace',
+			isDark: true,
+			recurrence: { frequency: 'weekly', interval: 2, daysOfWeek: [1], hour: 9, minute: 0 },
+			onApply: vi.fn(),
+		}));
+		const monthlyMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			animationConfig: { enabled: false },
+			pickerMode: 'replace',
+			isDark: true,
+			recurrence: { frequency: 'monthly', interval: 2, dayOfMonth: 15, hour: 9, minute: 0 },
+			onApply: vi.fn(),
+		}));
 
-        expect(weeklyMarkup).toContain('recurrence-frequency-detail');
-        expect(weeklyMarkup).toContain('aria-label="Repeat days"');
-        expect(weeklyMarkup).toContain('<small> weeks</small>');
-        expect(monthlyMarkup).toContain('recurrence-frequency-detail');
-        expect(monthlyMarkup).toContain('>Day of month<');
-        expect(monthlyMarkup).toContain('class="recurrence-stepper-value" aria-live="polite">15</strong>');
-        for (const markup of [weeklyMarkup, monthlyMarkup]) {
-            expect(markup.indexOf('picker-time-card')).toBeLessThan(markup.indexOf('recurrence-frequency-detail'));
-            expect(markup.indexOf('recurrence-frequency-detail')).toBeLessThan(markup.indexOf('picker-current-summary'));
-        }
-        expect(monthlyMarkup).toContain('<small> months</small>');
-    });
+		expect(weeklyMarkup).toContain('recurrence-frequency-detail');
+		expect(weeklyMarkup).toContain('aria-label="Repeat days"');
+		expect(weeklyMarkup).toContain('<small> weeks</small>');
+		expect(monthlyMarkup).toContain('recurrence-frequency-detail');
+		expect(monthlyMarkup).toContain('>Day of month<');
+		expect(monthlyMarkup).toContain('class="recurrence-stepper-value" aria-live="polite">15</strong>');
+		for (const markup of [weeklyMarkup, monthlyMarkup]) {
+			expect(markup.indexOf('picker-time-card')).toBeLessThan(markup.indexOf('recurrence-frequency-detail'));
+			expect(markup.indexOf('recurrence-frequency-detail')).toBeLessThan(markup.indexOf('picker-current-summary'));
+		}
+		expect(monthlyMarkup).toContain('<small> months</small>');
+	});
 
-    it('keeps removal actions hidden for new date and recurrence selections', () => {
-        const dateMarkup = renderToStaticMarkup(React.createElement(DatePickerModal, {
-            isOpen: true,
-            onClose: vi.fn(),
-            animationConfig: { enabled: false },
-            pickerMode: 'replace',
-            dueDate: null,
-            isDark: true,
-            onDateTimeChange: vi.fn(),
-        }));
-        const recurrenceMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
-            isOpen: true,
-            onClose: vi.fn(),
-            animationConfig: { enabled: false },
-            pickerMode: 'replace',
-            isDark: true,
-            onApply: vi.fn(),
-        }));
+	it('keeps removal actions hidden for new date and recurrence selections', () => {
+		const dateMarkup = renderToStaticMarkup(React.createElement(DatePickerModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			animationConfig: { enabled: false },
+			pickerMode: 'replace',
+			dueDate: null,
+			isDark: true,
+			onDateTimeChange: vi.fn(),
+		}));
+		const recurrenceMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			animationConfig: { enabled: false },
+			pickerMode: 'replace',
+			isDark: true,
+			onApply: vi.fn(),
+		}));
 
-        expect(dateMarkup).toContain('>Schedule<');
-        expect(dateMarkup).not.toContain('Remove schedule');
-        expect(dateMarkup).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Done"/);
-        expect(recurrenceMarkup).not.toContain('Remove repeat');
-    });
+		expect(dateMarkup).toContain('>Schedule<');
+		expect(dateMarkup).not.toContain('Remove schedule');
+		expect(dateMarkup).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Done"/);
+		expect(recurrenceMarkup).not.toContain('Remove repeat');
+	});
 
-    it('uses a grouped, calmly selected project list', () => {
-        const markup = renderToStaticMarkup(React.createElement(ProjectPickerModal, {
-            isOpen: true,
-            onClose: vi.fn(),
-            animationConfig: { enabled: false },
-            pickerMode: 'replace',
-            projects: ['Inbox', 'Work'],
-            project: 'Work',
-            defaultProject: 'Inbox',
-            isDark: true,
-            onSelectProject: vi.fn(),
-        }));
+	it('uses a grouped, calmly selected project list', () => {
+		const markup = renderToStaticMarkup(React.createElement(ProjectPickerModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			animationConfig: { enabled: false },
+			pickerMode: 'replace',
+			projects: ['Inbox', 'Work'],
+			project: 'Work',
+			defaultProject: 'Inbox',
+			isDark: true,
+			onSelectProject: vi.fn(),
+		}));
 
-        expect(markup).toContain('>Project<');
-        expect(markup).toContain('project-picker-list');
-        expect(markup).toContain('crate-reminder-picker-surface is-project-picker');
-        expect(markup).toContain('aria-label="Close project selection"');
-        expect(markup).toContain('crate-icon-button reminder-modal-header-close');
-        expect(markup).not.toContain('reminder-header-close');
-        expect(markup).toContain('data-icon="x"');
-        expect(markup).not.toContain('data-icon="chevron-left"');
-        expect(markup).toContain('aria-selected="true"');
-        expect(markup).toContain('tabindex="0"');
-        expect(markup).toContain('aria-label="Select project"');
-        expect(markup).toContain('project-picker-dot');
-        expect(markup).toContain('project-picker-row-check');
-        expect(markup).toContain('--project-picker-dot-accent');
-        expect(markup).not.toContain('--project-picker-row-accent');
-        expect(markup).not.toContain('>Done<');
-        expect(markup).not.toContain('Select Project');
-    });
+		expect(markup).toContain('>Project<');
+		expect(markup).toContain('project-picker-list');
+		expect(markup).toContain('crate-reminder-picker-surface is-project-picker');
+		expect(markup).toContain('aria-label="Close project selection"');
+		expect(markup).toContain('crate-icon-button reminder-modal-header-close');
+		expect(markup).not.toContain('reminder-header-close');
+		expect(markup).toContain('data-icon="x"');
+		expect(markup).not.toContain('data-icon="chevron-left"');
+		expect(markup).toContain('aria-selected="true"');
+		expect(markup).toContain('tabindex="0"');
+		expect(markup).toContain('aria-label="Select project"');
+		expect(markup).toContain('project-picker-dot');
+		expect(markup).toContain('project-picker-row-check');
+		expect(markup).toContain('--project-picker-dot-accent');
+		expect(markup).not.toContain('--project-picker-row-accent');
+		expect(markup).not.toContain('>Done<');
+		expect(markup).not.toContain('Select Project');
+	});
 
-    it('uses the shared dialog layout for delete confirmation', () => {
-        const markup = renderToStaticMarkup(React.createElement(DeleteConfirmationModal, {
-            isOpen: true,
-            onClose: vi.fn(),
-            onConfirm: vi.fn(),
-            message: 'Delete "Buy milk"? This can\'t be undone.',
-        }));
+	it('uses the shared dialog layout for delete confirmation', () => {
+		const markup = renderToStaticMarkup(React.createElement(DeleteConfirmationModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			onConfirm: vi.fn(),
+			message: 'Delete "Buy milk"? This can\'t be undone.',
+		}));
 
-        expect(markup).toContain('Delete reminder?');
-        expect(markup).toContain('Delete &quot;Buy milk&quot;? This can&#x27;t be undone.');
-        expect(markup).toContain('role="alertdialog"');
-        expect(markup).toContain('aria-labelledby=');
-        expect(markup).toContain('aria-describedby=');
-        expect(markup).toContain('autofocus=""');
-        expect(markup).not.toContain('style="opacity:0');
-        expect(markup).not.toMatch(/transform:(?!none)/);
-        expect(markup).toContain('crate-modal-footer');
-        expect(markup).toContain('crate-modal-actions');
-        expect(markup).toContain('data-tone="danger"');
-        expect(markup).not.toContain('aria-label="Close confirmation"');
-        expect(markup).toContain('reminder-modal-header');
-        expect(markup).not.toContain('data-icon="triangle-alert"');
-    });
+		expect(markup).toContain('Delete reminder?');
+		expect(markup).toContain('Delete &quot;Buy milk&quot;? This can&#x27;t be undone.');
+		expect(markup).toContain('role="alertdialog"');
+		expect(markup).toContain('aria-labelledby=');
+		expect(markup).toContain('aria-describedby=');
+		expect(markup).toContain('autofocus=""');
+		expect(markup).not.toContain('style="opacity:0');
+		expect(markup).not.toMatch(/transform:(?!none)/);
+		expect(markup).toContain('crate-modal-footer');
+		expect(markup).toContain('crate-modal-actions');
+		expect(markup).toContain('data-tone="danger"');
+		expect(markup).not.toContain('aria-label="Close confirmation"');
+		expect(markup).toContain('reminder-modal-header');
+		expect(markup).not.toContain('data-icon="triangle-alert"');
+	});
 });

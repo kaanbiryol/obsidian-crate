@@ -19,19 +19,19 @@ export interface MaintenanceResult { removedObjects: number; backlog: boolean }
 /** `backlog` reports a bounded pruning task that filled its batch. `firstPass`
  * is false for the follow-up passes of one maintenance episode. */
 export async function runScheduledMaintenance(env: Env, { firstPass = true }: { firstPass?: boolean } = {}): Promise<MaintenanceResult> {
-  if (await env.DB.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first()) return { removedObjects: 0, backlog: false };
+	if (await env.DB.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first()) return { removedObjects: 0, backlog: false };
 	if ((await readEncryptionState(env.DB))?.mode === 'resetting') return { removedObjects: 0, backlog: false };
 	const errors: string[] = [];
-  let removedObjects = 0, backlog = false;
-  const bounded = (task: () => Promise<boolean>) => async () => { if (await task()) backlog = true; };
+	let removedObjects = 0, backlog = false;
+	const bounded = (task: () => Promise<boolean>) => async () => { if (await task()) backlog = true; };
 	const tasks: Array<[string, () => Promise<unknown>]> = [
-    // Once per episode: each wake would otherwise reset a running pass's retry budget.
-    ['recover Reading work', async () => {
-      if (firstPass && await env.DB.prepare('SELECT 1 FROM reading_policy WHERE enabled=1').first()) {
-        if (!await wakeProjection(env)) throw new Error('Reading coordinator unavailable');
-      }
-    }],
-        ['prune shared checkpoints', () => pruneSharedCheckpoints(env.BUCKET, env.DB)],
+		// Once per episode: each wake would otherwise reset a running pass's retry budget.
+		['recover Reading work', async () => {
+			if (firstPass && await env.DB.prepare('SELECT 1 FROM reading_policy WHERE enabled=1').first()) {
+				if (!await wakeProjection(env)) throw new Error('Reading coordinator unavailable');
+			}
+		}],
+				['prune shared checkpoints', () => pruneSharedCheckpoints(env.BUCKET, env.DB)],
 		['expire file versions', bounded(() => enqueueExpiredFileVersions(env.DB))],
 		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, env.DB); }],
 		['prune changelog', bounded(() => pruneChangelog(env.DB))],
@@ -57,5 +57,5 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
 		}
 	}
 	await recordMaintenanceRun(env.DB, errors);
-  return { removedObjects, backlog };
+	return { removedObjects, backlog };
 }

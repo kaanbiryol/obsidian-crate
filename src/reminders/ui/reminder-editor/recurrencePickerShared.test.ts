@@ -104,10 +104,10 @@ describe('recurrencePickerShared', () => {
 });
 
 it('keeps typed seconds when changing only the repeat interval', () => {
-    const original = { frequency: 'daily' as const, hour: 9, minute: 0, second: 30, millisecond: 123, timezone: 'UTC' };
-    const draft = buildRecurrencePickerDraft(original);
-    const changed = recurrenceRuleFromPickerDraft({ ...draft, interval: 2 }, original.timezone);
-    expect(changed).toEqual({ ...original, interval: 2 });
-    const initial = buildRecurrencePickerState(original);
-    expect(isRecurrencePickerStateUnchanged({ ...initial, second: undefined, millisecond: undefined }, initial)).toBe(false);
+	const original = { frequency: 'daily' as const, hour: 9, minute: 0, second: 30, millisecond: 123, timezone: 'UTC' };
+	const draft = buildRecurrencePickerDraft(original);
+	const changed = recurrenceRuleFromPickerDraft({ ...draft, interval: 2 }, original.timezone);
+	expect(changed).toEqual({ ...original, interval: 2 });
+	const initial = buildRecurrencePickerState(original);
+	expect(isRecurrencePickerStateUnchanged({ ...initial, second: undefined, millisecond: undefined }, initial)).toBe(false);
 });

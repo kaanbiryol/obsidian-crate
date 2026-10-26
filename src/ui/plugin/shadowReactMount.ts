@@ -4,84 +4,84 @@ import type { Plugin } from "obsidian";
 import { attachPluginStylesheet } from "./shadowStyles";
 
 export interface ShadowRootMount {
-  shadowRoot: ShadowRoot;
-  mountPoint: HTMLDivElement;
+	shadowRoot: ShadowRoot;
+	mountPoint: HTMLDivElement;
 }
 
 export interface ShadowReactMount extends ShadowRootMount {
-  root: Root;
-  render(children: ReactNode): void;
-  unmount(): void;
+	root: Root;
+	render(children: ReactNode): void;
+	unmount(): void;
 }
 
 interface ShadowRootMountOptions {
-  mountClassName?: string;
-  configureMountPoint?(mountPoint: HTMLDivElement): void;
+	mountClassName?: string;
+	configureMountPoint?(mountPoint: HTMLDivElement): void;
 }
 
 interface ShadowReactRootOptions {
-  isActive?(mount: ShadowRootMount): boolean;
+	isActive?(mount: ShadowRootMount): boolean;
 }
 
 interface ShadowReactMountOptions extends ShadowRootMountOptions, ShadowReactRootOptions {}
 
 /** Mirrors Obsidian's body theme class onto a shadow mount point. */
 function syncMountTheme(mountPoint: HTMLElement): void {
-  const dark = mountPoint.doc.body.classList.contains("theme-dark");
-  mountPoint.classList.toggle("dark", dark);
-  mountPoint.classList.toggle("light", !dark);
+	const dark = mountPoint.doc.body.classList.contains("theme-dark");
+	mountPoint.classList.toggle("dark", dark);
+	mountPoint.classList.toggle("light", !dark);
 }
 
 export function createShadowRootMount(
-  host: HTMLElement,
-  options: ShadowRootMountOptions = {},
+	host: HTMLElement,
+	options: ShadowRootMountOptions = {},
 ): ShadowRootMount {
-  const shadowRoot = host.attachShadow({ mode: "open" });
-  const mountPoint = shadowRoot.createDiv();
-  mountPoint.className = options.mountClassName ?? "reminders-shadow-root";
-  mountPoint.classList.add("crate-reminders-ui");
-  mountPoint.dataset.uiHost = "plugin";
-  mountPoint.classList.toggle("is-mobile", host.doc.body.classList.contains("is-mobile"));
-  syncMountTheme(mountPoint);
-  // Obsidian switches theme on the body, e.g. when a phone follows the system appearance.
-  const themeObserver = new MutationObserver(() => {
-    if (!host.isConnected) themeObserver.disconnect();
-    else syncMountTheme(mountPoint);
-  });
-  themeObserver.observe(host.doc.body, { attributes: true, attributeFilter: ["class"] });
-  options.configureMountPoint?.(mountPoint);
-  return { shadowRoot, mountPoint };
+	const shadowRoot = host.attachShadow({ mode: "open" });
+	const mountPoint = shadowRoot.createDiv();
+	mountPoint.className = options.mountClassName ?? "reminders-shadow-root";
+	mountPoint.classList.add("crate-reminders-ui");
+	mountPoint.dataset.uiHost = "plugin";
+	mountPoint.classList.toggle("is-mobile", host.doc.body.classList.contains("is-mobile"));
+	syncMountTheme(mountPoint);
+	// Obsidian switches theme on the body, e.g. when a phone follows the system appearance.
+	const themeObserver = new MutationObserver(() => {
+		if (!host.isConnected) themeObserver.disconnect();
+		else syncMountTheme(mountPoint);
+	});
+	themeObserver.observe(host.doc.body, { attributes: true, attributeFilter: ["class"] });
+	options.configureMountPoint?.(mountPoint);
+	return { shadowRoot, mountPoint };
 }
 
 export async function createShadowReactRoot(
-  plugin: Plugin,
-  mount: ShadowRootMount,
-  options: ShadowReactRootOptions = {},
+	plugin: Plugin,
+	mount: ShadowRootMount,
+	options: ShadowReactRootOptions = {},
 ): Promise<Root | null> {
-  await attachPluginStylesheet(plugin, mount.shadowRoot);
+	await attachPluginStylesheet(plugin, mount.shadowRoot);
 
-  if (options.isActive && !options.isActive(mount)) {
-    return null;
-  }
+	if (options.isActive && !options.isActive(mount)) {
+		return null;
+	}
 
-  return createRoot(mount.mountPoint);
+	return createRoot(mount.mountPoint);
 }
 
 export async function createShadowReactMount(
-  plugin: Plugin,
-  host: HTMLElement,
-  options: ShadowReactMountOptions = {},
+	plugin: Plugin,
+	host: HTMLElement,
+	options: ShadowReactMountOptions = {},
 ): Promise<ShadowReactMount | null> {
-  const mount = createShadowRootMount(host, options);
-  const root = await createShadowReactRoot(plugin, mount, options);
-  if (!root) {
-    return null;
-  }
+	const mount = createShadowRootMount(host, options);
+	const root = await createShadowReactRoot(plugin, mount, options);
+	if (!root) {
+		return null;
+	}
 
-  return {
-    ...mount,
-    root,
-    render: (children: ReactNode) => root.render(children),
-    unmount: () => root.unmount(),
-  };
+	return {
+		...mount,
+		root,
+		render: (children: ReactNode) => root.render(children),
+		unmount: () => root.unmount(),
+	};
 }

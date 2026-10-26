@@ -5,11 +5,11 @@ import { formatReminderTime } from '../dates/reminderDate';
 
 /** Show a non-local rule's zone when editing; durable Markdown keeps its existing format. */
 export function recurrenceToEditorText(rule: RecurrenceRule): string {
-  // Stored IANA aliases (e.g. CET) may have a different meaning from Chrono's
-  // typed abbreviations. Display their canonical name to preserve the rule.
-  const timezone = rule.timezone && canonicalReminderTimezone(rule.timezone);
-  const zone = timezone && timezone !== canonicalReminderTimezone(getLocalTimeZone()) ? ` ${timezone}` : '';
-  return recurrenceToText(rule) + zone;
+	// Stored IANA aliases (e.g. CET) may have a different meaning from Chrono's
+	// typed abbreviations. Display their canonical name to preserve the rule.
+	const timezone = rule.timezone && canonicalReminderTimezone(rule.timezone);
+	const zone = timezone && timezone !== canonicalReminderTimezone(getLocalTimeZone()) ? ` ${timezone}` : '';
+	return recurrenceToText(rule) + zone;
 }
 
 /**
@@ -25,46 +25,46 @@ export function recurrenceToEditorText(rule: RecurrenceRule): string {
  * - { frequency: 'weekly', interval: 2 } => "Every 2 weeks"
  */
 export function formatRecurrence(rule: RecurrenceRule): string {
-  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const interval = rule.interval || 1;
-  const { hour, minute } = rule;
-  const timeStr = hour !== undefined && minute !== undefined
-    ? ` at ${formatReminderTime(hour, minute, rule.second, rule.millisecond)}`
-    : '';
+	const interval = rule.interval || 1;
+	const { hour, minute } = rule;
+	const timeStr = hour !== undefined && minute !== undefined
+		? ` at ${formatReminderTime(hour, minute, rule.second, rule.millisecond)}`
+		: '';
 
-  if (rule.frequency === 'daily') {
-    if (interval === 1) {
-      return `Daily${timeStr}`;
-    }
-    return `Every ${interval} days${timeStr}`;
-  }
+	if (rule.frequency === 'daily') {
+		if (interval === 1) {
+			return `Daily${timeStr}`;
+		}
+		return `Every ${interval} days${timeStr}`;
+	}
 
-  if (rule.frequency === 'weekly') {
-    let base = interval === 1 ? 'Weekly' : `Every ${interval} weeks`;
-    if (rule.daysOfWeek && rule.daysOfWeek.length > 0) {
-      const days = rule.daysOfWeek.map(d => DAY_NAMES[d]).join(', ');
-      base += ` on ${days}`;
-    }
-    return base + timeStr;
-  }
+	if (rule.frequency === 'weekly') {
+		let base = interval === 1 ? 'Weekly' : `Every ${interval} weeks`;
+		if (rule.daysOfWeek && rule.daysOfWeek.length > 0) {
+			const days = rule.daysOfWeek.map(d => DAY_NAMES[d]).join(', ');
+			base += ` on ${days}`;
+		}
+		return base + timeStr;
+	}
 
-  if (rule.frequency === 'monthly') {
-    let base = interval === 1 ? 'Monthly' : `Every ${interval} months`;
-    if (rule.dayOfMonth) {
-      base += ` on the ${formatOrdinal(rule.dayOfMonth)}`;
-    }
-    return base + timeStr;
-  }
+	if (rule.frequency === 'monthly') {
+		let base = interval === 1 ? 'Monthly' : `Every ${interval} months`;
+		if (rule.dayOfMonth) {
+			base += ` on the ${formatOrdinal(rule.dayOfMonth)}`;
+		}
+		return base + timeStr;
+	}
 
-  return 'Repeating';
+	return 'Repeating';
 }
 
 /** English ordinal such as 1st, 22nd or 13th. */
 export function formatOrdinal(n: number): string {
-  const suffixes = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return `${n}${suffixes[(v - 20) % 10] || suffixes[v] || 'th'}`;
+	const suffixes = ['th', 'st', 'nd', 'rd'];
+	const v = n % 100;
+	return `${n}${suffixes[(v - 20) % 10] || suffixes[v] || 'th'}`;
 }
 
 /**
@@ -84,45 +84,45 @@ export function formatOrdinal(n: number): string {
  * - { frequency: 'monthly', dayOfMonth: 20, hour: 20, minute: 0 } => "monthly on the 20th 20:00"
  */
 export function recurrenceToText(rule: RecurrenceRule): string {
-  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const interval = rule.interval || 1;
-  const { hour, minute } = rule;
-  const timeStr = hour !== undefined && minute !== undefined
-    ? ` ${formatReminderTime(hour, minute, rule.second, rule.millisecond)}`
-    : '';
+	const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	const interval = rule.interval || 1;
+	const { hour, minute } = rule;
+	const timeStr = hour !== undefined && minute !== undefined
+		? ` ${formatReminderTime(hour, minute, rule.second, rule.millisecond)}`
+		: '';
 
-  if (rule.frequency === 'daily') {
-    if (interval === 1) {
-      return `daily${timeStr}`;
-    }
-    return `every ${interval} days${timeStr}`;
-  }
+	if (rule.frequency === 'daily') {
+		if (interval === 1) {
+			return `daily${timeStr}`;
+		}
+		return `every ${interval} days${timeStr}`;
+	}
 
-  if (rule.frequency === 'weekly') {
-    const days = rule.daysOfWeek && rule.daysOfWeek.length > 0
-      ? rule.daysOfWeek.map(d => DAY_NAMES[d]).join(', ')
-      : '';
-    if (interval > 1 && days) {
-      return `every ${interval} weeks on ${days}${timeStr}`;
-    }
-    // If specific days are set, use "every Mon, Wed, Fri" format
-    if (rule.daysOfWeek && rule.daysOfWeek.length > 0) {
-      return `every ${days}${timeStr}`;
-    }
-    // Otherwise use simple weekly/every N weeks
-    if (interval === 1) {
-      return `weekly${timeStr}`;
-    }
-    return `every ${interval} weeks${timeStr}`;
-  }
+	if (rule.frequency === 'weekly') {
+		const days = rule.daysOfWeek && rule.daysOfWeek.length > 0
+			? rule.daysOfWeek.map(d => DAY_NAMES[d]).join(', ')
+			: '';
+		if (interval > 1 && days) {
+			return `every ${interval} weeks on ${days}${timeStr}`;
+		}
+		// If specific days are set, use "every Mon, Wed, Fri" format
+		if (rule.daysOfWeek && rule.daysOfWeek.length > 0) {
+			return `every ${days}${timeStr}`;
+		}
+		// Otherwise use simple weekly/every N weeks
+		if (interval === 1) {
+			return `weekly${timeStr}`;
+		}
+		return `every ${interval} weeks${timeStr}`;
+	}
 
-  if (rule.frequency === 'monthly') {
-    let base = interval === 1 ? 'monthly' : `every ${interval} months`;
-    if (rule.dayOfMonth) {
-      base += ` on the ${formatOrdinal(rule.dayOfMonth)}`;
-    }
-    return base + timeStr;
-  }
+	if (rule.frequency === 'monthly') {
+		let base = interval === 1 ? 'monthly' : `every ${interval} months`;
+		if (rule.dayOfMonth) {
+			base += ` on the ${formatOrdinal(rule.dayOfMonth)}`;
+		}
+		return base + timeStr;
+	}
 
-  return 'repeating';
+	return 'repeating';
 }

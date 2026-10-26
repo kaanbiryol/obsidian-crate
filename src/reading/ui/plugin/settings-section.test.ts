@@ -79,8 +79,8 @@ it.each(['read', 'pause', 'update'])('does not continue a folder change after sw
  const { plugin } = await setup();
  const calls = { read: 1, pause: 2, update: 3 };
  request.mockImplementation(async () => {
-  if (request.mock.calls.length === calls[step as keyof typeof calls]) plugin.settings.workerUrl = 'https://replacement.example';
-  return { policy: { ...policy } };
+	if (request.mock.calls.length === calls[step as keyof typeof calls]) plugin.settings.workerUrl = 'https://replacement.example';
+	return { policy: { ...policy } };
  });
  const folder = MockSetting.instances.find(row => row.nameEl.textContent === 'Reading folder')!.texts[0]!;
  folder.inputEl.value = 'New reading';
@@ -96,9 +96,9 @@ it('keeps a pause made while a folder change waits for the server', async () => 
  const { plugin, toggle } = await setup();
  let release = () => {};
  request.mockImplementation(async (_plugin: unknown, path: string, body?: unknown) => {
-  if (path === '/features') return body ? { reading: false, reminders: true, revision: 'f2' } : { reading: true, reminders: true, revision: 'f1' };
-  if (!body) return new Promise(resolve => { release = () => resolve({ policy: { ...policy } }); });
-  return { policy: { ...policy } };
+	if (path === '/features') return body ? { reading: false, reminders: true, revision: 'f2' } : { reading: true, reminders: true, revision: 'f1' };
+	if (!body) return new Promise(resolve => { release = () => resolve({ policy: { ...policy } }); });
+	return { policy: { ...policy } };
  });
  const folder = MockSetting.instances.find(row => row.nameEl.textContent === 'Reading folder')!.texts[0]!;
  folder.inputEl.value = 'New reading';

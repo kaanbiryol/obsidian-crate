@@ -20,7 +20,7 @@ it('preserves the saved preview when the local copy is missing or unreadable', a
 it('does not download binary or oversized versions', async () => {
  const client = api(); const adapter = { stat: vi.fn(), readBinary: vi.fn() };
  for (const entry of [{ ...version, path: 'image.png' }, { ...version, size: 256_001 }]) {
-  expect((await loadFileHistoryPreview(adapter, client, entry)).unavailable).toBeTypeOf('string');
+	expect((await loadFileHistoryPreview(adapter, client, entry)).unavailable).toBeTypeOf('string');
  }
  expect(client.previewFileVersion).not.toHaveBeenCalled();
 });

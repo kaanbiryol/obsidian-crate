@@ -337,35 +337,35 @@ it('does not open Cloudflare for a network failure', async () => {
 });
 
 it('shows a rejected D1 quota error directly without sending the user to lock recovery', async () => {
-    const { startCloudflareDeployment } = await loadPluginIntegration();
-    const { CloudflareApiError } = await import('../cloudflare/cloudflare-api');
-    const plugin = createPlugin(true);
-    const message = "Your account has exceeded D1's free tier daily row write limit. Wait until midnight UTC.";
-    plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new CloudflareApiError(message, 400, 7500));
-    await startCloudflareDeployment(plugin as never, 'update');
-    expect(progress.fail).toHaveBeenCalledWith('Could not update your Cloudflare server', message,
-        ['Select “Update server” in Crate settings to try again.']);
-    expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const { CloudflareApiError } = await import('../cloudflare/cloudflare-api');
+	const plugin = createPlugin(true);
+	const message = "Your account has exceeded D1's free tier daily row write limit. Wait until midnight UTC.";
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new CloudflareApiError(message, 400, 7500));
+	await startCloudflareDeployment(plugin as never, 'update');
+	expect(progress.fail).toHaveBeenCalledWith('Could not update your Cloudflare server', message,
+		['Select “Update server” in Crate settings to try again.']);
+	expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
 });
 
 it.each(['update', 'reset', 'delete'] as const)('shows recovery guidance for an uncertain %s', async intent => {
-    const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
-    const { DeploymentRecoveryRequiredError } = await import('../cloudflare/deployment/fence');
-    const plugin = createPlugin(true);
-    plugin.cloudflareDeploymentService.pendingIntent = intent === 'update' ? null : intent;
-    plugin.cloudflareDeploymentService.handleCallback.mockRejectedValue(
-        new DeploymentRecoveryRequiredError('Network changed. The deployment fence remains held.'),
-    );
-    await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
-    expect(progress.fail).toHaveBeenCalledWith(
-        'Server operation needs review',
-        expect.stringContaining('Further server changes are blocked'),
-        expect.arrayContaining(['Closing this message does not clear the lock.']),
-        expect.objectContaining({ technicalDetails: 'Network changed. The deployment fence remains held.' }),
-    );
-    expect(progress.fail.mock.calls[0]?.[3]).toHaveProperty('action.label', intent === 'update' ? 'Check and recover update' : 'Open settings');
-    if (intent === 'delete') expect(JSON.stringify(progress.fail.mock.calls)).toContain('select Delete server and all data');
-    expect(JSON.stringify(progress.fail.mock.calls)).not.toContain('select Resume server deletion');
+	const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+	const { DeploymentRecoveryRequiredError } = await import('../cloudflare/deployment/fence');
+	const plugin = createPlugin(true);
+	plugin.cloudflareDeploymentService.pendingIntent = intent === 'update' ? null : intent;
+	plugin.cloudflareDeploymentService.handleCallback.mockRejectedValue(
+		new DeploymentRecoveryRequiredError('Network changed. The deployment fence remains held.'),
+	);
+	await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+	expect(progress.fail).toHaveBeenCalledWith(
+		'Server operation needs review',
+		expect.stringContaining('Further server changes are blocked'),
+		expect.arrayContaining(['Closing this message does not clear the lock.']),
+		expect.objectContaining({ technicalDetails: 'Network changed. The deployment fence remains held.' }),
+	);
+	expect(progress.fail.mock.calls[0]?.[3]).toHaveProperty('action.label', intent === 'update' ? 'Check and recover update' : 'Open settings');
+	if (intent === 'delete') expect(JSON.stringify(progress.fail.mock.calls)).toContain('select Delete server and all data');
+	expect(JSON.stringify(progress.fail.mock.calls)).not.toContain('select Resume server deletion');
 });
 
 it('offers resume only when an interrupted deletion checkpoint is saved', async () => {
@@ -422,12 +422,12 @@ it('keeps connection-test retry guidance for a temporary network failure', async
 });
 
 it('does not open another update dialog when the service is busy', async () => {
-    const { startCloudflareDeployment } = await loadPluginIntegration();
-    const plugin = createPlugin(true);
-    Object.assign(plugin.cloudflareDeploymentService, { isBusy: true });
-    await startCloudflareDeployment(plugin as never, 'update');
-    expect(openCloudflareDeploymentModal).not.toHaveBeenCalled();
-    expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).not.toHaveBeenCalled();
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const plugin = createPlugin(true);
+	Object.assign(plugin.cloudflareDeploymentService, { isBusy: true });
+	await startCloudflareDeployment(plugin as never, 'update');
+	expect(openCloudflareDeploymentModal).not.toHaveBeenCalled();
+	expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).not.toHaveBeenCalled();
 });
 
 

@@ -50,14 +50,14 @@ describe('performPwaLogout', () => {
 });
 
  it('clears local state even when remote cleanup throws synchronously', async () => {
-  const clearLocalSession = vi.fn(); const apiFetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
-  expect(await performPwaLogout({apiFetch, clearLocalSession, disablePushNotifications: () => { throw new Error('Unavailable'); }})).toBe(true);
-  expect(clearLocalSession).toHaveBeenCalledOnce(); expect(apiFetch).toHaveBeenCalledOnce();
+	const clearLocalSession = vi.fn(); const apiFetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+	expect(await performPwaLogout({apiFetch, clearLocalSession, disablePushNotifications: () => { throw new Error('Unavailable'); }})).toBe(true);
+	expect(clearLocalSession).toHaveBeenCalledOnce(); expect(apiFetch).toHaveBeenCalledOnce();
  });
  it('clears local state before a delayed revocation completes', async () => {
-  let resolve!: (value: Response) => void;
-  const clearLocalSession = vi.fn();
-  const logout = performPwaLogout({apiFetch: () => new Promise(done => { resolve = done; }), clearLocalSession, disablePushNotifications: async () => {}});
-  expect(clearLocalSession).toHaveBeenCalledOnce(); resolve(new Response(null, {status: 204}));
-  expect(await logout).toBe(false);
+	let resolve!: (value: Response) => void;
+	const clearLocalSession = vi.fn();
+	const logout = performPwaLogout({apiFetch: () => new Promise(done => { resolve = done; }), clearLocalSession, disablePushNotifications: async () => {}});
+	expect(clearLocalSession).toHaveBeenCalledOnce(); resolve(new Response(null, {status: 204}));
+	expect(await logout).toBe(false);
  });

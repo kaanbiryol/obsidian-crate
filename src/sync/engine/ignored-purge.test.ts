@@ -54,7 +54,7 @@ describe('ignored remote cleanup', () => {
 				'.trash/old.md': 'a'.repeat(64),
 				'notes/draft.tmp': 'b'.repeat(64),
 			},
-      { '.trash/old.md': 'version-1', 'notes/draft.tmp': 'version-1' },
+			{ '.trash/old.md': 'version-1', 'notes/draft.tmp': 'version-1' },
 		);
 		expect(h.localManifest.removeEntry).toHaveBeenCalledTimes(2);
 		expect(h.localManifest.save).toHaveBeenCalledOnce();

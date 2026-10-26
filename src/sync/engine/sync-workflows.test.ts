@@ -124,7 +124,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 			files: {
 				'notes/remote-only.md': {
 					hash: 'remote-hash',
-          revision: 'version-1',
+					revision: 'version-1',
 					size: 3,
 					modified: '2026-02-06T12:00:00.000Z',
 				},
@@ -156,7 +156,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 				},
 				'notes/remote-only.md': {
 					hash: 'remote-hash',
-          revision: 'version-1',
+					revision: 'version-1',
 					size: 3,
 					modified: '2026-02-06T12:00:00.000Z',
 				},

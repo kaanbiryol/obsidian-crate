@@ -41,14 +41,14 @@ it.each([false, true])('checks Windows filenames only on Windows (%s)', async is
  const previous = Platform.isWin;
  Object.assign(Platform, { isWin });
  try {
-  const disk = new PersistentTestVault();
-  const apply = applyRemoteContentIfUnchanged({ vault: disk.vault }, 'notes/question?.pdf', incoming, null);
-  if (isWin) {
-   await expect(apply).rejects.toThrow('on this Windows device');
-   expect(disk.paths()).toEqual([]);
-  } else {
-   expect(await apply).toEqual({ status: 'applied' });
-   expect(disk.read('notes/question?.pdf')).toEqual(incoming);
-  }
+	const disk = new PersistentTestVault();
+	const apply = applyRemoteContentIfUnchanged({ vault: disk.vault }, 'notes/question?.pdf', incoming, null);
+	if (isWin) {
+	 await expect(apply).rejects.toThrow('on this Windows device');
+	 expect(disk.paths()).toEqual([]);
+	} else {
+	 expect(await apply).toEqual({ status: 'applied' });
+	 expect(disk.read('notes/question?.pdf')).toEqual(incoming);
+	}
  } finally { Object.assign(Platform, { isWin: previous }); }
 });

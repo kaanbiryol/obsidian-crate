@@ -10,169 +10,169 @@ import { findReminderLiteralRanges } from './reminderLiteralRanges';
 import { parseReminderTimezoneSuffix } from '../dates/reminderTimezone';
 
 export type ReminderSchedule =
-    | { kind: 'recurrence'; rule: RecurrenceRule }
-    | { kind: 'date'; dueDate: Date; hasTime: boolean; absolute: boolean };
+	| { kind: 'recurrence'; rule: RecurrenceRule }
+	| { kind: 'date'; dueDate: Date; hasTime: boolean; absolute: boolean };
 
 function fromChrono(result: chrono.ParsedResult): ReminderSchedule {
-    const hasTime = hasReminderTime(result);
-    const dueDate = hasTime ? result.start.date() : parseLocalDateKey(
-        formatDateKeyParts(result.start.get('year')!, result.start.get('month')!, result.start.get('day')!),
-    );
-    const absolute = /\b\d{4}\b/.test(result.text)
-        && (['year', 'month', 'day'] as const).every(component => result.start.isCertain(component))
-        && (!hasTime || result.start.isCertain('timezoneOffset'));
-    return { kind: 'date', dueDate, hasTime, absolute };
+	const hasTime = hasReminderTime(result);
+	const dueDate = hasTime ? result.start.date() : parseLocalDateKey(
+		formatDateKeyParts(result.start.get('year')!, result.start.get('month')!, result.start.get('day')!),
+	);
+	const absolute = /\b\d{4}\b/.test(result.text)
+		&& (['year', 'month', 'day'] as const).every(component => result.start.isCertain(component))
+		&& (!hasTime || result.start.isCertain('timezoneOffset'));
+	return { kind: 'date', dueDate, hasTime, absolute };
 }
 
 /** Keep a title's final weekday separate from the calendar date appended on save. */
 function lastCalendarDate(result: chrono.ParsedResult, referenceDate: Date): chrono.ParsedResult {
-    if (!result.start.isCertain('weekday')
-        || !(['year', 'month', 'day'] as const).every(component => result.start.isCertain(component))) return result;
-    for (const separator of result.text.matchAll(/,\s*|\s+/g)) {
-        const prefix = result.text.slice(0, separator.index);
-        const weekday = chrono.parse(prefix, referenceDate, { forwardDate: true })[0];
-        if (!weekday || weekday.index !== 0 || weekday.text !== prefix || weekday.end
-            || !weekday.start.isCertain('weekday') || weekday.start.isCertain('day') || hasReminderTime(weekday)) continue;
-        const offset = separator.index + separator[0].length;
-        const suffix = result.text.slice(offset);
-        const date = chrono.parse(suffix, referenceDate, { forwardDate: true })[0];
-        if (date && date.index === 0 && date.text === suffix && !date.end
-            && (['year', 'month', 'day'] as const).every(component => date.start.isCertain(component))) {
-            return { ...date, index: result.index + offset, tags: () => date.tags(), date: () => date.date() };
-        }
-    }
-    return result;
+	if (!result.start.isCertain('weekday')
+		|| !(['year', 'month', 'day'] as const).every(component => result.start.isCertain(component))) return result;
+	for (const separator of result.text.matchAll(/,\s*|\s+/g)) {
+		const prefix = result.text.slice(0, separator.index);
+		const weekday = chrono.parse(prefix, referenceDate, { forwardDate: true })[0];
+		if (!weekday || weekday.index !== 0 || weekday.text !== prefix || weekday.end
+			|| !weekday.start.isCertain('weekday') || weekday.start.isCertain('day') || hasReminderTime(weekday)) continue;
+		const offset = separator.index + separator[0].length;
+		const suffix = result.text.slice(offset);
+		const date = chrono.parse(suffix, referenceDate, { forwardDate: true })[0];
+		if (date && date.index === 0 && date.text === suffix && !date.end
+			&& (['year', 'month', 'day'] as const).every(component => date.start.isCertain(component))) {
+			return { ...date, index: result.index + offset, tags: () => date.tags(), date: () => date.date() };
+		}
+	}
+	return result;
 }
 
 /** A number right after a range dash ends the range in the title ("pages 5-10 tomorrow");
  * Chrono would read it as the hour of the following date. Null when nothing else follows. */
 function afterNumberRange(result: chrono.ParsedResult, source: string, referenceDate: Date): chrono.ParsedResult | null {
-    const digits = /^\d+/.exec(result.text)?.[0];
-    if (!digits || !/\d[-–—]$/.test(source.slice(0, result.index))) return result;
-    const offset = result.index + digits.length;
-    const next = chrono.parse(source.slice(offset), referenceDate, { forwardDate: true })[0];
-    return next ? { ...next, index: offset + next.index, tags: () => next.tags(), date: () => next.date() } : null;
+	const digits = /^\d+/.exec(result.text)?.[0];
+	if (!digits || !/\d[-–—]$/.test(source.slice(0, result.index))) return result;
+	const offset = result.index + digits.length;
+	const next = chrono.parse(source.slice(offset), referenceDate, { forwardDate: true })[0];
+	return next ? { ...next, index: offset + next.index, tags: () => next.tags(), date: () => next.date() } : null;
 }
 
 function chronoMatch(result: chrono.ParsedResult, source: string, referenceDate: Date): TextMatch {
-    result = lastCalendarDate(result, referenceDate);
-    let schedule = fromChrono(result);
-    const suffix = parseReminderTimezoneSuffix(source.slice(result.index + result.text.length), referenceDate);
-    let text = result.text;
-    // Chrono accepts some rolled offsets (e.g. +1260). Validate only the
-    // explicitly written suffix, never its internally inferred timezone.
-    const writtenOffset = result.start.isCertain('timezoneOffset') && /(?:\s*(?:UTC|GMT))?\s*[+-]\d[\d:]*\)?$/i.exec(text);
-    const offsetError = writtenOffset && parseReminderTimezoneSuffix(writtenOffset[0], referenceDate)?.error;
-    if (offsetError) return { text, index: result.index, length: text.length, type: 'date', invalid: true, error: offsetError };
-    if (suffix?.error) return { text: text + suffix.text, index: result.index, length: text.length + suffix.text.length,
-        type: 'date', invalid: true, error: suffix.error };
-    if (suffix?.timezone && schedule.kind === 'date') {
-        const extraZone = parseReminderTimezoneSuffix(source.slice(result.index + text.length + suffix.text.length), referenceDate);
-        if (extraZone) return { text: text + suffix.text + extraZone.text, index: result.index,
-            length: text.length + suffix.text.length + extraZone.text.length,
-            type: 'date', invalid: true, error: 'Use one timezone per schedule.' };
-        if (result.start.isCertain('timezoneOffset')) {
-            if (result.tags().has('result/relativeDateAndTime') || result.tags().has('casualReference/now')) {
-                return { text: text + suffix.text, index: result.index, length: text.length + suffix.text.length, type: 'date', schedule };
-            }
-            return { text: text + suffix.text, index: result.index, length: text.length + suffix.text.length,
-                type: 'date', invalid: true, error: 'Use one timezone per schedule.' };
-        }
-        if (!suffix.text.includes('/')) {
-            const zoneText = /^\s*-/.test(suffix.text) ? ` UTC${suffix.text.trim()}` : suffix.text;
-            const zoned = chrono.parse(result.text + zoneText, referenceDate, { forwardDate: true })[0];
-            if (zoned) schedule = fromChrono(zoned);
-            text += suffix.text;
-            return { text, index: result.index, length: text.length, type: 'date', schedule };
-        }
-        // Chrono does not read IANA names. Resolve relative calendar words in
-        // that zone, then let the calendar library apply its offset on the date.
-        const reference = fromDate(referenceDate, suffix.timezone);
-        const zoned = chrono.parse(result.text, { instant: referenceDate, timezone: reference.offset / 60_000 }, { forwardDate: true })[0];
-        if (zoned) {
-            schedule = fromChrono(zoned);
-            if (schedule.kind === 'date' && schedule.hasTime) {
-                const c = zoned.start;
-                const date = formatDateKeyParts(c.get('year')!, c.get('month')!, c.get('day')!);
-                const time = formatReminderTime(c.get('hour')!, c.get('minute') ?? 0, c.get('second') ?? 0, c.get('millisecond') ?? 0);
-                schedule.dueDate = toZoned(parseDateTime(`${date}T${time}`), suffix.timezone).toDate();
-                schedule.absolute = /\b\d{4}\b/.test(result.text)
-                    && (['year', 'month', 'day'] as const).every(component => c.isCertain(component));
-            }
-            text += suffix.text;
-        }
-    }
-    return { text, index: result.index, length: text.length, type: 'date', schedule };
+	result = lastCalendarDate(result, referenceDate);
+	let schedule = fromChrono(result);
+	const suffix = parseReminderTimezoneSuffix(source.slice(result.index + result.text.length), referenceDate);
+	let text = result.text;
+	// Chrono accepts some rolled offsets (e.g. +1260). Validate only the
+	// explicitly written suffix, never its internally inferred timezone.
+	const writtenOffset = result.start.isCertain('timezoneOffset') && /(?:\s*(?:UTC|GMT))?\s*[+-]\d[\d:]*\)?$/i.exec(text);
+	const offsetError = writtenOffset && parseReminderTimezoneSuffix(writtenOffset[0], referenceDate)?.error;
+	if (offsetError) return { text, index: result.index, length: text.length, type: 'date', invalid: true, error: offsetError };
+	if (suffix?.error) return { text: text + suffix.text, index: result.index, length: text.length + suffix.text.length,
+		type: 'date', invalid: true, error: suffix.error };
+	if (suffix?.timezone && schedule.kind === 'date') {
+		const extraZone = parseReminderTimezoneSuffix(source.slice(result.index + text.length + suffix.text.length), referenceDate);
+		if (extraZone) return { text: text + suffix.text + extraZone.text, index: result.index,
+			length: text.length + suffix.text.length + extraZone.text.length,
+			type: 'date', invalid: true, error: 'Use one timezone per schedule.' };
+		if (result.start.isCertain('timezoneOffset')) {
+			if (result.tags().has('result/relativeDateAndTime') || result.tags().has('casualReference/now')) {
+				return { text: text + suffix.text, index: result.index, length: text.length + suffix.text.length, type: 'date', schedule };
+			}
+			return { text: text + suffix.text, index: result.index, length: text.length + suffix.text.length,
+				type: 'date', invalid: true, error: 'Use one timezone per schedule.' };
+		}
+		if (!suffix.text.includes('/')) {
+			const zoneText = /^\s*-/.test(suffix.text) ? ` UTC${suffix.text.trim()}` : suffix.text;
+			const zoned = chrono.parse(result.text + zoneText, referenceDate, { forwardDate: true })[0];
+			if (zoned) schedule = fromChrono(zoned);
+			text += suffix.text;
+			return { text, index: result.index, length: text.length, type: 'date', schedule };
+		}
+		// Chrono does not read IANA names. Resolve relative calendar words in
+		// that zone, then let the calendar library apply its offset on the date.
+		const reference = fromDate(referenceDate, suffix.timezone);
+		const zoned = chrono.parse(result.text, { instant: referenceDate, timezone: reference.offset / 60_000 }, { forwardDate: true })[0];
+		if (zoned) {
+			schedule = fromChrono(zoned);
+			if (schedule.kind === 'date' && schedule.hasTime) {
+				const c = zoned.start;
+				const date = formatDateKeyParts(c.get('year')!, c.get('month')!, c.get('day')!);
+				const time = formatReminderTime(c.get('hour')!, c.get('minute') ?? 0, c.get('second') ?? 0, c.get('millisecond') ?? 0);
+				schedule.dueDate = toZoned(parseDateTime(`${date}T${time}`), suffix.timezone).toDate();
+				schedule.absolute = /\b\d{4}\b/.test(result.text)
+					&& (['year', 'month', 'day'] as const).every(component => c.isCertain(component));
+			}
+			text += suffix.text;
+		}
+	}
+	return { text, index: result.index, length: text.length, type: 'date', schedule };
 }
 
 /** Find complete schedules with the same recurrence grammar used when saving. */
 export const findReminderScheduleMatches = (text: string, referenceDate: Date): TextMatch[] => {
-    const matches: TextMatch[] = [];
-    let remaining = text;
-    const mask = (index: number, length: number) => {
-        remaining = remaining.slice(0, index) + '\uFFFC'.repeat(length) + remaining.slice(index + length);
-    };
+	const matches: TextMatch[] = [];
+	let remaining = text;
+	const mask = (index: number, length: number) => {
+		remaining = remaining.slice(0, index) + '\uFFFC'.repeat(length) + remaining.slice(index + length);
+	};
 
-    // Protect entire links and project names, including names such as #Tomorrow.
-    for (const link of parseMarkdownLinks(text)) mask(link.index, link.fullMatch.length);
-    for (const url of remaining.matchAll(/\bhttps?:\/\/[^\s)]+/gi)) mask(url.index, url[0].length);
-    for (const literal of findReminderLiteralRanges(remaining)) mask(literal.index, literal.length);
+	// Protect entire links and project names, including names such as #Tomorrow.
+	for (const link of parseMarkdownLinks(text)) mask(link.index, link.fullMatch.length);
+	for (const url of remaining.matchAll(/\bhttps?:\/\/[^\s)]+/gi)) mask(url.index, url[0].length);
+	for (const literal of findReminderLiteralRanges(remaining)) mask(literal.index, literal.length);
 
-    for (const recurrence of findRecurrenceCandidates(remaining, text, referenceDate)) {
-        const { index } = recurrence;
-        const { matched, error } = recurrence;
-        matches.push({ text: matched, index, length: matched.length, type: 'date', ...(error ? { invalid: true, error }
-            : { schedule: { kind: 'recurrence' as const, rule: recurrence.rule } }) });
-        mask(index, matched.length);
-    }
+	for (const recurrence of findRecurrenceCandidates(remaining, text, referenceDate)) {
+		const { index } = recurrence;
+		const { matched, error } = recurrence;
+		matches.push({ text: matched, index, length: matched.length, type: 'date', ...(error ? { invalid: true, error }
+			: { schedule: { kind: 'recurrence' as const, rule: recurrence.rule } }) });
+		mask(index, matched.length);
+	}
 
-    // Keep malformed offsets from becoming a later clock, and keep negative
-    // colon offsets separate from Chrono's date-range grammar. A spaced dash
-    // (09:00 - 10:00) remains a range; a signed suffix (-03:30) is a zone.
-    for (const clock of remaining.matchAll(/\b(?:\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?|noon|midnight)\b/gi)) {
-        const suffix = text.slice(clock.index + clock[0].length);
-        if (!/^\s*\(?(?:(?:UTC|GMT)\s*)?[+-]/i.test(suffix)) continue;
-        const zone = parseReminderTimezoneSuffix(suffix, referenceDate);
-        if (zone?.error) {
-            const matched = clock[0] + zone.text;
-            matches.push({ text: matched, index: clock.index, length: matched.length, type: 'date', invalid: true, error: zone.error });
-            mask(clock.index, matched.length);
-        } else if (zone && /^\s*-\d{1,2}:\d{2}$/.test(zone.text)) {
-            mask(clock.index + clock[0].length, zone.text.length);
-        }
-    }
+	// Keep malformed offsets from becoming a later clock, and keep negative
+	// colon offsets separate from Chrono's date-range grammar. A spaced dash
+	// (09:00 - 10:00) remains a range; a signed suffix (-03:30) is a zone.
+	for (const clock of remaining.matchAll(/\b(?:\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?|noon|midnight)\b/gi)) {
+		const suffix = text.slice(clock.index + clock[0].length);
+		if (!/^\s*\(?(?:(?:UTC|GMT)\s*)?[+-]/i.test(suffix)) continue;
+		const zone = parseReminderTimezoneSuffix(suffix, referenceDate);
+		if (zone?.error) {
+			const matched = clock[0] + zone.text;
+			matches.push({ text: matched, index: clock.index, length: matched.length, type: 'date', invalid: true, error: zone.error });
+			mask(clock.index, matched.length);
+		} else if (zone && /^\s*-\d{1,2}:\d{2}$/.test(zone.text)) {
+			mask(clock.index + clock[0].length, zone.text.length);
+		}
+	}
 
-    for (const parsed of chrono.parse(remaining, referenceDate, { forwardDate: true })) {
-        const result = afterNumberRange(parsed, remaining, referenceDate);
-        if (!result) continue;
-        if (result.end) {
-            // A reminder has one date. Keep the range's earlier endpoint and
-            // connector in the title. Chrono must consume both endpoints:
-            // a hyphen inside an ISO date/offset is not a separator.
-            let endpoint: chrono.ParsedResult | undefined;
-            for (const separator of result.text.matchAll(/\s+(?:to|through|until|till)\s+|\s*[-–—]\s*/gi)) {
-                const prefix = result.text.slice(0, separator.index);
-                const start = chrono.parse(prefix, referenceDate, { forwardDate: true })[0];
-                if (!start || start.end || start.index !== 0 || start.text !== prefix) continue;
-                const offset = separator.index + separator[0].length;
-                const suffix = result.text.slice(offset);
-                const end = chrono.parse(suffix, referenceDate, { forwardDate: true })[0];
-                if (end && !end.end && end.index === 0 && end.text === suffix) {
-                    // Resolve the last written date independently, as with
-                    // "Monday with Friday", even if Chrono orders the range.
-                    endpoint = { ...end, index: result.index + offset, tags: () => end.tags(), date: () => end.date() };
-                    break;
-                }
-            }
-            if (endpoint) {
-                matches.push(chronoMatch(endpoint, text, referenceDate));
-            } else {
-                matches.push({ text: result.text, index: result.index, length: result.text.length, type: 'date', invalid: true,
-                    error: 'Use a complete end date for the reminder.' });
-            }
-        } else {
-            matches.push(chronoMatch(result, text, referenceDate));
-        }
-    }
-    return matches;
+	for (const parsed of chrono.parse(remaining, referenceDate, { forwardDate: true })) {
+		const result = afterNumberRange(parsed, remaining, referenceDate);
+		if (!result) continue;
+		if (result.end) {
+			// A reminder has one date. Keep the range's earlier endpoint and
+			// connector in the title. Chrono must consume both endpoints:
+			// a hyphen inside an ISO date/offset is not a separator.
+			let endpoint: chrono.ParsedResult | undefined;
+			for (const separator of result.text.matchAll(/\s+(?:to|through|until|till)\s+|\s*[-–—]\s*/gi)) {
+				const prefix = result.text.slice(0, separator.index);
+				const start = chrono.parse(prefix, referenceDate, { forwardDate: true })[0];
+				if (!start || start.end || start.index !== 0 || start.text !== prefix) continue;
+				const offset = separator.index + separator[0].length;
+				const suffix = result.text.slice(offset);
+				const end = chrono.parse(suffix, referenceDate, { forwardDate: true })[0];
+				if (end && !end.end && end.index === 0 && end.text === suffix) {
+					// Resolve the last written date independently, as with
+					// "Monday with Friday", even if Chrono orders the range.
+					endpoint = { ...end, index: result.index + offset, tags: () => end.tags(), date: () => end.date() };
+					break;
+				}
+			}
+			if (endpoint) {
+				matches.push(chronoMatch(endpoint, text, referenceDate));
+			} else {
+				matches.push({ text: result.text, index: result.index, length: result.text.length, type: 'date', invalid: true,
+					error: 'Use a complete end date for the reminder.' });
+			}
+		} else {
+			matches.push(chronoMatch(result, text, referenceDate));
+		}
+	}
+	return matches;
 };

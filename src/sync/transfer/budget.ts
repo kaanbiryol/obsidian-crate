@@ -81,31 +81,31 @@ export async function* prepareUploadChunks<T>(
 
 /** Prepare one chunk ahead only when both chunks fit the existing byte budget. */
 export async function* pipelineUploadChunks<T>(
-    items: T[],
-    prepare: (item: T) => Promise<PreparedUpload | null>,
-    maxBytes = getTransferBudgetBytes(),
-    maxFiles = MAX_TRANSFER_CHUNK_FILES / 2,
+	items: T[],
+	prepare: (item: T) => Promise<PreparedUpload | null>,
+	maxBytes = getTransferBudgetBytes(),
+	maxFiles = MAX_TRANSFER_CHUNK_FILES / 2,
 ): AsyncGenerator<PreparedUpload[]> {
-    let available = maxBytes;
-    const source = prepareUploadChunks(items, prepare, maxBytes, maxFiles, () => available);
-    let pending: Promise<IteratorResult<PreparedUpload[]>> | undefined;
-    try {
-        let next = await source.next();
-        while (!next.done) {
-            const chunk = next.value;
-            available = maxBytes - chunk.reduce((sum, file) => sum + file.content.byteLength, 0);
-            if (available >= MAX_FILE_SIZE_BYTES) {
-                pending = source.next();
-                // Observe failures immediately, then propagate them after the active upload.
-                void pending.catch(() => {});
-            }
-            yield chunk;
-            available = maxBytes;
-            next = pending ? await pending : await source.next();
-            pending = undefined;
-        }
-    } finally {
-        await pending?.catch(() => {});
-        await source.return(undefined);
-    }
+	let available = maxBytes;
+	const source = prepareUploadChunks(items, prepare, maxBytes, maxFiles, () => available);
+	let pending: Promise<IteratorResult<PreparedUpload[]>> | undefined;
+	try {
+		let next = await source.next();
+		while (!next.done) {
+			const chunk = next.value;
+			available = maxBytes - chunk.reduce((sum, file) => sum + file.content.byteLength, 0);
+			if (available >= MAX_FILE_SIZE_BYTES) {
+				pending = source.next();
+				// Observe failures immediately, then propagate them after the active upload.
+				void pending.catch(() => {});
+			}
+			yield chunk;
+			available = maxBytes;
+			next = pending ? await pending : await source.next();
+			pending = undefined;
+		}
+	} finally {
+		await pending?.catch(() => {});
+		await source.return(undefined);
+	}
 }

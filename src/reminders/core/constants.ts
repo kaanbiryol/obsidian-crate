@@ -16,5 +16,5 @@ export const MAX_REMINDERS_PER_NOTE = 10_000;
 
 /** Project choices with the default project first. */
 export function projectOptionsWithDefault(projects: readonly string[]): string[] {
-  return [DEFAULT_PROJECT, ...projects.filter(project => project !== DEFAULT_PROJECT)];
+	return [DEFAULT_PROJECT, ...projects.filter(project => project !== DEFAULT_PROJECT)];
 }

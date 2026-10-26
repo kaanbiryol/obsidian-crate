@@ -17,148 +17,148 @@ import { sha256Hex } from '@/platform/sha256';
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
 async function token(id: string, scope = 'reminders', folder: string | null = 'Reminders') {
-  await env.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope, expires_at, folder_path) VALUES (?, ?, ?, ?, ?)')
-    .bind(id, await sha256Hex(id), scope, Date.now() + 60_000, folder).run();
+	await env.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope, expires_at, folder_path) VALUES (?, ?, ?, ?, ?)')
+		.bind(id, await sha256Hex(id), scope, Date.now() + 60_000, folder).run();
 }
 const request = (path: string, id: string, body?: unknown, method = 'POST', protocol = String(CRATE_PLUGIN_PROTOCOL.current)) => new Request(`https://test${path}`, {
-  method, headers: { Authorization: `Bearer ${id}`, 'X-Crate-Protocol': protocol, 'Content-Type': 'application/json' },
-  ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+	method, headers: { Authorization: `Bearer ${id}`, 'X-Crate-Protocol': protocol, 'Content-Type': 'application/json' },
+	...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
 const subscription = (suffix: string) => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}`, keys: { p256dh: 'key', auth: 'auth' } });
 
 it.each(['', '0', 'invalid', ...[1, 2, 3].map(offset => String(CRATE_PLUGIN_PROTOCOL.current + offset))])('rejects protocol %s before committing a mutation', async protocol => {
-  await token('vault-token', 'vault', null);
-  expect((await worker.fetch(request('/sync/upload?path=a.md', 'vault-token', {}, 'PUT', protocol), env)).status).toBe(428);
-  expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first<{ count: number }>())?.count).toBe(0);
+	await token('vault-token', 'vault', null);
+	expect((await worker.fetch(request('/sync/upload?path=a.md', 'vault-token', {}, 'PUT', protocol), env)).status).toBe(428);
+	expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first<{ count: number }>())?.count).toBe(0);
 });
 it('binds reads, source edits, and enrollment permissions to the original folder', async () => {
-  await token('browser');
-  expect((await worker.fetch(request('/reminders/list?folderPath=Private', 'browser', undefined, 'GET'), env)).status).toBe(403);
-  expect((await worker.fetch(request('/reminders/create', 'browser', { folderPath: 'Private', content: 'No', project: 'Inbox', operationId: crypto.randomUUID() }), env)).status).toBe(403);
-  expect((await worker.fetch(request('/notifications/reminders-enrollment-token', 'browser', { folderPath: 'Private' }), env)).status).toBe(403);
-  expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env)).status).toBe(200);
-  await token('unbound', 'reminders', null);
-  expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'unbound', undefined, 'GET'), env)).status).toBe(401);
+	await token('browser');
+	expect((await worker.fetch(request('/reminders/list?folderPath=Private', 'browser', undefined, 'GET'), env)).status).toBe(403);
+	expect((await worker.fetch(request('/reminders/create', 'browser', { folderPath: 'Private', content: 'No', project: 'Inbox', operationId: crypto.randomUUID() }), env)).status).toBe(403);
+	expect((await worker.fetch(request('/notifications/reminders-enrollment-token', 'browser', { folderPath: 'Private' }), env)).status).toBe(403);
+	expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env)).status).toBe(200);
+	await token('unbound', 'reminders', null);
+	expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'unbound', undefined, 'GET'), env)).status).toBe(401);
 });
 it('moves web app sessions, their push subscriptions and setup links with the reminders folder', async () => {
-  await token('vault', 'vault', null); await token('browser'); await token('stale', 'reminders', 'Old'); await token('reading', 'reading', 'Reminders');
-  await handleSubscribe(request('/notifications/subscribe', 'browser', subscription('moved')), env.DB, 'browser');
-  await env.DB.prepare("INSERT INTO web_enrollment_tokens (token_hash, expires_at, folder_path) VALUES ('link', ?, 'Reminders')").bind(Date.now() + 60_000).run();
-  const policy = { timezone: 'UTC', allDayTime: null };
-  const created = await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Reminders' }), env);
-  const { revision } = (await created.json() as { policy: { revision: string } }).policy;
-  expect((await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Tasks', expectedRevision: 'stale' }, 'PUT'), env)).status).toBe(409);
-  expect(await env.DB.prepare("SELECT folder_path FROM auth_tokens WHERE id = 'browser'").first()).toEqual({ folder_path: 'Reminders' });
-  expect((await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Tasks', expectedRevision: revision }, 'PUT'), env)).status).toBe(200);
-  const folders = async (sql: string) => (await env.DB.prepare(sql).all<{ folder_path: string }>()).results.map(row => row.folder_path);
-  expect(await folders("SELECT folder_path FROM auth_tokens WHERE id IN ('browser', 'stale', 'reading') ORDER BY id")).toEqual(['Tasks', 'Reminders', 'Old']);
-  expect(await folders('SELECT folder_path FROM push_subscriptions')).toEqual(['Tasks']);
-  expect(await folders('SELECT folder_path FROM web_enrollment_tokens')).toEqual(['Tasks']);
-  const moved = await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env);
-  expect(moved.status).toBe(403);
-  expect(await moved.json()).toMatchObject({ code: 'reminders_folder_changed', folderPath: 'Tasks' });
-  expect((await worker.fetch(request('/reminders/list?folderPath=Tasks', 'browser', undefined, 'GET'), env)).status).toBe(200);
+	await token('vault', 'vault', null); await token('browser'); await token('stale', 'reminders', 'Old'); await token('reading', 'reading', 'Reminders');
+	await handleSubscribe(request('/notifications/subscribe', 'browser', subscription('moved')), env.DB, 'browser');
+	await env.DB.prepare("INSERT INTO web_enrollment_tokens (token_hash, expires_at, folder_path) VALUES ('link', ?, 'Reminders')").bind(Date.now() + 60_000).run();
+	const policy = { timezone: 'UTC', allDayTime: null };
+	const created = await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Reminders' }), env);
+	const { revision } = (await created.json() as { policy: { revision: string } }).policy;
+	expect((await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Tasks', expectedRevision: 'stale' }, 'PUT'), env)).status).toBe(409);
+	expect(await env.DB.prepare("SELECT folder_path FROM auth_tokens WHERE id = 'browser'").first()).toEqual({ folder_path: 'Reminders' });
+	expect((await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Tasks', expectedRevision: revision }, 'PUT'), env)).status).toBe(200);
+	const folders = async (sql: string) => (await env.DB.prepare(sql).all<{ folder_path: string }>()).results.map(row => row.folder_path);
+	expect(await folders("SELECT folder_path FROM auth_tokens WHERE id IN ('browser', 'stale', 'reading') ORDER BY id")).toEqual(['Tasks', 'Reminders', 'Old']);
+	expect(await folders('SELECT folder_path FROM push_subscriptions')).toEqual(['Tasks']);
+	expect(await folders('SELECT folder_path FROM web_enrollment_tokens')).toEqual(['Tasks']);
+	const moved = await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env);
+	expect(moved.status).toBe(403);
+	expect(await moved.json()).toMatchObject({ code: 'reminders_folder_changed', folderPath: 'Tasks' });
+	expect((await worker.fetch(request('/reminders/list?folderPath=Tasks', 'browser', undefined, 'GET'), env)).status).toBe(200);
 });
 it('keeps the Reading library accessible when article fetching is disabled', async () => {
-  await token('browser'); await token('vault', 'vault', null);
-  expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(403);
-  expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: true, folderPath: 'Reading', revision: null }), env)).status).toBe(200);
-  const session = await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env);
-  expect(session.status).toBe(200);
-  const sessionData = await session.json() as { id: string; folderPath: string; expiresAt: number };
-  expect(sessionData.id).toBe('browser');
-  expect(sessionData.folderPath).toBe('Reading');
-  expect(sessionData.expiresAt).toBeGreaterThan(Date.now());
-  expect((await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env)).status).toBe(200);
-  const capture = await worker.fetch(request('/reading/capture', 'browser', {
-    url: 'https://example.invalid/shared-pwa', operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
-  }), env);
-  expect(capture.status).toBe(200);
-  const saved = await env.DB.prepare("SELECT path FROM files WHERE path LIKE 'Reading/%'").first<{ path: string }>();
-  expect(saved).toBeNull();
-  expect(await env.DB.prepare('SELECT url_identity FROM reading_captures').first()).toEqual({ url_identity: 'https://example.invalid/shared-pwa' });
-  expect((await worker.fetch(request('/reading/policy', 'browser', { enabled: false, folderPath: 'Reading' }), env)).status).toBe(403);
-  const policy = await env.DB.prepare('SELECT revision FROM reading_policy').first<{ revision: string }>();
-  expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: false, folderPath: 'Reading', revision: policy!.revision }), env)).status).toBe(200);
-  expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(200);
-  expect((await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env)).status).toBe(200);
-  const bookmark = await worker.fetch(request('/reading/capture', 'browser', {
-    url: 'https://example.invalid/bookmark', operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
-  }), env);
-  expect(bookmark.status).toBe(200);
-  const library = await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env);
-  const bookmarks = await library.json() as { items: { source_url: string; extraction_status: string }[] };
-  expect(bookmarks.items.find(item => item.source_url === 'https://example.invalid/bookmark')?.extraction_status).toBe('unavailable');
-  const state = await env.DB.prepare('SELECT enabled, revision FROM reading_policy').first<{ enabled: number; revision: string }>();
-  expect(state?.enabled).toBe(0);
-  expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: true, folderPath: 'Reading', revision: state!.revision }), env)).status).toBe(200);
-  const explicitBookmark = await worker.fetch(request('/reading/capture', 'browser', {
-    url: 'https://example.invalid/offline-bookmark', fetchArticle: false,
-    operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
-  }), env);
-  expect(explicitBookmark.status).toBe(200);
-  const refreshed = await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env);
-  const savedItems = await refreshed.json() as { items: { source_url: string; extraction_status: string }[] };
-  expect(savedItems.items.find(item => item.source_url === 'https://example.invalid/offline-bookmark')?.extraction_status).toBe('unavailable');
-  expect((await worker.fetch(request('/auth/session', 'browser', undefined, 'DELETE'), env)).status).toBe(200);
-  expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(401);
+	await token('browser'); await token('vault', 'vault', null);
+	expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(403);
+	expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: true, folderPath: 'Reading', revision: null }), env)).status).toBe(200);
+	const session = await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env);
+	expect(session.status).toBe(200);
+	const sessionData = await session.json() as { id: string; folderPath: string; expiresAt: number };
+	expect(sessionData.id).toBe('browser');
+	expect(sessionData.folderPath).toBe('Reading');
+	expect(sessionData.expiresAt).toBeGreaterThan(Date.now());
+	expect((await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env)).status).toBe(200);
+	const capture = await worker.fetch(request('/reading/capture', 'browser', {
+		url: 'https://example.invalid/shared-pwa', operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
+	}), env);
+	expect(capture.status).toBe(200);
+	const saved = await env.DB.prepare("SELECT path FROM files WHERE path LIKE 'Reading/%'").first<{ path: string }>();
+	expect(saved).toBeNull();
+	expect(await env.DB.prepare('SELECT url_identity FROM reading_captures').first()).toEqual({ url_identity: 'https://example.invalid/shared-pwa' });
+	expect((await worker.fetch(request('/reading/policy', 'browser', { enabled: false, folderPath: 'Reading' }), env)).status).toBe(403);
+	const policy = await env.DB.prepare('SELECT revision FROM reading_policy').first<{ revision: string }>();
+	expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: false, folderPath: 'Reading', revision: policy!.revision }), env)).status).toBe(200);
+	expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(200);
+	expect((await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env)).status).toBe(200);
+	const bookmark = await worker.fetch(request('/reading/capture', 'browser', {
+		url: 'https://example.invalid/bookmark', operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
+	}), env);
+	expect(bookmark.status).toBe(200);
+	const library = await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env);
+	const bookmarks = await library.json() as { items: { source_url: string; extraction_status: string }[] };
+	expect(bookmarks.items.find(item => item.source_url === 'https://example.invalid/bookmark')?.extraction_status).toBe('unavailable');
+	const state = await env.DB.prepare('SELECT enabled, revision FROM reading_policy').first<{ enabled: number; revision: string }>();
+	expect(state?.enabled).toBe(0);
+	expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: true, folderPath: 'Reading', revision: state!.revision }), env)).status).toBe(200);
+	const explicitBookmark = await worker.fetch(request('/reading/capture', 'browser', {
+		url: 'https://example.invalid/offline-bookmark', fetchArticle: false,
+		operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
+	}), env);
+	expect(explicitBookmark.status).toBe(200);
+	const refreshed = await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env);
+	const savedItems = await refreshed.json() as { items: { source_url: string; extraction_status: string }[] };
+	expect(savedItems.items.find(item => item.source_url === 'https://example.invalid/offline-bookmark')?.extraction_status).toBe('unavailable');
+	expect((await worker.fetch(request('/auth/session', 'browser', undefined, 'DELETE'), env)).status).toBe(200);
+	expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(401);
 });
 it('cannot replace or unsubscribe another session’s endpoint and revokes owned push on logout', async () => {
-  await token('one'); await token('two');
-  const body = subscription('shared');
-  expect((await handleSubscribe(request('/notifications/subscribe', 'one', body), env.DB, 'one')).status).toBe(200);
-  expect((await handleSubscribe(request('/notifications/subscribe', 'two', body), env.DB, 'two')).status).toBe(429);
-  await handleUnsubscribe(request('/notifications/subscribe', 'two', { endpoint: body.endpoint }, 'DELETE'), env.DB, 'two');
-  expect((await env.DB.prepare('SELECT owner_token_id, folder_path FROM push_subscriptions').first())).toMatchObject({ owner_token_id: 'one', folder_path: 'Reminders' });
-  expect((await worker.fetch(request('/auth/session', 'one', undefined, 'DELETE'), env)).status).toBe(200);
-  expect(await env.DB.prepare('SELECT id FROM push_subscriptions').first()).toBeNull();
-  expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'one', undefined, 'GET'), env)).status).toBe(401);
+	await token('one'); await token('two');
+	const body = subscription('shared');
+	expect((await handleSubscribe(request('/notifications/subscribe', 'one', body), env.DB, 'one')).status).toBe(200);
+	expect((await handleSubscribe(request('/notifications/subscribe', 'two', body), env.DB, 'two')).status).toBe(429);
+	await handleUnsubscribe(request('/notifications/subscribe', 'two', { endpoint: body.endpoint }, 'DELETE'), env.DB, 'two');
+	expect((await env.DB.prepare('SELECT owner_token_id, folder_path FROM push_subscriptions').first())).toMatchObject({ owner_token_id: 'one', folder_path: 'Reminders' });
+	expect((await worker.fetch(request('/auth/session', 'one', undefined, 'DELETE'), env)).status).toBe(200);
+	expect(await env.DB.prepare('SELECT id FROM push_subscriptions').first()).toBeNull();
+	expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'one', undefined, 'GET'), env)).status).toBe(401);
 });
 it('enforces the per-owner cap during concurrent subscriptions', async () => {
-  await token('browser');
-  const results = await Promise.all(Array.from({ length: 12 }, (_, i) => handleSubscribe(request('/notifications/subscribe', 'browser', subscription(String(i))), env.DB, 'browser')));
-  expect(results.filter(response => response.status === 200)).toHaveLength(5);
-  expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM push_subscriptions').first<{ count: number }>())?.count).toBe(5);
+	await token('browser');
+	const results = await Promise.all(Array.from({ length: 12 }, (_, i) => handleSubscribe(request('/notifications/subscribe', 'browser', subscription(String(i))), env.DB, 'browser')));
+	expect(results.filter(response => response.status === 200)).toHaveLength(5);
+	expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM push_subscriptions').first<{ count: number }>())?.count).toBe(5);
 });
 it('composes browser logout with the real API wrapper and Worker revocation', async () => {
-  await token('browser-logout');
-  await handleSubscribe(request('/notifications/subscribe', 'browser-logout', subscription('logout')), env.DB, 'browser-logout');
-  let localToken: string | null = 'browser-logout';
-  vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'crate-reminders-auth-token' ? localToken : null });
-  vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh) Version/26.0 Safari/604.1', maxTouchPoints: 0 });
-  vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
-  const network = vi.fn(async (path: string, init?: RequestInit) => worker.fetch(new Request(`https://test${path}`, init), env));
-  vi.stubGlobal('fetch', network);
-  expect(await performPwaLogout({
-    apiFetch: makeApiFetch(localToken, () => { throw new Error('Unexpected unauthorized callback'); }),
-    disablePushNotifications: async () => {},
-    clearLocalSession: () => { invalidatePwaSession(); localToken = null; },
-  })).toBe(false);
-  expect(network.mock.calls.filter(([path]) => path === '/auth/session')).toHaveLength(1);
-  expect(await env.DB.prepare("SELECT id FROM push_subscriptions WHERE owner_token_id = 'browser-logout'").first()).toBeNull();
-  expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser-logout', undefined, 'GET'), env)).status).toBe(401);
+	await token('browser-logout');
+	await handleSubscribe(request('/notifications/subscribe', 'browser-logout', subscription('logout')), env.DB, 'browser-logout');
+	let localToken: string | null = 'browser-logout';
+	vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'crate-reminders-auth-token' ? localToken : null });
+	vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh) Version/26.0 Safari/604.1', maxTouchPoints: 0 });
+	vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
+	const network = vi.fn(async (path: string, init?: RequestInit) => worker.fetch(new Request(`https://test${path}`, init), env));
+	vi.stubGlobal('fetch', network);
+	expect(await performPwaLogout({
+		apiFetch: makeApiFetch(localToken, () => { throw new Error('Unexpected unauthorized callback'); }),
+		disablePushNotifications: async () => {},
+		clearLocalSession: () => { invalidatePwaSession(); localToken = null; },
+	})).toBe(false);
+	expect(network.mock.calls.filter(([path]) => path === '/auth/session')).toHaveLength(1);
+	expect(await env.DB.prepare("SELECT id FROM push_subscriptions WHERE owner_token_id = 'browser-logout'").first()).toBeNull();
+	expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser-logout', undefined, 'GET'), env)).status).toBe(401);
 });
 it('rejects internal, arbitrary and malformed push destinations', () => {
-  for (const endpoint of ['http://fcm.googleapis.com/x', 'https://127.0.0.1/x', 'https://api.cloudflare.com/x', 'https://fcm.googleapis.com.evil.test/x', 'https://user@fcm.googleapis.com/x', 'https://fcm.googleapis.com:444/x']) expect(isValidPushEndpoint(endpoint)).toBe(false);
-  for (const endpoint of ['https://fcm.googleapis.com/x', 'https://updates.push.services.mozilla.com/wpush/v2/x', 'https://web.push.apple.com/x']) expect(isValidPushEndpoint(endpoint)).toBe(true);
+	for (const endpoint of ['http://fcm.googleapis.com/x', 'https://127.0.0.1/x', 'https://api.cloudflare.com/x', 'https://fcm.googleapis.com.evil.test/x', 'https://user@fcm.googleapis.com/x', 'https://fcm.googleapis.com:444/x']) expect(isValidPushEndpoint(endpoint)).toBe(false);
+	for (const endpoint of ['https://fcm.googleapis.com/x', 'https://updates.push.services.mozilla.com/wpush/v2/x', 'https://web.push.apple.com/x']) expect(isValidPushEndpoint(endpoint)).toBe(true);
 });
 it('limits notification test requests without revealing provider responses', async () => {
-  await token('vault-token', 'vault', null);
-  const responses = await Promise.all(Array.from({ length: 5 }, () => worker.fetch(request('/notifications/test', 'vault-token'), env)));
-  expect(responses.filter(response => response.status === 429)).toHaveLength(2);
+	await token('vault-token', 'vault', null);
+	const responses = await Promise.all(Array.from({ length: 5 }, () => worker.fetch(request('/notifications/test', 'vault-token'), env)));
+	expect(responses.filter(response => response.status === 429)).toHaveLength(2);
 });
 it('keeps healthy reminders available alongside oversized notes without downloading them', async () => {
-  await token('browser');
-  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', '- [ ] Healthy <!-- crate-id:healthy -->', null);
-  await env.DB.prepare('INSERT INTO files (path, portable_path, hash, size, storage_key) VALUES (?, ?, ?, ?, ?)')
-    .bind('Reminders/Large.md', 'reminders/large.md', 'a'.repeat(64), 2 * 1024 * 1024, 'absent-large-object').run();
-  const response = await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env);
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({ reminders: [{ content: 'Healthy' }], issues: [{ path: 'Reminders/Large.md' }] });
+	await token('browser');
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', '- [ ] Healthy <!-- crate-id:healthy -->', null);
+	await env.DB.prepare('INSERT INTO files (path, portable_path, hash, size, storage_key) VALUES (?, ?, ?, ?, ?)')
+		.bind('Reminders/Large.md', 'reminders/large.md', 'a'.repeat(64), 2 * 1024 * 1024, 'absent-large-object').run();
+	const response = await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env);
+	expect(response.status).toBe(200);
+	expect(await response.json()).toMatchObject({ reminders: [{ content: 'Healthy' }], issues: [{ path: 'Reminders/Large.md' }] });
 });
 it('cannot bypass public request limits by varying an unverified bearer header', async () => {
-  const responses = [];
-  for (let i = 0; i < 61; i++) responses.push(await worker.fetch(request('/notifications/reminders-exchange', `unverified-${i}`, { token: 'invalid' }), env));
-  expect(responses.at(-1)?.status).toBe(429);
-  expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM request_rate_limits').first<{ count: number }>())?.count).toBe(0); // Invalid grants never charge authenticated action/day budgets.
+	const responses = [];
+	for (let i = 0; i < 61; i++) responses.push(await worker.fetch(request('/notifications/reminders-exchange', `unverified-${i}`, { token: 'invalid' }), env));
+	expect(responses.at(-1)?.status).toBe(429);
+	expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM request_rate_limits').first<{ count: number }>())?.count).toBe(0); // Invalid grants never charge authenticated action/day budgets.
 });

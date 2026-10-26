@@ -9,8 +9,8 @@ import { ReminderCardWrapper } from "@/reminders/ui/plugin/ReminderCardWrapper";
 import { RemindersViewCloseButton } from "@/reminders/ui/plugin/RemindersViewCloseButton";
 import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
 import {
-    PluginRemindersAppShell,
-    type PluginReminderCardRenderer,
+	PluginRemindersAppShell,
+	type PluginReminderCardRenderer,
 } from "@/reminders/ui/plugin/PluginRemindersAppShell";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import { requireReminderBackend } from "@/reminders/runtime";
@@ -20,108 +20,108 @@ import "../reminders-view.scss";
 
 import { ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
 interface RemindersViewContentProps {
-    isFullScreen?: boolean;
-    isModal?: boolean;
-    onClose?: () => void;
-    initialTab?: TabId;
-    initialProject?: string;
-    hideTabBar?: boolean;
-    activeTab?: TabId;
-    onTabChange?: (tab: TabId) => void;
-    renderNavigation?: React.ComponentProps<typeof PluginRemindersAppShell>['renderNavigation'];
-    renderHeader?: React.ComponentProps<typeof PluginRemindersAppShell>['renderHeader'];
+	isFullScreen?: boolean;
+	isModal?: boolean;
+	onClose?: () => void;
+	initialTab?: TabId;
+	initialProject?: string;
+	hideTabBar?: boolean;
+	activeTab?: TabId;
+	onTabChange?: (tab: TabId) => void;
+	renderNavigation?: React.ComponentProps<typeof PluginRemindersAppShell>['renderNavigation'];
+	renderHeader?: React.ComponentProps<typeof PluginRemindersAppShell>['renderHeader'];
 }
 
 export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ isFullScreen = false, onClose, isModal = Boolean(onClose), initialTab, initialProject, hideTabBar = false, renderHeader, activeTab, onTabChange, renderNavigation }) => {
-    const plugin = PluginContext.use();
-    const listStyle = useRemindersSettingsStore(state => state.listStyle);
-    const upcomingDays = useRemindersSettingsStore(state => state.upcomingDaysDefault);
-    const isDarkMode = useObsidianDarkMode();
-    // Startup sync can defer the index scan even after the view is registered.
-    // Publish readiness with its reminders so no render sees a stale empty list.
-    const readSnapshot = useCallback(() => ({
-        reminders: plugin.reminders?.repository.getAll() ?? [],
-        isInitialLoadComplete: plugin.reminders?.index.isInitialLoadComplete ?? false,
-    }), [plugin]);
-    const [{ reminders, isInitialLoadComplete }, setSnapshot] = useState(readSnapshot);
+	const plugin = PluginContext.use();
+	const listStyle = useRemindersSettingsStore(state => state.listStyle);
+	const upcomingDays = useRemindersSettingsStore(state => state.upcomingDaysDefault);
+	const isDarkMode = useObsidianDarkMode();
+	// Startup sync can defer the index scan even after the view is registered.
+	// Publish readiness with its reminders so no render sees a stale empty list.
+	const readSnapshot = useCallback(() => ({
+		reminders: plugin.reminders?.repository.getAll() ?? [],
+		isInitialLoadComplete: plugin.reminders?.index.isInitialLoadComplete ?? false,
+	}), [plugin]);
+	const [{ reminders, isInitialLoadComplete }, setSnapshot] = useState(readSnapshot);
 
-    // Subscribe to index changes for automatic refresh (replaces 5-second polling)
-    const { refreshToken, triggerRefresh } = useIndexRefresh();
+	// Subscribe to index changes for automatic refresh (replaces 5-second polling)
+	const { refreshToken, triggerRefresh } = useIndexRefresh();
 
-    // Get all reminders from the repository.
-    const updateReminders = useCallback(() => {
-        setSnapshot(readSnapshot());
-    }, [readSnapshot]);
+	// Get all reminders from the repository.
+	const updateReminders = useCallback(() => {
+		setSnapshot(readSnapshot());
+	}, [readSnapshot]);
 
-    // Load reminders when index changes
-    useEffect(() => {
-        updateReminders();
-    }, [updateReminders, refreshToken]);
+	// Load reminders when index changes
+	useEffect(() => {
+		updateReminders();
+	}, [updateReminders, refreshToken]);
 
-    const handleAdd = useCallback((defaultProject: string) => {
-        openReminderCreationModal(plugin, defaultProject, updateReminders);
-    }, [plugin, updateReminders]);
+	const handleAdd = useCallback((defaultProject: string) => {
+		openReminderCreationModal(plugin, defaultProject, updateReminders);
+	}, [plugin, updateReminders]);
 
-    const renderCard = useCallback<PluginReminderCardRenderer>(({ reminder, index, hideProject }) => (
-        <ReminderCardWrapper
-            key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
-            reminder={reminder}
-            onUpdate={triggerRefresh}
-            index={index}
-            hideProject={hideProject}
-            colorScheme={isDarkMode ? "dark" : "light"}
-        />
-    ), [isDarkMode, triggerRefresh]);
+	const renderCard = useCallback<PluginReminderCardRenderer>(({ reminder, index, hideProject }) => (
+		<ReminderCardWrapper
+			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
+			reminder={reminder}
+			onUpdate={triggerRefresh}
+			index={index}
+			hideProject={hideProject}
+			colorScheme={isDarkMode ? "dark" : "light"}
+		/>
+	), [isDarkMode, triggerRefresh]);
 
-    const handleReorder = useCallback(async (project: string, orderedIds: string[]) => {
-        await persistReminderOrder(
-            requireReminderBackend(plugin).repository,
-            project,
-            orderedIds,
-            updateReminders,
-        );
-        updateReminders();
-    }, [plugin, updateReminders]);
+	const handleReorder = useCallback(async (project: string, orderedIds: string[]) => {
+		await persistReminderOrder(
+			requireReminderBackend(plugin).repository,
+			project,
+			orderedIds,
+			updateReminders,
+		);
+		updateReminders();
+	}, [plugin, updateReminders]);
 
-    return (
-        // Large folders render in pages, matching the web app.
-        <ReminderPageSizeContext.Provider value={200}><PluginRemindersAppShell
-            listStyle={listStyle}
-            activeTab={activeTab}
-            onTabChange={onTabChange}
-            renderNavigation={renderNavigation}
-            reminders={reminders}
-            isInitialLoadComplete={isInitialLoadComplete}
-            loadingContent={!isInitialLoadComplete ? <RemindersLoading /> : undefined}
-            isDarkMode={isDarkMode}
-            isFullScreen={isFullScreen}
-            isModal={isModal}
-            isCompact={hideTabBar}
-            initialTab={initialTab}
-            initialProject={initialProject}
-            hideTabBar={hideTabBar}
-            renderHeader={renderHeader}
-            upcomingDays={upcomingDays}
-            renderCard={renderCard}
-            onAdd={handleAdd}
-            onReorder={handleReorder}
-            belowHeaderContent={<PluginReminderSourceNotice
-                issues={plugin.reminders?.index.sourceIssues ?? []}
-                onRefresh={() => requireReminderBackend(plugin).index.load()}
-                onOpenNote={async path => {
-                    const file = plugin.app.vault.getAbstractFileByPath(path);
-                    if (!(file instanceof TFile)) throw new Error('This note is no longer available. Retry the scan to update the list.');
-                    await plugin.app.workspace.getLeaf(false).openFile(file);
-                    onClose?.();
-                }}
-            />}
-            topOverlay={onClose ? (
-                <>
-                    <RemindersViewCloseButton
-                        onClose={onClose}
-                    />
-                </>
-            ) : undefined}
-        /></ReminderPageSizeContext.Provider>
-    );
+	return (
+		// Large folders render in pages, matching the web app.
+		<ReminderPageSizeContext.Provider value={200}><PluginRemindersAppShell
+			listStyle={listStyle}
+			activeTab={activeTab}
+			onTabChange={onTabChange}
+			renderNavigation={renderNavigation}
+			reminders={reminders}
+			isInitialLoadComplete={isInitialLoadComplete}
+			loadingContent={!isInitialLoadComplete ? <RemindersLoading /> : undefined}
+			isDarkMode={isDarkMode}
+			isFullScreen={isFullScreen}
+			isModal={isModal}
+			isCompact={hideTabBar}
+			initialTab={initialTab}
+			initialProject={initialProject}
+			hideTabBar={hideTabBar}
+			renderHeader={renderHeader}
+			upcomingDays={upcomingDays}
+			renderCard={renderCard}
+			onAdd={handleAdd}
+			onReorder={handleReorder}
+			belowHeaderContent={<PluginReminderSourceNotice
+				issues={plugin.reminders?.index.sourceIssues ?? []}
+				onRefresh={() => requireReminderBackend(plugin).index.load()}
+				onOpenNote={async path => {
+					const file = plugin.app.vault.getAbstractFileByPath(path);
+					if (!(file instanceof TFile)) throw new Error('This note is no longer available. Retry the scan to update the list.');
+					await plugin.app.workspace.getLeaf(false).openFile(file);
+					onClose?.();
+				}}
+			/>}
+			topOverlay={onClose ? (
+				<>
+					<RemindersViewCloseButton
+						onClose={onClose}
+					/>
+				</>
+			) : undefined}
+		/></ReminderPageSizeContext.Provider>
+	);
 };

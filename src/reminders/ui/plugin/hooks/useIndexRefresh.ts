@@ -18,30 +18,30 @@ import { subscribeReminderBackend } from '@/reminders/runtime';
  * ```
  */
 export function useIndexRefresh(): {
-  refreshToken: number;
-  triggerRefresh: () => void;
+	refreshToken: number;
+	triggerRefresh: () => void;
 } {
-  const plugin = PluginContext.use();
-  const [refreshToken, setRefreshToken] = useState(0);
+	const plugin = PluginContext.use();
+	const [refreshToken, setRefreshToken] = useState(0);
 
-  const triggerRefresh = useCallback(() => {
-    setRefreshToken(prev => prev + 1);
-  }, []);
+	const triggerRefresh = useCallback(() => {
+		setRefreshToken(prev => prev + 1);
+	}, []);
 
-  useEffect(() => {
-    // Subscribe to index changes
-    if (plugin.reminders?.index) {
-      const unsubscribe = plugin.reminders.index.onIndexChange(() => {
-        triggerRefresh();
-      });
+	useEffect(() => {
+		// Subscribe to index changes
+		if (plugin.reminders?.index) {
+			const unsubscribe = plugin.reminders.index.onIndexChange(() => {
+				triggerRefresh();
+			});
 
 		return unsubscribe;
 	}
 	return undefined;
-  }, [plugin.reminders?.index, triggerRefresh]);
+	}, [plugin.reminders?.index, triggerRefresh]);
 
-  // A folder change replaces the index; reload and subscribe to the new one.
-  useEffect(() => subscribeReminderBackend(plugin, triggerRefresh), [plugin, triggerRefresh]);
+	// A folder change replaces the index; reload and subscribe to the new one.
+	useEffect(() => subscribeReminderBackend(plugin, triggerRefresh), [plugin, triggerRefresh]);
 
-  return { refreshToken, triggerRefresh };
+	return { refreshToken, triggerRefresh };
 }

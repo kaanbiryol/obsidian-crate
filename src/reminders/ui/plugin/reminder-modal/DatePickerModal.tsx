@@ -13,97 +13,97 @@ import { getReminderDateForPreset, type ReminderDatePreset } from '../../reminde
 import { REMINDER_PICKER_COPY } from '../../reminder-editor/pickerCopy';
 
 interface DatePickerModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    finalFocus?: () => HTMLElement | false | null;
-    animationConfig: AnimationConfig;
-    pickerMode: 'replace' | 'overlay';
-    dueDate: string | null;
-    hasTime?: boolean;
-    isDark: boolean;
-    onDateTimeChange: (value: string | null, hasTime: boolean) => void;
+	isOpen: boolean;
+	onClose: () => void;
+	finalFocus?: () => HTMLElement | false | null;
+	animationConfig: AnimationConfig;
+	pickerMode: 'replace' | 'overlay';
+	dueDate: string | null;
+	hasTime?: boolean;
+	isDark: boolean;
+	onDateTimeChange: (value: string | null, hasTime: boolean) => void;
 }
 
 export const DatePickerModal: React.FC<DatePickerModalProps> = ({
-    isOpen,
-    onClose,
-    finalFocus,
-    animationConfig,
-    pickerMode,
-    dueDate,
-    hasTime,
-    isDark,
-    onDateTimeChange,
+	isOpen,
+	onClose,
+	finalFocus,
+	animationConfig,
+	pickerMode,
+	dueDate,
+	hasTime,
+	isDark,
+	onDateTimeChange,
 }) => {
-    const reduceMotion = useReducedMotion();
-    const currentDate = parseReminderDateValue(dueDate, hasTime) ?? null;
-    const modalProps = getPickerModalProps(pickerMode);
+	const reduceMotion = useReducedMotion();
+	const currentDate = parseReminderDateValue(dueDate, hasTime) ?? null;
+	const modalProps = getPickerModalProps(pickerMode);
 
-    const handleQuickDate = useCallback((preset: ReminderDatePreset) => {
-        const date = getReminderDateForPreset(preset);
-        const presetHasTime = preset === 'evening';
-        const selection = buildDatePickerDateSelection(
-            date,
-            date,
-            presetHasTime,
-        );
-        onDateTimeChange(selection.value, selection.hasTime);
-    }, [onDateTimeChange]);
+	const handleQuickDate = useCallback((preset: ReminderDatePreset) => {
+		const date = getReminderDateForPreset(preset);
+		const presetHasTime = preset === 'evening';
+		const selection = buildDatePickerDateSelection(
+			date,
+			date,
+			presetHasTime,
+		);
+		onDateTimeChange(selection.value, selection.hasTime);
+	}, [onDateTimeChange]);
 
-    const handleDateChange = useCallback((value: string) => {
-        if (!value) {
-            onDateTimeChange(null, false);
-            return;
-        }
+	const handleDateChange = useCallback((value: string) => {
+		if (!value) {
+			onDateTimeChange(null, false);
+			return;
+		}
 
-        const selection = buildDatePickerDateSelection(
-            parseLocalDateKey(value),
-            parseReminderDateValue(dueDate, hasTime) ?? null,
-            hasTime ?? false,
-        );
-        onDateTimeChange(selection.value, selection.hasTime);
-    }, [dueDate, hasTime, onDateTimeChange]);
+		const selection = buildDatePickerDateSelection(
+			parseLocalDateKey(value),
+			parseReminderDateValue(dueDate, hasTime) ?? null,
+			hasTime ?? false,
+		);
+		onDateTimeChange(selection.value, selection.hasTime);
+	}, [dueDate, hasTime, onDateTimeChange]);
 
-    const handleTimeChange = useCallback((hour: number, minute: number) => {
-        const selection = buildDatePickerTimeSelection(
-            hour,
-            minute,
-            parseReminderDateValue(dueDate, hasTime) ?? null,
-        );
-        onDateTimeChange(selection.value, selection.hasTime);
-    }, [dueDate, hasTime, onDateTimeChange]);
+	const handleTimeChange = useCallback((hour: number, minute: number) => {
+		const selection = buildDatePickerTimeSelection(
+			hour,
+			minute,
+			parseReminderDateValue(dueDate, hasTime) ?? null,
+		);
+		onDateTimeChange(selection.value, selection.hasTime);
+	}, [dueDate, hasTime, onDateTimeChange]);
 
-    const handleTimeClear = useCallback(() => {
-        if (!currentDate) {
-            onDateTimeChange(null, false);
-            return;
-        }
+	const handleTimeClear = useCallback(() => {
+		if (!currentDate) {
+			onDateTimeChange(null, false);
+			return;
+		}
 
-        const selection = buildDatePickerDateSelection(currentDate, currentDate, false);
-        onDateTimeChange(selection.value, selection.hasTime);
-    }, [currentDate, onDateTimeChange]);
+		const selection = buildDatePickerDateSelection(currentDate, currentDate, false);
+		onDateTimeChange(selection.value, selection.hasTime);
+	}, [currentDate, onDateTimeChange]);
 
-    const handleRemoveSchedule = useCallback(() => {
-        onDateTimeChange(null, false);
-    }, [onDateTimeChange]);
+	const handleRemoveSchedule = useCallback(() => {
+		onDateTimeChange(null, false);
+	}, [onDateTimeChange]);
 
-    return (
-        <BaseModal
-            isOpen={isOpen}
-            onClose={onClose}
-            finalFocus={finalFocus}
-            animationConfig={animationConfig}
-            className={`crate-reminder-picker-surface is-date-picker${reduceMotion ? ' is-reduced-motion' : ''}`}
-            ariaLabel={REMINDER_PICKER_COPY.schedule.dialogLabel}
-            {...modalProps}
-        >
-            <ThemeIconProvider renderer={ObsidianIcon}>
-                <DatePickerContent
-                    currentDate={currentDate} hasTime={hasTime ?? false} isDark={isDark}
-                    onClose={onClose} onSelectPreset={handleQuickDate} onDateChange={handleDateChange}
-                    onTimeChange={handleTimeChange} onTimeClear={handleTimeClear} onRemove={handleRemoveSchedule}
-                />
-            </ThemeIconProvider>
-        </BaseModal>
-    );
+	return (
+		<BaseModal
+			isOpen={isOpen}
+			onClose={onClose}
+			finalFocus={finalFocus}
+			animationConfig={animationConfig}
+			className={`crate-reminder-picker-surface is-date-picker${reduceMotion ? ' is-reduced-motion' : ''}`}
+			ariaLabel={REMINDER_PICKER_COPY.schedule.dialogLabel}
+			{...modalProps}
+		>
+			<ThemeIconProvider renderer={ObsidianIcon}>
+				<DatePickerContent
+					currentDate={currentDate} hasTime={hasTime ?? false} isDark={isDark}
+					onClose={onClose} onSelectPreset={handleQuickDate} onDateChange={handleDateChange}
+					onTimeChange={handleTimeChange} onTimeClear={handleTimeClear} onRemove={handleRemoveSchedule}
+				/>
+			</ThemeIconProvider>
+		</BaseModal>
+	);
 };

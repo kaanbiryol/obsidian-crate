@@ -11,47 +11,47 @@ import { sha256Hex } from '../../../platform/sha256';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
-  vi.stubGlobal('window', { setTimeout, clearTimeout });
-  vi.spyOn(console, 'info').mockImplementation(() => {});
-  await applySchema(env.DB);
-  await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES ('audit', ?, 'vault')").bind(await sha256Hex('audit')).run();
+	vi.stubGlobal('window', { setTimeout, clearTimeout });
+	vi.spyOn(console, 'info').mockImplementation(() => {});
+	await applySchema(env.DB);
+	await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES ('audit', ?, 'vault')").bind(await sha256Hex('audit')).run();
 });
 afterEach(async () => {
-  for (const client of clients.splice(0)) client.close();
-  vi.restoreAllMocks(); vi.unstubAllGlobals();
-  await reset();
+	for (const client of clients.splice(0)) client.close();
+	vi.restoreAllMocks(); vi.unstubAllGlobals();
+	await reset();
 });
 async function request(path: string, body: unknown, token = 'audit') {
-  return worker.fetch(new Request(`https://worker.test${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current), 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }), env);
+	return worker.fetch(new Request(`https://worker.test${path}`, {
+		method: 'POST',
+		headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current), 'Content-Type': 'application/json' },
+		body: JSON.stringify(body),
+	}), env);
 }
 
 it('a remote folder-to-file replacement converges after its child is removed', async () => {
-  const client = new SyncTestDevice('folder-receiver', env);
-  clients.push(client);
-  await client.authorize(); await client.open();
-  await client.disk.vault.createFolder('Projects');
-  client.disk.write('Projects/note.md', 'initial note');
-  expect((await client.engine.sync()).success).toBe(true);
-  const prior = (await client.api.getManifest()).files['Projects/note.md']!;
-  expect(await (await request('/sync/batch-delete', { files: [{ path: 'Projects/note.md', expectedHash: prior.hash, expectedRevision: prior.revision }] })).json()).toMatchObject({ deleted: ['Projects/note.md'] });
-  const content = new TextEncoder().encode('replacement parent file');
-  const upload = await worker.fetch(new Request('https://worker.test/sync/upload?path=Projects', {
-    method: 'PUT', body: content,
-    headers: { Authorization: 'Bearer audit', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current),
-      'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86_400_000)) },
-  }), env);
-  expect(upload.status).toBe(200);
-  let result = await client.engine.sync();
-  for (let attempt = 0; attempt < 3 && !result.success; attempt++) result = await client.engine.sync();
-  expect(result.success).toBe(true);
-  expect(client.disk.has('Projects/note.md')).toBe(false);
-  expect(client.disk.text('Projects')).toBe('replacement parent file');
-  expect(await client.disk.vault.adapter.stat('Projects')).toMatchObject({ type: 'file' });
-  expect((await client.api.getManifest()).files.Projects).toBeDefined();
+	const client = new SyncTestDevice('folder-receiver', env);
+	clients.push(client);
+	await client.authorize(); await client.open();
+	await client.disk.vault.createFolder('Projects');
+	client.disk.write('Projects/note.md', 'initial note');
+	expect((await client.engine.sync()).success).toBe(true);
+	const prior = (await client.api.getManifest()).files['Projects/note.md']!;
+	expect(await (await request('/sync/batch-delete', { files: [{ path: 'Projects/note.md', expectedHash: prior.hash, expectedRevision: prior.revision }] })).json()).toMatchObject({ deleted: ['Projects/note.md'] });
+	const content = new TextEncoder().encode('replacement parent file');
+	const upload = await worker.fetch(new Request('https://worker.test/sync/upload?path=Projects', {
+		method: 'PUT', body: content,
+		headers: { Authorization: 'Bearer audit', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current),
+			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86_400_000)) },
+	}), env);
+	expect(upload.status).toBe(200);
+	let result = await client.engine.sync();
+	for (let attempt = 0; attempt < 3 && !result.success; attempt++) result = await client.engine.sync();
+	expect(result.success).toBe(true);
+	expect(client.disk.has('Projects/note.md')).toBe(false);
+	expect(client.disk.text('Projects')).toBe('replacement parent file');
+	expect(await client.disk.vault.adapter.stat('Projects')).toMatchObject({ type: 'file' });
+	expect((await client.api.getManifest()).files.Projects).toBeDefined();
 });
 
 

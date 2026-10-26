@@ -258,34 +258,34 @@ describe('renderConfigSection integration', () => {
 });
 
 it.each([true, false])('hides the top notice when no update is actionable (connected: %s)', async connected => {
-    const { renderServerUpdateNotice } = await loadConfigSectionModule();
-    renderServerUpdateNotice({
-        containerEl: new FakeElement('div') as never,
-        plugin: { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
-            settings: { cloudflareDeployment: {
-                lastDeployedVersion: embeddedArtifact.version,
-                lastDeployedFingerprint: embeddedArtifact.fingerprint,
-            } },
-            syncRuntime: { getCachedVersionInfo: () => undefined, getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => connected },
-        } as never,
-        rerender: vi.fn(),
-    });
-    expect(MockSetting.instances).toHaveLength(0);
+		const { renderServerUpdateNotice } = await loadConfigSectionModule();
+		renderServerUpdateNotice({
+				containerEl: new FakeElement('div') as never,
+				plugin: { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
+						settings: { cloudflareDeployment: {
+								lastDeployedVersion: embeddedArtifact.version,
+								lastDeployedFingerprint: embeddedArtifact.fingerprint,
+						} },
+						syncRuntime: { getCachedVersionInfo: () => undefined, getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => connected },
+				} as never,
+				rerender: vi.fn(),
+		});
+		expect(MockSetting.instances).toHaveLength(0);
 });
 
 it('keeps the installed version in the server section without duplicating the update button', async () => {
-    const { renderServerSection } = await loadConfigSectionModule();
-    renderServerSection({
-        containerEl: new FakeElement('div') as never,
-        plugin: { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
-            settings: { cloudflareDeployment: {
-                lastDeployedVersion: '0.0.9',
-                lastDeployedFingerprint: 'old',
-            } },
-            syncRuntime: { getCachedVersionInfo: () => undefined, getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => true },
-        } as never,
-        rerender: vi.fn(),
-    });
+		const { renderServerSection } = await loadConfigSectionModule();
+		renderServerSection({
+				containerEl: new FakeElement('div') as never,
+				plugin: { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
+						settings: { cloudflareDeployment: {
+								lastDeployedVersion: '0.0.9',
+								lastDeployedFingerprint: 'old',
+						} },
+						syncRuntime: { getCachedVersionInfo: () => undefined, getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => true },
+				} as never,
+				rerender: vi.fn(),
+		});
 	await flushMicrotasks();
 	const server = getSettingByName('Connected server');
 	expect(server.buttons).toHaveLength(1);
@@ -355,19 +355,19 @@ it('does not forget or disconnect when the dialog is cancelled after choosing fo
 });
 
 it('keeps a matching live build visible and routes it to recovery when saved deployment metadata is stale', async () => {
-    const { renderServerUpdateNotice } = await loadConfigSectionModule();
-    const plugin = { secretStorage: { get: () => null },
-        settings: { cloudflareDeployment: { lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) } },
-        syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: async () => ({ deploymentFingerprint: embeddedArtifact.fingerprint }) },
-    };
-    renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
-    await flushMicrotasks();
-    const update = getSettingByName('Verify server update');
-    expect(update.buttons[0]?.buttonEl.textContent).toBe('Check and recover update');
-    expect(update.settingEl.style.display).not.toBe('none');
-    update.buttons[0]?.click();
-    expect(checkAndRecoverUpdate).toHaveBeenCalledWith(plugin, expect.any(Function));
-    expect(startCloudflareDeployment).not.toHaveBeenCalled();
+		const { renderServerUpdateNotice } = await loadConfigSectionModule();
+		const plugin = { secretStorage: { get: () => null },
+				settings: { cloudflareDeployment: { lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) } },
+				syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: async () => ({ deploymentFingerprint: embeddedArtifact.fingerprint }) },
+		};
+		renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		await flushMicrotasks();
+		const update = getSettingByName('Verify server update');
+		expect(update.buttons[0]?.buttonEl.textContent).toBe('Check and recover update');
+		expect(update.settingEl.style.display).not.toBe('none');
+		update.buttons[0]?.click();
+		expect(checkAndRecoverUpdate).toHaveBeenCalledWith(plugin, expect.any(Function));
+		expect(startCloudflareDeployment).not.toHaveBeenCalled();
 });
 
 
@@ -385,72 +385,72 @@ it('offers one Cloudflare reconnect action even while configured', async () => {
 });
 
 it.each([undefined, 'copying', 'complete'])('offers restore, resume or review from server settings (%s)', async phase => {
-  const { renderServerSection } = await loadConfigSectionModule();
-  const plugin = { app: {}, manifest: { version: '0.3.0' }, settings: { cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' }, cloudflareRestore: phase ? { phase } : undefined }, syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: vi.fn() } };
-  renderServerSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
-  const button = getSettingByName('Server backup recovery').buttons[0]!;
-  expect(button.buttonEl.textContent).toBe(phase === 'complete' ? 'View restored server' : phase ? 'Resume restore' : 'Restore backup…');
-  button.click(); await vi.waitFor(() => expect(openServerRestore).toHaveBeenCalledWith(plugin));
+	const { renderServerSection } = await loadConfigSectionModule();
+	const plugin = { app: {}, manifest: { version: '0.3.0' }, settings: { cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' }, cloudflareRestore: phase ? { phase } : undefined }, syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: vi.fn() } };
+	renderServerSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+	const button = getSettingByName('Server backup recovery').buttons[0]!;
+	expect(button.buttonEl.textContent).toBe(phase === 'complete' ? 'View restored server' : phase ? 'Resume restore' : 'Restore backup…');
+	button.click(); await vi.waitFor(() => expect(openServerRestore).toHaveBeenCalledWith(plugin));
 });
 
 
 it.each(['older development', 'stable', 'newer development', 'missing fingerprint', 'offline'])('checks automatically and preserves upgrade guards: %s', async live => {
-  const worker = 'crate-0123456789abcdef';
-  embeddedArtifact.development = { number: 3, worker };
-  const { renderServerUpdateNotice } = await loadConfigSectionModule();
-  const getVersionInfo = vi.fn(async () => {
-    if (live === 'offline') throw new Error('Offline');
-    return { serverRevision: release.revision, deploymentFingerprint: live === 'missing fingerprint' ? undefined : 'a'.repeat(64),
-      developmentBuild: live === 'stable' ? undefined : { worker, number: live === 'newer development' ? 4 : 2 } };
-  });
-  const plugin = { settings: {
-    workerUrl: `https://${worker}.example.workers.dev`,
-    cloudflareDeployment: { workerName: worker, workersSubdomain: 'example', lastKnownRevision: release.revision,
-      lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) },
-  }, syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo } };
-  renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
-  const row = getSettingByName('Check server version');
-  const visibleButtons = () => row.buttons.filter(button => button.buttonEl.style.display !== 'none');
-  expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Checking…']);
-  expect(getVersionInfo).toHaveBeenCalledOnce();
-  const check = visibleButtons()[0]!;
-  expect(check.buttonEl.textContent).toBe('Checking…');
-  expect(check.buttonEl.classNames.has('is-disabled')).toBe(true);
-  await vi.waitFor(() => expect(check.buttonEl.classNames.has('is-disabled')).toBe(false));
-  expect(getVersionInfo).toHaveBeenCalledOnce();
-  expect(startCloudflareDeployment).not.toHaveBeenCalled();
-  if (live === 'older development') {
-    expect(row.descEl.textContent).toContain(`${release.revision}-dev.2`);
-    expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Update server']);
-    visibleButtons()[0]!.click();
-    expect(startCloudflareDeployment).toHaveBeenCalledExactlyOnceWith(plugin);
-  } else {
-    expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Check for updates']);
-    expect(row.buttons[0]!.buttonEl.classNames.has('is-disabled')).toBe(true);
-    expect(row.descEl.textContent).toContain(`${release.revision}-dev.3`);
-    if (live === 'offline') {
-      getVersionInfo.mockResolvedValueOnce({ serverRevision: release.revision, deploymentFingerprint: 'a'.repeat(64), developmentBuild: { worker, number: 2 } });
-      visibleButtons()[0]!.click();
-      await vi.waitFor(() => expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Update server']));
-      expect(getVersionInfo).toHaveBeenCalledTimes(2);
-      expect(startCloudflareDeployment).not.toHaveBeenCalled();
-    }
-  }
+	const worker = 'crate-0123456789abcdef';
+	embeddedArtifact.development = { number: 3, worker };
+	const { renderServerUpdateNotice } = await loadConfigSectionModule();
+	const getVersionInfo = vi.fn(async () => {
+		if (live === 'offline') throw new Error('Offline');
+		return { serverRevision: release.revision, deploymentFingerprint: live === 'missing fingerprint' ? undefined : 'a'.repeat(64),
+			developmentBuild: live === 'stable' ? undefined : { worker, number: live === 'newer development' ? 4 : 2 } };
+	});
+	const plugin = { settings: {
+		workerUrl: `https://${worker}.example.workers.dev`,
+		cloudflareDeployment: { workerName: worker, workersSubdomain: 'example', lastKnownRevision: release.revision,
+			lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) },
+	}, syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo } };
+	renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+	const row = getSettingByName('Check server version');
+	const visibleButtons = () => row.buttons.filter(button => button.buttonEl.style.display !== 'none');
+	expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Checking…']);
+	expect(getVersionInfo).toHaveBeenCalledOnce();
+	const check = visibleButtons()[0]!;
+	expect(check.buttonEl.textContent).toBe('Checking…');
+	expect(check.buttonEl.classNames.has('is-disabled')).toBe(true);
+	await vi.waitFor(() => expect(check.buttonEl.classNames.has('is-disabled')).toBe(false));
+	expect(getVersionInfo).toHaveBeenCalledOnce();
+	expect(startCloudflareDeployment).not.toHaveBeenCalled();
+	if (live === 'older development') {
+		expect(row.descEl.textContent).toContain(`${release.revision}-dev.2`);
+		expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Update server']);
+		visibleButtons()[0]!.click();
+		expect(startCloudflareDeployment).toHaveBeenCalledExactlyOnceWith(plugin);
+	} else {
+		expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Check for updates']);
+		expect(row.buttons[0]!.buttonEl.classNames.has('is-disabled')).toBe(true);
+		expect(row.descEl.textContent).toContain(`${release.revision}-dev.3`);
+		if (live === 'offline') {
+			getVersionInfo.mockResolvedValueOnce({ serverRevision: release.revision, deploymentFingerprint: 'a'.repeat(64), developmentBuild: { worker, number: 2 } });
+			visibleButtons()[0]!.click();
+			await vi.waitFor(() => expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Update server']));
+			expect(getVersionInfo).toHaveBeenCalledTimes(2);
+			expect(startCloudflareDeployment).not.toHaveBeenCalled();
+		}
+	}
 });
 
 it.each([undefined, release.revision - 1, release.revision, release.revision + 1])('explains a development target mismatch without offering an update or a pointless check (revision=%s)', async revision => {
-  embeddedArtifact.development = { number: 28, worker: 'crate-fedcba9876543210' };
-  const { renderServerUpdateNotice } = await loadConfigSectionModule();
-  const plugin = { settings: {
-    workerUrl: 'https://crate-0123456789abcdef.example.workers.dev',
-    cloudflareDeployment: { workerName: 'crate-0123456789abcdef', workersSubdomain: 'example',
-      lastKnownRevision: revision, lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) },
-  }, syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: vi.fn() } };
-  renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
-  const row = getSettingByName('Server update unavailable');
-  expect(row.descEl.textContent).toContain('This development build targets a different server');
-  expect(row.buttons.filter(button => button.buttonEl.style.display !== 'none')).toHaveLength(0);
-  row.buttons[0]!.click();
-  expect(startCloudflareDeployment).not.toHaveBeenCalled();
-  expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
+	embeddedArtifact.development = { number: 28, worker: 'crate-fedcba9876543210' };
+	const { renderServerUpdateNotice } = await loadConfigSectionModule();
+	const plugin = { settings: {
+		workerUrl: 'https://crate-0123456789abcdef.example.workers.dev',
+		cloudflareDeployment: { workerName: 'crate-0123456789abcdef', workersSubdomain: 'example',
+			lastKnownRevision: revision, lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) },
+	}, syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: vi.fn() } };
+	renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+	const row = getSettingByName('Server update unavailable');
+	expect(row.descEl.textContent).toContain('This development build targets a different server');
+	expect(row.buttons.filter(button => button.buttonEl.style.display !== 'none')).toHaveLength(0);
+	row.buttons[0]!.click();
+	expect(startCloudflareDeployment).not.toHaveBeenCalled();
+	expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
 });

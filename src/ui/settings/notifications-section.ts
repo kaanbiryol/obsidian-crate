@@ -15,133 +15,133 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 	const isActive = () => active;
 
 
-  const policyApi = plugin.syncRuntime.getApiClient();
-  let policy: NotificationPolicy | null = null;
-  let loadError: unknown;
-  const openedPolicy = policyApi ? policyApi.getNotificationPolicy().then(result => { policy = result.policy; }).catch(error => { loadError = error; }) : Promise.resolve();
-  const savePolicy = async (patch: Partial<NotificationPolicy>) => {
-    await openedPolicy;
-    if (loadError) throw new Error(errorMessage(loadError));
-    if (!policyApi) throw new Error('Connect to the sync server before changing notifications');
-    await saveNotificationPolicy(policyApi, plugin, policy, patch, saved => { policy = saved; });
-  };
-  const content = createSettingsDisclosure(containerEl, 'Notifications', {
-    summary: plugin.settings.pushEnabled ? 'On · schedule, timezone, and devices' : 'Off',
-    onOpen: notificationContent => {
-      if (!active) return;
-      let enabledToggle: ToggleComponent;
-      new Setting(notificationContent)
-        .setName('Push notifications')
-        .setDesc('All devices · send reminder notifications to subscribed phones and browsers.')
-        .addToggle(toggle => {
-          enabledToggle = toggle;
-          toggle.setValue(plugin.settings.pushEnabled).onChange(async value => {
-            toggle.setDisabled(true);
-            try {
-              await savePolicy({ enabled: value });
-              await plugin.writeSettings({ pushEnabled: value });
-              if (active) context.rerender();
-            } catch (error) {
-              new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
-              toggle.setValue(policy?.enabled ?? plugin.settings.pushEnabled);
-            } finally { toggle.setDisabled(false); }
-          });
-        });
-      void openedPolicy.then(() => { if (active && policy) enabledToggle.setValue(policy.enabled !== false); });
+	const policyApi = plugin.syncRuntime.getApiClient();
+	let policy: NotificationPolicy | null = null;
+	let loadError: unknown;
+	const openedPolicy = policyApi ? policyApi.getNotificationPolicy().then(result => { policy = result.policy; }).catch(error => { loadError = error; }) : Promise.resolve();
+	const savePolicy = async (patch: Partial<NotificationPolicy>) => {
+		await openedPolicy;
+		if (loadError) throw new Error(errorMessage(loadError));
+		if (!policyApi) throw new Error('Connect to the sync server before changing notifications');
+		await saveNotificationPolicy(policyApi, plugin, policy, patch, saved => { policy = saved; });
+	};
+	const content = createSettingsDisclosure(containerEl, 'Notifications', {
+		summary: plugin.settings.pushEnabled ? 'On · schedule, timezone, and devices' : 'Off',
+		onOpen: notificationContent => {
+			if (!active) return;
+			let enabledToggle: ToggleComponent;
+			new Setting(notificationContent)
+				.setName('Push notifications')
+				.setDesc('All devices · send reminder notifications to subscribed phones and browsers.')
+				.addToggle(toggle => {
+					enabledToggle = toggle;
+					toggle.setValue(plugin.settings.pushEnabled).onChange(async value => {
+						toggle.setDisabled(true);
+						try {
+							await savePolicy({ enabled: value });
+							await plugin.writeSettings({ pushEnabled: value });
+							if (active) context.rerender();
+						} catch (error) {
+							new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
+							toggle.setValue(policy?.enabled ?? plugin.settings.pushEnabled);
+						} finally { toggle.setDisabled(false); }
+					});
+				});
+			void openedPolicy.then(() => { if (active && policy) enabledToggle.setValue(policy.enabled !== false); });
 
-      const options = notificationContent.createDiv();
-      options.hidden = !plugin.settings.pushEnabled;
-      void openedPolicy.then(() => {
-        if (active && !loadError) options.hidden = !(policy?.enabled ?? plugin.settings.pushEnabled);
-      });
-      const saveAllDayTime = async (time: string | null) => {
-        await savePolicy({ allDayTime: time });
-        await plugin.writeRemindersSettings({ allDayNotificationTime: time });
-      };
-      let timeInput: TextComponent;
-      const timeSetting = new Setting(options)
-        .setName('All-day notification time')
-        .setDesc('All devices · loading the notification timezone…')
-        .addText(text => {
-          timeInput = text;
-          text.inputEl.type = 'time';
-          text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '')
-            .setPlaceholder('09:00');
-          text.inputEl.maxLength = 5;
+			const options = notificationContent.createDiv();
+			options.hidden = !plugin.settings.pushEnabled;
+			void openedPolicy.then(() => {
+				if (active && !loadError) options.hidden = !(policy?.enabled ?? plugin.settings.pushEnabled);
+			});
+			const saveAllDayTime = async (time: string | null) => {
+				await savePolicy({ allDayTime: time });
+				await plugin.writeRemindersSettings({ allDayNotificationTime: time });
+			};
+			let timeInput: TextComponent;
+			const timeSetting = new Setting(options)
+				.setName('All-day notification time')
+				.setDesc('All devices · loading the notification timezone…')
+				.addText(text => {
+					timeInput = text;
+					text.inputEl.type = 'time';
+					text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '')
+						.setPlaceholder('09:00');
+					text.inputEl.maxLength = 5;
 
-          const commit = async (): Promise<void> => {
-            const trimmed = text.inputEl.value.trim();
-            if (trimmed === '') {
-              await saveAllDayTime(null);
-              return;
-            }
-            const normalized = normalizeTimeString(trimmed);
-            if (normalized) {
-              text.setValue(normalized);
-              await saveAllDayTime(normalized);
-            } else {
-              text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
-            }
-          };
+					const commit = async (): Promise<void> => {
+						const trimmed = text.inputEl.value.trim();
+						if (trimmed === '') {
+							await saveAllDayTime(null);
+							return;
+						}
+						const normalized = normalizeTimeString(trimmed);
+						if (normalized) {
+							text.setValue(normalized);
+							await saveAllDayTime(normalized);
+						} else {
+							text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
+						}
+					};
 
-          text.inputEl.addEventListener('blur', () => {
-            void commit().catch((error: unknown) => {
-              new Notice(`Failed to save notification time: ${errorMessage(error)}`);
-              text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
-            });
-          });
-          text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              text.inputEl.blur();
-            }
-          });
-        })
-        .addButton(button => button.setButtonText('Turn off').onClick(async () => {
-          button.setDisabled(true);
-          try {
-            await saveAllDayTime(null);
-            timeInput.setValue('');
-          } catch (error) {
-            new Notice(`Failed to save notification time: ${errorMessage(error)}`);
-          } finally {
-            button.setDisabled(false);
-          }
-        }));
+					text.inputEl.addEventListener('blur', () => {
+						void commit().catch((error: unknown) => {
+							new Notice(`Failed to save notification time: ${errorMessage(error)}`);
+							text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
+						});
+					});
+					text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
+						if (e.key === 'Enter') {
+							e.preventDefault();
+							text.inputEl.blur();
+						}
+					});
+				})
+				.addButton(button => button.setButtonText('Turn off').onClick(async () => {
+					button.setDisabled(true);
+					try {
+						await saveAllDayTime(null);
+						timeInput.setValue('');
+					} catch (error) {
+						new Notice(`Failed to save notification time: ${errorMessage(error)}`);
+					} finally {
+						button.setDisabled(false);
+					}
+				}));
 
-      void openedPolicy.then(() => {
-        if (!active) return;
-        if (policy) timeInput.setValue(policy.allDayTime ?? '');
-        timeSetting.setDesc(loadError
-          ? 'Could not load the notification timezone. Reopen settings to retry.'
-          : `All devices · timezone: ${policy?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}. An empty time means off.`);
-      });
-      const policyDescription = options.createEl('p', { cls: 'setting-item-description' });
-      void openedPolicy.then(() => {
-        if (!active) return;
-        policyDescription.textContent = loadError ? 'Shared settings could not be loaded. Reopen settings to retry.'
-          : policy ? `Server notifications: ${policy.folderPath} · ${policy.timezone}` : 'The first enabled device saves the shared folder and timezone.';
-      });
-      new Setting(options).setName('Notification folder and timezone')
-        .setDesc(`All devices · set the notification folder to ${plugin.remindersSettings.remindersFolderPath} and timezone to ${Intl.DateTimeFormat().resolvedOptions().timeZone}.`)
-        .addButton(button => button.setButtonText('Use this device’s settings').onClick(async () => {
-          button.setDisabled(true);
-          try {
-            await savePolicy({ folderPath: plugin.remindersSettings.remindersFolderPath, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-            if (active) context.rerender();
-          } catch (error) { new Notice(`Failed to save shared settings: ${errorMessage(error)}`); }
-          finally { button.setDisabled(false); }
-        }));
-      const apiClient = plugin.syncRuntime.getApiClient();
-      if (apiClient) renderEnabledDevices(options, plugin, apiClient, isActive);
-    },
-  });
-  void openedPolicy.then(() => {
-    if (!active || loadError) return;
-    const summary = content.parentElement?.querySelector('.crate-settings-disclosure-summary');
-    if (summary) summary.textContent = (policy?.enabled ?? plugin.settings.pushEnabled)
-      ? 'On · schedule, timezone, and devices' : 'Off';
-  });
+			void openedPolicy.then(() => {
+				if (!active) return;
+				if (policy) timeInput.setValue(policy.allDayTime ?? '');
+				timeSetting.setDesc(loadError
+					? 'Could not load the notification timezone. Reopen settings to retry.'
+					: `All devices · timezone: ${policy?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}. An empty time means off.`);
+			});
+			const policyDescription = options.createEl('p', { cls: 'setting-item-description' });
+			void openedPolicy.then(() => {
+				if (!active) return;
+				policyDescription.textContent = loadError ? 'Shared settings could not be loaded. Reopen settings to retry.'
+					: policy ? `Server notifications: ${policy.folderPath} · ${policy.timezone}` : 'The first enabled device saves the shared folder and timezone.';
+			});
+			new Setting(options).setName('Notification folder and timezone')
+				.setDesc(`All devices · set the notification folder to ${plugin.remindersSettings.remindersFolderPath} and timezone to ${Intl.DateTimeFormat().resolvedOptions().timeZone}.`)
+				.addButton(button => button.setButtonText('Use this device’s settings').onClick(async () => {
+					button.setDisabled(true);
+					try {
+						await savePolicy({ folderPath: plugin.remindersSettings.remindersFolderPath, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+						if (active) context.rerender();
+					} catch (error) { new Notice(`Failed to save shared settings: ${errorMessage(error)}`); }
+					finally { button.setDisabled(false); }
+				}));
+			const apiClient = plugin.syncRuntime.getApiClient();
+			if (apiClient) renderEnabledDevices(options, plugin, apiClient, isActive);
+		},
+	});
+	void openedPolicy.then(() => {
+		if (!active || loadError) return;
+		const summary = content.parentElement?.querySelector('.crate-settings-disclosure-summary');
+		if (summary) summary.textContent = (policy?.enabled ?? plugin.settings.pushEnabled)
+			? 'On · schedule, timezone, and devices' : 'Off';
+	});
 
 	return () => { active = false; };
 }

@@ -38,30 +38,30 @@ describe('PWA preferences', () => {
 });
 
 it.each([
-  [undefined, [...DEFAULT_DOCK_TABS]],
-  [[], [...DEFAULT_DOCK_TABS]],
-  [['unknown'], [...DEFAULT_DOCK_TABS]],
-  [['reading', 'today', 'reading', null, 'bad'], ['reading', 'today', 'inbox', 'browse']],
-  [['browse'], ['browse', 'inbox', 'today', 'reading']],
-  [['highlights', 'favorites', 'archive', 'upcoming', 'inbox'], ['highlights', 'favorites', 'archive', 'inbox']],
+	[undefined, [...DEFAULT_DOCK_TABS]],
+	[[], [...DEFAULT_DOCK_TABS]],
+	[['unknown'], [...DEFAULT_DOCK_TABS]],
+	[['reading', 'today', 'reading', null, 'bad'], ['reading', 'today', 'inbox', 'browse']],
+	[['browse'], ['browse', 'inbox', 'today', 'reading']],
+	[['highlights', 'favorites', 'archive', 'upcoming', 'inbox'], ['highlights', 'favorites', 'archive', 'inbox']],
 ])('normalizes dock preferences without losing their order: %j', (dockTabs, expected) => {
-  storage(JSON.stringify({ dockTabs }));
-  expect(loadPwaPreferences().dockTabs).toEqual(expected);
+	storage(JSON.stringify({ dockTabs }));
+	expect(loadPwaPreferences().dockTabs).toEqual(expected);
 });
 
 it('persists hidden and reordered tabs independently of the launch screen', () => {
-  storage();
-  savePwaPreferences({ ...loadPwaPreferences(), dockTabs: ['reading', 'inbox'] });
-  expect(loadPwaPreferences()).toMatchObject({ defaultScreen: 'today', dockTabs: ['reading', 'inbox', 'today', 'browse'] });
+	storage();
+	savePwaPreferences({ ...loadPwaPreferences(), dockTabs: ['reading', 'inbox'] });
+	expect(loadPwaPreferences()).toMatchObject({ defaultScreen: 'today', dockTabs: ['reading', 'inbox', 'today', 'browse'] });
 });
 
 it.each(['flat', 'cards'] as const)('persists the %s reminder style without changing other preferences', reminderListStyle => {
-  storage();
-  savePwaPreferences({ ...loadPwaPreferences(), reminderListStyle });
-  expect(loadPwaPreferences()).toMatchObject({ reminderListStyle, defaultScreen: 'today', upcomingDays: null });
+	storage();
+	savePwaPreferences({ ...loadPwaPreferences(), reminderListStyle });
+	expect(loadPwaPreferences()).toMatchObject({ reminderListStyle, defaultScreen: 'today', upcomingDays: null });
 });
 
 it.each([undefined, null, 'compact', 42])('defaults invalid reminder styles to flat: %s', reminderListStyle => {
-  storage(JSON.stringify({ reminderListStyle }));
-  expect(loadPwaPreferences().reminderListStyle).toBe('flat');
+	storage(JSON.stringify({ reminderListStyle }));
+	expect(loadPwaPreferences().reminderListStyle).toBe('flat');
 });

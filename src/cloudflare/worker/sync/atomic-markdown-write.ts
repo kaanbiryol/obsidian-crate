@@ -25,9 +25,9 @@ function destinationMutation(
 	const destinationNamespace = fileNamespaceGuard(destination.path);
 	const sourceNamespace = fileNamespaceGuard(source.path);
 	const destinationLease = stagedUploadGuard(destination.objectKey);
-  const sourceLease = stagedUploadGuard(source.objectKey);
-  const encryption = encryptionWriteGuard(encryptionState);
-  let namespaceGuard = `${destinationNamespace.sql} AND ${sourceNamespace.sql} AND ${destinationLease.sql} AND ${sourceLease.sql} AND ${encryption.sql}`;
+	const sourceLease = stagedUploadGuard(source.objectKey);
+	const encryption = encryptionWriteGuard(encryptionState);
+	let namespaceGuard = `${destinationNamespace.sql} AND ${sourceNamespace.sql} AND ${destinationLease.sql} AND ${sourceLease.sql} AND ${encryption.sql}`;
 	const namespaceArgs = [...destinationNamespace.args, ...sourceNamespace.args, ...destinationLease.args, ...sourceLease.args, ...encryption.args];
 	for (const file of [source, destination]) {
 		if (file.expectedRevision) {
@@ -122,7 +122,7 @@ export async function writeCommittedMarkdownFilePair(
 	try {
 		stagedFiles.push(await stageMarkdownFile(
 			bucket,
-      db,
+			db,
 			params.destination.path,
 			params.destination.content,
 			params.destination.expectedHash,
@@ -130,7 +130,7 @@ export async function writeCommittedMarkdownFilePair(
 		));
 		stagedFiles.push(await stageMarkdownFile(
 			bucket,
-      db,
+			db,
 			params.source.path,
 			params.source.content,
 			params.source.expectedHash,

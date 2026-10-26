@@ -9,33 +9,33 @@ const relativeFormatters = new Map<string, Intl.RelativeTimeFormat>();
 const dateFormatters = new Map<string, Intl.DateTimeFormat>();
 
 export function resetDateFormatterCache(): void {
-  relativeFormatters.clear();
-  dateFormatters.clear();
+	relativeFormatters.clear();
+	dateFormatters.clear();
 }
 
 function getRelativeFormatter(locale: string | undefined): Intl.RelativeTimeFormat {
-  const key = locale ?? '';
-  let formatter = relativeFormatters.get(key);
-  if (!formatter) {
-    formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
-    relativeFormatters.set(key, formatter);
-  }
-  return formatter;
+	const key = locale ?? '';
+	let formatter = relativeFormatters.get(key);
+	if (!formatter) {
+		formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+		relativeFormatters.set(key, formatter);
+	}
+	return formatter;
 }
 
 function getDateFormatter(locale: string | undefined, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
-  const key = `${locale ?? ''}|${JSON.stringify(options)}`;
-  let formatter = dateFormatters.get(key);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat(locale, options);
-    dateFormatters.set(key, formatter);
-  }
-  return formatter;
+	const key = `${locale ?? ''}|${JSON.stringify(options)}`;
+	let formatter = dateFormatters.get(key);
+	if (!formatter) {
+		formatter = new Intl.DateTimeFormat(locale, options);
+		dateFormatters.set(key, formatter);
+	}
+	return formatter;
 }
 
 function formatRelativeDay(offset: number, locale = getUiLocale()): string {
-  const value = getRelativeFormatter(locale).format(offset, 'day');
-  return sentenceCaseLocalized(value, locale);
+	const value = getRelativeFormatter(locale).format(offset, 'day');
+	return sentenceCaseLocalized(value, locale);
 }
 
 /**
@@ -45,45 +45,45 @@ function formatRelativeDay(offset: number, locale = getUiLocale()): string {
  * @returns Formatted date string or null
  */
 export function formatDueDate(
-  dateString: string | undefined,
-  locale = getUiLocale(),
-  now = new Date(),
-  recurrence?: RecurrenceRule,
+	dateString: string | undefined,
+	locale = getUiLocale(),
+	now = new Date(),
+	recurrence?: RecurrenceRule,
 ): string | null {
-  if (!dateString) return null;
-  const hasTime = dateString.includes('T');
-  const date = parseReminderDateValue(dateString, hasTime);
-  if (!date) return null;
+	if (!dateString) return null;
+	const hasTime = dateString.includes('T');
+	const date = parseReminderDateValue(dateString, hasTime);
+	if (!date) return null;
 
-  let dateText = '';
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  if (formatLocalDateKey(date) === formatLocalDateKey(now)) {
-    dateText = formatRelativeDay(0, locale);
-  } else if (formatLocalDateKey(date) === formatLocalDateKey(tomorrow)) {
-    dateText = formatRelativeDay(1, locale);
-  } else {
-    dateText = getDateFormatter(locale, {
-      month: 'short',
-      day: 'numeric',
-    }).format(date);
-  }
+	let dateText = '';
+	const tomorrow = new Date(now);
+	tomorrow.setDate(tomorrow.getDate() + 1);
+	if (formatLocalDateKey(date) === formatLocalDateKey(now)) {
+		dateText = formatRelativeDay(0, locale);
+	} else if (formatLocalDateKey(date) === formatLocalDateKey(tomorrow)) {
+		dateText = formatRelativeDay(1, locale);
+	} else {
+		dateText = getDateFormatter(locale, {
+			month: 'short',
+			day: 'numeric',
+		}).format(date);
+	}
 
-  // Explicit timestamps take precedence over the recurring schedule's time.
-  const recurrenceHour = recurrence?.hour;
-  if (hasTime || recurrenceHour !== undefined) {
-    // Date-only occurrences keep their wall-clock time in the repeat rule.
-    // Format that time in UTC to avoid shifting it through a local DST gap.
-    const time = hasTime ? date : new Date(Date.UTC(2000, 0, 1, recurrenceHour, recurrence?.minute ?? 0));
-    const timeText = getDateFormatter(locale, {
-      hour: '2-digit',
-      minute: '2-digit', hourCycle: 'h23',
-      ...(!hasTime ? { timeZone: 'UTC' } : {}),
-    }).format(time);
-    dateText += `, ${timeText}`;
-  }
+	// Explicit timestamps take precedence over the recurring schedule's time.
+	const recurrenceHour = recurrence?.hour;
+	if (hasTime || recurrenceHour !== undefined) {
+		// Date-only occurrences keep their wall-clock time in the repeat rule.
+		// Format that time in UTC to avoid shifting it through a local DST gap.
+		const time = hasTime ? date : new Date(Date.UTC(2000, 0, 1, recurrenceHour, recurrence?.minute ?? 0));
+		const timeText = getDateFormatter(locale, {
+			hour: '2-digit',
+			minute: '2-digit', hourCycle: 'h23',
+			...(!hasTime ? { timeZone: 'UTC' } : {}),
+		}).format(time);
+		dateText += `, ${timeText}`;
+	}
 
-  return dateText;
+	return dateText;
 }
 
 /**
@@ -92,13 +92,13 @@ export function formatDueDate(
  * @returns Formatted date header
  */
 export function formatDateHeader(date: Date, locale = getUiLocale(), now = new Date()): string {
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  if (formatLocalDateKey(date) === formatLocalDateKey(now)) return formatRelativeDay(0, locale);
-  if (formatLocalDateKey(date) === formatLocalDateKey(tomorrow)) return formatRelativeDay(1, locale);
-  return getDateFormatter(locale, {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
+	const tomorrow = new Date(now);
+	tomorrow.setDate(tomorrow.getDate() + 1);
+	if (formatLocalDateKey(date) === formatLocalDateKey(now)) return formatRelativeDay(0, locale);
+	if (formatLocalDateKey(date) === formatLocalDateKey(tomorrow)) return formatRelativeDay(1, locale);
+	return getDateFormatter(locale, {
+		weekday: 'long',
+		month: 'short',
+		day: 'numeric',
+	}).format(date);
 }

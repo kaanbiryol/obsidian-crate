@@ -167,14 +167,14 @@ describe('safe local application', () => {
 });
 
 it('preserves edits to an earlier incoming binary copy when the transfer retries', async () => {
-  const original = new Uint8Array([255, 0, 254]).buffer;
-  const remote = new Uint8Array([254, 0, 255]).buffer;
-  const h = harness('image.png', original);
-  await applyRemoteContentIfUnchanged(h.context, 'image.png', remote, await sha256Hex(original));
-  const copy = [...h.files.keys()].find(path => path !== 'image.png')!;
-  h.files.set(copy, encode('edited recovery copy'));
-  await applyRemoteContentIfUnchanged(h.context, 'image.png', remote, await sha256Hex(original));
-  expect(decode(h.files.get(copy)!)).toBe('edited recovery copy');
-  expect([...h.files.values()]).toContainEqual(remote);
-  expect(h.files.get('image.png')).toEqual(original);
+	const original = new Uint8Array([255, 0, 254]).buffer;
+	const remote = new Uint8Array([254, 0, 255]).buffer;
+	const h = harness('image.png', original);
+	await applyRemoteContentIfUnchanged(h.context, 'image.png', remote, await sha256Hex(original));
+	const copy = [...h.files.keys()].find(path => path !== 'image.png')!;
+	h.files.set(copy, encode('edited recovery copy'));
+	await applyRemoteContentIfUnchanged(h.context, 'image.png', remote, await sha256Hex(original));
+	expect(decode(h.files.get(copy)!)).toBe('edited recovery copy');
+	expect([...h.files.values()]).toContainEqual(remote);
+	expect(h.files.get('image.png')).toEqual(original);
 });

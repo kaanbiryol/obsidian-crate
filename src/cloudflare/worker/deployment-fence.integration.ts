@@ -14,8 +14,8 @@ import type { CloudflareDeploymentMetadata } from '../deployment/types';
 
 // Recovery tests exercise an older publication, independently of the launch revision.
 vi.mock('../server-release.json', async importOriginal => {
-  const { default: release } = await importOriginal<{ default: typeof import('../server-release.json') }>();
-  return { default: { ...release, revision: 2 } };
+	const { default: release } = await importOriginal<{ default: typeof import('../server-release.json') }>();
+	return { default: { ...release, revision: 2 } };
 });
 
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
@@ -119,8 +119,8 @@ it('preserves definite publication rejections for recovery and does not retry un
 	h.api.uploadWorker.mockRejectedValueOnce(new CloudflareApiError('forbidden', 403, null));
 	await expect(h.deploy()).rejects.toThrow('forbidden');
 	expect(JSON.parse((await held())!.value)).toMatchObject({ stepState: 'rejected' });
-  await reset();
-  const next = await harness();
+	await reset();
+	const next = await harness();
 	next.api.getWorkersSubdomain.mockResolvedValue(null);
 	next.api.createWorkersSubdomain.mockRejectedValueOnce(new Error('lost subdomain response'));
 	await expect(next.deploy()).rejects.toThrow('fence remains held');
@@ -228,388 +228,388 @@ it('refuses stale resource metadata instead of acquiring a fence in a different 
 });
 
 it('recovery of a confirmed step prevents the old updater from sending its next mutation', async () => {
-    const h = await harness();
-    const gate = deferred();
-    const started = deferred();
-    h.api.getWorkersSubdomain.mockImplementationOnce(async () => {
-        started.resolve();
-        await gate.promise;
-        return 'test';
-    });
-    const updating = h.deploy();
-    const rejected = expect(updating).rejects.toThrow('Deployment ownership changed');
-    await started.promise;
-    expect(JSON.parse((await held())!.value)).toMatchObject({ recoveryProtocol: 1, step: 'prepare-database', stepState: 'confirmed' });
-    expect((await recoverDeployment(h.api, h.metadata)).status).toBe('recovered');
-    gate.resolve();
-    await rejected;
-    expect(h.api.uploadWorker).not.toHaveBeenCalled();
+		const h = await harness();
+		const gate = deferred();
+		const started = deferred();
+		h.api.getWorkersSubdomain.mockImplementationOnce(async () => {
+				started.resolve();
+				await gate.promise;
+				return 'test';
+		});
+		const updating = h.deploy();
+		const rejected = expect(updating).rejects.toThrow('Deployment ownership changed');
+		await started.promise;
+		expect(JSON.parse((await held())!.value)).toMatchObject({ recoveryProtocol: 1, step: 'prepare-database', stepState: 'confirmed' });
+		expect((await recoverDeployment(h.api, h.metadata)).status).toBe('recovered');
+		gate.resolve();
+		await rejected;
+		expect(h.api.uploadWorker).not.toHaveBeenCalled();
 });
 
 
 it('preserves existing file references and never reapplies fresh DDL during an update', async () => {
-  const h = await harness();
-  await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Notes/École.md', 'notes/école.md', 'existing-key')").run();
-  await h.deploy();
-  expect(await held()).toBeNull();
-  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: SERVER_RELEASE.schemaVersion });
-  expect(await env.DB.prepare('SELECT path, storage_key FROM files').first()).toEqual({ path: 'Notes/École.md', storage_key: 'existing-key' });
-  expect(h.api.queryD1.mock.calls.some(call => call[2] === schema)).toBe(false);
-  expect(h.api.verifyWorkerDeployment).toHaveBeenCalledOnce();
+	const h = await harness();
+	await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Notes/École.md', 'notes/école.md', 'existing-key')").run();
+	await h.deploy();
+	expect(await held()).toBeNull();
+	expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: SERVER_RELEASE.schemaVersion });
+	expect(await env.DB.prepare('SELECT path, storage_key FROM files').first()).toEqual({ path: 'Notes/École.md', storage_key: 'existing-key' });
+	expect(h.api.queryD1.mock.calls.some(call => call[2] === schema)).toBe(false);
+	expect(h.api.verifyWorkerDeployment).toHaveBeenCalledOnce();
 });
 
 it('keeps a failed live check locked until the published build is verified', async () => {
-  const h = await harness();
-  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
-  await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
-  const record = JSON.parse((await held())!.value) as Record<string, unknown>;
-  expect(record).toMatchObject({ verificationPending: true, step: 'enable-server-address', stepState: 'confirmed' });
-  expect((await recoverDeployment(h.api as never, h.metadata, 'a'.repeat(64))).status).toBe('verify');
-  const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
-  expect(recovery.status).toBe('verify');
-  expect(await held()).not.toBeNull();
-  await completePublishedDeployment(h.api, h.metadata, artifact(), recovery.resumeValue!);
-  expect(await held()).toBeNull();
+	const h = await harness();
+	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
+	await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
+	const record = JSON.parse((await held())!.value) as Record<string, unknown>;
+	expect(record).toMatchObject({ verificationPending: true, step: 'enable-server-address', stepState: 'confirmed' });
+	expect((await recoverDeployment(h.api as never, h.metadata, 'a'.repeat(64))).status).toBe('verify');
+	const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+	expect(recovery.status).toBe('verify');
+	expect(await held()).not.toBeNull();
+	await completePublishedDeployment(h.api, h.metadata, artifact(), recovery.resumeValue!);
+	expect(await held()).toBeNull();
 });
 
 it('blocks lower revisions and different artifacts at the same revision before publication', async () => {
-  const h = await harness();
-  await h.deploy();
-  await expect(h.deploy(artifact('0.1.0', 'a'.repeat(64)))).rejects.toThrow('different build');
-  await env.DB.prepare('UPDATE crate_release SET revision = ?').bind(SERVER_RELEASE.revision + 1).run();
-  await expect(h.deploy()).rejects.toThrow('newer or different build');
-  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+	const h = await harness();
+	await h.deploy();
+	await expect(h.deploy(artifact('0.1.0', 'a'.repeat(64)))).rejects.toThrow('different build');
+	await env.DB.prepare('UPDATE crate_release SET revision = ?').bind(SERVER_RELEASE.revision + 1).run();
+	await expect(h.deploy()).rejects.toThrow('newer or different build');
+	expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
 });
 
 it('keeps initialization recoverable after a definite upload rejection', async () => {
-  const h = await harness(true);
-  h.api.uploadWorker.mockRejectedValueOnce(new CloudflareApiError('rejected', 403, null));
-  await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
-  expect(JSON.parse((await held())!.value)).toMatchObject({ verificationPending: true, step: 'upload-worker', stepState: 'rejected' });
-  const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
-  expect(recovery.status).toBe('resume');
-  await provisionCloudflareDeployment({ api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
-    artifacts: artifact(), resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
-  expect(await held()).toBeNull();
-  expect(h.api.queryD1.mock.calls.filter(call => call[2] === schema)).toHaveLength(1);
+	const h = await harness(true);
+	h.api.uploadWorker.mockRejectedValueOnce(new CloudflareApiError('rejected', 403, null));
+	await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
+	expect(JSON.parse((await held())!.value)).toMatchObject({ verificationPending: true, step: 'upload-worker', stepState: 'rejected' });
+	const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+	expect(recovery.status).toBe('resume');
+	await provisionCloudflareDeployment({ api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
+		artifacts: artifact(), resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
+	expect(await held()).toBeNull();
+	expect(h.api.queryD1.mock.calls.filter(call => call[2] === schema)).toHaveLength(1);
 });
 
 it.each([
-  new CloudflareApiError("Your account has exceeded D1's free tier daily row write limit. Wait until midnight UTC.", 400, 7500),
-  new CloudflareApiError('Permission denied', 403, 10000),
-  new CloudflareApiError('Too many requests', 429, null),
+	new CloudflareApiError("Your account has exceeded D1's free tier daily row write limit. Wait until midnight UTC.", 400, 7500),
+	new CloudflareApiError('Permission denied', 403, 10000),
+	new CloudflareApiError('Too many requests', 429, null),
 ])('preserves a definite acquisition rejection without inventing a recovery lock: %s', async error => {
-  const h = await harness();
-  const query = h.api.queryD1.getMockImplementation()!;
-  h.api.queryD1.mockImplementation(async (...args) => {
-    if (args[2].startsWith('INSERT INTO maintenance_state')) throw error;
-    return query(...args);
-  });
-  await expect(h.deploy()).rejects.toBe(error);
-  expect(await held()).toBeNull();
-  expect(h.api.uploadWorker).not.toHaveBeenCalled();
-  expect(h.api.createR2Bucket).not.toHaveBeenCalled();
-  expect((await recoverDeployment(h.api, h.metadata, artifact().fingerprint)).status).toBe('ready');
-  h.api.queryD1.mockImplementation(query);
-  await h.deploy();
-  expect(await held()).toBeNull();
-  expect(h.api.uploadWorker).toHaveBeenCalledOnce();
+	const h = await harness();
+	const query = h.api.queryD1.getMockImplementation()!;
+	h.api.queryD1.mockImplementation(async (...args) => {
+		if (args[2].startsWith('INSERT INTO maintenance_state')) throw error;
+		return query(...args);
+	});
+	await expect(h.deploy()).rejects.toBe(error);
+	expect(await held()).toBeNull();
+	expect(h.api.uploadWorker).not.toHaveBeenCalled();
+	expect(h.api.createR2Bucket).not.toHaveBeenCalled();
+	expect((await recoverDeployment(h.api, h.metadata, artifact().fingerprint)).status).toBe('ready');
+	h.api.queryD1.mockImplementation(query);
+	await h.deploy();
+	expect(await held()).toBeNull();
+	expect(h.api.uploadWorker).toHaveBeenCalledOnce();
 });
 
 it.each([
-  new CloudflareApiError('Request timed out', 408, null),
-  new CloudflareApiError('Cloudflare unavailable', 503, null),
+	new CloudflareApiError('Request timed out', 408, null),
+	new CloudflareApiError('Cloudflare unavailable', 503, null),
 ])('keeps uncertain acquisition failures on the recovery path: %s', async error => {
-  const h = await harness();
-  const query = h.api.queryD1.getMockImplementation()!;
-  h.api.queryD1.mockImplementation(async (...args) => {
-    const result = await query(...args);
-    if (args[2].startsWith('INSERT INTO maintenance_state')) throw error;
-    return result;
-  });
-  await expect(h.deploy()).rejects.toThrow('Could not confirm deployment ownership');
-  expect(await held()).not.toBeNull();
-  expect(h.api.uploadWorker).not.toHaveBeenCalled();
-  expect((await recoverDeployment(h.api, h.metadata, artifact().fingerprint)).status).toBe('recovered');
+	const h = await harness();
+	const query = h.api.queryD1.getMockImplementation()!;
+	h.api.queryD1.mockImplementation(async (...args) => {
+		const result = await query(...args);
+		if (args[2].startsWith('INSERT INTO maintenance_state')) throw error;
+		return result;
+	});
+	await expect(h.deploy()).rejects.toThrow('Could not confirm deployment ownership');
+	expect(await held()).not.toBeNull();
+	expect(h.api.uploadWorker).not.toHaveBeenCalled();
+	expect((await recoverDeployment(h.api, h.metadata, artifact().fingerprint)).status).toBe('recovered');
 });
 
 it.each([false, true])('recovers a lost acquisition response before any provider mutation (empty: %s)', async empty => {
-  const h = await harness(empty);
-  const query = h.api.queryD1.getMockImplementation()!;
-  let lost = false;
-  h.api.queryD1.mockImplementation(async (...args) => {
-    const result = await query(...args);
-    if (!lost && args[2].startsWith('INSERT INTO maintenance_state')) {
-      lost = true;
-      throw new Error('lost acquisition response');
-    }
-    return result;
-  });
-  await expect(h.deploy()).rejects.toThrow('Could not confirm deployment ownership');
-  expect(JSON.parse((await held())!.value)).toMatchObject({ step: 'acquire-deployment', stepState: 'confirmed', verificationPending: false });
-  expect(h.api.uploadWorker).not.toHaveBeenCalled();
-  expect(h.api.createR2Bucket).not.toHaveBeenCalled();
-  expect((await recoverDeployment(h.api, h.metadata, artifact().fingerprint)).status).toBe('recovered');
-  await h.deploy();
-  expect(await held()).toBeNull();
+	const h = await harness(empty);
+	const query = h.api.queryD1.getMockImplementation()!;
+	let lost = false;
+	h.api.queryD1.mockImplementation(async (...args) => {
+		const result = await query(...args);
+		if (!lost && args[2].startsWith('INSERT INTO maintenance_state')) {
+			lost = true;
+			throw new Error('lost acquisition response');
+		}
+		return result;
+	});
+	await expect(h.deploy()).rejects.toThrow('Could not confirm deployment ownership');
+	expect(JSON.parse((await held())!.value)).toMatchObject({ step: 'acquire-deployment', stepState: 'confirmed', verificationPending: false });
+	expect(h.api.uploadWorker).not.toHaveBeenCalled();
+	expect(h.api.createR2Bucket).not.toHaveBeenCalled();
+	expect((await recoverDeployment(h.api, h.metadata, artifact().fingerprint)).status).toBe('recovered');
+	await h.deploy();
+	expect(await held()).toBeNull();
 });
 
 it('keeps repeated lost takeover responses recoverable without ever unlocking pending writes', async () => {
-  const h = await harness();
-  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
-  await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
-  const query = h.api.queryD1.getMockImplementation()!;
-  const resume = (resumeUpdateValue: string | undefined) => completePublishedDeployment(h.api, h.metadata, artifact(), resumeUpdateValue!);
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
-    expect(recovery.status).toBe('verify');
-    const previous = JSON.parse(recovery.resumeValue!) as { owner: string };
-    let lost = false;
-    h.api.queryD1.mockImplementation(async (...args) => {
-      const result = await query(...args);
-      if (!lost && args[2].startsWith('UPDATE maintenance_state')) {
-        lost = true;
-        expect(await held()).not.toBeNull();
-        throw new Error('lost takeover response');
-      }
-      return result;
-    });
-    await expect(resume(recovery.resumeValue)).rejects.toThrow('Could not confirm deployment ownership');
-    const next = JSON.parse((await held())!.value) as { owner: string };
-    expect(next).toMatchObject({ step: 'acquire-deployment', stepState: 'confirmed', verificationPending: true });
-    expect(next.owner).not.toBe(previous.owner);
-    // A client holding the old snapshot cannot take ownership back.
-    await expect(resume(recovery.resumeValue)).rejects.toThrow('Another deployment');
-  }
-  h.api.queryD1.mockImplementation(query);
-  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
-  expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE FROM maintenance_state'))).toBe(false);
-  const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
-  await resume(recovery.resumeValue);
-  expect(await held()).toBeNull();
-  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+	const h = await harness();
+	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
+	await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
+	const query = h.api.queryD1.getMockImplementation()!;
+	const resume = (resumeUpdateValue: string | undefined) => completePublishedDeployment(h.api, h.metadata, artifact(), resumeUpdateValue!);
+	for (let attempt = 0; attempt < 2; attempt++) {
+		const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+		expect(recovery.status).toBe('verify');
+		const previous = JSON.parse(recovery.resumeValue!) as { owner: string };
+		let lost = false;
+		h.api.queryD1.mockImplementation(async (...args) => {
+			const result = await query(...args);
+			if (!lost && args[2].startsWith('UPDATE maintenance_state')) {
+				lost = true;
+				expect(await held()).not.toBeNull();
+				throw new Error('lost takeover response');
+			}
+			return result;
+		});
+		await expect(resume(recovery.resumeValue)).rejects.toThrow('Could not confirm deployment ownership');
+		const next = JSON.parse((await held())!.value) as { owner: string };
+		expect(next).toMatchObject({ step: 'acquire-deployment', stepState: 'confirmed', verificationPending: true });
+		expect(next.owner).not.toBe(previous.owner);
+		// A client holding the old snapshot cannot take ownership back.
+		await expect(resume(recovery.resumeValue)).rejects.toThrow('Another deployment');
+	}
+	h.api.queryD1.mockImplementation(query);
+	expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+	expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE FROM maintenance_state'))).toBe(false);
+	const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+	await resume(recovery.resumeValue);
+	expect(await held()).toBeNull();
+	expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
 });
 
 it('prevents a paused owner from advancing after its acquisition checkpoint is recovered', async () => {
-  const h = await harness();
-  const gate = deferred(), acquired = deferred();
-  const query = h.api.queryD1.getMockImplementation()!;
-  h.api.queryD1.mockImplementation(async (...args) => {
-    const result = await query(...args);
-    if (args[2].startsWith('INSERT INTO maintenance_state')) {
-      acquired.resolve();
-      await gate.promise;
-    }
-    return result;
-  });
-  const updating = h.deploy();
-  const rejected = expect(updating).rejects.toThrow('Could not checkpoint');
-  await acquired.promise;
-  expect((await recoverDeployment(h.api, h.metadata)).status).toBe('recovered');
-  gate.resolve();
-  await rejected;
-  expect(h.api.uploadWorker).not.toHaveBeenCalled();
-  expect(await held()).toBeNull();
+	const h = await harness();
+	const gate = deferred(), acquired = deferred();
+	const query = h.api.queryD1.getMockImplementation()!;
+	h.api.queryD1.mockImplementation(async (...args) => {
+		const result = await query(...args);
+		if (args[2].startsWith('INSERT INTO maintenance_state')) {
+			acquired.resolve();
+			await gate.promise;
+		}
+		return result;
+	});
+	const updating = h.deploy();
+	const rejected = expect(updating).rejects.toThrow('Could not checkpoint');
+	await acquired.promise;
+	expect((await recoverDeployment(h.api, h.metadata)).status).toBe('recovered');
+	gate.resolve();
+	await rejected;
+	expect(h.api.uploadWorker).not.toHaveBeenCalled();
+	expect(await held()).toBeNull();
 });
 
 it('refuses a schema edit hidden inside a code-only release and preserves storage', async () => {
-  const h = await harness();
-  await h.deploy();
-  const changed = { ...artifact(), d1SchemaSha256: 'changed-schema' };
-  await expect(h.deploy(changed)).rejects.toThrow('schema version change');
-  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
-  expect(await held()).toBeNull();
+	const h = await harness();
+	await h.deploy();
+	const changed = { ...artifact(), d1SchemaSha256: 'changed-schema' };
+	await expect(h.deploy(changed)).rejects.toThrow('schema version change');
+	expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+	expect(await held()).toBeNull();
 });
 
 it('refuses missing saved storage rather than silently creating a replacement database', async () => {
-  const h = await harness();
-  h.state.database = false;
-  await expect(h.deploy()).rejects.toThrow('saved server database is missing');
-  expect(h.api.createD1Database).not.toHaveBeenCalled();
-  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+	const h = await harness();
+	h.state.database = false;
+	await expect(h.deploy()).rejects.toThrow('saved server database is missing');
+	expect(h.api.createD1Database).not.toHaveBeenCalled();
+	expect(h.api.uploadWorker).not.toHaveBeenCalled();
 });
 
 it('refuses a missing file bucket instead of substituting empty storage', async () => {
-  const h = await harness();
-  h.state.bucket = false;
-  await expect(h.deploy()).rejects.toThrow('file bucket is missing');
-  expect(h.api.createR2Bucket).not.toHaveBeenCalled();
-  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+	const h = await harness();
+	h.state.bucket = false;
+	await expect(h.deploy()).rejects.toThrow('file bucket is missing');
+	expect(h.api.createR2Bucket).not.toHaveBeenCalled();
+	expect(h.api.uploadWorker).not.toHaveBeenCalled();
 });
 
 it('finishes a confirmed older publication from a newer plugin without uploading or changing vault data', async () => {
-  const h = await harness();
-  await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Notes/Keep.md', 'notes/keep.md', 'existing-key')").run();
-  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
-  await expect(h.deploy()).rejects.toThrow('fence remains held');
-  const value = (await held())!.value;
-  const newer = artifact('0.2.0', 'e'.repeat(64));
-  expect((await recoverDeployment(h.api, h.metadata, newer.fingerprint)).status).toBe('verify');
-  const filesBefore = await env.DB.prepare('SELECT * FROM files').all();
-  await completePublishedDeployment(h.api, h.metadata, newer, value);
-  expect(await held()).toBeNull();
-  expect(await env.DB.prepare('SELECT revision, fingerprint FROM crate_release WHERE id = 1').first()).toEqual({ revision: SERVER_RELEASE.revision - 1, fingerprint: artifact().fingerprint });
-  expect(h.metadata.lastDeployedFingerprint).toBe(artifact().fingerprint);
-  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
-  expect(h.api.enableWorkerSubdomain).not.toHaveBeenCalled();
-  expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(filesBefore.results);
+	const h = await harness();
+	await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Notes/Keep.md', 'notes/keep.md', 'existing-key')").run();
+	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	await expect(h.deploy()).rejects.toThrow('fence remains held');
+	const value = (await held())!.value;
+	const newer = artifact('0.2.0', 'e'.repeat(64));
+	expect((await recoverDeployment(h.api, h.metadata, newer.fingerprint)).status).toBe('verify');
+	const filesBefore = await env.DB.prepare('SELECT * FROM files').all();
+	await completePublishedDeployment(h.api, h.metadata, newer, value);
+	expect(await held()).toBeNull();
+	expect(await env.DB.prepare('SELECT revision, fingerprint FROM crate_release WHERE id = 1').first()).toEqual({ revision: SERVER_RELEASE.revision - 1, fingerprint: artifact().fingerprint });
+	expect(h.metadata.lastDeployedFingerprint).toBe(artifact().fingerprint);
+	expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+	expect(h.api.enableWorkerSubdomain).not.toHaveBeenCalled();
+	expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(filesBefore.results);
 });
 
 it('keeps failed publication verification locked and permits checking it again', async () => {
-  const h = await harness();
-  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
-  await expect(h.deploy()).rejects.toThrow('fence remains held');
-  const newer = artifact('0.2.0', 'e'.repeat(64));
-  h.api.verifyPublishedWorkerDeployment.mockRejectedValueOnce(new Error('Public fingerprint mismatch'));
-  await expect(completePublishedDeployment(h.api, h.metadata, newer, (await held())!.value)).rejects.toThrow('Public fingerprint mismatch');
-  expect(JSON.parse((await held())!.value)).toMatchObject({ completionOnly: true, verificationPending: true, step: 'acquire-deployment', stepState: 'confirmed' });
-  const recovery = await recoverDeployment(h.api, h.metadata, newer.fingerprint);
-  expect(recovery.status).toBe('verify');
-  await completePublishedDeployment(h.api, h.metadata, newer, recovery.resumeValue!);
-  expect(await held()).toBeNull();
-  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+	const h = await harness();
+	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	await expect(h.deploy()).rejects.toThrow('fence remains held');
+	const newer = artifact('0.2.0', 'e'.repeat(64));
+	h.api.verifyPublishedWorkerDeployment.mockRejectedValueOnce(new Error('Public fingerprint mismatch'));
+	await expect(completePublishedDeployment(h.api, h.metadata, newer, (await held())!.value)).rejects.toThrow('Public fingerprint mismatch');
+	expect(JSON.parse((await held())!.value)).toMatchObject({ completionOnly: true, verificationPending: true, step: 'acquire-deployment', stepState: 'confirmed' });
+	const recovery = await recoverDeployment(h.api, h.metadata, newer.fingerprint);
+	expect(recovery.status).toBe('verify');
+	await completePublishedDeployment(h.api, h.metadata, newer, recovery.resumeValue!);
+	expect(await held()).toBeNull();
+	expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
 });
 
 it('does not take ownership if the old updater advances after inspection', async () => {
-  const h = await harness();
-  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
-  await expect(h.deploy()).rejects.toThrow('fence remains held');
-  const value = (await held())!.value;
-  const advanced = JSON.stringify({ ...JSON.parse(value), step: 'record-release', stepState: 'started' });
-  await env.DB.prepare('UPDATE maintenance_state SET value = ? WHERE key = ?').bind(advanced, DEPLOYMENT_FENCE_KEY).run();
-  await expect(completePublishedDeployment(h.api, h.metadata, artifact('0.2.0', 'e'.repeat(64)), value)).rejects.toThrow('Another deployment');
-  expect((await held())!.value).toBe(advanced);
-  expect(h.api.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
+	const h = await harness();
+	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	await expect(h.deploy()).rejects.toThrow('fence remains held');
+	const value = (await held())!.value;
+	const advanced = JSON.stringify({ ...JSON.parse(value), step: 'record-release', stepState: 'started' });
+	await env.DB.prepare('UPDATE maintenance_state SET value = ? WHERE key = ?').bind(advanced, DEPLOYMENT_FENCE_KEY).run();
+	await expect(completePublishedDeployment(h.api, h.metadata, artifact('0.2.0', 'e'.repeat(64)), value)).rejects.toThrow('Another deployment');
+	expect((await held())!.value).toBe(advanced);
+	expect(h.api.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
 });
 
 it.each(['storage', 'schema', 'release'])('retains the publication lock when %s verification fails', async problem => {
-  const h = await harness();
-  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
-  await expect(h.deploy()).rejects.toThrow('fence remains held');
-  if (problem === 'storage') h.state.worker!.bindings![0]!.id = 'different-database';
-  if (problem === 'schema') await env.DB.prepare('UPDATE crate_schema SET version = 999').run();
-  if (problem === 'release') h.api.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision + 1, schemaVersion: SERVER_RELEASE.schemaVersion });
-  await expect(completePublishedDeployment(h.api, h.metadata, artifact('0.2.0', 'e'.repeat(64)), (await held())!.value)).rejects.toThrow('fence remains held');
-  expect(await held()).not.toBeNull();
-  expect(await env.DB.prepare('SELECT * FROM crate_release').first()).toBeNull();
+	const h = await harness();
+	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	await expect(h.deploy()).rejects.toThrow('fence remains held');
+	if (problem === 'storage') h.state.worker!.bindings![0]!.id = 'different-database';
+	if (problem === 'schema') await env.DB.prepare('UPDATE crate_schema SET version = 999').run();
+	if (problem === 'release') h.api.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision + 1, schemaVersion: SERVER_RELEASE.schemaVersion });
+	await expect(completePublishedDeployment(h.api, h.metadata, artifact('0.2.0', 'e'.repeat(64)), (await held())!.value)).rejects.toThrow('fence remains held');
+	expect(await held()).not.toBeNull();
+	expect(await env.DB.prepare('SELECT * FROM crate_release').first()).toBeNull();
 });
 
 it('never retries an unconfirmed release-record write during publication recovery', async () => {
-  const h = await harness();
-  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
-  await expect(h.deploy()).rejects.toThrow('fence remains held');
-  const query = h.api.queryD1.getMockImplementation()!;
-  h.api.queryD1.mockImplementation(async (...args) => {
-    const result = await query(...args);
-    if (args[2].startsWith('INSERT INTO crate_release')) throw new Error('Lost release write response');
-    return result;
-  });
-  const newer = artifact('0.2.0', 'e'.repeat(64));
-  await expect(completePublishedDeployment(h.api, h.metadata, newer, (await held())!.value)).rejects.toThrow('Lost release write response');
-  expect(JSON.parse((await held())!.value)).toMatchObject({ completionOnly: true, step: 'record-release', stepState: 'started' });
-  expect((await recoverDeployment(h.api, h.metadata, newer.fingerprint)).status).toBe('blocked');
-  expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE FROM maintenance_state'))).toBe(false);
+	const h = await harness();
+	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	await expect(h.deploy()).rejects.toThrow('fence remains held');
+	const query = h.api.queryD1.getMockImplementation()!;
+	h.api.queryD1.mockImplementation(async (...args) => {
+		const result = await query(...args);
+		if (args[2].startsWith('INSERT INTO crate_release')) throw new Error('Lost release write response');
+		return result;
+	});
+	const newer = artifact('0.2.0', 'e'.repeat(64));
+	await expect(completePublishedDeployment(h.api, h.metadata, newer, (await held())!.value)).rejects.toThrow('Lost release write response');
+	expect(JSON.parse((await held())!.value)).toMatchObject({ completionOnly: true, step: 'record-release', stepState: 'started' });
+	expect((await recoverDeployment(h.api, h.metadata, newer.fingerprint)).status).toBe('blocked');
+	expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE FROM maintenance_state'))).toBe(false);
 });
 
 it('recovers an observed address activation and prevents its late owner from advancing', async () => {
-  const h = await harness();
-  const dispatched = deferred();
-  const response = deferred();
-  h.api.getWorkerSubdomain.mockResolvedValueOnce({ enabled: false, previews_enabled: false });
-  h.api.enableWorkerSubdomain.mockImplementationOnce(async () => { dispatched.resolve(); await response.promise; });
-  const oldUpdate = h.deploy();
-  const oldFailure = expect(oldUpdate).rejects.toThrow('checkpoint');
-  await dispatched.promise;
-  expect(JSON.parse((await held())!.value)).toMatchObject({ step: 'enable-server-address', stepState: 'started' });
-  const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
-  expect(recovery.status).toBe('verify');
-  await completePublishedDeployment(h.api, h.metadata, artifact(), recovery.resumeValue!);
-  expect(await held()).toBeNull();
-  expect(h.api.enableWorkerSubdomain).toHaveBeenCalledTimes(1);
-  // A delayed identical route-setting request cannot republish the old Worker.
-  const newer = artifact('0.2.0', 'e'.repeat(64));
-  await h.deploy(newer);
-  response.resolve();
-  await oldFailure;
-  expect(await held()).toBeNull();
-  expect(await env.DB.prepare('SELECT fingerprint FROM crate_release WHERE id = 1').first()).toEqual({ fingerprint: newer.fingerprint });
-  expect(h.state.worker!.annotations!['workers/message']).toContain(newer.fingerprint);
-  expect(h.api.enableWorkerSubdomain).toHaveBeenCalledTimes(1);
+	const h = await harness();
+	const dispatched = deferred();
+	const response = deferred();
+	h.api.getWorkerSubdomain.mockResolvedValueOnce({ enabled: false, previews_enabled: false });
+	h.api.enableWorkerSubdomain.mockImplementationOnce(async () => { dispatched.resolve(); await response.promise; });
+	const oldUpdate = h.deploy();
+	const oldFailure = expect(oldUpdate).rejects.toThrow('checkpoint');
+	await dispatched.promise;
+	expect(JSON.parse((await held())!.value)).toMatchObject({ step: 'enable-server-address', stepState: 'started' });
+	const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+	expect(recovery.status).toBe('verify');
+	await completePublishedDeployment(h.api, h.metadata, artifact(), recovery.resumeValue!);
+	expect(await held()).toBeNull();
+	expect(h.api.enableWorkerSubdomain).toHaveBeenCalledTimes(1);
+	// A delayed identical route-setting request cannot republish the old Worker.
+	const newer = artifact('0.2.0', 'e'.repeat(64));
+	await h.deploy(newer);
+	response.resolve();
+	await oldFailure;
+	expect(await held()).toBeNull();
+	expect(await env.DB.prepare('SELECT fingerprint FROM crate_release WHERE id = 1').first()).toEqual({ fingerprint: newer.fingerprint });
+	expect(h.state.worker!.annotations!['workers/message']).toContain(newer.fingerprint);
+	expect(h.api.enableWorkerSubdomain).toHaveBeenCalledTimes(1);
 });
 
 it.each([{ enabled: false, previews_enabled: false }, { enabled: true, previews_enabled: true }])('keeps an unconfirmed activation untouched when address settings differ: %j', async address => {
-  const h = await harness();
-  h.api.getWorkerSubdomain.mockResolvedValue(address);
-  h.api.enableWorkerSubdomain.mockRejectedValueOnce(new Error('Lost activation response'));
-  await expect(h.deploy()).rejects.toThrow('Lost activation response');
-  const original = (await held())!.value;
-  await expect(completePublishedDeployment(h.api, h.metadata, artifact(), original)).rejects.toThrow('address settings');
-  expect((await held())!.value).toBe(original);
-  expect(h.api.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
+	const h = await harness();
+	h.api.getWorkerSubdomain.mockResolvedValue(address);
+	h.api.enableWorkerSubdomain.mockRejectedValueOnce(new Error('Lost activation response'));
+	await expect(h.deploy()).rejects.toThrow('Lost activation response');
+	const original = (await held())!.value;
+	await expect(completePublishedDeployment(h.api, h.metadata, artifact(), original)).rejects.toThrow('address settings');
+	expect((await held())!.value).toBe(original);
+	expect(h.api.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
 });
 
  it('replaces a rejected upload with a corrected artifact while preserving the fence and vault data', async () => {
-  const h = await harness();
-  await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('retained-test', 'retained')").run();
-  h.api.uploadWorker.mockRejectedValueOnce(new CloudflareApiError('orphaned_provisioned_namespace', 400, 100));
-  await expect(h.deploy()).rejects.toThrow('orphaned_provisioned_namespace');
-  const rejected = (await held())!.value;
-  expect(JSON.parse(rejected)).toMatchObject({ step: 'upload-worker', stepState: 'rejected', verificationPending: true });
-  const fixed = artifact('0.1.0', 'e'.repeat(64));
-  const recovery = await recoverDeployment(h.api, h.metadata, fixed.fingerprint);
-  expect(recovery.status).toBe('resume');
-  expect((await held())!.value).toBe(rejected);
-  const upload = h.api.uploadWorker.getMockImplementation()!;
-  h.api.uploadWorker.mockImplementation(async input => {
-    const owned = JSON.parse((await held())!.value) as { owner: string };
-    expect(owned.owner).not.toBe((JSON.parse(rejected) as { owner: string }).owner);
-    expect(owned).toMatchObject({ fingerprint: fixed.fingerprint, verificationPending: true });
-    await upload(input);
-  });
-  await provisionCloudflareDeployment({ api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
-    artifacts: fixed, resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
-  expect(await held()).toBeNull();
-  expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'retained-test'").first()).toEqual({ value: 'retained' });
-  expect(h.api.verifyWorkerDeployment).toHaveBeenCalledWith(expect.any(String), fixed.fingerprint);
+	const h = await harness();
+	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('retained-test', 'retained')").run();
+	h.api.uploadWorker.mockRejectedValueOnce(new CloudflareApiError('orphaned_provisioned_namespace', 400, 100));
+	await expect(h.deploy()).rejects.toThrow('orphaned_provisioned_namespace');
+	const rejected = (await held())!.value;
+	expect(JSON.parse(rejected)).toMatchObject({ step: 'upload-worker', stepState: 'rejected', verificationPending: true });
+	const fixed = artifact('0.1.0', 'e'.repeat(64));
+	const recovery = await recoverDeployment(h.api, h.metadata, fixed.fingerprint);
+	expect(recovery.status).toBe('resume');
+	expect((await held())!.value).toBe(rejected);
+	const upload = h.api.uploadWorker.getMockImplementation()!;
+	h.api.uploadWorker.mockImplementation(async input => {
+		const owned = JSON.parse((await held())!.value) as { owner: string };
+		expect(owned.owner).not.toBe((JSON.parse(rejected) as { owner: string }).owner);
+		expect(owned).toMatchObject({ fingerprint: fixed.fingerprint, verificationPending: true });
+		await upload(input);
+	});
+	await provisionCloudflareDeployment({ api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
+		artifacts: fixed, resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
+	expect(await held()).toBeNull();
+	expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'retained-test'").first()).toEqual({ value: 'retained' });
+	expect(h.api.verifyWorkerDeployment).toHaveBeenCalledWith(expect.any(String), fixed.fingerprint);
  });
 
 it('deploys successive development builds, promotes to stable, and rejects reuse or rollback', async () => {
-  const h = await harness();
-  const dev = (number: number, hash: string) => ({ ...artifact('0.1.0', hash.repeat(64)), development: { number, worker: h.metadata.workerName } });
-  await h.deploy(dev(1, 'a'));
-  await h.deploy(dev(2, 'b'));
-  await expect(h.deploy(dev(1, 'a'))).rejects.toThrow('different build');
-  await expect(h.deploy(dev(2, 'c'))).rejects.toThrow('different build');
-  expect(await env.DB.prepare('SELECT revision, fingerprint FROM crate_release WHERE id = 1').first()).toEqual({ revision: SERVER_RELEASE.revision, fingerprint: 'b'.repeat(64) });
-  const saved = await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_development_build'").first<{ value: string }>();
-  expect(JSON.parse(saved!.value)).toEqual({ fingerprint: 'b'.repeat(64), development: { number: 2, worker: h.metadata.workerName } });
-  await h.deploy(artifact('0.1.0', 'c'.repeat(64)));
-  await expect(h.deploy(dev(3, 'd'))).rejects.toThrow('different build');
-  await expect(h.deploy(artifact('0.1.0', 'e'.repeat(64)))).rejects.toThrow('different build');
-  expect(await held()).toBeNull();
+	const h = await harness();
+	const dev = (number: number, hash: string) => ({ ...artifact('0.1.0', hash.repeat(64)), development: { number, worker: h.metadata.workerName } });
+	await h.deploy(dev(1, 'a'));
+	await h.deploy(dev(2, 'b'));
+	await expect(h.deploy(dev(1, 'a'))).rejects.toThrow('different build');
+	await expect(h.deploy(dev(2, 'c'))).rejects.toThrow('different build');
+	expect(await env.DB.prepare('SELECT revision, fingerprint FROM crate_release WHERE id = 1').first()).toEqual({ revision: SERVER_RELEASE.revision, fingerprint: 'b'.repeat(64) });
+	const saved = await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_development_build'").first<{ value: string }>();
+	expect(JSON.parse(saved!.value)).toEqual({ fingerprint: 'b'.repeat(64), development: { number: 2, worker: h.metadata.workerName } });
+	await h.deploy(artifact('0.1.0', 'c'.repeat(64)));
+	await expect(h.deploy(dev(3, 'd'))).rejects.toThrow('different build');
+	await expect(h.deploy(artifact('0.1.0', 'e'.repeat(64)))).rejects.toThrow('different build');
+	expect(await held()).toBeNull();
 });
 
 it('rejects development publication to another Worker before any provider mutation', async () => {
-  const h = await harness();
-  await expect(h.deploy({ ...artifact(), development: { number: 1, worker: `crate-${'b'.repeat(16)}` } } as ReturnType<typeof artifact>)).rejects.toThrow('designated Worker');
-  expect(h.api.queryD1).not.toHaveBeenCalled();
-  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+	const h = await harness();
+	await expect(h.deploy({ ...artifact(), development: { number: 1, worker: `crate-${'b'.repeat(16)}` } } as ReturnType<typeof artifact>)).rejects.toThrow('designated Worker');
+	expect(h.api.queryD1).not.toHaveBeenCalled();
+	expect(h.api.uploadWorker).not.toHaveBeenCalled();
 });
 
 it('retains a development identity when an interrupted publication is completed by a stable plugin', async () => {
-  const h = await harness();
-  const development = { number: 7, worker: h.metadata.workerName };
-  const build = { ...artifact('0.1.0', 'a'.repeat(64)), development };
-  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('route not ready'));
-  await expect(h.deploy(build)).rejects.toThrow();
-  h.api.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision, schemaVersion: SERVER_RELEASE.schemaVersion, developmentBuild: development } as Awaited<ReturnType<typeof h.api.verifyPublishedWorkerDeployment>>);
-  const pending = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
-  await completePublishedDeployment(h.api, h.metadata, artifact(), pending.resumeValue!);
-  const saved = await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_development_build'").first<{ value: string }>();
-  expect(JSON.parse(saved!.value)).toEqual({ fingerprint: build.fingerprint, development });
-  expect(h.api.uploadWorker).toHaveBeenCalledOnce();
-  expect(await held()).toBeNull();
-  await h.deploy(artifact());
+	const h = await harness();
+	const development = { number: 7, worker: h.metadata.workerName };
+	const build = { ...artifact('0.1.0', 'a'.repeat(64)), development };
+	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('route not ready'));
+	await expect(h.deploy(build)).rejects.toThrow();
+	h.api.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision, schemaVersion: SERVER_RELEASE.schemaVersion, developmentBuild: development } as Awaited<ReturnType<typeof h.api.verifyPublishedWorkerDeployment>>);
+	const pending = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+	await completePublishedDeployment(h.api, h.metadata, artifact(), pending.resumeValue!);
+	const saved = await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_development_build'").first<{ value: string }>();
+	expect(JSON.parse(saved!.value)).toEqual({ fingerprint: build.fingerprint, development });
+	expect(h.api.uploadWorker).toHaveBeenCalledOnce();
+	expect(await held()).toBeNull();
+	await h.deploy(artifact());
 });
 
 it('coordinates terminal deletion with only an old key/value administration table and arbitrary application tables', async () => {

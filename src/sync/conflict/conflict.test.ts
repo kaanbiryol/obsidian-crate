@@ -175,7 +175,7 @@ describe('classifyPaths (3-way hash)', () => {
 			path: 'note.md',
 			action: 'delete',
 			remoteHash: 'base',
-      remoteRevision: 'version-1',
+			remoteRevision: 'version-1',
 			cause: 'local-deleted',
 		}]);
 	});
@@ -310,10 +310,10 @@ describe('createConflictCopy', () => {
 
 describe('conflict copies preserve directories and hidden basenames', () => {
  it.each(['archive.v1/README', '.archive/README', '.gitignore', 'notes/.env'])('keeps %s in the same directory and round-trips the original', path => {
-  for (const copy of [getConflictFileName(path), getIncomingConflictFileName(path, 'a'.repeat(64))]) {
-   expect(copy.split('/').slice(0, -1)).toEqual(path.split('/').slice(0, -1));
-   expect(copy.startsWith(`${path} (conflict `)).toBe(true);
-   expect(getOriginalPathFromConflictFile(copy)).toBe(path);
-  }
+	for (const copy of [getConflictFileName(path), getIncomingConflictFileName(path, 'a'.repeat(64))]) {
+	 expect(copy.split('/').slice(0, -1)).toEqual(path.split('/').slice(0, -1));
+	 expect(copy.startsWith(`${path} (conflict `)).toBe(true);
+	 expect(getOriginalPathFromConflictFile(copy)).toBe(path);
+	}
  });
 });

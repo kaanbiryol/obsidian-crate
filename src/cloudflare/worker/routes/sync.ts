@@ -37,21 +37,21 @@ export async function handleSyncRoute(
 ): Promise<Response | null> {
 	const db = env.DB;
 	const bucket = env.BUCKET;
-    if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(bucket);
-    if (path === '/sync/checkpoints' && method === 'POST') return createSharedCheckpoint(bucket, db);
-    if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpoint);
-    if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpointFile);
-  if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, async () => {
-    if (!await wakeProjection(env)) throw new Error('Unable to resume reminder setup');
-  });
-  if (path === '/sync/import/complete' && method === 'POST') return finishInitialImport(request, db);
-  if (path === '/sync/import/readiness' && method === 'POST') return finishInitialReminderSetup(request, db);
-  if (path === '/sync/import/prune' && method === 'POST') return pruneInitialImport(request, db);
-  if (path === '/sync/import/upload' && (method === 'POST' || method === 'PUT')) {
-    // Hashing, R2 writes and D1 publication use the existing object's CPU allowance.
-    // The public Worker has already checked protocol, authorization and maintenance.
-    return forwardTransferRequest(request, env, TRANSFER_PATHS.importUpload);
-  }
+		if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(bucket);
+		if (path === '/sync/checkpoints' && method === 'POST') return createSharedCheckpoint(bucket, db);
+		if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpoint);
+		if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpointFile);
+	if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, async () => {
+		if (!await wakeProjection(env)) throw new Error('Unable to resume reminder setup');
+	});
+	if (path === '/sync/import/complete' && method === 'POST') return finishInitialImport(request, db);
+	if (path === '/sync/import/readiness' && method === 'POST') return finishInitialReminderSetup(request, db);
+	if (path === '/sync/import/prune' && method === 'POST') return pruneInitialImport(request, db);
+	if (path === '/sync/import/upload' && (method === 'POST' || method === 'PUT')) {
+		// Hashing, R2 writes and D1 publication use the existing object's CPU allowance.
+		// The public Worker has already checked protocol, authorization and maintenance.
+		return forwardTransferRequest(request, env, TRANSFER_PATHS.importUpload);
+	}
 
 	if (path === '/sync/check' && method === 'GET') {
 		return await handleCheckChanges(request, db);

@@ -225,27 +225,27 @@ export class CloudflareApiClient {
 		return { keys: response.result.map(object => object.key!), ...(next ? { cursor: next } : {}) };
 	}
 
-  async getRecoveryObject(accountId: string, bucketName: string, key: string): Promise<Uint8Array> {
-    const response = await this.transport(`${API_BASE_URL}${this.r2ObjectPath(accountId, bucketName, key)}`, {
-      method: 'GET', headers: { Authorization: `Bearer ${this.accessToken}` },
-    });
-    if (response.status !== 200 || !response.arrayBuffer) throw new CloudflareApiError(`Recovery object unavailable (${response.status})`, response.status, null);
-    return new Uint8Array(response.arrayBuffer);
-  }
-  async putRecoveryObject(accountId: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
-    if (!key.startsWith(BACKUPS_PREFIX)) throw new Error('Invalid checkpoint destination');
-    await this.request(this.r2ObjectPath(accountId, bucketName, key), {
-      method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
-    });
-  }
+	async getRecoveryObject(accountId: string, bucketName: string, key: string): Promise<Uint8Array> {
+		const response = await this.transport(`${API_BASE_URL}${this.r2ObjectPath(accountId, bucketName, key)}`, {
+			method: 'GET', headers: { Authorization: `Bearer ${this.accessToken}` },
+		});
+		if (response.status !== 200 || !response.arrayBuffer) throw new CloudflareApiError(`Recovery object unavailable (${response.status})`, response.status, null);
+		return new Uint8Array(response.arrayBuffer);
+	}
+	async putRecoveryObject(accountId: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
+		if (!key.startsWith(BACKUPS_PREFIX)) throw new Error('Invalid checkpoint destination');
+		await this.request(this.r2ObjectPath(accountId, bucketName, key), {
+			method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
+		});
+	}
 
-  /** Only the isolated restore workflow can write original object keys. */
-  async putRestoredObject(accountId: string, sourceBucket: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
-    if (bucketName === sourceBucket || !/^crate-[a-f0-9]{16}$/.test(bucketName)) throw new Error('Restore requires a separate bucket');
-    await this.request(this.r2ObjectPath(accountId, bucketName, key), {
-      method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
-    });
-  }
+	/** Only the isolated restore workflow can write original object keys. */
+	async putRestoredObject(accountId: string, sourceBucket: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
+		if (bucketName === sourceBucket || !/^crate-[a-f0-9]{16}$/.test(bucketName)) throw new Error('Restore requires a separate bucket');
+		await this.request(this.r2ObjectPath(accountId, bucketName, key), {
+			method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
+		});
+	}
 
 	async deleteR2Objects(origin: string, resetId: string, token: string, keys: string[]): Promise<void> {
 		await deleteResetWorkerObjects(this.transport, origin, resetId, token, keys);
@@ -317,13 +317,13 @@ export class CloudflareApiClient {
 		});
 	}
 
-  async verifyWorkerDeployment(origin: string, fingerprint: string): Promise<void> {
-    await verifyWorkerDeployment(this.transport, origin, fingerprint);
-  }
+	async verifyWorkerDeployment(origin: string, fingerprint: string): Promise<void> {
+		await verifyWorkerDeployment(this.transport, origin, fingerprint);
+	}
 
-  async verifyPublishedWorkerDeployment(origin: string, fingerprint: string): Promise<{ revision: number; schemaVersion: number; developmentBuild?: import('../protocol/server-build').DevelopmentBuild }> {
-    return verifyWorkerDeployment(this.transport, origin, fingerprint, true);
-  }
+	async verifyPublishedWorkerDeployment(origin: string, fingerprint: string): Promise<{ revision: number; schemaVersion: number; developmentBuild?: import('../protocol/server-build').DevelopmentBuild }> {
+		return verifyWorkerDeployment(this.transport, origin, fingerprint, true);
+	}
 
 	async updateWorkerSchedules(accountId: string, workerName: string, crons: string[]): Promise<void> {
 		await this.request(

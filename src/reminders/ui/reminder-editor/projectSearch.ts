@@ -7,22 +7,22 @@
  * Prefix matches are sorted first, then substring matches.
  */
 export function filterProjects(projects: string[], query: string): string[] {
-    const q = query.trim().toLowerCase();
-    if (!q) return projects;
+	const q = query.trim().toLowerCase();
+	if (!q) return projects;
 
-    const prefix: string[] = [];
-    const substring: string[] = [];
+	const prefix: string[] = [];
+	const substring: string[] = [];
 
-    for (const project of projects) {
-        const lower = project.toLowerCase();
-        if (lower.startsWith(q)) {
-            prefix.push(project);
-        } else if (lower.includes(q)) {
-            substring.push(project);
-        }
-    }
+	for (const project of projects) {
+		const lower = project.toLowerCase();
+		if (lower.startsWith(q)) {
+			prefix.push(project);
+		} else if (lower.includes(q)) {
+			substring.push(project);
+		}
+	}
 
-    return [...prefix, ...substring];
+	return [...prefix, ...substring];
 }
 
 /**
@@ -33,28 +33,28 @@ export function filterProjects(projects: string[], query: string): string[] {
  * The `#` must be at the start of the text or preceded by whitespace.
  */
 export function extractHashtagQuery(
-    text: string,
-    cursorOffset: number,
+	text: string,
+	cursorOffset: number,
 ): { query: string; startIndex: number } | null {
-    if (cursorOffset <= 0 || cursorOffset > text.length) return null;
+	if (cursorOffset <= 0 || cursorOffset > text.length) return null;
 
-    // Scan backwards from cursor to find '#'
-    let hashIndex = -1;
-    for (let i = cursorOffset - 1; i >= 0; i--) {
-        const ch = text[i];
-        if (ch === '#') {
-            // '#' must be at start or preceded by whitespace
-            if (i === 0 || /\s/.test(text[i - 1]!)) {
-                hashIndex = i;
-            }
-            break;
-        }
-        // Treat editor-inserted non-breaking spaces like ordinary token boundaries.
-        if (/\s/.test(ch!)) break;
-    }
+	// Scan backwards from cursor to find '#'
+	let hashIndex = -1;
+	for (let i = cursorOffset - 1; i >= 0; i--) {
+		const ch = text[i];
+		if (ch === '#') {
+			// '#' must be at start or preceded by whitespace
+			if (i === 0 || /\s/.test(text[i - 1]!)) {
+				hashIndex = i;
+			}
+			break;
+		}
+		// Treat editor-inserted non-breaking spaces like ordinary token boundaries.
+		if (/\s/.test(ch!)) break;
+	}
 
-    if (hashIndex === -1) return null;
+	if (hashIndex === -1) return null;
 
-    const query = text.substring(hashIndex + 1, cursorOffset);
-    return { query, startIndex: hashIndex };
+	const query = text.substring(hashIndex + 1, cursorOffset);
+	return { query, startIndex: hashIndex };
 }

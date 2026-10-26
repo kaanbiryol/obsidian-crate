@@ -154,58 +154,58 @@ function createFlushHarness(overrides: Partial<{
 }
 
 it('records the affected file and preserves earlier uploads if queue preparation fails', async () => {
-  const h = createFlushHarness({
-    prepareUploadFromPath: async path => {
-      if (path === 'broken.md') throw new Error('EACCES');
-      return { path, hash: 'a'.repeat(64), content: new ArrayBuffer(1), size: 1, contentType: 'text/plain' };
-    },
-    uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
-  });
-  for (let index = 0; index < 128; index++) h.pendingKeys.add(`sent-${index}.md`);
-  h.pendingKeys.add('broken.md');
-  await processPendingChanges(h.context);
-  expect(h.state.lastIssues).toEqual([{ path: 'broken.md', message: 'EACCES' }]);
-  expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
-    success: false, uploaded: 128, issues: [{ path: 'broken.md', message: 'EACCES' }], errors: ['broken.md: EACCES'],
-  }));
-  expect(h.pendingKeys.has('broken.md')).toBe(true);
+	const h = createFlushHarness({
+		prepareUploadFromPath: async path => {
+			if (path === 'broken.md') throw new Error('EACCES');
+			return { path, hash: 'a'.repeat(64), content: new ArrayBuffer(1), size: 1, contentType: 'text/plain' };
+		},
+		uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
+	});
+	for (let index = 0; index < 128; index++) h.pendingKeys.add(`sent-${index}.md`);
+	h.pendingKeys.add('broken.md');
+	await processPendingChanges(h.context);
+	expect(h.state.lastIssues).toEqual([{ path: 'broken.md', message: 'EACCES' }]);
+	expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
+		success: false, uploaded: 128, issues: [{ path: 'broken.md', message: 'EACCES' }], errors: ['broken.md: EACCES'],
+	}));
+	expect(h.pendingKeys.has('broken.md')).toBe(true);
 });
 
 it('backs off after a failed flush and resets after a successful one', async () => {
-  let failing = true;
-  const h = createFlushHarness({
-    prepareUploadFromPath: async path => {
-      if (failing) throw new Error('offline');
-      return { path, hash: 'a'.repeat(64), content: new ArrayBuffer(1), size: 1, contentType: 'text/plain' };
-    },
-    uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
-  });
-  const retryAfterFailure = vi.fn(), flushSucceeded = vi.fn();
-  Object.assign(h.context, { retryAfterFailure, flushSucceeded });
-  h.pendingKeys.add('note.md');
-  await processPendingChanges(h.context);
-  expect(retryAfterFailure).toHaveBeenCalledOnce();
-  expect(h.context.triggerDebouncedSync).not.toHaveBeenCalled();
-  failing = false;
-  await processPendingChanges(h.context);
-  expect(flushSucceeded).toHaveBeenCalledOnce();
+	let failing = true;
+	const h = createFlushHarness({
+		prepareUploadFromPath: async path => {
+			if (failing) throw new Error('offline');
+			return { path, hash: 'a'.repeat(64), content: new ArrayBuffer(1), size: 1, contentType: 'text/plain' };
+		},
+		uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
+	});
+	const retryAfterFailure = vi.fn(), flushSucceeded = vi.fn();
+	Object.assign(h.context, { retryAfterFailure, flushSucceeded });
+	h.pendingKeys.add('note.md');
+	await processPendingChanges(h.context);
+	expect(retryAfterFailure).toHaveBeenCalledOnce();
+	expect(h.context.triggerDebouncedSync).not.toHaveBeenCalled();
+	failing = false;
+	await processPendingChanges(h.context);
+	expect(flushSucceeded).toHaveBeenCalledOnce();
 });
 
 it('settles an oversized file without failing the rest of its batch', async () => {
-  const h = createFlushHarness({
-    prepareUploadFromPath: async path => {
-      if (path === 'big.bin') throw new SkippedFileError(path);
-      return { path, hash: 'a'.repeat(64), content: new ArrayBuffer(1), size: 1, contentType: 'text/plain' };
-    },
-    uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
-  });
-  h.pendingKeys.add('big.bin');
-  h.pendingKeys.add('note.md');
-  await processPendingChanges(h.context);
-  expect(h.pendingKeys.size).toBe(0);
-  expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
-    success: true, uploaded: 1, errors: [], issues: [{ path: 'big.bin', message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' }],
-  }));
+	const h = createFlushHarness({
+		prepareUploadFromPath: async path => {
+			if (path === 'big.bin') throw new SkippedFileError(path);
+			return { path, hash: 'a'.repeat(64), content: new ArrayBuffer(1), size: 1, contentType: 'text/plain' };
+		},
+		uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
+	});
+	h.pendingKeys.add('big.bin');
+	h.pendingKeys.add('note.md');
+	await processPendingChanges(h.context);
+	expect(h.pendingKeys.size).toBe(0);
+	expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
+		success: true, uploaded: 1, errors: [], issues: [{ path: 'big.bin', message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' }],
+	}));
 });
 
 function createNamedAbortError(message = 'Sync request aborted'): Error {
@@ -246,7 +246,7 @@ describe('processPendingChanges', () => {
 		expect(harness.batchDelete).toHaveBeenCalledWith(
 			['notes/old.md'],
 			{ 'notes/old.md': 'd'.repeat(64) },
-      { 'notes/old.md': 'version-1' },
+			{ 'notes/old.md': 'version-1' },
 		);
 		expect(harness.setEntry).toHaveBeenCalledWith(
 			'notes/a.md',

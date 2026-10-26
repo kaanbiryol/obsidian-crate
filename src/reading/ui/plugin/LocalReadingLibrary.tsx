@@ -29,9 +29,9 @@ export function LocalReadingLibrary({ plugin, library, renderNavigation }: { plu
 	}, [plugin, requested, snapshot.items, open]);
 	const capturing = Boolean(item && library.isCapturing(item));
 	return <ReadingDialogHost.Provider value={ObsidianReadingDialog}><ReadingLibraryPanel listStyle={listStyle} snapshot={snapshot}
-        renderNavigation={renderNavigation}
-        readerMotion={reduceMotion ? 'none' : 'slide'}
-        renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
+		renderNavigation={renderNavigation}
+		readerMotion={reduceMotion ? 'none' : 'slide'}
+		renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
 		onAdd={() => new AddReadingLinkModal(plugin, open).open()}
 		onOpen={open}
 		onEnrich={async (target, source) => { await library.enrich(target, source); await open(target); }}

@@ -213,11 +213,11 @@ export function resolveLogicalCursorPosition(
  * @returns Character offset from start, or null if no selection
  */
 export const saveCursorPosition = (element: HTMLElement | null): number | null => {
-    if (!element) return null;
+	if (!element) return null;
 
-    const range = getEditorSelectionRange(element);
-    if (!range) return null;
-    return getLogicalCursorOffset(element, range.endContainer, range.endOffset);
+	const range = getEditorSelectionRange(element);
+	if (!range) return null;
+	return getLogicalCursorOffset(element, range.endContainer, range.endOffset);
 };
 
 /**
@@ -226,41 +226,41 @@ export const saveCursorPosition = (element: HTMLElement | null): number | null =
  * @param position - Character offset to restore
  */
 const restoreCursorPosition = (element: HTMLElement | null, position: number | null): void => {
-    if (position === null || !element) return;
+	if (position === null || !element) return;
 
-    const sel = element.ownerDocument.getSelection();
-    if (!sel) return;
+	const sel = element.ownerDocument.getSelection();
+	if (!sel) return;
 
-    const resolved = resolveLogicalCursorPosition(element, position);
-    const range = element.ownerDocument.createRange();
+	const resolved = resolveLogicalCursorPosition(element, position);
+	const range = element.ownerDocument.createRange();
 
-    if (!resolved) {
-        range.selectNodeContents(element);
-        range.collapse(false);
-        sel.setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
-        return;
-    }
+	if (!resolved) {
+		range.selectNodeContents(element);
+		range.collapse(false);
+		sel.setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
+		return;
+	}
 
-    if (resolved.type === 'after-node') {
-        range.setStartAfter(resolved.node);
-    } else {
-        range.setStart(resolved.container, resolved.offset);
-    }
+	if (resolved.type === 'after-node') {
+		range.setStartAfter(resolved.node);
+	} else {
+		range.setStart(resolved.container, resolved.offset);
+	}
 
-    range.collapse(true);
-    sel.setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
+	range.collapse(true);
+	sel.setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
 };
 
 /**
  * Move cursor to end of contenteditable element
  */
 export const moveCursorToEnd = (element: HTMLElement | null): void => {
-    if (!element) return;
+	if (!element) return;
 
-    // Let a stateful editor move its own selection before reconciling the DOM.
-    if (element.dataset?.editor === 'lexical') {
-        element.dispatchEvent(new Event('crate-editor-select-end'));
-    }
+	// Let a stateful editor move its own selection before reconciling the DOM.
+	if (element.dataset?.editor === 'lexical') {
+		element.dispatchEvent(new Event('crate-editor-select-end'));
+	}
 
-    restoreCursorPosition(element, getLogicalTextLength(element));
+	restoreCursorPosition(element, getLogicalTextLength(element));
 };

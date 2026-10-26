@@ -4,52 +4,52 @@ export type Priority = 1 | 4;
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly';
 
 export interface RecurrenceRule {
-  frequency: RecurrenceFrequency;
-  interval?: number;           // every N days/weeks/months (default: 1)
-  daysOfWeek?: number[];       // 0=Sun, 1=Mon...6=Sat (for weekly)
-  dayOfMonth?: number;         // 1-31 (for monthly)
-  endDate?: string;            // optional end date (ISO string)
-  count?: number;              // optional max occurrences
-  completedCount?: number;     // persisted completed occurrences within this rule
-  hour?: number;               // 0-23, time of day for recurring reminder
-  minute?: number;             // 0-59, time of day for recurring reminder
-  second?: number;             // 0-59, when supplied by Chrono
-  millisecond?: number;        // 0-999, when supplied by Chrono
-  timezone?: string;           // IANA timezone or fixed ±HH:MM offset for wall-clock recurrence semantics
+	frequency: RecurrenceFrequency;
+	interval?: number;           // every N days/weeks/months (default: 1)
+	daysOfWeek?: number[];       // 0=Sun, 1=Mon...6=Sat (for weekly)
+	dayOfMonth?: number;         // 1-31 (for monthly)
+	endDate?: string;            // optional end date (ISO string)
+	count?: number;              // optional max occurrences
+	completedCount?: number;     // persisted completed occurrences within this rule
+	hour?: number;               // 0-23, time of day for recurring reminder
+	minute?: number;             // 0-59, time of day for recurring reminder
+	second?: number;             // 0-59, when supplied by Chrono
+	millisecond?: number;        // 0-999, when supplied by Chrono
+	timezone?: string;           // IANA timezone or fixed ±HH:MM offset for wall-clock recurrence semantics
 }
 
 export interface Reminder {
-  id: string; // Unique identifier for the reminder
-  content: string;
-  description?: string; // Optional multi-line notes stored as indented lines in markdown
-  dueDate?: string; // ISO date string
-  dueDatetime?: string; // ISO datetime string
-  priority: Priority;
-  completed: boolean;
-  project?: string; // Project tag for organizing reminders (defaults to "Inbox")
-  recurrence?: RecurrenceRule; // Optional recurrence rule for recurring reminders
-  lineNumber?: number; // Line position in source markdown file (for manual ordering)
+	id: string; // Unique identifier for the reminder
+	content: string;
+	description?: string; // Optional multi-line notes stored as indented lines in markdown
+	dueDate?: string; // ISO date string
+	dueDatetime?: string; // ISO datetime string
+	priority: Priority;
+	completed: boolean;
+	project?: string; // Project tag for organizing reminders (defaults to "Inbox")
+	recurrence?: RecurrenceRule; // Optional recurrence rule for recurring reminders
+	lineNumber?: number; // Line position in source markdown file (for manual ordering)
 }
 
 export interface CreateReminderParams {
-  content: string;
-  description?: string;
-  dueDate?: string;
-  dueDatetime?: string;
-  priority?: Priority;
-  project?: string; // Project tag (defaults to "Inbox")
-  id?: string; // Optional: specify custom ID
-  recurrence?: RecurrenceRule; // Optional recurrence rule
+	content: string;
+	description?: string;
+	dueDate?: string;
+	dueDatetime?: string;
+	priority?: Priority;
+	project?: string; // Project tag (defaults to "Inbox")
+	id?: string; // Optional: specify custom ID
+	recurrence?: RecurrenceRule; // Optional recurrence rule
 }
 
 export interface UpdateReminderParams {
-  expectedRevision?: string;
-  content?: string;
-  description?: string;
-  dueDate?: string;
-  dueDatetime?: string;
-  priority?: Priority;
-  completed?: boolean;
-  project?: string; // Project tag
-  recurrence?: RecurrenceRule | null; // Optional recurrence rule (null to remove)
+	expectedRevision?: string;
+	content?: string;
+	description?: string;
+	dueDate?: string;
+	dueDatetime?: string;
+	priority?: Priority;
+	completed?: boolean;
+	project?: string; // Project tag
+	recurrence?: RecurrenceRule | null; // Optional recurrence rule (null to remove)
 }

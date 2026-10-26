@@ -4,13 +4,13 @@ import { HttpError, SyncApiClient } from './client';
 import type { ApiHttpResponse, ApiHttpTransport } from './http';
 
 function mockTransport(...responses: Response[]) {
-  const explicitMetadata = responses.some(response => response.headers.get('X-Test-Metadata') === 'true');
+	const explicitMetadata = responses.some(response => response.headers.get('X-Test-Metadata') === 'true');
 	let responseIndex = 0;
 	return vi.fn<ApiHttpTransport>(async request => {
-    if (request.url.endsWith('/.well-known/crate') && !explicitMetadata) {
-      const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
-      return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
-    }
+		if (request.url.endsWith('/.well-known/crate') && !explicitMetadata) {
+			const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
+			return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
+		}
 		const response = responses[responseIndex++];
 		if (!response) throw new Error('No mock response available');
 		const arrayBuffer = await response.arrayBuffer();
@@ -62,7 +62,7 @@ describe('SyncApiClient', () => {
 		};
 		const transport: ApiHttpTransport = async request => {
 			if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
-      if (request.url.includes('/sync/upload')) {
+			if (request.url.includes('/sync/upload')) {
 				return new Promise(resolve => {
 					commit = () => {
 						remoteFiles = { 'note.md': { hash, size: 1, modified: '2026-01-01', revision: 'r1' } };
@@ -80,7 +80,7 @@ describe('SyncApiClient', () => {
 		void upload.then(() => { accepted = true; }, () => {});
 		const assertion = expect(upload).rejects.toThrow(reason === 'abort' ? 'Sync request aborted' : 'Request timed out');
 		await vi.waitFor(() => expect(commit).toBeTypeOf('function'));
-    if (reason === 'abort') controller.abort();
+		if (reason === 'abort') controller.abort();
 		else await vi.advanceTimersByTimeAsync(120_000);
 		await assertion;
 		commit();
@@ -381,30 +381,30 @@ describe('SyncApiClient', () => {
 });
 
 describe('asset batch negotiation', () => {
-  beforeEach(() => { vi.stubGlobal('window', { setTimeout, clearTimeout }); });
-  afterEach(() => { vi.unstubAllGlobals(); });
+	beforeEach(() => { vi.stubGlobal('window', { setTimeout, clearTimeout }); });
+	afterEach(() => { vi.unstubAllGlobals(); });
 it.each([true, 'bulk'] as const)('negotiates larger asset uploads with server support=%s', async supported => {
-  const batches: Array<Array<{ path: string; operationId: string }>> = [];
-  const transport: ApiHttpTransport = async request => {
-    let value: unknown;
-    if (request.url.endsWith('/.well-known/crate')) {
-      value = { service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL,
-        reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: supported === 'bulk' ? ['sync-v1', 'bulk-new-file-uploads-v1'] : supported ? ['sync-v1'] : [] };
-    } else {
-      const { files } = JSON.parse(request.body as string) as { files: Array<{ path: string; operationId: string }> };
-      batches.push(files);
-      value = { success: true, results: files.map(file => ({ path: file.path, success: true, hash: 'h', revision: 'r' })) };
-    }
-    const text = JSON.stringify(value);
-    return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
-  };
-  const client = new SyncApiClient('https://worker.example', 'token', transport);
-  const response = await client.unjournaled.batchUpload(Array.from({ length: 8 }, (_, index) => ({
-    path: `${index}.svg`, content: btoa('x'), size: 1, hash: 'h', contentType: 'image/svg+xml', expectedHash: null,
-  })));
-  expect(response.results).toHaveLength(8);
-  expect(batches.map(batch => batch.length)).toEqual(supported === 'bulk' ? [8] : [4, 4]);
-  expect(new Set(batches.flat().map(file => file.operationId)).size).toBe(8);
+	const batches: Array<Array<{ path: string; operationId: string }>> = [];
+	const transport: ApiHttpTransport = async request => {
+		let value: unknown;
+		if (request.url.endsWith('/.well-known/crate')) {
+			value = { service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL,
+				reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: supported === 'bulk' ? ['sync-v1', 'bulk-new-file-uploads-v1'] : supported ? ['sync-v1'] : [] };
+		} else {
+			const { files } = JSON.parse(request.body as string) as { files: Array<{ path: string; operationId: string }> };
+			batches.push(files);
+			value = { success: true, results: files.map(file => ({ path: file.path, success: true, hash: 'h', revision: 'r' })) };
+		}
+		const text = JSON.stringify(value);
+		return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
+	};
+	const client = new SyncApiClient('https://worker.example', 'token', transport);
+	const response = await client.unjournaled.batchUpload(Array.from({ length: 8 }, (_, index) => ({
+		path: `${index}.svg`, content: btoa('x'), size: 1, hash: 'h', contentType: 'image/svg+xml', expectedHash: null,
+	})));
+	expect(response.results).toHaveLength(8);
+	expect(batches.map(batch => batch.length)).toEqual(supported === 'bulk' ? [8] : [4, 4]);
+	expect(new Set(batches.flat().map(file => file.operationId)).size).toBe(8);
 });
 
 });

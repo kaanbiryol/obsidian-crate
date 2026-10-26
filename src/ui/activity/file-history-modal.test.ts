@@ -49,8 +49,8 @@ it('opens a deleted file directly from Sync Activity', async () => {
 });
 it('loads older versions for the selected file and confirms restore before mutation', async () => {
  const list = vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>()
-  .mockResolvedValueOnce({ versions: [row], hasMore: true, nextCursor: 'older' })
-  .mockResolvedValue({ versions: [{ ...row, storage_key: 'oldest' }], hasMore: false });
+	.mockResolvedValueOnce({ versions: [row], hasMore: true, nextCursor: 'older' })
+	.mockResolvedValue({ versions: [{ ...row, storage_key: 'oldest' }], hasMore: false });
  const { runtime } = await open(list, [], 'older.md');
  await vi.waitFor(() => expect(button('Older versions')).toBeDefined()); button('Older versions').click();
  await vi.waitFor(() => expect(list).toHaveBeenLastCalledWith({ path: 'older.md', cursor: 'older' }));

@@ -11,7 +11,7 @@ vi.mock('./session/session', () => ({
 	assertReadingSession: () => { if (!storage.current) throw new Error('Reading sign-in changed.'); },
 }));
 vi.mock('./storage/storage', () => ({
-  pruneReadingAttempts: vi.fn(async () => {}),
+	pruneReadingAttempts: vi.fn(async () => {}),
 	readingLock: async <T>(action: () => Promise<T>) => action(),
 	readingDrainLock: async <T>(action: () => Promise<T>) => action(),
 	pendingReading: async (session: ReadingSession) => structuredClone(storage.values.get(`pending:${session.id}`) ?? []) as PendingReading[],

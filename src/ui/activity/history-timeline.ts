@@ -8,8 +8,8 @@ import { getSyncIssues } from '../../sync/issues';
 import { renderSyncIssues, type SyncIssueRenderOptions } from './sync-issues';
 
 export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[], openFileHistory?: (path: string) => void, issueOptions: SyncIssueRenderOptions = {}): void {
-    // Server-only restore points have no local sync activity to display.
-    const activity = history.filter(entry => entry.checkpointFileCount === undefined);
+	// Server-only restore points have no local sync activity to display.
+	const activity = history.filter(entry => entry.checkpointFileCount === undefined);
 	if (activity.length === 0) {
 		renderEmptyState(container, 'clock', 'No activity yet', 'Sync history will appear here.');
 		return;
@@ -17,9 +17,9 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 
 	const timeline = container.createDiv({ cls: 'crate-activity-timeline' });
 	for (const group of groupHistory(activity)) {
-        const section = timeline.createEl('section', { cls: 'crate-history-day' });
-        section.createEl('h3', { text: group.label, cls: 'crate-history-day-label' });
-        for (const { entry, count } of group.rows) {
+		const section = timeline.createEl('section', { cls: 'crate-history-day' });
+		section.createEl('h3', { text: group.label, cls: 'crate-history-day-label' });
+		for (const { entry, count } of group.rows) {
 			const entryEl = section.createDiv({ cls: 'crate-history-entry' });
 			if (!entry.success) entryEl.addClass('is-error');
 
@@ -34,7 +34,7 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 				renderHistoryHeader(card, entry, false, count);
 			}
 		}
-    }
+	}
 }
 
 function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expandable: boolean, count = 1): void {
@@ -46,12 +46,12 @@ function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expa
 	renderHistorySummary(header, entry, count);
 	const meta = header.createDiv({ cls: 'crate-history-meta' });
 	if (entry.type !== 'sync') {
-        meta.createSpan({ text: entry.type === 'initial' ? 'Initial sync' : 'Full sync', cls: 'crate-history-type' });
-    }
+		meta.createSpan({ text: entry.type === 'initial' ? 'Initial sync' : 'Full sync', cls: 'crate-history-type' });
+	}
 	const timestamp = meta.createSpan({ text: historyTime(entry), cls: 'crate-history-time' });
-    timestamp.setAttribute('title', new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'long', timeStyle: 'long', hourCycle: 'h23',
-    }).format(new Date(entry.timestamp)));
+	timestamp.setAttribute('title', new Intl.DateTimeFormat(undefined, {
+		dateStyle: 'long', timeStyle: 'long', hourCycle: 'h23',
+	}).format(new Date(entry.timestamp)));
 }
 
 function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry, openFileHistory?: (path: string) => void, issueOptions: SyncIssueRenderOptions = {}): void {
@@ -104,31 +104,31 @@ function hasFilePaths(entry: SyncHistoryEntry): boolean {
 }
 
 function renderHistorySummary(header: HTMLElement, entry: SyncHistoryEntry, count: number): void {
-    const summary = header.createDiv({ cls: 'crate-history-summary' });
-    if (!entry.success) {
-        summary.createSpan({
-            text: `Failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`,
-            cls: 'crate-history-summary-error',
-        });
-    }
-    const metrics = [
-        { count: entry.uploaded, label: 'uploaded' },
-        { count: entry.downloaded, label: 'downloaded' },
-        { count: entry.merged, label: 'merged' },
-        { count: entry.deleted, label: 'deleted' },
-        { count: entry.conflictCount, label: entry.conflictCount === 1 ? 'conflict' : 'conflicts' },
-        { count: entry.resolvedRaceCount ?? 0, label: entry.resolvedRaceCount === 1 ? 'race resolved' : 'races resolved' },
-    ].filter(metric => metric.count > 0);
-    for (const [index, metric] of metrics.entries()) {
-        if (index > 0) summary.createSpan({ text: '·', cls: 'crate-history-separator', attr: { 'aria-hidden': 'true' } });
-        const stat = summary.createSpan({ cls: 'crate-history-stat' });
-        const transfer = ['uploaded', 'downloaded', 'merged', 'deleted'].includes(metric.label);
-        if (transfer) stat.createSpan({ text: metric.label[0]!.toUpperCase() + metric.label.slice(1) });
-        stat.createSpan({ text: metric.count.toLocaleString(), cls: 'crate-history-count' });
-        if (transfer && metrics.length === 1) stat.createSpan({ text: metric.count === 1 ? 'file' : 'files' });
-        if (!transfer) stat.createSpan({ text: metric.label });
-    }
-    if (entry.success && metrics.length === 0) {
-        summary.createSpan({ text: count > 1 ? `No changes · ${count.toLocaleString()} checks` : 'No changes', cls: 'crate-history-unchanged' });
-    }
+	const summary = header.createDiv({ cls: 'crate-history-summary' });
+	if (!entry.success) {
+		summary.createSpan({
+			text: `Failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`,
+			cls: 'crate-history-summary-error',
+		});
+	}
+	const metrics = [
+		{ count: entry.uploaded, label: 'uploaded' },
+		{ count: entry.downloaded, label: 'downloaded' },
+		{ count: entry.merged, label: 'merged' },
+		{ count: entry.deleted, label: 'deleted' },
+		{ count: entry.conflictCount, label: entry.conflictCount === 1 ? 'conflict' : 'conflicts' },
+		{ count: entry.resolvedRaceCount ?? 0, label: entry.resolvedRaceCount === 1 ? 'race resolved' : 'races resolved' },
+	].filter(metric => metric.count > 0);
+	for (const [index, metric] of metrics.entries()) {
+		if (index > 0) summary.createSpan({ text: '·', cls: 'crate-history-separator', attr: { 'aria-hidden': 'true' } });
+		const stat = summary.createSpan({ cls: 'crate-history-stat' });
+		const transfer = ['uploaded', 'downloaded', 'merged', 'deleted'].includes(metric.label);
+		if (transfer) stat.createSpan({ text: metric.label[0]!.toUpperCase() + metric.label.slice(1) });
+		stat.createSpan({ text: metric.count.toLocaleString(), cls: 'crate-history-count' });
+		if (transfer && metrics.length === 1) stat.createSpan({ text: metric.count === 1 ? 'file' : 'files' });
+		if (!transfer) stat.createSpan({ text: metric.label });
+	}
+	if (entry.success && metrics.length === 0) {
+		summary.createSpan({ text: count > 1 ? `No changes · ${count.toLocaleString()} checks` : 'No changes', cls: 'crate-history-unchanged' });
+	}
 }

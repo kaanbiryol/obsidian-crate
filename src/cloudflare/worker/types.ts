@@ -1,8 +1,8 @@
 import type { NotificationRateLimiter } from './rate-limit';
 export interface Env {
-  /** Local-only native public-network binding. Hosted deployments use strictly public global fetch. */
-  READING_FETCH?: { fetch(request: Request): Promise<Response> };
-  CRATE_DEPLOYMENT_FINGERPRINT?: string;
+	/** Local-only native public-network binding. Hosted deployments use strictly public global fetch. */
+	READING_FETCH?: { fetch(request: Request): Promise<Response> };
+	CRATE_DEPLOYMENT_FINGERPRINT?: string;
 	CRATE_PUBLIC_ORIGIN?: string;
 	NOTIFICATION_REQUEST_LIMITER?: NotificationRateLimiter;
 	BUCKET: R2Bucket;

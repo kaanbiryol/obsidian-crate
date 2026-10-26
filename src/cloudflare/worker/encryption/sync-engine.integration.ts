@@ -108,31 +108,31 @@ it.each(['sync', 'selected', 'wire-fallback'])('reconciles encrypted edits made 
 });
 
 it('adopts encrypted server settings on an empty vault first sync without uploading its setup defaults', async () => {
-  const first = await device('first'), path = '.obsidian/appearance.json';
-  first.disk.write(path, '{"theme":"private-vault-theme"}'); first.disk.write('note.md', 'Private note'); await sync(first);
-  const before = await first.api.getManifest();
-  const second = await device('empty-vault');
-  second.disk.write(path, '{"theme":"new-vault-default"}'); await second.engine.onRawFileChange(path);
-  const pulled = await sync(second);
-  expect(pulled.uploaded).toBe(0); expect(pulled.conflicts).toEqual([]);
-  expect(second.disk.text(path)).toBe('{"theme":"private-vault-theme"}');
-  expect((await first.api.getManifest()).files).toEqual(before.files);
-  expect(await (await env.BUCKET.get((await stored(path))!.storage_key))!.text()).not.toContain('private-vault-theme');
+	const first = await device('first'), path = '.obsidian/appearance.json';
+	first.disk.write(path, '{"theme":"private-vault-theme"}'); first.disk.write('note.md', 'Private note'); await sync(first);
+	const before = await first.api.getManifest();
+	const second = await device('empty-vault');
+	second.disk.write(path, '{"theme":"new-vault-default"}'); await second.engine.onRawFileChange(path);
+	const pulled = await sync(second);
+	expect(pulled.uploaded).toBe(0); expect(pulled.conflicts).toEqual([]);
+	expect(second.disk.text(path)).toBe('{"theme":"private-vault-theme"}');
+	expect((await first.api.getManifest()).files).toEqual(before.files);
+	expect(await (await env.BUCKET.get((await stored(path))!.storage_key))!.text()).not.toContain('private-vault-theme');
 });
 
 it('decrypts retained baselines and shared history when comparing unsynced local settings', async () => {
-  const first = await device('first'), path = '.obsidian/appearance.json';
-  const original = '{"theme":"original private setting"}', local = '{"theme":"local unsynced setting"}';
-  first.disk.write(path, original); await sync(first);
-  const checkpoint = await first.engine.saveSharedHistoryCheckpoint(); expect(checkpoint).toBeDefined();
-  const second = await device('second'); await sync(second);
-  second.disk.write(path, '{"theme":"new remote setting"}'); await sync(second);
-  first.disk.write(path, local); await first.engine.onRawFileChange(path);
-  expect(await first.engine.loadPendingDiff(path, false)).toMatchObject({ before: original, after: local });
-  const comparison = await first.engine.loadHistoryComparison(checkpoint!.id, true);
-  expect(comparison.items).toContainEqual({ path, action: 'modified' });
-  expect(await comparison.preview(path)).toEqual({ current: local, saved: original });
-  expect(first.disk.text(path)).toBe(local);
+	const first = await device('first'), path = '.obsidian/appearance.json';
+	const original = '{"theme":"original private setting"}', local = '{"theme":"local unsynced setting"}';
+	first.disk.write(path, original); await sync(first);
+	const checkpoint = await first.engine.saveSharedHistoryCheckpoint(); expect(checkpoint).toBeDefined();
+	const second = await device('second'); await sync(second);
+	second.disk.write(path, '{"theme":"new remote setting"}'); await sync(second);
+	first.disk.write(path, local); await first.engine.onRawFileChange(path);
+	expect(await first.engine.loadPendingDiff(path, false)).toMatchObject({ before: original, after: local });
+	const comparison = await first.engine.loadHistoryComparison(checkpoint!.id, true);
+	expect(comparison.items).toContainEqual({ path, action: 'modified' });
+	expect(await comparison.preview(path)).toEqual({ current: local, saved: original });
+	expect(first.disk.text(path)).toBe(local);
 });
 
 it.each(['delete-first', 'edit-first'])('preserves encrypted offline edits in delete races (%s)', async order => {
@@ -191,33 +191,33 @@ it('round-trips an encrypted attachment at the 25 MiB plaintext limit', async ()
 }, 30_000); // Two-device encryption and transfer of 25 MiB is a correctness check, not a 5-second benchmark.
 
 it('preserves encrypted file renames and moves into and out of a reminders folder on another device', async () => {
-  const first = await device('move-first'), second = await device('move-second');
-  await first.disk.vault.adapter.mkdir('Reminders');
-  first.disk.write('Reminders/Original.md', 'Private movable note');
-  await sync(first); await sync(second);
-  first.disk.rename('Reminders/Original.md', 'Moved.md');
-  first.engine.onFileRename(first.disk.vault.getAbstractFileByPath('Moved.md')!, 'Reminders/Original.md');
-  await sync(first); await sync(second);
-  expect(second.disk.paths()).toEqual(['Moved.md']);
-  expect(second.disk.text('Moved.md')).toBe('Private movable note');
-  first.disk.rename('Moved.md', 'Reminders/Renamed.md');
-  first.engine.onFileRename(first.disk.vault.getAbstractFileByPath('Reminders/Renamed.md')!, 'Moved.md');
-  await sync(first); await sync(second);
-  expect(second.disk.paths()).toEqual(['Reminders/Renamed.md']);
-  expect(second.disk.text('Reminders/Renamed.md')).toBe('Private movable note');
+	const first = await device('move-first'), second = await device('move-second');
+	await first.disk.vault.adapter.mkdir('Reminders');
+	first.disk.write('Reminders/Original.md', 'Private movable note');
+	await sync(first); await sync(second);
+	first.disk.rename('Reminders/Original.md', 'Moved.md');
+	first.engine.onFileRename(first.disk.vault.getAbstractFileByPath('Moved.md')!, 'Reminders/Original.md');
+	await sync(first); await sync(second);
+	expect(second.disk.paths()).toEqual(['Moved.md']);
+	expect(second.disk.text('Moved.md')).toBe('Private movable note');
+	first.disk.rename('Moved.md', 'Reminders/Renamed.md');
+	first.engine.onFileRename(first.disk.vault.getAbstractFileByPath('Reminders/Renamed.md')!, 'Moved.md');
+	await sync(first); await sync(second);
+	expect(second.disk.paths()).toEqual(['Reminders/Renamed.md']);
+	expect(second.disk.text('Reminders/Renamed.md')).toBe('Private movable note');
 });
 
 it('syncs a renamed reminders folder without resurrecting its old path', async () => {
-  const first = await device('folder-first'), second = await device('folder-second');
-  await first.disk.vault.adapter.mkdir('Reminders');
-  first.disk.write('Reminders/Inbox.md', 'Private moved folder content'); await sync(first); await sync(second);
-  await first.disk.vault.adapter.mkdir('Tasks');
-  first.disk.rename('Reminders/Inbox.md', 'Tasks/Inbox.md');
-  first.engine.onFileRename({ path: 'Tasks' } as never, 'Reminders');
-  // One vault key encrypts every folder, so a folder rename is an ordinary encrypted sync.
-  first.close(); await first.engine.waitForIdle();
-  await open(first); await sync(first); await sync(second);
-  await converge([first, second], { 'Tasks/Inbox.md': 'Private moved folder content' });
+	const first = await device('folder-first'), second = await device('folder-second');
+	await first.disk.vault.adapter.mkdir('Reminders');
+	first.disk.write('Reminders/Inbox.md', 'Private moved folder content'); await sync(first); await sync(second);
+	await first.disk.vault.adapter.mkdir('Tasks');
+	first.disk.rename('Reminders/Inbox.md', 'Tasks/Inbox.md');
+	first.engine.onFileRename({ path: 'Tasks' } as never, 'Reminders');
+	// One vault key encrypts every folder, so a folder rename is an ordinary encrypted sync.
+	first.close(); await first.engine.waitForIdle();
+	await open(first); await sync(first); await sync(second);
+	await converge([first, second], { 'Tasks/Inbox.md': 'Private moved folder content' });
 });
 
 it('republishes unchanged notes so a newly chosen reminders folder gets its schedules', async () => {

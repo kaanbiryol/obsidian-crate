@@ -93,16 +93,16 @@ it('resumes a cold batch after committed response loss and retains a later local
 });
 
 it('uses larger commits for the initial import', async () => {
-  const client = await device();
-  for (let index = 0; index < 64; index++) client.disk.write(`initial-${index}.md`, `Initial note ${index}`);
-  const batch = vi.spyOn(client.api.initialImport, 'upload');
-  const result = await client.engine.sync();
-  expect(result.errors).toEqual([]);
-  expect(result.uploaded).toBe(64);
-  expect(batch.mock.calls.map(([, files]) => files.length)).toEqual([32, 32]);
-  expect(client.requests.filter(route => route === 'POST /sync/import/upload')).toHaveLength(2);
-  expect(Object.keys(client.checkpoint().files)).toHaveLength(64);
-  for (let index = 0; index < 64; index++) {
-    expect(await remote(client, `initial-${index}.md`)).toBe(`Initial note ${index}`);
-  }
+	const client = await device();
+	for (let index = 0; index < 64; index++) client.disk.write(`initial-${index}.md`, `Initial note ${index}`);
+	const batch = vi.spyOn(client.api.initialImport, 'upload');
+	const result = await client.engine.sync();
+	expect(result.errors).toEqual([]);
+	expect(result.uploaded).toBe(64);
+	expect(batch.mock.calls.map(([, files]) => files.length)).toEqual([32, 32]);
+	expect(client.requests.filter(route => route === 'POST /sync/import/upload')).toHaveLength(2);
+	expect(Object.keys(client.checkpoint().files)).toHaveLength(64);
+	for (let index = 0; index < 64; index++) {
+		expect(await remote(client, `initial-${index}.md`)).toBe(`Initial note ${index}`);
+	}
 });

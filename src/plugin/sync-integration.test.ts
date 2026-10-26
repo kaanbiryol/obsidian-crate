@@ -16,11 +16,11 @@ function setup() {
  let fileMenu!: (menu: Menu, file: TAbstractFile) => void;
  const file = Object.assign(new TFile(), { path: 'Notes/Inbox.md' });
  const workspace = {
-  getActiveFile: vi.fn<() => TFile | null>(() => file),
-  on: vi.fn((_event: string, callback: typeof fileMenu) => { fileMenu = callback; return { event: 'file-menu' }; }),
+	getActiveFile: vi.fn<() => TFile | null>(() => file),
+	on: vi.fn((_event: string, callback: typeof fileMenu) => { fileMenu = callback; return { event: 'file-menu' }; }),
  };
  const plugin = { app: { workspace }, syncRuntime: { isConfigured: vi.fn(() => true) },
-  addCommand: (command: Command) => commands.push(command), registerEvent: vi.fn(),
+	addCommand: (command: Command) => commands.push(command), registerEvent: vi.fn(),
  };
  registerSyncCommands(plugin as unknown as CratePlugin);
  return { plugin, workspace, file, commands, fileMenu };

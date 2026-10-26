@@ -67,7 +67,7 @@ describe('canonical reminder dates', () => {
 		const reminder = record(rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date('2099-03-01T14:00:00Z'), priority: 4, recurrence: rule, hasTime: true, reminderId: 'one' }));
 		const draft = buildModalDraft(reminder, null);
 		draft.content = draft.content.replace('Task', 'Edited');
-    Object.assign(draft, deriveDraftPatchFromContent(draft, ['Inbox']));
+		Object.assign(draft, deriveDraftPatchFromContent(draft, ['Inbox']));
 		const body = buildReminderMutationBody({ config: { folderPath: 'Reminders' }, draft, mode: 'edit', projects: ['Inbox'], selectedProject: null });
 		expect(body.recurrence).toEqual(rule);
 		expect(body.dueDatetime).toBe('2099-03-01T14:00:00.000Z');
@@ -79,20 +79,20 @@ describe('canonical reminder dates', () => {
 });
 
 it.each(['2099-03-01T14:00:37.123Z', '2026-11-01T06:30:37.123Z'])('preserves exact instant through plugin and PWA title-edit form derivation: %s', instant => {
-  process.env.TZ = 'America/New_York'; resetLocalTimeZone();
-  const reminder = record(rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date(instant), priority: 4, hasTime: true, reminderId: 'one' }));
-  const draft = buildModalDraft(reminder, null);
-  draft.content = draft.content.replace('Task', 'Edited');
-  Object.assign(draft, deriveDraftPatchFromContent(draft, ['Inbox']));
-  const body = buildReminderMutationBody({ config: { folderPath: 'Reminders' }, draft, mode: 'edit', projects: ['Inbox'], selectedProject: null });
-  expect(body.dueDatetime).toBe(instant);
-  const submission = buildReminderSubmission({ content: draft.content, description: '', projects: ['Inbox'], priority: 4, project: 'Inbox', dueDate: instant, hasTime: true, reminder });
-  expect(submission?.updatedReminder?.dueDatetime).toBe(instant);
+	process.env.TZ = 'America/New_York'; resetLocalTimeZone();
+	const reminder = record(rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date(instant), priority: 4, hasTime: true, reminderId: 'one' }));
+	const draft = buildModalDraft(reminder, null);
+	draft.content = draft.content.replace('Task', 'Edited');
+	Object.assign(draft, deriveDraftPatchFromContent(draft, ['Inbox']));
+	const body = buildReminderMutationBody({ config: { folderPath: 'Reminders' }, draft, mode: 'edit', projects: ['Inbox'], selectedProject: null });
+	expect(body.dueDatetime).toBe(instant);
+	const submission = buildReminderSubmission({ content: draft.content, description: '', projects: ['Inbox'], priority: 4, project: 'Inbox', dueDate: instant, hasTime: true, reminder });
+	expect(submission?.updatedReminder?.dueDatetime).toBe(instant);
 });
 it('retains recurrence occurrence, timezone and progress through plugin form submission', () => {
-  const originalRule = { ...rule, completedCount: 1 };
-  const reminder = record(rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date('2099-03-01T14:00:00Z'), priority: 4, recurrence: originalRule, hasTime: true, reminderId: 'one' }));
-  const draft = buildModalDraft(reminder, null);
-  const submission = buildReminderSubmission({ content: draft.content.replace('Task', 'Edited'), projects: ['Inbox'], priority: 4, project: 'Inbox', dueDate: reminder.dueDatetime!, hasTime: true, recurrence: reminder.recurrence, reminder });
-  expect(submission?.updatedReminder).toMatchObject({ dueDatetime: reminder.dueDatetime, recurrence: originalRule });
+	const originalRule = { ...rule, completedCount: 1 };
+	const reminder = record(rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date('2099-03-01T14:00:00Z'), priority: 4, recurrence: originalRule, hasTime: true, reminderId: 'one' }));
+	const draft = buildModalDraft(reminder, null);
+	const submission = buildReminderSubmission({ content: draft.content.replace('Task', 'Edited'), projects: ['Inbox'], priority: 4, project: 'Inbox', dueDate: reminder.dueDatetime!, hasTime: true, recurrence: reminder.recurrence, reminder });
+	expect(submission?.updatedReminder).toMatchObject({ dueDatetime: reminder.dueDatetime, recurrence: originalRule });
 });

@@ -9,12 +9,12 @@
  * Controls whether and how components animate
  */
 export interface AnimationConfig {
-  /** Whether animations are enabled */
-  enabled: boolean;
-  /** Animation duration in seconds (default: 0.3) */
-  duration?: number;
-  /** Stagger delay between items in milliseconds (default: 30) */
-  stagger?: number;
+	/** Whether animations are enabled */
+	enabled: boolean;
+	/** Animation duration in seconds (default: 0.3) */
+	duration?: number;
+	/** Stagger delay between items in milliseconds (default: 30) */
+	stagger?: number;
 }
 
 /**

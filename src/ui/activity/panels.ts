@@ -8,8 +8,8 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], load
 	const checking = state?.initializing && !hasError && state.status !== 'offline';
 	container.toggleClass('has-file-browser', paths.length > 0 && !syncing && !progress && !checking);
 	if (syncing || progress) {
-        renderLoadingState(container, formatSyncProgress(progress, state?.work));
-        return;
+		renderLoadingState(container, formatSyncProgress(progress, state?.work));
+		return;
 	}
 	if (checking) {
 		renderLoadingState(container, 'Checking local files…');
@@ -40,29 +40,29 @@ export function renderConflictsPanel(container: HTMLElement, conflicts: Conflict
 	const list = container.createDiv({ cls: 'crate-activity-list' });
 	for (const conflict of conflicts) {
 		const row = list.createDiv({ cls: 'crate-conflict-row' });
-        const kind = conflict.cause === 'incoming-review' ? 'File review required'
-            : conflict.copySide === 'remote' ? 'Incoming server copy' : 'Saved conflict copy';
-        const date = new Date(conflict.createdAt);
-        const now = new Date();
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const day = date.toDateString() === now.toDateString() ? 'Today'
-            : date.toDateString() === yesterday.toDateString() ? 'Yesterday'
-                : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric',
-                    ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}) });
-        const timestamp = Number.isNaN(date.getTime()) ? ''
-            : `${day}, ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
-        const card = renderFileMicroCard(row, conflict.originalPath, 'conflict',
-            [kind, timestamp].filter(Boolean).join(' · '));
-        const title = card.querySelector<HTMLElement>('.crate-file-name');
-        if (title) {
-            title.empty();
-            title.title = conflict.conflictPath;
-            const parts = conflict.originalPath.split('/');
-            const filename = parts.pop()!;
-            if (parts.length) title.createSpan({ text: `${parts.join('/')}/`, cls: 'crate-conflict-row-folder' });
-            title.createSpan({ text: filename });
-        }
+		const kind = conflict.cause === 'incoming-review' ? 'File review required'
+			: conflict.copySide === 'remote' ? 'Incoming server copy' : 'Saved conflict copy';
+		const date = new Date(conflict.createdAt);
+		const now = new Date();
+		const yesterday = new Date(now);
+		yesterday.setDate(yesterday.getDate() - 1);
+		const day = date.toDateString() === now.toDateString() ? 'Today'
+			: date.toDateString() === yesterday.toDateString() ? 'Yesterday'
+				: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric',
+					...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}) });
+		const timestamp = Number.isNaN(date.getTime()) ? ''
+			: `${day}, ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+		const card = renderFileMicroCard(row, conflict.originalPath, 'conflict',
+			[kind, timestamp].filter(Boolean).join(' · '));
+		const title = card.querySelector<HTMLElement>('.crate-file-name');
+		if (title) {
+			title.empty();
+			title.title = conflict.conflictPath;
+			const parts = conflict.originalPath.split('/');
+			const filename = parts.pop()!;
+			if (parts.length) title.createSpan({ text: `${parts.join('/')}/`, cls: 'crate-conflict-row-folder' });
+			title.createSpan({ text: filename });
+		}
 
 		if (onReview) {
 			const review = row.createEl('button', { text: 'Review', cls: 'crate-conflict-review-button crate-activity-action', attr: { type: 'button', 'aria-label': `Review conflict for ${conflict.originalPath}` } });

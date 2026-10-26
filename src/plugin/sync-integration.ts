@@ -20,7 +20,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		plugin.settings,
 		plugin.secretStorage,
 		update => update ? plugin.writeSettings(update) : plugin.saveSettings(),
-    () => ensureReminderNotificationPolicy(plugin, true),
+	() => ensureReminderNotificationPolicy(plugin, true),
 		() => [plugin.remindersSettings.remindersFolderPath],
 		() => plugin.settings.reading?.enabled ? plugin.settings.reading.folderPath : null,
 	);

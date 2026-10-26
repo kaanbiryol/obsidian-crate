@@ -10,13 +10,13 @@ const html = `<html><head><title>Synthetic post</title></head><body>
 </body></html>`;
 
 describe('extractDocument', () => {
-  afterEach(() => { vi.unstubAllGlobals(); });
+	afterEach(() => { vi.unstubAllGlobals(); });
 
-  it('extracts the article when browser globals reject linkedom nodes', async () => {
-    // Browsers expose getComputedStyle globally and throw for nodes from another DOM implementation.
-    vi.stubGlobal('getComputedStyle', () => { throw new TypeError("parameter 1 is not of type 'Element'"); });
-    const { markdown } = await extractDocument(html, 'https://example.com/post');
-    expect(markdown).toContain('Synthetic article text');
-    expect(markdown).not.toContain('Powered by');
-  });
+	it('extracts the article when browser globals reject linkedom nodes', async () => {
+		// Browsers expose getComputedStyle globally and throw for nodes from another DOM implementation.
+		vi.stubGlobal('getComputedStyle', () => { throw new TypeError("parameter 1 is not of type 'Element'"); });
+		const { markdown } = await extractDocument(html, 'https://example.com/post');
+		expect(markdown).toContain('Synthetic article text');
+		expect(markdown).not.toContain('Powered by');
+	});
 });

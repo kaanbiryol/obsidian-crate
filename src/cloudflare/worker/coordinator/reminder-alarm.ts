@@ -22,13 +22,13 @@ export class ReminderAlarm implements DurableObject {
 	) {}
 
 	fetch(request: Request): Promise<Response> {
-    return withD1Usage(this.env as Env, env => this.fetchMeasured(request, env));
-  }
+		return withD1Usage(this.env as Env, env => this.fetchMeasured(request, env));
+	}
 
-  private fetchMeasured(request: Request, env: Env): Promise<Response> {
-    return handleCoordinatorRequest(request, this.state, env,
-      action => this.withStateLock(action), () => handleReminderScheduleRequest(request, this.scheduleContext(env)));
-  }
+	private fetchMeasured(request: Request, env: Env): Promise<Response> {
+		return handleCoordinatorRequest(request, this.state, env,
+			action => this.withStateLock(action), () => handleReminderScheduleRequest(request, this.scheduleContext(env)));
+	}
 
 	alarm(): Promise<void> {
 		// Schedule changes remain responsive while pushes are in flight, but two

@@ -85,7 +85,7 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 			errors: value.errors.filter((error): error is string => typeof error === 'string').slice(0, MAX_SYNC_HISTORY_PATHS),
 		} : {}),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
-        ...(typeof value.sharedCheckpoint === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value.sharedCheckpoint) ? { sharedCheckpoint: value.sharedCheckpoint } : {}),
+		...(typeof value.sharedCheckpoint === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value.sharedCheckpoint) ? { sharedCheckpoint: value.sharedCheckpoint } : {}),
 		...(isSha256Hex(value.historyCheckpoint)
 			? { historyCheckpoint: value.historyCheckpoint } : {}),
 		...(requestDiagnostics ? { requestDiagnostics } : {}),

@@ -10,7 +10,7 @@ import { validateEncryptedSchedules, ENCRYPTED_NOTIFICATION_PREFIX, ENCRYPTED_SC
 
 export class PermanentReminderSourceError extends Error {}
 export function isPermanentSourceError(error: unknown): boolean {
-  return error instanceof PermanentReminderSourceError || error instanceof MarkdownEncodingError || error instanceof ReminderIdentityConflictError;
+	return error instanceof PermanentReminderSourceError || error instanceof MarkdownEncodingError || error instanceof ReminderIdentityConflictError;
 }
 
 type ParsedReminderSource =

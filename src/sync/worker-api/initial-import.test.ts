@@ -5,77 +5,77 @@ import { syncErrorIssues } from '../issues';
 
 afterEach(() => vi.useRealTimers());
 function harness() {
-  const requestJson = vi.fn();
-  const api = new InitialImportApi({ requestJson, getWorkerUrl: () => 'https://test',
-    getServerInfo: async () => ({ capabilities: [INITIAL_IMPORT_CAPABILITY] }) } as never);
-  return { api, requestJson };
+	const requestJson = vi.fn();
+	const api = new InitialImportApi({ requestJson, getWorkerUrl: () => 'https://test',
+		getServerInfo: async () => ({ capabilities: [INITIAL_IMPORT_CAPABILITY] }) } as never);
+	return { api, requestJson };
 }
 
 it('waits for schedules before treating a vault as established', async () => {
-  vi.useFakeTimers();
-  const { api, requestJson } = harness();
-  requestJson.mockResolvedValueOnce({ ready: false }).mockResolvedValueOnce({ ready: true });
-  let finished = false;
-  const waiting = api.waitUntilReady('token', () => {}).then(() => { finished = true; });
-  await vi.advanceTimersByTimeAsync(500);
-  expect(finished).toBe(false);
-  await vi.advanceTimersByTimeAsync(500); await waiting;
-  expect(await api.begin()).toBeNull();
-  expect(requestJson).toHaveBeenCalledTimes(2);
+	vi.useFakeTimers();
+	const { api, requestJson } = harness();
+	requestJson.mockResolvedValueOnce({ ready: false }).mockResolvedValueOnce({ ready: true });
+	let finished = false;
+	const waiting = api.waitUntilReady('token', () => {}).then(() => { finished = true; });
+	await vi.advanceTimersByTimeAsync(500);
+	expect(finished).toBe(false);
+	await vi.advanceTimersByTimeAsync(500); await waiting;
+	expect(await api.begin()).toBeNull();
+	expect(requestJson).toHaveBeenCalledTimes(2);
 });
 
 it('preserves a completed-upload session for retry after a reminder error', async () => {
-  const { api, requestJson } = harness();
-  requestJson.mockResolvedValueOnce({ ready: false, error: 'Duplicate reminder identity' })
-    .mockResolvedValueOnce({ import: { token: 'token', state: 'complete' } });
-  await expect(api.waitUntilReady('token', () => {})).rejects.toThrow('Files uploaded. Reminder setup needs attention');
-  expect(await api.begin()).toEqual({ token: 'token', state: 'complete' });
+	const { api, requestJson } = harness();
+	requestJson.mockResolvedValueOnce({ ready: false, error: 'Duplicate reminder identity' })
+		.mockResolvedValueOnce({ import: { token: 'token', state: 'complete' } });
+	await expect(api.waitUntilReady('token', () => {})).rejects.toThrow('Files uploaded. Reminder setup needs attention');
+	expect(await api.begin()).toEqual({ token: 'token', state: 'complete' });
 });
 
 it('preserves every reported note and reminder scope, and filters unsafe remote paths', async () => {
-  const { api, requestJson } = harness();
-  requestJson.mockResolvedValue({ ready: false, error: 'Reminder setup failed', moreIssues: true, issues: [
-    { path: 'Reminders/café: draft.md', message: 'Unsupported reminder description encoding on line 4', code: 'unsupported-description-encoding', line: 4 },
-    { path: 'Reminders/two.md', message: 'Duplicate reminder identity' },
-    { path: '../outside.md', message: 'Bad path' },
-    { path: 'invalid.md', message: 42 },
-  ] });
-  const error = await api.waitUntilReady('token', () => {}).catch((error: unknown) => error);
-  expect(syncErrorIssues(error)).toEqual([
-    { scope: 'reminders', path: 'Reminders/café: draft.md', message: 'Unsupported reminder description encoding on line 4', code: 'unsupported-description-encoding', line: 4 },
-    { scope: 'reminders', path: 'Reminders/two.md', message: 'Duplicate reminder identity' },
-    { scope: 'reminders', message: 'Bad path' },
-    { scope: 'reminders', code: 'more-reminder-issues', message: expect.stringContaining('More reminder notes') as string },
-  ]);
+	const { api, requestJson } = harness();
+	requestJson.mockResolvedValue({ ready: false, error: 'Reminder setup failed', moreIssues: true, issues: [
+		{ path: 'Reminders/café: draft.md', message: 'Unsupported reminder description encoding on line 4', code: 'unsupported-description-encoding', line: 4 },
+		{ path: 'Reminders/two.md', message: 'Duplicate reminder identity' },
+		{ path: '../outside.md', message: 'Bad path' },
+		{ path: 'invalid.md', message: 42 },
+	] });
+	const error = await api.waitUntilReady('token', () => {}).catch((error: unknown) => error);
+	expect(syncErrorIssues(error)).toEqual([
+		{ scope: 'reminders', path: 'Reminders/café: draft.md', message: 'Unsupported reminder description encoding on line 4', code: 'unsupported-description-encoding', line: 4 },
+		{ scope: 'reminders', path: 'Reminders/two.md', message: 'Duplicate reminder identity' },
+		{ scope: 'reminders', message: 'Bad path' },
+		{ scope: 'reminders', code: 'more-reminder-issues', message: expect.stringContaining('More reminder notes') as string },
+	]);
 });
 
 it('retains older server errors without guessing which part of their text is a filename', async () => {
-  const { api, requestJson } = harness();
-  requestJson.mockResolvedValue({ ready: false, error: 'note.md: bad description' });
-  const error = await api.waitUntilReady('token', () => {}).catch((error: unknown) => error);
-  expect(syncErrorIssues(error)).toEqual([{ scope: 'reminders', message: 'Files uploaded. Reminder setup needs attention: note.md: bad description' }]);
+	const { api, requestJson } = harness();
+	requestJson.mockResolvedValue({ ready: false, error: 'note.md: bad description' });
+	const error = await api.waitUntilReady('token', () => {}).catch((error: unknown) => error);
+	expect(syncErrorIssues(error)).toEqual([{ scope: 'reminders', message: 'Files uploaded. Reminder setup needs attention: note.md: bad description' }]);
 });
 
 it('stops polling when the sync is cancelled', async () => {
-  vi.useFakeTimers();
-  const { api, requestJson } = harness();
-  requestJson.mockResolvedValue({ ready: false });
-  let cancelled = false;
-  const pending = api.waitUntilReady('token', () => { if (cancelled) throw new Error('cancelled'); });
-  const rejected = expect(pending).rejects.toThrow('cancelled');
-  await vi.advanceTimersByTimeAsync(500); cancelled = true;
-  await vi.advanceTimersByTimeAsync(500); await rejected;
-  expect(requestJson).toHaveBeenCalledOnce();
+	vi.useFakeTimers();
+	const { api, requestJson } = harness();
+	requestJson.mockResolvedValue({ ready: false });
+	let cancelled = false;
+	const pending = api.waitUntilReady('token', () => { if (cancelled) throw new Error('cancelled'); });
+	const rejected = expect(pending).rejects.toThrow('cancelled');
+	await vi.advanceTimersByTimeAsync(500); cancelled = true;
+	await vi.advanceTimersByTimeAsync(500); await rejected;
+	expect(requestJson).toHaveBeenCalledOnce();
 });
 
 it('reports live remaining work while polling and accepts older servers without progress', async () => {
-  vi.useFakeTimers();
-  const { api, requestJson } = harness();
-  const progress = vi.fn();
-  const counts = { scanning: false, remainingFiles: 0, remainingSchedules: 42 };
-  requestJson.mockResolvedValueOnce({ ready: false, progress: counts })
-    .mockResolvedValueOnce({ ready: false }).mockResolvedValueOnce({ ready: true });
-  const waiting = api.waitUntilReady('token', () => {}, progress);
-  await vi.advanceTimersByTimeAsync(2000); await waiting;
-  expect(progress).toHaveBeenCalledExactlyOnceWith(counts);
+	vi.useFakeTimers();
+	const { api, requestJson } = harness();
+	const progress = vi.fn();
+	const counts = { scanning: false, remainingFiles: 0, remainingSchedules: 42 };
+	requestJson.mockResolvedValueOnce({ ready: false, progress: counts })
+		.mockResolvedValueOnce({ ready: false }).mockResolvedValueOnce({ ready: true });
+	const waiting = api.waitUntilReady('token', () => {}, progress);
+	await vi.advanceTimersByTimeAsync(2000); await waiting;
+	expect(progress).toHaveBeenCalledExactlyOnceWith(counts);
 });

@@ -15,7 +15,7 @@ export function buildModalDraft(reminder: ReminderRecord | null, selectedProject
 	const defaultProject = selectedProject ?? DEFAULT_PROJECT;
 
 	return {
-    originalDueDatetime: reminder?.dueDatetime,
+	originalDueDatetime: reminder?.dueDatetime,
 		content: buildInitialReminderContent(reminder ?? undefined, defaultProject),
 		description: reminder?.description ?? '',
 		project: reminder?.project ?? defaultProject,

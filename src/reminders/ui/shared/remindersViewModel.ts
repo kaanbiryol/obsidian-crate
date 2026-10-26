@@ -1,5 +1,5 @@
 import {
-  DEFAULT_PROJECT,
+	DEFAULT_PROJECT,
 } from "@/reminders/core/constants";
 import { compareProjects } from "@/reminders/core/reminder-list";
 import { getUpcomingReminders, selectTodayReminders } from "@/reminders/core/reminderSort";
@@ -11,101 +11,101 @@ import { reminderProject } from "@/reminders/core/reminderProjectPath";
 export type ViewMode = TabId;
 
 interface RemindersHeaderStats {
-  count: number;
-  overdueCount: number;
+	count: number;
+	overdueCount: number;
 }
 
 export interface RemindersHeaderData {
-  inbox: RemindersHeaderStats;
-  today: RemindersHeaderStats;
-  upcoming: RemindersHeaderStats;
-  browse: RemindersHeaderStats;
+	inbox: RemindersHeaderStats;
+	today: RemindersHeaderStats;
+	upcoming: RemindersHeaderStats;
+	browse: RemindersHeaderStats;
 }
 
 export interface CurrentHeaderData extends RemindersHeaderStats {
-  title: "Inbox" | "Today" | "Upcoming" | "Projects";
+	title: "Inbox" | "Today" | "Upcoming" | "Projects";
 }
 
 export function getReminderProjects(reminders: Reminder[]): string[] {
-  return Array.from(new Set(reminders.map(reminderProject))).sort(compareProjects);
+	return Array.from(new Set(reminders.map(reminderProject))).sort(compareProjects);
 }
 
 export function getRemindersHeaderData(
-  reminders: Reminder[],
-  projects: string[],
-  upcomingDays: number,
-  now = new Date(),
+	reminders: Reminder[],
+	projects: string[],
+	upcomingDays: number,
+	now = new Date(),
 ): RemindersHeaderData {
-  const activeReminders = reminders.filter((reminder) => !reminder.completed);
-  const inboxReminders = activeReminders.filter(
-    (reminder) => reminderProject(reminder) === DEFAULT_PROJECT,
-  );
-  const uniqueTodayReminders = selectTodayReminders(activeReminders, now, false);
-  const upcomingReminders = getUpcomingReminders(activeReminders, upcomingDays, now);
+	const activeReminders = reminders.filter((reminder) => !reminder.completed);
+	const inboxReminders = activeReminders.filter(
+		(reminder) => reminderProject(reminder) === DEFAULT_PROJECT,
+	);
+	const uniqueTodayReminders = selectTodayReminders(activeReminders, now, false);
+	const upcomingReminders = getUpcomingReminders(activeReminders, upcomingDays, now);
 
-  return {
-    inbox: {
-      count: inboxReminders.length,
-      overdueCount: inboxReminders.filter((reminder) => isReminderOverdue(reminder, now)).length,
-    },
-    today: {
-      count: uniqueTodayReminders.length,
-      overdueCount: uniqueTodayReminders.filter((reminder) => isReminderOverdue(reminder, now)).length,
-    },
-    upcoming: {
-      count: upcomingReminders.length,
-      overdueCount: upcomingReminders.filter((reminder) => isReminderOverdue(reminder, now)).length,
-    },
-    browse: {
-      count: projects.length,
-      overdueCount: 0,
-    },
-  };
+	return {
+		inbox: {
+			count: inboxReminders.length,
+			overdueCount: inboxReminders.filter((reminder) => isReminderOverdue(reminder, now)).length,
+		},
+		today: {
+			count: uniqueTodayReminders.length,
+			overdueCount: uniqueTodayReminders.filter((reminder) => isReminderOverdue(reminder, now)).length,
+		},
+		upcoming: {
+			count: upcomingReminders.length,
+			overdueCount: upcomingReminders.filter((reminder) => isReminderOverdue(reminder, now)).length,
+		},
+		browse: {
+			count: projects.length,
+			overdueCount: 0,
+		},
+	};
 }
 
 export function getCurrentHeaderData(
-  viewMode: ViewMode,
-  headerData: RemindersHeaderData,
+	viewMode: ViewMode,
+	headerData: RemindersHeaderData,
 ): CurrentHeaderData {
-  switch (viewMode) {
-    case "inbox":
-      return { title: "Inbox", ...headerData.inbox };
-    case "today":
-      return { title: "Today", ...headerData.today };
-    case "upcoming":
-      return { title: "Upcoming", ...headerData.upcoming };
-    case "browse":
-      return { title: "Projects", ...headerData.browse };
-  }
+	switch (viewMode) {
+		case "inbox":
+			return { title: "Inbox", ...headerData.inbox };
+		case "today":
+			return { title: "Today", ...headerData.today };
+		case "upcoming":
+			return { title: "Upcoming", ...headerData.upcoming };
+		case "browse":
+			return { title: "Projects", ...headerData.browse };
+	}
 }
 
 export function getReminderCreateProject(
-  viewMode: ViewMode,
-  selectedProject: string | null,
+	viewMode: ViewMode,
+	selectedProject: string | null,
 ): string {
-  return viewMode === "inbox" || viewMode === "browse"
-    ? selectedProject || DEFAULT_PROJECT
-    : DEFAULT_PROJECT;
+	return viewMode === "inbox" || viewMode === "browse"
+		? selectedProject || DEFAULT_PROJECT
+		: DEFAULT_PROJECT;
 }
 
 export function shouldShowReminderFab(
-  viewMode: ViewMode,
-  selectedProject: string | null,
+	viewMode: ViewMode,
+	selectedProject: string | null,
 ): boolean {
-  return viewMode !== "browse" || selectedProject !== null;
+	return viewMode !== "browse" || selectedProject !== null;
 }
 
 export function getReorderProject(
-  viewMode: ViewMode,
-  selectedProject: string | null,
+	viewMode: ViewMode,
+	selectedProject: string | null,
 ): string | null {
-  if (viewMode === "inbox") {
-    return DEFAULT_PROJECT;
-  }
+	if (viewMode === "inbox") {
+		return DEFAULT_PROJECT;
+	}
 
-  if (viewMode === "browse" && selectedProject) {
-    return selectedProject;
-  }
+	if (viewMode === "browse" && selectedProject) {
+		return selectedProject;
+	}
 
-  return null;
+	return null;
 }

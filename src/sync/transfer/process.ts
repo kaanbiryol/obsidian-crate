@@ -19,275 +19,275 @@ import { fileFailure } from '../failures';
 import { HttpError } from '../worker-api/http';
 
 export async function processDiff(
-  context: TransferContext,
-  diff: FileDiff,
-  localFiles: Record<string, FileEntry>,
-  result: SyncResult,
+	context: TransferContext,
+	diff: FileDiff,
+	localFiles: Record<string, FileEntry>,
+	result: SyncResult,
 ): Promise<DiffApplyOutcome> {
-  assertLocalSyncPath(diff.path);
-  switch (diff.action) {
-    case "upload": {
-      const uploadFile = await prepareUploadFromPath(context, diff.path, {
-        force: true,
-        expectedHash: diff.remoteHash ?? null,
-      });
-      if (!uploadFile) {
-        return {
-          status: "deferred",
-          reason: "Local file changed or disappeared while preparing the upload",
-        };
-      }
+	assertLocalSyncPath(diff.path);
+	switch (diff.action) {
+		case "upload": {
+			const uploadFile = await prepareUploadFromPath(context, diff.path, {
+				force: true,
+				expectedHash: diff.remoteHash ?? null,
+			});
+			if (!uploadFile) {
+				return {
+					status: "deferred",
+					reason: "Local file changed or disappeared while preparing the upload",
+				};
+			}
 
-      const uploadResult = await context.files.uploadFile(
-        uploadFile.path,
-        uploadFile.content,
-        uploadFile.hash,
-        uploadFile.size,
-        uploadFile.contentType || "application/octet-stream",
-        uploadFile.expectedHash ?? null,
-      );
-      if (!uploadResult.success) {
-        throw new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code);
-      }
-      if (uploadResult.hash && uploadResult.hash !== uploadFile.hash) {
-        throw new Error(`Hash mismatch after upload (expected ${uploadFile.hash}, got ${uploadResult.hash})`);
-      }
+			const uploadResult = await context.files.uploadFile(
+				uploadFile.path,
+				uploadFile.content,
+				uploadFile.hash,
+				uploadFile.size,
+				uploadFile.contentType || "application/octet-stream",
+				uploadFile.expectedHash ?? null,
+			);
+			if (!uploadResult.success) {
+				throw new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code);
+			}
+			if (uploadResult.hash && uploadResult.hash !== uploadFile.hash) {
+				throw new Error(`Hash mismatch after upload (expected ${uploadFile.hash}, got ${uploadResult.hash})`);
+			}
 
-      result.uploaded++;
-      result.uploadedPaths.push(uploadFile.path);
-      const modified = await context.getModifiedIso(uploadFile.path, uploadFile.mtime);
-      const entry: FileEntry = {
-        hash: uploadFile.hash,
-        revision: uploadResult.revision,
-        size: uploadFile.size,
-        modified,
-      };
-      context.localManifest.setEntry(uploadFile.path, entry);
-      if (isMarkdownPath(uploadFile.path)) {
-        await context.markdownBaseCache?.putBase(uploadFile.path, uploadFile.hash, uploadFile.content);
-      }
-      localFiles[uploadFile.path] = entry;
-      if (diff.cause === "remote-deleted") {
-        recordResolvedRace(result, diff.path, "kept-local-edit");
-      }
-      return { status: "applied" };
-    }
+			result.uploaded++;
+			result.uploadedPaths.push(uploadFile.path);
+			const modified = await context.getModifiedIso(uploadFile.path, uploadFile.mtime);
+			const entry: FileEntry = {
+				hash: uploadFile.hash,
+				revision: uploadResult.revision,
+				size: uploadFile.size,
+				modified,
+			};
+			context.localManifest.setEntry(uploadFile.path, entry);
+			if (isMarkdownPath(uploadFile.path)) {
+				await context.markdownBaseCache?.putBase(uploadFile.path, uploadFile.hash, uploadFile.content);
+			}
+			localFiles[uploadFile.path] = entry;
+			if (diff.cause === "remote-deleted") {
+				recordResolvedRace(result, diff.path, "kept-local-edit");
+			}
+			return { status: "applied" };
+		}
 
-    case "download": {
-      if (!diff.remoteHash) throw new Error("Missing remote hash for download");
-      const outcome = await downloadAndSaveFile(context, {
-        path: diff.path,
-        expectedLocalHash: diff.localHash ?? null,
-        expectedRemoteHash: diff.remoteHash,
-        remoteSize: 0,
-      }, result);
-      if (outcome.status === "deferred") return outcome;
+		case "download": {
+			if (!diff.remoteHash) throw new Error("Missing remote hash for download");
+			const outcome = await downloadAndSaveFile(context, {
+				path: diff.path,
+				expectedLocalHash: diff.localHash ?? null,
+				expectedRemoteHash: diff.remoteHash,
+				remoteSize: 0,
+			}, result);
+			if (outcome.status === "deferred") return outcome;
 
-      const manifestEntry = context.localManifest.getEntry(diff.path);
-      if (manifestEntry) localFiles[diff.path] = manifestEntry;
-      if (diff.cause === "local-deleted" && !hasUnresolvedConflict(result, diff.path)) {
-        recordResolvedRace(result, diff.path, "kept-remote-edit");
-      }
-      return { status: "applied" };
-    }
+			const manifestEntry = context.localManifest.getEntry(diff.path);
+			if (manifestEntry) localFiles[diff.path] = manifestEntry;
+			if (diff.cause === "local-deleted" && !hasUnresolvedConflict(result, diff.path)) {
+				recordResolvedRace(result, diff.path, "kept-remote-edit");
+			}
+			return { status: "applied" };
+		}
 
-    case "conflict": {
-      const response = await context.files.downloadFile(diff.path);
-      const remoteContent = response.content;
-      if (remoteContent.byteLength > MAX_FILE_SIZE_BYTES) {
-        throw new Error("Skipped remote file larger than 25MB");
-      }
-      await validateDownloadedContent(
-        diff.path,
-        remoteContent,
-        response.size,
-        response.hash,
-        diff.remoteHash ?? "",
-      );
+		case "conflict": {
+			const response = await context.files.downloadFile(diff.path);
+			const remoteContent = response.content;
+			if (remoteContent.byteLength > MAX_FILE_SIZE_BYTES) {
+				throw new Error("Skipped remote file larger than 25MB");
+			}
+			await validateDownloadedContent(
+				diff.path,
+				remoteContent,
+				response.size,
+				response.hash,
+				diff.remoteHash ?? "",
+			);
 
-      const localFile = context.vault.getAbstractFileByPath(diff.path);
-      const hasLocalFile = isVaultTFileLike(localFile) || await context.vault.adapter.exists(diff.path);
-      if (!hasLocalFile) {
-        return {
-          status: "deferred",
-          reason: "Local file changed or disappeared before conflict resolution",
-        };
-      }
+			const localFile = context.vault.getAbstractFileByPath(diff.path);
+			const hasLocalFile = isVaultTFileLike(localFile) || await context.vault.adapter.exists(diff.path);
+			if (!hasLocalFile) {
+				return {
+					status: "deferred",
+					reason: "Local file changed or disappeared before conflict resolution",
+				};
+			}
 
-      const localContent = await context.vault.adapter.readBinary(diff.path);
-      const baseHash = context.localManifest.getEntry(diff.path)?.hash;
-      const autoMergeOutcome = await tryAutoMergeMarkdownConflict(
-        context,
-        diff,
-        localContent,
-        remoteContent,
-        localFiles,
-        result,
-      );
-      if (autoMergeOutcome) return autoMergeOutcome;
+			const localContent = await context.vault.adapter.readBinary(diff.path);
+			const baseHash = context.localManifest.getEntry(diff.path)?.hash;
+			const autoMergeOutcome = await tryAutoMergeMarkdownConflict(
+				context,
+				diff,
+				localContent,
+				remoteContent,
+				localFiles,
+				result,
+			);
+			if (autoMergeOutcome) return autoMergeOutcome;
 
-      const applyOutcome = await preserveLocalVersionsAndApplyRemote(
-        context,
-        diff.path,
-        localContent,
-        remoteContent,
-        async (copy) => {
-          recordUnresolvedConflict(result, diff.path, copy.path);
-          await context.conflictStore?.record({
-            originalPath: diff.path,
-            conflictPath: copy.path,
-            cause: diff.cause,
-            localHash: copy.hash,
-            remoteHash: diff.remoteHash,
-            ...(baseHash ? { baseHash } : {}),
-          });
-        },
-      );
-      if (applyOutcome.status === "deferred") return applyOutcome;
+			const applyOutcome = await preserveLocalVersionsAndApplyRemote(
+				context,
+				diff.path,
+				localContent,
+				remoteContent,
+				async (copy) => {
+					recordUnresolvedConflict(result, diff.path, copy.path);
+					await context.conflictStore?.record({
+						originalPath: diff.path,
+						conflictPath: copy.path,
+						cause: diff.cause,
+						localHash: copy.hash,
+						remoteHash: diff.remoteHash,
+						...(baseHash ? { baseHash } : {}),
+					});
+				},
+			);
+			if (applyOutcome.status === "deferred") return applyOutcome;
 
-      localFiles[diff.path] = await recordAppliedContent(context, diff.path, remoteContent, response.revision);
-      return { status: "applied" };
-    }
+			localFiles[diff.path] = await recordAppliedContent(context, diff.path, remoteContent, response.revision);
+			return { status: "applied" };
+		}
 
-    case "delete":
-      // Every sync mode sends remote deletes through the guarded batch executor.
-      throw new Error("Remote deletes are applied in batches");
+		case "delete":
+			// Every sync mode sends remote deletes through the guarded batch executor.
+			throw new Error("Remote deletes are applied in batches");
 
-    case "delete-local": {
-      const localDelete = await deletePathLocallyIfUnchanged(context, diff.path, diff.localHash ?? null);
-      if (localDelete.status === "changed") {
-        return processDiff(context, {
-          path: diff.path,
-          action: "upload",
-          localHash: localDelete.hash,
-          cause: "remote-deleted",
-        }, localFiles, result);
-      }
-      delete localFiles[diff.path];
-      context.localManifest.removeEntry(diff.path);
-      if (localDelete.status === "deleted") {
-        result.deleted++;
-        result.deletedPaths.push(diff.path);
-      }
-      return { status: "applied" };
-    }
-  }
+		case "delete-local": {
+			const localDelete = await deletePathLocallyIfUnchanged(context, diff.path, diff.localHash ?? null);
+			if (localDelete.status === "changed") {
+				return processDiff(context, {
+					path: diff.path,
+					action: "upload",
+					localHash: localDelete.hash,
+					cause: "remote-deleted",
+				}, localFiles, result);
+			}
+			delete localFiles[diff.path];
+			context.localManifest.removeEntry(diff.path);
+			if (localDelete.status === "deleted") {
+				result.deleted++;
+				result.deletedPaths.push(diff.path);
+			}
+			return { status: "applied" };
+		}
+	}
 }
 
 async function tryAutoMergeMarkdownConflict(
-  context: TransferContext,
-  diff: ConflictDiff,
-  localContent: ArrayBuffer,
-  remoteContent: ArrayBuffer,
-  localFiles: Record<string, FileEntry>,
-  result: SyncResult,
+	context: TransferContext,
+	diff: ConflictDiff,
+	localContent: ArrayBuffer,
+	remoteContent: ArrayBuffer,
+	localFiles: Record<string, FileEntry>,
+	result: SyncResult,
 ): Promise<DiffApplyOutcome | null> {
-  if (!isMarkdownPath(diff.path) || !context.markdownBaseCache) {
-    return null;
-  }
+	if (!isMarkdownPath(diff.path) || !context.markdownBaseCache) {
+		return null;
+	}
 
-  const manifestHash = context.localManifest.getEntry(diff.path)?.hash;
-  if (!manifestHash) {
-    return null;
-  }
+	const manifestHash = context.localManifest.getEntry(diff.path)?.hash;
+	if (!manifestHash) {
+		return null;
+	}
 
-  const baseContent = await context.markdownBaseCache.readBase(diff.path, manifestHash);
-  if (!baseContent) {
-    return null;
-  }
+	const baseContent = await context.markdownBaseCache.readBase(diff.path, manifestHash);
+	if (!baseContent) {
+		return null;
+	}
 
-  const mergeResult = mergeMarkdownContent(baseContent, localContent, remoteContent);
-  if (!mergeResult.success) {
-    return null;
-  }
+	const mergeResult = mergeMarkdownContent(baseContent, localContent, remoteContent);
+	if (!mergeResult.success) {
+		return null;
+	}
 
-  const mergedContent = mergeResult.content;
-  const mergedHash = await sha256Hex(mergedContent);
-  const uploadResult = await context.files.uploadFile(
-    diff.path,
-    mergedContent,
-    mergedHash,
-    mergedContent.byteLength,
-    "text/markdown",
-    diff.remoteHash ?? null,
-    undefined,
-    localContent,
-  );
-  if (!uploadResult.success) {
-    throw new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code);
-  }
-  if (uploadResult.hash && uploadResult.hash !== mergedHash) {
-    throw new Error(`Hash mismatch after upload (expected ${mergedHash}, got ${uploadResult.hash})`);
-  }
+	const mergedContent = mergeResult.content;
+	const mergedHash = await sha256Hex(mergedContent);
+	const uploadResult = await context.files.uploadFile(
+		diff.path,
+		mergedContent,
+		mergedHash,
+		mergedContent.byteLength,
+		"text/markdown",
+		diff.remoteHash ?? null,
+		undefined,
+		localContent,
+	);
+	if (!uploadResult.success) {
+		throw new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code);
+	}
+	if (uploadResult.hash && uploadResult.hash !== mergedHash) {
+		throw new Error(`Hash mismatch after upload (expected ${mergedHash}, got ${uploadResult.hash})`);
+	}
 
-  // The remote compare-and-swap happens first. Revalidate the local file before
-  // replacing it so an edit made while the request was in flight is retained.
-  const plannedLocalHash = await sha256Hex(localContent);
-  const localApplyOutcome = await applyRemoteContentIfUnchanged(
-    context,
-    diff.path,
-    mergedContent,
-    plannedLocalHash,
-  ).catch(async (error: unknown) => {
-    await context.files.recordMergeApplication?.(diff.path, mergedHash, 'local-apply-failed');
-    throw error;
-  });
-  if (localApplyOutcome.status === "deferred") {
-    await context.files.recordMergeApplication?.(diff.path, mergedHash, 'local-deferred');
-    // The uploaded merge already contains this local snapshot. Keep that
-    // snapshot as a virtual common ancestor so the next reconciliation can
-    // merge only the newer local edits into the remote merge without
-    // duplicating the local changes that were just uploaded.
-    const localBaseEntry: FileEntry = {
-      hash: plannedLocalHash,
-      size: localContent.byteLength,
-      modified: UNVERIFIED_MODIFIED,
-    };
-    context.localManifest.setEntry(diff.path, localBaseEntry);
-    await context.markdownBaseCache.putBase(diff.path, plannedLocalHash, localContent);
-    return {
-      status: "deferred",
-      reason: "Local file changed while applying the merged version",
-    };
-  }
+	// The remote compare-and-swap happens first. Revalidate the local file before
+	// replacing it so an edit made while the request was in flight is retained.
+	const plannedLocalHash = await sha256Hex(localContent);
+	const localApplyOutcome = await applyRemoteContentIfUnchanged(
+		context,
+		diff.path,
+		mergedContent,
+		plannedLocalHash,
+	).catch(async (error: unknown) => {
+		await context.files.recordMergeApplication?.(diff.path, mergedHash, 'local-apply-failed');
+		throw error;
+	});
+	if (localApplyOutcome.status === "deferred") {
+		await context.files.recordMergeApplication?.(diff.path, mergedHash, 'local-deferred');
+		// The uploaded merge already contains this local snapshot. Keep that
+		// snapshot as a virtual common ancestor so the next reconciliation can
+		// merge only the newer local edits into the remote merge without
+		// duplicating the local changes that were just uploaded.
+		const localBaseEntry: FileEntry = {
+			hash: plannedLocalHash,
+			size: localContent.byteLength,
+			modified: UNVERIFIED_MODIFIED,
+		};
+		context.localManifest.setEntry(diff.path, localBaseEntry);
+		await context.markdownBaseCache.putBase(diff.path, plannedLocalHash, localContent);
+		return {
+			status: "deferred",
+			reason: "Local file changed while applying the merged version",
+		};
+	}
 
-  localFiles[diff.path] = await recordAppliedContent(context, diff.path, mergedContent, uploadResult.revision);
-  result.merged++;
-  result.mergedPaths.push(diff.path);
-  return { status: "applied" };
+	localFiles[diff.path] = await recordAppliedContent(context, diff.path, mergedContent, uploadResult.revision);
+	result.merged++;
+	result.mergedPaths.push(diff.path);
+	return { status: "applied" };
 }
 
 export interface ApplyDiffsOptions {
-  /** The baseline record each diff updates. */
-  localFiles(diff: FileDiff): Record<string, FileEntry>;
-  /** Runs before each diff applies; an error it throws counts against that diff. */
-  beforeDiff?(diff: FileDiff): void;
-  onFailure?(failure: MutationFailure): void;
-  /** Runs after each diff, whether it applied, was deferred or failed. */
-  afterDiff?(diff: FileDiff): void;
+	/** The baseline record each diff updates. */
+	localFiles(diff: FileDiff): Record<string, FileEntry>;
+	/** Runs before each diff applies; an error it throws counts against that diff. */
+	beforeDiff?(diff: FileDiff): void;
+	onFailure?(failure: MutationFailure): void;
+	/** Runs after each diff, whether it applied, was deferred or failed. */
+	afterDiff?(diff: FileDiff): void;
 }
 
 /** Applies diffs in order. A deferred or failed diff is recorded against its path
  * and the rest continue; cancellation stops them all. */
 export async function applyDiffs(
-  context: { processDiff(diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult): Promise<DiffApplyOutcome> },
-  diffs: readonly FileDiff[],
-  result: SyncResult,
-  options: ApplyDiffsOptions,
+	context: { processDiff(diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult): Promise<DiffApplyOutcome> },
+	diffs: readonly FileDiff[],
+	result: SyncResult,
+	options: ApplyDiffsOptions,
 ): Promise<void> {
-  for (const diff of diffs) {
-    try {
-      const localFiles = options.localFiles(diff);
-      options.beforeDiff?.(diff);
-      const outcome = await context.processDiff(diff, localFiles, result);
-      if (outcome.status === "deferred") {
-        recordSyncError(result, `${outcome.reason}`, diff.path);
-      }
-    } catch (error) {
-      if (isAbortError(error)) throw error;
-      recordSyncError(result, `${errorMessage(error)}`, diff.path);
-      options.onFailure?.(fileFailure(diff.path, error));
-    }
-    options.afterDiff?.(diff);
-  }
+	for (const diff of diffs) {
+		try {
+			const localFiles = options.localFiles(diff);
+			options.beforeDiff?.(diff);
+			const outcome = await context.processDiff(diff, localFiles, result);
+			if (outcome.status === "deferred") {
+				recordSyncError(result, `${outcome.reason}`, diff.path);
+			}
+		} catch (error) {
+			if (isAbortError(error)) throw error;
+			recordSyncError(result, `${errorMessage(error)}`, diff.path);
+			options.onFailure?.(fileFailure(diff.path, error));
+		}
+		options.afterDiff?.(diff);
+	}
 }

@@ -30,61 +30,61 @@ import { useDocumentReaderScroll } from './useDocumentReaderScroll';
 import { useReadingArticle } from './useReadingArticle';
 
 export default function ReadingApp() {
-  return <ReadingDialogHost.Provider value={PwaReadingDialog}><ReadingAppContent /></ReadingDialogHost.Provider>;
+	return <ReadingDialogHost.Provider value={PwaReadingDialog}><ReadingAppContent /></ReadingDialogHost.Provider>;
 }
 
 function ReadingAppContent() {
-  const { preferences } = usePwaPreferences();
-  const { appearance, updateAppearance } = useReadingAppearance();
-  const captureFormId = useId();
-  const featureNavigation = useContext(FeatureNavigationContext);
-  const active = featureNavigation?.active !== false;
-  const { connection, sync, showToast, saving, saveLink, updateItem, retryArticle } = useReadingRuntime();
-  const { session, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, share, run, connect,
-    isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture } = connection;
-  const { refreshManually, isOffline } = sync;
-  const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, isCurrentSession, reportSessionError, run });
-  const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
-  const [settingsOpen, setSettingsOpen] = useSettingsOpen();
-  useDocumentReaderScroll(ready && !!session && active && !!reader, reader?.item.crate_reading_id);
-  const canSaveLink = (() => {
-    try { readingUrl(url); return !saving; } catch { return false; }
-  })();
-  const visibleItems = useMemo(() => presentReadingItems(cache?.items ?? [], pending), [cache, pending]);
-  const openCapture = () => {
-    if (!session) { showToast('info', 'Choose a Reading folder in Obsidian’s Crate settings to save a link.'); return; }
-    // Mount and focus within the tap so iOS can open its software keyboard.
-    flushSync(openCaptureForm);
-  };
-  const visibleReader = useMemo(() => reader && presentReadingItems([reader.item], pending)[0], [reader, pending]);
-  // Ordinary edits remain usable while sending. New links need their server ID,
-  // and rejected changes or text extraction require settlement before further edits.
-  const blockedItemIds = useMemo(() => new Set([...visibleItems.filter(item => !item.path).map(item => item.crate_reading_id), ...pending.flatMap(op => op.action === 'capture' ? [op.id]
-    : (op.review || op.action === 'retry') && typeof op.intent.id === 'string' ? [op.intent.id] : [])]), [pending, visibleItems]);
-  const readingDisabled = !session && connectionState !== 'available';
+	const { preferences } = usePwaPreferences();
+	const { appearance, updateAppearance } = useReadingAppearance();
+	const captureFormId = useId();
+	const featureNavigation = useContext(FeatureNavigationContext);
+	const active = featureNavigation?.active !== false;
+	const { connection, sync, showToast, saving, saveLink, updateItem, retryArticle } = useReadingRuntime();
+	const { session, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, share, run, connect,
+		isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture } = connection;
+	const { refreshManually, isOffline } = sync;
+	const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, isCurrentSession, reportSessionError, run });
+	const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
+	const [settingsOpen, setSettingsOpen] = useSettingsOpen();
+	useDocumentReaderScroll(ready && !!session && active && !!reader, reader?.item.crate_reading_id);
+	const canSaveLink = (() => {
+		try { readingUrl(url); return !saving; } catch { return false; }
+	})();
+	const visibleItems = useMemo(() => presentReadingItems(cache?.items ?? [], pending), [cache, pending]);
+	const openCapture = () => {
+		if (!session) { showToast('info', 'Choose a Reading folder in Obsidian’s Crate settings to save a link.'); return; }
+		// Mount and focus within the tap so iOS can open its software keyboard.
+		flushSync(openCaptureForm);
+	};
+	const visibleReader = useMemo(() => reader && presentReadingItems([reader.item], pending)[0], [reader, pending]);
+	// Ordinary edits remain usable while sending. New links need their server ID,
+	// and rejected changes or text extraction require settlement before further edits.
+	const blockedItemIds = useMemo(() => new Set([...visibleItems.filter(item => !item.path).map(item => item.crate_reading_id), ...pending.flatMap(op => op.action === 'capture' ? [op.id]
+		: (op.review || op.action === 'retry') && typeof op.intent.id === 'string' ? [op.intent.id] : [])]), [pending, visibleItems]);
+	const readingDisabled = !session && connectionState !== 'available';
 
-  if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
-  const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
-  const syncIssue = pending.find(op => op.error || op.review);
-  const notices = <>{recovery && <p className="crate-reading__notice">Changes from an earlier sign-in are still stored here. <Button variant="outline" onClick={() => void run(exportReadingData)}>Export earlier changes</Button></p>}
-    {error && !readingDisabled && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => { if (session) void run(refreshManually); else void connect(); }}>Retry</Button></p>}
-    {!error && syncIssue && <p className="crate-reading__notice" role="alert">{syncIssue.error || 'A Reading change needs review.'} <Button variant="outline" onClick={() => setSettingsOpen(true)}>Review changes</Button></p>}
-  </>;
-  return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>
-    {!session && !readingDisabled ? <section className="crate-reading crate-reading-welcome"><div className="pwa-feature-welcome-action"><FeatureSwitcherButton /></div><h1>Your reading, everywhere</h1><p>{remindersConnected ? 'Reading uses this app’s existing connection. Open Obsidian once to confirm your Reading folder.' : 'In Obsidian, open Crate settings → Crate web app → Open app to connect this browser.'}</p>{share && <p>Your shared link is kept on this device. Connect Reading here, then return to save it.</p>}{!remindersConnected && <p>To install on iPhone, open your Crate setup link in Safari, then use Share → Add to Home Screen within 10 minutes.</p>}{notices}</section> : <>
-      <ReadingLibraryPanel listStyle={preferences.reminderListStyle} initialSection={featureNavigation?.readingTab} renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>} renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader || readerClosing} onAdd={openCapture} />} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length, error: !readingDisabled && !cache && error ? 'Your library is unavailable. Retry when connected.' : null }} onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }} onRefresh={refreshManually} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />} notice={!reader && notices} activeId={reader?.item.crate_reading_id} readerClosing={readerClosing} onReaderClosed={finishReaderClose} readerMotion={window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : readerMotion}
-        listContent={readingDisabled ? <EmptyState className="crate-reading__empty crate-reading-disabled" icon="book-open"
-          title="Connect your Reading folder"
-          description={<>In Obsidian, open <strong>Crate settings → Reading</strong> and select <strong>Reading folder</strong>.</>}>
-          {share && <p>Your shared link is saved on this device. Connect Reading, then return to save it.</p>}
-          <Button variant="outline" size="touch" disabled={connecting || isOffline} aria-busy={connecting} onClick={() => void connect()}>{connecting ? 'Checking…' : 'Check again'}</Button>
-          {isOffline && <p role="status">Connect to the internet to check again.</p>}
-        </EmptyState> : undefined}
-        beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
-        headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
-        reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)} onBack={closeReader} onUpdate={changes => updateItem(visibleReader, changes, reader)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={() => retryArticle(reader.item)} />} />
-      {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={closeCapture}>{close => <SaveLinkForm id={captureFormId} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { if (await saveLink(open)) close(); })} />}</ReadingDialog>}
+	if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
+	const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
+	const syncIssue = pending.find(op => op.error || op.review);
+	const notices = <>{recovery && <p className="crate-reading__notice">Changes from an earlier sign-in are still stored here. <Button variant="outline" onClick={() => void run(exportReadingData)}>Export earlier changes</Button></p>}
+		{error && !readingDisabled && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => { if (session) void run(refreshManually); else void connect(); }}>Retry</Button></p>}
+		{!error && syncIssue && <p className="crate-reading__notice" role="alert">{syncIssue.error || 'A Reading change needs review.'} <Button variant="outline" onClick={() => setSettingsOpen(true)}>Review changes</Button></p>}
+	</>;
+	return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>
+		{!session && !readingDisabled ? <section className="crate-reading crate-reading-welcome"><div className="pwa-feature-welcome-action"><FeatureSwitcherButton /></div><h1>Your reading, everywhere</h1><p>{remindersConnected ? 'Reading uses this app’s existing connection. Open Obsidian once to confirm your Reading folder.' : 'In Obsidian, open Crate settings → Crate web app → Open app to connect this browser.'}</p>{share && <p>Your shared link is kept on this device. Connect Reading here, then return to save it.</p>}{!remindersConnected && <p>To install on iPhone, open your Crate setup link in Safari, then use Share → Add to Home Screen within 10 minutes.</p>}{notices}</section> : <>
+			<ReadingLibraryPanel listStyle={preferences.reminderListStyle} initialSection={featureNavigation?.readingTab} renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>} renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader || readerClosing} onAdd={openCapture} />} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length, error: !readingDisabled && !cache && error ? 'Your library is unavailable. Retry when connected.' : null }} onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }} onRefresh={refreshManually} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />} notice={!reader && notices} activeId={reader?.item.crate_reading_id} readerClosing={readerClosing} onReaderClosed={finishReaderClose} readerMotion={window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : readerMotion}
+				listContent={readingDisabled ? <EmptyState className="crate-reading__empty crate-reading-disabled" icon="book-open"
+					title="Connect your Reading folder"
+					description={<>In Obsidian, open <strong>Crate settings → Reading</strong> and select <strong>Reading folder</strong>.</>}>
+					{share && <p>Your shared link is saved on this device. Connect Reading, then return to save it.</p>}
+					<Button variant="outline" size="touch" disabled={connecting || isOffline} aria-busy={connecting} onClick={() => void connect()}>{connecting ? 'Checking…' : 'Check again'}</Button>
+					{isOffline && <p role="status">Connect to the internet to check again.</p>}
+				</EmptyState> : undefined}
+				beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
+				headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
+				reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)} onBack={closeReader} onUpdate={changes => updateItem(visibleReader, changes, reader)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={() => retryArticle(reader.item)} />} />
+			{adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={closeCapture}>{close => <SaveLinkForm id={captureFormId} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { if (await saveLink(open)) close(); })} />}</ReadingDialog>}
 
-    </>}
-  </main>;
+		</>}
+	</main>;
 }

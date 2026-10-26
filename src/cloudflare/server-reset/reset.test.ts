@@ -353,11 +353,11 @@ it('resumes by refreshing an older cleanup Worker before removing backups', asyn
 
 
 it('recognizes every current Crate table when verifying a reset target', async () => {
-  const h = harness();
-  const tables = [...readFileSync('src/cloudflare/schema.sql', 'utf8').matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)].map(match => ({ name: match[1] }));
-  const query = h.api.queryD1.getMockImplementation()!;
-  h.api.queryD1.mockImplementation((account, database, sql, params) => sql.includes("type = 'table'")
-    ? Promise.resolve([{ results: tables }]) : query(account, database, sql, params));
-  await resetCrateServer(h.input);
-  expect(h.api.deleteD1Database).toHaveBeenCalledOnce();
+	const h = harness();
+	const tables = [...readFileSync('src/cloudflare/schema.sql', 'utf8').matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)].map(match => ({ name: match[1] }));
+	const query = h.api.queryD1.getMockImplementation()!;
+	h.api.queryD1.mockImplementation((account, database, sql, params) => sql.includes("type = 'table'")
+		? Promise.resolve([{ results: tables }]) : query(account, database, sql, params));
+	await resetCrateServer(h.input);
+	expect(h.api.deleteD1Database).toHaveBeenCalledOnce();
 });

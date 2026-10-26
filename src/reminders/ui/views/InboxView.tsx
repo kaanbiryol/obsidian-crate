@@ -13,21 +13,21 @@ import { useReminderOrder } from '../shared/hooks/useReminderOrder';
 import type { CompletedSectionToggleProps } from './CompletedReminderSection';
 
 export interface InboxViewProps {
-  reminders: Reminder[];
-  animationConfig?: AnimationConfig;
-  /** Custom render function for reminder cards (for platform-specific wrappers) */
-  renderCard?: (reminder: Reminder, index: number) => React.ReactNode;
-  /** Whether to use fixed bottom padding (for views with FAB) */
-  hasFab?: boolean;
-  /** Custom class name for the container */
-  className?: string;
-  /** Custom render function for the completed section toggle button (for Shadow DOM compatibility) */
-  renderToggleButton?: (props: CompletedSectionToggleProps) => React.ReactNode;
-  /** Callback when reminders are reordered via drag */
-  onReorder?: (orderedIds: string[]) => Promise<void> | void;
-  onReorderDragActiveChange?: (active: boolean) => void;
-  reorderInteraction?: 'drag' | 'long-press';
-  colorScheme: ProjectColorScheme;
+	reminders: Reminder[];
+	animationConfig?: AnimationConfig;
+	/** Custom render function for reminder cards (for platform-specific wrappers) */
+	renderCard?: (reminder: Reminder, index: number) => React.ReactNode;
+	/** Whether to use fixed bottom padding (for views with FAB) */
+	hasFab?: boolean;
+	/** Custom class name for the container */
+	className?: string;
+	/** Custom render function for the completed section toggle button (for Shadow DOM compatibility) */
+	renderToggleButton?: (props: CompletedSectionToggleProps) => React.ReactNode;
+	/** Callback when reminders are reordered via drag */
+	onReorder?: (orderedIds: string[]) => Promise<void> | void;
+	onReorderDragActiveChange?: (active: boolean) => void;
+	reorderInteraction?: 'drag' | 'long-press';
+	colorScheme: ProjectColorScheme;
 }
 
 /**
@@ -35,64 +35,64 @@ export interface InboxViewProps {
  * Displays reminders from the Inbox project with collapsible completed section
  */
 export const InboxView = memo(function InboxView({
-  reminders,
-  animationConfig = { enabled: true },
-  renderCard,
-  hasFab = true,
-  className = '',
-  renderToggleButton,
-  onReorder,
-  onReorderDragActiveChange,
-  reorderInteraction = 'drag',
-  colorScheme,
+	reminders,
+	animationConfig = { enabled: true },
+	renderCard,
+	hasFab = true,
+	className = '',
+	renderToggleButton,
+	onReorder,
+	onReorderDragActiveChange,
+	reorderInteraction = 'drag',
+	colorScheme,
 }: InboxViewProps) {
-  const { active, completed } = useMemo(() => buildInboxViewModel(reminders), [reminders]);
-  const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);
+	const { active, completed } = useMemo(() => buildInboxViewModel(reminders), [reminders]);
+	const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);
 
-  const hasContent = active.length > 0 || completed.length > 0;
+	const hasContent = active.length > 0 || completed.length > 0;
 
-  // Default card renderer
-  const defaultRenderCard = (reminder: Reminder, index: number) => (
-    <ReminderCard
-      reminder={reminder}
-      index={index}
-      animationConfig={{ enabled: false }}
-      colorScheme={colorScheme}
-      hideProject
-    />
-  );
+	// Default card renderer
+	const defaultRenderCard = (reminder: Reminder, index: number) => (
+		<ReminderCard
+			reminder={reminder}
+			index={index}
+			animationConfig={{ enabled: false }}
+			colorScheme={colorScheme}
+			hideProject
+		/>
+	);
 
-  const cardRenderer = renderCard || defaultRenderCard;
+	const cardRenderer = renderCard || defaultRenderCard;
 
-  return (
-    <ReminderListLayout
-      className={className}
-      hasFab={hasFab}
-      hasContent={hasContent}
-      renderCard={cardRenderer}
-      animationConfig={animationConfig}
-      completed={completed}
-      isDragging={order.isDragging}
-      renderToggleButton={renderToggleButton}
-      emptyState={
-        <EmptyState
-          icon="inbox"
-          title="Your inbox is empty"
-          description="Add a new reminder to get started"
-          iconColor="primary"
-          animationConfig={animationConfig}
-        />
-      }
-    >
-      <ReorderableReminderList
-        reminders={order.displayedOrder}
-        onReorder={order.onReorder}
-        onReorderCommit={order.onCommit}
-        onDragActiveChange={order.onDragChange}
-        renderCard={cardRenderer}
-        interaction={reorderInteraction}
-        animationsEnabled={animationConfig.enabled}
-      />
-    </ReminderListLayout>
-  );
+	return (
+		<ReminderListLayout
+			className={className}
+			hasFab={hasFab}
+			hasContent={hasContent}
+			renderCard={cardRenderer}
+			animationConfig={animationConfig}
+			completed={completed}
+			isDragging={order.isDragging}
+			renderToggleButton={renderToggleButton}
+			emptyState={
+				<EmptyState
+					icon="inbox"
+					title="Your inbox is empty"
+					description="Add a new reminder to get started"
+					iconColor="primary"
+					animationConfig={animationConfig}
+				/>
+			}
+		>
+			<ReorderableReminderList
+				reminders={order.displayedOrder}
+				onReorder={order.onReorder}
+				onReorderCommit={order.onCommit}
+				onDragActiveChange={order.onDragChange}
+				renderCard={cardRenderer}
+				interaction={reorderInteraction}
+				animationsEnabled={animationConfig.enabled}
+			/>
+		</ReminderListLayout>
+	);
 });

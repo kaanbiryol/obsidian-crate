@@ -2,21 +2,21 @@ import React from "react";
 import { IconButton } from "@/ui/shared/IconButton";
 
 interface RemindersViewCloseButtonProps {
-  onClose: () => void;
+	onClose: () => void;
 }
 
 export const RemindersViewCloseButton: React.FC<RemindersViewCloseButtonProps> = ({
-  onClose,
+	onClose,
 }) => {
-  return (
-    <IconButton
-      icon="x"
-      iconSize="l"
-      onClick={onClose}
-      className="reminders-view-close"
-      label="Close"
-      size="large"
-      variant="surface"
-    />
-  );
+	return (
+		<IconButton
+			icon="x"
+			iconSize="l"
+			onClick={onClose}
+			className="reminders-view-close"
+			label="Close"
+			size="large"
+			variant="surface"
+		/>
+	);
 };

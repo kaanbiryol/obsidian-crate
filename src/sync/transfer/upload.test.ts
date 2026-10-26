@@ -165,35 +165,35 @@ describe('transfer upload helpers', () => {
 });
 
 it('limits batch concurrency and reports every completed file', async () => {
-    const harness = createTransferHarness();
-    let active = 0;
-    let maximum = 0;
-    const onProcessed = vi.fn<(count: number) => void>();
-    const runConcurrent = async <T>(tasks: Array<() => Promise<T>>, concurrency: number) => {
-        const results: T[] = [];
-        let next = 0;
-        await Promise.all(Array.from({ length: concurrency }, async () => {
-            while (next < tasks.length) {
-                const index = next++;
-                results[index] = await tasks[index]!();
-            }
-        }));
-        return results;
-    };
-    harness.api.batchUpload.mockImplementation(async (files: BatchUploadFile[]) => {
-        active++;
-        maximum = Math.max(maximum, active);
-        await new Promise(resolve => setTimeout(resolve, 1));
-        active--;
-        return { success: true, results: files.map(file => ({ path: file.path, success: true, hash: file.hash })) };
-    });
-    const prepared = Array.from({ length: 15 }, (_, index) => ({
-        path: `file-${index}.md`, content: new ArrayBuffer(1), hash: 'h', size: 1,
-    }));
-    const result = emptyResult();
-    await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { retry: false, onProcessed });
-    expect(maximum).toBe(BATCH_UPLOAD_CONCURRENCY);
-    expect(result.uploaded).toBe(15);
-    expect(result.errors).toEqual([]);
-    expect(onProcessed.mock.calls.map(([count]) => count)).toEqual([3, 3, 3, 3, 3]);
+	const harness = createTransferHarness();
+	let active = 0;
+	let maximum = 0;
+	const onProcessed = vi.fn<(count: number) => void>();
+	const runConcurrent = async <T>(tasks: Array<() => Promise<T>>, concurrency: number) => {
+		const results: T[] = [];
+		let next = 0;
+		await Promise.all(Array.from({ length: concurrency }, async () => {
+			while (next < tasks.length) {
+				const index = next++;
+				results[index] = await tasks[index]!();
+			}
+		}));
+		return results;
+	};
+	harness.api.batchUpload.mockImplementation(async (files: BatchUploadFile[]) => {
+		active++;
+		maximum = Math.max(maximum, active);
+		await new Promise(resolve => setTimeout(resolve, 1));
+		active--;
+		return { success: true, results: files.map(file => ({ path: file.path, success: true, hash: file.hash })) };
+	});
+	const prepared = Array.from({ length: 15 }, (_, index) => ({
+		path: `file-${index}.md`, content: new ArrayBuffer(1), hash: 'h', size: 1,
+	}));
+	const result = emptyResult();
+	await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { retry: false, onProcessed });
+	expect(maximum).toBe(BATCH_UPLOAD_CONCURRENCY);
+	expect(result.uploaded).toBe(15);
+	expect(result.errors).toEqual([]);
+	expect(onProcessed.mock.calls.map(([count]) => count)).toEqual([3, 3, 3, 3, 3]);
 });

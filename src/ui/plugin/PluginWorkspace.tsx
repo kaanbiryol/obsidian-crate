@@ -13,25 +13,25 @@ import './plugin-navigation.scss';
 
 const DOCK_KEY = 'crate-navigation-tabs';
 export function PluginWorkspace({ plugin, shadowRoot, initialSection, initialReminderTab, initialProject, isFullScreen }: {
-  plugin: CratePlugin; shadowRoot: ShadowRoot; initialSection?: 'reminders' | 'reading';
-  initialReminderTab?: TabId; initialProject?: string; isFullScreen?: boolean;
+	plugin: CratePlugin; shadowRoot: ShadowRoot; initialSection?: 'reminders' | 'reading';
+	initialReminderTab?: TabId; initialProject?: string; isFullScreen?: boolean;
 }) {
-  const subscribe = useCallback((listener: () => void) => subscribeReadingRuntime(plugin, listener), [plugin]);
-  const getLibrary = useCallback(() => getReadingLibrary(plugin), [plugin]);
-  const library = useSyncExternalStore(subscribe, getLibrary);
-  const remindersEnabled = useRemindersSettingsStore(state => state.enabled);
-  const [tabs, setTabs] = useState(() => {
-    try { return normalizeDockTabs(plugin.app.loadLocalStorage(DOCK_KEY)); }
-    catch { return normalizeDockTabs(null); }
-  });
-  useObsidianStatusBarInset(shadowRoot, true);
-  const saveTabs = (next: DockTab[]) => {
-    try { plugin.app.saveLocalStorage(DOCK_KEY, next); setTabs(next); }
-    catch { new Notice('Could not save navigation tabs on this device.'); }
-  };
-  return <PluginWorkspaceNavigation isFullScreen={isFullScreen} initialSection={initialSection} initialReminderTab={initialProject ? 'browse' : initialReminderTab}
-    remindersEnabled={remindersEnabled} readingEnabled={Boolean(library)} tabs={tabs} onTabsChange={saveTabs}
-    renderReminders={(tab, onChange, renderNavigation) => <RemindersViewContent
-      isFullScreen={isFullScreen} initialProject={initialProject} activeTab={tab} onTabChange={onChange} renderNavigation={renderNavigation} />}
-    renderReading={renderNavigation => library && <LocalReadingLibrary plugin={plugin} library={library} renderNavigation={renderNavigation} />} />;
+	const subscribe = useCallback((listener: () => void) => subscribeReadingRuntime(plugin, listener), [plugin]);
+	const getLibrary = useCallback(() => getReadingLibrary(plugin), [plugin]);
+	const library = useSyncExternalStore(subscribe, getLibrary);
+	const remindersEnabled = useRemindersSettingsStore(state => state.enabled);
+	const [tabs, setTabs] = useState(() => {
+		try { return normalizeDockTabs(plugin.app.loadLocalStorage(DOCK_KEY)); }
+		catch { return normalizeDockTabs(null); }
+	});
+	useObsidianStatusBarInset(shadowRoot, true);
+	const saveTabs = (next: DockTab[]) => {
+		try { plugin.app.saveLocalStorage(DOCK_KEY, next); setTabs(next); }
+		catch { new Notice('Could not save navigation tabs on this device.'); }
+	};
+	return <PluginWorkspaceNavigation isFullScreen={isFullScreen} initialSection={initialSection} initialReminderTab={initialProject ? 'browse' : initialReminderTab}
+		remindersEnabled={remindersEnabled} readingEnabled={Boolean(library)} tabs={tabs} onTabsChange={saveTabs}
+		renderReminders={(tab, onChange, renderNavigation) => <RemindersViewContent
+			isFullScreen={isFullScreen} initialProject={initialProject} activeTab={tab} onTabChange={onChange} renderNavigation={renderNavigation} />}
+		renderReading={renderNavigation => library && <LocalReadingLibrary plugin={plugin} library={library} renderNavigation={renderNavigation} />} />;
 }

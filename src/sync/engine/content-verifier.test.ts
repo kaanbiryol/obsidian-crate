@@ -129,29 +129,29 @@ describe('content verification independent of filesystem fingerprints', () => {
 });
 
  it('reaches late paths across repeated restarts without rewriting the full manifest', async () => {
-  const h = await fixture(100);
-  h.adapter.write.mockClear();
-  h.adapter.readBinary.mockImplementation(async path => toArrayBuffer(path === h.files[99]!.path ? 'edit' : 'same'));
-  for (let restart = 0; restart < 4; restart++) {
-   await new LocalContentVerifier(h.progress).verify(h.planner.vault, h.manifest, h.files, h.signal);
-  }
-  expect(h.manifest.getEntry(h.files[99]!.path)?.modified).toBe('unverified');
-  expect(h.adapter.write.mock.calls.filter(([path]) => path === h.progress.path)).toHaveLength(4);
-  expect(new Set(h.adapter.readBinary.mock.calls.map(([path]) => path)).size).toBe(100);
+	const h = await fixture(100);
+	h.adapter.write.mockClear();
+	h.adapter.readBinary.mockImplementation(async path => toArrayBuffer(path === h.files[99]!.path ? 'edit' : 'same'));
+	for (let restart = 0; restart < 4; restart++) {
+	 await new LocalContentVerifier(h.progress).verify(h.planner.vault, h.manifest, h.files, h.signal);
+	}
+	expect(h.manifest.getEntry(h.files[99]!.path)?.modified).toBe('unverified');
+	expect(h.adapter.write.mock.calls.filter(([path]) => path === h.progress.path)).toHaveLength(4);
+	expect(new Set(h.adapter.readBinary.mock.calls.map(([path]) => path)).size).toBe(100);
  });
  it.each(['broken json', JSON.stringify({ version: 1, authority: 'https://another.example', cursor: 'zzz' })])('safely resets a damaged or foreign progress hint', async raw => {
-  const h = await fixture(40); h.disk.set(h.progress.path, raw);
-  await h.verify(); expect(h.adapter.readBinary.mock.calls[0]![0]).toBe(h.files[0]!.path);
+	const h = await fixture(40); h.disk.set(h.progress.path, raw);
+	await h.verify(); expect(h.adapter.readBinary.mock.calls[0]![0]).toBe(h.files[0]!.path);
  });
  it('surfaces progress write failures instead of promising durable coverage', async () => {
-  const h = await fixture(); h.adapter.write.mockRejectedValueOnce(new Error('Disk full'));
-  await expect(h.verify()).rejects.toThrow('Disk full');
+	const h = await fixture(); h.adapter.write.mockRejectedValueOnce(new Error('Disk full'));
+	await expect(h.verify()).rejects.toThrow('Disk full');
  });
  it('advances past an unreadable file across restart without losing later coverage', async () => {
-  const h = await fixture(40); h.adapter.readBinary.mockRejectedValueOnce(new Error('Unreadable'));
-  await expect(h.verify()).rejects.toThrow('Unreadable');
-  await new LocalContentVerifier(h.progress).verify(h.planner.vault, h.manifest, h.files, h.signal);
-  expect(h.adapter.readBinary.mock.calls[1]![0]).toBe(h.files[1]!.path);
+	const h = await fixture(40); h.adapter.readBinary.mockRejectedValueOnce(new Error('Unreadable'));
+	await expect(h.verify()).rejects.toThrow('Unreadable');
+	await new LocalContentVerifier(h.progress).verify(h.planner.vault, h.manifest, h.files, h.signal);
+	expect(h.adapter.readBinary.mock.calls[1]![0]).toBe(h.files[1]!.path);
  });
 
 it('waits for a started progress write before replacing a destroyed engine', async () => {

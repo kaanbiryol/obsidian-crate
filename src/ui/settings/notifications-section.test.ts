@@ -51,7 +51,7 @@ describe('renderNotificationsSection', () => {
 		resetObsidianUiMocks();
 		lastQrCodeData = null;
 		openExternalBrowserModal.mockClear();
-    updateNotificationPolicy.mockClear();
+	updateNotificationPolicy.mockClear();
 	});
 
 	afterEach(() => {
@@ -193,8 +193,8 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(plugin.settings.pushEnabled).toBe(true);
-    expect(getSettingByName('Push notifications').toggles[0]?.value).toBe(false);
-    expect(noticeMessages.some(message => message.includes('disk full'))).toBe(true);
+	expect(getSettingByName('Push notifications').toggles[0]?.value).toBe(false);
+	expect(noticeMessages.some(message => message.includes('disk full'))).toBe(true);
 	});
 
 	it('removes enabled notification devices through the push subscription API', async () => {
@@ -343,9 +343,9 @@ function createPlugin(apiClient: Record<string, unknown>): never {
 		syncRuntime: {
 			getApiClient: () => stableApi ??= ({
 				getNotificationPolicy: vi.fn(async () => ({ policy: { folderPath: 'Reminders', timezone: 'America/New_York', allDayTime: '09:00', revision: 'policy-1', enabled: true } })),
-        ensureNotificationPolicy: vi.fn(async (policy: unknown) => ({ policy })),
-        updateNotificationPolicy,
-        getWorkerUrl: vi.fn(() => 'https://worker.example.com'),
+		ensureNotificationPolicy: vi.fn(async (policy: unknown) => ({ policy })),
+		updateNotificationPolicy,
+		getWorkerUrl: vi.fn(() => 'https://worker.example.com'),
 				serverFolder: async (folderPath: string) => ({ folderPath }),
 				createRemindersEnrollmentToken: vi.fn(async () => ({
 					token: 'install-token',

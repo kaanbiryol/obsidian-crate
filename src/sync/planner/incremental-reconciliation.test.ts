@@ -25,22 +25,22 @@ vi.mock('../conflict/conflict', () => ({
 }));
 
 describe('runIncrementalSync', () => {
-  it('retains the cursor and remote files when an earlier upload fails', async () => {
-    const harness = createIncrementalHarness({ settings: { lastSeq: 10 }, lastSeq: 11,
-      localChanges: [{ path: 'edit.md', hash: 'edited' }], localDeletes: ['deleted.md'] });
-    harness.localManifest.getEntry.mockReturnValue({ hash: 'base', revision: 'version-1', size: 1, modified: '2026-02-06T10:00:00Z' });
-    harness.context.prepareUploadFromPath = vi.fn(async () => ({ path: 'edit.md', hash: 'edited', content: new ArrayBuffer(1), size: 1 }));
-    harness.context.uploadPreparedFiles = vi.fn(async (_uploads: PreparedUpload[], result: SyncResult) => { result.errors.push('Upload failed'); });
+	it('retains the cursor and remote files when an earlier upload fails', async () => {
+		const harness = createIncrementalHarness({ settings: { lastSeq: 10 }, lastSeq: 11,
+			localChanges: [{ path: 'edit.md', hash: 'edited' }], localDeletes: ['deleted.md'] });
+		harness.localManifest.getEntry.mockReturnValue({ hash: 'base', revision: 'version-1', size: 1, modified: '2026-02-06T10:00:00Z' });
+		harness.context.prepareUploadFromPath = vi.fn(async () => ({ path: 'edit.md', hash: 'edited', content: new ArrayBuffer(1), size: 1 }));
+		harness.context.uploadPreparedFiles = vi.fn(async (_uploads: PreparedUpload[], result: SyncResult) => { result.errors.push('Upload failed'); });
 
-    const result = await runIncrementalSync(harness.context, {});
+		const result = await runIncrementalSync(harness.context, {});
 
-    expect(result?.success).toBe(false);
-    expect(result?.errors).toContain('deleted.md: Remote deletion deferred until uploads and reconciliation finish successfully');
-    expect(harness.api.batchDelete).not.toHaveBeenCalled();
-    expect(harness.localManifest.removeEntry).not.toHaveBeenCalled();
-    expect(harness.localManifest.save).toHaveBeenCalledOnce();
-    expect(harness.settings.lastSeq).toBe(10);
-  });
+		expect(result?.success).toBe(false);
+		expect(result?.errors).toContain('deleted.md: Remote deletion deferred until uploads and reconciliation finish successfully');
+		expect(harness.api.batchDelete).not.toHaveBeenCalled();
+		expect(harness.localManifest.removeEntry).not.toHaveBeenCalled();
+		expect(harness.localManifest.save).toHaveBeenCalledOnce();
+		expect(harness.settings.lastSeq).toBe(10);
+	});
 
 	it('chunks more than one server batch of local deletes', async () => {
 		const paths = Array.from({ length: 14 }, (_, index) => `notes/delete-${index}.md`);
@@ -132,7 +132,7 @@ describe('runIncrementalSync', () => {
 		expect(batchDelete).toHaveBeenCalledWith(
 			['notes/local-delete.md'],
 			{ 'notes/local-delete.md': 'a'.repeat(64) },
-      { 'notes/local-delete.md': 'version-1' },
+			{ 'notes/local-delete.md': 'version-1' },
 		);
 		expect(localManifest.removeEntry).toHaveBeenCalledWith('notes/local-delete.md');
 		expect(result?.success).toBe(true);
@@ -307,23 +307,23 @@ describe('runIncrementalSync', () => {
 });
 
 it('reports local upload progress after transfer, not preparation', async () => {
-    const harness = createIncrementalHarness({
-        settings: { lastSeq: 10 },
-        localChanges: [{ path: 'note.md', hash: 'local-hash' }],
-    });
-    const progressCallback = vi.fn();
-    harness.context.prepareUploadFromPath = vi.fn(async () => ({
-        path: 'note.md', hash: 'local-hash', content: new ArrayBuffer(1), size: 1,
-    }));
-    const uploadPreparedFiles = vi.fn(async () => {
-        expect(progressCallback).toHaveBeenLastCalledWith(0, 1);
-        expect(progressCallback).not.toHaveBeenCalledWith(1, 1);
-    });
+		const harness = createIncrementalHarness({
+				settings: { lastSeq: 10 },
+				localChanges: [{ path: 'note.md', hash: 'local-hash' }],
+		});
+		const progressCallback = vi.fn();
+		harness.context.prepareUploadFromPath = vi.fn(async () => ({
+				path: 'note.md', hash: 'local-hash', content: new ArrayBuffer(1), size: 1,
+		}));
+		const uploadPreparedFiles = vi.fn(async () => {
+				expect(progressCallback).toHaveBeenLastCalledWith(0, 1);
+				expect(progressCallback).not.toHaveBeenCalledWith(1, 1);
+		});
 
-    harness.context.uploadPreparedFiles = uploadPreparedFiles;
-    const result = await runIncrementalSync(harness.context, { progressCallback });
+		harness.context.uploadPreparedFiles = uploadPreparedFiles;
+		const result = await runIncrementalSync(harness.context, { progressCallback });
 
-    expect(result?.success).toBe(true);
-    expect(uploadPreparedFiles).toHaveBeenCalledOnce();
-    expect(progressCallback).toHaveBeenLastCalledWith(1, 1);
+		expect(result?.success).toBe(true);
+		expect(uploadPreparedFiles).toHaveBeenCalledOnce();
+		expect(progressCallback).toHaveBeenLastCalledWith(1, 1);
 });

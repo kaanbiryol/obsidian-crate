@@ -370,10 +370,10 @@ describe('reminder alarm delivery', () => {
 });
 
  it('stops retrying when source authority never becomes available', async () => {
-   const harness = createHarness(false);
-   for (let attempt = 0; attempt < 11; attempt++) await harness.alarm.alarm();
-   expect(harness.setAlarm).toHaveBeenCalledTimes(10);
-   expect(harness.deleteAlarm).toHaveBeenCalledOnce();
-   expect(harness.storedValues.get('deliveryFailure')).toMatchObject({ attempts: 10 });
-   expect(sendToAllSubscriptions).not.toHaveBeenCalled();
+	 const harness = createHarness(false);
+	 for (let attempt = 0; attempt < 11; attempt++) await harness.alarm.alarm();
+	 expect(harness.setAlarm).toHaveBeenCalledTimes(10);
+	 expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+	 expect(harness.storedValues.get('deliveryFailure')).toMatchObject({ attempts: 10 });
+	 expect(sendToAllSubscriptions).not.toHaveBeenCalled();
  });

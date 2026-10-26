@@ -12,54 +12,54 @@ const load = vi.fn(async () => { throw new Error('Not loaded in panel tests'); }
 afterEach(() => vi.clearAllMocks());
 
 it('shows active sync progress with an empty pending queue', () => {
-    const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], load, false, false, { type: 'sync', current: 12, total: 20 });
-    expect(element.collectText()).toContain('Processing changes: 12/20');
-    expect(element.children[0]?.attributes.get('role')).toBe('status');
-    expect(element.collectText()).not.toContain('All synced');
+		const element = new FakeElement('div');
+		renderPendingPanel(element as never, [], load, false, false, { type: 'sync', current: 12, total: 20 });
+		expect(element.collectText()).toContain('Processing changes: 12/20');
+		expect(element.children[0]?.attributes.get('role')).toBe('status');
+		expect(element.collectText()).not.toContain('All synced');
 });
 
 it('does not claim completion before transfer progress is available', () => {
-    const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], load, false, true);
-    expect(element.collectText()).toContain('Starting sync…');
-    expect(element.collectText()).not.toContain('All synced');
+		const element = new FakeElement('div');
+		renderPendingPanel(element as never, [], load, false, true);
+		expect(element.collectText()).toContain('Starting sync…');
+		expect(element.collectText()).not.toContain('All synced');
 });
 
 it('shows the normal empty state after syncing finishes', () => {
-    const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], load, false, false, null, 'Synced just now');
-    expect(element.collectText()).toContain('All synced');
-    expect(element.collectText()).toContain('Synced just now');
-    expect(element.collectText()).not.toContain('Your vault is up to date.');
+		const element = new FakeElement('div');
+		renderPendingPanel(element as never, [], load, false, false, null, 'Synced just now');
+		expect(element.collectText()).toContain('All synced');
+		expect(element.collectText()).toContain('Synced just now');
+		expect(element.collectText()).not.toContain('Your vault is up to date.');
 });
 
 it('shows runtime saving progress after the engine finishes an unchanged sync', () => {
-    const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], load, false, false, {
-        type: 'sync', current: 0, total: 0, work: { phase: 'saving' },
-    }, '', { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
-    expect(element.collectText()).toBe('Saving sync progress…');
-    expect(element.children[0]?.attributes.get('role')).toBe('status');
+		const element = new FakeElement('div');
+		renderPendingPanel(element as never, [], load, false, false, {
+				type: 'sync', current: 0, total: 0, work: { phase: 'saving' },
+		}, '', { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
+		expect(element.collectText()).toBe('Saving sync progress…');
+		expect(element.children[0]?.attributes.get('role')).toBe('status');
 });
 
 it('replaces the pending file list with a loading indicator during sync', () => {
-    const element = new FakeElement('div');
-    renderPendingPanel(element as never, ['Notes/draft.md', pendingChangeKey('delete', 'old.md')], load, false, true);
-    expect(element.collectText()).toBe('Starting sync…');
-    expect(element.children[0]?.classNames.has('crate-activity-loading')).toBe(true);
-    expect(element.children[0]?.children[0]?.attributes.get('aria-hidden')).toBe('true');
+		const element = new FakeElement('div');
+		renderPendingPanel(element as never, ['Notes/draft.md', pendingChangeKey('delete', 'old.md')], load, false, true);
+		expect(element.collectText()).toBe('Starting sync…');
+		expect(element.children[0]?.classNames.has('crate-activity-loading')).toBe(true);
+		expect(element.children[0]?.children[0]?.attributes.get('aria-hidden')).toBe('true');
 
-    element.empty();
-    renderPendingPanel(element as never, ['Notes/draft.md'], load);
-    expect(element.collectText()).not.toContain('Starting sync…');
-    expect(renderPendingBrowser).toHaveBeenCalledExactlyOnceWith(element, ['Notes/draft.md'], load, undefined, undefined);
+		element.empty();
+		renderPendingPanel(element as never, ['Notes/draft.md'], load);
+		expect(element.collectText()).not.toContain('Starting sync…');
+		expect(renderPendingBrowser).toHaveBeenCalledExactlyOnceWith(element, ['Notes/draft.md'], load, undefined, undefined);
 });
 
 it.each([false, true])('shows a conflict state without a duplicate sync subtitle (checking: %s)', checking => {
-    const element = new FakeElement('div');
-    renderConflictsPanel(element as never, [], checking);
-    expect(element.collectText()).toBe(checking ? 'Checking for conflicts…' : 'No conflicts There are no files requiring attention.');
+		const element = new FakeElement('div');
+		renderConflictsPanel(element as never, [], checking);
+		expect(element.collectText()).toBe(checking ? 'Checking for conflicts…' : 'No conflicts There are no files requiring attention.');
 });
 
 it.each([
@@ -73,20 +73,20 @@ it.each([
 });
 
 it('shows change progress independently of the pending queue size', () => {
-    const element = new FakeElement('div');
-    renderPendingPanel(element as never, ['queued.md'], load, false, true, { type: 'sync', current: 3, total: 12 });
-    expect(element.collectText()).toBe('Processing changes: 3/12');
+		const element = new FakeElement('div');
+		renderPendingPanel(element as never, ['queued.md'], load, false, true, { type: 'sync', current: 3, total: 12 });
+		expect(element.collectText()).toBe('Processing changes: 3/12');
 });
 
 it('shows one spinner with the file count during uploads', () => {
-    const element = new FakeElement('div');
-    renderPendingPanel(element as never, [], load, false, true, null, '', {
-        status: 'syncing', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0,
-        work: { phase: 'uploading', current: 640, total: 1986 },
-    });
-    const indicator = element.children[0]?.children[0];
-    expect(indicator?.classNames.has('crate-activity-spinner')).toBe(true);
-    expect(indicator?.attributes.get('aria-hidden')).toBe('true');
-    expect(element.children[0]?.children).toHaveLength(2);
-    expect(element.collectText()).toBe('Uploading 640 of 1,986 files');
+		const element = new FakeElement('div');
+		renderPendingPanel(element as never, [], load, false, true, null, '', {
+				status: 'syncing', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0,
+				work: { phase: 'uploading', current: 640, total: 1986 },
+		});
+		const indicator = element.children[0]?.children[0];
+		expect(indicator?.classNames.has('crate-activity-spinner')).toBe(true);
+		expect(indicator?.attributes.get('aria-hidden')).toBe('true');
+		expect(element.children[0]?.children).toHaveLength(2);
+		expect(element.collectText()).toBe('Uploading 640 of 1,986 files');
 });

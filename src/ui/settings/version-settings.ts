@@ -72,10 +72,10 @@ export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMa
 	};
 	const describe = (revision: number | undefined, development?: DevelopmentBuild, fingerprint?: string) => {
 		const versions = `Current version: ${revision ? serverBuildLabel(revision, development) : 'Unknown'} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}`;
-    const available = revision !== undefined && (revision < release.revision || Boolean(fingerprint && canReplaceServerBuild(
-      { revision, fingerprint, development }, { revision: release.revision, fingerprint: EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint, development: EMBEDDED_CLOUDFLARE_ARTIFACT.development })));
-    setAvailability(available);
-    if (available) { setting.setName('Cloudflare update available'); return versions; }
+	const available = revision !== undefined && (revision < release.revision || Boolean(fingerprint && canReplaceServerBuild(
+	  { revision, fingerprint, development }, { revision: release.revision, fingerprint: EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint, development: EMBEDDED_CLOUDFLARE_ARTIFACT.development })));
+	setAvailability(available);
+	if (available) { setting.setName('Cloudflare update available'); return versions; }
 		if (revision === undefined) {
 			setting.setName('Check server version');
 			return versions;

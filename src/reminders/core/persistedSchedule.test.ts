@@ -17,36 +17,36 @@ function clock(zone: string, date: string) {
 }
 
 describe('persisted schedule decoding', () => {
-    it.each([
-        ['every morning', '2026-09-22T06:00:00.000Z', '2026-09-23T06:00:00.000Z'],
-        ['every Monday morning', '2026-09-28T06:00:00.000Z', '2026-10-05T06:00:00.000Z'],
-        ['every Thurs 09:00', '2026-09-24T09:00:00.000Z', '2026-10-01T09:00:00.000Z'],
-    ])('advances everyday repeat wording after completion: %s', (schedule, first, next) => {
-        clock('UTC', '2026-09-21T13:00:00Z');
-        const parsed = parseReminderContent(`Task ${schedule}`);
-        const block = buildCreatedReminderBlock({ content: parsed.cleanContent, priority: 4,
-            dueDate: undefined, recurrence: parsed.recurrence, reminderId: 'one' });
-        expect(block).toMatchObject({ content: 'Task', dueDatetime: first, hasTime: true });
-        const reminder = scan(block.checkboxLine);
-        const completed = buildReminderCompletionPlan(reminder, true);
-        expect(completed).toMatchObject({ completed: false, dueDatetime: next,
-            recurrence: { ...parsed.recurrence, completedCount: 1 } });
-    });
+	it.each([
+		['every morning', '2026-09-22T06:00:00.000Z', '2026-09-23T06:00:00.000Z'],
+		['every Monday morning', '2026-09-28T06:00:00.000Z', '2026-10-05T06:00:00.000Z'],
+		['every Thurs 09:00', '2026-09-24T09:00:00.000Z', '2026-10-01T09:00:00.000Z'],
+	])('advances everyday repeat wording after completion: %s', (schedule, first, next) => {
+		clock('UTC', '2026-09-21T13:00:00Z');
+		const parsed = parseReminderContent(`Task ${schedule}`);
+		const block = buildCreatedReminderBlock({ content: parsed.cleanContent, priority: 4,
+			dueDate: undefined, recurrence: parsed.recurrence, reminderId: 'one' });
+		expect(block).toMatchObject({ content: 'Task', dueDatetime: first, hasTime: true });
+		const reminder = scan(block.checkboxLine);
+		const completed = buildReminderCompletionPlan(reminder, true);
+		expect(completed).toMatchObject({ completed: false, dueDatetime: next,
+			recurrence: { ...parsed.recurrence, completedCount: 1 } });
+	});
 
-    it.each(['Compare Monday with', 'Review weekly report', 'Task every Monday'])('keeps inactive schedules literal across save and durable reload: %s', title => {
-        clock('UTC', '2026-09-08T10:00:00Z');
-        const input = parseReminderContent(`${title} 2099-01-01`);
-        const line = rebuildCheckboxLine({ completed: false, content: input.cleanContent, dueDate: input.dueDate, priority: 4, recurrence: input.recurrence, hasTime: input.hasTime, reminderId: 'one' });
-        expect(scan(line)).toMatchObject({ content: title, dueDate: '2099-01-01', recurrence: undefined });
-    });
+	it.each(['Compare Monday with', 'Review weekly report', 'Task every Monday'])('keeps inactive schedules literal across save and durable reload: %s', title => {
+		clock('UTC', '2026-09-08T10:00:00Z');
+		const input = parseReminderContent(`${title} 2099-01-01`);
+		const line = rebuildCheckboxLine({ completed: false, content: input.cleanContent, dueDate: input.dueDate, priority: 4, recurrence: input.recurrence, hasTime: input.hasTime, reminderId: 'one' });
+		expect(scan(line)).toMatchObject({ content: title, dueDate: '2099-01-01', recurrence: undefined });
+	});
 
-    it.each(['2026-02-30T09:00:00Z', '2026-13-01T09:00:00Z', '2026-02-30', 'February 30 09:00', 'February 30 at 9 in the morning', '29 February 2026 09:00'])('keeps calendar phrases that Chrono does not recognize unscheduled: %s', text => {
-        const saved = scan(`- [ ] Task ${text} <!-- crate-id:one -->`);
-        expect(saved).toMatchObject({ content: `Task ${text}` });
-        expect(saved.dueDate).toBeUndefined();
-        expect(saved.dueDatetime).toBeUndefined();
-        expect(saved.recurrence).toBeUndefined();
-    });
+	it.each(['2026-02-30T09:00:00Z', '2026-13-01T09:00:00Z', '2026-02-30', 'February 30 09:00', 'February 30 at 9 in the morning', '29 February 2026 09:00'])('keeps calendar phrases that Chrono does not recognize unscheduled: %s', text => {
+		const saved = scan(`- [ ] Task ${text} <!-- crate-id:one -->`);
+		expect(saved).toMatchObject({ content: `Task ${text}` });
+		expect(saved.dueDate).toBeUndefined();
+		expect(saved.dueDatetime).toBeUndefined();
+		expect(saved.recurrence).toBeUndefined();
+	});
 
 	it.each([
 		['every Monday to Friday 09:00', '2026-09-09T09:00:00.000Z'],
@@ -174,26 +174,26 @@ describe('persisted schedule decoding', () => {
 });
 
 it('preserves earlier project and priority tokens through a vault save and reload', () => {
-    const input = parseReminderContent('Compare #Home with #Work ! !');
-    expect(input.cleanContent).toBe('Compare #Home with !');
-    const line = rebuildCheckboxLine({ completed: false, content: input.cleanContent, priority: input.priority, hasTime: false, reminderId: 'one' });
-    const saved = scanReminderMarkdownContent('Reminders/Work.md', line, 'Reminders').reminders[0];
-    expect(saved).toMatchObject({ content: 'Compare #Home with !', priority: 1, project: 'Work' });
+	const input = parseReminderContent('Compare #Home with #Work ! !');
+	expect(input.cleanContent).toBe('Compare #Home with !');
+	const line = rebuildCheckboxLine({ completed: false, content: input.cleanContent, priority: input.priority, hasTime: false, reminderId: 'one' });
+	const saved = scanReminderMarkdownContent('Reminders/Work.md', line, 'Reminders').reminders[0];
+	expect(saved).toMatchObject({ content: 'Compare #Home with !', priority: 1, project: 'Work' });
 });
 
 
 it('normalizes a handwritten month-end rule using the recurrence calculator', () => {
-    clock('UTC', '2026-02-01T10:00:00Z');
-    const normalized = normalizeReminderScheduleLine('- [ ] Task monthly on the last day 09:00 <!-- crate-id:one -->');
-    expect(scan(normalized)).toMatchObject({ content: 'Task', dueDatetime: '2026-02-28T09:00:00.000Z',
-        recurrence: { frequency: 'monthly', dayOfMonth: 31, hour: 9, minute: 0 } });
+	clock('UTC', '2026-02-01T10:00:00Z');
+	const normalized = normalizeReminderScheduleLine('- [ ] Task monthly on the last day 09:00 <!-- crate-id:one -->');
+	expect(scan(normalized)).toMatchObject({ content: 'Task', dueDatetime: '2026-02-28T09:00:00.000Z',
+		recurrence: { frequency: 'monthly', dayOfMonth: 31, hour: 9, minute: 0 } });
 });
 
 it('changes the semantic revision when recurrence seconds change', async () => {
-    const reminder = { id: 'precise', content: 'Task', priority: 4 as const, completed: false,
-        recurrence: { frequency: 'daily' as const, hour: 9, minute: 0, timezone: 'UTC' } };
-    const original = await reminderRevision(reminder);
-    expect(await reminderRevision({ ...reminder, recurrence: { ...reminder.recurrence, second: 0, millisecond: 0 } })).toBe(original);
-    expect(await reminderRevision({ ...reminder, recurrence: { ...reminder.recurrence, second: 30 } })).not.toBe(original);
-    expect(await reminderRevision({ ...reminder, recurrence: { ...reminder.recurrence, millisecond: 123 } })).not.toBe(original);
+	const reminder = { id: 'precise', content: 'Task', priority: 4 as const, completed: false,
+		recurrence: { frequency: 'daily' as const, hour: 9, minute: 0, timezone: 'UTC' } };
+	const original = await reminderRevision(reminder);
+	expect(await reminderRevision({ ...reminder, recurrence: { ...reminder.recurrence, second: 0, millisecond: 0 } })).toBe(original);
+	expect(await reminderRevision({ ...reminder, recurrence: { ...reminder.recurrence, second: 30 } })).not.toBe(original);
+	expect(await reminderRevision({ ...reminder, recurrence: { ...reminder.recurrence, millisecond: 123 } })).not.toBe(original);
 });

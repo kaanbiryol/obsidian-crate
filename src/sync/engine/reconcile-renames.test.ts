@@ -53,15 +53,15 @@ async function harness(destinationUploaded: boolean, destinationExists = true) {
 	));
 	const context: TargetedReconcileContext = {
 		deleteRemoteFiles: (files, result, options) => deleteRemoteFiles({ vault, localManifest: manifest, files: {
-    batchDelete: async paths => {
-      for (const path of paths) {
-        await assertRenamePreserved(manifest, vault, path);
-        if (destinationExists) expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
-        deleted(path); delete remote[path];
-      }
-      return { success: true, deleted: paths };
-    },
-  } }, files, result, options),
+		batchDelete: async paths => {
+			for (const path of paths) {
+				await assertRenamePreserved(manifest, vault, path);
+				if (destinationExists) expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
+				deleted(path); delete remote[path];
+			}
+			return { success: true, deleted: paths };
+		},
+	} }, files, result, options),
 		vault, localManifest: manifest, getRemoteEntries, processDiff, shouldIgnore: () => false,
 	};
 	return { source, destination, entry, remote, manifest, context, processDiff, getRemoteEntries, deleted };

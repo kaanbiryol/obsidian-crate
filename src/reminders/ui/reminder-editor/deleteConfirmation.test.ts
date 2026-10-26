@@ -3,28 +3,28 @@ import type { Reminder } from "@/reminders/types/reminder";
 import { buildDeleteConfirmationMessage } from "./deleteConfirmation";
 
 function makeReminder(content: string): Reminder {
-  return {
-    id: "r1",
-    content,
-    priority: 4,
-    completed: false,
-  };
+	return {
+		id: "r1",
+		content,
+		priority: 4,
+		completed: false,
+	};
 }
 
 describe("buildDeleteConfirmationMessage", () => {
-  it("keeps short reminder content intact", () => {
-    expect(buildDeleteConfirmationMessage(makeReminder("Buy milk"))).toBe(
-      'Delete "Buy milk"? This can\'t be undone.',
-    );
-  });
+	it("keeps short reminder content intact", () => {
+		expect(buildDeleteConfirmationMessage(makeReminder("Buy milk"))).toBe(
+			'Delete "Buy milk"? This can\'t be undone.',
+		);
+	});
 
-  it("truncates long reminder content to preserve the existing preview behavior", () => {
-    expect(
-      buildDeleteConfirmationMessage(
-        makeReminder("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"),
-      ),
-    ).toBe(
-      'Delete "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX..."? This can\'t be undone.',
-    );
-  });
+	it("truncates long reminder content to preserve the existing preview behavior", () => {
+		expect(
+			buildDeleteConfirmationMessage(
+				makeReminder("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			),
+		).toBe(
+			'Delete "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX..."? This can\'t be undone.',
+		);
+	});
 });

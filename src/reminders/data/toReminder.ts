@@ -5,16 +5,16 @@ import { reminderProject } from "../core/reminderProjectPath";
 
 /** Convert the persisted Markdown representation into the UI-facing reminder model. */
 export function toReminder(indexed: IndexedReminder): Reminder {
-  return {
-    id: indexed.id,
-    content: indexed.content,
-    description: indexed.description,
-    dueDate: indexed.dueDate,
-    dueDatetime: indexed.dueDatetime,
-    priority: indexed.priority,
-    completed: indexed.completed,
-    project: reminderProject(indexed),
-    recurrence: normalizeRecurrenceRule(indexed.recurrence),
-    lineNumber: indexed.lineNumber,
-  };
+	return {
+		id: indexed.id,
+		content: indexed.content,
+		description: indexed.description,
+		dueDate: indexed.dueDate,
+		dueDatetime: indexed.dueDatetime,
+		priority: indexed.priority,
+		completed: indexed.completed,
+		project: reminderProject(indexed),
+		recurrence: normalizeRecurrenceRule(indexed.recurrence),
+		lineNumber: indexed.lineNumber,
+	};
 }

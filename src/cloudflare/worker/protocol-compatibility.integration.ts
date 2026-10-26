@@ -74,9 +74,9 @@ it('accepts launch protocol receipts while fencing restores without durable oper
 });
 
 it('reports server elapsed time for successful and rejected requests', async () => {
-  for (const [path, protocol, method] of [['/.well-known/crate', undefined, 'GET'], ['/sync/upload', 'invalid', 'PUT']] as const) {
-    const response = await worker.fetch(request(path, protocol, method), env);
-    expect(response.headers.get('Server-Timing')).toMatch(/^crate;dur=\d+(\.\d+)?$/);
-    expect(response.headers.get('Access-Control-Expose-Headers')).toContain('Server-Timing');
-  }
+	for (const [path, protocol, method] of [['/.well-known/crate', undefined, 'GET'], ['/sync/upload', 'invalid', 'PUT']] as const) {
+		const response = await worker.fetch(request(path, protocol, method), env);
+		expect(response.headers.get('Server-Timing')).toMatch(/^crate;dur=\d+(\.\d+)?$/);
+		expect(response.headers.get('Access-Control-Expose-Headers')).toContain('Server-Timing');
+	}
 });

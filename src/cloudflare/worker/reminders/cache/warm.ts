@@ -15,7 +15,7 @@ export function selectReminderIndexWarmBatch(
 	let selectedBytes = 0;
 	for (const file of metadata) {
 		if (selected.length >= REMINDER_INDEX_WARM_MAX_FILES) break;
-    const bytes = file.size <= MAX_REMINDER_NOTE_BYTES ? file.size : 0;
+	const bytes = file.size <= MAX_REMINDER_NOTE_BYTES ? file.size : 0;
 		if (selected.length > 0 && selectedBytes + bytes > REMINDER_INDEX_WARM_MAX_BYTES) break;
 		selected.push(file);
 		selectedBytes += bytes;

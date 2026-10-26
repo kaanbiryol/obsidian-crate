@@ -1,167 +1,167 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Reminder } from "@/reminders/types/reminder";
 import {
-  buildBrowseProjectCardsViewModel,
-  buildInboxViewModel,
-  buildProjectDetailHeaderViewModel,
-  buildProjectDetailViewModel,
-  buildProjectStatsMap,
-  buildTodayViewModel,
-  buildUpcomingViewModel,
-  getProjectStats,
+	buildBrowseProjectCardsViewModel,
+	buildInboxViewModel,
+	buildProjectDetailHeaderViewModel,
+	buildProjectDetailViewModel,
+	buildProjectStatsMap,
+	buildTodayViewModel,
+	buildUpcomingViewModel,
+	getProjectStats,
 } from "./viewModels";
 import { getProjectColor } from "@/reminders/ui/format/projectColors";
 
 function makeReminder(overrides: Partial<Reminder>): Reminder {
-  return {
-    id: overrides.id || "r1",
-    content: overrides.content || "Task",
-    priority: overrides.priority ?? 4,
-    completed: overrides.completed ?? false,
-    project: overrides.project,
-    dueDate: overrides.dueDate,
-    dueDatetime: overrides.dueDatetime,
-    recurrence: overrides.recurrence,
-    description: overrides.description,
-    lineNumber: overrides.lineNumber,
-  };
+	return {
+		id: overrides.id || "r1",
+		content: overrides.content || "Task",
+		priority: overrides.priority ?? 4,
+		completed: overrides.completed ?? false,
+		project: overrides.project,
+		dueDate: overrides.dueDate,
+		dueDatetime: overrides.dueDatetime,
+		recurrence: overrides.recurrence,
+		description: overrides.description,
+		lineNumber: overrides.lineNumber,
+	};
 }
 
 describe("reminder view models", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+	afterEach(() => {
+		vi.useRealTimers();
+	});
 
-  it("keeps completed inbox reminders in file order", () => {
-    const viewModel = buildInboxViewModel([
-      makeReminder({ id: "b", project: "Inbox", lineNumber: 2 }),
-      makeReminder({ id: "c", project: "Inbox", lineNumber: 3, completed: true }),
-      makeReminder({ id: "a", project: "Inbox", lineNumber: 1, completed: true }),
-      makeReminder({ id: "other", project: "Work" }),
-    ]);
+	it("keeps completed inbox reminders in file order", () => {
+		const viewModel = buildInboxViewModel([
+			makeReminder({ id: "b", project: "Inbox", lineNumber: 2 }),
+			makeReminder({ id: "c", project: "Inbox", lineNumber: 3, completed: true }),
+			makeReminder({ id: "a", project: "Inbox", lineNumber: 1, completed: true }),
+			makeReminder({ id: "other", project: "Work" }),
+		]);
 
-    expect(viewModel.active.map((reminder) => reminder.id)).toEqual(["b"]);
-    expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["a", "c"]);
-  });
+		expect(viewModel.active.map((reminder) => reminder.id)).toEqual(["b"]);
+		expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["a", "c"]);
+	});
 
-  it("groups today, overdue, and completed-due-today reminders", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
+	it("groups today, overdue, and completed-due-today reminders", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
 
-    const viewModel = buildTodayViewModel([
-      makeReminder({ id: "today", dueDate: "2026-01-10" }),
-      makeReminder({ id: "overdue", dueDate: "2026-01-08" }),
-      makeReminder({ id: "done-today", dueDate: "2026-01-10", completed: true }),
-      makeReminder({ id: "done-old", dueDate: "2026-01-08", completed: true }),
-    ]);
+		const viewModel = buildTodayViewModel([
+			makeReminder({ id: "today", dueDate: "2026-01-10" }),
+			makeReminder({ id: "overdue", dueDate: "2026-01-08" }),
+			makeReminder({ id: "done-today", dueDate: "2026-01-10", completed: true }),
+			makeReminder({ id: "done-old", dueDate: "2026-01-08", completed: true }),
+		]);
 
-    expect(viewModel.active.map((reminder) => reminder.id)).toEqual(["overdue", "today"]);
-    expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["done-today"]);
-  });
+		expect(viewModel.active.map((reminder) => reminder.id)).toEqual(["overdue", "today"]);
+		expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["done-today"]);
+	});
 
-  it("deduplicates elapsed reminders and keeps due-date order", () => {
-    const now = new Date(2026, 0, 10, 12);
-    const elapsed = makeReminder({ id: "elapsed", dueDatetime: new Date(2026, 0, 10, 9).toISOString() });
-    const viewModel = buildTodayViewModel([
-      makeReminder({ id: "all-day", dueDate: "2026-01-10" }),
-      elapsed,
-      makeReminder({ id: "later", dueDatetime: new Date(2026, 0, 10, 15).toISOString() }),
-      elapsed,
-    ], now);
-    expect(viewModel.active.map(reminder => reminder.id)).toEqual(["all-day", "elapsed", "later"]);
-  });
+	it("deduplicates elapsed reminders and keeps due-date order", () => {
+		const now = new Date(2026, 0, 10, 12);
+		const elapsed = makeReminder({ id: "elapsed", dueDatetime: new Date(2026, 0, 10, 9).toISOString() });
+		const viewModel = buildTodayViewModel([
+			makeReminder({ id: "all-day", dueDate: "2026-01-10" }),
+			elapsed,
+			makeReminder({ id: "later", dueDatetime: new Date(2026, 0, 10, 15).toISOString() }),
+			elapsed,
+		], now);
+		expect(viewModel.active.map(reminder => reminder.id)).toEqual(["all-day", "elapsed", "later"]);
+	});
 
-  it("builds the upcoming reminder order and project stats/details", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
+	it("builds the upcoming reminder order and project stats/details", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
 
-    const reminders = [
-      makeReminder({ id: "work-active", project: "Work", dueDate: "2026-01-11" }),
-      makeReminder({ id: "work-done", project: "Work", completed: true, dueDate: "2026-01-11" }),
-      makeReminder({ id: "home", project: "Home", dueDate: "2026-01-12" }),
-    ];
+		const reminders = [
+			makeReminder({ id: "work-active", project: "Work", dueDate: "2026-01-11" }),
+			makeReminder({ id: "work-done", project: "Work", completed: true, dueDate: "2026-01-11" }),
+			makeReminder({ id: "home", project: "Home", dueDate: "2026-01-12" }),
+		];
 
-    const upcoming = buildUpcomingViewModel(reminders, 7);
-    expect(upcoming.upcomingReminders.map((reminder) => reminder.id)).toEqual(["work-active", "home"]);
+		const upcoming = buildUpcomingViewModel(reminders, 7);
+		expect(upcoming.upcomingReminders.map((reminder) => reminder.id)).toEqual(["work-active", "home"]);
 
-    const projectStats = buildProjectStatsMap(reminders);
-    expect(getProjectStats(projectStats, "Work")).toEqual({
-      active: 1,
-      completed: 1,
-      total: 2,
-      completionPercentage: 50,
-    });
+		const projectStats = buildProjectStatsMap(reminders);
+		expect(getProjectStats(projectStats, "Work")).toEqual({
+			active: 1,
+			completed: 1,
+			total: 2,
+			completionPercentage: 50,
+		});
 
-    const detail = buildProjectDetailViewModel(reminders, "Work");
-    expect(detail.active.map((reminder) => reminder.id)).toEqual(["work-active"]);
-    expect(detail.completed.map((reminder) => reminder.id)).toEqual(["work-done"]);
-    expect(detail.total).toBe(2);
-    expect(detail.completionPercentage).toBe(50);
-    expect(typeof detail.accentColor).toBe("string");
-  });
+		const detail = buildProjectDetailViewModel(reminders, "Work");
+		expect(detail.active.map((reminder) => reminder.id)).toEqual(["work-active"]);
+		expect(detail.completed.map((reminder) => reminder.id)).toEqual(["work-done"]);
+		expect(detail.total).toBe(2);
+		expect(detail.completionPercentage).toBe(50);
+		expect(typeof detail.accentColor).toBe("string");
+	});
 
-  it("builds browse card models with fallback empty stats for projects without reminders", () => {
-    const cards = buildBrowseProjectCardsViewModel(
-      ["Work", "Empty"],
-      [
-        makeReminder({ id: "work-active", project: "Work" }),
-        makeReminder({ id: "work-done", project: "Work", completed: true }),
-      ],
-    );
+	it("builds browse card models with fallback empty stats for projects without reminders", () => {
+		const cards = buildBrowseProjectCardsViewModel(
+			["Work", "Empty"],
+			[
+				makeReminder({ id: "work-active", project: "Work" }),
+				makeReminder({ id: "work-done", project: "Work", completed: true }),
+			],
+		);
 
-    expect(cards.every((card) => typeof card.accentColor === "string")).toBe(true);
-    expect(cards.map(({ project, stats, isComplete }) => ({ project, stats, isComplete }))).toEqual([
-      {
-        project: "Work",
-        stats: {
-          active: 1,
-          completed: 1,
-          total: 2,
-          completionPercentage: 50,
-        },
-        isComplete: false,
-      },
-      {
-        project: "Empty",
-        stats: {
-          active: 0,
-          completed: 0,
-          total: 0,
-          completionPercentage: 0,
-        },
-        isComplete: false,
-      },
-    ]);
-  });
+		expect(cards.every((card) => typeof card.accentColor === "string")).toBe(true);
+		expect(cards.map(({ project, stats, isComplete }) => ({ project, stats, isComplete }))).toEqual([
+			{
+				project: "Work",
+				stats: {
+					active: 1,
+					completed: 1,
+					total: 2,
+					completionPercentage: 50,
+				},
+				isComplete: false,
+			},
+			{
+				project: "Empty",
+				stats: {
+					active: 0,
+					completed: 0,
+					total: 0,
+					completionPercentage: 0,
+				},
+				isComplete: false,
+			},
+		]);
+	});
 
-  it("uses the project palette variant for the active color scheme", () => {
-    const reminders = [makeReminder({ id: "work", project: "Work" })];
-    const expected = getProjectColor("Work");
+	it("uses the project palette variant for the active color scheme", () => {
+		const reminders = [makeReminder({ id: "work", project: "Work" })];
+		const expected = getProjectColor("Work");
 
 	expect(buildBrowseProjectCardsViewModel(["Work"], reminders, "light")[0]?.accentColor)
-      .toBe(expected.light.accent);
-    expect(buildProjectDetailViewModel(reminders, "Work", "dark").accentColor)
-      .toBe(expected.dark.accent);
-  });
+			.toBe(expected.light.accent);
+		expect(buildProjectDetailViewModel(reminders, "Work", "dark").accentColor)
+			.toBe(expected.dark.accent);
+	});
 
-  it("builds compact project detail header state including all-done status", () => {
-    const header = buildProjectDetailHeaderViewModel(buildProjectDetailViewModel([
-      makeReminder({ id: "done-1", project: "Work", completed: true }),
-      makeReminder({ id: "done-2", project: "Work", completed: true }),
-      makeReminder({ id: "other", project: "Home" }),
-    ], "Work"));
+	it("builds compact project detail header state including all-done status", () => {
+		const header = buildProjectDetailHeaderViewModel(buildProjectDetailViewModel([
+			makeReminder({ id: "done-1", project: "Work", completed: true }),
+			makeReminder({ id: "done-2", project: "Work", completed: true }),
+			makeReminder({ id: "other", project: "Home" }),
+		], "Work"));
 
-    expect(typeof header.accentColor).toBe("string");
-    expect({
-      completedCount: header.completedCount,
-      total: header.total,
-      completionPercentage: header.completionPercentage,
-      isComplete: header.isComplete,
-    }).toEqual({
-      completedCount: 2,
-      total: 2,
-      completionPercentage: 100,
-      isComplete: true,
-    });
-  });
+		expect(typeof header.accentColor).toBe("string");
+		expect({
+			completedCount: header.completedCount,
+			total: header.total,
+			completionPercentage: header.completionPercentage,
+			isComplete: header.isComplete,
+		}).toEqual({
+			completedCount: 2,
+			total: 2,
+			completionPercentage: 100,
+			isComplete: true,
+		});
+	});
 });

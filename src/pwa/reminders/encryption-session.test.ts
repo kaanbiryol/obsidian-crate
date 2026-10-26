@@ -97,11 +97,11 @@ it.each([[200, 'no longer reports'], [404, 'Could not verify encryption']] as co
 });
 
 it.each([200, 404])('rejects plaintext mode for a fresh encrypted setup link when the server returns %s', async status => {
-  vi.stubGlobal('window', { location: { hash: '#crateKey=private-setup-key', pathname: '/notifications', search: '' }, history: { state: null, replaceState: vi.fn() } });
-  consumeReminderEncryptionFragment();
-  await expect(prepareReminderEncryption('session', async () => Response.json({ encryption: null }, { status }))).rejects.toThrow();
-  expect(reminderEncryptionSnapshot().status).toBe('locked');
-  expect(() => sealPrivateValue('private draft', 'test')).toThrow('Unlock');
+	vi.stubGlobal('window', { location: { hash: '#crateKey=private-setup-key', pathname: '/notifications', search: '' }, history: { state: null, replaceState: vi.fn() } });
+	consumeReminderEncryptionFragment();
+	await expect(prepareReminderEncryption('session', async () => Response.json({ encryption: null }, { status }))).rejects.toThrow();
+	expect(reminderEncryptionSnapshot().status).toBe('locked');
+	expect(() => sealPrivateValue('private draft', 'test')).toThrow('Unlock');
 });
 
 it('keeps storage locked after an unavailable check and permits writes after a successful plaintext retry', async () => {

@@ -6,30 +6,30 @@ import { ThemeIcon } from './ThemeIcon';
 import { usePreserveFieldFocus } from './usePreserveFieldFocus';
 
 interface ModalHeaderAction {
-    label: string;
-    onClick?: () => void;
-    ariaLabel?: string;
-    disabled?: boolean;
-    type?: 'button' | 'submit';
-    form?: string;
-    busy?: boolean;
-    tone?: 'accent' | 'danger';
-    dataAction?: string;
-    /** Shows this icon in place of the label; the label stays the accessible name. */
-    icon?: string;
+	label: string;
+	onClick?: () => void;
+	ariaLabel?: string;
+	disabled?: boolean;
+	type?: 'button' | 'submit';
+	form?: string;
+	busy?: boolean;
+	tone?: 'accent' | 'danger';
+	dataAction?: string;
+	/** Shows this icon in place of the label; the label stays the accessible name. */
+	icon?: string;
 }
 
 interface ModalHeaderProps {
-    title?: string;
-    titleId?: string;
-    closeLabel: string;
-    navigation?: 'dismiss' | 'back';
-    onClose: () => void;
-    action?: ModalHeaderAction;
-    secondaryActions?: React.ReactNode;
-    closeDisabled?: boolean;
-    preventFocusOnPress?: boolean;
-    titleLive?: 'polite';
+	title?: string;
+	titleId?: string;
+	closeLabel: string;
+	navigation?: 'dismiss' | 'back';
+	onClose: () => void;
+	action?: ModalHeaderAction;
+	secondaryActions?: React.ReactNode;
+	closeDisabled?: boolean;
+	preventFocusOnPress?: boolean;
+	titleLive?: 'polite';
 }
 
 /**
@@ -39,60 +39,60 @@ interface ModalHeaderProps {
  * accessibility, and visual hierarchy of the header itself.
  */
 export const ModalHeader: React.FC<ModalHeaderProps> = ({
-    title,
-    titleId,
-    closeLabel,
-    navigation = 'dismiss',
-    onClose,
-    action,
-    secondaryActions,
-    closeDisabled,
-    preventFocusOnPress,
-    titleLive,
+	title,
+	titleId,
+	closeLabel,
+	navigation = 'dismiss',
+	onClose,
+	action,
+	secondaryActions,
+	closeDisabled,
+	preventFocusOnPress,
+	titleLive,
 }) => {
-    const headerRef = useRef<HTMLElement | null>(null);
-    usePreserveFieldFocus(headerRef, Boolean(preventFocusOnPress));
-    return (
-        <header ref={headerRef} className="reminder-modal-header">
-            <div className="reminder-modal-header-side">
-                <IconButton
-                    disabled={closeDisabled}
-                    preventFocusOnPress={preventFocusOnPress}
-                    icon={navigation === 'back' ? 'chevron-left' : 'x'}
-                    iconSize="m"
-                    onClick={onClose}
-                    label={closeLabel}
-                    title={navigation === 'back' ? 'Back' : 'Close'}
-                    className="reminder-modal-header-close"
-                />
-            </div>
+	const headerRef = useRef<HTMLElement | null>(null);
+	usePreserveFieldFocus(headerRef, Boolean(preventFocusOnPress));
+	return (
+		<header ref={headerRef} className="reminder-modal-header">
+			<div className="reminder-modal-header-side">
+				<IconButton
+					disabled={closeDisabled}
+					preventFocusOnPress={preventFocusOnPress}
+					icon={navigation === 'back' ? 'chevron-left' : 'x'}
+					iconSize="m"
+					onClick={onClose}
+					label={closeLabel}
+					title={navigation === 'back' ? 'Back' : 'Close'}
+					className="reminder-modal-header-close"
+				/>
+			</div>
 
-            <div className="reminder-modal-header-copy">
-                {title && <h2 id={titleId} className="reminder-modal-header-title" aria-live={titleLive}>{title}</h2>}
-            </div>
+			<div className="reminder-modal-header-copy">
+				{title && <h2 id={titleId} className="reminder-modal-header-title" aria-live={titleLive}>{title}</h2>}
+			</div>
 
-            <div className="reminder-modal-header-side is-right">
-                {secondaryActions}
-                {action && (
-                    <Button
-                        onClick={action.onClick}
-                        type={action.type}
-                        form={action.form}
-                        aria-busy={action.busy}
-                        data-action={action.dataAction}
-                        data-tone={action.tone}
-                        preventFocusOnPress={preventFocusOnPress}
-                        disabled={action.disabled}
-                        aria-label={action.ariaLabel ?? action.label}
-                        title={action.icon ? action.label : undefined}
-                        className={`reminder-modal-header-action${action.icon ? ' is-icon' : ''}${action.disabled ? '' : ' is-enabled'}`}
-                    >
-                        {action.icon
-                            ? <ThemeIcon id={action.icon} size="m" aria-hidden="true" />
-                            : <span className="reminder-modal-header-action-label">{action.label}</span>}
-                    </Button>
-                )}
-            </div>
-        </header>
-    );
+			<div className="reminder-modal-header-side is-right">
+				{secondaryActions}
+				{action && (
+					<Button
+						onClick={action.onClick}
+						type={action.type}
+						form={action.form}
+						aria-busy={action.busy}
+						data-action={action.dataAction}
+						data-tone={action.tone}
+						preventFocusOnPress={preventFocusOnPress}
+						disabled={action.disabled}
+						aria-label={action.ariaLabel ?? action.label}
+						title={action.icon ? action.label : undefined}
+						className={`reminder-modal-header-action${action.icon ? ' is-icon' : ''}${action.disabled ? '' : ' is-enabled'}`}
+					>
+						{action.icon
+							? <ThemeIcon id={action.icon} size="m" aria-hidden="true" />
+							: <span className="reminder-modal-header-action-label">{action.label}</span>}
+					</Button>
+				)}
+			</div>
+		</header>
+	);
 };

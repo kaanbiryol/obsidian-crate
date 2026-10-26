@@ -90,6 +90,6 @@ export const CRATE_PROTOCOL_HEADER = 'X-Crate-Protocol';
 /** POST routes that only read, so they skip mutation logging and protocol checks. */
 export const READ_ONLY_POST_PATHS: readonly string[] = ['/sync/metadata', '/sync/batch-download', '/encryption/metadata', '/links/title'];
 export function isCrateMutation(path: string, method = 'GET'): boolean {
-  return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())
-    && !READ_ONLY_POST_PATHS.includes(path.split('?')[0] ?? path);
+	return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())
+		&& !READ_ONLY_POST_PATHS.includes(path.split('?')[0] ?? path);
 }

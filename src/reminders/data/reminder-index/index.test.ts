@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TFile, type App } from 'obsidian';
 
 vi.mock('@/reminders/data/vaultScanner', () => ({
-  scanVault: vi.fn(),
-  scanFile: vi.fn(),
-  isInRemindersFolder: vi.fn(),
-  getProjectFromPath: vi.fn(),
+	scanVault: vi.fn(),
+	scanFile: vi.fn(),
+	isInRemindersFolder: vi.fn(),
+	getProjectFromPath: vi.fn(),
 }));
 
 import { createReminderIndex, type IndexedReminder } from '@/reminders/data/reminder-index';
@@ -13,298 +13,298 @@ import * as vaultScanner from '@/reminders/data/vaultScanner';
 import type { ScanResult } from '@/reminders/data/vaultScanner';
 
 function makeMockFile(path: string): TFile {
-  const file = new TFile();
-  const name = path.split('/').pop() ?? path;
-  const dotIndex = name.lastIndexOf('.');
+	const file = new TFile();
+	const name = path.split('/').pop() ?? path;
+	const dotIndex = name.lastIndexOf('.');
 
-  file.vault = {} as never;
-  file.path = path;
-  file.name = name;
-  file.parent = null;
-  file.basename = dotIndex >= 0 ? name.slice(0, dotIndex) : name;
-  file.extension = dotIndex >= 0 ? name.slice(dotIndex + 1) : '';
-  file.stat = { ctime: 0, mtime: 0, size: 0 };
+	file.vault = {} as never;
+	file.path = path;
+	file.name = name;
+	file.parent = null;
+	file.basename = dotIndex >= 0 ? name.slice(0, dotIndex) : name;
+	file.extension = dotIndex >= 0 ? name.slice(dotIndex + 1) : '';
+	file.stat = { ctime: 0, mtime: 0, size: 0 };
 
-  return file;
+	return file;
 }
 
 function makeReminder(overrides: Partial<IndexedReminder>): IndexedReminder {
-  return {
-    id: overrides.id || 'r1',
-    content: overrides.content || 'Task',
-    dueDate: overrides.dueDate,
-    dueDatetime: overrides.dueDatetime,
-    priority: overrides.priority ?? 4,
-    completed: overrides.completed ?? false,
-    project: overrides.project,
-    recurrence: overrides.recurrence,
-    filePath: overrides.filePath || 'Reminders/Work.md',
-    lineNumber: overrides.lineNumber ?? 0,
-    rawLine: overrides.rawLine || '- [ ] Task',
-  };
+	return {
+		id: overrides.id || 'r1',
+		content: overrides.content || 'Task',
+		dueDate: overrides.dueDate,
+		dueDatetime: overrides.dueDatetime,
+		priority: overrides.priority ?? 4,
+		completed: overrides.completed ?? false,
+		project: overrides.project,
+		recurrence: overrides.recurrence,
+		filePath: overrides.filePath || 'Reminders/Work.md',
+		lineNumber: overrides.lineNumber ?? 0,
+		rawLine: overrides.rawLine || '- [ ] Task',
+	};
 }
 
 describe('reminderIndex', () => {
-  const app = { vault: {} } as unknown as App;
+	const app = { vault: {} } as unknown as App;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+	afterEach(() => {
+		vi.useRealTimers();
+	});
 
-  it.each([false, true])('waits for an initial scan deferred by sync (partial: %s)', async (partial) => {
-    let syncing = !partial;
-    const index = createReminderIndex(app, 'Reminders', { shouldDeferScan: () => syncing });
-    const result: ScanResult = {
-      reminders: [makeReminder({ id: 'today', dueDate: '2026-09-11' })],
-      filesScanned: 1, totalLines: 1, issues: [], scanDurationMs: 1, discoveredProjects: ['Work'],
-    };
-    vi.mocked(vaultScanner.scanVault).mockResolvedValueOnce({ ...result, reminders: [], deferred: true });
-    expect(index.isInitialLoadComplete).toBe(false);
-    await index.load();
-    expect(index.isInitialLoadComplete).toBe(false);
-    expect(index.getAll()).toEqual([]);
-    const snapshots: { ready: boolean; ids: string[] }[] = [];
-    index.onIndexChange(() => snapshots.push({ ready: index.isInitialLoadComplete, ids: index.getAll().map(item => item.id) }));
-    syncing = false;
-    vi.mocked(vaultScanner.scanVault).mockReset().mockResolvedValue(result);
-    await index.flushDeferredScans();
-    expect(snapshots).toEqual([{ ready: true, ids: ['today'] }]);
-    syncing = true;
-    await index.load();
-    expect(index.isInitialLoadComplete).toBe(true);
-    expect(index.getAll().map(item => item.id)).toEqual(['today']);
-  });
+	it.each([false, true])('waits for an initial scan deferred by sync (partial: %s)', async (partial) => {
+		let syncing = !partial;
+		const index = createReminderIndex(app, 'Reminders', { shouldDeferScan: () => syncing });
+		const result: ScanResult = {
+			reminders: [makeReminder({ id: 'today', dueDate: '2026-09-11' })],
+			filesScanned: 1, totalLines: 1, issues: [], scanDurationMs: 1, discoveredProjects: ['Work'],
+		};
+		vi.mocked(vaultScanner.scanVault).mockResolvedValueOnce({ ...result, reminders: [], deferred: true });
+		expect(index.isInitialLoadComplete).toBe(false);
+		await index.load();
+		expect(index.isInitialLoadComplete).toBe(false);
+		expect(index.getAll()).toEqual([]);
+		const snapshots: { ready: boolean; ids: string[] }[] = [];
+		index.onIndexChange(() => snapshots.push({ ready: index.isInitialLoadComplete, ids: index.getAll().map(item => item.id) }));
+		syncing = false;
+		vi.mocked(vaultScanner.scanVault).mockReset().mockResolvedValue(result);
+		await index.flushDeferredScans();
+		expect(snapshots).toEqual([{ ready: true, ids: ['today'] }]);
+		syncing = true;
+		await index.load();
+		expect(index.isInitialLoadComplete).toBe(true);
+		expect(index.getAll().map(item => item.id)).toEqual(['today']);
+	});
 
-  it.each([false, true])('finishes an empty initial scan (source issues: %s)', async (hasIssues) => {
-    const index = createReminderIndex(app, 'Reminders');
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue({
-      reminders: [], filesScanned: 0, totalLines: 0, scanDurationMs: 1, discoveredProjects: [],
-      issues: hasIssues ? [{ path: 'Reminders/Work.md', reason: 'Unreadable file' }] : [],
-    });
-    await index.load();
-    expect(index.isInitialLoadComplete).toBe(true);
-    expect(index.sourceIssues).toHaveLength(hasIssues ? 1 : 0);
-  });
+	it.each([false, true])('finishes an empty initial scan (source issues: %s)', async (hasIssues) => {
+		const index = createReminderIndex(app, 'Reminders');
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+			reminders: [], filesScanned: 0, totalLines: 0, scanDurationMs: 1, discoveredProjects: [],
+			issues: hasIssues ? [{ path: 'Reminders/Work.md', reason: 'Unreadable file' }] : [],
+		});
+		await index.load();
+		expect(index.isInitialLoadComplete).toBe(true);
+		expect(index.sourceIssues).toHaveLength(hasIssues ? 1 : 0);
+	});
 
-  it('updates indexes when renaming files', () => {
-    const reminders = [
-      makeReminder({ id: 'r1', project: 'Old', filePath: 'Reminders/Old.md' }),
-      makeReminder({ id: 'r2', project: 'Old', filePath: 'Reminders/Old.md', lineNumber: 1 }),
-    ];
+	it('updates indexes when renaming files', () => {
+		const reminders = [
+			makeReminder({ id: 'r1', project: 'Old', filePath: 'Reminders/Old.md' }),
+			makeReminder({ id: 'r2', project: 'Old', filePath: 'Reminders/Old.md', lineNumber: 1 }),
+		];
 
-    const scanResult: ScanResult = {
-      reminders,
-      filesScanned: 1,
-      totalLines: 2,
-      issues: [],
-      scanDurationMs: 5,
-      discoveredProjects: ['Old'],
-    };
+		const scanResult: ScanResult = {
+			reminders,
+			filesScanned: 1,
+			totalLines: 2,
+			issues: [],
+			scanDurationMs: 5,
+			discoveredProjects: ['Old'],
+		};
 
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
-    vi.mocked(vaultScanner.getProjectFromPath)
-      .mockImplementation((path: string) => (path.includes('Old') ? 'Old' : 'New'));
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
+		vi.mocked(vaultScanner.getProjectFromPath)
+			.mockImplementation((path: string) => (path.includes('Old') ? 'Old' : 'New'));
 
-    const index = createReminderIndex(app, 'Reminders');
-    return index.load().then(() => {
-      index.renameFile('Reminders/Old.md', 'Reminders/New.md');
+		const index = createReminderIndex(app, 'Reminders');
+		return index.load().then(() => {
+			index.renameFile('Reminders/Old.md', 'Reminders/New.md');
 
-      expect(index.getAll().filter(item => item.filePath === 'Reminders/New.md')).toHaveLength(2);
-      expect(index.getAll().filter(item => item.project === 'New')).toHaveLength(2);
-      expect(index.getAll().filter(item => item.project === 'Old')).toHaveLength(0);
-      expect(index.getProjects()).toEqual(['New']);
-    });
-  });
+			expect(index.getAll().filter(item => item.filePath === 'Reminders/New.md')).toHaveLength(2);
+			expect(index.getAll().filter(item => item.project === 'New')).toHaveLength(2);
+			expect(index.getAll().filter(item => item.project === 'Old')).toHaveLength(0);
+			expect(index.getProjects()).toEqual(['New']);
+		});
+	});
 
-  it('removes a file from indexes and projects', async () => {
-    const reminders = [
-      makeReminder({ id: 'r1', project: 'Work', filePath: 'Reminders/Work.md' }),
-      makeReminder({ id: 'r2', project: 'Home', filePath: 'Reminders/Home.md' }),
-    ];
+	it('removes a file from indexes and projects', async () => {
+		const reminders = [
+			makeReminder({ id: 'r1', project: 'Work', filePath: 'Reminders/Work.md' }),
+			makeReminder({ id: 'r2', project: 'Home', filePath: 'Reminders/Home.md' }),
+		];
 
-    const scanResult: ScanResult = {
-      reminders,
-      filesScanned: 2,
-      totalLines: 2,
-      issues: [],
-      scanDurationMs: 5,
-      discoveredProjects: ['Work', 'Home'],
-    };
+		const scanResult: ScanResult = {
+			reminders,
+			filesScanned: 2,
+			totalLines: 2,
+			issues: [],
+			scanDurationMs: 5,
+			discoveredProjects: ['Work', 'Home'],
+		};
 
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
-    vi.mocked(vaultScanner.getProjectFromPath)
-      .mockImplementation((path: string) => (path.includes('Work') ? 'Work' : 'Home'));
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
+		vi.mocked(vaultScanner.getProjectFromPath)
+			.mockImplementation((path: string) => (path.includes('Work') ? 'Work' : 'Home'));
 
-    const index = createReminderIndex(app, 'Reminders');
-    await index.load();
+		const index = createReminderIndex(app, 'Reminders');
+		await index.load();
 
-    index.removeFile('Reminders/Work.md');
+		index.removeFile('Reminders/Work.md');
 
-    expect(index.getAll().filter(item => item.filePath === 'Reminders/Work.md')).toHaveLength(0);
-    expect(index.getAll().filter(item => item.project === 'Work')).toHaveLength(0);
-    expect(index.getProjects()).toEqual(['Home']);
-  });
+		expect(index.getAll().filter(item => item.filePath === 'Reminders/Work.md')).toHaveLength(0);
+		expect(index.getAll().filter(item => item.project === 'Work')).toHaveLength(0);
+		expect(index.getProjects()).toEqual(['Home']);
+	});
 
-  it('notifies listeners on index changes', async () => {
-    const reminders = [
-      makeReminder({ id: 'r1', project: 'Work', filePath: 'Reminders/Work.md' }),
-    ];
+	it('notifies listeners on index changes', async () => {
+		const reminders = [
+			makeReminder({ id: 'r1', project: 'Work', filePath: 'Reminders/Work.md' }),
+		];
 
-    const scanResult: ScanResult = {
-      reminders,
-      filesScanned: 1,
-      totalLines: 1,
-      issues: [],
-      scanDurationMs: 5,
-      discoveredProjects: ['Work'],
-    };
+		const scanResult: ScanResult = {
+			reminders,
+			filesScanned: 1,
+			totalLines: 1,
+			issues: [],
+			scanDurationMs: 5,
+			discoveredProjects: ['Work'],
+		};
 
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
-    vi.mocked(vaultScanner.getProjectFromPath).mockReturnValue('Work');
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
+		vi.mocked(vaultScanner.getProjectFromPath).mockReturnValue('Work');
 
-    const index = createReminderIndex(app, 'Reminders');
-    const listener = vi.fn();
-    index.onIndexChange(listener);
+		const index = createReminderIndex(app, 'Reminders');
+		const listener = vi.fn();
+		index.onIndexChange(listener);
 
-    await index.load();
-    listener.mockClear();
+		await index.load();
+		listener.mockClear();
 
-    index.removeFile('Reminders/Work.md');
+		index.removeFile('Reminders/Work.md');
 
-    expect(listener).toHaveBeenCalledTimes(1);
-  });
+		expect(listener).toHaveBeenCalledTimes(1);
+	});
 
-  it('notifies listeners when optimistic state is cleared', async () => {
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue({
-      reminders: [makeReminder({ id: 'r1', content: 'Original task', project: 'Work' })],
-      filesScanned: 1,
-      totalLines: 1,
-      issues: [],
-      scanDurationMs: 5,
-      discoveredProjects: ['Work'],
-    });
+	it('notifies listeners when optimistic state is cleared', async () => {
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+			reminders: [makeReminder({ id: 'r1', content: 'Original task', project: 'Work' })],
+			filesScanned: 1,
+			totalLines: 1,
+			issues: [],
+			scanDurationMs: 5,
+			discoveredProjects: ['Work'],
+		});
 
-    const index = createReminderIndex(app, 'Reminders');
-    const listener = vi.fn();
-    index.onIndexChange(listener);
-    await index.load();
-    listener.mockClear();
+		const index = createReminderIndex(app, 'Reminders');
+		const listener = vi.fn();
+		index.onIndexChange(listener);
+		await index.load();
+		listener.mockClear();
 
-    index.applyOptimisticUpdate('r1', { content: 'Optimistic task' });
-    listener.mockClear();
-    index.clearOptimistic('r1');
+		index.applyOptimisticUpdate('r1', { content: 'Optimistic task' });
+		listener.mockClear();
+		index.clearOptimistic('r1');
 
-    expect(index.getById('r1')?.content).toBe('Original task');
-    expect(listener).toHaveBeenCalledTimes(1);
-  });
+		expect(index.getById('r1')?.content).toBe('Original task');
+		expect(listener).toHaveBeenCalledTimes(1);
+	});
 
-  it('merges optimistic create, update, and delete state into queries', async () => {
-    const baseReminder = makeReminder({ id: 'r1', content: 'Task', project: 'Work' });
-    const scanResult: ScanResult = {
-      reminders: [baseReminder],
-      filesScanned: 1,
-      totalLines: 1,
-      issues: [],
-      scanDurationMs: 5,
-      discoveredProjects: ['Work'],
-    };
+	it('merges optimistic create, update, and delete state into queries', async () => {
+		const baseReminder = makeReminder({ id: 'r1', content: 'Task', project: 'Work' });
+		const scanResult: ScanResult = {
+			reminders: [baseReminder],
+			filesScanned: 1,
+			totalLines: 1,
+			issues: [],
+			scanDurationMs: 5,
+			discoveredProjects: ['Work'],
+		};
 
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
 
-    const index = createReminderIndex(app, 'Reminders');
-    await index.load();
-    // Without pending optimistic state, queries reuse the indexed array.
-    expect(index.getAll()).toBe(index.getAll());
+		const index = createReminderIndex(app, 'Reminders');
+		await index.load();
+		// Without pending optimistic state, queries reuse the indexed array.
+		expect(index.getAll()).toBe(index.getAll());
 
-    index.applyOptimisticUpdate('r1', { content: 'Updated task', completed: true });
-    index.applyOptimisticCreate(
-      makeReminder({
-        id: 'r2',
-        content: 'Created task',
-        project: 'Inbox',
-        filePath: 'Reminders/Inbox.md',
-      }),
-    );
+		index.applyOptimisticUpdate('r1', { content: 'Updated task', completed: true });
+		index.applyOptimisticCreate(
+			makeReminder({
+				id: 'r2',
+				content: 'Created task',
+				project: 'Inbox',
+				filePath: 'Reminders/Inbox.md',
+			}),
+		);
 
-    expect(index.getById('r1')?.content).toBe('Updated task');
-    expect(index.getAll().filter((reminder) => reminder.completed).map((reminder) => reminder.id)).toEqual(['r1']);
-    expect(index.getAll().filter(item => item.project === 'Inbox').map((reminder) => reminder.id)).toEqual(['r2']);
+		expect(index.getById('r1')?.content).toBe('Updated task');
+		expect(index.getAll().filter((reminder) => reminder.completed).map((reminder) => reminder.id)).toEqual(['r1']);
+		expect(index.getAll().filter(item => item.project === 'Inbox').map((reminder) => reminder.id)).toEqual(['r2']);
 
-    index.applyOptimisticDelete('r1');
+		index.applyOptimisticDelete('r1');
 
-    expect(index.getById('r1')).toBeUndefined();
-    expect(index.getAll().map((reminder) => reminder.id)).toEqual(['r2']);
-  });
+		expect(index.getById('r1')).toBeUndefined();
+		expect(index.getAll().map((reminder) => reminder.id)).toEqual(['r2']);
+	});
 
-  it('clears optimistic state when a file is rescanned', async () => {
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue({
-      reminders: [
-        makeReminder({ id: 'r1', content: 'Original task', filePath: 'Reminders/Work.md', project: 'Work' }),
-      ],
-      filesScanned: 1,
-      totalLines: 1,
-      issues: [],
-      scanDurationMs: 5,
-      discoveredProjects: ['Work'],
-    });
-    vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
-    vi.mocked(vaultScanner.getProjectFromPath).mockReturnValue('Work');
-    vi.mocked(vaultScanner.scanFile).mockResolvedValue({
-      filePath: 'Reminders/Work.md',
-      reminders: [
-        makeReminder({ id: 'r1', content: 'Persisted task', filePath: 'Reminders/Work.md', project: 'Work' }),
-      ],
-      lineCount: 1,
-    });
+	it('clears optimistic state when a file is rescanned', async () => {
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+			reminders: [
+				makeReminder({ id: 'r1', content: 'Original task', filePath: 'Reminders/Work.md', project: 'Work' }),
+			],
+			filesScanned: 1,
+			totalLines: 1,
+			issues: [],
+			scanDurationMs: 5,
+			discoveredProjects: ['Work'],
+		});
+		vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
+		vi.mocked(vaultScanner.getProjectFromPath).mockReturnValue('Work');
+		vi.mocked(vaultScanner.scanFile).mockResolvedValue({
+			filePath: 'Reminders/Work.md',
+			reminders: [
+				makeReminder({ id: 'r1', content: 'Persisted task', filePath: 'Reminders/Work.md', project: 'Work' }),
+			],
+			lineCount: 1,
+		});
 
-    const index = createReminderIndex(app, 'Reminders');
-    await index.load();
+		const index = createReminderIndex(app, 'Reminders');
+		await index.load();
 
-    index.applyOptimisticUpdate('r1', { content: 'Optimistic task' });
-    index.applyOptimisticCreate(
-      makeReminder({ id: 'r2', content: 'Temp task', filePath: 'Reminders/Work.md', project: 'Work' }),
-    );
-    index.applyOptimisticDelete('r1');
+		index.applyOptimisticUpdate('r1', { content: 'Optimistic task' });
+		index.applyOptimisticCreate(
+			makeReminder({ id: 'r2', content: 'Temp task', filePath: 'Reminders/Work.md', project: 'Work' }),
+		);
+		index.applyOptimisticDelete('r1');
 
-    await index.rescanFile(makeMockFile('Reminders/Work.md'));
+		await index.rescanFile(makeMockFile('Reminders/Work.md'));
 
-    expect(index.getAll().map((reminder) => reminder.id)).toEqual(['r1']);
-    expect(index.getById('r1')?.content).toBe('Persisted task');
-    expect(index.getById('r2')).toBeUndefined();
-  });
+		expect(index.getAll().map((reminder) => reminder.id)).toEqual(['r1']);
+		expect(index.getById('r1')?.content).toBe('Persisted task');
+		expect(index.getById('r2')).toBeUndefined();
+	});
 
-  it('preserves the last-known-good index when a file rescan fails', async () => {
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue({
-      reminders: [
-        makeReminder({ id: 'r1', content: 'Persisted task', filePath: 'Reminders/Work.md', project: 'Work' }),
-      ],
-      filesScanned: 1,
-      totalLines: 1,
-      issues: [],
-      scanDurationMs: 5,
-      discoveredProjects: ['Work'],
-    });
-    vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
-    vi.mocked(vaultScanner.scanFile).mockResolvedValue({
-      filePath: 'Reminders/Work.md',
-      reminders: [],
-      lineCount: 0,
-      error: 'read failed',
-    });
+	it('preserves the last-known-good index when a file rescan fails', async () => {
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+			reminders: [
+				makeReminder({ id: 'r1', content: 'Persisted task', filePath: 'Reminders/Work.md', project: 'Work' }),
+			],
+			filesScanned: 1,
+			totalLines: 1,
+			issues: [],
+			scanDurationMs: 5,
+			discoveredProjects: ['Work'],
+		});
+		vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
+		vi.mocked(vaultScanner.scanFile).mockResolvedValue({
+			filePath: 'Reminders/Work.md',
+			reminders: [],
+			lineCount: 0,
+			error: 'read failed',
+		});
 
-    const index = createReminderIndex(app, 'Reminders');
-    const listener = vi.fn();
-    index.onIndexChange(listener);
-    await index.load();
-    listener.mockClear();
+		const index = createReminderIndex(app, 'Reminders');
+		const listener = vi.fn();
+		index.onIndexChange(listener);
+		await index.load();
+		listener.mockClear();
 
-    await index.rescanFile(makeMockFile('Reminders/Work.md'));
+		await index.rescanFile(makeMockFile('Reminders/Work.md'));
 
-    expect(index.getById('r1')?.content).toBe('Persisted task');
-    expect(listener).toHaveBeenCalledOnce();
-  });
+		expect(index.getById('r1')?.content).toBe('Persisted task');
+		expect(listener).toHaveBeenCalledOnce();
+	});
 });

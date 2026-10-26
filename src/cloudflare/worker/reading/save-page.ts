@@ -7,12 +7,12 @@ import { runReadingSavePage, type ReadingSaveConfig } from './save-client';
 import { isSha256Hex } from '@/platform/validation';
 
 const pageHeaders = (type: string) => ({ 'Content-Type': type, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',
-  'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://crate.kaanbiryol.com; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
+	'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://crate.kaanbiryol.com; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
 interface PageOptions { supportOnly?: boolean; scriptUrl?: string; serverFingerprint?: string }
 
 export function readingSavePage({ supportOnly = false, scriptUrl = '/notifications/save-reading.js' }: PageOptions = {}): Response {
-  const logo = supportOnly ? 'https://crate.kaanbiryol.com/assets/logo.png' : '/notifications/crate-mark-256.png';
-  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer"><title>Save to Crate</title><style>
+	const logo = supportOnly ? 'https://crate.kaanbiryol.com/assets/logo.png' : '/notifications/crate-mark-256.png';
+	return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer"><title>Save to Crate</title><style>
   ${statusStyles}
   .done{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 24px;border-radius:50%;background:#8b5cf624;color:var(--accent);animation:pop .4s cubic-bezier(.2,.9,.3,1.3)}
   .done svg{width:30px;height:30px}
@@ -27,10 +27,10 @@ export function readingSavePage({ supportOnly = false, scriptUrl = '/notificatio
 }
 
 export function readingSaveScript({ supportOnly = false, serverFingerprint }: PageOptions = {}): Response {
-  const config: ReadingSaveConfig = { wireProtocol: supportOnly ? null : CRATE_PLUGIN_PROTOCOL.current,
-    serverRevision: supportOnly ? null : release.revision,
-    serverFingerprint: !supportOnly && serverFingerprint && isSha256Hex(serverFingerprint) ? serverFingerprint : null,
-    pwaVersion: supportOnly ? null : PWA_ASSET_VERSION,
-    shortcutContract: contract.version, shortcutRevision: contract.revision, downloadUrl: contract.downloadUrl, issuesUrl: contract.issuesUrl, supportOnly };
-  return new Response(`(${runReadingSavePage.toString()})(${JSON.stringify(config)});`, { headers: pageHeaders('application/javascript') });
+	const config: ReadingSaveConfig = { wireProtocol: supportOnly ? null : CRATE_PLUGIN_PROTOCOL.current,
+		serverRevision: supportOnly ? null : release.revision,
+		serverFingerprint: !supportOnly && serverFingerprint && isSha256Hex(serverFingerprint) ? serverFingerprint : null,
+		pwaVersion: supportOnly ? null : PWA_ASSET_VERSION,
+		shortcutContract: contract.version, shortcutRevision: contract.revision, downloadUrl: contract.downloadUrl, issuesUrl: contract.issuesUrl, supportOnly };
+	return new Response(`(${runReadingSavePage.toString()})(${JSON.stringify(config)});`, { headers: pageHeaders('application/javascript') });
 }

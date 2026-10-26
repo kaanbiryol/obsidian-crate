@@ -47,18 +47,18 @@ it('escapes a project title in the React bootstrap shell', () => {
 });
 
 it('applies custom dock order and visibility before React starts, including hidden launch targets', () => {
-  const { document } = parseHTML('<html><body></body></html>');
-  new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
-    document, URLSearchParams, location: { search: '?tab=today' },
-    localStorage: { getItem: () => JSON.stringify({ dockTabs: ['reading', 'inbox', 'archive', 'highlights'] }) },
-  });
-  const style = document.documentElement.style;
-  expect(style.getPropertyValue('--pwa-dock-count')).toBe('4');
-  expect(style.getPropertyValue('--pwa-dock-reading-order')).toBe('0');
-  expect(style.getPropertyValue('--pwa-dock-inbox-order')).toBe('1');
-  expect(style.getPropertyValue('--pwa-dock-today-display')).toBe('none');
-  expect(style.getPropertyValue('--pwa-opening-dock-indicator')).toBe('0');
-  expect(document.documentElement.dataset.pwaOpeningTab).toBe('today');
+	const { document } = parseHTML('<html><body></body></html>');
+	new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
+		document, URLSearchParams, location: { search: '?tab=today' },
+		localStorage: { getItem: () => JSON.stringify({ dockTabs: ['reading', 'inbox', 'archive', 'highlights'] }) },
+	});
+	const style = document.documentElement.style;
+	expect(style.getPropertyValue('--pwa-dock-count')).toBe('4');
+	expect(style.getPropertyValue('--pwa-dock-reading-order')).toBe('0');
+	expect(style.getPropertyValue('--pwa-dock-inbox-order')).toBe('1');
+	expect(style.getPropertyValue('--pwa-dock-today-display')).toBe('none');
+	expect(style.getPropertyValue('--pwa-opening-dock-indicator')).toBe('0');
+	expect(document.documentElement.dataset.pwaOpeningTab).toBe('today');
 });
 
 it('selects a pinned Reading subview in the cached shell', () => {

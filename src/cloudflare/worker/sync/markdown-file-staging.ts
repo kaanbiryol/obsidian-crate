@@ -14,7 +14,7 @@ export interface StagedMarkdownFile {
 
 export async function stageMarkdownFile(
 	bucket: R2Bucket,
-  db: D1Database,
+	db: D1Database,
 	path: string,
 	content: string,
 	expectedHash: string | null,

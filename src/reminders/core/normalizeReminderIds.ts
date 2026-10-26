@@ -5,8 +5,8 @@ import { normalizeReminderScheduleLine } from './normalizeReminderSchedule';
 import { markdownTaskContexts } from './markdownTaskContext';
 
 interface ReminderIdNormalizationResult {
-  content: string;
-  remindersUpdated: number;
+	content: string;
+	remindersUpdated: number;
 }
 
 /**
@@ -15,53 +15,53 @@ interface ReminderIdNormalizationResult {
  * rewrite.
  */
 function createUniqueReminderId(usedIds: Set<string>): string {
-  let reminderId = createReminderId();
-  while (usedIds.has(reminderId)) {
-    reminderId = createReminderId();
-  }
-  return reminderId;
+	let reminderId = createReminderId();
+	while (usedIds.has(reminderId)) {
+		reminderId = createReminderId();
+	}
+	return reminderId;
 }
 
 export function normalizeReminderIds(
-  content: string,
-  reservedIds: ReadonlySet<string> = new Set(),
-  parsePersisted: (line: string) => ParsedCheckbox | null = value => parseCheckboxLine(value, { persisted: true }),
+	content: string,
+	reservedIds: ReadonlySet<string> = new Set(),
+	parsePersisted: (line: string) => ParsedCheckbox | null = value => parseCheckboxLine(value, { persisted: true }),
 ): ReminderIdNormalizationResult {
-  const lines = content.split("\n");
-  const usedIds = new Set(reservedIds);
-  let remindersUpdated = 0;
+	const lines = content.split("\n");
+	const usedIds = new Set(reservedIds);
+	let remindersUpdated = 0;
 
-  for (const index of markdownTaskContexts(lines).keys()) {
-    const line = lines[index];
-    if (line === undefined) continue;
-    // Saved lines resolve in persisted mode; only unresolved drafts need the
-    // slower draft parse and schedule normalization.
-    let parsed: ParsedCheckbox | null;
-    let unresolved = false;
-    try {
-      parsed = parsePersisted(line);
-    } catch (error) {
-      if (!(error instanceof UnresolvedReminderScheduleError)) throw error;
-      unresolved = true;
-      parsed = parseCheckboxLine(line);
-    }
-    if (!parsed || !parsed.parsed.cleanContent.trim()) {
-      continue;
-    }
+	for (const index of markdownTaskContexts(lines).keys()) {
+		const line = lines[index];
+		if (line === undefined) continue;
+		// Saved lines resolve in persisted mode; only unresolved drafts need the
+		// slower draft parse and schedule normalization.
+		let parsed: ParsedCheckbox | null;
+		let unresolved = false;
+		try {
+			parsed = parsePersisted(line);
+		} catch (error) {
+			if (!(error instanceof UnresolvedReminderScheduleError)) throw error;
+			unresolved = true;
+			parsed = parseCheckboxLine(line);
+		}
+		if (!parsed || !parsed.parsed.cleanContent.trim()) {
+			continue;
+		}
 
-    const reminderId = parsed.reminderId && !usedIds.has(parsed.reminderId)
-      ? parsed.reminderId : createUniqueReminderId(usedIds);
-    usedIds.add(reminderId);
-    const scheduled = unresolved ? normalizeReminderScheduleLine(line, () => { throw new UnresolvedReminderScheduleError(); }) : line;
-    const normalized = setReminderIdMarker(scheduled, reminderId);
-    if (normalized !== line) {
-      lines[index] = normalized;
-      remindersUpdated++;
-    }
-  }
+		const reminderId = parsed.reminderId && !usedIds.has(parsed.reminderId)
+			? parsed.reminderId : createUniqueReminderId(usedIds);
+		usedIds.add(reminderId);
+		const scheduled = unresolved ? normalizeReminderScheduleLine(line, () => { throw new UnresolvedReminderScheduleError(); }) : line;
+		const normalized = setReminderIdMarker(scheduled, reminderId);
+		if (normalized !== line) {
+			lines[index] = normalized;
+			remindersUpdated++;
+		}
+	}
 
-  return {
-    content: remindersUpdated > 0 ? lines.join("\n") : content,
-    remindersUpdated,
-  };
+	return {
+		content: remindersUpdated > 0 ? lines.join("\n") : content,
+		remindersUpdated,
+	};
 }

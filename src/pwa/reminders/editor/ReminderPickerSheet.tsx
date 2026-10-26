@@ -45,11 +45,11 @@ export function ReminderPickerSheet({
 	if (draft.activePicker === 'project') {
 		return (
 			<section className="pwa-picker-sheet pwa-project-picker-sheet" tabIndex={-1}>
-                <ProjectPickerContent
-                    isOpen projects={projectOptions} project={draft.project} defaultProject={draft.defaultProject}
-                    isDark={isDark} onClose={onClose}
-                    onSelectProject={(project) => onSelect(applyReminderTextUpdate(draft, projectOptions, { project }))}
-                />
+				<ProjectPickerContent
+					isOpen projects={projectOptions} project={draft.project} defaultProject={draft.defaultProject}
+					isDark={isDark} onClose={onClose}
+					onSelectProject={(project) => onSelect(applyReminderTextUpdate(draft, projectOptions, { project }))}
+				/>
 			</section>
 		);
 	}

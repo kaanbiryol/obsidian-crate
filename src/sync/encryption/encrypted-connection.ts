@@ -9,38 +9,38 @@ import { SECRET_KEYS } from '../../platform/secret-keys';
 /** Verify the encrypted identity before copying connection-scoped secrets.
  * The authenticated recovery bundle proves identity independently of generation. */
 export async function prepareEncryptedAddressChange(storage: SecretStorageService, http: WorkerApiHttpClient, workerUrl: string) {
-  if (storage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before changing this connection.');
-  const keys = loadEncryptionKeys(storage), recovery = storage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
-  if (!keys || !recovery) throw new Error('Recover this device’s encryption keys before changing the server address.');
-  const snapshot = [SECRET_KEYS.AUTH_TOKEN, SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]
-    .map(key => ({ key, value: storage.get(key) }));
-  const assertCurrent = () => {
-    if (storage.get(SECRET_KEYS.ENCRYPTION_RESET) || snapshot.some(({ key, value }) => storage.get(key) !== value)) {
-      throw new Error('Encryption recovery changed. Retry the server address update.');
-    }
-  };
-  const state = await readServerEncryption(http);
-  if (!state) throw new Error('The new address does not identify your encrypted vault');
-  const remote = await openRecoveryBundle(state.recovery, recovery);
-  assertEncryptionKeys(state, remote);
-  if (remote.vaultId !== keys.vaultId || remote.vault.id !== keys.vault.id || remote.vault.secret !== keys.vault.secret) {
-    throw new Error('The new address belongs to a different encrypted vault');
-  }
-  assertCurrent();
-  return () => {
-    assertCurrent();
-    const target = storage.forScope(workerUrl);
-    if (target.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('The new address has an unfinished encryption reset');
-    const existing = loadEncryptionKeys(target);
-    if (existing && (existing.vaultId !== keys.vaultId || existing.vault.id !== keys.vault.id || existing.vault.secret !== keys.vault.secret)) {
-      throw new Error('The new address has recovery keys for a different vault');
-    }
-    // Both copies survive a failed settings save or shutdown. Never migrate or
-    // discard file journals: the caller retains their original local authority.
-    for (const { key, value } of snapshot) {
-      target.set(key, value ?? '');
-      if (target.get(key) !== value) throw new Error('Could not verify the moved encryption credentials');
-    }
-    assertCurrent();
-  };
+	if (storage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before changing this connection.');
+	const keys = loadEncryptionKeys(storage), recovery = storage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
+	if (!keys || !recovery) throw new Error('Recover this device’s encryption keys before changing the server address.');
+	const snapshot = [SECRET_KEYS.AUTH_TOKEN, SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]
+		.map(key => ({ key, value: storage.get(key) }));
+	const assertCurrent = () => {
+		if (storage.get(SECRET_KEYS.ENCRYPTION_RESET) || snapshot.some(({ key, value }) => storage.get(key) !== value)) {
+			throw new Error('Encryption recovery changed. Retry the server address update.');
+		}
+	};
+	const state = await readServerEncryption(http);
+	if (!state) throw new Error('The new address does not identify your encrypted vault');
+	const remote = await openRecoveryBundle(state.recovery, recovery);
+	assertEncryptionKeys(state, remote);
+	if (remote.vaultId !== keys.vaultId || remote.vault.id !== keys.vault.id || remote.vault.secret !== keys.vault.secret) {
+		throw new Error('The new address belongs to a different encrypted vault');
+	}
+	assertCurrent();
+	return () => {
+		assertCurrent();
+		const target = storage.forScope(workerUrl);
+		if (target.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('The new address has an unfinished encryption reset');
+		const existing = loadEncryptionKeys(target);
+		if (existing && (existing.vaultId !== keys.vaultId || existing.vault.id !== keys.vault.id || existing.vault.secret !== keys.vault.secret)) {
+			throw new Error('The new address has recovery keys for a different vault');
+		}
+		// Both copies survive a failed settings save or shutdown. Never migrate or
+		// discard file journals: the caller retains their original local authority.
+		for (const { key, value } of snapshot) {
+			target.set(key, value ?? '');
+			if (target.get(key) !== value) throw new Error('Could not verify the moved encryption credentials');
+		}
+		assertCurrent();
+	};
 }

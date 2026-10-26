@@ -1,23 +1,23 @@
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 
 interface PickerCurrentSummaryProps {
-    label: string;
-    value: string;
-    icon: string;
+	label: string;
+	value: string;
+	icon: string;
 }
 
 export function PickerCurrentSummary({
-    label,
-    value,
-    icon,
+	label,
+	value,
+	icon,
 }: PickerCurrentSummaryProps) {
-    return (
-        <div className="picker-current-summary" aria-live="polite">
-            <span className="picker-current-label">{label}</span>
-            <span className="picker-current-value">
-                <ThemeIcon size="s" id={icon} aria-hidden="true" />
-                <strong>{value}</strong>
-            </span>
-        </div>
-    );
+	return (
+		<div className="picker-current-summary" aria-live="polite">
+			<span className="picker-current-label">{label}</span>
+			<span className="picker-current-value">
+				<ThemeIcon size="s" id={icon} aria-hidden="true" />
+				<strong>{value}</strong>
+			</span>
+		</div>
+	);
 }

@@ -3,6 +3,6 @@ export const SESSION_RECOVERY_MESSAGE = 'Session expired. Pending changes and dr
 /** Report only the rejected credential; the app decides whether it still owns it. */
 export function reportExpiredConnection(token: string): void { for (const listener of listeners) listener(token); }
 export function onConnectionExpired(listener: (token: string) => void): () => void {
-  listeners.add(listener);
-  return () => { listeners.delete(listener); };
+	listeners.add(listener);
+	return () => { listeners.delete(listener); };
 }

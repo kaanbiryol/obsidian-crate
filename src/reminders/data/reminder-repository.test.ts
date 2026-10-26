@@ -300,15 +300,15 @@ describe('reminderRepository.update and today view', () => {
 });
 
 it('rejects a stale modal update and delete even when the current index is fresh', async () => {
-  const original = { id: 'one', content: 'Original', priority: 4, completed: false, project: 'Inbox', filePath: 'Reminders/Inbox.md', lineNumber: 1, rawLine: '- [ ] Original' } as IndexedReminder;
-  const expectedRevision = await reminderRevision(toReminder(original));
-  const index = createIndex({ getById: () => ({ ...original, content: 'Changed on another device' }) });
-  const { writer, spies } = createWriter();
-  const repository = createReminderRepository(index, writer);
-  await expect(repository.update('one', { content: 'Stale draft', expectedRevision })).rejects.toThrow('changed');
-  await expect(repository.delete('one', expectedRevision)).rejects.toThrow('changed');
-  expect(spies.updateReminder).not.toHaveBeenCalled();
-  expect(spies.deleteReminder).not.toHaveBeenCalled();
+	const original = { id: 'one', content: 'Original', priority: 4, completed: false, project: 'Inbox', filePath: 'Reminders/Inbox.md', lineNumber: 1, rawLine: '- [ ] Original' } as IndexedReminder;
+	const expectedRevision = await reminderRevision(toReminder(original));
+	const index = createIndex({ getById: () => ({ ...original, content: 'Changed on another device' }) });
+	const { writer, spies } = createWriter();
+	const repository = createReminderRepository(index, writer);
+	await expect(repository.update('one', { content: 'Stale draft', expectedRevision })).rejects.toThrow('changed');
+	await expect(repository.delete('one', expectedRevision)).rejects.toThrow('changed');
+	expect(spies.updateReminder).not.toHaveBeenCalled();
+	expect(spies.deleteReminder).not.toHaveBeenCalled();
 });
 
 it('keeps converted reminders identical until their indexed record changes', () => {

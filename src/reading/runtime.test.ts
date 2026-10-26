@@ -41,177 +41,177 @@ function harness() {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 describe('Reading runtime lifecycle', () => {
-  it.each(['create', 'process'] as const)('drains an accepted host %s before completing shutdown or reading its replacement', async operation => {
-    const h = harness();
-    let enter!: () => void, release!: () => void;
-    const entered = new Promise<void>(resolve => { enter = resolve; });
-    const pending = new Promise<void>(resolve => { release = resolve; });
-    let completed = false;
-    if (operation === 'create') {
-      Object.assign(h.vault, {
-        getAllLoadedFiles: () => [h.file],
-        create: async () => { enter(); await pending; completed = true; },
-      });
-    } else {
-      h.vault.process.mockImplementationOnce(async (_file, update) => {
-        const next = update(await h.vault.read());
-        enter(); await pending;
-        h.edit(() => next); completed = true;
-        return next;
-      });
-    }
-    startReading(h.plugin);
-    const original = getReadingLibrary(h.plugin)!;
-    await original.refresh();
-    const saving = operation === 'create'
-      ? original.add('https://example.com/new', undefined, false)
-      : original.update(original.getSnapshot().items[0]!, { favorite: true });
-    await entered;
-    stopReading(h.plugin);
-    let drained = false;
-    const stopped = waitForStoppedReading(h.plugin).then(() => { drained = true; });
-    startReading(h.plugin);
-    const replacement = getReadingLibrary(h.plugin)!;
-    const reads = h.vault.read.mock.calls.length;
-    const refreshed = replacement.refresh();
-    await expect(original.refresh()).rejects.toThrow();
-    expect(drained).toBe(false);
-    expect(completed).toBe(false);
-    expect(h.vault.read).toHaveBeenCalledTimes(reads);
-    release();
-    await Promise.all([saving, stopped, refreshed]);
-    expect(completed).toBe(true);
-    expect(drained).toBe(true);
-    expect(h.vault.read.mock.calls.length).toBeGreaterThan(reads);
-    if (operation === 'process') expect(replacement.getSnapshot().items[0]?.favorite).toBe(true);
-    stopReading(h.plugin);
-    await waitForStoppedReading(h.plugin);
-  });
-  it.each(['missing', 'different folder'])('discards an old server’s %s policy before mutation or local save', async kind => {
-    const h = harness();
-    h.plugin.settings.workerUrl = 'https://original.example';
-    h.workspace.layoutReady = true;
-    const writeSettings = vi.fn();
-    Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
-    vi.mocked(readReadingPolicy).mockImplementationOnce(async () => {
-      h.plugin.settings.workerUrl = 'https://replacement.example';
-      return kind === 'missing' ? null : { enabled: 1, folder_path: 'Other reading', generation: 'old', revision: 'old' };
-    });
-    startReading(h.plugin);
-    try {
-      await vi.advanceTimersByTimeAsync(400);
-      expect(readReadingPolicy).toHaveBeenCalledOnce();
-      expect(writeSettings).not.toHaveBeenCalled();
-      expect(h.plugin.settings.reading.folderPath).toBe('Reading');
-    } finally { stopReading(h.plugin); }
-  });
-  it.each([
-    ['missing', null, { enabled: true, folderPath: 'Reading', revision: null }],
-    ['paused', { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' }, { enabled: true, folderPath: 'Reading', revision: 'r' }],
-  ] as const)('turns on a %s server policy for the local folder', async (_kind, policy, update) => {
-    const h = harness();
-    h.plugin.settings.workerUrl = 'https://server.example';
-    h.workspace.layoutReady = true;
-    const writeSettings = vi.fn();
-    Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
-    vi.mocked(readReadingPolicy).mockResolvedValueOnce(policy);
-    startReading(h.plugin);
-    try {
-      await vi.advanceTimersByTimeAsync(400);
-      expect(writeReadingPolicy).toHaveBeenCalledWith(h.plugin, update);
-      expect(writeSettings).not.toHaveBeenCalled();
-    } finally { stopReading(h.plugin); }
-  });
-  it('adopts the server’s Reading folder and restarts there', async () => {
-    const h = harness();
-    h.plugin.settings.workerUrl = 'https://server.example';
-    h.workspace.layoutReady = true;
-    const writeSettings = vi.fn(async (update: object) => { Object.assign(h.plugin.settings, update); });
-    Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
-    vi.mocked(readReadingPolicy).mockResolvedValueOnce({ enabled: 1, folder_path: 'Other reading', generation: 'g', revision: 'r' });
-    startReading(h.plugin);
-    const original = getReadingLibrary(h.plugin);
-    try {
-      await vi.advanceTimersByTimeAsync(400);
-      expect(writeReadingPolicy).not.toHaveBeenCalled();
-      expect(writeSettings).toHaveBeenCalledOnce();
-      expect(h.plugin.settings.reading.folderPath).toBe('Other reading');
-      expect(getReadingLibrary(h.plugin)).toBeDefined();
-      expect(getReadingLibrary(h.plugin)).not.toBe(original);
-    } finally { stopReading(h.plugin); }
-  });
-  it('saves and extracts on desktop before checking a configured server policy', async () => {
-    const h = harness(), saved = new Map<string, string>();
-    const root = h.vault.getAbstractFileByPath('Reading');
-    if (!(root instanceof TFolder)) throw new Error('Missing test folder');
-    const lookup = h.vault.getAbstractFileByPath;
-    Object.assign(h.vault, {
-      adapter: { exists: async () => false },
-      getAllLoadedFiles: () => root.children,
-      getAbstractFileByPath: (path: string) => root.children.find(file => file.path === path) ?? lookup(path),
-      create: async (path: string, content: string) => {
-        saved.set(path, content);
-        root.children.push(Object.assign(new TFile(), { path, extension: 'md', stat: { size: content.length, mtime: 2, ctime: 2 } }));
-      },
-    });
-    const read = h.vault.read.getMockImplementation()!;
-    h.vault.read.mockImplementation(async (file?: TFile) => file && saved.has(file.path) ? saved.get(file.path)! : read());
-    const process = h.vault.process.getMockImplementation()!;
-    h.vault.process.mockImplementation(async (file, update) => {
-      if (!saved.has(file.path)) return process(file, update);
-      const content = update(saved.get(file.path)!); saved.set(file.path, content); return content;
-    });
-    h.plugin.settings.workerUrl = 'https://crate.example.com';
-    Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'device-token' : null }, manifest: { id: 'crate' }, registerInterval: vi.fn() });
-    startReading(h.plugin);
-    const library = getReadingLibrary(h.plugin)!;
-    const { item } = await library.add('https://example.com/desktop');
-    await library.retryCapture(item);
-    expect(parseReadingNote(saved.get(item.path)!)).toMatchObject({ title: 'Desktop article', extraction_status: 'ready' });
-    expect(captureDesktopArticle).toHaveBeenCalledWith('https://example.com/desktop', expect.any(AbortSignal));
-    stopReading(h.plugin);
-  });
-  it('uses trusted native article capture on mobile', () => {
-    const h = harness();
-    const desktop = Platform.isDesktopApp;
-    try {
-      Platform.isDesktopApp = false;
-      startReading(h.plugin);
-      expect(getReadingLibrary(h.plugin)!.canCaptureLocally).toBe(true);
-    } finally { Platform.isDesktopApp = desktop; stopReading(h.plugin); }
-  });
-  it('updates mounted workspaces when the local library is replaced or stopped', () => {
-    const h = harness();
-    const listener = vi.fn(() => getReadingLibrary(h.plugin));
-    const unsubscribe = subscribeReadingRuntime(h.plugin, listener);
-    startReading(h.plugin);
-    const first = getReadingLibrary(h.plugin);
-    expect(listener).toHaveLastReturnedWith(first);
-    startReading(h.plugin);
-    expect(getReadingLibrary(h.plugin)).not.toBe(first);
-    expect(listener).toHaveLastReturnedWith(getReadingLibrary(h.plugin));
-    stopReading(h.plugin);
-    expect(listener).toHaveLastReturnedWith(undefined);
-    unsubscribe(); listener.mockClear();
-    startReading(h.plugin);
-    expect(listener).not.toHaveBeenCalled();
-    stopReading(h.plugin);
-  });
-  it('closes open Reading views when restarting and starts only when requested', () => {
-    const h = harness();
-    const detachLeavesOfType = vi.fn();
-    Object.assign(h.workspace, { detachLeavesOfType });
-    startReading(h.plugin);
-    const first = getReadingLibrary(h.plugin);
-    restartReading(h.plugin, false);
-    expect(getReadingLibrary(h.plugin)).toBeUndefined();
-    expect(detachLeavesOfType).toHaveBeenCalledExactlyOnceWith('crate-reading');
-    restartReading(h.plugin);
-    expect(getReadingLibrary(h.plugin)).toBeDefined();
-    expect(getReadingLibrary(h.plugin)).not.toBe(first);
-    expect(detachLeavesOfType).toHaveBeenCalledTimes(2);
-    stopReading(h.plugin);
-  });
+	it.each(['create', 'process'] as const)('drains an accepted host %s before completing shutdown or reading its replacement', async operation => {
+		const h = harness();
+		let enter!: () => void, release!: () => void;
+		const entered = new Promise<void>(resolve => { enter = resolve; });
+		const pending = new Promise<void>(resolve => { release = resolve; });
+		let completed = false;
+		if (operation === 'create') {
+			Object.assign(h.vault, {
+				getAllLoadedFiles: () => [h.file],
+				create: async () => { enter(); await pending; completed = true; },
+			});
+		} else {
+			h.vault.process.mockImplementationOnce(async (_file, update) => {
+				const next = update(await h.vault.read());
+				enter(); await pending;
+				h.edit(() => next); completed = true;
+				return next;
+			});
+		}
+		startReading(h.plugin);
+		const original = getReadingLibrary(h.plugin)!;
+		await original.refresh();
+		const saving = operation === 'create'
+			? original.add('https://example.com/new', undefined, false)
+			: original.update(original.getSnapshot().items[0]!, { favorite: true });
+		await entered;
+		stopReading(h.plugin);
+		let drained = false;
+		const stopped = waitForStoppedReading(h.plugin).then(() => { drained = true; });
+		startReading(h.plugin);
+		const replacement = getReadingLibrary(h.plugin)!;
+		const reads = h.vault.read.mock.calls.length;
+		const refreshed = replacement.refresh();
+		await expect(original.refresh()).rejects.toThrow();
+		expect(drained).toBe(false);
+		expect(completed).toBe(false);
+		expect(h.vault.read).toHaveBeenCalledTimes(reads);
+		release();
+		await Promise.all([saving, stopped, refreshed]);
+		expect(completed).toBe(true);
+		expect(drained).toBe(true);
+		expect(h.vault.read.mock.calls.length).toBeGreaterThan(reads);
+		if (operation === 'process') expect(replacement.getSnapshot().items[0]?.favorite).toBe(true);
+		stopReading(h.plugin);
+		await waitForStoppedReading(h.plugin);
+	});
+	it.each(['missing', 'different folder'])('discards an old server’s %s policy before mutation or local save', async kind => {
+		const h = harness();
+		h.plugin.settings.workerUrl = 'https://original.example';
+		h.workspace.layoutReady = true;
+		const writeSettings = vi.fn();
+		Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
+		vi.mocked(readReadingPolicy).mockImplementationOnce(async () => {
+			h.plugin.settings.workerUrl = 'https://replacement.example';
+			return kind === 'missing' ? null : { enabled: 1, folder_path: 'Other reading', generation: 'old', revision: 'old' };
+		});
+		startReading(h.plugin);
+		try {
+			await vi.advanceTimersByTimeAsync(400);
+			expect(readReadingPolicy).toHaveBeenCalledOnce();
+			expect(writeSettings).not.toHaveBeenCalled();
+			expect(h.plugin.settings.reading.folderPath).toBe('Reading');
+		} finally { stopReading(h.plugin); }
+	});
+	it.each([
+		['missing', null, { enabled: true, folderPath: 'Reading', revision: null }],
+		['paused', { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' }, { enabled: true, folderPath: 'Reading', revision: 'r' }],
+	] as const)('turns on a %s server policy for the local folder', async (_kind, policy, update) => {
+		const h = harness();
+		h.plugin.settings.workerUrl = 'https://server.example';
+		h.workspace.layoutReady = true;
+		const writeSettings = vi.fn();
+		Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
+		vi.mocked(readReadingPolicy).mockResolvedValueOnce(policy);
+		startReading(h.plugin);
+		try {
+			await vi.advanceTimersByTimeAsync(400);
+			expect(writeReadingPolicy).toHaveBeenCalledWith(h.plugin, update);
+			expect(writeSettings).not.toHaveBeenCalled();
+		} finally { stopReading(h.plugin); }
+	});
+	it('adopts the server’s Reading folder and restarts there', async () => {
+		const h = harness();
+		h.plugin.settings.workerUrl = 'https://server.example';
+		h.workspace.layoutReady = true;
+		const writeSettings = vi.fn(async (update: object) => { Object.assign(h.plugin.settings, update); });
+		Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
+		vi.mocked(readReadingPolicy).mockResolvedValueOnce({ enabled: 1, folder_path: 'Other reading', generation: 'g', revision: 'r' });
+		startReading(h.plugin);
+		const original = getReadingLibrary(h.plugin);
+		try {
+			await vi.advanceTimersByTimeAsync(400);
+			expect(writeReadingPolicy).not.toHaveBeenCalled();
+			expect(writeSettings).toHaveBeenCalledOnce();
+			expect(h.plugin.settings.reading.folderPath).toBe('Other reading');
+			expect(getReadingLibrary(h.plugin)).toBeDefined();
+			expect(getReadingLibrary(h.plugin)).not.toBe(original);
+		} finally { stopReading(h.plugin); }
+	});
+	it('saves and extracts on desktop before checking a configured server policy', async () => {
+		const h = harness(), saved = new Map<string, string>();
+		const root = h.vault.getAbstractFileByPath('Reading');
+		if (!(root instanceof TFolder)) throw new Error('Missing test folder');
+		const lookup = h.vault.getAbstractFileByPath;
+		Object.assign(h.vault, {
+			adapter: { exists: async () => false },
+			getAllLoadedFiles: () => root.children,
+			getAbstractFileByPath: (path: string) => root.children.find(file => file.path === path) ?? lookup(path),
+			create: async (path: string, content: string) => {
+				saved.set(path, content);
+				root.children.push(Object.assign(new TFile(), { path, extension: 'md', stat: { size: content.length, mtime: 2, ctime: 2 } }));
+			},
+		});
+		const read = h.vault.read.getMockImplementation()!;
+		h.vault.read.mockImplementation(async (file?: TFile) => file && saved.has(file.path) ? saved.get(file.path)! : read());
+		const process = h.vault.process.getMockImplementation()!;
+		h.vault.process.mockImplementation(async (file, update) => {
+			if (!saved.has(file.path)) return process(file, update);
+			const content = update(saved.get(file.path)!); saved.set(file.path, content); return content;
+		});
+		h.plugin.settings.workerUrl = 'https://crate.example.com';
+		Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'device-token' : null }, manifest: { id: 'crate' }, registerInterval: vi.fn() });
+		startReading(h.plugin);
+		const library = getReadingLibrary(h.plugin)!;
+		const { item } = await library.add('https://example.com/desktop');
+		await library.retryCapture(item);
+		expect(parseReadingNote(saved.get(item.path)!)).toMatchObject({ title: 'Desktop article', extraction_status: 'ready' });
+		expect(captureDesktopArticle).toHaveBeenCalledWith('https://example.com/desktop', expect.any(AbortSignal));
+		stopReading(h.plugin);
+	});
+	it('uses trusted native article capture on mobile', () => {
+		const h = harness();
+		const desktop = Platform.isDesktopApp;
+		try {
+			Platform.isDesktopApp = false;
+			startReading(h.plugin);
+			expect(getReadingLibrary(h.plugin)!.canCaptureLocally).toBe(true);
+		} finally { Platform.isDesktopApp = desktop; stopReading(h.plugin); }
+	});
+	it('updates mounted workspaces when the local library is replaced or stopped', () => {
+		const h = harness();
+		const listener = vi.fn(() => getReadingLibrary(h.plugin));
+		const unsubscribe = subscribeReadingRuntime(h.plugin, listener);
+		startReading(h.plugin);
+		const first = getReadingLibrary(h.plugin);
+		expect(listener).toHaveLastReturnedWith(first);
+		startReading(h.plugin);
+		expect(getReadingLibrary(h.plugin)).not.toBe(first);
+		expect(listener).toHaveLastReturnedWith(getReadingLibrary(h.plugin));
+		stopReading(h.plugin);
+		expect(listener).toHaveLastReturnedWith(undefined);
+		unsubscribe(); listener.mockClear();
+		startReading(h.plugin);
+		expect(listener).not.toHaveBeenCalled();
+		stopReading(h.plugin);
+	});
+	it('closes open Reading views when restarting and starts only when requested', () => {
+		const h = harness();
+		const detachLeavesOfType = vi.fn();
+		Object.assign(h.workspace, { detachLeavesOfType });
+		startReading(h.plugin);
+		const first = getReadingLibrary(h.plugin);
+		restartReading(h.plugin, false);
+		expect(getReadingLibrary(h.plugin)).toBeUndefined();
+		expect(detachLeavesOfType).toHaveBeenCalledExactlyOnceWith('crate-reading');
+		restartReading(h.plugin);
+		expect(getReadingLibrary(h.plugin)).toBeDefined();
+		expect(getReadingLibrary(h.plugin)).not.toBe(first);
+		expect(detachLeavesOfType).toHaveBeenCalledTimes(2);
+		stopReading(h.plugin);
+	});
 	it('discovers a normal clip after the vault is ready without a template marker', async () => {
 		const h = harness();
 		h.edit(() => '---\nsource: https://example.com/article\nauthor:\n---\nClipped text.');

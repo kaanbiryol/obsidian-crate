@@ -9,24 +9,24 @@ import { ProjectPickerContent } from '../../reminder-editor/ProjectPickerContent
 import { REMINDER_PICKER_COPY } from '../../reminder-editor/pickerCopy';
 
 type ProjectPickerModalProps = ComponentProps<typeof ProjectPickerContent> & {
-    animationConfig: AnimationConfig;
-    pickerMode: 'replace' | 'overlay';
-    finalFocus?: () => HTMLElement | false | null;
+	animationConfig: AnimationConfig;
+	pickerMode: 'replace' | 'overlay';
+	finalFocus?: () => HTMLElement | false | null;
 };
 
 export function ProjectPickerModal({ animationConfig, pickerMode, finalFocus, ...props }: ProjectPickerModalProps) {
-    const reduceMotion = useReducedMotion();
-    return (
-        <BaseModal
-            finalFocus={finalFocus}
-            isOpen={props.isOpen} onClose={props.onClose} animationConfig={animationConfig}
-            className={`crate-reminder-picker-surface is-project-picker${reduceMotion ? ' is-reduced-motion' : ''}`}
-            ariaLabel={REMINDER_PICKER_COPY.project.dialogLabel}
-            {...getPickerModalProps(pickerMode)}
-        >
-            <ThemeIconProvider renderer={ObsidianIcon}>
-                <ProjectPickerContent {...props} />
-            </ThemeIconProvider>
-        </BaseModal>
-    );
+	const reduceMotion = useReducedMotion();
+	return (
+		<BaseModal
+			finalFocus={finalFocus}
+			isOpen={props.isOpen} onClose={props.onClose} animationConfig={animationConfig}
+			className={`crate-reminder-picker-surface is-project-picker${reduceMotion ? ' is-reduced-motion' : ''}`}
+			ariaLabel={REMINDER_PICKER_COPY.project.dialogLabel}
+			{...getPickerModalProps(pickerMode)}
+		>
+			<ThemeIconProvider renderer={ObsidianIcon}>
+				<ProjectPickerContent {...props} />
+			</ThemeIconProvider>
+		</BaseModal>
+	);
 }

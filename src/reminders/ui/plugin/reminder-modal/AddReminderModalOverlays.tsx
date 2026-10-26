@@ -9,84 +9,84 @@ import { RecurrencePickerModal } from "./RecurrencePickerModal";
 type AddReminderModalView = "main" | "date" | "project" | "recurrence" | null;
 
 interface AddReminderModalOverlaysProps {
-  currentView: AddReminderModalView;
-  isClosing: boolean;
-  animationConfig: AnimationConfig;
-  pickerMode: "replace" | "overlay";
-  draft: ReminderDraft;
-  isDark: boolean;
-  projects: string[];
-  defaultProject: string;
-  onClosePicker: () => void;
-  editorFocus: () => HTMLElement | false;
-  showDeleteConfirm: boolean;
-  onCloseDeleteConfirm: () => void;
-  onConfirmDelete: () => void;
-  deleteMessage: string;
-  isDeleting: boolean;
+	currentView: AddReminderModalView;
+	isClosing: boolean;
+	animationConfig: AnimationConfig;
+	pickerMode: "replace" | "overlay";
+	draft: ReminderDraft;
+	isDark: boolean;
+	projects: string[];
+	defaultProject: string;
+	onClosePicker: () => void;
+	editorFocus: () => HTMLElement | false;
+	showDeleteConfirm: boolean;
+	onCloseDeleteConfirm: () => void;
+	onConfirmDelete: () => void;
+	deleteMessage: string;
+	isDeleting: boolean;
 }
 
 export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> = ({
-  currentView,
-  isClosing,
-  animationConfig,
-  pickerMode,
-  draft,
-  isDark,
-  projects,
-  defaultProject,
-  onClosePicker,
-  editorFocus,
-  showDeleteConfirm,
-  onCloseDeleteConfirm,
-  onConfirmDelete,
-  deleteMessage,
-  isDeleting,
+	currentView,
+	isClosing,
+	animationConfig,
+	pickerMode,
+	draft,
+	isDark,
+	projects,
+	defaultProject,
+	onClosePicker,
+	editorFocus,
+	showDeleteConfirm,
+	onCloseDeleteConfirm,
+	onConfirmDelete,
+	deleteMessage,
+	isDeleting,
 }) => {
-  return (
-    <>
-      <DatePickerModal
-        isOpen={currentView === "date" && !isClosing}
-        onClose={onClosePicker}
-        finalFocus={editorFocus}
-        animationConfig={animationConfig}
-        pickerMode={pickerMode}
-        // A repeat's occurrence is not a chosen date.
-        dueDate={draft.recurrence ? null : draft.dueDate}
-        hasTime={draft.hasTime}
-        isDark={isDark}
-        onDateTimeChange={draft.applyDateSelection}
-      />
-      <ProjectPickerModal
-        isOpen={currentView === "project" && !isClosing}
-        onClose={onClosePicker}
-        finalFocus={editorFocus}
-        animationConfig={animationConfig}
-        pickerMode={pickerMode}
-        projects={projects}
-        project={draft.project}
-        defaultProject={defaultProject}
-        isDark={isDark}
-        onSelectProject={draft.applyProjectSelection}
-      />
-      <RecurrencePickerModal
-        isOpen={currentView === "recurrence" && !isClosing}
-        onClose={onClosePicker}
-        finalFocus={editorFocus}
-        animationConfig={animationConfig}
-        pickerMode={pickerMode}
-        isDark={isDark}
-        recurrence={draft.recurrence}
-        onApply={(rule) => draft.applyRecurrenceSelection(rule ?? null)}
-      />
-      <DeleteConfirmationModal
-        isOpen={showDeleteConfirm}
-        onClose={onCloseDeleteConfirm}
-        onConfirm={onConfirmDelete}
-        title="Delete reminder?"
-        message={deleteMessage}
-        isLoading={isDeleting}
-      />
-    </>
-  );
+	return (
+		<>
+			<DatePickerModal
+				isOpen={currentView === "date" && !isClosing}
+				onClose={onClosePicker}
+				finalFocus={editorFocus}
+				animationConfig={animationConfig}
+				pickerMode={pickerMode}
+				// A repeat's occurrence is not a chosen date.
+				dueDate={draft.recurrence ? null : draft.dueDate}
+				hasTime={draft.hasTime}
+				isDark={isDark}
+				onDateTimeChange={draft.applyDateSelection}
+			/>
+			<ProjectPickerModal
+				isOpen={currentView === "project" && !isClosing}
+				onClose={onClosePicker}
+				finalFocus={editorFocus}
+				animationConfig={animationConfig}
+				pickerMode={pickerMode}
+				projects={projects}
+				project={draft.project}
+				defaultProject={defaultProject}
+				isDark={isDark}
+				onSelectProject={draft.applyProjectSelection}
+			/>
+			<RecurrencePickerModal
+				isOpen={currentView === "recurrence" && !isClosing}
+				onClose={onClosePicker}
+				finalFocus={editorFocus}
+				animationConfig={animationConfig}
+				pickerMode={pickerMode}
+				isDark={isDark}
+				recurrence={draft.recurrence}
+				onApply={(rule) => draft.applyRecurrenceSelection(rule ?? null)}
+			/>
+			<DeleteConfirmationModal
+				isOpen={showDeleteConfirm}
+				onClose={onCloseDeleteConfirm}
+				onConfirm={onConfirmDelete}
+				title="Delete reminder?"
+				message={deleteMessage}
+				isLoading={isDeleting}
+			/>
+		</>
+	);
 };

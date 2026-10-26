@@ -3,22 +3,22 @@
 const BINARY_PATH = /\.(?:pdf|png|jpe?g|gif|webp|avif|heic|heif|bmp|tiff?|ico|icns|psd|ai|eps|mp3|m4a|aac|wav|flac|ogg|opus|aiff?|mp4|m4v|mov|webm|avi|mkv|mpeg|mpg|zip|gz|bz2|xz|7z|rar|tar|docx?|xlsx?|pptx?|odt|ods|odp|epub|woff2?|ttf|otf|eot|db|sqlite3?|exe|dll|dmg|wasm)$/i;
 
 export function isBinaryPreviewPath(path: string): boolean {
-    return BINARY_PATH.test(path);
+	return BINARY_PATH.test(path);
 }
 
 /** Strict UTF-8 without NUL bytes, outside known binary formats: Obsidian's string
  * `process()` writer replaces these bytes exactly, so they can be updated atomically.
  * Like git, a NUL byte marks content as binary even when it decodes. */
 export function isUtf8Text(path: string, bytes: ArrayBuffer): boolean {
-    if (isBinaryPreviewPath(path) || new Uint8Array(bytes).includes(0)) return false;
-    try { new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); return true; }
-    catch { return false; }
+	if (isBinaryPreviewPath(path) || new Uint8Array(bytes).includes(0)) return false;
+	try { new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); return true; }
+	catch { return false; }
 }
 
 /** Decode display text; callers retain their own read, size and integrity checks. */
 export function decodePreviewText(bytes: ArrayBuffer, options: { preserveBom: boolean }): string {
-    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: options.preserveBom }).decode(bytes);
-    // eslint-disable-next-line no-control-regex -- Allow tabs and line endings, but reject binary control characters.
-    if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(text)) throw new Error('Not a text file');
-    return text;
+	const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: options.preserveBom }).decode(bytes);
+	// eslint-disable-next-line no-control-regex -- Allow tabs and line endings, but reject binary control characters.
+	if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(text)) throw new Error('Not a text file');
+	return text;
 }

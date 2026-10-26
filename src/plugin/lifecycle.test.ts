@@ -397,151 +397,151 @@ describe('shutdownPlugin', () => {
 });
 
 it.each(['connection restore', 'reminders', 'sync'])('stops startup after shutdown during %s', async stage => {
-  const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
-  let entered!: () => void;
-  const atBoundary = new Promise<void>(resolve => { entered = resolve; });
-  let finish!: () => void;
-  const pending = new Promise<void>(resolve => { finish = resolve; });
-  const wait = async () => { entered(); await pending; };
-  const plugin = createPlugin({
-    settings: { workerUrl: '', cloudflareDeployment: { workerName: 'crate-test', workersSubdomain: 'account' } },
-    writeSettings: stage === 'connection restore' ? wait : vi.fn(async () => {}),
-  });
-  secretStorageHas.mockReturnValue(stage === 'connection restore');
-  if (stage === 'reminders') initializeReminders.mockImplementation(wait);
-  const initialize = vi.fn(stage === 'sync' ? wait : async () => {});
-  const destroy = vi.fn();
-  initializeSyncManagers.mockImplementation(target => {
-    target.syncRuntime = { isConfigured: () => true, initialize, destroy, waitForStartupSync: async () => false };
-  });
-  const starting = bootstrapPlugin(plugin as never);
-  await atBoundary;
-  shutdownPlugin(plugin as never);
-  finish();
-  await starting;
-  // Sync initialization runs after onload, once the workspace layout is ready.
-  expect(registerSyncCommands).toHaveBeenCalledTimes(stage === 'sync' ? 1 : 0);
-  expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(stage === 'sync' ? 2 : 0);
-  expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
-  expect(initialize).toHaveBeenCalledTimes(stage === 'sync' ? 1 : 0);
-  expect(destroy).toHaveBeenCalledTimes(stage === 'connection restore' ? 0 : 1);
+	const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
+	let entered!: () => void;
+	const atBoundary = new Promise<void>(resolve => { entered = resolve; });
+	let finish!: () => void;
+	const pending = new Promise<void>(resolve => { finish = resolve; });
+	const wait = async () => { entered(); await pending; };
+	const plugin = createPlugin({
+		settings: { workerUrl: '', cloudflareDeployment: { workerName: 'crate-test', workersSubdomain: 'account' } },
+		writeSettings: stage === 'connection restore' ? wait : vi.fn(async () => {}),
+	});
+	secretStorageHas.mockReturnValue(stage === 'connection restore');
+	if (stage === 'reminders') initializeReminders.mockImplementation(wait);
+	const initialize = vi.fn(stage === 'sync' ? wait : async () => {});
+	const destroy = vi.fn();
+	initializeSyncManagers.mockImplementation(target => {
+		target.syncRuntime = { isConfigured: () => true, initialize, destroy, waitForStartupSync: async () => false };
+	});
+	const starting = bootstrapPlugin(plugin as never);
+	await atBoundary;
+	shutdownPlugin(plugin as never);
+	finish();
+	await starting;
+	// Sync initialization runs after onload, once the workspace layout is ready.
+	expect(registerSyncCommands).toHaveBeenCalledTimes(stage === 'sync' ? 1 : 0);
+	expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(stage === 'sync' ? 2 : 0);
+	expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
+	expect(initialize).toHaveBeenCalledTimes(stage === 'sync' ? 1 : 0);
+	expect(destroy).toHaveBeenCalledTimes(stage === 'connection restore' ? 0 : 1);
 });
 
 it('does not let an old startup attempt resume after the same plugin starts again', async () => {
-  const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
-  let finish!: () => void;
-  const pending = new Promise<void>(resolve => { finish = resolve; });
-  const plugin = createPlugin({ loadSettings: vi.fn().mockImplementationOnce(() => pending).mockResolvedValue(undefined) });
-  const initialize = vi.fn(async () => {});
-  initializeSyncManagers.mockImplementation(target => {
-    target.syncRuntime = { isConfigured: () => true, initialize, waitForStartupSync: async () => false };
-  });
-  const first = bootstrapPlugin(plugin as never);
-  shutdownPlugin(plugin as never);
-  await bootstrapPlugin(plugin as never);
-  finish();
-  await first;
-  expect(initializeSyncManagers).toHaveBeenCalledOnce();
-  expect(initialize).toHaveBeenCalledOnce();
-  expect(registerVaultSyncEventHandlers).toHaveBeenCalledOnce();
+	const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
+	let finish!: () => void;
+	const pending = new Promise<void>(resolve => { finish = resolve; });
+	const plugin = createPlugin({ loadSettings: vi.fn().mockImplementationOnce(() => pending).mockResolvedValue(undefined) });
+	const initialize = vi.fn(async () => {});
+	initializeSyncManagers.mockImplementation(target => {
+		target.syncRuntime = { isConfigured: () => true, initialize, waitForStartupSync: async () => false };
+	});
+	const first = bootstrapPlugin(plugin as never);
+	shutdownPlugin(plugin as never);
+	await bootstrapPlugin(plugin as never);
+	finish();
+	await first;
+	expect(initializeSyncManagers).toHaveBeenCalledOnce();
+	expect(initialize).toHaveBeenCalledOnce();
+	expect(registerVaultSyncEventHandlers).toHaveBeenCalledOnce();
 });
 
 it('does not reactivate after shutdown during settings load', async () => {
-  const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
-  let finishSettings!: () => void;
-  const waitingSettings = new Promise<void>(resolve => { finishSettings = resolve; });
-  const plugin = createPlugin({ loadSettings: vi.fn(() => waitingSettings) });
-  const initialize = vi.fn(async () => {});
-  const destroy = vi.fn();
-  initializeSyncManagers.mockImplementation(target => {
-    target.syncRuntime = { isConfigured: () => true, initialize, destroy, waitForStartupSync: async () => false };
-  });
-  const starting = bootstrapPlugin(plugin as never);
-  shutdownPlugin(plugin as never);
-  finishSettings();
-  await starting;
-  await Promise.resolve();
-  expect(initialize).not.toHaveBeenCalled();
+	const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
+	let finishSettings!: () => void;
+	const waitingSettings = new Promise<void>(resolve => { finishSettings = resolve; });
+	const plugin = createPlugin({ loadSettings: vi.fn(() => waitingSettings) });
+	const initialize = vi.fn(async () => {});
+	const destroy = vi.fn();
+	initializeSyncManagers.mockImplementation(target => {
+		target.syncRuntime = { isConfigured: () => true, initialize, destroy, waitForStartupSync: async () => false };
+	});
+	const starting = bootstrapPlugin(plugin as never);
+	shutdownPlugin(plugin as never);
+	finishSettings();
+	await starting;
+	await Promise.resolve();
+	expect(initialize).not.toHaveBeenCalled();
 });
 
 it('finishes loading before sync initializes and starts sync once the layout is ready', async () => {
-  const { bootstrapPlugin } = await loadLifecycleModule();
-  let layoutReady!: () => void;
-  const plugin = createPlugin({ reminders: { index: { flushDeferredScans: vi.fn(async () => undefined) } } });
-  plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
-  let finishInitialize!: () => void;
-  const initialize = vi.fn(() => new Promise<void>(resolve => { finishInitialize = resolve; }));
-  const waitForStartupSync = vi.fn(async () => true);
-  initializeSyncManagers.mockImplementation(target => {
-    target.syncRuntime = { isConfigured: () => true, initialize, waitForStartupSync };
-  });
+	const { bootstrapPlugin } = await loadLifecycleModule();
+	let layoutReady!: () => void;
+	const plugin = createPlugin({ reminders: { index: { flushDeferredScans: vi.fn(async () => undefined) } } });
+	plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
+	let finishInitialize!: () => void;
+	const initialize = vi.fn(() => new Promise<void>(resolve => { finishInitialize = resolve; }));
+	const waitForStartupSync = vi.fn(async () => true);
+	initializeSyncManagers.mockImplementation(target => {
+		target.syncRuntime = { isConfigured: () => true, initialize, waitForStartupSync };
+	});
 
-  await bootstrapPlugin(plugin as never);
+	await bootstrapPlugin(plugin as never);
 
-  expect(registerSyncCommands).toHaveBeenCalledWith(plugin);
-  expect(initialize).not.toHaveBeenCalled();
-  expect(waitForStartupSync).not.toHaveBeenCalled();
+	expect(registerSyncCommands).toHaveBeenCalledWith(plugin);
+	expect(initialize).not.toHaveBeenCalled();
+	expect(waitForStartupSync).not.toHaveBeenCalled();
 
-  layoutReady();
-  expect(initialize).toHaveBeenCalledOnce();
-  await Promise.resolve();
-  expect(waitForStartupSync).not.toHaveBeenCalled();
+	layoutReady();
+	expect(initialize).toHaveBeenCalledOnce();
+	await Promise.resolve();
+	expect(waitForStartupSync).not.toHaveBeenCalled();
 
-  finishInitialize();
-  await vi.waitFor(() => expect(ensureReminderNotificationPolicy).toHaveBeenCalledWith(plugin));
-  expect(waitForStartupSync).toHaveBeenCalledOnce();
+	finishInitialize();
+	await vi.waitFor(() => expect(ensureReminderNotificationPolicy).toHaveBeenCalledWith(plugin));
+	expect(waitForStartupSync).toHaveBeenCalledOnce();
 });
 
 it('pulls shared settings once the sync connection exists on a cold start', async () => {
-  const { bootstrapPlugin } = await loadLifecycleModule({ realSharedSettings: true });
-  const remote = { ignorePatterns: ['Archive/'], syncInterval: 120, pushEnabled: true };
-  // Stands in for the API client's `GET /settings`; only the client created by initialize() has it.
-  const getSharedSettings = vi.fn(async () => ({ settings: remote, settingsVersion: 'v1' }));
-  let api: { getSharedSettings: typeof getSharedSettings } | null = null;
-  const settings = { workerUrl: 'https://crate.example', ignorePatterns: ['*.tmp'], syncInterval: 300, pushEnabled: false };
-  const writeSettings = vi.fn(async (update: Partial<typeof settings>) => { Object.assign(settings, update); });
-  const plugin = createPlugin({ settings, writeSettings });
-  let layoutReady!: () => void;
-  plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
-  const updateSyncSettings = vi.fn();
-  initializeSyncManagers.mockImplementation(target => {
-    target.syncRuntime = {
-      isConfigured: () => true,
-      initialize: vi.fn(async () => { api = { getSharedSettings }; }),
-      waitForStartupSync: async () => false,
-      getApiClient: () => api,
-      updateSyncSettings,
-    };
-  });
+	const { bootstrapPlugin } = await loadLifecycleModule({ realSharedSettings: true });
+	const remote = { ignorePatterns: ['Archive/'], syncInterval: 120, pushEnabled: true };
+	// Stands in for the API client's `GET /settings`; only the client created by initialize() has it.
+	const getSharedSettings = vi.fn(async () => ({ settings: remote, settingsVersion: 'v1' }));
+	let api: { getSharedSettings: typeof getSharedSettings } | null = null;
+	const settings = { workerUrl: 'https://crate.example', ignorePatterns: ['*.tmp'], syncInterval: 300, pushEnabled: false };
+	const writeSettings = vi.fn(async (update: Partial<typeof settings>) => { Object.assign(settings, update); });
+	const plugin = createPlugin({ settings, writeSettings });
+	let layoutReady!: () => void;
+	plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
+	const updateSyncSettings = vi.fn();
+	initializeSyncManagers.mockImplementation(target => {
+		target.syncRuntime = {
+			isConfigured: () => true,
+			initialize: vi.fn(async () => { api = { getSharedSettings }; }),
+			waitForStartupSync: async () => false,
+			getApiClient: () => api,
+			updateSyncSettings,
+		};
+	});
 
-  await bootstrapPlugin(plugin as never);
-  expect(api).toBeNull();
-  layoutReady();
+	await bootstrapPlugin(plugin as never);
+	expect(api).toBeNull();
+	layoutReady();
 
-  await vi.waitFor(() => expect(updateSyncSettings).toHaveBeenCalledOnce());
-  expect(getSharedSettings).toHaveBeenCalledOnce();
-  // This device keeps excluding its own workspace files.
-  expect(settings).toMatchObject({ ...remote, ignorePatterns: ['Archive/', '.obsidian/workspace*'] });
+	await vi.waitFor(() => expect(updateSyncSettings).toHaveBeenCalledOnce());
+	expect(getSharedSettings).toHaveBeenCalledOnce();
+	// This device keeps excluding its own workspace files.
+	expect(settings).toMatchObject({ ...remote, ignorePatterns: ['Archive/', '.obsidian/workspace*'] });
 });
 
 it('does not initialize sync when the plugin unloads before the layout is ready', async () => {
-  const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
-  let layoutReady!: () => void;
-  const plugin = createPlugin();
-  plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
-  const initialize = vi.fn(async () => {});
-  const waitForStartupSync = vi.fn(async () => false);
-  initializeSyncManagers.mockImplementation(target => {
-    target.syncRuntime = { isConfigured: () => true, initialize, destroy: vi.fn(), waitForStartupSync };
-  });
+	const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
+	let layoutReady!: () => void;
+	const plugin = createPlugin();
+	plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
+	const initialize = vi.fn(async () => {});
+	const waitForStartupSync = vi.fn(async () => false);
+	initializeSyncManagers.mockImplementation(target => {
+		target.syncRuntime = { isConfigured: () => true, initialize, destroy: vi.fn(), waitForStartupSync };
+	});
 
-  await bootstrapPlugin(plugin as never);
-  shutdownPlugin(plugin as never);
-  layoutReady();
-  await Promise.resolve();
-  await Promise.resolve();
+	await bootstrapPlugin(plugin as never);
+	shutdownPlugin(plugin as never);
+	layoutReady();
+	await Promise.resolve();
+	await Promise.resolve();
 
-  expect(initialize).not.toHaveBeenCalled();
-  expect(waitForStartupSync).not.toHaveBeenCalled();
-  expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
+	expect(initialize).not.toHaveBeenCalled();
+	expect(waitForStartupSync).not.toHaveBeenCalled();
+	expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
 });

@@ -15,15 +15,15 @@ import { ReminderPagination, useReminderPagination } from '../shared/reminder-pa
 import { useReminderClock } from '../shared/useReminderClock';
 
 export interface TodayViewProps {
-  reminders: Reminder[];
-  animationConfig?: AnimationConfig;
-  /** Custom render function for reminder cards (for platform-specific wrappers) */
-  renderCard?: (reminder: Reminder, index: number) => React.ReactNode;
-  /** Whether to use fixed bottom padding (for views with FAB) */
-  hasFab?: boolean;
-  /** Custom class name for the container */
-  className?: string;
-  colorScheme: ProjectColorScheme;
+	reminders: Reminder[];
+	animationConfig?: AnimationConfig;
+	/** Custom render function for reminder cards (for platform-specific wrappers) */
+	renderCard?: (reminder: Reminder, index: number) => React.ReactNode;
+	/** Whether to use fixed bottom padding (for views with FAB) */
+	hasFab?: boolean;
+	/** Custom class name for the container */
+	className?: string;
+	colorScheme: ProjectColorScheme;
 }
 
 /**
@@ -31,63 +31,63 @@ export interface TodayViewProps {
  * Displays reminders due today, overdue reminders, and completed reminders due today
  */
 export const TodayView = memo(function TodayView({
-  reminders,
-  animationConfig = { enabled: true },
-  renderCard,
-  hasFab = true,
-  className = '',
-  colorScheme,
+	reminders,
+	animationConfig = { enabled: true },
+	renderCard,
+	hasFab = true,
+	className = '',
+	colorScheme,
 }: TodayViewProps) {
-  const reduceMotion = useReducedMotion();
-  const clock = useReminderClock(reminders);
-  const { active, completed } = useMemo(() => buildTodayViewModel(reminders, clock.now), [reminders, clock]);
-  const pagination = useReminderPagination(active);
-  const enableListAnimations = animationConfig.enabled && !reduceMotion && active.length <= 80;
-  const hasContent = active.length > 0 || completed.length > 0;
+	const reduceMotion = useReducedMotion();
+	const clock = useReminderClock(reminders);
+	const { active, completed } = useMemo(() => buildTodayViewModel(reminders, clock.now), [reminders, clock]);
+	const pagination = useReminderPagination(active);
+	const enableListAnimations = animationConfig.enabled && !reduceMotion && active.length <= 80;
+	const hasContent = active.length > 0 || completed.length > 0;
 
-  // Default card renderer
-  const defaultRenderCard = (reminder: Reminder, index: number) => (
-    <ReminderCard
-      reminder={reminder}
-      index={index}
-      animationConfig={{ enabled: false }}
-      colorScheme={colorScheme}
-    />
-  );
+	// Default card renderer
+	const defaultRenderCard = (reminder: Reminder, index: number) => (
+		<ReminderCard
+			reminder={reminder}
+			index={index}
+			animationConfig={{ enabled: false }}
+			colorScheme={colorScheme}
+		/>
+	);
 
-  const cardRenderer = renderCard || defaultRenderCard;
+	const cardRenderer = renderCard || defaultRenderCard;
 
-  return (
-    <ReminderListLayout
-      className={className}
-      hasFab={hasFab}
-      hasContent={hasContent}
-      renderCard={cardRenderer}
-      animationConfig={animationConfig}
-      completed={completed}
-      emptyState={
-        <EmptyState
-            icon="calendar"
-            title="Nothing due today"
-            description="Enjoy your free time!"
-            iconColor="warning"
-            animationConfig={animationConfig}
-          />
-      }
-    >
-      <ReminderPagination pagination={pagination} label="Active reminders" />
-      <ReminderListPresence>
-        {pagination.items.map((reminder, index) => (
-          <ReminderMotionRow
-            key={reminder.id}
-            id={reminder.id}
-            section="active"
-            animationsEnabled={enableListAnimations}
-          >
-            {cardRenderer(reminder, pagination.start + index)}
-          </ReminderMotionRow>
-        ))}
-      </ReminderListPresence>
-    </ReminderListLayout>
-  );
+	return (
+		<ReminderListLayout
+			className={className}
+			hasFab={hasFab}
+			hasContent={hasContent}
+			renderCard={cardRenderer}
+			animationConfig={animationConfig}
+			completed={completed}
+			emptyState={
+				<EmptyState
+						icon="calendar"
+						title="Nothing due today"
+						description="Enjoy your free time!"
+						iconColor="warning"
+						animationConfig={animationConfig}
+					/>
+			}
+		>
+			<ReminderPagination pagination={pagination} label="Active reminders" />
+			<ReminderListPresence>
+				{pagination.items.map((reminder, index) => (
+					<ReminderMotionRow
+						key={reminder.id}
+						id={reminder.id}
+						section="active"
+						animationsEnabled={enableListAnimations}
+					>
+						{cardRenderer(reminder, pagination.start + index)}
+					</ReminderMotionRow>
+				))}
+			</ReminderListPresence>
+		</ReminderListLayout>
+	);
 });

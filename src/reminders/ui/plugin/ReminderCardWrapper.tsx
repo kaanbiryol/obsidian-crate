@@ -20,11 +20,11 @@ import type { ProjectColorScheme } from '@/reminders/ui/format/projectColors';
 import { useRemindersSettingsStore } from '@/reminders/settings';
 
 interface ReminderCardWrapperProps {
-  reminder: Reminder;
-  onUpdate?: () => void;
-  index?: number;
-  hideProject?: boolean;
-  colorScheme: ProjectColorScheme;
+	reminder: Reminder;
+	onUpdate?: () => void;
+	index?: number;
+	hideProject?: boolean;
+	colorScheme: ProjectColorScheme;
 }
 
 /**
@@ -34,82 +34,82 @@ interface ReminderCardWrapperProps {
  * Optimistic updates are handled by ReminderIndex.
  */
 export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
-  reminder,
-  onUpdate,
-  index,
-  hideProject = false,
-  colorScheme,
+	reminder,
+	onUpdate,
+	index,
+	hideProject = false,
+	colorScheme,
 }: ReminderCardWrapperProps) {
-  const plugin = PluginContext.use();
-  const listStyle = useRemindersSettingsStore(state => state.listStyle);
-  const isTogglingRef = useRef(false);
-  const [completionPreview, setCompletionPreview] = useState<{ source: Reminder; completed: boolean }>();
+	const plugin = PluginContext.use();
+	const listStyle = useRemindersSettingsStore(state => state.listStyle);
+	const isTogglingRef = useRef(false);
+	const [completionPreview, setCompletionPreview] = useState<{ source: Reminder; completed: boolean }>();
 
-  /**
-   * Handle reminder completion toggle
-   * Optimistic updates are handled by ReminderIndex
-   */
-  const handleToggle = useCallback(async () => {
-    if (isTogglingRef.current) return;
-    isTogglingRef.current = true;
-    // The exiting row keeps its old props. Give it immediate checkbox feedback,
-    // and let the next repository snapshot take over without a timer or delay.
-    setCompletionPreview({ source: reminder, completed: !reminder.completed });
+	/**
+	 * Handle reminder completion toggle
+	 * Optimistic updates are handled by ReminderIndex
+	 */
+	const handleToggle = useCallback(async () => {
+		if (isTogglingRef.current) return;
+		isTogglingRef.current = true;
+		// The exiting row keeps its old props. Give it immediate checkbox feedback,
+		// and let the next repository snapshot take over without a timer or delay.
+		setCompletionPreview({ source: reminder, completed: !reminder.completed });
 
-    try {
-      if (reminder.completed) {
-        await requireReminderBackend(plugin).repository.uncomplete(reminder.id);
-      } else {
-        await requireReminderBackend(plugin).repository.complete(reminder.id);
-      }
-    } catch (error) {
-      setCompletionPreview(undefined);
-      log.error('Failed to toggle reminder', error);
-      new Notice('Failed to update reminder');
-    } finally {
-      isTogglingRef.current = false;
-    }
-  }, [plugin, reminder]);
+		try {
+			if (reminder.completed) {
+				await requireReminderBackend(plugin).repository.uncomplete(reminder.id);
+			} else {
+				await requireReminderBackend(plugin).repository.complete(reminder.id);
+			}
+		} catch (error) {
+			setCompletionPreview(undefined);
+			log.error('Failed to toggle reminder', error);
+			new Notice('Failed to update reminder');
+		} finally {
+			isTogglingRef.current = false;
+		}
+	}, [plugin, reminder]);
 
-  /**
-   * Handle reminder edit
-   */
-  const handleEdit = useCallback(() => {
-    openReminderEditModal(plugin, reminder, onUpdate ?? (() => undefined));
-  }, [onUpdate, plugin, reminder]);
+	/**
+	 * Handle reminder edit
+	 */
+	const handleEdit = useCallback(() => {
+		openReminderEditModal(plugin, reminder, onUpdate ?? (() => undefined));
+	}, [onUpdate, plugin, reminder]);
 
-  const wrapperRef = useReminderCardInteractions({
-    onEdit: handleEdit,
-    onToggleComplete: handleToggle,
-    isDisabled: () => isTogglingRef.current,
-  });
+	const wrapperRef = useReminderCardInteractions({
+		onEdit: handleEdit,
+		onToggleComplete: handleToggle,
+		isDisabled: () => isTogglingRef.current,
+	});
 
-  return (
-    <div
-      ref={wrapperRef}
-      className="sidebar-reminder-card-wrapper is-interactive"
-      role="group"
-      tabIndex={0}
-      aria-label={`${reminder.content}. Press Enter to edit reminder.`}
-    >
-      <SharedReminderCard
-        listStyle={listStyle}
-        reminder={{
-          id: reminder.id,
-          content: reminder.content,
-          description: reminder.description,
-          completed: completionPreview?.source === reminder ? completionPreview.completed : reminder.completed,
-          dueDatetime: reminder.dueDatetime,
-          dueDate: reminder.dueDate,
-          priority: reminder.priority,
-          project: reminder.project,
-          recurrence: reminder.recurrence,
-        }}
-        animationConfig={{ enabled: false }}
-        index={index}
-        hideProject={hideProject}
-        colorScheme={colorScheme}
-      />
-    </div>
-  );
+	return (
+		<div
+			ref={wrapperRef}
+			className="sidebar-reminder-card-wrapper is-interactive"
+			role="group"
+			tabIndex={0}
+			aria-label={`${reminder.content}. Press Enter to edit reminder.`}
+		>
+			<SharedReminderCard
+				listStyle={listStyle}
+				reminder={{
+					id: reminder.id,
+					content: reminder.content,
+					description: reminder.description,
+					completed: completionPreview?.source === reminder ? completionPreview.completed : reminder.completed,
+					dueDatetime: reminder.dueDatetime,
+					dueDate: reminder.dueDate,
+					priority: reminder.priority,
+					project: reminder.project,
+					recurrence: reminder.recurrence,
+				}}
+				animationConfig={{ enabled: false }}
+				index={index}
+				hideProject={hideProject}
+				colorScheme={colorScheme}
+			/>
+		</div>
+	);
 });

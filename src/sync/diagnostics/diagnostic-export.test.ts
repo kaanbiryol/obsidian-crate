@@ -14,8 +14,8 @@ const requestId = 'e9ffeb0c-7610-4cdb-a129-913c45c2a053';
 const sensitive = 'private-client-name-and-secret';
 const response = (status = 200) => ({ status, headers: { 'X-Crate-Request-Id': requestId, 'Set-Cookie': sensitive }, text: JSON.stringify({ ok: true, private: sensitive }), arrayBuffer: new ArrayBuffer(0) });
 beforeEach(() => {
-  vi.stubGlobal('window', { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout });
-  vi.spyOn(InitialImportApi.prototype, 'begin').mockResolvedValue(null);
+	vi.stubGlobal('window', { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout });
+	vi.spyOn(InitialImportApi.prototype, 'begin').mockResolvedValue(null);
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 

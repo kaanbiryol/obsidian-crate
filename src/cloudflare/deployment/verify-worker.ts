@@ -21,8 +21,8 @@ export async function verifyWorkerDeployment(transport: HttpTransport, origin: s
 			&& info.deploymentFingerprint === fingerprint
 			&& (published ? Number.isSafeInteger(info.serverRevision) && Number(info.serverRevision) > 0 && Number(info.serverRevision) <= release.revision : info.serverRevision === release.revision)
 			&& info.schemaVersion === release.schemaVersion
-      && (info.developmentBuild === undefined || parseDevelopmentBuild(info.developmentBuild))) return { revision: Number(info.serverRevision), schemaVersion: release.schemaVersion,
-        ...(info.developmentBuild ? { developmentBuild: parseDevelopmentBuild(info.developmentBuild) } : {}) };
+			&& (info.developmentBuild === undefined || parseDevelopmentBuild(info.developmentBuild))) return { revision: Number(info.serverRevision), schemaVersion: release.schemaVersion,
+				...(info.developmentBuild ? { developmentBuild: parseDevelopmentBuild(info.developmentBuild) } : {}) };
 		// Report only bounded deployment identity, never response bodies or credentials.
 		const revision = Number.isSafeInteger(info?.serverRevision) ? String(info?.serverRevision) : 'missing';
 		const schema = Number.isSafeInteger(info?.schemaVersion) ? String(info?.schemaVersion) : 'missing';

@@ -1,11 +1,11 @@
 import { setIcon } from 'obsidian';
 
 export function renderLoadingState(container: HTMLElement, text: string): void {
-    const loading = container.createDiv({ cls: 'crate-activity-loading' });
-    loading.setAttribute('role', 'status');
-    loading.setAttribute('aria-live', 'polite');
-    loading.createSpan({ cls: 'crate-activity-spinner' }).setAttribute('aria-hidden', 'true');
-    loading.createSpan({ cls: 'crate-activity-loading-label', text }).setAttribute('title', text);
+	const loading = container.createDiv({ cls: 'crate-activity-loading' });
+	loading.setAttribute('role', 'status');
+	loading.setAttribute('aria-live', 'polite');
+	loading.createSpan({ cls: 'crate-activity-spinner' }).setAttribute('aria-hidden', 'true');
+	loading.createSpan({ cls: 'crate-activity-loading-label', text }).setAttribute('title', text);
 }
 
 export type FileCardType = 'upload' | 'download' | 'merge' | 'delete' | 'conflict';
@@ -31,8 +31,8 @@ export function renderFileMicroCard(
 
 	const iconEl = card.createDiv({ cls: `crate-file-icon crate-file-icon-${type}` });
 	setIcon(iconEl, FILE_CARD_ICONS[type]);
-    iconEl.setAttribute('aria-label', type === 'merge' ? 'Merged' : type === 'conflict' ? 'Conflict' : type === 'delete' ? 'Delete' : type === 'upload' ? 'Upload' : 'Download');
-    iconEl.setAttribute('role', 'img');
+	iconEl.setAttribute('aria-label', type === 'merge' ? 'Merged' : type === 'conflict' ? 'Conflict' : type === 'delete' ? 'Delete' : type === 'upload' ? 'Upload' : 'Download');
+	iconEl.setAttribute('role', 'img');
 
 	const info = card.createDiv({ cls: 'crate-file-info' });
 	const parts = filePath.split('/');

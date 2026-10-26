@@ -19,7 +19,7 @@ async function setup(path = 'note.md') {
  const readBinary = vi.fn<(filePath: string) => Promise<ArrayBuffer>>(async filePath => filePath === path ? toArrayBuffer('after') : base);
  h.vault.adapter.readBinary = readBinary;
  for (const method of Object.values(h.api)) {
-  if (vi.isMockFunction(method)) method.mockClear().mockImplementation(() => { throw new Error('Network unavailable'); });
+	if (vi.isMockFunction(method)) method.mockClear().mockImplementation(() => { throw new Error('Network unavailable'); });
  }
  return { ...h, readBinary, remote, base, baseline };
 }
@@ -70,8 +70,8 @@ it('rejects a preview if sync advances its baseline during a server read', async
  h.vault.adapter.exists.mockResolvedValue(false);
  h.remote.getFileMetadata.mockResolvedValue({ files: { 'note.md': h.baseline } });
  h.api.downloadFile = vi.fn(async () => {
-  h.localManifest.getEntry.mockReturnValue(undefined);
-  return { content: h.base };
+	h.localManifest.getEntry.mockReturnValue(undefined);
+	return { content: h.base };
  });
  await expect(h.engine.loadPendingDiff('note.md', false)).rejects.toThrow('Pending changes were updated');
 });
@@ -79,8 +79,8 @@ it('rejects a preview if sync advances its baseline during a server read', async
 it('rejects a preview if sync changes its baseline during a local read', async () => {
  const h = await setup();
  h.readBinary.mockImplementation(() => {
-  h.localManifest.getEntry.mockReturnValue(undefined);
-  return Promise.resolve(toArrayBuffer('after'));
+	h.localManifest.getEntry.mockReturnValue(undefined);
+	return Promise.resolve(toArrayBuffer('after'));
  });
  await expect(h.engine.loadPendingDiff('note.md', false)).rejects.toThrow('Pending changes were updated');
 });
@@ -98,7 +98,7 @@ it('discards a local deletion offline and preserves the last-synced revision', a
  h.vault.adapter.readBinary = vi.fn(async () => base);
  h.vault.createBinary.mockImplementation(() => { restored = true; });
  for (const [name, method] of Object.entries(h.api)) {
-  if (name !== 'isConfigured' && vi.isMockFunction(method)) method.mockClear().mockImplementation(() => { throw new Error('Offline'); });
+	if (name !== 'isConfigured' && vi.isMockFunction(method)) method.mockClear().mockImplementation(() => { throw new Error('Offline'); });
  }
  const review = await h.engine.createPendingDiscard([pendingChangeKey('delete', 'note.md')]);
  await review.discard();
@@ -106,6 +106,6 @@ it('discards a local deletion offline and preserves the last-synced revision', a
  expect(h.localManifest.getEntry('note.md')).toMatchObject({ hash, revision: baseline.revision });
  expect(h.engine.getPendingKeys()).not.toContain(pendingChangeKey('delete', 'note.md'));
  for (const [name, method] of Object.entries(h.api)) {
-  if (name !== 'isConfigured' && vi.isMockFunction(method)) expect(method).not.toHaveBeenCalled();
+	if (name !== 'isConfigured' && vi.isMockFunction(method)) expect(method).not.toHaveBeenCalled();
  }
 });

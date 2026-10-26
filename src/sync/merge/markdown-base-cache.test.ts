@@ -181,68 +181,68 @@ describe('MarkdownBaseCache', () => {
 });
 
 it('coalesces duplicate cache writes and retries failed writes', async () => {
-    const { cache, adapter } = createCacheHarness();
-    const content = toArrayBuffer('same content');
-    const hash = await sha256Hex(content);
-    await Promise.all([cache.putBase('a.md', hash, content), cache.putBase('b.md', hash, content)]);
-    await cache.putBase('a.md', hash, content);
-    expect(adapter.writeBinary).toHaveBeenCalledTimes(1);
+	const { cache, adapter } = createCacheHarness();
+	const content = toArrayBuffer('same content');
+	const hash = await sha256Hex(content);
+	await Promise.all([cache.putBase('a.md', hash, content), cache.putBase('b.md', hash, content)]);
+	await cache.putBase('a.md', hash, content);
+	expect(adapter.writeBinary).toHaveBeenCalledTimes(1);
 
-    const next = toArrayBuffer('next content');
-    const nextHash = await sha256Hex(next);
-    adapter.writeBinary.mockRejectedValueOnce(new Error('disk unavailable'));
-    await cache.putBase('a.md', nextHash, next);
-    await cache.putBase('a.md', nextHash, next);
-    expect(adapter.writeBinary).toHaveBeenCalledTimes(3);
+	const next = toArrayBuffer('next content');
+	const nextHash = await sha256Hex(next);
+	adapter.writeBinary.mockRejectedValueOnce(new Error('disk unavailable'));
+	await cache.putBase('a.md', nextHash, next);
+	await cache.putBase('a.md', nextHash, next);
+	expect(adapter.writeBinary).toHaveBeenCalledTimes(3);
 });
 
 it('rewrites a cache entry after pruning it', async () => {
-    const { cache, adapter } = createCacheHarness();
-    const content = toArrayBuffer('content');
-    const hash = await sha256Hex(content);
-    await cache.putBase('a.md', hash, content);
-    await cache.pruneReferencedHashes(new Set());
-    await cache.putBase('a.md', hash, content);
-    expect(adapter.writeBinary).toHaveBeenCalledTimes(2);
+	const { cache, adapter } = createCacheHarness();
+	const content = toArrayBuffer('content');
+	const hash = await sha256Hex(content);
+	await cache.putBase('a.md', hash, content);
+	await cache.pruneReferencedHashes(new Set());
+	await cache.putBase('a.md', hash, content);
+	expect(adapter.writeBinary).toHaveBeenCalledTimes(2);
 });
 
 it('checks a complete cache with one listing instead of an exists call per note', async () => {
-    const { cache, adapter, files } = createCacheHarness();
-    const entries: Record<string, FileEntry> = {};
-    for (let i = 0; i < 1000; i++) {
-        const hash = i.toString(16).padStart(64, '0');
-        entries[`notes/${i}.md`] = { hash, size: 4, modified: '2026-01-01' };
-        files.set(`${PLUGIN_DIR}/markdown-base-cache/${hash}.md`, toArrayBuffer('base'));
-    }
-    await cache.seedFromManifest(createManifest(entries), {
-        isDestroyed: () => false,
-        runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
-    });
-    // Before: 1,000 exists() calls plus a second listing for the prune.
-    expect(adapter.exists).not.toHaveBeenCalled();
-    expect(adapter.list).toHaveBeenCalledOnce();
-    expect(adapter.readBinary).not.toHaveBeenCalled();
-    expect(adapter.remove).not.toHaveBeenCalled();
+	const { cache, adapter, files } = createCacheHarness();
+	const entries: Record<string, FileEntry> = {};
+	for (let i = 0; i < 1000; i++) {
+		const hash = i.toString(16).padStart(64, '0');
+		entries[`notes/${i}.md`] = { hash, size: 4, modified: '2026-01-01' };
+		files.set(`${PLUGIN_DIR}/markdown-base-cache/${hash}.md`, toArrayBuffer('base'));
+	}
+	await cache.seedFromManifest(createManifest(entries), {
+		isDestroyed: () => false,
+		runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+	});
+	// Before: 1,000 exists() calls plus a second listing for the prune.
+	expect(adapter.exists).not.toHaveBeenCalled();
+	expect(adapter.list).toHaveBeenCalledOnce();
+	expect(adapter.readBinary).not.toHaveBeenCalled();
+	expect(adapter.remove).not.toHaveBeenCalled();
 });
 
 it('prunes after syncs at most once per interval', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    try {
-        const { cache, adapter, files } = createCacheHarness();
-        const orphan = `${PLUGIN_DIR}/markdown-base-cache/${'b'.repeat(64)}.md`;
-        files.set(orphan, toArrayBuffer('old base'));
-        const manifest = createManifest({});
+	vi.useFakeTimers({ toFake: ['Date'] });
+	try {
+		const { cache, adapter, files } = createCacheHarness();
+		const orphan = `${PLUGIN_DIR}/markdown-base-cache/${'b'.repeat(64)}.md`;
+		files.set(orphan, toArrayBuffer('old base'));
+		const manifest = createManifest({});
 
-        await cache.pruneUnreferenced(manifest);
-        expect(files.has(orphan)).toBe(false);
-        files.set(orphan, toArrayBuffer('old base'));
-        await cache.pruneUnreferenced(manifest);
-        expect(adapter.list).toHaveBeenCalledOnce();
-        expect(files.has(orphan)).toBe(true);
+		await cache.pruneUnreferenced(manifest);
+		expect(files.has(orphan)).toBe(false);
+		files.set(orphan, toArrayBuffer('old base'));
+		await cache.pruneUnreferenced(manifest);
+		expect(adapter.list).toHaveBeenCalledOnce();
+		expect(files.has(orphan)).toBe(true);
 
-        vi.advanceTimersByTime(PRUNE_INTERVAL_MS);
-        await cache.pruneUnreferenced(manifest);
-        expect(adapter.list).toHaveBeenCalledTimes(2);
-        expect(files.has(orphan)).toBe(false);
-    } finally { vi.useRealTimers(); }
+		vi.advanceTimersByTime(PRUNE_INTERVAL_MS);
+		await cache.pruneUnreferenced(manifest);
+		expect(adapter.list).toHaveBeenCalledTimes(2);
+		expect(files.has(orphan)).toBe(false);
+	} finally { vi.useRealTimers(); }
 });

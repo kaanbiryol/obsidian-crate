@@ -201,7 +201,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 				{
 					path: 'notes/test.md',
 					content: btoa('hello'),
-          revision: managedKey,
+		  revision: managedKey,
 					hash: '',
 					size: 5,
 					contentType: 'application/octet-stream',
@@ -334,26 +334,26 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 });
 
 it('fetches batch download objects with bounded concurrency', async () => {
-    const paths = Array.from({ length: 7 }, (_, index) => `note-${index}.md`);
-    const entries = Object.fromEntries(paths.map(path => [path, 'hello']));
-    const { bucket } = createMockR2Bucket(entries);
-    const { db } = createMockD1Database({ files: Object.fromEntries(paths.map(path => [path, path])) });
-    const source = createMockR2Bucket(entries).bucket;
-    const originalGet = source.get.bind(source);
-    let active = 0;
-    let peak = 0;
-    vi.spyOn(bucket, 'get').mockImplementation(async (...args) => {
-        active++;
-        peak = Math.max(peak, active);
-        await new Promise(resolve => setTimeout(resolve, 1));
-        try { return await originalGet(...args); } finally { active--; }
-    });
-    const response = await handleBatchDownload(new Request('https://worker.test/sync/batch-download', {
-        method: 'POST', body: JSON.stringify({ paths }),
-    }), bucket, db);
-    expect(response.status).toBe(200);
-    expect(peak).toBe(3);
-    const body = await response.json() as { files: Array<{ path: string; error?: string }> };
-    expect(body.files.map(file => file.path).sort()).toEqual([...paths].sort());
-    expect(body.files.every(file => !file.error)).toBe(true);
+	const paths = Array.from({ length: 7 }, (_, index) => `note-${index}.md`);
+	const entries = Object.fromEntries(paths.map(path => [path, 'hello']));
+	const { bucket } = createMockR2Bucket(entries);
+	const { db } = createMockD1Database({ files: Object.fromEntries(paths.map(path => [path, path])) });
+	const source = createMockR2Bucket(entries).bucket;
+	const originalGet = source.get.bind(source);
+	let active = 0;
+	let peak = 0;
+	vi.spyOn(bucket, 'get').mockImplementation(async (...args) => {
+		active++;
+		peak = Math.max(peak, active);
+		await new Promise(resolve => setTimeout(resolve, 1));
+		try { return await originalGet(...args); } finally { active--; }
+	});
+	const response = await handleBatchDownload(new Request('https://worker.test/sync/batch-download', {
+		method: 'POST', body: JSON.stringify({ paths }),
+	}), bucket, db);
+	expect(response.status).toBe(200);
+	expect(peak).toBe(3);
+	const body = await response.json() as { files: Array<{ path: string; error?: string }> };
+	expect(body.files.map(file => file.path).sort()).toEqual([...paths].sort());
+	expect(body.files.every(file => !file.error)).toBe(true);
 });

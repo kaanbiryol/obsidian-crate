@@ -13,8 +13,8 @@ import type { ReminderIndex } from "../reminder-index";
 import type { ReminderMoveJournal } from '../reminder-move-journal';
 import { getReminderProjectFilePath } from '../../core/reminderProjectPath';
 import {
-  getFile,
-  getOrCreateProjectFile,
+	getFile,
+	getOrCreateProjectFile,
 } from "./helpers";
 import { createReminderInMarkdown } from "./create";
 import { deleteReminderInMarkdown } from "./delete";
@@ -22,56 +22,56 @@ import { reorderRemindersInMarkdown } from "./reorder";
 import { toggleReminderCompletionInMarkdown } from "./toggle";
 import { updateReminderInMarkdown } from "./update";
 import type {
-  MarkdownWriter,
-  MarkdownWriterContext,
+	MarkdownWriter,
+	MarkdownWriterContext,
 } from "./types";
 
 export type {
-  MarkdownWriter,
+	MarkdownWriter,
 } from "./types";
 
 export function createMarkdownWriter(
-  app: App,
-  index: ReminderIndex,
-  moveJournal?: ReminderMoveJournal,
+	app: App,
+	index: ReminderIndex,
+	moveJournal?: ReminderMoveJournal,
 ): MarkdownWriter {
-  let mutationQueue: Promise<void> = Promise.resolve();
+	let mutationQueue: Promise<void> = Promise.resolve();
 
-  const enqueueMutation = <T>(mutation: () => Promise<T>, paths: string[] | (() => string[])): Promise<T> => {
-    const guarded = () => {
-      const targets = typeof paths === 'function' ? paths() : paths;
-      moveJournal?.assertWritable(targets);
-      const issue = index.sourceIssues?.find(issue => targets.includes(issue.path));
-      if (issue) throw new Error(`Refresh reminders before editing ${issue.path}. ${issue.reason}`);
-      return mutation();
-    };
-    const result = mutationQueue.then(guarded, guarded);
-    mutationQueue = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
-  };
+	const enqueueMutation = <T>(mutation: () => Promise<T>, paths: string[] | (() => string[])): Promise<T> => {
+		const guarded = () => {
+			const targets = typeof paths === 'function' ? paths() : paths;
+			moveJournal?.assertWritable(targets);
+			const issue = index.sourceIssues?.find(issue => targets.includes(issue.path));
+			if (issue) throw new Error(`Refresh reminders before editing ${issue.path}. ${issue.reason}`);
+			return mutation();
+		};
+		const result = mutationQueue.then(guarded, guarded);
+		mutationQueue = result.then(
+			() => undefined,
+			() => undefined,
+		);
+		return result;
+	};
 
-  const context: MarkdownWriterContext = {
-    app,
-    index,
-    moveJournal,
-    getFile: (filePath: string) => getFile(app, filePath),
-    getOrCreateProjectFile: (project: string) => getOrCreateProjectFile(app, index, project),
-  };
+	const context: MarkdownWriterContext = {
+		app,
+		index,
+		moveJournal,
+		getFile: (filePath: string) => getFile(app, filePath),
+		getOrCreateProjectFile: (project: string) => getOrCreateProjectFile(app, index, project),
+	};
 
-  return {
-    createReminder: (input) =>
-      enqueueMutation(() => createReminderInMarkdown(context, input), () => [getReminderProjectFilePath(index.remindersFolderPath, input.project)]),
-    updateReminder: (reminder, updates) =>
-      enqueueMutation(() => updateReminderInMarkdown(context, reminder, updates), () => [reminder.filePath,
-        ...(updates.project ? [getReminderProjectFilePath(index.remindersFolderPath, updates.project)] : [])]),
-    deleteReminder: (reminder) =>
-      enqueueMutation(() => deleteReminderInMarkdown(context, reminder), [reminder.filePath]),
-    toggleComplete: (reminder) =>
-      enqueueMutation(() => toggleReminderCompletionInMarkdown(context, reminder), [reminder.filePath]),
-    reorderReminders: (filePath, orderedIds) =>
-      enqueueMutation(() => reorderRemindersInMarkdown(context, filePath, orderedIds), [filePath]),
-  };
+	return {
+		createReminder: (input) =>
+			enqueueMutation(() => createReminderInMarkdown(context, input), () => [getReminderProjectFilePath(index.remindersFolderPath, input.project)]),
+		updateReminder: (reminder, updates) =>
+			enqueueMutation(() => updateReminderInMarkdown(context, reminder, updates), () => [reminder.filePath,
+				...(updates.project ? [getReminderProjectFilePath(index.remindersFolderPath, updates.project)] : [])]),
+		deleteReminder: (reminder) =>
+			enqueueMutation(() => deleteReminderInMarkdown(context, reminder), [reminder.filePath]),
+		toggleComplete: (reminder) =>
+			enqueueMutation(() => toggleReminderCompletionInMarkdown(context, reminder), [reminder.filePath]),
+		reorderReminders: (filePath, orderedIds) =>
+			enqueueMutation(() => reorderRemindersInMarkdown(context, filePath, orderedIds), [filePath]),
+	};
 }

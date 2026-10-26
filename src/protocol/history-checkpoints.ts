@@ -12,39 +12,39 @@ export const MAX_ENCRYPTED_CHECKPOINT_BYTES = 48 * 1024 * 1024;
 export const isCheckpointId = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 
 export interface SharedCheckpoint {
-    id: string;
-    sequence: number;
-    timestamp: string;
-    expiresAt: number;
-    fileCount: number;
+	id: string;
+	sequence: number;
+	timestamp: string;
+	expiresAt: number;
+	fileCount: number;
 }
 export interface SharedCheckpointDocument {
-    version: 1;
-    checkpoint: SharedCheckpoint;
-    files: Record<string, FileEntry>;
+	version: 1;
+	checkpoint: SharedCheckpoint;
+	files: Record<string, FileEntry>;
 }
 
 export function parseSharedCheckpoint(value: unknown): SharedCheckpoint {
-    if (!isRecord(value) || !isCheckpointId(value.id) || !isSyncSequence(value.sequence)
-        || !isSyncDate(value.timestamp) || !isSyncSequence(value.expiresAt)
-        || !isSyncSequence(value.fileCount) || value.fileCount > MAX_CHECKPOINT_FILES
-        || value.expiresAt <= Date.parse(value.timestamp) || value.expiresAt > Date.parse(value.timestamp) + CHECKPOINT_RETENTION_MS) {
-        throw new Error('Invalid shared checkpoint metadata');
-    }
-    return { id: value.id, sequence: value.sequence, timestamp: value.timestamp, expiresAt: value.expiresAt, fileCount: value.fileCount };
+	if (!isRecord(value) || !isCheckpointId(value.id) || !isSyncSequence(value.sequence)
+		|| !isSyncDate(value.timestamp) || !isSyncSequence(value.expiresAt)
+		|| !isSyncSequence(value.fileCount) || value.fileCount > MAX_CHECKPOINT_FILES
+		|| value.expiresAt <= Date.parse(value.timestamp) || value.expiresAt > Date.parse(value.timestamp) + CHECKPOINT_RETENTION_MS) {
+		throw new Error('Invalid shared checkpoint metadata');
+	}
+	return { id: value.id, sequence: value.sequence, timestamp: value.timestamp, expiresAt: value.expiresAt, fileCount: value.fileCount };
 }
 
 export function parseSharedCheckpointList(value: unknown): SharedCheckpoint[] {
-    if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.checkpoints) || value.checkpoints.length > MAX_SHARED_CHECKPOINTS) throw new Error('Invalid shared checkpoint list');
-    const checkpoints = value.checkpoints.map(parseSharedCheckpoint);
-    if (new Set(checkpoints.map(entry => entry.id)).size !== checkpoints.length) throw new Error('Duplicate shared checkpoint');
-    return checkpoints;
+	if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.checkpoints) || value.checkpoints.length > MAX_SHARED_CHECKPOINTS) throw new Error('Invalid shared checkpoint list');
+	const checkpoints = value.checkpoints.map(parseSharedCheckpoint);
+	if (new Set(checkpoints.map(entry => entry.id)).size !== checkpoints.length) throw new Error('Duplicate shared checkpoint');
+	return checkpoints;
 }
 
 export function parseSharedCheckpointDocument(value: unknown): SharedCheckpointDocument {
-    if (!isRecord(value) || value.version !== 1) throw new Error('Unsupported shared checkpoint');
-    const checkpoint = parseSharedCheckpoint(value.checkpoint);
-    const files = parseSyncFiles(value.files);
-    if (Object.keys(files).length !== checkpoint.fileCount) throw new Error('Incomplete shared checkpoint');
-    return { version: 1, checkpoint, files };
+	if (!isRecord(value) || value.version !== 1) throw new Error('Unsupported shared checkpoint');
+	const checkpoint = parseSharedCheckpoint(value.checkpoint);
+	const files = parseSyncFiles(value.files);
+	if (Object.keys(files).length !== checkpoint.fileCount) throw new Error('Incomplete shared checkpoint');
+	return { version: 1, checkpoint, files };
 }

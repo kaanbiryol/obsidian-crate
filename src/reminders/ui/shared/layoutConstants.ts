@@ -21,12 +21,12 @@ export const PAGE_TRANSITION_DURATION = 0.18;
 
 // Position belongs to the row; the separate drag surface owns the subtle lift.
 export const REMINDER_LIST_LAYOUT_TRANSITION = {
-  type: 'spring' as const,
-  stiffness: 500,
-  damping: 44,
-  mass: 0.8,
-  restDelta: 0.5,
-  restSpeed: 10,
+	type: 'spring' as const,
+	stiffness: 500,
+	damping: 44,
+	mass: 0.8,
+	restDelta: 0.5,
+	restSpeed: 10,
 } as const;
 
 export const REMINDER_SECTION_TRANSITION = { duration: 0.2, ease: EASE_STANDARD } as const;
@@ -38,14 +38,14 @@ export const REMINDER_DRAG_SCALE = 1.02;
 export type TabId = 'inbox' | 'today' | 'upcoming' | 'browse';
 
 interface TabDefinition {
-  id: TabId;
-  label: string;
-  iconName: string;
+	id: TabId;
+	label: string;
+	iconName: string;
 }
 
 export const TABS: TabDefinition[] = [
-  { id: 'inbox', label: 'Inbox', iconName: 'inbox' },
-  { id: 'today', label: 'Today', iconName: 'calendar' },
-  { id: 'upcoming', label: 'Upcoming', iconName: 'calendar-range' },
-  { id: 'browse', label: 'Projects', iconName: 'folder-open' },
+	{ id: 'inbox', label: 'Inbox', iconName: 'inbox' },
+	{ id: 'today', label: 'Today', iconName: 'calendar' },
+	{ id: 'upcoming', label: 'Upcoming', iconName: 'calendar-range' },
+	{ id: 'browse', label: 'Projects', iconName: 'folder-open' },
 ];

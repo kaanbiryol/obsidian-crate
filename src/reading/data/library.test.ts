@@ -167,119 +167,119 @@ describe('local Reading library', () => {
 
 
 describe('local article downloads', () => {
-  const article = { markdown: 'Article text saved on this device.', title: 'An article', author: 'Writer' };
-  it('waits for a dispatched capture to settle and rejects its late write after closing', async () => {
-    const h = harness(), entered = deferred<void>(), pending = deferred<typeof article>();
-    const { item } = await h.library.add('https://example.com/article', undefined, false);
-    h.vault.captureArticle = vi.fn(() => { entered.resolve(); return pending.promise; });
-    const capture = h.library.retryCapture(item);
-    const rejected = expect(capture).rejects.toThrow('stopped');
-    await entered.promise;
-    let drained = false;
-    const closing = h.library.close().then(() => { drained = true; });
-    await expect(h.library.retryCapture(item)).rejects.toThrow('stopped');
-    expect(drained).toBe(false);
-    pending.resolve(article);
-    await Promise.all([closing, rejected]);
-    expect(drained).toBe(true);
-    expect(h.library.isCapturing(item)).toBe(false);
-    expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('unavailable');
-  });
-  it('saves before downloading, skips server capture and preserves metadata and personal notes', async () => {
-    const h = harness(), pending = deferred<typeof article>();
-    h.vault.captureArticle = vi.fn(() => pending.promise);
-    const { item } = await h.library.add('https://example.com/article');
-    expect(h.files.has(item.path)).toBe(true);
-    expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('unavailable');
-    expect(h.library.isCapturing(item)).toBe(true);
-    const finished = h.library.retryCapture(item);
-    await h.library.update(item, { favorite: true });
-    h.files.set(item.path, h.files.get(item.path)! + '\nPersonal notes.');
-    expect((await h.library.add(item.source_url)).duplicate).toBe(true);
-    pending.resolve(article); await finished;
-    expect(h.vault.captureArticle).toHaveBeenCalledTimes(1);
-    expect(parseReadingNote(h.files.get(item.path)!)).toMatchObject({ title: 'An article', author: 'Writer', favorite: true, extraction_status: 'ready' });
-    expect(h.files.get(item.path)).toContain('Article text saved on this device.');
-    expect(h.files.get(item.path)).toContain('Personal notes.');
-    expect(h.library.isCapturing(item)).toBe(false);
-  });
-  it('stops reporting a failed download once its note is deleted', async () => {
-    const h = harness(); h.vault.captureArticle = vi.fn().mockRejectedValue(new Error('Offline'));
-    const { item } = await h.library.add('https://example.com/article');
-    await expect(h.library.retryCapture(item)).rejects.toThrow('Offline');
-    await h.library.refresh();
-    expect(h.library.getSnapshot().issues).toHaveLength(1);
-    h.files.delete(item.path); h.library.invalidate(item.path);
-    await h.library.refresh();
-    expect(h.library.getSnapshot().issues).toEqual([]);
-  });
-  it('keeps failed/offline bookmarks and allows retry after restarting the library', async () => {
-    const h = harness(); h.vault.captureArticle = vi.fn().mockRejectedValue(new Error('Offline'));
-    const { item } = await h.library.add('https://example.com/article');
-    await expect(h.library.retryCapture(item)).rejects.toThrow('Offline');
-    await h.library.refresh();
-    expect(h.library.getSnapshot().issues[0]?.message).toContain('Link saved. Offline');
-    expect(h.files.size).toBe(1);
-    const resumed = new ReadingLibrary(h.vault, 'Reading', h.controller.signal);
-    h.vault.captureArticle = vi.fn().mockResolvedValue(article);
-    await resumed.retryCapture(item);
-    expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('ready');
-  });
-  it('renames a note still named after its link once the title downloads, keeping user renames', async () => {
-    const h = harness();
-    const rename = vi.fn(async (file: ReadingFile, path: string) => { h.files.set(path, h.files.get(file.path)!); h.files.delete(file.path); });
-    h.vault.rename = rename;
-    h.vault.captureArticle = vi.fn().mockResolvedValue(article);
-    const { item } = await h.library.add('https://www.example.com/article', undefined, false);
-    expect(item.path).toMatch(/^Reading\/example\.com - [0-9a-f]{8}\.md$/);
-    const saved = await h.library.retryCapture(item);
-    expect(saved.path).toBe(`Reading/An article - example.com - ${item.crate_reading_id.slice(0, 8)}.md`);
-    expect([...h.files.keys()]).toEqual([saved.path]);
-    expect(parseReadingNote(h.files.get(saved.path)!)).toMatchObject({ title: 'An article', extraction_status: 'ready' });
-    const chosen = await h.library.add('https://example.com/chosen', undefined, false);
-    h.files.set('Reading/My pick.md', h.files.get(chosen.item.path)!); h.files.delete(chosen.item.path); await h.library.refresh();
-    expect((await h.library.retryCapture({ ...chosen.item, path: 'Reading/My pick.md' })).path).toBe('Reading/My pick.md');
-    expect(rename).toHaveBeenCalledTimes(1);
-  });
-  it.each(['edited', 'deleted', 'replaced', 'duplicate', 'stopped'])('does not overwrite a %s note after a download', async state => {
-    const h = harness(), pending = deferred<typeof article>();
-    h.vault.captureArticle = vi.fn(() => pending.promise);
-    const { item } = await h.library.add('https://example.com/article');
-    const finished = h.library.retryCapture(item);
-    await vi.waitFor(() => expect(h.vault.captureArticle).toHaveBeenCalled());
-    if (state === 'edited') h.files.set(item.path, h.files.get(item.path)!.replace('<!-- crate:article:end -->', 'My own text.\n<!-- crate:article:end -->'));
-    if (state === 'deleted') h.files.delete(item.path);
-    if (state === 'replaced') h.files.set(item.path, createReadingNote({ id: crypto.randomUUID(), url: 'https://other.example.com', savedAt: item.saved_at }));
-    if (state === 'duplicate') h.files.set('Reading/Copy.md', h.files.get(item.path)!);
-    if (state === 'stopped') h.controller.abort();
-    const before = [...h.files];
-    pending.resolve(article);
-    await expect(finished).rejects.toThrow();
-    expect([...h.files]).toEqual(before);
-  });
+	const article = { markdown: 'Article text saved on this device.', title: 'An article', author: 'Writer' };
+	it('waits for a dispatched capture to settle and rejects its late write after closing', async () => {
+		const h = harness(), entered = deferred<void>(), pending = deferred<typeof article>();
+		const { item } = await h.library.add('https://example.com/article', undefined, false);
+		h.vault.captureArticle = vi.fn(() => { entered.resolve(); return pending.promise; });
+		const capture = h.library.retryCapture(item);
+		const rejected = expect(capture).rejects.toThrow('stopped');
+		await entered.promise;
+		let drained = false;
+		const closing = h.library.close().then(() => { drained = true; });
+		await expect(h.library.retryCapture(item)).rejects.toThrow('stopped');
+		expect(drained).toBe(false);
+		pending.resolve(article);
+		await Promise.all([closing, rejected]);
+		expect(drained).toBe(true);
+		expect(h.library.isCapturing(item)).toBe(false);
+		expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('unavailable');
+	});
+	it('saves before downloading, skips server capture and preserves metadata and personal notes', async () => {
+		const h = harness(), pending = deferred<typeof article>();
+		h.vault.captureArticle = vi.fn(() => pending.promise);
+		const { item } = await h.library.add('https://example.com/article');
+		expect(h.files.has(item.path)).toBe(true);
+		expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('unavailable');
+		expect(h.library.isCapturing(item)).toBe(true);
+		const finished = h.library.retryCapture(item);
+		await h.library.update(item, { favorite: true });
+		h.files.set(item.path, h.files.get(item.path)! + '\nPersonal notes.');
+		expect((await h.library.add(item.source_url)).duplicate).toBe(true);
+		pending.resolve(article); await finished;
+		expect(h.vault.captureArticle).toHaveBeenCalledTimes(1);
+		expect(parseReadingNote(h.files.get(item.path)!)).toMatchObject({ title: 'An article', author: 'Writer', favorite: true, extraction_status: 'ready' });
+		expect(h.files.get(item.path)).toContain('Article text saved on this device.');
+		expect(h.files.get(item.path)).toContain('Personal notes.');
+		expect(h.library.isCapturing(item)).toBe(false);
+	});
+	it('stops reporting a failed download once its note is deleted', async () => {
+		const h = harness(); h.vault.captureArticle = vi.fn().mockRejectedValue(new Error('Offline'));
+		const { item } = await h.library.add('https://example.com/article');
+		await expect(h.library.retryCapture(item)).rejects.toThrow('Offline');
+		await h.library.refresh();
+		expect(h.library.getSnapshot().issues).toHaveLength(1);
+		h.files.delete(item.path); h.library.invalidate(item.path);
+		await h.library.refresh();
+		expect(h.library.getSnapshot().issues).toEqual([]);
+	});
+	it('keeps failed/offline bookmarks and allows retry after restarting the library', async () => {
+		const h = harness(); h.vault.captureArticle = vi.fn().mockRejectedValue(new Error('Offline'));
+		const { item } = await h.library.add('https://example.com/article');
+		await expect(h.library.retryCapture(item)).rejects.toThrow('Offline');
+		await h.library.refresh();
+		expect(h.library.getSnapshot().issues[0]?.message).toContain('Link saved. Offline');
+		expect(h.files.size).toBe(1);
+		const resumed = new ReadingLibrary(h.vault, 'Reading', h.controller.signal);
+		h.vault.captureArticle = vi.fn().mockResolvedValue(article);
+		await resumed.retryCapture(item);
+		expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('ready');
+	});
+	it('renames a note still named after its link once the title downloads, keeping user renames', async () => {
+		const h = harness();
+		const rename = vi.fn(async (file: ReadingFile, path: string) => { h.files.set(path, h.files.get(file.path)!); h.files.delete(file.path); });
+		h.vault.rename = rename;
+		h.vault.captureArticle = vi.fn().mockResolvedValue(article);
+		const { item } = await h.library.add('https://www.example.com/article', undefined, false);
+		expect(item.path).toMatch(/^Reading\/example\.com - [0-9a-f]{8}\.md$/);
+		const saved = await h.library.retryCapture(item);
+		expect(saved.path).toBe(`Reading/An article - example.com - ${item.crate_reading_id.slice(0, 8)}.md`);
+		expect([...h.files.keys()]).toEqual([saved.path]);
+		expect(parseReadingNote(h.files.get(saved.path)!)).toMatchObject({ title: 'An article', extraction_status: 'ready' });
+		const chosen = await h.library.add('https://example.com/chosen', undefined, false);
+		h.files.set('Reading/My pick.md', h.files.get(chosen.item.path)!); h.files.delete(chosen.item.path); await h.library.refresh();
+		expect((await h.library.retryCapture({ ...chosen.item, path: 'Reading/My pick.md' })).path).toBe('Reading/My pick.md');
+		expect(rename).toHaveBeenCalledTimes(1);
+	});
+	it.each(['edited', 'deleted', 'replaced', 'duplicate', 'stopped'])('does not overwrite a %s note after a download', async state => {
+		const h = harness(), pending = deferred<typeof article>();
+		h.vault.captureArticle = vi.fn(() => pending.promise);
+		const { item } = await h.library.add('https://example.com/article');
+		const finished = h.library.retryCapture(item);
+		await vi.waitFor(() => expect(h.vault.captureArticle).toHaveBeenCalled());
+		if (state === 'edited') h.files.set(item.path, h.files.get(item.path)!.replace('<!-- crate:article:end -->', 'My own text.\n<!-- crate:article:end -->'));
+		if (state === 'deleted') h.files.delete(item.path);
+		if (state === 'replaced') h.files.set(item.path, createReadingNote({ id: crypto.randomUUID(), url: 'https://other.example.com', savedAt: item.saved_at }));
+		if (state === 'duplicate') h.files.set('Reading/Copy.md', h.files.get(item.path)!);
+		if (state === 'stopped') h.controller.abort();
+		const before = [...h.files];
+		pending.resolve(article);
+		await expect(finished).rejects.toThrow();
+		expect([...h.files]).toEqual(before);
+	});
 });
 
 function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>(accept => { resolve = accept; });
-  return { promise, resolve };
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>(accept => { resolve = accept; });
+	return { promise, resolve };
 }
 
 it('reuses a clipped video for equivalent URL saves and safely enriches a bookmark clipped later', async () => {
-  const h = harness();
-  h.files.set('Reading/Clipped video.md', '---\ntitle: Clipped video\nsource: https://www.youtube.com/watch?v=jNQXAC9IVRw\n---\n**0:42** · A useful passage.\n');
-  const first = await h.library.add('https://youtu.be/jNQXAC9IVRw?t=99', undefined, false);
-  expect(first.duplicate).toBe(true);
-  expect(h.files.size).toBe(1);
-  const other = harness();
-  const bookmark = (await other.library.add('https://youtu.be/jNQXAC9IVRw', undefined, false)).item;
-  other.files.set('Reading/Clipped video.md', h.files.get('Reading/Clipped video.md')!);
-  await other.library.refresh();
-  const clip = other.library.getSnapshot().items.find(item => item.capture_method === 'web-clipper')!;
-  await other.library.enrich(bookmark, clip);
-  expect(other.files.size).toBe(2);
-  expect((await other.library.read(bookmark)).markdown).toContain('**0:42**');
-  await expect(other.library.enrich(bookmark, clip)).rejects.toThrow('empty bookmark');
+	const h = harness();
+	h.files.set('Reading/Clipped video.md', '---\ntitle: Clipped video\nsource: https://www.youtube.com/watch?v=jNQXAC9IVRw\n---\n**0:42** · A useful passage.\n');
+	const first = await h.library.add('https://youtu.be/jNQXAC9IVRw?t=99', undefined, false);
+	expect(first.duplicate).toBe(true);
+	expect(h.files.size).toBe(1);
+	const other = harness();
+	const bookmark = (await other.library.add('https://youtu.be/jNQXAC9IVRw', undefined, false)).item;
+	other.files.set('Reading/Clipped video.md', h.files.get('Reading/Clipped video.md')!);
+	await other.library.refresh();
+	const clip = other.library.getSnapshot().items.find(item => item.capture_method === 'web-clipper')!;
+	await other.library.enrich(bookmark, clip);
+	expect(other.files.size).toBe(2);
+	expect((await other.library.read(bookmark)).markdown).toContain('**0:42**');
+	await expect(other.library.enrich(bookmark, clip)).rejects.toThrow('empty bookmark');
 });
 
 it('does not republish an unchanged library after a rescan', async () => {

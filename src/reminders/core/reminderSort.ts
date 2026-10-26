@@ -15,35 +15,35 @@ import { formatLocalDateKey, isDateOnlyString, isReminderDueToday, isReminderOve
  * This ensures consistent sorting in the plugin.
  */
 export function sortReminders(reminders: Reminder[]): Reminder[] {
-  // Parse each due date once rather than in every comparison.
-  const times = new Map<Reminder, number | null>();
-  for (const reminder of reminders) {
-    const date = reminder.dueDatetime || reminder.dueDate;
-    times.set(reminder, date ? parseReminderDateValue(date, !isDateOnlyString(date))?.getTime() ?? 0 : null);
-  }
-  return [...reminders].sort((a, b) => {
-    // 1. Sort by completion status (incomplete first)
-    if (a.completed !== b.completed) {
-      return a.completed ? 1 : -1;
-    }
+	// Parse each due date once rather than in every comparison.
+	const times = new Map<Reminder, number | null>();
+	for (const reminder of reminders) {
+		const date = reminder.dueDatetime || reminder.dueDate;
+		times.set(reminder, date ? parseReminderDateValue(date, !isDateOnlyString(date))?.getTime() ?? 0 : null);
+	}
+	return [...reminders].sort((a, b) => {
+		// 1. Sort by completion status (incomplete first)
+		if (a.completed !== b.completed) {
+			return a.completed ? 1 : -1;
+		}
 
-    // 2. Sort by due date (earliest first, no date goes last)
-    const timeA = times.get(a)!;
-    const timeB = times.get(b)!;
+		// 2. Sort by due date (earliest first, no date goes last)
+		const timeA = times.get(a)!;
+		const timeB = times.get(b)!;
 
-    // If only one has a date, prioritize the one with a date
-    if (timeA !== null && timeB === null) return -1;
-    if (timeA === null && timeB !== null) return 1;
+		// If only one has a date, prioritize the one with a date
+		if (timeA !== null && timeB === null) return -1;
+		if (timeA === null && timeB !== null) return 1;
 
-    // If both have dates, compare them
-    if (timeA !== null && timeB !== null) {
-      const dateDiff = timeA - timeB;
-      if (dateDiff !== 0) return dateDiff;
-    }
+		// If both have dates, compare them
+		if (timeA !== null && timeB !== null) {
+			const dateDiff = timeA - timeB;
+			if (dateDiff !== 0) return dateDiff;
+		}
 
-    // 3. Sort by priority (1 is highest, 4 is lowest)
-    return a.priority - b.priority;
-  });
+		// 3. Sort by priority (1 is highest, 4 is lowest)
+		return a.priority - b.priority;
+	});
 }
 
 /**
@@ -51,49 +51,49 @@ export function sortReminders(reminders: Reminder[]): Reminder[] {
  * Incomplete reminders first, then by line number ascending.
  */
 export function sortRemindersByFileOrder(reminders: Reminder[]): Reminder[] {
-  return [...reminders].sort((a, b) => {
-    if (a.completed !== b.completed) {
-      return a.completed ? 1 : -1;
-    }
-    return (a.lineNumber ?? Infinity) - (b.lineNumber ?? Infinity);
-  });
+	return [...reminders].sort((a, b) => {
+		if (a.completed !== b.completed) {
+			return a.completed ? 1 : -1;
+		}
+		return (a.lineNumber ?? Infinity) - (b.lineNumber ?? Infinity);
+	});
 }
 
 /** Today's list: overdue reminders plus those due today, completed ones only when requested. Each id appears once. */
 export function selectTodayReminders<T extends Pick<Reminder, 'id' | 'completed' | 'dueDate' | 'dueDatetime'>>(reminders: T[], now: Date, includeCompleted: boolean): T[] {
-  const selected = new Map<string, T>();
-  for (const reminder of reminders) {
-    if (isReminderOverdue(reminder, now) || (isReminderDueToday(reminder, now) && (includeCompleted || !reminder.completed))) selected.set(reminder.id, reminder);
-  }
-  return [...selected.values()];
+	const selected = new Map<string, T>();
+	for (const reminder of reminders) {
+		if (isReminderOverdue(reminder, now) || (isReminderDueToday(reminder, now) && (includeCompleted || !reminder.completed))) selected.set(reminder.id, reminder);
+	}
+	return [...selected.values()];
 }
 
 /**
  * Get upcoming reminders (next N days)
  */
 export function getUpcomingReminders<T extends Reminder>(reminders: T[], days: number = 7, now = new Date(), includeCompleted = false): T[] {
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startDate = new Date(todayStart);
-  startDate.setDate(startDate.getDate() + 1);
-  const endDate = new Date(todayStart);
-  endDate.setDate(endDate.getDate() + days + 1);
+	const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+	const startDate = new Date(todayStart);
+	startDate.setDate(startDate.getDate() + 1);
+	const endDate = new Date(todayStart);
+	endDate.setDate(endDate.getDate() + days + 1);
 
-  return reminders.filter(r => {
-    if (r.completed && !includeCompleted) return false;
-    if (r.dueDatetime) {
-      const dueDate = new Date(r.dueDatetime);
-      return dueDate > now && dueDate < endDate;
-    }
-    const dueDate = parseReminderDateValue(r.dueDate, false);
-    return !!dueDate && dueDate >= startDate && dueDate < endDate;
-  });
+	return reminders.filter(r => {
+		if (r.completed && !includeCompleted) return false;
+		if (r.dueDatetime) {
+			const dueDate = new Date(r.dueDatetime);
+			return dueDate > now && dueDate < endDate;
+		}
+		const dueDate = parseReminderDateValue(r.dueDate, false);
+		return !!dueDate && dueDate >= startDate && dueDate < endDate;
+	});
 }
 
 /**
  * Get the due date from a reminder
  */
 function getReminderDueDate(reminder: Reminder): string | undefined {
-  return reminder.dueDatetime || reminder.dueDate;
+	return reminder.dueDatetime || reminder.dueDate;
 }
 
 /**
@@ -101,25 +101,25 @@ function getReminderDueDate(reminder: Reminder): string | undefined {
  * Returns array of { date, reminders } objects sorted by date
  */
 export function groupRemindersByDate(reminders: Reminder[]): Array<{ date: Date; reminders: Reminder[] }> {
-  const grouped: Record<string, { date: Date; reminders: Reminder[] }> = {};
+	const grouped: Record<string, { date: Date; reminders: Reminder[] }> = {};
 
-  for (const reminder of reminders) {
-    const dueDateStr = getReminderDueDate(reminder);
-    if (!dueDateStr) continue;
+	for (const reminder of reminders) {
+		const dueDateStr = getReminderDueDate(reminder);
+		if (!dueDateStr) continue;
 
-    const dueDate = parseReminderDateValue(dueDateStr, !isDateOnlyString(dueDateStr));
-    if (!dueDate) continue;
-    const startOfDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-    const dateKey = formatLocalDateKey(startOfDay);
+		const dueDate = parseReminderDateValue(dueDateStr, !isDateOnlyString(dueDateStr));
+		if (!dueDate) continue;
+		const startOfDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+		const dateKey = formatLocalDateKey(startOfDay);
 
-    if (!grouped[dateKey]) {
-      grouped[dateKey] = {
-        date: startOfDay,
-        reminders: [],
-      };
-    }
-    grouped[dateKey].reminders.push(reminder);
-  }
+		if (!grouped[dateKey]) {
+			grouped[dateKey] = {
+				date: startOfDay,
+				reminders: [],
+			};
+		}
+		grouped[dateKey].reminders.push(reminder);
+	}
 
-  return Object.values(grouped).sort((a, b) => a.date.getTime() - b.date.getTime());
+	return Object.values(grouped).sort((a, b) => a.date.getTime() - b.date.getTime());
 }

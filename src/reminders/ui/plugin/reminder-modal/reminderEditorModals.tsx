@@ -14,114 +14,114 @@ import { hideNativeModalCloseButton } from "../../../../ui/plugin/shared-modal";
 const log = createLogger("ReminderEditModal");
 
 abstract class BaseReminderModal extends BaseUiModal {
-  protected readonly plugin: CratePlugin;
-  private unsubscribeSettings?: () => void;
-  private root: Root | undefined;
+	protected readonly plugin: CratePlugin;
+	private unsubscribeSettings?: () => void;
+	private root: Root | undefined;
 
-  constructor(plugin: CratePlugin) {
-    super(plugin.app);
-    this.plugin = plugin;
-  }
+	constructor(plugin: CratePlugin) {
+		super(plugin.app);
+		this.plugin = plugin;
+	}
 
-  protected abstract renderContent(): ReactElement;
+	protected abstract renderContent(): ReactElement;
 
-  onOpen(): void {
-    if (!this.plugin.remindersSettings.enabled) { this.close(); return; }
-    this.unsubscribeSettings = useRemindersSettingsStore.subscribe(state => { if (!state.enabled) this.close(); });
-    const { contentEl } = this;
-    const isMobile = Platform.isMobile;
+	onOpen(): void {
+		if (!this.plugin.remindersSettings.enabled) { this.close(); return; }
+		this.unsubscribeSettings = useRemindersSettingsStore.subscribe(state => { if (!state.enabled) this.close(); });
+		const { contentEl } = this;
+		const isMobile = Platform.isMobile;
 
-    this.modalEl.addClass("crate-reminder-editor-modal");
-    this.modalEl.toggleClass("is-mobile", isMobile);
-    hideNativeModalCloseButton(this.modalEl);
+		this.modalEl.addClass("crate-reminder-editor-modal");
+		this.modalEl.toggleClass("is-mobile", isMobile);
+		hideNativeModalCloseButton(this.modalEl);
 
-    contentEl.addClasses(["crate-reminder-editor-modal__content", "crate-reminders-ui"]);
+		contentEl.addClasses(["crate-reminder-editor-modal__content", "crate-reminders-ui"]);
 
-    const isDarkMode = document.body.classList.contains("theme-dark");
-    const close = () => this.close();
+		const isDarkMode = document.body.classList.contains("theme-dark");
+		const close = () => this.close();
 
-    this.root = createRoot(contentEl);
-    this.root.render(
-      <PluginRoot plugin={this.plugin}>
-        <div className={isDarkMode ? "dark" : "light"}>
-          <ModalContext.Provider value={{ close, isMobile }}>
-            {this.renderContent()}
-          </ModalContext.Provider>
-        </div>
-      </PluginRoot>,
-    );
-  }
+		this.root = createRoot(contentEl);
+		this.root.render(
+			<PluginRoot plugin={this.plugin}>
+				<div className={isDarkMode ? "dark" : "light"}>
+					<ModalContext.Provider value={{ close, isMobile }}>
+						{this.renderContent()}
+					</ModalContext.Provider>
+				</div>
+			</PluginRoot>,
+		);
+	}
 
-  onClose(): void {
-    this.unsubscribeSettings?.();
-    this.unsubscribeSettings = undefined;
-    this.root?.unmount();
-    this.contentEl.removeClasses(["crate-reminder-editor-modal__content", "crate-reminders-ui"]);
-  }
+	onClose(): void {
+		this.unsubscribeSettings?.();
+		this.unsubscribeSettings = undefined;
+		this.root?.unmount();
+		this.contentEl.removeClasses(["crate-reminder-editor-modal__content", "crate-reminders-ui"]);
+	}
 }
 
 class ReminderCreationModal extends BaseReminderModal {
-  private readonly initialProject: string | undefined;
-  private readonly onCreate: ((reminder: Reminder | null) => void) | undefined;
+	private readonly initialProject: string | undefined;
+	private readonly onCreate: ((reminder: Reminder | null) => void) | undefined;
 
-  constructor(
-    plugin: CratePlugin,
-    initialProject: string | undefined,
-    onCreate?: (reminder: Reminder | null) => void,
-  ) {
-    super(plugin);
-    this.initialProject = initialProject;
-    this.onCreate = onCreate;
-  }
+	constructor(
+		plugin: CratePlugin,
+		initialProject: string | undefined,
+		onCreate?: (reminder: Reminder | null) => void,
+	) {
+		super(plugin);
+		this.initialProject = initialProject;
+		this.onCreate = onCreate;
+	}
 
-  protected renderContent(): ReactElement {
-    return <ReminderModal initialProject={this.initialProject} onSave={this.onCreate} />;
-  }
+	protected renderContent(): ReactElement {
+		return <ReminderModal initialProject={this.initialProject} onSave={this.onCreate} />;
+	}
 }
 
 class ReminderEditModal extends BaseReminderModal {
-  private readonly reminder: Reminder;
-  private readonly onUpdate: (action: "saved" | "deleted", reminder?: Reminder) => void;
+	private readonly reminder: Reminder;
+	private readonly onUpdate: (action: "saved" | "deleted", reminder?: Reminder) => void;
 
-  constructor(
-    plugin: CratePlugin,
-    reminder: Reminder,
-    onUpdate: (action: "saved" | "deleted", reminder?: Reminder) => void,
-  ) {
-    super(plugin);
-    this.reminder = reminder;
-    this.onUpdate = onUpdate;
-  }
+	constructor(
+		plugin: CratePlugin,
+		reminder: Reminder,
+		onUpdate: (action: "saved" | "deleted", reminder?: Reminder) => void,
+	) {
+		super(plugin);
+		this.reminder = reminder;
+		this.onUpdate = onUpdate;
+	}
 
-  protected renderContent(): ReactElement {
-    return (
-      <ReminderModal
-        reminder={this.reminder}
-        onSave={(updatedReminder: Reminder | null) => {
-          log.info(" onSave called:", updatedReminder?.id);
-          this.onUpdate("saved", updatedReminder ?? undefined);
-        }}
-        onDelete={() => {
-          log.info(" onDelete called for reminder:", this.reminder.id);
-          this.onUpdate("deleted");
-        }}
-      />
-    );
-  }
+	protected renderContent(): ReactElement {
+		return (
+			<ReminderModal
+				reminder={this.reminder}
+				onSave={(updatedReminder: Reminder | null) => {
+					log.info(" onSave called:", updatedReminder?.id);
+					this.onUpdate("saved", updatedReminder ?? undefined);
+				}}
+				onDelete={() => {
+					log.info(" onDelete called for reminder:", this.reminder.id);
+					this.onUpdate("deleted");
+				}}
+			/>
+		);
+	}
 }
 
 export function openReminderCreationModal(
-  plugin: CratePlugin,
-  initialProject?: string,
-  onCreate?: (reminder: Reminder | null) => void,
+	plugin: CratePlugin,
+	initialProject?: string,
+	onCreate?: (reminder: Reminder | null) => void,
 ): void {
-  new ReminderCreationModal(plugin, initialProject, onCreate).open();
+	new ReminderCreationModal(plugin, initialProject, onCreate).open();
 }
 
 export function openReminderEditModal(
-  plugin: CratePlugin,
-  reminder: Reminder,
-  onUpdate: (action: "saved" | "deleted", reminder?: Reminder) => void,
+	plugin: CratePlugin,
+	reminder: Reminder,
+	onUpdate: (action: "saved" | "deleted", reminder?: Reminder) => void,
 ): void {
-  new ReminderEditModal(plugin, reminder, onUpdate).open();
+	new ReminderEditModal(plugin, reminder, onUpdate).open();
 }

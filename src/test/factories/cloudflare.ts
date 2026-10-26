@@ -217,7 +217,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 						const results = statement._args.flatMap((value) => {
 							if (typeof value !== 'string') return [];
 							const entry = [...files.entries()].find(([path]) => portablePathKey(path) === value);
-              const file = entry?.[1];
+							const file = entry?.[1];
 							return file ? [{
 								path: entry[0],
 								hash: file.hash,

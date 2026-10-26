@@ -32,7 +32,7 @@ const artifacts = {
 };
 
 function createApi() {
-  let initialized = false;
+	let initialized = false;
 	const fence = createFenceQueryHarness();
 	const metadata = createMetadata();
 	return {
@@ -46,7 +46,7 @@ function createApi() {
 		createR2Bucket: vi.fn(),
 		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? (sql === artifacts.d1Schema ? (initialized = true, []) : sql.includes('sqlite_master') && initialized ? [{ results: [{ name: 'crate_schema' }] }] : sql.startsWith('SELECT version') ? [{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion }] }] : [])),
 		uploadWorker: vi.fn(async (_input: Parameters<CloudflareApiClient['uploadWorker']>[0]) => {}),
-    verifyWorkerDeployment: vi.fn(async () => {}),
+		verifyWorkerDeployment: vi.fn(async () => {}),
 		updateWorkerSchedules: vi.fn(async () => {}),
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
 		createWorkersSubdomain: vi.fn(),
@@ -176,26 +176,26 @@ describe('provisionCloudflareDeployment', () => {
 	});
 
 
-  it('rejects a retired development schema baseline before upload', async () => {
-    const api = createApi();
-    api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
-    api.queryD1.mockResolvedValueOnce([{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: 0 }] }]);
-    const metadata = createMetadata();
-    await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
-      .rejects.toThrow('Unsupported database schema baseline');
-    expect(api.uploadWorker).not.toHaveBeenCalled();
-  });
+	it('rejects a retired development schema baseline before upload', async () => {
+		const api = createApi();
+		api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
+		api.queryD1.mockResolvedValueOnce([{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: 0 }] }]);
+		const metadata = createMetadata();
+		await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
+			.rejects.toThrow('Unsupported database schema baseline');
+		expect(api.uploadWorker).not.toHaveBeenCalled();
+	});
 
-  it('updates a current database without reapplying the fresh schema', async () => {
-    const api = createApi();
-    const query = api.queryD1.getMockImplementation()!;
-    api.queryD1.mockImplementation((account, database, sql, params) => sql.includes('sqlite_master')
-      ? Promise.resolve([{ results: [{ name: 'crate_schema' }] }]) : query(account, database, sql, params));
-    const metadata = createMetadata();
-    await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
-    expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
-    expect(api.verifyWorkerDeployment).toHaveBeenCalledWith('https://crate-0123456789abcdef.personal-crate.workers.dev', artifacts.fingerprint);
-  });
+	it('updates a current database without reapplying the fresh schema', async () => {
+		const api = createApi();
+		const query = api.queryD1.getMockImplementation()!;
+		api.queryD1.mockImplementation((account, database, sql, params) => sql.includes('sqlite_master')
+			? Promise.resolve([{ results: [{ name: 'crate_schema' }] }]) : query(account, database, sql, params));
+		const metadata = createMetadata();
+		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+		expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
+		expect(api.verifyWorkerDeployment).toHaveBeenCalledWith('https://crate-0123456789abcdef.personal-crate.workers.dev', artifacts.fingerprint);
+	});
 
 	it('explains how to activate R2 when the account is not entitled', async () => {
 		const api = createApi();
@@ -223,24 +223,24 @@ describe('provisionCloudflareDeployment', () => {
 });
 
 it('resumes and verifies after Cloudflare publishes an upload but its response is lost', async () => {
-    const api = createApi();
-    const metadata = createMetadata();
-    const input = { api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} };
-    api.uploadWorker.mockImplementationOnce(async upload => {
-        const held = await api.queryD1(input.accountId, metadata.d1DatabaseId!, 'SELECT value FROM maintenance_state WHERE key = ?;', ['crate_deployment_fence']);
-        expect(JSON.parse(String(held[0]!.results![0]!.value))).toMatchObject({ step: 'upload-worker', stepState: 'started', uploadTag: upload.uploadTag });
-        const settings = await api.getWorkerSettings();
-        api.getWorkerSettings.mockResolvedValue({ ...settings, annotations: { ...settings.annotations, 'workers/tag': upload.uploadTag } });
-        throw new Error('Lost upload response');
-    });
-    await expect(provisionCloudflareDeployment(input)).rejects.toThrow('Lost upload response');
-    expect(api.uploadWorker).toHaveBeenCalledTimes(1);
-    const recovery = await recoverDeployment(api, metadata, artifacts.fingerprint);
-    expect(recovery.status).toBe('resume');
-    await provisionCloudflareDeployment({ ...input, resumeUpdateValue: recovery.resumeValue });
-    expect(api.verifyWorkerDeployment).toHaveBeenCalledOnce();
-    expect(metadata.lastDeployedFingerprint).toBe(artifacts.fingerprint);
-    const calls = api.uploadWorker.mock.calls;
-    expect(calls[0]![0].uploadTag).not.toBe(calls[1]![0].uploadTag);
-    expect((await recoverDeployment(api as never, metadata, artifacts.fingerprint)).status).toBe('ready');
+		const api = createApi();
+		const metadata = createMetadata();
+		const input = { api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} };
+		api.uploadWorker.mockImplementationOnce(async upload => {
+				const held = await api.queryD1(input.accountId, metadata.d1DatabaseId!, 'SELECT value FROM maintenance_state WHERE key = ?;', ['crate_deployment_fence']);
+				expect(JSON.parse(String(held[0]!.results![0]!.value))).toMatchObject({ step: 'upload-worker', stepState: 'started', uploadTag: upload.uploadTag });
+				const settings = await api.getWorkerSettings();
+				api.getWorkerSettings.mockResolvedValue({ ...settings, annotations: { ...settings.annotations, 'workers/tag': upload.uploadTag } });
+				throw new Error('Lost upload response');
+		});
+		await expect(provisionCloudflareDeployment(input)).rejects.toThrow('Lost upload response');
+		expect(api.uploadWorker).toHaveBeenCalledTimes(1);
+		const recovery = await recoverDeployment(api, metadata, artifacts.fingerprint);
+		expect(recovery.status).toBe('resume');
+		await provisionCloudflareDeployment({ ...input, resumeUpdateValue: recovery.resumeValue });
+		expect(api.verifyWorkerDeployment).toHaveBeenCalledOnce();
+		expect(metadata.lastDeployedFingerprint).toBe(artifacts.fingerprint);
+		const calls = api.uploadWorker.mock.calls;
+		expect(calls[0]![0].uploadTag).not.toBe(calls[1]![0].uploadTag);
+		expect((await recoverDeployment(api as never, metadata, artifacts.fingerprint)).status).toBe('ready');
 });

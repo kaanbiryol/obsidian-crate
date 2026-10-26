@@ -4,33 +4,33 @@ import { timezone as getLocalTimeZone } from '../dates/time';
 import { canonicalReminderTimezone } from '../dates/reminderTimezone';
 
 export function getRecurrenceTimeZone(rule: RecurrenceRule | undefined): string {
-  return rule?.timezone || getLocalTimeZone();
+	return rule?.timezone || getLocalTimeZone();
 }
 
 export function normalizeRecurrenceRule(rule: RecurrenceRule): RecurrenceRule;
 export function normalizeRecurrenceRule(rule: null | undefined): undefined;
 export function normalizeRecurrenceRule(
-  rule: RecurrenceRule | null | undefined,
+	rule: RecurrenceRule | null | undefined,
 ): RecurrenceRule | undefined;
 export function normalizeRecurrenceRule(
-  rule: RecurrenceRule | null | undefined,
+	rule: RecurrenceRule | null | undefined,
 ): RecurrenceRule | undefined {
-  if (!rule) {
-    return undefined;
-  }
+	if (!rule) {
+		return undefined;
+	}
 
-  if (rule.timezone) {
-    return rule;
-  }
+	if (rule.timezone) {
+		return rule;
+	}
 
-  return {
-    ...rule,
-    timezone: getRecurrenceTimeZone(rule),
-  };
+	return {
+		...rule,
+		timezone: getRecurrenceTimeZone(rule),
+	};
 }
 
 /** NLP describes visible recurrence fields; keep non-visible metadata on title edits. */
 export function preserveRecurrenceMetadata(parsed: RecurrenceRule | undefined, previous: RecurrenceRule | undefined): RecurrenceRule | undefined {
-  return parsed && previous && recurrenceToText(parsed) === recurrenceToText(previous)
-    && canonicalReminderTimezone(getRecurrenceTimeZone(parsed)) === canonicalReminderTimezone(getRecurrenceTimeZone(previous)) ? previous : parsed;
+	return parsed && previous && recurrenceToText(parsed) === recurrenceToText(previous)
+		&& canonicalReminderTimezone(getRecurrenceTimeZone(parsed)) === canonicalReminderTimezone(getRecurrenceTimeZone(previous)) ? previous : parsed;
 }
