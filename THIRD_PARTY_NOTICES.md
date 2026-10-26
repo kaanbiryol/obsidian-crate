@@ -54,7 +54,7 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | domutils | 4.0.2 | BSD-2-Clause |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
 | entities | 8.1.0 | BSD-2-Clause |
-| framer-motion | 14.5.0 | MIT |
+| framer-motion | 14.6.0 | MIT |
 | highlight.js | 11.12.0 | BSD-3-Clause |
 | html-escaper | 3.0.3 | MIT |
 | htmlparser2 | 12.0.0 | MIT |
@@ -72,9 +72,9 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | mathml-to-latex | 1.8.0 | MIT |
 | minimalistic-assert | 1.0.1 | ISC |
 | minimist | 1.2.8 | MIT |
-| motion | 14.5.0 | MIT |
-| motion-dom | 14.5.0 | MIT |
-| motion-utils | 14.1.1 | MIT |
+| motion | 14.6.0 | MIT |
+| motion-dom | 14.6.0 | MIT |
+| motion-utils | 14.6.0 | MIT |
 | ms | 2.1.3 | MIT |
 | nth-check | 3.0.1 | BSD-2-Clause |
 | qrcode-generator | 2.0.4 | MIT |
@@ -2217,7 +2217,7 @@ THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRE
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## framer-motion@14.5.0
+## framer-motion@14.6.0
 
 Declared license: MIT
 
@@ -2760,7 +2760,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## motion@14.5.0
+## motion@14.6.0
 
 Declared license: MIT
 
@@ -2790,7 +2790,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## motion-dom@14.5.0
+## motion-dom@14.6.0
 
 Declared license: MIT
 
@@ -2820,7 +2820,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## motion-utils@14.1.1
+## motion-utils@14.6.0
 
 Declared license: MIT
 
