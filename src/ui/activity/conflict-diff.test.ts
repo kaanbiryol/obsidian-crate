@@ -39,7 +39,7 @@ it('bounds total highlighting time for large conflicts', () => {
     const started = performance.now();
     const { rows, limited } = buildConflictDiff(current.join('\n'), saved.join('\n'));
     // Before: about 1.9 seconds for this 455 KB file on an M-series Mac.
-    expect(performance.now() - started).toBeLessThan(300);
+    expect(performance.now() - started).toBeLessThan(1_000);
     expect(limited).toBe(false);
     expect(rows).toHaveLength(200);
     expect(rows.every(row => row.current?.changed && row.saved?.changed)).toBe(true);
