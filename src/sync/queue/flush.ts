@@ -166,8 +166,13 @@ export async function processPendingChanges(
 		}
 
 		if (deletes.length > 0 && failures.length > 0) {
+			// Reconciliation runs deletes after the conflicting uploads settle. Without
+			// it, held-back deletes would wait for an unrelated event or sync.
+			const reconciling = reconciliationPaths.size > 0;
 			for (const file of deletes) {
-				batch.requeue([pendingChangeKey('delete', file.path)]);
+				const key = pendingChangeKey('delete', file.path);
+				batch.requeue([key]);
+				if (reconciling) reconciliationPaths.add(key);
 				failures.push({ path: file.path, error: 'Remote deletion deferred until uploads finish successfully' });
 			}
 		}
