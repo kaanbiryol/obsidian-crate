@@ -1,7 +1,7 @@
 import { assertReadingUpdateBase, coalesceReadingUpdate } from './coalesce-update';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingUrl, type ReadingChanges } from '@/reading/core/model';
-import { loadReading, readingRequest } from './api';
+import { loadReading, readingRequest, reloadReadingAfterWrites, type ReadingWrite } from './api';
 import { ReadingApiError } from './session/api-error';
 import { readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, savePendingReading, type ReadingCache } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
@@ -81,6 +81,8 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
     const info = await readingRequest<{ day: number; generation: string }>('/reading/session', session);
     if (info.generation !== session.generation) throw new Error('Reading destination changed. Export and review pending work.');
     const confirmed = new Set<string>();
+    const writes: ReadingWrite[] = [];
+    let onlyEdits = true;
     for (const candidate of queue) {
       if (!canSend()) break;
       if (!canDispatch(candidate, mode)) continue;
@@ -101,8 +103,10 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
       if (!op) continue;
       if (!canSend()) break;
       try {
-        await readingRequest(`/reading/${op.action}`, session, op.body);
+        const response = await readingRequest<{ library?: unknown } | null>(`/reading/${op.action}`, session, op.body);
         confirmed.add(op.id);
+        if (op.action === 'capture') onlyEdits = false;
+        else writes.push({ itemId: op.intent.id, library: response?.library });
       } catch (error) {
         const review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
         await readingLock(async () => {
@@ -133,7 +137,8 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
     if (!confirmed.size) return undefined;
     // Confirm once for this batch before removing any durable command. Another
     // tab may have queued more work while the network requests were in flight.
-    const cache = await loadReading(session);
+    // Captures add items the cache does not have yet, so they reload the whole library.
+    const cache = onlyEdits ? await reloadReadingAfterWrites(session, writes) : await loadReading(session);
     await readingLock(async () => {
       const current = await pendingReading(session);
       await savePendingReading(session, current.filter(op => !confirmed.has(op.id)));

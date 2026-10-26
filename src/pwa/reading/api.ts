@@ -5,7 +5,7 @@ import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingInd
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../connection/session-generation';
-import { commitReadingCache, type ReadingCache } from './storage/storage';
+import { commitReadingCache, readReadingCache, type ReadingCache } from './storage/storage';
 import { READING_CHANGED_EVENT, READING_SESSION_KEY, assertReadingSession, readingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
 import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
@@ -142,6 +142,29 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
   // Pages are already validated; only identities can conflict across pages.
   if (new Set(cache.items.map(item => item.crate_reading_id)).size !== cache.items.length) throw new Error('Reading library response is unreadable.');
   return commitReadingCache(session, cache);
+}
+
+/** A confirmed edit and the library revisions the server reported around it. */
+export interface ReadingWrite { itemId: string; library?: unknown }
+
+/** Edits that chain from the cached library revision only need their items again; any
+ * other write, a lost response or a missing revision reloads the whole library. */
+export async function reloadReadingAfterWrites(session: ReadingSession, writes: ReadingWrite[]): Promise<ReadingCache> {
+  const previous = await readReadingCache(session);
+  let revision = previous?.revision;
+  for (const { library } of writes) {
+    if (!revision || !library || typeof library !== 'object') return loadReading(session, previous);
+    const { before, after } = library as { before?: unknown; after?: unknown };
+    if (before !== revision || typeof after !== 'string' || after.length > 128) return loadReading(session, previous);
+    revision = after;
+  }
+  if (!previous || !writes.length) return loadReading(session, previous);
+  const items = new Map(previous.items.map(item => [item.crate_reading_id, item]));
+  for (const id of new Set(writes.map(write => write.itemId))) {
+    if (!items.has(id)) return loadReading(session, previous);
+    items.set(id, (await loadReadingArticle(session, id)).item);
+  }
+  return commitReadingCache(session, { ...previous, items: previous.items.map(item => items.get(item.crate_reading_id)!), savedAt: Date.now(), revision });
 }
 
 export async function loadReadingArticle(session: ReadingSession, id: string): Promise<ReadingArticle> {
