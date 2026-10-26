@@ -1,15 +1,15 @@
-import { BaseUiModal } from '../../../ui/plugin/BaseUiModal';
-import { useRemindersSettingsStore } from "../../settings";
+import { BaseUiModal } from '../../../../ui/plugin/BaseUiModal';
+import { useRemindersSettingsStore } from "../../../settings";
 import { Platform } from "obsidian";
 import type { ReactElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import type CratePlugin from "@/plugin/CratePlugin";
 import { createLogger } from "@/reminders/logger";
 import type { Reminder } from "@/reminders/types/reminder";
-import { ReminderModal } from "./createReminderModal";
-import { ModalContext } from "./reminders-context";
-import { PluginRoot } from "../../../ui/plugin/PluginRoot";
-import { hideNativeModalCloseButton } from "../../../ui/plugin/shared-modal";
+import { ReminderModal } from "./ReminderModal";
+import { ModalContext } from "../reminders-context";
+import { PluginRoot } from "../../../../ui/plugin/PluginRoot";
+import { hideNativeModalCloseButton } from "../../../../ui/plugin/shared-modal";
 
 const log = createLogger("ReminderEditModal");
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildCreatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
+import { buildCreatedReminderBlock } from './markdownReminderMutation';
+import { setReminderCompletionInContent } from './reminderCompletion';
 import { scanReminderMarkdownContent } from './markdownScan';
 import { predictReminderCompletion } from '@/pwa/reminders/outbox/reminder-optimistic-state';
 

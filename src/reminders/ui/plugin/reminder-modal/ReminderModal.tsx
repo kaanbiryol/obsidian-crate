@@ -1,11 +1,11 @@
-import { reminderRevision } from '../../core/reminderRevision';
+import { reminderRevision } from '../../../core/reminderRevision';
 import React, { useMemo, useRef } from "react";
 import { Notice } from "obsidian";
-import { AddReminderModal as SharedAddReminderModal } from "@/reminders/ui/plugin/reminder-modal/AddReminderModal";
-import type { NewReminder } from "@/reminders/ui/plugin/reminder-modal/reminderMutation";
+import { AddReminderModal } from "./AddReminderModal";
+import type { NewReminder } from "./reminderMutation";
 import { createLogger } from "@/reminders/logger";
-import { DEFAULT_PROJECT, projectOptionsWithDefault } from '../../core/constants';
-import { ReminderInputError } from '../../core/reminderMutationInput';
+import { DEFAULT_PROJECT, projectOptionsWithDefault } from '../../../core/constants';
+import { ReminderInputError } from '../../../core/reminderMutationInput';
 
 const log = createLogger('ReminderModal');
 
@@ -120,7 +120,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
   // Mobile uses a bottom sheet; desktop uses a centered modal.
   return (
-    <SharedAddReminderModal
+    <AddReminderModal
       onClose={() => modal.close()}
       onAdd={handleAdd}
       onSave={handleSave}

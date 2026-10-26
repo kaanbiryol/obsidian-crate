@@ -6,7 +6,7 @@ import { normalizeCrateSettings } from '../plugin/settings';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { createReadingNote, parseReadingNote, updateReadingNote } from './core/notes';
 import { getReadingLibrary, restartReading, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
-import { readReadingPolicy } from './server';
+import { readReadingPolicy, writeReadingPolicy } from './server';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
 vi.mock('./desktop-capture', () => ({ captureDesktopArticle: vi.fn(async () => ({ markdown: 'Downloaded article text from the desktop.', title: 'Desktop article' })) }));
@@ -103,6 +103,41 @@ describe('Reading runtime lifecycle', () => {
       expect(readReadingPolicy).toHaveBeenCalledOnce();
       expect(writeSettings).not.toHaveBeenCalled();
       expect(h.plugin.settings.reading.folderPath).toBe('Reading');
+    } finally { stopReading(h.plugin); }
+  });
+  it.each([
+    ['missing', null, { enabled: true, folderPath: 'Reading', revision: null }],
+    ['paused', { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' }, { enabled: true, folderPath: 'Reading', revision: 'r' }],
+  ] as const)('turns on a %s server policy for the local folder', async (_kind, policy, update) => {
+    const h = harness();
+    h.plugin.settings.workerUrl = 'https://server.example';
+    h.workspace.layoutReady = true;
+    const writeSettings = vi.fn();
+    Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
+    vi.mocked(readReadingPolicy).mockResolvedValueOnce(policy);
+    startReading(h.plugin);
+    try {
+      await vi.advanceTimersByTimeAsync(400);
+      expect(writeReadingPolicy).toHaveBeenCalledWith(h.plugin, update);
+      expect(writeSettings).not.toHaveBeenCalled();
+    } finally { stopReading(h.plugin); }
+  });
+  it('adopts the server’s Reading folder and restarts there', async () => {
+    const h = harness();
+    h.plugin.settings.workerUrl = 'https://server.example';
+    h.workspace.layoutReady = true;
+    const writeSettings = vi.fn(async (update: object) => { Object.assign(h.plugin.settings, update); });
+    Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
+    vi.mocked(readReadingPolicy).mockResolvedValueOnce({ enabled: 1, folder_path: 'Other reading', generation: 'g', revision: 'r' });
+    startReading(h.plugin);
+    const original = getReadingLibrary(h.plugin);
+    try {
+      await vi.advanceTimersByTimeAsync(400);
+      expect(writeReadingPolicy).not.toHaveBeenCalled();
+      expect(writeSettings).toHaveBeenCalledOnce();
+      expect(h.plugin.settings.reading.folderPath).toBe('Other reading');
+      expect(getReadingLibrary(h.plugin)).toBeDefined();
+      expect(getReadingLibrary(h.plugin)).not.toBe(original);
     } finally { stopReading(h.plugin); }
   });
   it('saves and extracts on desktop before checking a configured server policy', async () => {

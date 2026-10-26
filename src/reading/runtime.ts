@@ -54,6 +54,24 @@ export function validateReadingConfiguration(plugin: CratePlugin, settings: Read
 	return folder;
 }
 
+/** Agrees on one Reading folder with the server. A missing or paused server policy is
+ * turned on, keeping the server's folder when it has one. Returns true after adopting
+ * a different server folder into settings, which needs a restart. */
+async function reconcileReadingPolicy(plugin: CratePlugin, folder: string, assertCurrent: () => void): Promise<boolean> {
+	const policy = await readReadingPolicy(plugin);
+	assertCurrent();
+	if (!policy || !policy.enabled) {
+		await writeReadingPolicy(plugin, { enabled: true, folderPath: policy?.folder_path ?? folder, revision: policy?.revision ?? null });
+		assertCurrent();
+	}
+	if (!policy || policy.folder_path === folder) return false;
+	const reading = { ...plugin.settings.reading, folderPath: policy.folder_path };
+	validateReadingConfiguration(plugin, reading);
+	await plugin.writeSettings({ reading }, assertCurrent);
+	assertCurrent();
+	return true;
+}
+
 export function startReading(plugin: CratePlugin): void {
 	stopReading(plugin);
 	if (!plugin.settings.reading.enabled) return;
@@ -86,25 +104,14 @@ export function startReading(plugin: CratePlugin): void {
 	const refresh = () => {
 		if (controller.signal.aborted || !plugin.app.workspace.layoutReady || plugin.syncRuntime.getState().status === 'syncing') return;
 
-    if (plugin.settings.workerUrl && Date.now() - checkedAt > 60_000) {
-      checkedAt = Date.now();
-      void (async () => {
-        const connection = captureServerConnection(plugin);
-        const assertCurrent = () => { controller.signal.throwIfAborted(); connection.assertCurrent(); };
-        const policy = await readReadingPolicy(plugin);
-        assertCurrent();
-        if (!policy || !policy.enabled) {
-          await writeReadingPolicy(plugin, { enabled: true, folderPath: policy?.folder_path ?? folder, revision: policy?.revision ?? null });
-          assertCurrent();
-        }
-        if (policy && policy.folder_path !== folder) {
-          const reading = { ...plugin.settings.reading, folderPath: policy.folder_path };
-          validateReadingConfiguration(plugin, reading); await plugin.writeSettings({ reading }, assertCurrent);
-          assertCurrent(); startReading(plugin); return;
-        }
-        policyChecked = true; schedule();
-      })().catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
-    }
+		if (plugin.settings.workerUrl && Date.now() - checkedAt > 60_000) {
+			checkedAt = Date.now();
+			const connection = captureServerConnection(plugin);
+			void reconcileReadingPolicy(plugin, folder, () => { controller.signal.throwIfAborted(); connection.assertCurrent(); }).then(adopted => {
+				if (adopted) startReading(plugin);
+				else { policyChecked = true; schedule(); }
+			}).catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
+		}
 		const work = library.refresh().catch(error => { if (!controller.signal.aborted && Date.now() - lastErrorAt > 60_000) { lastErrorAt = Date.now(); new Notice(error instanceof Error ? error.message : 'Could not refresh Reading.'); } });
     refreshes.add(work); void work.finally(() => refreshes.delete(work));
 	};

@@ -1,10 +1,6 @@
 import { processVaultMarkdown } from '../vault-markdown';
 import { parseStoredReminderDate } from '@/reminders/core/dates/reminderDate';
-import {
-	buildReminderCompletionPlan,
-	setReminderCompletionInContent,
-	type ReminderCompletionMutation,
-} from '../../core/markdownReminderMutation';
+import { buildReminderCompletionPlan, setReminderCompletionInContent, type ReminderCompletionMutation } from '../../core/reminderCompletion';
 import type { IndexedReminder } from '../reminder-index';
 import type { MarkdownWriterContext } from './types';
 import { markdownWriterLog } from './helpers';

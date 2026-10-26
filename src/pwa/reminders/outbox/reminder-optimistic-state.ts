@@ -1,4 +1,5 @@
-import { buildCreatedReminderBlock, planReminderCompletion } from '@/reminders/core/markdownReminderMutation';
+import { buildCreatedReminderBlock } from '@/reminders/core/markdownReminderMutation';
+import { planReminderCompletion } from '@/reminders/core/reminderCompletion';
 import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
 import { parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
 import { applyReminderListEffect, type ReminderList } from './reminder-list-state';

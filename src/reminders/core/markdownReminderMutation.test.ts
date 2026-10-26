@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { scanReminderMarkdownContent } from './markdownScan';
-import { buildCreatedReminderBlock, buildReminderCompletionPlan, buildUpdatedReminderBlock, planReminderCompletion, setReminderCompletionInContent } from './markdownReminderMutation';
+import { buildCreatedReminderBlock, buildUpdatedReminderBlock } from './markdownReminderMutation';
+import { buildReminderCompletionPlan, planReminderCompletion, setReminderCompletionInContent } from './reminderCompletion';
 import { ReminderInputError } from './reminderMutationInput';
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 

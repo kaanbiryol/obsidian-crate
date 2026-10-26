@@ -1,6 +1,6 @@
 import { FuzzySuggestModal, Notice } from "obsidian";
 import type CratePlugin from "@/plugin/CratePlugin";
-import { openReminderCreationModal } from "@/reminders/ui/plugin/reminderEditorModals";
+import { openReminderCreationModal } from "@/reminders/ui/plugin/reminder-modal/reminderEditorModals";
 import { openCompactReminderModal } from "@/reminders/ui/plugin/remindersViewModals";
 
 class ProjectSuggestModal extends FuzzySuggestModal<string> {

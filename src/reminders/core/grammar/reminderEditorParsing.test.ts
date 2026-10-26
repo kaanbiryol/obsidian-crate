@@ -119,7 +119,7 @@ describe('reminder editor metadata', () => {
 
     it.each(['Tuesday', '2026-04-01'])('preserves date mentions through a vault save and reload: %s', mention => {
         const parsed = parseReminderContent(`Compare ${mention} with 2026-04-03`);
-        const line = rebuildCheckboxLine('', false, parsed.cleanContent, parsed.dueDate, 4);
+        const line = rebuildCheckboxLine({ completed: false, content: parsed.cleanContent, dueDate: parsed.dueDate, priority: 4 });
         const reloaded = parseCheckboxLine(line)?.parsed;
         expect(reloaded?.cleanContent).toBe(`Compare ${mention} with`);
         expect(reloaded?.dueDate).toEqual(parsed.dueDate);

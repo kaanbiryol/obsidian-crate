@@ -171,29 +171,28 @@ export function createPersistedCheckboxParses() {
   };
 }
 
-/**
- * Rebuild a checkbox line with updated data
- *
- * @param indentation - Leading whitespace
- * @param isCompleted - Whether checkbox should be checked
- * @param cleanContent - Task content (without date/priority markers)
- * @param dueDate - Optional due date
- * @param priority - Priority level (1 = important, 4 = normal)
- * @param recurrence - Optional recurrence rule (added before date)
- * @returns Formatted markdown checkbox line
- */
-export function rebuildCheckboxLine(
-  indentation: string,
-  isCompleted: boolean,
-  cleanContent: string,
-  dueDate: Date | undefined,
-  priority: Priority,
-  recurrence?: RecurrenceRule,
-  hasTime?: boolean,
-  reminderId?: string,
+export interface CheckboxLineOptions {
+  /** Leading whitespace. */
+  indentation?: string;
+  completed: boolean;
+  /** Task text without date or priority markers. */
+  content: string;
+  /** Shown even with recurrence, as the next occurrence. */
+  dueDate?: Date;
+  /** 1 marks the reminder important; 4 is normal. */
+  priority: Priority;
+  /** Written before the date, the order it is parsed in. */
+  recurrence?: RecurrenceRule;
+  hasTime?: boolean;
+  reminderId?: string;
   /** Write a date-only due as `2026-10-30` instead of `Oct 30, 2026`. */
-  isoDate = false,
-): string {
+  isoDate?: boolean;
+}
+
+/** Rebuilds a checkbox line with updated data. */
+export function rebuildCheckboxLine({
+  indentation = '', completed: isCompleted, content: cleanContent, dueDate, priority, recurrence, hasTime, reminderId, isoDate = false,
+}: CheckboxLineOptions): string {
   const checkbox = isCompleted ? '[x]' : '[ ]';
 
   // Build content with correct order: recurrence, date, priority

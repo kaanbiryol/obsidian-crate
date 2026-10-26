@@ -6,7 +6,8 @@ import { reminderRevision } from './reminderRevision';
 import { UnresolvedReminderScheduleError, parseReminderContent } from './grammar/reminderParser';
 import { rebuildCheckboxLine } from './grammar/checkboxParser';
 import { calculateFirstOccurrence } from './recurrence/recurrenceCalculator';
-import { buildCreatedReminderBlock, buildReminderCompletionPlan } from './markdownReminderMutation';
+import { buildCreatedReminderBlock } from './markdownReminderMutation';
+import { buildReminderCompletionPlan } from './reminderCompletion';
 
 const originalZone = process.env.TZ;
 afterEach(() => { if (originalZone === undefined) delete process.env.TZ; else process.env.TZ = originalZone; resetLocalTimeZone(); vi.useRealTimers(); });
@@ -35,7 +36,7 @@ describe('persisted schedule decoding', () => {
     it.each(['Compare Monday with', 'Review weekly report', 'Task every Monday'])('keeps inactive schedules literal across save and durable reload: %s', title => {
         clock('UTC', '2026-09-08T10:00:00Z');
         const input = parseReminderContent(`${title} 2099-01-01`);
-        const line = rebuildCheckboxLine('', false, input.cleanContent, input.dueDate, 4, input.recurrence, input.hasTime, 'one');
+        const line = rebuildCheckboxLine({ completed: false, content: input.cleanContent, dueDate: input.dueDate, priority: 4, recurrence: input.recurrence, hasTime: input.hasTime, reminderId: 'one' });
         expect(scan(line)).toMatchObject({ content: title, dueDate: '2099-01-01', recurrence: undefined });
     });
 
@@ -73,7 +74,7 @@ describe('persisted schedule decoding', () => {
 		expect(input.recurrence).toBeDefined();
 		const dueDate = calculateFirstOccurrence(input.recurrence!);
 		expect(dueDate.toISOString()).toBe(dueDatetime);
-		const line = rebuildCheckboxLine('', false, input.cleanContent, dueDate, input.priority, input.recurrence, true, 'one');
+		const line = rebuildCheckboxLine({ completed: false, content: input.cleanContent, dueDate, priority: input.priority, recurrence: input.recurrence, hasTime: true, reminderId: 'one' });
 		for (const zone of ['UTC', 'Europe/Berlin', 'Pacific/Honolulu']) {
 			clock(zone, '2028-04-10T23:58:00Z');
 			expect(scan(line)).toMatchObject({ content: 'Task', dueDatetime, recurrence: input.recurrence });
@@ -89,7 +90,7 @@ describe('persisted schedule decoding', () => {
 		for (const recurring of [false, true]) {
 			const input = parseReminderContent(`${title} ${recurring ? 'daily 09:00' : '2099-01-01 09:00'}`);
 			expect(input.cleanContent).toBe(title);
-			const line = rebuildCheckboxLine('', false, input.cleanContent, new Date('2099-01-01T09:00:00Z'), input.priority, input.recurrence, true, 'one');
+			const line = rebuildCheckboxLine({ completed: false, content: input.cleanContent, dueDate: new Date('2099-01-01T09:00:00Z'), priority: input.priority, recurrence: input.recurrence, hasTime: true, reminderId: 'one' });
 			const saved = scan(line);
 			expect(saved.content).toBe(title);
 			expect(saved.priority).toBe(4);
@@ -102,13 +103,12 @@ describe('persisted schedule decoding', () => {
 		clock('UTC', '2026-09-08T10:00:00Z');
 		const input = parseReminderContent(`Compare ${date} against the old report ${date}`);
 		expect(input.cleanContent).toBe(`Compare ${date} against the old report`);
-		const line = rebuildCheckboxLine('', false, input.cleanContent, input.dueDate, 4, undefined, input.hasTime, 'one');
+		const line = rebuildCheckboxLine({ completed: false, content: input.cleanContent, dueDate: input.dueDate, priority: 4, hasTime: input.hasTime, reminderId: 'one' });
 		expect(scan(line).content).toBe(input.cleanContent);
 	});
 
 	it('uses the appended recurrence and preserves earlier recurrence prose', () => {
-		const line = rebuildCheckboxLine('', false, 'Daily report', new Date('2099-01-01T09:00:00Z'), 4,
-			{ frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0 }, true, 'one');
+		const line = rebuildCheckboxLine({ completed: false, content: 'Daily report', dueDate: new Date('2099-01-01T09:00:00Z'), priority: 4, recurrence: { frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0 }, hasTime: true, reminderId: 'one' });
 		expect(scan(line)).toMatchObject({ content: 'Daily report', recurrence: { frequency: 'daily', hour: 9, minute: 0 } });
 	});
 
@@ -156,8 +156,7 @@ describe('persisted schedule decoding', () => {
 	});
 
 	it.each(['weekly', 'daily 12:00'])('requires fresh metadata after the readable rule changes to %s', readableRule => {
-		const original = rebuildCheckboxLine('', false, 'Task', new Date('2026-09-09T10:00:00Z'), 4,
-			{ frequency: 'daily', timezone: 'Pacific/Honolulu' }, true, 'one');
+		const original = rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date('2026-09-09T10:00:00Z'), priority: 4, recurrence: { frequency: 'daily', timezone: 'Pacific/Honolulu' }, hasTime: true, reminderId: 'one' });
 		const edited = original.replace('daily', readableRule);
 		for (const zone of ['UTC', 'Pacific/Honolulu', 'Asia/Tokyo']) {
 			clock(zone, '2026-09-08T10:00:00Z');
@@ -177,7 +176,7 @@ describe('persisted schedule decoding', () => {
 it('preserves earlier project and priority tokens through a vault save and reload', () => {
     const input = parseReminderContent('Compare #Home with #Work ! !');
     expect(input.cleanContent).toBe('Compare #Home with !');
-    const line = rebuildCheckboxLine('', false, input.cleanContent, undefined, input.priority, undefined, false, 'one');
+    const line = rebuildCheckboxLine({ completed: false, content: input.cleanContent, priority: input.priority, hasTime: false, reminderId: 'one' });
     const saved = scanReminderMarkdownContent('Reminders/Work.md', line, 'Reminders').reminders[0];
     expect(saved).toMatchObject({ content: 'Compare #Home with !', priority: 1, project: 'Work' });
 });

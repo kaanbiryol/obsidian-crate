@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { resetLocalTimeZone } from '@internationalized/date';
 import { rebuildCheckboxLine, parseCheckboxLine } from './grammar/checkboxParser';
 import { scanReminderMarkdownContent } from './markdownScan';
-import { buildCreatedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
+import { buildCreatedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock } from './markdownReminderMutation';
+import { setReminderCompletionInContent } from './reminderCompletion';
 import { deleteReminderBlockFromContent } from './markdownReminderFile';
 import { buildModalDraft } from '@/pwa/reminders/editor/reminder-drafts';
 import { deriveDraftPatchFromContent } from '@/pwa/reminders/editor/editor-draft';
@@ -34,7 +35,7 @@ describe('reminder editing boundaries', () => {
 describe('canonical reminder dates', () => {
 	it.each(['UTC', 'Pacific/Honolulu', 'Asia/Tokyo', 'America/New_York'])('preserves instant and recurrence metadata when read in %s', zone => {
 		process.env.TZ = 'Europe/Berlin'; resetLocalTimeZone();
-		const line = rebuildCheckboxLine('', false, 'Task', new Date('2099-03-01T14:00:00.000Z'), 1, rule, true, 'one');
+		const line = rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date('2099-03-01T14:00:00.000Z'), priority: 1, recurrence: rule, hasTime: true, reminderId: 'one' });
 		process.env.TZ = zone; resetLocalTimeZone();
 		const parsed = parseCheckboxLine(line)!;
 		expect(parsed.parsed.dueDate?.toISOString()).toBe('2099-03-01T14:00:00.000Z');
@@ -42,7 +43,7 @@ describe('canonical reminder dates', () => {
 		expect(parsed.parsed.cleanContent).toBe('Task');
 	});
 	it('persists recurrence progress and stops after the configured number of completions', () => {
-		let content = rebuildCheckboxLine('', false, 'Task', new Date('2099-03-01T14:00:00Z'), 4, rule, true, 'one');
+		let content = rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date('2099-03-01T14:00:00Z'), priority: 4, recurrence: rule, hasTime: true, reminderId: 'one' });
 		for (let count = 1; count <= 3; count++) {
 			content = setReminderCompletionInContent(content, record(content), true).content;
 			expect(record(content).recurrence?.completedCount).toBe(count);
@@ -53,7 +54,7 @@ describe('canonical reminder dates', () => {
 	it.each(['UTC', 'Asia/Tokyo', 'Pacific/Honolulu'])('advances an all-day rule by calendar day in %s', zone => {
 		process.env.TZ = zone; resetLocalTimeZone();
 		const allDayRule = { frequency: 'daily' as const, timezone: 'Pacific/Honolulu', endDate: '2099-01-02' };
-		let content = rebuildCheckboxLine('', false, 'Task', new Date(2099, 0, 1), 4, allDayRule, false, 'one');
+		let content = rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date(2099, 0, 1), priority: 4, recurrence: allDayRule, hasTime: false, reminderId: 'one' });
 		content = setReminderCompletionInContent(content, record(content), true).content;
 		expect(record(content)).toMatchObject({ dueDate: '2099-01-02', dueDatetime: undefined, completed: false });
 		content = setReminderCompletionInContent(content, record(content), true).content;
@@ -63,7 +64,7 @@ describe('canonical reminder dates', () => {
 		expect(created.dueDatetime).toBeUndefined();
 	});
 	it('keeps occurrence and timezone when editing only a PWA title', () => {
-		const reminder = record(rebuildCheckboxLine('', false, 'Task', new Date('2099-03-01T14:00:00Z'), 4, rule, true, 'one'));
+		const reminder = record(rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date('2099-03-01T14:00:00Z'), priority: 4, recurrence: rule, hasTime: true, reminderId: 'one' }));
 		const draft = buildModalDraft(reminder, null);
 		draft.content = draft.content.replace('Task', 'Edited');
     Object.assign(draft, deriveDraftPatchFromContent(draft, ['Inbox']));
@@ -72,14 +73,14 @@ describe('canonical reminder dates', () => {
 		expect(body.dueDatetime).toBe('2099-03-01T14:00:00.000Z');
 	});
 	it('uses a manually changed readable rule and ignores malformed metadata', () => {
-		const line = rebuildCheckboxLine('', false, 'Task', new Date('2099-03-01T14:00:00Z'), 4, rule, true, 'one');
+		const line = rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date('2099-03-01T14:00:00Z'), priority: 4, recurrence: rule, hasTime: true, reminderId: 'one' });
 		expect(parseCheckboxLine(line.replace('daily', 'weekly'))?.parsed.recurrence?.count).toBeUndefined();
 	});
 });
 
 it.each(['2099-03-01T14:00:37.123Z', '2026-11-01T06:30:37.123Z'])('preserves exact instant through plugin and PWA title-edit form derivation: %s', instant => {
   process.env.TZ = 'America/New_York'; resetLocalTimeZone();
-  const reminder = record(rebuildCheckboxLine('', false, 'Task', new Date(instant), 4, undefined, true, 'one'));
+  const reminder = record(rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date(instant), priority: 4, hasTime: true, reminderId: 'one' }));
   const draft = buildModalDraft(reminder, null);
   draft.content = draft.content.replace('Task', 'Edited');
   Object.assign(draft, deriveDraftPatchFromContent(draft, ['Inbox']));
@@ -90,7 +91,7 @@ it.each(['2099-03-01T14:00:37.123Z', '2026-11-01T06:30:37.123Z'])('preserves exa
 });
 it('retains recurrence occurrence, timezone and progress through plugin form submission', () => {
   const originalRule = { ...rule, completedCount: 1 };
-  const reminder = record(rebuildCheckboxLine('', false, 'Task', new Date('2099-03-01T14:00:00Z'), 4, originalRule, true, 'one'));
+  const reminder = record(rebuildCheckboxLine({ completed: false, content: 'Task', dueDate: new Date('2099-03-01T14:00:00Z'), priority: 4, recurrence: originalRule, hasTime: true, reminderId: 'one' }));
   const draft = buildModalDraft(reminder, null);
   const submission = buildReminderSubmission({ content: draft.content.replace('Task', 'Edited'), projects: ['Inbox'], priority: 4, project: 'Inbox', dueDate: reminder.dueDatetime!, hasTime: true, recurrence: reminder.recurrence, reminder });
   expect(submission?.updatedReminder).toMatchObject({ dueDatetime: reminder.dueDatetime, recurrence: originalRule });
