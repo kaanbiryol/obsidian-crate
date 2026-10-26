@@ -1,13 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { TFile, TFolder, type Command, type Menu, type MenuItem, type TAbstractFile } from 'obsidian';
-import type CratePlugin from '../plugin/CratePlugin';
+import type CratePlugin from './CratePlugin';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
-import { registerSyncCommands } from './plugin-integration';
-import { setSyncReady } from '../plugin/lifecycle-state';
+import { registerSyncCommands } from './sync-integration';
+import { setSyncReady } from './lifecycle-state';
 
 vi.mock('../ui/activity/file-history-modal', () => ({ openFileHistoryModal: vi.fn() }));
 vi.mock('../ui/activity/activity-modal', () => ({ ActivityModal: vi.fn() }));
-vi.mock('./runtime/runtime', () => ({ SyncRuntime: vi.fn() }));
+vi.mock('../sync/runtime/runtime', () => ({ SyncRuntime: vi.fn() }));
 vi.mock('../reminders/notification-policy-sync', () => ({ ensureReminderNotificationPolicy: vi.fn(), refreshReminderNotificationPolicy: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
 

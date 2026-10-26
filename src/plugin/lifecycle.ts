@@ -13,7 +13,7 @@ import {
   initializeSyncManagers,
   registerSyncCommands,
   registerVaultSyncEventHandlers,
-} from "../sync/plugin-integration";
+} from "./sync-integration";
 import { ensurePluginDeviceId } from "./deviceId";
 import type CratePlugin from "./CratePlugin";
 import {

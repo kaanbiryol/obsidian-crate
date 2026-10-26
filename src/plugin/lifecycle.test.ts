@@ -70,7 +70,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 	vi.doMock('../reminders/notification-policy-sync', () => ({
 		ensureReminderNotificationPolicy,
 	}));
-	vi.doMock('../sync/plugin-integration', () => ({
+	vi.doMock('./sync-integration', () => ({
 		initializeSyncManagers,
 		registerSyncCommands,
 		registerVaultSyncEventHandlers,
@@ -141,7 +141,7 @@ afterEach(() => {
 	vi.doUnmock('./logger');
 	vi.doUnmock('../ui/settings-tab');
 	vi.doUnmock('../reminders/plugin-integration');
-	vi.doUnmock('../sync/plugin-integration');
+	vi.doUnmock('./sync-integration');
 	vi.doUnmock('./deviceId');
 	vi.doUnmock('./cloudflare-operations');
 	vi.doUnmock('../cloudflare/update-notice');
