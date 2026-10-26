@@ -10,6 +10,10 @@ interface ServerRequestOptions {
 	capabilities?: Readonly<Record<string, string>>;
 }
 
+function connectionChanged(): DOMException {
+	return new DOMException('The server connection changed. Reopen settings and try again.', 'AbortError');
+}
+
 /** Capture once for operations that span requests, queued saves and UI publication. */
 export function captureServerConnection(plugin: CratePlugin) {
 	const signal = getPluginLifecycleSignal(plugin);
@@ -19,10 +23,22 @@ export function captureServerConnection(plugin: CratePlugin) {
 	const assertCurrent = () => {
 		signal.throwIfAborted();
 		if (plugin.settings.workerUrl !== origin || origin && plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== token) {
-			throw new DOMException('The server connection changed. Reopen settings and try again.', 'AbortError');
+			throw connectionChanged();
 		}
 	};
 	return { signal, origin, token, assertCurrent };
+}
+
+/** Also captures the sync runtime's client, whose encryption keys map folder labels, so a
+ * mapping and the request it accompanies cannot come from different connections. */
+export function captureSyncApiConnection(plugin: CratePlugin) {
+	const connection = captureServerConnection(plugin);
+	const api = plugin.syncRuntime.getApiClient();
+	const assertCurrent = () => {
+		connection.assertCurrent();
+		if (plugin.syncRuntime.getApiClient() !== api) throw connectionChanged();
+	};
+	return { ...connection, api, assertCurrent };
 }
 
 /** Bind request dispatch and response publication to the same connection. */
