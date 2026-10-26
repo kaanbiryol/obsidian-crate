@@ -53,6 +53,21 @@ describe('SyncRuntime operation wrappers', () => {
 		} finally { vi.useRealTimers(); }
 	});
 
+	it('spaces a failed checkpoint save like a saved one instead of retrying after every sync', async () => {
+		vi.useFakeTimers({ now: Date.parse('2026-10-17T10:00:00Z') });
+		try {
+			const { runtime } = createRuntimeHarness();
+			const saveSharedHistoryCheckpoint = vi.fn(async () => { throw new Error('Vault too large for a shared checkpoint'); });
+			const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
+			await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveSharedHistoryCheckpoint, trackedFileCount: () => 100_001 });
+			const automatic = callback.mock.calls.at(-1)![0];
+			callback.mockRestore();
+			await automatic(createEmptySyncResult());
+			await automatic(createEmptySyncResult());
+			expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce();
+		} finally { vi.useRealTimers(); }
+	});
+
 	it('attaches a completed checkpoint without changing older snapshots or replacing newer history', async () => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness();
 		const checkpoint = createDeferred<{ id: string }>();
