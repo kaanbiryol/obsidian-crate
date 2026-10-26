@@ -1,0 +1,5 @@
+# Mechanical commits that `git blame` should skip. Enable locally with:
+# git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# chore: indent source files with tabs
+497a18b5a2bcd97b33b032aafd6954249c2e4746

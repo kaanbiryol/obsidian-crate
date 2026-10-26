@@ -4,6 +4,9 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 import globals from "globals";
 import { globalIgnores } from "eslint/config";
 import workerImportBoundary from './scripts/worker-import-boundary.mjs';
+import tabIndentation from './scripts/tab-indentation.mjs';
+
+const crate = { rules: { 'worker-import-boundary': workerImportBoundary, 'tab-indentation': tabIndentation } };
 
 const pluginAdapterImports = {
 	regex: '^(?:@/ui/plugin|(?:\\.\\./)+(?:ui/)?plugin|(?:@/|(?:\\.\\./)+)reminders/ui/plugin)(?:/|$)',
@@ -164,9 +167,17 @@ export default tseslint.config(
 		},
 	},
 	{
+		// Indent with tabs, as .editorconfig sets.
+		files: ['src/**/*.{ts,tsx}'],
+		plugins: { crate },
+		rules: {
+			'crate/tab-indentation': 'error',
+		},
+	},
+	{
 		files: ['src/cloudflare/worker/**/*.{ts,tsx}'],
 		ignores: ['**/*.test.ts', '**/*.integration.ts', '**/*-test-harness.ts'],
-		plugins: { crate: { rules: { 'worker-import-boundary': workerImportBoundary } } },
+		plugins: { crate },
 		rules: {
 			'crate/worker-import-boundary': 'error',
 		},
