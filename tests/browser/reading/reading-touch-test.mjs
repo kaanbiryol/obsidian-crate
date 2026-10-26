@@ -58,6 +58,8 @@ try {
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       await page.addInitScript(session => localStorage.setItem('crate-reading-session-v1', JSON.stringify(session)), session);
+      // These checks open uncached articles; Save-Data keeps background prefetch from caching them first.
+      await page.addInitScript(() => Object.defineProperty(navigator, 'connection', { configurable: true, value: { saveData: true } }));
       await page.route('**/reading/session', route => route.fulfill({ json: session }));
       await page.route('**/reading/list*', route => route.fulfill({ json: { items, issues: [], cursor: null } }));
       let heldArticle;
