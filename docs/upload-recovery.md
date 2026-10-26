@@ -7,7 +7,9 @@ create no per-file receipt journal, changelog, or version history. Locally delet
 files are pruned while the import is open. Only the device that started the import
 prunes or uploads for it: it saves the import token in its local checkpoint before its
 first prune or upload. Another device that finds files in the open import stops with
-"Another device is uploading this vault for the first time. Let it finish, then sync."
+"Another device is uploading this vault for the first time. Let it finish, then sync. If this device started it, select Replace server files." A device that
+started the import but lost its checkpoint, for example after disconnecting or reinstalling,
+finishes it with **Replace server files**.
 A device without a saved token, for example one updated mid-import, continues only
 while its checkpoint holds the revision of every file already imported. While an import is open, ordinary
 uploads and deletes from automatic sync and **Sync selected** wait on every device, because

@@ -10,7 +10,7 @@ There are two ways to use Crate on another device:
 
 ## Another Obsidian device
 
-1. Let a sync finish on your first device. Until it does, other devices stop with "Another device is uploading this vault for the first time."
+1. Let a sync finish on your first device. Until it does, other devices stop with "Another device is uploading this vault for the first time." If you see this on the device that started the upload, for example after reconnecting it, select **Replace server files** to finish.
 2. On the other device, open a vault and [install Crate](/docs/getting-started/installation/). Use an empty vault for a fresh copy. If the vault already has notes, back them up first, because they'll be combined with the synced ones.
 3. Connect to the **same server**:
    - **Cloudflare:** select **Connect with Cloudflare** and choose the existing server.

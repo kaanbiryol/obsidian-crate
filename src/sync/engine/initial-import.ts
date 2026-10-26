@@ -25,7 +25,7 @@ interface ImportContext {
   setImportToken(token: string | undefined): void;
 }
 
-export const ANOTHER_DEVICE_IMPORTING = 'Another device is uploading this vault for the first time. Let it finish, then sync.';
+export const ANOTHER_DEVICE_IMPORTING = 'Another device is uploading this vault for the first time. Let it finish, then sync. If this device started it, select Replace server files.';
 export const FIRST_UPLOAD_UNFINISHED = 'The first upload of this vault has not finished. Select Sync now on the device that started it, then sync here.';
 
 /** Resuming a first upload prunes server files the importing device lacks, so
