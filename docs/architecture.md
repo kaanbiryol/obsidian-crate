@@ -196,6 +196,9 @@ succeed. These helpers do not own engine cancellation or runtime lifecycle state
 file renames. Its `lookup-store.ts` maintains derived lookup maps: the owner removes
 old keys before changing records, then adds the updated records before notifying
 subscribers. Scan failure retains the last published records and lookups together.
+A full load that holds back individual files (a move awaiting review, deferred
+duplicate repair) publishes every other file and keeps those files' previous
+records until a later rescan can read them safely.
 `file-scan-result.ts` applies one file's scan result to that state; queueing,
 invalidation and deferral stay in `index.ts`.
 
