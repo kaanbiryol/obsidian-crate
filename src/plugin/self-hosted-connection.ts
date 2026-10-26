@@ -3,7 +3,6 @@ import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { SyncApiClient } from '../sync/worker-api/client';
 import { requireNormalizedWorkerUrl } from '../sync/connection/worker-url';
-import { applySharedSettings } from '../sync/connection/shared-settings';
 import { exchangeSelfHostedPairingCode } from '../sync/connection/self-hosted-pairing';
 import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { isSha256Hex } from '../platform/validation';
@@ -88,8 +87,8 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 		await plugin.syncRuntime.applyInfrastructureConfig({ workerUrl, authToken }, signal, ...(reconnect ? [expected] : []));
 		signal.throwIfAborted();
 		if (shared.settings) {
-			applySharedSettings(plugin.settings, shared.settings);
-			await plugin.saveSettings();
+			// Normalizing adds this device's own workspace exclusion to the server's patterns.
+			await plugin.writeSettings(shared.settings);
 			plugin.syncRuntime.updateSyncSettings();
 		}
 	} finally {

@@ -18,7 +18,7 @@ function plugin() {
 		settings: { cloudflareDeployment: null, workerUrl: 'https://previous.trycloudflare.com' },
 		secretStorage: { get: vi.fn((key: string) => key === 'crate-auth-token' ? token : null) },
 		cloudflareDeploymentService: { isBusy: false, pendingIntent: null },
-		clearSettingsUiState: vi.fn(), saveSettings: vi.fn(),
+		clearSettingsUiState: vi.fn(), writeSettings: vi.fn(),
 		syncRuntime: { isConfigured: vi.fn(() => false), applyInfrastructureConfig: vi.fn(), updateEncryptedServerAddress: vi.fn(), updateEncryptionResetAddress: vi.fn(), updateSyncSettings: vi.fn() },
 	};
 }
@@ -39,6 +39,15 @@ describe('self-hosted server connection', () => {
 		await connectSelfHostedServer(owner as unknown as CratePlugin, 'https://crate.example', code);
 		expect(exchange).toHaveBeenCalledWith('https://crate.example', code, expect.any(AbortSignal));
 		expect(owner.syncRuntime.applyInfrastructureConfig).toHaveBeenCalledWith({ workerUrl: 'https://crate.example', authToken: token }, expect.any(AbortSignal));
+	});
+	it('applies the server\'s shared settings through the normalizing settings write', async () => {
+		const owner = plugin();
+		const shared = { ignorePatterns: ['.git/'], syncInterval: 60, pushEnabled: false };
+		api.getSharedSettings.mockResolvedValue({ settings: shared });
+		await connectSelfHostedServer(owner as unknown as CratePlugin, 'https://crate.example', token);
+		// writeSettings adds this device's own workspace exclusion before publishing.
+		expect(owner.writeSettings).toHaveBeenCalledExactlyOnceWith(shared);
+		expect(owner.syncRuntime.updateSyncSettings).toHaveBeenCalledOnce();
 	});
 	it('verifies a new tunnel address with the saved credential before updating', async () => {
 		const owner = plugin();
