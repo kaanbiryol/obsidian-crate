@@ -209,7 +209,7 @@ describe('durable plugin move recovery', () => {
 	it('rejects a description changed in the note before a move starts', async () => {
 		const { files, first, vault, records } = await workspace();
 		files.set(sourcePath, `${task.replace('Important%20details', 'Edited%20details')}\n${other}`);
-		await expect(first.writer.updateReminder(first.index.getById('one')!, { project: 'Z' })).rejects.toThrow('source or destination changed');
+		await expect(first.writer.updateReminder(first.index.getById('one')!, { project: 'Z' })).rejects.toThrow('Reminder changed while it was being edited');
 		expect(vault.process).not.toHaveBeenCalled();
 		expect(records()).toEqual([]);
 	});
