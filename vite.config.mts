@@ -8,8 +8,16 @@ import { testVaultDeployPlugin } from "./scripts/vite/test-vault-vite-plugin.mjs
 import { cloudflareArtifactsPlugin } from "./scripts/vite/cloudflare-artifacts-vite-plugin.mjs";
 import { readingExtractionVitePlugin } from "./scripts/reading-extraction-build.mjs";
 
+/** Reads the Worker build identity only when Vite builds, so tools that just load
+ * this config (knip) work before the Worker has been built. */
+const developmentBuildDefine = () => ({
+	name: "crate-development-build",
+	config: () => ({ define: { __CRATE_DEVELOPMENT_BUILD__: JSON.stringify(readBuiltIdentity(__dirname).development ?? null) } }),
+});
+
 export default defineConfig(({ mode }) => ({
 	plugins: [
+		developmentBuildDefine(),
 		readingExtractionVitePlugin(),
 		cloudflareArtifactsPlugin({ rootDir: __dirname }),
 		react(),
@@ -20,7 +28,6 @@ export default defineConfig(({ mode }) => ({
 		...(mode === "development" ? [testVaultDeployPlugin({ rootDir: __dirname })] : []),
 	],
 	define: {
-    __CRATE_DEVELOPMENT_BUILD__: JSON.stringify(readBuiltIdentity(__dirname).development ?? null),
 		__CRATE_CLOUDFLARE_OAUTH_CLIENT_ID__: JSON.stringify(
 			process.env.CRATE_CLOUDFLARE_OAUTH_CLIENT_ID || "9c474af284e49ff0201106f3b42cca05",
 		),
