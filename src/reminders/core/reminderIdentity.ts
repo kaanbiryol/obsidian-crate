@@ -1,4 +1,4 @@
-const REMINDER_ID_MARKER_REGEX = /\s*<!--\s*crate-id:([A-Za-z0-9_-]+(?:-[A-Za-z0-9_-]+)*)\s*-->\s*$/;
+const REMINDER_ID_MARKER_REGEX = /\s*<!--\s*crate-id:([A-Za-z0-9_-]+)\s*-->\s*$/;
 
 function normalizeReminderId(id: string): string | null {
 	const trimmed = id.trim();
