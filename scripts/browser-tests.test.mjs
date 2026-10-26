@@ -55,10 +55,10 @@ test('Linux and native macOS groups retain every browser check exactly once', ()
 	assert.equal(new Set(macosBrowserScripts).size, macosBrowserScripts.length);
 	assert.ok(macosBrowserScripts.every(script => browserScripts.includes(script)));
 	const linux = Array.from({ length: 4 }, (_, i) => selectScripts(`${i + 1}/4`, 'linux')).flat();
-	const macos = Array.from({ length: 2 }, (_, i) => selectScripts(`${i + 1}/2`, 'macos')).flat();
+	const macos = Array.from({ length: 3 }, (_, i) => selectScripts(`${i + 1}/3`, 'macos')).flat();
 	assert.deepEqual([...linux, ...macos].sort(), [...browserScripts].sort());
 	assert.deepEqual(macos.sort(), [...macosBrowserScripts].sort());
-	for (const [platform, count] of [['linux', 4], ['macos', 2]]) {
+	for (const [platform, count] of [['linux', 4], ['macos', 3]]) {
 		const totals = Array.from({ length: count }, (_, i) => selectScripts(`${i + 1}/${count}`, platform)
 			.reduce((total, script) => total + browserDurations[script], 0));
 		const average = totals.reduce((a, b) => a + b) / count;
