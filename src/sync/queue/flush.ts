@@ -24,10 +24,10 @@ interface QueueManifest {
 	save(): Promise<void>;
 }
 
-export type QueueDeleteCandidate = ConditionalDeleteCandidate;
-export type QueueDeleteFailure = MutationFailure;
+type QueueDeleteCandidate = ConditionalDeleteCandidate;
+type QueueDeleteFailure = MutationFailure;
 
-export interface QueueUploadFailure {
+interface QueueUploadFailure {
 	code?: string;
 	path: string;
 	error: string;

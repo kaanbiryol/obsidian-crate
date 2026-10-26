@@ -11,7 +11,7 @@ import { requestSharedFeaturesRefresh } from '../shared-features';
 import type { ApiFetch, DataMode, StoredConfig } from '../types';
 import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue, ReminderSyncHost } from './types';
 
-export interface ConfirmedReminderSnapshot {
+interface ConfirmedReminderSnapshot {
 	reminders: ReminderRecord[];
 	projects: string[];
 }

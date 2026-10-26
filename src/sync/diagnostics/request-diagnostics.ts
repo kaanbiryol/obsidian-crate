@@ -67,7 +67,7 @@ export function normalizeUploadOperationIds(value: unknown): string[] {
 	return [...new Set(value.filter((id): id is string => typeof id === 'string' && reminderOperationDay(id) !== null))].slice(0, BULK_NEW_UPLOAD_MAX_FILES);
 }
 
-export function diagnosticRoute(path: string): string {
+function diagnosticRoute(path: string): string {
 	const route = path.split('?')[0] ?? '';
 	return routes.has(route) ? route : 'other';
 }
