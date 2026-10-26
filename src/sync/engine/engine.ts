@@ -16,8 +16,7 @@ import { LocalManifest } from '../manifest/manifest';
 import { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import { ConflictStore } from '../conflict/store';
 import { isConflictFile } from '../conflict/conflict';
-import { isHiddenPath, type VaultFile } from '../local/file-discovery';
-import { assertLocalSyncPath } from '../local/local-path-safety';
+import type { VaultFile } from '../local/file-discovery';
 import { SyncQueueController } from '../queue/controller';
 import { createAbortError, isAbortError } from '../abort';
 import { createLogger } from '../logger';
@@ -34,6 +33,7 @@ import {
 } from '../local/ignore';
 import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
+import { createRawConfigEventHandler } from './raw-config-events';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';
 import { runSyncWorkflow } from './standard-sync-workflow';
 import { AUTH_ERROR_MESSAGE, beginSyncAttempt, completeTransferResult, handleWorkflowError, ReconnectNotice } from '../sync-outcome';
@@ -72,8 +72,7 @@ export class SyncEngine {
 	private periodicCheckFailed = false;
 	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private prepareReminderScope?: () => Promise<void>;
-	private rawEventRevisions = new Map<string, object>();
-	private rawVerificationTask: Promise<unknown> = Promise.resolve();
+	private readonly rawConfigEvents: (path: string) => Promise<void>;
 	private ignore: IgnoreMatcherContext;
 	private syncActivityRevision = 0;
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -195,6 +194,17 @@ export class SyncEngine {
 			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
 			reconcile: (queueKeys) => this.reconcileFromQueue(queueKeys),
 			onFlushResult: (result) => this.onAutomaticSyncResult?.(result),
+		});
+		this.rawConfigEvents = createRawConfigEventHandler({
+			vault: this.vault,
+			manifest: this.localManifest,
+			queue: this.queueController,
+			isDestroyed: () => this.lifecycle.isDestroyed,
+			isSyncing: () => this.state.status === 'syncing',
+			shouldIgnore: this.shouldIgnore.bind(this),
+			captureSyncActivity: () => this.captureSyncActivity(),
+			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
+			trackWork: operation => this.trackWork(operation),
 		});
 	}
 
@@ -559,39 +569,8 @@ export class SyncEngine {
 		}, keys);
 	}
 
-	async onRawFileChange(path: string): Promise<void> {
-		const configDir = this.vault.configDir;
-		if (!isHiddenPath(path) && !path.startsWith(`${configDir}/`)) return;
-		if (this.lifecycle.isDestroyed || this.shouldIgnore(path)) return;
-		const revision = {};
-		this.rawEventRevisions.set(path, revision);
-		const isCurrent = () => !this.lifecycle.isDestroyed
-			&& this.rawEventRevisions.get(path) === revision && !this.shouldIgnore(path);
-		try {
-			assertLocalSyncPath(path);
-			const stat = await this.vault.adapter.stat(path);
-			if (!isCurrent()) return;
-			if (stat?.type === 'file' && this.localManifest.hasFile(path)
-				&& this.state.status !== 'syncing' && !this.hasPendingKey(pendingChangeKey('upload', path))) {
-				// Obsidian and iCloud can touch settings without changing their bytes.
-				// Check before publishing a pending entry; serialize reads to bound memory.
-				const activityCurrent = this.captureSyncActivity();
-				const verification = this.rawVerificationTask.then(() => this.verifyPendingPaths([path],
-					() => isCurrent() && this.state.status !== 'syncing' && activityCurrent()));
-				this.rawVerificationTask = verification.catch(() => {});
-				const settled = await this.trackWork(() => verification).catch((error): string[] => {
-					logger.warn('Could not verify changed configuration file:', errorMessage(error));
-					return [];
-				});
-				if (!isCurrent() || settled.includes(path)) return;
-			}
-			if (stat?.type === 'file') this.queueController.onFileChange({ path });
-			else if (!stat) this.queueController.onFileDelete({ path });
-		} catch (error) {
-			logger.warn('Failed to inspect changed configuration file:', errorMessage(error));
-		} finally {
-			if (this.rawEventRevisions.get(path) === revision) this.rawEventRevisions.delete(path);
-		}
+	onRawFileChange(path: string): Promise<void> {
+		return this.rawConfigEvents(path);
 	}
 
 	/** Queues changes whose vault events the runtime dropped, as live events would. */
