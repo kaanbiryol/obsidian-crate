@@ -2,7 +2,7 @@ import { BaseUiModal } from './plugin/BaseUiModal';
 import { Platform, Setting, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { ExclusionSheet } from './ExclusionSheet';
+import { ActivitySheet } from './activity/ActivitySheet';
 import { hideNativeModalCloseButton } from './plugin/shared-modal';
 
 export class ExclusionPreviewModal extends BaseUiModal {
@@ -15,7 +15,10 @@ export class ExclusionPreviewModal extends BaseUiModal {
 		hideNativeModalCloseButton(this.modalEl);
 		this.contentEl.addClasses(['crate-reminder-editor-modal__content', 'crate-reminders-ui']);
 		this.root = createRoot(this.contentEl);
-		this.root.render(createElement(ExclusionSheet, {
+		this.root.render(createElement(ActivitySheet, {
+			kind: 'exclusion',
+			// The preview always opens as a bottom sheet.
+			isMobile: true,
 			animationsEnabled: typeof window !== 'undefined' && this.contentEl.win === window,
 			onClose: () => this.close(),
 			onMount: container => this.renderPreview(container),
