@@ -94,6 +94,5 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, source.path, content, source.file.hash);
   const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, readingRevision: revision, encryptionState: null, effects: operationEffects(env.DB, op, response) });
   if (!result.committed) throw new ReadingError('This note changed. Refresh before editing it.', 409);
-  if (action === 'retry') await env.DB.prepare('DELETE FROM reading_jobs WHERE path=?').bind(source.path).run();
   return readingResponse({ ...response, library: { before: await readingListEtag(current, index.revision), after: await readingListEtag(current, revision) } });
 }

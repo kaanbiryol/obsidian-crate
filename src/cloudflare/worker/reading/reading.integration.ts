@@ -171,6 +171,13 @@ it('keeps a failed publication leased so the article queue cannot restart its fe
   expect(parseReadingNote((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))!.content)?.extraction_status).toBe('unavailable');
   expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
 });
+it('queues a fresh extraction job when an unavailable bookmark is retried', async () => {
+  const job = await capture(); await publishExtraction(env, { job, result: null });
+  expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
+  expect((await command('retry', { id: job.item_id, operationId: id() })).status).toBe(200);
+  const file = (await getStoredFileRow(env.DB, job.path))!;
+  expect(await env.DB.prepare('SELECT path, source_revision, attempts FROM reading_jobs').first()).toEqual({ path: job.path, source_revision: file.storageKey, attempts: 0 });
+});
 it('keeps failed extractions as useful bookmarks and never extracts clipper notes', async () => {
   const job = await capture(); await publishExtraction(env, { job, result: null });
   const saved = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))!;
