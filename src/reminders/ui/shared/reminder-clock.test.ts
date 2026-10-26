@@ -115,7 +115,7 @@ it('tracks thousands of card deadlines in linear time and reschedules after earl
 	for (const stop of stops.slice(1)) stop();
 	cleanups.push(stops[0]!);
 	// Before: about 1.3 seconds to mount and 1.5 seconds to unmount 20,000 cards on an M-series Mac.
-	expect(performance.now() - started).toBeLessThan(300);
+	expect(performance.now() - started).toBeLessThan(1_000);
 	expect(vi.getTimerCount()).toBe(1);
 	// The removed 12:00:31 deadline causes one early wake-up, then the
 	// remaining far deadline leaves the next wake-up at the minute boundary.

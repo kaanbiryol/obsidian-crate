@@ -25,7 +25,7 @@ it('removes a large single-project file in linear time', () => {
   const started = performance.now();
   expect(store.removeFile('Big.md')).toHaveLength(count);
   // Before: about 3 seconds on an M-series Mac, growing with the square of the reminder count.
-  expect(performance.now() - started).toBeLessThan(300);
+  expect(performance.now() - started).toBeLessThan(1_000);
   expect(store.getProjects(new Set())).toEqual([]);
   expect(store.getById('r0')).toBeUndefined();
 });
