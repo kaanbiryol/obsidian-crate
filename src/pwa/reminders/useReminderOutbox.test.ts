@@ -182,3 +182,25 @@ it.each([1, 3])('preserves a saved retry deadline and %i attempts across mountin
 	}
 	reopened.unmount();
 });
+
+it('waits for Reminders to unlock before opening pending changes', async () => {
+	const session = await import('./encryption-session');
+	const locked = { status: 'locked' as const, message: 'Unlock Crate', converting: false, setupRequired: false, unavailable: true };
+	let view: typeof locked | { status: 'ready'; folderPath: string } = locked;
+	const listeners = new Set<() => void>();
+	vi.spyOn(session, 'reminderEncryptionSnapshot').mockImplementation(() => view);
+	vi.spyOn(session, 'subscribeReminderEncryption').mockImplementation(listener => { listeners.add(listener); return () => { listeners.delete(listener); }; });
+	const rendered = renderHook(() => useReminderOutbox({
+		authToken: 'token', folderPath: 'Reminders', bootstrapped: true, apiFetch: vi.fn<ApiFetch>(), showToast: vi.fn(),
+		beginLocalMutation: () => () => {}, invalidateReads: () => {}, commitReminderState: async () => {},
+		getSnapshot: () => ({ reminders: [], projects: [] }), loadReminders: vi.fn(),
+	}));
+	await act(async () => {});
+	expect(rendered.current.ready).toBe(false);
+	expect(rendered.current.outboxRef.current).toBeNull();
+	view = { status: 'ready', folderPath: 'Reminders' };
+	await act(async () => { for (const listener of listeners) listener(); });
+	expect(rendered.current.ready).toBe(true);
+	rendered.unmount();
+	vi.restoreAllMocks();
+});

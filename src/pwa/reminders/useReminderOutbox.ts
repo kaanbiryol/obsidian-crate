@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useSyncFailureToast } from '../hooks/useSyncFailureToast';
 import { reminderNeedsAttention, reminderRetryAt, type createReminderOutbox } from './outbox/reminder-outbox';
 import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from './outbox/reminder-outbox-storage';
 import { capturePwaSession } from '../connection/session-generation';
 import { createReminderSettlementChannel } from './outbox/reminder-settlement';
 import { createReminderOutboxSession } from './outbox/reminder-outbox-session';
+import { reminderEncryptionSnapshot, subscribeReminderEncryption } from './encryption-session';
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';
 import type { ApiFetch, ShowToast } from '../types';
 import type { LoadReminders, ReminderRecord } from './types';
@@ -37,6 +38,8 @@ export function useReminderOutbox(options: {
 	const optionsRef = useRef(options);
 	optionsRef.current = options;
 	const { authToken, bootstrapped, folderPath } = options;
+	// While locked, sealed changes read as unparseable and would be offered for removal as damaged.
+	const locked = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot).status === 'locked';
 
 	useEffect(() => {
 		let alive = true;
@@ -50,7 +53,7 @@ export function useReminderOutbox(options: {
 		setQuarantinedChanges([]);
 		removeQuarantinedRef.current = null;
 		recoverRef.current = null;
-		if (!authToken || !bootstrapped) return;
+		if (!authToken || !bootstrapped || locked) return;
 		let dispose = () => {};
 		void Promise.all([createReminderOutboxStorage(authToken, folderPath), createReminderRecoveryStorage(authToken, folderPath), createReminderSettlementChannel(authToken, folderPath)]).then(([storage, recovery, settlement]) => {
 			if (!isCurrent()) return;
@@ -68,7 +71,7 @@ export function useReminderOutbox(options: {
 			if (isCurrent()) setStorageError(`Could not load pending changes. ${error instanceof Error ? error.message : String(error)}`);
 		});
 		return () => { alive = false; outboxRef.current = null; recoverRef.current = null; removeQuarantinedRef.current = null; dispose(); };
-	}, [authToken, bootstrapped, folderPath, initialization]);
+	}, [authToken, bootstrapped, folderPath, initialization, locked]);
 
 	useEffect(() => {
 		if (ready && options.enabled !== false && options.hasSnapshot !== false) void outboxRef.current?.drain();
