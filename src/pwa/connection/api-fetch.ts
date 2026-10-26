@@ -7,8 +7,7 @@ import { CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '@/protocol/http-head
 import { detectWebSessionName } from './session-label';
 import { prepareReminderEncryption } from '../reminders/encryption-session';
 import type { FeatureKeys } from '../encryption/encryption-keys';
-import { EncryptionStateChangedError } from '../encryption/encryption-retry';
-import { requestSharedFeaturesRefresh } from '../shared-features';
+import { checkEncryptionSignals, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
 import { requireCompatibleProtocol } from './server-compatibility';
 import { EncryptedReminderApi } from '../reminders/encrypted-reminder-api';
@@ -60,8 +59,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		if (encryptionState === 'off') encryptionOffToken = authToken;
 		else if (encryptionState === 'on' && encryptionOffToken === authToken) encryptionOffToken = null;
 		// Without keys, a 428 from a newly encrypted vault retries after a fresh probe.
-		if ((keys || encryptionState === 'on') && response.status === 428 && path !== '/encryption') throw new EncryptionStateChangedError('The vault encryption changed.');
-		if (response.status === 423) requestSharedFeaturesRefresh(true);
+		checkEncryptionSignals(response, path, { probePath: '/encryption', message: 'The vault encryption changed.', encrypted: Boolean(keys) || encryptionState === 'on' });
 		if (response.status === 403 && path.startsWith('/reminders/')) await followFolderChange(response);
 		return response;
 	}
@@ -88,16 +86,14 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 	async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
 		if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		if (path === '/encryption' || (path === '/auth/session' && init.method === 'DELETE')) return rawFetch(path, init);
-		for (let attempt = 0; ; attempt++) {
-			await ready(attempt > 0);
-			try {
-				if (encrypted) {
-					const response = await encrypted.handle(path, init);
-					if (response) return response;
-				}
-				return await rawFetch(path, init);
-			} catch (error) { if (!(error instanceof EncryptionStateChangedError) || attempt > 0) throw error; }
-		}
+		return retryAfterEncryptionChange(async refresh => {
+			await ready(refresh);
+			if (encrypted) {
+				const response = await encrypted.handle(path, init);
+				if (response) return response;
+			}
+			return rawFetch(path, init);
+		});
 	}
 	return Object.assign(apiFetch, { ready });
 }

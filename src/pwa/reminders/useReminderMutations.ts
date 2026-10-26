@@ -1,4 +1,3 @@
-import type { ConfirmedReminderSnapshot } from './useReminderSync';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { capturePwaSession } from '../connection/session-generation';
 import { newReminderOperationId } from './outbox/reminder-operation-id';
@@ -6,7 +5,7 @@ import { applyReminderChanges, predictReminderCompletion } from './outbox/remind
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';
 import { useReminderOutbox } from './useReminderOutbox';
 import type { ApiFetch, ShowToast, StoredConfig } from '../types';
-import type { LoadReminders, ModalState, ReminderRecord } from './types';
+import type { ModalState, ReminderRecord, ReminderSyncHost } from './types';
 import { createSaveReminderChange } from './outbox/save-reminder-command';
 
 export function useReminderMutations(options: {
@@ -14,23 +13,23 @@ export function useReminderMutations(options: {
 	apiFetch: ApiFetch;
 	authToken: string | null;
 	bootstrapped: boolean;
-	beginLocalMutation: () => () => void;
-	invalidateReads: () => void;
-	commitReminderState: (reminders: ReminderRecord[], projects?: string[]) => void | Promise<void>;
+	sync: ReminderSyncHost;
 	config: StoredConfig;
 	ensureCanMutate: () => boolean;
 	reminders: ReminderRecord[];
 	projects: string[];
-	getSnapshot: () => ConfirmedReminderSnapshot;
 	selectedProject: string | null;
 	refreshPresentation: () => void;
 	showToast: ShowToast;
-	loadReminders: LoadReminders;
 	hasSnapshot?: boolean;
 	canRecover?: boolean;
 }) {
-	const { changes, ready, outboxRef, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges } = useReminderOutbox({ ...options, folderPath: options.config.folderPath });
-	const { config, ensureCanMutate, projects, getSnapshot, selectedProject, refreshPresentation, showToast } = options;
+	const { enabled, apiFetch, authToken, bootstrapped, sync, config, hasSnapshot, canRecover } = options;
+	const { changes, ready, outboxRef, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges } = useReminderOutbox({
+		...sync, enabled, apiFetch, authToken, bootstrapped, hasSnapshot, canRecover, showToast: options.showToast, folderPath: config.folderPath,
+	});
+	const { ensureCanMutate, projects, selectedProject, refreshPresentation, showToast } = options;
+	const { getSnapshot } = sync;
 	const preparingRef = useRef(false);
 	const pendingPreparations = useRef(0);
 	const [, setPreparationCount] = useState(0);

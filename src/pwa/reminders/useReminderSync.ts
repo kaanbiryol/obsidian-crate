@@ -9,14 +9,14 @@ import { createReminderListCursor } from './reminder-list-cursor';
 import { decideReminderListFailure, decideReminderListResponse, needsDiskFallback } from './reminder-list-response';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import type { ApiFetch, DataMode, StoredConfig } from '../types';
-import type { CachedReminderSnapshot, LoadReminders, ReminderRecord, ReminderSourceIssue } from './types';
+import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue, ReminderSyncHost } from './types';
 
 export interface ConfirmedReminderSnapshot {
 	reminders: ReminderRecord[];
 	projects: string[];
 }
 
-export interface ReminderSyncState {
+export interface ReminderSyncState extends ReminderSyncHost {
 	reminders: ReminderRecord[];
 	projects: string[];
 	loading: boolean;
@@ -32,12 +32,7 @@ export interface ReminderSyncState {
 	getSnapshot: () => ConfirmedReminderSnapshot;
 	hasHydratedCache: () => boolean;
 	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
-	loadReminders: LoadReminders;
 	rebuildOfflineCache: () => Promise<void>;
-	beginLocalMutation: () => () => void;
-	/** Drops in-flight reads without starting a write, e.g. after another tab's command settles. */
-	invalidateReads: () => void;
-	/** Peers applying another tab's persisted confirmation pass persist: false. */
 	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => Promise<void>;
 	resetReminderState: () => void;
 	refreshPresentation: () => void;

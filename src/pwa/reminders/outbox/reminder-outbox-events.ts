@@ -3,7 +3,7 @@ import type { ReminderOutboxStorage } from './reminder-outbox-storage';
 import type { createReminderOutbox } from './reminder-outbox';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import type { ShowToast } from '../../types';
-import type { CachedReminderSnapshot, LoadReminders, ReminderRecord } from '../types';
+import type { ReminderSyncHost } from '../types';
 
 const PEER_REFRESH_DELAY_MS = 100;
 
@@ -16,15 +16,7 @@ export function subscribeReminderOutboxEvents(options: {
 	settlement: Pick<Awaited<ReturnType<typeof createReminderSettlementChannel>>, 'key' | 'read'>;
 	outbox: Pick<ReturnType<typeof createReminderOutbox>, 'refresh' | 'drain'>;
 	setRecoveryChanges: (changes: PendingReminderChange[]) => void;
-	current: () => {
-		hasSnapshot?: boolean;
-		beginLocalMutation: () => () => void;
-		invalidateReads: () => void;
-		getSnapshot: () => Pick<CachedReminderSnapshot, 'reminders' | 'projects'>;
-		commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => void | Promise<void>;
-		loadReminders: LoadReminders;
-		showToast: ShowToast;
-	};
+	current: () => ReminderSyncHost & { hasSnapshot?: boolean; showToast: ShowToast };
 }): () => void {
 	const { storage, recovery, settlement, outbox } = options;
 	const browser = window, page = document;

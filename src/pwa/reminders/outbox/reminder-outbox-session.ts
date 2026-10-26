@@ -6,19 +6,14 @@ import { subscribeReminderOutboxEvents } from './reminder-outbox-events';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import { REMINDER_OUTBOX_LOCK } from '../private-storage';
 import type { ApiFetch, ShowToast } from '../../types';
-import type { LoadReminders, ReminderRecord } from '../types';
+import type { ReminderSyncHost } from '../types';
 
 /** The latest values from the hosting view, read when the session needs them. */
-export interface ReminderOutboxSessionHost {
+export interface ReminderOutboxSessionHost extends ReminderSyncHost {
 	enabled?: boolean;
 	hasSnapshot?: boolean;
 	canRecover?: boolean;
 	apiFetch: ApiFetch;
-	beginLocalMutation: () => () => void;
-	invalidateReads: () => void;
-	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => void | Promise<void>;
-	getSnapshot: () => { reminders: ReminderRecord[]; projects: string[] };
-	loadReminders: LoadReminders;
 	showToast: ShowToast;
 }
 

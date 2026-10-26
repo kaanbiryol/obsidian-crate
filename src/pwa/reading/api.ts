@@ -12,7 +12,7 @@ import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
 export { ReadingApiError } from './session/api-error';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './storage/record-validation';
-import { EncryptionStateChangedError } from '../encryption/encryption-retry';
+import { checkEncryptionSignals, EncryptionStateChangedError, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 
 /** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
@@ -53,15 +53,11 @@ async function rawReadingRequest(path: string, session: ReadingSession | null, b
     reportExpiredConnection(session.token);
     throw new ReadingApiError(SESSION_RECOVERY_MESSAGE, 401);
   }
-  if (response.status === 428 && path !== '/reading/encryption') throw new EncryptionStateChangedError('The encrypted Reading folder changed.');
-  if (response.status === 423) requestSharedFeaturesRefresh(true);
+  checkEncryptionSignals(response, path, { probePath: '/reading/encryption', message: 'The encrypted Reading folder changed.' });
   return response;
 }
-export async function readingRequest<T>(path: string, session: ReadingSession | null, body?: string): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try { return await preparedReadingRequest<T>(path, session, body, attempt > 0); }
-    catch (error) { if (!(error instanceof EncryptionStateChangedError) || attempt > 0) throw error; }
-  }
+export function readingRequest<T>(path: string, session: ReadingSession | null, body?: string): Promise<T> {
+  return retryAfterEncryptionChange(refresh => preparedReadingRequest<T>(path, session, body, refresh));
 }
 async function preparedReadingRequest<T>(path: string, session: ReadingSession | null, body?: string, refresh = false): Promise<T> {
   if (session) {

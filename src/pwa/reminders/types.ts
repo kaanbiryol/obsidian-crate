@@ -6,6 +6,17 @@ export type ModalMode = 'create' | 'edit';
 export type ModalPickerId = 'date' | 'project' | 'recurrence';
 export type LoadReminders = (options?: { silent?: boolean; maxAgeMs?: number }) => Promise<void>;
 
+/** The confirmed reminder state the outbox and mutations read and publish through. */
+export interface ReminderSyncHost {
+	beginLocalMutation: () => () => void;
+	/** Drops in-flight reads without starting a write, e.g. after another tab's command settles. */
+	invalidateReads: () => void;
+	/** Peers applying another tab's persisted confirmation pass persist: false. */
+	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => void | Promise<void>;
+	getSnapshot: () => { reminders: ReminderRecord[]; projects: string[] };
+	loadReminders: LoadReminders;
+}
+
 export type ReminderRecord = InferOutput<typeof reminderRecordSchema>;
 
 export type ModalDraft = InferOutput<typeof reminderDraftSchema>;

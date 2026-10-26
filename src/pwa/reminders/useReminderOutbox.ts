@@ -8,20 +8,14 @@ import { createReminderOutboxSession } from './outbox/reminder-outbox-session';
 import { reminderEncryptionSnapshot, subscribeReminderEncryption } from './encryption-session';
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';
 import type { ApiFetch, ShowToast } from '../types';
-import type { LoadReminders, ReminderRecord } from './types';
-import type { ConfirmedReminderSnapshot } from './useReminderSync';
+import type { ReminderSyncHost } from './types';
 
-export function useReminderOutbox(options: {
+export function useReminderOutbox(options: ReminderSyncHost & {
 	enabled?: boolean;
 	authToken: string | null;
 	bootstrapped: boolean;
 	folderPath: string;
 	apiFetch: ApiFetch;
-	beginLocalMutation: () => () => void;
-	invalidateReads: () => void;
-	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => void | Promise<void>;
-	getSnapshot: () => ConfirmedReminderSnapshot;
-	loadReminders: LoadReminders;
 	showToast: ShowToast;
 	hasSnapshot?: boolean;
 	canRecover?: boolean;
