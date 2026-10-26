@@ -1,6 +1,6 @@
 import type { TFile, Vault } from 'obsidian';
 import { createConflictCopy, getIncomingConflictFileName } from '../conflict/conflict';
-import { isHiddenPath } from './file-discovery';
+import { ensureParentFolder, isHiddenPath } from './file-discovery';
 import type { RecordConflictInput } from '../conflict/store';
 import { isVaultTFileLike } from './local-delete';
 import type { DiffApplyOutcome } from '../transfer/types';
@@ -186,26 +186,6 @@ async function readLocalSnapshot(vault: Vault, path: string): Promise<LocalSnaps
 	} catch (error) {
 		if (!await vault.adapter.exists(path)) return { exists: false };
 		throw error;
-	}
-}
-
-async function ensureParentFolder(vault: Vault, path: string): Promise<void> {
-	const folderPath = path.substring(0, path.lastIndexOf('/'));
-	if (!folderPath) return;
-
-	if (isHiddenPath(path)) {
-		try {
-			await vault.adapter.mkdir(folderPath);
-		} catch {
-			// Folder already exists.
-		}
-		return;
-	}
-
-	try {
-		await vault.createFolder(folderPath);
-	} catch {
-		// Folder already exists.
 	}
 }
 

@@ -31,6 +31,18 @@ export function isHiddenPath(path: string): boolean {
 	return path.split('/').some(segment => segment.startsWith('.'));
 }
 
+/** Create a file's parent folder, through the adapter for hidden paths, if it is missing. */
+export async function ensureParentFolder(vault: Vault, path: string): Promise<void> {
+	const folderPath = path.substring(0, path.lastIndexOf('/'));
+	if (!folderPath) return;
+	try {
+		if (isHiddenPath(path)) await vault.adapter.mkdir(folderPath);
+		else await vault.createFolder(folderPath);
+	} catch {
+		// Folder already exists.
+	}
+}
+
 /**
  * Extract the extension from a path string (without the leading dot).
  * Returns empty string for extensionless files like `.gitignore`.
