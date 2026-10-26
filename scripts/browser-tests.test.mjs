@@ -91,6 +91,7 @@ test('builds once, preserves child environment and reports all test failures', (
 	assert.ok(calls.every(call => call.options.env.CI === 'true'));
 	assert.deepEqual(calls[0].options.env, { CI: 'true' });
 	assert.ok(calls.slice(1).every(call => call.options.env.CRATE_WORKER_PREBUILT === '1'));
+	assert.ok(calls.slice(1).every(call => call.options.timeout === 6 * 60_000));
 });
 
 test('plugin groups skip the Worker build', () => {
