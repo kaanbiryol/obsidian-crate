@@ -11,7 +11,7 @@
 
 import { parseReminderContent, UnresolvedReminderScheduleError, type ParsedReminder } from './reminderParser';
 import type { Priority, RecurrenceRule } from '../../types';
-import { formatReminderDateText } from '../dates/reminderDate';
+import { formatLocalDateKey, formatReminderDateText } from '../dates/reminderDate';
 import { recurrenceToText } from '../recurrence/recurrenceText';
 import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../reminderIdentity';
 import { appendRecurrenceMetadata, readRecurrenceMetadata } from '../recurrence/recurrenceMetadata';
@@ -191,6 +191,8 @@ export function rebuildCheckboxLine(
   recurrence?: RecurrenceRule,
   hasTime?: boolean,
   reminderId?: string,
+  /** Write a date-only due as `2026-10-30` instead of `Oct 30, 2026`. */
+  isoDate = false,
 ): string {
   const checkbox = isCompleted ? '[x]' : '[ ]';
 
@@ -207,7 +209,7 @@ export function rebuildCheckboxLine(
     const showTime = hasTime ?? (recurrence?.hour !== undefined || dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0);
     const formatted = showTime
       ? dueDate.toISOString()
-      : formatReminderDateText(dueDate);        // "Jan 13, 2026"
+      : isoDate ? formatLocalDateKey(dueDate) : formatReminderDateText(dueDate);        // "Jan 13, 2026"
     content += ` ${formatted}`;
   }
 

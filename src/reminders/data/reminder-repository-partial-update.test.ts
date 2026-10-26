@@ -88,13 +88,13 @@ describe('titles that would not read back', () => {
 		expect(index.sourceIssues).toEqual([]);
 		expect(index.getAll().map(reminder => reminder.id)).toEqual(['one']);
 
-		await expect(repository.create({ content: 'Pages 20-30', project: 'Reading', priority: 4, dueDate: '2026-10-30' })).rejects.toThrow(ReminderInputError);
+		await expect(repository.create({ content: 'Slides 10-20', project: 'Reading', priority: 4, dueDate: '2026-10-30' })).rejects.toThrow(ReminderInputError);
 		expect(files.has('Reminders/Reading.md')).toBe(false);
 	});
 
 	it('refuses an edit before writing', async () => {
 		const { files, index, repository } = await workspace();
-		await expect(repository.update('one', { content: 'Sprint 14-28', dueDate: '2026-10-30', dueDatetime: undefined, recurrence: null }))
+		await expect(repository.update('one', { content: 'Read pages 13-19', dueDate: '2026-10-30', dueDatetime: undefined, recurrence: null }))
 			.rejects.toThrow(ReminderInputError);
 		expect(files.get(path)).toBe(content);
 		expect(index.sourceIssues).toEqual([]);
