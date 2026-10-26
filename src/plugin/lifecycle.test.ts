@@ -91,6 +91,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 function createPlugin(overrides: Record<string, unknown> = {}) {
 	return {
 		app: {
+			vault: { configDir: '.obsidian' },
 			setting: {
 				open: vi.fn(),
 				openTabById: vi.fn(),
@@ -519,7 +520,8 @@ it('pulls shared settings once the sync connection exists on a cold start', asyn
 
   await vi.waitFor(() => expect(updateSyncSettings).toHaveBeenCalledOnce());
   expect(getSharedSettings).toHaveBeenCalledOnce();
-  expect(settings).toMatchObject(remote);
+  // This device keeps excluding its own workspace files.
+  expect(settings).toMatchObject({ ...remote, ignorePatterns: ['Archive/', '.obsidian/workspace*'] });
 });
 
 it('does not initialize sync when the plugin unloads before the layout is ready', async () => {

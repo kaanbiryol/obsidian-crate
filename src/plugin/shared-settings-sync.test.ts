@@ -225,3 +225,26 @@ describe('shared settings pull on refresh', () => {
 		}
 	});
 });
+
+it('adopts other devices\' exclusion changes on a device with its own config folder', async () => {
+	const { server, transport } = settingsServer({ ignorePatterns: ['X/', '.obsidian/workspace*'], syncInterval: 300, pushEnabled: true });
+	const api = new SyncApiClient(WORKER_URL, 'token', transport);
+	const own = (patterns: string[]) => patterns.includes('.m/workspace*') ? patterns : [...patterns, '.m/workspace*'];
+	const settings: TrackedSettings = { workerUrl: WORKER_URL, ignorePatterns: ['X/', '.obsidian/workspace*', '.m/workspace*'], syncInterval: 300, pushEnabled: true,
+		sharedSettingsBase: { workerUrl: WORKER_URL, settings: { ignorePatterns: ['X/', '.obsidian/workspace*'], syncInterval: 300, pushEnabled: true } } };
+	// Like the plugin's settings normalization, every write keeps this device's own workspace pattern.
+	const writeSettings = vi.fn(async (update: Partial<TrackedSettings>) => {
+		Object.assign(settings, update);
+		settings.ignorePatterns = own(settings.ignorePatterns);
+	});
+	const plugin = { settings, writeSettings, syncRuntime: { getApiClient: () => api, updateSyncSettings: vi.fn() } };
+	const sharedSettings = createSharedSettingsSync(plugin as unknown as CratePlugin, '.m');
+	server.settings = { ...server.settings!, ignorePatterns: ['Private/', '.obsidian/workspace*'] };
+	server.version = 'remote';
+	await sharedSettings.pull();
+	expect(settings.ignorePatterns).toEqual(['Private/', '.obsidian/workspace*', '.m/workspace*']);
+	sharedSettings.observe();
+	await sharedSettings.push();
+	expect(Notice.messages).not.toContain(SHARED_SETTINGS_CONFLICT_NOTICE);
+	expect(server.settings?.ignorePatterns).toEqual(['Private/', '.obsidian/workspace*']);
+});

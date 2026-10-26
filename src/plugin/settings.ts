@@ -20,7 +20,8 @@ function normalizeBoolean(value: unknown, fallback: boolean): boolean {
 	return typeof value === 'boolean' ? value : fallback;
 }
 
-function normalizeIgnorePatterns(ignorePatterns: string[], configDir: string): string[] {
+/** Every device also excludes its own workspace files, whatever its shared patterns say. */
+export function normalizeIgnorePatterns(ignorePatterns: string[], configDir: string): string[] {
 	const normalizedConfigDir = configDir.replace(/^\/+|\/+$/g, '');
 	const workspacePattern = normalizedConfigDir ? `${normalizedConfigDir}/workspace*` : null;
 	return !workspacePattern || ignorePatterns.includes(workspacePattern)
