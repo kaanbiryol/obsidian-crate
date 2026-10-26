@@ -40,7 +40,7 @@ platform: 'browser', target: 'es2022', alias: { obsidian: resolve('src/test/mock
 } }] })).outputFiles[0].text;
 const pushWorker = await buildEncryptedPushWorker();
 const server = createServer((req, res) => {
-	if (req.url === '/encrypted-push-worker.js') {
+	if (req.url?.split('?')[0] === '/encrypted-push-worker.js') {
 		res.setHeader('Content-Type', 'application/javascript'); res.end(pushWorker); return;
 	}
 	res.setHeader('Content-Type', req.url === '/harness.js' ? 'application/javascript' : 'text/html');
