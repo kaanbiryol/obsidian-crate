@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { constantTimeEqual, createPkcePair, randomBase64Url, randomHex } from './pkce';
+import { constantTimeEqual, createPkcePair, randomBase64Url } from './pkce';
+import { createRandomHexToken } from '../../platform/random-hex';
 
 describe('Cloudflare OAuth PKCE helpers', () => {
 	it('creates an S256 verifier and challenge without base64 padding', async () => {
@@ -20,7 +21,7 @@ describe('Cloudflare OAuth PKCE helpers', () => {
 		const secondState = randomBase64Url(32);
 		expect(firstState).toMatch(/^[A-Za-z0-9_-]{43}$/);
 		expect(secondState).not.toBe(firstState);
-		expect(randomHex(8)).toMatch(/^[a-f0-9]{16}$/);
+		expect(createRandomHexToken(8)).toMatch(/^[a-f0-9]{16}$/);
 	});
 
 	it('compares state values without returning early for different lengths', () => {

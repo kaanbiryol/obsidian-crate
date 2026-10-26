@@ -7,4 +7,4 @@ export const SECRET_KEYS = {
 	ENCRYPTION_RECOVERY: 'crate-encryption-recovery',
 } as const;
 
-export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS] | `crate-analytics-${string}` | `crate-usage-oauth-${string}`;
+export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS] | `crate-usage-oauth-${string}`;

@@ -1,5 +1,5 @@
 import { readEncryptionState } from '../../encryption/state';
-import { capturePath, publishCapture, runCapture, type CapturePublication } from '../captures';
+import { capturePath, MAX_FETCH_ATTEMPTS, publishCapture, runCapture, type CapturePublication } from '../captures';
 import { featureEnabled } from '../../feature-policy';
 import type { FeaturePolicy } from '../../../../protocol/feature-policy';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
@@ -33,6 +33,7 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
   if (!current?.enabled || current.generation !== job.generation) return;
   const stored = await env.DB.prepare('SELECT source_revision FROM reading_jobs WHERE path=?').bind(job.path).first<{ source_revision: string }>();
   if (stored?.source_revision !== job.source_revision) return;
+  let failed = false;
   try {
     const source = await readSource(env, job.path), item = parseReadingNote(source.content), block = managedArticle(source.content);
     if (source.file.storageKey !== job.source_revision || item?.crate_reading_id !== job.item_id || item.capture_method !== 'url'
@@ -46,9 +47,13 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
     }
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, job.path, content, source.file.hash);
     await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, encryptionState: null });
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
     // A capture that is still pending at its current revision is queued again by scheduleReading.
-    await env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision).run();
+    // A failed publication keeps its leased row instead, so that queue cannot restart its attempts.
+    if (!failed) await env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision).run();
   }
 }
 
@@ -73,8 +78,12 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
       if (source.file.storageKey !== job.source_revision) {
         await env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision).run();
       } else {
-        try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; }
-        catch { if (job.attempts < 2) return; }
+        // Three attempts fetch the page. Later ones publish the bookmark without an
+        // article, so a note that cannot take its article stops refetching it.
+        if (job.attempts < MAX_FETCH_ATTEMPTS) {
+          try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; }
+          catch { if (job.attempts < MAX_FETCH_ATTEMPTS - 1) return; }
+        }
         if (!await publishReading(env, { job, result, resolvedUrl } satisfies Publication)) throw new Error('Reading publication unavailable');
       }
     } catch { /* Keep the bounded lease and exact source for recovery. No article or URL logging. */ }

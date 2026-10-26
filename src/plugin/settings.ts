@@ -10,7 +10,7 @@ import { normalizeUsageSnapshot } from '../cloudflare/usage/snapshot';
 import { normalizeWorkerUrl } from '../sync/connection/worker-url';
 import { type CrateSettings, type PersistedCrateSettings, DEFAULT_SETTINGS } from './settings-types';
 import { normalizeSyncHistory } from '../sync/settings';
-import { normalizeSharedSettingsValue } from '../protocol/shared-settings';
+import { MAX_SYNC_INTERVAL_SECONDS, normalizeSharedSettingsValue } from '../protocol/shared-settings';
 
 function normalizeString(value: unknown, fallback = ''): string {
 	return typeof value === 'string' ? value.trim() : fallback;
@@ -53,7 +53,7 @@ export function normalizePersistedCrateSettings(
 			configDir,
 		),
 		automaticSync: normalizeBoolean(value?.automaticSync, DEFAULT_SETTINGS.automaticSync),
-		syncInterval: normalizeNonNegativeInteger(value?.syncInterval, DEFAULT_SETTINGS.syncInterval),
+		syncInterval: Math.min(normalizeNonNegativeInteger(value?.syncInterval, DEFAULT_SETTINGS.syncInterval), MAX_SYNC_INTERVAL_SECONDS),
 		syncHistory: normalizeSyncHistory(value?.syncHistory),
 		pushEnabled: normalizeBoolean(value?.pushEnabled, DEFAULT_SETTINGS.pushEnabled),
 		debugLogging: normalizeBoolean(value?.debugLogging, DEFAULT_SETTINGS.debugLogging),

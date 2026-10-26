@@ -15,7 +15,6 @@ function checkpoint(): ManifestCheckpoint {
 		authority: 'https://crate.test',
 		settledUploads: [otherOperationId, operationId],
 		renames: new Map([['note.md', 'renamed.md'], ['__proto__', 'prototype.md']]),
-		appliedRename: 'folder-move-1',
 		uploadDiagnostics: [{
 			at: '2026-01-01T00:00:00Z', clientSession: '11111111-1111-1111-1111-111111111111',
 			operationId, kind: 'merge', phase: 'checkpointed', generation: 7,

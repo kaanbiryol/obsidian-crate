@@ -218,7 +218,9 @@ export function createReminderIndex(
         // the inventory before publishing a snapshot that crossed that event.
       } while (!signal?.aborted && revision !== structureRevision);
       if (signal?.aborted) return result;
-      if (result.deferred) {
+      // Only a scan that stopped early leaves the whole load for later. Files held
+      // back individually keep their previous records and are rescanned on flush.
+      if (result.deferred && !result.deferredPaths) {
         deferredLoad = true;
         for (const issue of result.issues) sourceIssues.set(issue.path, issue);
         ambiguousOwners = result.ambiguousOwners ?? ambiguousOwners;
@@ -232,11 +234,21 @@ export function createReminderIndex(
         return result;
       }
 
+      const heldBack = new Set(result.deferredPaths);
       deferredLoad = false;
       isInitialLoadComplete = true;
+      const previousIssues = sourceIssues;
       sourceIssues = new Map(result.issues.map(issue => [issue.path, issue]));
-      reminders = [...result.reminders, ...reminders.filter(reminder => sourceIssues.has(reminder.filePath))];
-      ambiguousOwners = [];
+      for (const path of heldBack) {
+        const issue = previousIssues.get(path);
+        if (issue) sourceIssues.set(path, issue);
+        deferredPaths.add(path);
+      }
+      // Before the first load there are no previous records, so held-back files
+      // show what could be read without normalizing them.
+      const fresh = isLoaded ? result.reminders.filter(reminder => !heldBack.has(reminder.filePath)) : result.reminders;
+      reminders = [...fresh, ...reminders.filter(reminder => sourceIssues.has(reminder.filePath) || heldBack.has(reminder.filePath))];
+      ambiguousOwners = result.ambiguousOwners ?? [];
       isLoaded = true;
       discoveredProjects = new Set(result.discoveredProjects);
 

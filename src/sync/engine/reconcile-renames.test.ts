@@ -8,7 +8,7 @@ import { assertRenamePreserved } from '../manifest/rename-dependencies';
 import { reconcileQueuePaths, type TargetedReconcileContext } from './reconcile-paths';
 import { sha256Hex } from '../../platform/sha256';
 
-async function harness(destinationUploaded: boolean) {
+async function harness(destinationUploaded: boolean, destinationExists = true) {
 	const source = 'Dashboard.md';
 	const destination = 'Upcoming.md';
 	const content = new TextEncoder().encode('dashboard').buffer;
@@ -25,7 +25,7 @@ async function harness(destinationUploaded: boolean) {
 	};
 	const vault = {
 		adapter,
-		getAbstractFileByPath: vi.fn((path: string) => path === destination
+		getAbstractFileByPath: vi.fn((path: string) => destinationExists && path === destination
 			? { path, extension: 'md', stat: { size: content.byteLength, mtime: 1000 } } : null),
 	} as unknown as Vault;
 	const manifest = new LocalManifest({ vault } as App, { dir: '.obsidian/plugins/crate' } as PluginManifest);
@@ -41,7 +41,7 @@ async function harness(destinationUploaded: boolean) {
 		} else if (diff.action === 'delete') {
 			await assertRenamePreserved(manifest, vault, diff.path);
 			// The destination receipt must be durable before deleting the source.
-			expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
+			if (destinationExists) expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
 			deleted(diff.path);
 			delete remote[diff.path];
 			manifest.removeEntry(diff.path);
@@ -56,7 +56,7 @@ async function harness(destinationUploaded: boolean) {
     batchDelete: async paths => {
       for (const path of paths) {
         await assertRenamePreserved(manifest, vault, path);
-        expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
+        if (destinationExists) expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
         deleted(path); delete remote[path];
       }
       return { success: true, deleted: paths };
@@ -99,6 +99,17 @@ describe('targeted rename reconciliation', () => {
 		expect(result.settledPaths).toEqual([]);
 		expect(h.deleted).not.toHaveBeenCalled();
 		expect(h.remote[h.source]).toEqual(h.entry);
+	});
+
+	it('deletes the source once its renamed copy was deleted before uploading', async () => {
+		const h = await harness(false, false);
+		const result = await reconcileQueuePaths(h.context, [pendingChangeKey('delete', h.source)]);
+		expect(result.success).toBe(true);
+		expect(h.deleted).toHaveBeenCalledWith(h.source);
+		expect(h.remote[h.source]).toBeUndefined();
+		expect(h.manifest.getRenameDependencies()).toEqual({});
+		// Later deletions are no longer held back by the cleared dependency.
+		await expect(assertRenamePreserved(h.manifest, {} as Vault, h.source)).resolves.toBeUndefined();
 	});
 
 	it('does not upload an unselected destination or bypass the deletion guard', async () => {

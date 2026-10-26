@@ -4,6 +4,7 @@ import { createEmptySyncResult } from '../sync-result';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { TransferContext } from './types';
 import { sha256Hex } from '../../platform/sha256';
+import { HttpError } from '../worker-api/http';
 
 function toArrayBuffer(text: string): ArrayBuffer {
 	return new TextEncoder().encode(text).buffer;
@@ -342,6 +343,27 @@ describe('processDiff conflict handling', () => {
 		expect(harness.vault.modifyBinary).not.toHaveBeenCalled();
 		expect(harness.vault.createBinary).not.toHaveBeenCalled();
 		expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
+	});
+
+	it('keeps the status and code of a refused merged upload, so reconciliation can retry it', async () => {
+		const harness = createProcessHarness();
+		const path = 'notes/merge.md';
+		const base = 'title\nbase local\nbase remote\n';
+		const local = 'title\nlocal edit\nbase remote\n';
+		const remote = 'title\nbase local\nremote edit\n';
+		harness.localManifest.getEntry.mockReturnValue({ hash: await sha256Hex(toArrayBuffer(base)), size: base.length, modified: '2026-02-14T00:00:00.000Z' });
+		harness.markdownBaseCache.readBase.mockResolvedValue(toArrayBuffer(base));
+		harness.vault.getAbstractFileByPath.mockReturnValue({ path, extension: 'md' });
+		harness.adapter.readBinary.mockResolvedValue(toArrayBuffer(local));
+		harness.api.downloadFile.mockResolvedValue({ content: toArrayBuffer(remote), contentType: 'text/markdown', size: remote.length });
+		harness.api.uploadFile.mockResolvedValue({ success: false, path, status: 409, code: 'version_conflict', error: 'Remote file changed' });
+
+		const error = await processDiff(harness.context, {
+			path, action: 'conflict', cause: 'concurrent-edit',
+			localHash: await sha256Hex(toArrayBuffer(local)), remoteHash: await sha256Hex(toArrayBuffer(remote)),
+		}, {}, createEmptySyncResult()).catch((caught: unknown) => caught);
+		expect(error).toBeInstanceOf(HttpError);
+		expect(error).toMatchObject({ status: 409, code: 'version_conflict' });
 	});
 
 	it('uses deterministic timestamp format for visible conflict copies', async () => {

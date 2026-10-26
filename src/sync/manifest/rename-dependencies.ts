@@ -85,9 +85,12 @@ export async function assertRenamePreserved(manifest: LocalManifest, vault: Vaul
 	if (manifest.uploadJournal.pending().length) throw new Error('Remote deletion deferred until pending uploads are resolved. The previous remote copies are preserved.');
 	const destination = manifest.renameDestination(path);
 	if (!destination) return;
-	const saved = manifest.getEntry(destination);
 	const local = await readLocalFileEntry(vault, destination);
-	if (!saved?.revision || !local || saved.hash !== local.hash) throw new Error(`Remote deletion deferred until the renamed file is uploaded: ${destination}`);
+	// The renamed copy was deleted or excluded locally, so nothing remains to
+	// upload; deleting the old path is the user's intent.
+	if (!local) return;
+	const saved = manifest.getEntry(destination);
+	if (!saved?.revision || saved.hash !== local.hash) throw new Error(`Remote deletion deferred until the renamed file is uploaded: ${destination}`);
 	// Persist the acknowledgement before the old copy can be deleted.
 	await manifest.save();
 }

@@ -42,6 +42,27 @@ function harness(path: string, initial: ArrayBuffer) {
 }
 
 describe('safe local application', () => {
+	it.each(['notes/view.base', 'refs.bib', 'notes/unknown-extension.note'])('atomically replaces an unchanged UTF-8 file at %s', async path => {
+		const original = encode('views: []\n');
+		const h = harness(path, original);
+		const outcome = await applyRemoteContentIfUnchanged(h.context, path, encode('views: [table]\n'), await sha256Hex(original));
+		expect(outcome).toEqual({ status: 'applied' });
+		expect(decode(h.files.get(path)!)).toBe('views: [table]\n');
+		expect(h.vault.process).toHaveBeenCalled();
+		expect(h.files.size).toBe(1);
+	});
+	it.each([
+		['a known binary format, even when valid UTF-8', 'scan.pdf', encode('%PDF-1.7 a'), encode('%PDF-1.7 b')],
+		['bytes that are not UTF-8', 'notes/data.base', new Uint8Array([255, 1]).buffer, new Uint8Array([255, 2]).buffer],
+		['bytes with NUL characters', 'image.bin', new Uint8Array([0, 1]).buffer, new Uint8Array([0, 2]).buffer],
+	])('keeps incoming bytes for review for %s', async (_case, path, original, incoming) => {
+		const h = harness(path, original);
+		const outcome = await applyRemoteContentIfUnchanged(h.context, path, incoming, await sha256Hex(original));
+		expect(outcome.status).toBe('deferred');
+		expect(h.files.get(path)).toEqual(original);
+		expect(h.vault.process).not.toHaveBeenCalled();
+		expect(h.files.size).toBe(2);
+	});
 	it('does not overwrite a hidden incoming copy created at the final write', async () => {
 		const path = '.hidden/image.bin', original = new Uint8Array([255, 1]).buffer;
 		const h = harness(path, original), late = new Uint8Array([255, 3]).buffer;

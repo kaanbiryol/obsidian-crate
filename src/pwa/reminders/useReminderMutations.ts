@@ -123,6 +123,10 @@ export function useReminderMutations(options: {
 		} catch (error) { if (current()) { refreshPresentation(); report(error); } }
 		finally { finishPreparation(); }
 	};
+	const resumeChanges = () => {
+		try { void outboxRef.current?.resume(); }
+		catch (error) { report(error); }
+	};
 	const retryChange = (operationId: string) => {
 		try { outboxRef.current?.retry(operationId); void outboxRef.current?.drain(); }
 		catch (error) { report(error); }
@@ -153,5 +157,5 @@ export function useReminderMutations(options: {
 	const stableToggleCompleted = useCallback((id: string, completed: boolean) => latest.current.toggleReminderCompleted(id, completed), []);
 	const stablePersistReorder = useCallback((project: string, orderedIds: string[]) => latest.current.persistReorder(project, orderedIds), []);
 	const visible = useMemo(() => applyReminderChanges(options.reminders, projects, changes), [options.reminders, projects, changes]);
-	return { isPreparingMutation: () => preparingRef.current || pendingPreparations.current > 0, saveReminder, toggleReminderCompleted: stableToggleCompleted, deleteReminder, persistReorder: stablePersistReorder, ...visible, changes, ready, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
+	return { isPreparingMutation: () => preparingRef.current || pendingPreparations.current > 0, saveReminder, toggleReminderCompleted: stableToggleCompleted, deleteReminder, persistReorder: stablePersistReorder, ...visible, changes, ready, resumeChanges, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
 }

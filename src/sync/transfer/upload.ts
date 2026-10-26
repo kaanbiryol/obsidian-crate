@@ -91,22 +91,7 @@ export async function uploadPreparedFiles(
           }
 
           if (fileResult.success) {
-            if (fileResult.hash && fileResult.hash !== upload.hash) {
-              recordUploadError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${fileResult.hash})`, upload.path, options);
-              continue;
-            }
-
-            result.uploaded++;
-            result.uploadedPaths.push(upload.path);
-            context.localManifest.setEntry(upload.path, {
-              hash: upload.hash,
-              revision: fileResult.revision,
-              size: upload.size,
-              modified: await context.getModifiedIso(upload.path, upload.mtime),
-            });
-            if (isMarkdownPath(upload.path)) {
-              await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
-            }
+            await recordAcceptedUpload(context, result, upload, fileResult, options);
           } else if (isVersionConflict(fileResult.status, fileResult.code)) {
             versionConflictPaths.add(upload.path);
           } else {
@@ -177,22 +162,7 @@ async function uploadPreparedFilesIndividually(
         : await doUpload();
 
       if (uploadResult.success) {
-        if (uploadResult.hash && uploadResult.hash !== upload.hash) {
-          recordUploadError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${uploadResult.hash})`, upload.path, options);
-          return null;
-        }
-
-        result.uploaded++;
-        result.uploadedPaths.push(upload.path);
-        context.localManifest.setEntry(upload.path, {
-          hash: upload.hash,
-          revision: uploadResult.revision,
-          size: upload.size,
-          modified: await context.getModifiedIso(upload.path, upload.mtime),
-        });
-        if (isMarkdownPath(upload.path)) {
-          await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
-        }
+        await recordAcceptedUpload(context, result, upload, uploadResult, options);
         return null;
       }
 
@@ -214,6 +184,26 @@ async function uploadPreparedFilesIndividually(
 
   const versionConflicts = await context.runConcurrent(tasks, UPLOAD_CONCURRENCY);
   return versionConflicts.filter((path): path is string => path !== null);
+}
+
+/** Records an acknowledged upload; a different acknowledged hash is an error instead. */
+async function recordAcceptedUpload(context: UploadTransferContext, result: SyncResult, upload: PreparedUpload,
+  accepted: { hash?: string; revision?: string }, options: Pick<UploadPreparedFilesOptions, 'onFailure'>): Promise<void> {
+  if (accepted.hash && accepted.hash !== upload.hash) {
+    recordUploadError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${accepted.hash})`, upload.path, options);
+    return;
+  }
+  result.uploaded++;
+  result.uploadedPaths.push(upload.path);
+  context.localManifest.setEntry(upload.path, {
+    hash: upload.hash,
+    revision: accepted.revision,
+    size: upload.size,
+    modified: await context.getModifiedIso(upload.path, upload.mtime),
+  });
+  if (isMarkdownPath(upload.path)) {
+    await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
+  }
 }
 
 function recordUploadError(result: SyncResult, error: unknown, path: string, options: Pick<UploadPreparedFilesOptions, 'onFailure'>): void {

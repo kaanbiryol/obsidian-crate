@@ -23,6 +23,15 @@ async function workspace(content: string | Uint8Array = task + other) {
 afterEach(async () => { for (const h of fixtures.splice(0)) await h.dispose(); vi.restoreAllMocks(); });
 
 describe('plugin reminder byte safety', () => {
+	it('rejects a project move that would detach supporting text before writing the destination', async () => {
+		const h = await workspace(`${task}Supporting paragraph\n${other}`);
+		const before = await h.readBytes(destination);
+		await expect(h.writer.updateReminder(h.index.getById('one')!, { project: 'Z' })).rejects.toThrow('nested tasks or supporting text');
+		expect(await h.readBytes(destination)).toEqual(before);
+		expect(h.journal.hasPending()).toBe(false);
+		expect(h.index.getById('one')?.filePath).toBe(source);
+	});
+
 	it.each([
 		['invalid UTF-8', malformed],
 		['null characters', Buffer.from(`Unrelated\0content\n${task}`)],

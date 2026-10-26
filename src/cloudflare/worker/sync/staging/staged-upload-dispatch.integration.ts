@@ -91,8 +91,8 @@ it('reads the reminder policy and previous file once while committing a reminder
     const size = new TextEncoder().encode(content).byteLength;
     expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, content, expectedHash: first.hash })).committed).toBe(true);
   } finally { env.DB.prepare = prepare; }
-  // One policy read prepares the upload outside the lock; one combined read commits it.
-  expect(reads).toHaveLength(2);
+  // Framed bytes need no policy read to prepare; one combined read commits the upload.
+  expect(reads).toHaveLength(1);
   expect(await env.DB.prepare('SELECT storage_key FROM file_versions').all()).toMatchObject({ results: [{}] });
   expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toEqual({ path });
 });

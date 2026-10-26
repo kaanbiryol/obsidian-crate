@@ -170,7 +170,8 @@ jobs:
           name: release-assets
           path: release
       - name: Rebuild from a clean install
-        run: npm ci && npm run build
+        # Types were checked in the checks job and cannot change the compared artifacts.
+        run: npm ci && npm run build:worker && npm run build:plugin
       - name: Compare original and reproduced artifacts
         run: node scripts/release-artifacts.mjs reproduce
 
@@ -223,15 +224,12 @@ jobs:
         run: npm run test:docker
 
   visual:
-    name: Visual tests (${{ matrix.shard }}/2)
+    name: Visual tests
     if: inputs.reuse-run-id == '' && inputs.parent-run-id == ''
-    # Keep the reviewed snapshot platform; system fonts differ on Linux.
+    # Keep the reviewed snapshot platform; system fonts differ on Linux. One job
+    # leaves three of the four macOS slots for the longer native PWA shards.
     runs-on: macos-26
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -246,16 +244,16 @@ jobs:
       - name: Check the native shortcut parser
         run: node --test scripts/reading-shortcut.test.mjs
       - name: Install browser test runtimes
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps --only-shell chromium webkit
       # Types are checked once in the checks job; browser jobs need only the build output.
       - run: npm run build:worker && npm run build:plugin
       - name: Compare shared UI screenshots
-        run: node scripts/visual-test-run.mjs --shard=${{ matrix.shard }}/2
+        run: node scripts/visual-test-run.mjs
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: visual-${{ matrix.shard }}
+          name: visual
           path: |
             playwright-report/
             test-results/
@@ -350,14 +348,14 @@ jobs:
           retention-days: 7
 
   pwa-native:
-    name: Native PWA browser tests (${{ matrix.shard }}/2)
+    name: Native PWA browser tests (${{ matrix.shard }}/3)
     if: inputs.reuse-run-id == '' && inputs.parent-run-id == ''
     runs-on: macos-26
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -369,9 +367,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Install native browser test runtimes
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps --only-shell chromium webkit
       - name: Check native browser behavior
-        run: npm run test:pwa-browser -- --platform=macos --shard=${{ matrix.shard }}/2
+        run: npm run test:pwa-browser -- --platform=macos --shard=${{ matrix.shard }}/3
       - name: Upload browser failure diagnostics
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

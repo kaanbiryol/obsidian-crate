@@ -3,6 +3,7 @@ import { armNotificationCoordinator } from '../../notifications/lifecycle';
 import { FileNamespaceConflictError } from '../file-namespace';
 import type { Env } from '../../types';
 import { isReminderPath } from '../../reminders/scope';
+import { isReadingNotePath } from '../../reading/library-index';
 import { getNotificationPolicy } from '../../notifications/policy';
 import { readEncryptionState } from '../../encryption/state';
 import type { UploadCommitInput, UploadCommitters } from './upload-committers';
@@ -76,17 +77,24 @@ export function coordinatedUpload(env: Env): CommitUpload {
 export async function prepareCoordinatedUpload(request: Request, env: Env): Promise<UploadParams | Response> {
   // Only the authenticated Worker calls this internal DO endpoint. No public route exposes it.
   const { metadata, content: framed } = await readUpload(request);
-  const policy = await getNotificationPolicy(env.DB);
-  metadata.reminderPolicyRevision = policy?.revision ?? null;
+  // Framed bytes need no policy fence: the commit projects whatever folder is current.
   if (framed) {
     if (framed.byteLength !== metadata.size) return Response.json({ error: 'Staged upload size mismatch' }, { status: 400 });
     return { ...metadata, content: framed };
   }
+  const policy = await getNotificationPolicy(env.DB);
+  metadata.reminderPolicyRevision = policy?.revision ?? null;
   if (!isReminderPath(metadata.path, policy?.folderPath ?? null) && !await readEncryptionState(env.DB)) return { ...metadata, content: new ArrayBuffer(0) };
   const object = await env.BUCKET.get(metadata.objectKey);
   if (!object) return Response.json({ error: 'Staged object unavailable' }, { status: 503 });
   const content = await object.arrayBuffer();
   return { ...metadata, content };
+}
+
+/** Only reminder notes and plaintext Reading notes queue projection or index work.
+ * Arming for others would add a full notification pass per commit. */
+export function createsNotificationWork(paths: readonly string[], reminderFolder: string | null, readingFolder: string | null): boolean {
+  return paths.some(path => isReminderPath(path, reminderFolder) || (readingFolder !== null && isReadingNotePath(path, readingFolder)));
 }
 
 export async function commitCoordinatedUpload(params: UploadParams, state: DurableObjectState, env: Env): Promise<Response> {
@@ -98,7 +106,7 @@ export async function commitCoordinatedUpload(params: UploadParams, state: Durab
   if (params.reminderPolicyRevision !== undefined && params.reminderPolicyRevision !== (current?.revision ?? null)) {
     return Response.json({ error: 'Reminder folder changed during upload. Retry the upload.' }, { status: 503 });
   }
-  await armNotificationCoordinator(state);
+  if (createsNotificationWork([params.path], current?.folder_path ?? null, current?.reading_folder ?? null)) await armNotificationCoordinator(state);
   try {
     return Response.json(await commitStagedFile(env.BUCKET, env.DB, { ...params, reminderFolder: current?.folder_path ?? null,
       readingPolicy: current?.reading_folder ? { folder_path: current.reading_folder } : null }));

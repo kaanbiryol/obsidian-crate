@@ -346,6 +346,21 @@ describe('processPendingChanges', () => {
 		expect(harness.requestReconciliation).toHaveBeenCalledWith(['notes/a.md']);
 	});
 
+	it('reconciles deletes held back by an upload version conflict', async () => {
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({ path, content: new TextEncoder().encode('hello').buffer, hash: 'abc123', size: 5, contentType: 'text/plain' }),
+			uploadFile: async () => { throw new HttpError('remote changed', 409); },
+		});
+		harness.pendingKeys.add('notes/a.md');
+		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/b.md'));
+
+		await processPendingChanges(harness.context);
+
+		expect(harness.batchDelete).not.toHaveBeenCalled();
+		expect(harness.pendingKeys.has(pendingChangeKey('delete', 'notes/b.md'))).toBe(true);
+		expect(harness.requestReconciliation).toHaveBeenCalledExactlyOnceWith(['notes/a.md', pendingChangeKey('delete', 'notes/b.md')]);
+	});
+
 	it('keeps authentication failures pending without attempting reconciliation or automatic retry', async () => {
 		Notice.reset();
 		const harness = createFlushHarness({

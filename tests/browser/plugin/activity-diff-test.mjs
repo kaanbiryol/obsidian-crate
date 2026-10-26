@@ -446,7 +446,8 @@ for (const browserType of [chromium, webkit]) {
                 await expect(syncSelected).toBeDisabled();
                 await expect(syncSelected).toHaveText('Sync files');
                 await expect(page.locator('.crate-browser-selection-count')).toHaveText('0 of 20 files selected');
-                await expect(highlighted).toHaveCount(20);
+                // Every rendered row is highlighted; the menu below counts all 20 files.
+                await expect(highlighted).toHaveCount(await rows.count());
                 await page.keyboard.press('Shift+F10');
                 await page.getByRole('menuitem', { name: 'Discard 20 items…', exact: true }).click();
                 await expect(page.locator('.fixture-modal .reminder-modal-header-title')).toHaveText('Discard 20 files?');
@@ -491,9 +492,20 @@ for (const browserType of [chromium, webkit]) {
                     window.calls = 0;
                     window.mount();
                 });
+                // Only rows near the viewport render; scrolling and keyboard navigation reach the last file.
+                assert.ok(await rows.count() < 100, 'A 500-file list renders a bounded window of rows');
+                await page.locator('.crate-browser-files').evaluate(list => { list.scrollTop = list.scrollHeight; });
+                await expect(rows.last().locator('.crate-browser-file-name')).toHaveText('Note.md');
                 await expect(rows.last().locator('.crate-browser-file-status')).toHaveText('+2 −2');
-                await expect(page.locator('.crate-browser-file-status', { hasText: 'No preview' })).toHaveCount(499);
+                assert.ok(await rows.count() < 100, 'Scrolling replaces rows instead of adding them');
                 assert.equal(await page.evaluate(() => window.calls), 1, 'Only the text file is checked in the background');
+                // Keyboard navigation reaches rows outside the rendered window.
+                await rows.first().focus();
+                await page.keyboard.press('End');
+                await expect(page.locator('.crate-browser-file:focus .crate-browser-file-name')).toHaveText('Note.md');
+                await page.keyboard.press('Home');
+                await expect(page.locator('.crate-browser-file:focus .crate-browser-file-name')).toHaveText('Image 0.PNG');
+                await expect(rows.first().locator('.crate-browser-file-name')).toHaveText('Image 0.PNG');
                 await rows.first().click();
                 await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
                 assert.equal(await page.evaluate(() => window.calls), 2, 'Selecting a binary file loads its details on demand');

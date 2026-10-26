@@ -42,6 +42,7 @@ export function createPendingRowSelection(sidebar: HTMLElement, keys: string[], 
     return {
         choose, selectAll,
         addButton(key: string, button: HTMLButtonElement) { buttons.set(key, button); button.setAttribute('aria-pressed', String(highlighted.has(key))); },
+        removeButton(key: string) { buttons.delete(key); },
         contextTargets(key: string) {
             if (!highlighted.has(key)) choose(keys.indexOf(key));
             buttons.get(key)?.focus({ preventScroll: true });

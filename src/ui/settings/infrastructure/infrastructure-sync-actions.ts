@@ -1,6 +1,7 @@
 import { showSyncErrorNotice } from '../../sync-error-notice';
 import { Notice, Setting } from 'obsidian';
 import { openConfirmationModal } from '../../confirmation-modal';
+import { errorMessage } from '../../../platform/logger';
 import {
 	createFileSyncProgress,
 	hideFileSyncProgress,
@@ -57,8 +58,8 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 							showSyncErrorNotice(plugin, 'Server file replacement completed with errors.');
 						}
 					},
-					onError: () => {
-						new Notice('Could not replace server files');
+					onError: (error) => {
+						new Notice(`Could not replace server files: ${errorMessage(error)}`);
 					},
 					onFinally: () => {
 						hideFileSyncProgress(forceProgress);

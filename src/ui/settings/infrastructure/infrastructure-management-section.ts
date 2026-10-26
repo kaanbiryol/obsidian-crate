@@ -1,7 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 import { SyncDiagnosticsModal } from '../../sync-diagnostics-modal';
 import { runSyncDiagnostics } from '../../../sync/diagnostics/checks';
-import { getErrorMessage, runButtonTask } from '../action-helpers';
+import { runButtonTask } from '../action-helpers';
 import {
 	getDiagnosticsNoticeMessage,
 	summarizeDiagnosticResults,
@@ -9,6 +9,7 @@ import {
 import { renderDiagnostics } from './infrastructure-diagnostics';
 import type { InfrastructureSectionContext } from './infrastructure-types';
 import { buildDiagnosticsSettingsStateKey } from '../settings-ui-state';
+import { errorMessage } from '../../../platform/logger';
 
 export function renderInfrastructureManagementSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin, isConfigured } = context;
@@ -45,7 +46,7 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 							new Notice(getDiagnosticsNoticeMessage(summarizeDiagnosticResults(results)));
 						},
 						onError: (error) => {
-							new Notice(`Diagnostics failed: ${getErrorMessage(error)}`);
+							new Notice(`Diagnostics failed: ${errorMessage(error)}`);
 						},
 						onFinally: () => {
 							diagnosticsSetting.descEl.show();

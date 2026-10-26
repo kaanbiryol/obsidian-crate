@@ -196,6 +196,9 @@ succeed. These helpers do not own engine cancellation or runtime lifecycle state
 file renames. Its `lookup-store.ts` maintains derived lookup maps: the owner removes
 old keys before changing records, then adds the updated records before notifying
 subscribers. Scan failure retains the last published records and lookups together.
+A full load that holds back individual files (a move awaiting review, deferred
+duplicate repair) publishes every other file and keeps those files' previous
+records until a later rescan can read them safely.
 `file-scan-result.ts` applies one file's scan result to that state; queueing,
 invalidation and deferral stay in `index.ts`.
 
@@ -673,7 +676,7 @@ Styling driven by `data-status` attribute on the status bar element, which CSS s
 The plugin scans local Markdown for its UI. The server derives notification schedules from committed Markdown, using one shared folder, timezone, all-day time, and enabled flag in `notification_policy`. Startup only initializes an absent policy. Explicit settings edits compare the captured policy revision before updating it.
 
 1. Every Markdown commit records source identities and durable occurrence observations; commits and deletions record a projection job in the same D1 transaction as the file metadata and changelog.
-2. A reserved coordinator Durable Object wakes after successful mutations. Scheduled maintenance recovers missed wakeups. Each alarm processes at most three source files and five notification jobs, then rearms while work remains.
+2. A reserved coordinator Durable Object wakes after successful mutations. Scheduled maintenance recovers missed wakeups. Each alarm verifies at most two source files (one in an encrypted vault) and projects one file; a separate invocation dispatches up to ten notification jobs, five at a time. It rearms while work remains.
 3. Projection reads and verifies the current immutable R2 object. A conditional D1 batch replaces reminder projections and outbox jobs only while the file revision, policy revision, and projection job token still match.
 4. Each projection publishes its expected notification token and policy revision. The outbox job token becomes the alarm's stable schedule token. Delivery requires all of these to match the current source and policy, closing the gap between projection and outbox application. A durable completed-occurrence receipt prevents accepted-command replay from notifying again; recipient progress survives updates to the same due time.
 5. Web app enrollment produces a folder-bound 90-day session. The authenticated session owns its push subscriptions. Logout captures its revocation request before clearing local state. Recipient selection independently checks expiry and folder authority. Every subscription has a recorded owner.
@@ -699,7 +702,7 @@ The repeat grammar owns the cadence, weekday lists/ranges and monthly day. `remi
 
 One-off calendar recognition also belongs to Chrono. Dates, times and timestamps are not prevalidated or partially masked: when Chrono returns no match, the full phrase remains title text. Durable reads use the same recognition and require recognized schedules to be absolute.
 
-Sync deletes require both the acknowledged content hash and opaque file revision. Recreating the same bytes produces a new revision, so an old delete cannot remove the new file. Missing revisions require reconciliation. Local remote-deletion application always uses vault trash so bytes written after the hash check remain recoverable. Supported text updates use Obsidian's atomic process API. Existing binary files are preserved and incoming bytes saved as conflict copies for explicit review because Obsidian exposes no atomic binary compare-and-swap.
+Sync deletes require both the acknowledged content hash and opaque file revision. Recreating the same bytes produces a new revision, so an old delete cannot remove the new file. Missing revisions require reconciliation. Local remote-deletion application always uses vault trash so bytes written after the hash check remain recoverable. Updates whose old and new bytes are both strict UTF-8, outside known binary formats, use Obsidian's atomic process API, whatever the extension. Existing binary files are preserved and incoming bytes saved as conflict copies for explicit review because Obsidian exposes no atomic binary compare-and-swap.
 
 See [the protocol contract](protocol.md) and [backup and recovery](recovery.md).
 

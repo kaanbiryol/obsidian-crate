@@ -1,4 +1,3 @@
-import { createRandomHexToken } from '../../platform/random-hex';
 
 function base64Url(bytes: Uint8Array): string {
 	let binary = '';
@@ -10,10 +9,6 @@ export function randomBase64Url(byteLength: number): string {
 	const bytes = new Uint8Array(byteLength);
 	crypto.getRandomValues(bytes);
 	return base64Url(bytes);
-}
-
-export function randomHex(byteLength: number): string {
-	return createRandomHexToken(byteLength);
 }
 
 export async function createPkcePair(): Promise<{ verifier: string; challenge: string }> {

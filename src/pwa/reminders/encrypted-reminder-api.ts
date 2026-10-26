@@ -261,7 +261,8 @@ export class EncryptedReminderApi {
 			const ack = await response.json() as { encrypted?: string };
 			if (typeof ack.encrypted !== 'string') throw new Error('The server did not confirm the encrypted save');
 			const result = await decryptJson(ack.encrypted, this.keys.vault, this.context(body.operationId));
-			await saveEncryptedReminderAttempt(key, { ...attempt, acknowledgment: ack.encrypted }, attempt, this.current);
+			// A retry answers from the acknowledgment, so the sealed notes are no longer needed.
+			await saveEncryptedReminderAttempt(key, { ...attempt, body: '', acknowledgment: ack.encrypted }, attempt, this.current);
 			return Response.json(result);
 		}
 		throw new Error('Encrypted save could not converge');

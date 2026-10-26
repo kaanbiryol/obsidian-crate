@@ -1,12 +1,13 @@
 import type { TFile, Vault } from 'obsidian';
 import { createConflictCopy, getIncomingConflictFileName } from '../conflict/conflict';
-import { isHiddenPath } from './file-discovery';
+import { ensureParentFolder, isHiddenPath } from './file-discovery';
 import type { RecordConflictInput } from '../conflict/store';
 import { isVaultTFileLike } from './local-delete';
 import type { DiffApplyOutcome } from '../transfer/types';
 import { isCurrentVaultFile } from './vault-file-identity';
 import { sha256Hex } from '../../platform/sha256';
 import { assertLocalSyncPath } from './local-path-safety';
+import { isUtf8Text } from '../history/preview-format';
 
 class LocalPathObstructionError extends Error {
 	constructor(readonly path: string, readonly isParent = false) {
@@ -89,8 +90,6 @@ interface LocalApplyContext {
 	conflictStore?: { record(input: RecordConflictInput): Promise<void> };
 }
 
-export const TEXT_PATH = /\.(?:md|txt|canvas|json|jsonc|css|scss|js|mjs|cjs|ts|tsx|jsx|svg|xml|html|csv|tsv|yaml|yml|toml|ini|excalidraw)$/i;
-
 interface CreatedConflictCopy {
 	path: string;
 	hash: string;
@@ -129,7 +128,7 @@ export async function preserveLocalVersionsAndApplyRemote(
 	const obstruction = await preparePath(context, path, remoteContent);
 	if (obstruction) return obstruction;
 	await ensureParentFolder(context.vault, path);
-	if (!TEXT_PATH.test(path)) {
+	if (!isUtf8Text(path, initialLocalContent) || !isUtf8Text(path, remoteContent)) {
 		return applySnapshot(context, path, remoteContent, await readLocalSnapshot(context.vault, path));
 	}
 	let localContent = initialLocalContent;
@@ -190,26 +189,6 @@ async function readLocalSnapshot(vault: Vault, path: string): Promise<LocalSnaps
 	}
 }
 
-async function ensureParentFolder(vault: Vault, path: string): Promise<void> {
-	const folderPath = path.substring(0, path.lastIndexOf('/'));
-	if (!folderPath) return;
-
-	if (isHiddenPath(path)) {
-		try {
-			await vault.adapter.mkdir(folderPath);
-		} catch {
-			// Folder already exists.
-		}
-		return;
-	}
-
-	try {
-		await vault.createFolder(folderPath);
-	} catch {
-		// Folder already exists.
-	}
-}
-
 async function writeLocalContent(
 	context: LocalApplyContext,
 	path: string,
@@ -217,15 +196,9 @@ async function writeLocalContent(
 	snapshot: LocalSnapshot,
 ): Promise<void> {
 	const { vault } = context;
-	if (TEXT_PATH.test(path) && snapshot.content) {
-		let expectedText: string;
-		let replacement: string;
-		try {
-			expectedText = textDecoder.decode(snapshot.content);
-			replacement = textDecoder.decode(content);
-		} catch {
-			return preserveIncomingForReview(context, path, content, snapshot.hash ?? '');
-		}
+	if (snapshot.content && isUtf8Text(path, snapshot.content) && isUtf8Text(path, content)) {
+		const expectedText = textDecoder.decode(snapshot.content);
+		const replacement = textDecoder.decode(content);
 		const update = (current: string): string => {
 			if (current !== expectedText || snapshot.visibleFile && !isCurrentVaultFile(vault, path, snapshot.visibleFile)) throw new LocalFileChangedError();
 			return replacement;

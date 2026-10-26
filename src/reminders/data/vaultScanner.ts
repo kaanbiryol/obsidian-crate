@@ -36,6 +36,8 @@ export interface ScanResult {
   scanDurationMs: number;
   discoveredProjects: string[]; // All projects from file paths, including empty ones
   deferred?: boolean;
+  /** Set when every file was read and only these files were held back. */
+  deferredPaths?: string[];
   ambiguousOwners?: ReminderIdentityOwner[];
 }
 
@@ -242,13 +244,15 @@ export async function scanVault(
   const identityOwners: ReminderIdentityOwners = new Map();
   addReminderIdentityOwners(identityOwners, knownOwners);
   let deferred = false;
+  let complete = true;
+  const deferredPaths: string[] = [];
   for (const file of reminderFiles) {
     if (signal?.aborted) break;
-    if (shouldDeferNormalization()) { deferred = true; break; }
+    if (shouldDeferNormalization()) { deferred = true; complete = false; break; }
     const result = await scanFile(app, file, remindersFolderPath, {
       signal, identityOwners, shouldDeferNormalization: () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair,
     });
-    if (result.deferred) deferred = true;
+    if (result.deferred) { deferred = true; deferredPaths.push(file.path); }
     if (result.error) {
       issues.push({ path: result.filePath, reason: result.error, ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}) });
       continue;
@@ -278,6 +282,7 @@ export async function scanVault(
     scanDurationMs,
     discoveredProjects: Array.from(discoveredProjects).sort(compareProjects),
     ...(deferred ? { deferred: true } : {}),
+    ...(deferred && complete ? { deferredPaths } : {}),
     ...(deferred ? { ambiguousOwners: allReminders.filter(reminder => (identityCounts.get(reminder.id) ?? 0) > 1)
       .map(({ id, filePath }) => ({ id, filePath })) } : {}),
   };

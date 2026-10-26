@@ -10,19 +10,13 @@ type SharedSettingsTarget = Pick<
 
 const SHARED_SETTING_KEYS = ['ignorePatterns', 'syncInterval', 'pushEnabled'] as const;
 
-/** Settings replicated to other devices; apply is the inverse of build. */
+/** Settings replicated to other devices. */
 export function buildSharedSettings(settings: SharedSettingsTarget): SharedSettings {
 	return {
 		ignorePatterns: settings.ignorePatterns,
 		syncInterval: settings.syncInterval,
 		pushEnabled: settings.pushEnabled,
 	};
-}
-
-export function applySharedSettings(target: SharedSettingsTarget, shared: SharedSettings): void {
-	target.ignorePatterns = [...shared.ignorePatterns];
-	target.syncInterval = shared.syncInterval;
-	target.pushEnabled = shared.pushEnabled;
 }
 
 function sameValue(a: unknown, b: unknown): boolean {

@@ -1,7 +1,6 @@
 import { fileRevisionGuard } from '../file-identity';
 import type { ObjectReference } from '../../storage-references';
 import { ENCRYPTION_STATE_SQL, EncryptionStateError, encryptionWriteGuard } from '../../encryption/state';
-import { changedRows } from '../../db';
 import { validateEncryptionState, type EncryptionServerState } from '../../../../encryption/server-state';
 import { syncResetGenerationGuard } from '../reset-generation';
 /** A publication lease. Cleanup may claim it after 24 hours, never before. */
@@ -11,10 +10,7 @@ const stagingEncryptionGuard = `${ENCRYPTION_STATE_SQL} IS NULL
   OR (? = 1 AND json_extract(${ENCRYPTION_STATE_SQL}, '$.mode') = 'active')`;
 
 export async function trackStagedUpload(db: D1Database, storageKey: string, path: string, encrypted = false): Promise<void> {
-  const result = await db.prepare(`INSERT INTO staged_uploads(storage_key, file_path, expires_at)
-    SELECT ?, ?, unixepoch('now') * 1000 + ? WHERE ${stagingEncryptionGuard}`)
-    .bind(storageKey, path, STAGED_UPLOAD_TTL_MS, encrypted ? 1 : 0).run();
-  if (changedRows(result) !== 1) throw new EncryptionStateError('Encryption changed before this upload. Reconnect before syncing.', 428);
+  await trackStagedUploads(db, [{ storageKey, path }], encrypted);
 }
 
 export function stagedUploadGuard(storageKey: string): { sql: string; args: string[] } {

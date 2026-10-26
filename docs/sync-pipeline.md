@@ -173,10 +173,11 @@ retain whole-file conflict handling.
 The remote compare-and-swap is
 committed before the local file is replaced, and the local hash is checked again
 after the request so an edit made in flight is retained for the next pass.
-Existing UTF-8 Markdown files are then compared and replaced inside Obsidian's
-atomic `process()` callback (using the adapter for hidden files). An edit between
-the hash check and that callback defers the write instead of being overwritten.
-Other files retain the binary write path.
+Existing files whose current and incoming bytes are both strict UTF-8 without NUL
+bytes (other than known binary formats such as PDFs and images) are then compared and replaced inside
+Obsidian's atomic `process()` callback (using the adapter for hidden files). An edit
+between the hash check and that callback defers the write instead of being
+overwritten. Other existing files keep the incoming bytes for review.
 
 If the merge overlaps, the conflict remains unresolved:
 

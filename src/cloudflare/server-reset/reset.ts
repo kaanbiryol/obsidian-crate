@@ -4,7 +4,7 @@ import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { workersDevOrigin } from '../deployment/worker-origin';
 import { assertDeploymentIsNotDowngrade } from '../deployment/update';
 import { deployedArtifact } from '../deployment/discovery';
-import { randomHex } from '../oauth/pkce';
+import { createRandomHexToken } from '../../platform/random-hex';
 import { assertWorkerTarget, assertUnsharedResources, assertOwnedNamespace, readCrateTables, type ResetApi } from './reset-ownership';
 import { createObjectOwnershipCheck, inspectBucketObjects, clearBucketObjects } from './reset-objects';
 import { fenceResetMutations, withDeploymentFence, type DeploymentFence } from '../deployment/fence';
@@ -71,8 +71,8 @@ export async function resetCrateServer(input: {
 	input.onProgress?.('Checking the database and remote file references…');
 	const check = database ? await createObjectOwnershipCheck(api, accountId, databaseId, await readCrateTables(api, accountId, databaseId)) : null;
 	const objectCount = bucket && check ? await inspectBucketObjects(api, accountId, name, check, input.onProgress) : 0;
-	const resetId = metadata.reset?.id ?? randomHex(16);
-	const cleanupToken = randomHex(32);
+	const resetId = metadata.reset?.id ?? createRandomHexToken(16);
+	const cleanupToken = createRandomHexToken(32);
 	const subdomain = bucket ? await api.getWorkersSubdomain(accountId) : null;
 	if (bucket && (!subdomain || !/^[a-z0-9-]+$/.test(subdomain))) throw new ResetBlockedError('could not verify the cleanup Worker address.');
 	// Only bucket cleanup uses this origin, and a bucket requires the verified subdomain above.

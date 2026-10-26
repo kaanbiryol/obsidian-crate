@@ -9,7 +9,7 @@ const remote = { ignorePatterns: ['remote-pattern'], syncInterval: 60, pushEnabl
 function plugin() {
 	return {
 		settings: { ...DEFAULT_SETTINGS },
-		saveSettings: vi.fn(async () => {}),
+		writeSettings: vi.fn(async function (this: { settings: object }, update: object) { Object.assign(this.settings, update); }),
 		syncRuntime: {
 			applyInfrastructureConfig: vi.fn(async () => {}),
 			updateSyncSettings: vi.fn(),
@@ -51,9 +51,9 @@ it('applies remote shared settings only after the connection is saved', async ()
 	});
 	await expect(configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token')).resolves.toEqual({ success: true });
 	expect(owner.settings).toMatchObject(remote);
-	expect(owner.saveSettings).toHaveBeenCalledOnce();
+	expect(owner.writeSettings).toHaveBeenCalledExactlyOnceWith(remote);
 	expect(owner.syncRuntime.updateSyncSettings).toHaveBeenCalledOnce();
-	expect(owner.syncRuntime.applyInfrastructureConfig.mock.invocationCallOrder[0]).toBeLessThan(owner.saveSettings.mock.invocationCallOrder[0]!);
+	expect(owner.syncRuntime.applyInfrastructureConfig.mock.invocationCallOrder[0]).toBeLessThan(owner.writeSettings.mock.invocationCallOrder[0]!);
 });
 
 function expectNoSettingsWrite(owner: ReturnType<typeof plugin>) {
@@ -93,7 +93,7 @@ it('seeds a fresh deployment with this device\'s shared settings after connectin
 	});
 	expect(owner.syncRuntime.applyInfrastructureConfig.mock.invocationCallOrder[0]).toBeLessThan(server.createSettings.mock.invocationCallOrder[0]!);
 	expect(owner.syncRuntime.pushSharedSettingsBestEffort).not.toHaveBeenCalled();
-	expect(owner.saveSettings).not.toHaveBeenCalled();
+	expect(owner.writeSettings).not.toHaveBeenCalled();
 });
 
 it('keeps the connection when seeding loses to another device', async () => {
@@ -109,7 +109,7 @@ it('keeps the current connection settings when switching servers fails', async (
 	owner.syncRuntime.applyInfrastructureConfig.mockRejectedValue(new Error('Resume the encrypted folder move before changing this device’s connection.'));
 	await expect(configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token')).rejects.toThrow('Resume the encrypted folder move');
 	expect(owner.settings.ignorePatterns).toEqual(DEFAULT_SETTINGS.ignorePatterns);
-	expect(owner.saveSettings).not.toHaveBeenCalled();
+	expect(owner.writeSettings).not.toHaveBeenCalled();
 	expect(owner.syncRuntime.pushSharedSettingsBestEffort).not.toHaveBeenCalled();
 });
 
@@ -120,5 +120,5 @@ it('does not read shared settings from an encrypted server before its keys are a
 	expect(server.sharedSettings).not.toHaveBeenCalled();
 	expect(owner.syncRuntime.applyInfrastructureConfig).toHaveBeenCalledOnce();
 	expect(owner.settings.ignorePatterns).toEqual(DEFAULT_SETTINGS.ignorePatterns);
-	expect(owner.saveSettings).not.toHaveBeenCalled();
+	expect(owner.writeSettings).not.toHaveBeenCalled();
 });

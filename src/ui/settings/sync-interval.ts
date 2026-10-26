@@ -1,9 +1,8 @@
 import { Notice, Setting, type TextComponent } from 'obsidian';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
+import { MAX_SYNC_INTERVAL_SECONDS } from '../../protocol/shared-settings';
 
 const PRESETS = new Map([[0, 'Off'], [60, '1 minute'], [300, '5 minutes'], [900, '15 minutes']]);
-// Browser timers use signed 32-bit milliseconds.
-const MAX_INTERVAL = Math.floor(2_147_483_647 / 1000);
 
 export function renderSyncInterval(
 	containerEl: HTMLElement,
@@ -40,11 +39,11 @@ export function renderSyncInterval(
 		.addText(text => {
 			customInput = text;
 			text.setValue(String(currentValue()));
-			configureIntegerInput(text, 0, MAX_INTERVAL);
+			configureIntegerInput(text, 0, MAX_SYNC_INTERVAL_SECONDS);
 			text.inputEl.setAttribute('aria-label', 'Custom check interval in seconds');
 			text.inputEl.hidden = PRESETS.has(currentValue());
 			bindCommittedText(text, () => String(currentValue()), value => save(Number(value)),
-				value => parseSettingInteger(value, 0, MAX_INTERVAL) !== null);
+				value => parseSettingInteger(value, 0, MAX_SYNC_INTERVAL_SECONDS) !== null);
 		});
 	setting.settingEl.addClass('crate-sync-interval');
 }

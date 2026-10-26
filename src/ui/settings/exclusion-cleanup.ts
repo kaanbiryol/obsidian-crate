@@ -1,7 +1,8 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { openConfirmationModal } from '../confirmation-modal';
-import { getErrorMessage, runButtonTask } from './action-helpers';
+import { runButtonTask } from './action-helpers';
+import { errorMessage } from '../../platform/logger';
 
 export function renderExclusionCleanup(containerEl: HTMLElement, plugin: CratePlugin): void {
 	new Setting(containerEl)
@@ -38,7 +39,7 @@ export function renderExclusionCleanup(containerEl: HTMLElement, plugin: CratePl
 						else if (result) new Notice(`Removed ${result.deleted.length} excluded server files`);
 					},
 					onError: error => {
-						new Notice(`Could not remove excluded server files: ${getErrorMessage(error)}`);
+						new Notice(`Could not remove excluded server files: ${errorMessage(error)}`);
 					},
 				});
 			}));

@@ -260,6 +260,22 @@ describe('optimistic reminder outbox', () => {
 		expect(state.storage.load()).toEqual([]);
 	});
 
+	it('resends paused uncertain changes on an explicit refresh with the same body', async () => {
+		const state = harness();
+		const paused = { ...completion(), status: 'uncertain' as const, attempts: 3, retryAt: 0, ambiguous: true };
+		const review = { ...completion('two'), status: 'uncertain' as const, attempts: 3, retryAt: 0, ambiguous: true, reviewRequired: true };
+		state.storage.put(paused); state.storage.put(review);
+		await state.drain();
+		// Automatic wakeups respect the spent budget.
+		expect(state.requests).toHaveLength(0);
+		const resumed = state.resume();
+		expect(state.requests).toHaveLength(1);
+		expect(state.requests[0]!.init?.body).toBe(paused.body);
+		state.requests[0]!.resolve(confirmed());
+		await resumed;
+		expect(state.storage.load().map(change => change.operationId)).toEqual([review.operationId]);
+	});
+
 	it('replays an in-flight persisted command after reload', async () => {
 		const before = harness();
 		const change = completion();

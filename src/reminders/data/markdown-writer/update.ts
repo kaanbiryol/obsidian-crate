@@ -1,5 +1,5 @@
 import type { UpdateReminderInput } from '../../core/reminderMutationPlan';
-import { processVaultMarkdown } from '../vault-markdown';
+import { processVaultMarkdown, readVaultMarkdown } from '../vault-markdown';
 import type { IndexedReminder } from "../reminder-index";
 import {
   appendReminderBlockToContent,
@@ -61,6 +61,12 @@ export async function updateReminderInMarkdown(
     const oldFile = await context.getFile(reminder.filePath);
     if (!oldFile) {
       throw new Error(`File not found: ${reminder.filePath}`);
+    }
+    // Check the source block can be removed before writing anything, as the
+    // shared web command does. Nested tasks or supporting text reject the move
+    // here instead of leaving the reminder in both notes.
+    if (!deleteReminderBlockFromContent(await readVaultMarkdown(context.app, oldFile), reminder).found) {
+      throw new Error(`Cannot safely locate reminder line in ${reminder.filePath}. The file may have been modified.`);
     }
 
     const newFile = await context.getOrCreateProjectFile(newProject);

@@ -10,7 +10,7 @@ const scopes: AuthPrincipal['scope'][] = ['vault', 'reminders', 'reading', 'read
 
 it.each([
 	['GET', '/sync/manifest', ['vault'], undefined],
-	['POST', '/sync/checkpoints', ['vault'], { kind: 'coordinator', wake: true }],
+	['POST', '/sync/checkpoints', ['vault'], { kind: 'coordinator', wake: false }],
 	['POST', '/sync/import/complete', ['vault'], { kind: 'coordinator', wake: true }],
 	['PUT', '/sync/upload', ['vault'], { kind: 'transfer', path: '/sync-upload' }],
 	['PUT', '/settings', ['vault'], { kind: 'coordinator', wake: false }],
@@ -25,18 +25,18 @@ it.each([
 	['DELETE', '/reminders/delete', ['vault', 'reminders'], { kind: 'coordinator', wake: true }],
 	['GET', '/reminders/notification-policy', ['vault'], undefined],
 	['PUT', '/reminders/notification-policy', ['vault'], { kind: 'coordinator', wake: true }],
-	['POST', '/notifications/subscribe', ['vault', 'reminders'], { kind: 'coordinator', wake: true }],
-	['DELETE', '/notifications/subscribe', ['vault', 'reminders'], { kind: 'coordinator', wake: true }],
-	['POST', '/notifications/reminders-enrollment-token', ['vault'], { kind: 'coordinator', wake: true }],
+	['POST', '/notifications/subscribe', ['vault', 'reminders'], { kind: 'coordinator', wake: false }],
+	['DELETE', '/notifications/subscribe', ['vault', 'reminders'], { kind: 'coordinator', wake: false }],
+	['POST', '/notifications/reminders-enrollment-token', ['vault'], { kind: 'coordinator', wake: false }],
 	['GET', '/features', ['vault', 'reminders', 'reading'], undefined],
 	['POST', '/features', ['vault'], { kind: 'coordinator', wake: true }],
-	['DELETE', '/auth/tokens', ['vault'], { kind: 'coordinator', wake: true }],
-	['DELETE', '/auth/session', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: true }],
+	['DELETE', '/auth/tokens', ['vault'], { kind: 'coordinator', wake: false }],
+	['DELETE', '/auth/session', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: false }],
 	['GET', '/reading/list', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: false }],
 	['GET', '/reading/encrypted-file', ['vault', 'reminders', 'reading'], undefined],
 	['GET', '/reading/session', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: false }],
 	['POST', '/reading/capture', scopes, { kind: 'coordinator', wake: true }],
-	['POST', '/reading/shortcut-pairing', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: true }],
+	['POST', '/reading/shortcut-pairing', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: false }],
 	['POST', shortcut.preparePath, ['reading_capture'], { kind: 'coordinator', wake: true }],
 ] as const)('%s %s enforces admission, scopes and execution', (method, path, allowed, execution) => {
 	const request = new Request(`https://test${path}`, { method });

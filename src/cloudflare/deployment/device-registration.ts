@@ -1,5 +1,5 @@
 import type { CloudflareApiClient } from '../cloudflare-api';
-import { randomHex } from '../oauth/pkce';
+import { createRandomHexToken } from '../../platform/random-hex';
 
 export interface CloudflareAuthorizedDevice {
 	tokenHash: string;
@@ -50,7 +50,7 @@ export async function registerCloudflareAuthorizedDevice(input: {
 			(id, token_hash, device_id, device_name, platform, last_seen_at)
 			VALUES (?, ?, ?, ?, ?, datetime('now'));`,
 		[
-			randomHex(16),
+			createRandomHexToken(16),
 			input.device.tokenHash,
 			input.device.deviceId,
 			input.device.deviceName,

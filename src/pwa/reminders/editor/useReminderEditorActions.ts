@@ -6,7 +6,7 @@ import type { ModalMode, ModalState } from '../types';
 import type { useReminderEditor } from './useReminderEditor';
 import type { useReminderMutations } from '../useReminderMutations';
 
-/** Editor policy stays mounted with the runtime, independently of its lazy screen. */
+/** Editor policy stays mounted with the runtime, independently of its screen. */
 export function useReminderEditorActions({ editor, mutations, selectedProject, folderPath, ensureCanMutate, showToast }: {
 	editor: Pick<ReturnType<typeof useReminderEditor>, 'setSaving' | 'closeModal' | 'openEditor' | 'openReminder'>;
 	mutations: Pick<ReturnType<typeof useReminderMutations>, 'ready' | 'changes' | 'visibleReminders' | 'prepareEdit' | 'saveReminder' | 'deleteReminder'>;

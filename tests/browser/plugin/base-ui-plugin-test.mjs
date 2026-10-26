@@ -27,7 +27,6 @@ const { outputFiles } = await build({
     import { BaseModal } from './src/ui/shared/BaseModal';
     import { ActivityTabs } from './src/ui/activity/ActivityTabs';
     import { ActivitySheet } from './src/ui/activity/ActivitySheet';
-    import { ExclusionSheet } from './src/ui/ExclusionSheet';
     import { StatusBarManager } from './src/ui/status';
     class HostShell extends BaseUiModal {}
     const hostShell = new HostShell({}); hostShell.open();
@@ -89,7 +88,7 @@ const { outputFiles } = await build({
           }} />
         </BaseModal>}
         {open === 'activity' && <ActivitySheet isMobile={false} onClose={() => setOpen(null)} onMount={el => {el.textContent='Mounted activity';}} />}
-        {open === 'exclusion' && <ExclusionSheet onClose={() => setOpen(null)} onMount={el => {el.textContent='Mounted exclusions';}} />}
+        {open === 'exclusion' && <ActivitySheet kind="exclusion" isMobile onClose={() => setOpen(null)} onMount={el => {el.textContent='Mounted exclusions';}} />}
       </>;
     }
     const plugin = { syncRuntime: { getApiClient: () => null } };

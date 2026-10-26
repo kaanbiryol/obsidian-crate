@@ -26,8 +26,9 @@ Explicit logout still deletes the whole private cache and clears pending command
 
 Reminder commands retain their automatic retry deadline and attempt count through
 reloads, foreground changes and reconnection. After three uncertain attempts,
-automatic sending pauses. Explicit retry or **Resume saved changes** for an earlier
-session starts another attempt budget with the same operation ID and request body.
+automatic sending pauses. Explicit retry, a pull to refresh or sync refresh, or
+**Resume saved changes** for an earlier session starts another attempt budget with
+the same operation ID and request body.
 Rejected commands remain available for review.
 
 ## Damaged pending commands
@@ -139,8 +140,7 @@ Reading dispatch while only Reminders is rendered, reminder dispatch while only 
 is rendered, a Reading refresh failure that does not block reminders, shared header
 status, and paused queues retained through reload and resumed without opening their
 screens, plus immediate logout and remote cleanup feedback with the other screen
-unmounted. A blocked Reminders screen chunk must leave sync, settings and Reading
-usable. The preview supplies synthetic domain APIs; existing receipt and auth recovery
+unmounted. The preview supplies synthetic domain APIs; existing receipt and auth recovery
 suites cover their separate server and session guarantees. Settings opens sync details
 without mounting the other feature's screen. Physical installed-app acceptance remains
 a device check.

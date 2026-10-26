@@ -8,9 +8,9 @@ import { getAllVaultFiles } from '../local/file-discovery';
 import { isOversizedSyncFile } from '../local/local-file-changes';
 import { pipelineUploadChunks } from '../transfer/budget';
 import { prepareUploadFromVaultFile } from '../transfer/prepare';
+import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
 import { createPathRecord } from '@/protocol/path-record';
 import type { FileEntry } from '@/protocol/sync-types';
-import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
 
 interface ImportContext {
   prepareReminderScope?(): Promise<void>;
@@ -35,6 +35,9 @@ export async function assertNoOpenInitialImport(api: { initialImport?: Pick<Sync
 }
 
 /** The committed remote inventory is the checkpoint; initial uploads need no receipt journal. */
+/** Preparation checked this mtime around its read, as ordinary uploads do. */
+const verifiedModified = (upload: PreparedUpload) => upload.mtime === undefined ? UNVERIFIED_MODIFIED : new Date(upload.mtime).toISOString();
+
 export async function runInitialImport(context: ImportContext, result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null> {
   context.throwIfDestroyed();
   context.report({ phase: 'server' });
@@ -79,7 +82,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
       const existing = remote.files[file.path];
       if (existing?.hash === upload.hash && existing.size === upload.size && existing.revision) {
         inventory[file.path] = existing;
-        transfer.localManifest.setEntry(file.path, { ...existing, modified: UNVERIFIED_MODIFIED });
+        transfer.localManifest.setEntry(file.path, { ...existing, modified: verifiedModified(upload) });
         await transfer.markdownBaseCache?.putBase(file.path, upload.hash, upload.content);
         completed++;
         return null;
@@ -109,7 +112,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
           const receipt = response.results.find(file => file.path === upload.path);
           if (!receipt?.success) { recordSyncError(result, `${receipt?.error ?? 'Upload interrupted'}`, upload.path); continue; }
           if (receipt.hash !== upload.hash || typeof receipt.revision !== 'string' || !receipt.revision) throw new SyncIssueError('Invalid initial upload metadata', [{ path: upload.path, message: 'Invalid initial upload metadata', code: 'transfer-unverified' }]);
-          const entry = { hash: upload.hash, size: upload.size, revision: receipt.revision, modified: UNVERIFIED_MODIFIED };
+          const entry = { hash: upload.hash, size: upload.size, revision: receipt.revision, modified: verifiedModified(upload) };
           transfer.localManifest.setEntry(upload.path, entry);
           inventory[upload.path] = entry;
           await transfer.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);

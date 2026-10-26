@@ -4,14 +4,21 @@ import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { ObsidianIcon } from '@/ui/obsidian-icon';
 import { BaseModal } from '../shared/BaseModal';
 
+/** Sync activity and the excluded files preview share this sheet frame. */
+const SHEETS = {
+    activity: { title: 'Sync activity', closeLabel: 'Close sync activity' },
+    exclusion: { title: 'Excluded files', closeLabel: 'Close excluded files' },
+} as const;
+
 interface ActivitySheetProps {
+    kind?: keyof typeof SHEETS;
     isMobile: boolean;
     animationsEnabled?: boolean;
     onClose: () => void;
     onMount: (container: HTMLDivElement, close: () => void, header: HTMLDivElement) => void;
 }
 
-export function ActivitySheet({ isMobile, animationsEnabled = true, onClose, onMount }: ActivitySheetProps) {
+export function ActivitySheet({ kind = 'activity', isMobile, animationsEnabled = true, onClose, onMount }: ActivitySheetProps) {
     const [isOpen, setIsOpen] = useState(true);
     const close = useCallback(() => {
         if (animationsEnabled) setIsOpen(false);
@@ -25,35 +32,35 @@ export function ActivitySheet({ isMobile, animationsEnabled = true, onClose, onM
             onClose={close}
             onExitComplete={onClose}
             variant={isMobile ? 'bottom-sheet' : 'centered'}
-            className="crate-reminder-editor-surface crate-activity-surface"
-            ariaLabel="Sync activity"
+            className={`crate-reminder-editor-surface crate-${kind}-surface`}
+            ariaLabel={SHEETS[kind].title}
             showBackdrop={false}
             showDragHandle={false}
             disableSwipeToDismiss
         >
-            <ActivityContent close={close} onMount={onMount} />
+            <SheetContent kind={kind} close={close} onMount={onMount} />
         </BaseModal>
     );
 }
 
-function ActivityContent({ close, onMount }: { close: () => void; onMount: ActivitySheetProps['onMount'] }) {
+function SheetContent({ kind, close, onMount }: { kind: keyof typeof SHEETS; close: () => void; onMount: ActivitySheetProps['onMount'] }) {
     const headerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     useLayoutEffect(() => {
         const container = contentRef.current;
         if (!container || !headerRef.current) return;
         onMount(container, close, headerRef.current);
-        container.closest<HTMLElement>('.crate-activity-surface')?.focus({ preventScroll: true });
-    }, [close, onMount]);
+        container.closest<HTMLElement>(`.crate-${kind}-surface`)?.focus({ preventScroll: true });
+    }, [kind, close, onMount]);
 
     return (
-        <div className="crate-activity-modal">
+        <div className={`crate-${kind}-modal`}>
             <div ref={headerRef} className="crate-modal-header-host">
                 <ThemeIconProvider renderer={ObsidianIcon}>
-                    <ModalHeader title="Sync activity" closeLabel="Close sync activity" onClose={close} />
+                    <ModalHeader title={SHEETS[kind].title} closeLabel={SHEETS[kind].closeLabel} onClose={close} />
                 </ThemeIconProvider>
             </div>
-            <div ref={contentRef} className="crate-activity-body" />
+            <div ref={contentRef} className={`crate-${kind}-body`} />
         </div>
     );
 }

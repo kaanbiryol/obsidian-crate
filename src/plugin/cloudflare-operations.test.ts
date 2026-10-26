@@ -89,7 +89,7 @@ afterEach(() => {
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../sync/worker-api/client');
 	vi.doUnmock('../cloudflare/oauth/config');
-	vi.doUnmock('../sync/plugin-integration');
+	vi.doUnmock('./sync-integration');
 	vi.doUnmock('../sync/device-token');
 	vi.doUnmock('./deviceInfo');
 	vi.doUnmock('../ui/cloudflare/deployment-modal');

@@ -63,7 +63,7 @@ describe('real reminder writes respect Markdown context', () => {
 		await expect(writer.deleteReminder(reminder)).rejects.toThrow('nested tasks or supporting text');
 		await expect(writer.updateReminder(reminder, { project: 'Other' })).rejects.toThrow('nested tasks or supporting text');
 		expect(files.get(path)).toBe(content);
-		expect(files.get('Reminders/Other.md')).not.toContain('crate-id:first');
+		expect(files.has('Reminders/Other.md')).toBe(false);
 		await writer.updateReminder(reminder, { content: 'Edited' });
 		expect(files.get(path)).toBe(`${first.replace('First', 'Edited')}\n${child}\n${second}\n`);
 	});

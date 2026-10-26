@@ -4,7 +4,7 @@
 
 import { Notice, type Vault } from 'obsidian';
 import { createLogger } from '../logger';
-import { isHiddenPath } from '../local/file-discovery';
+import { ensureParentFolder } from '../local/file-discovery';
 
 const logger = createLogger('Conflict');
 const CONFLICT_TAG_PATTERN = / \(conflict (?:\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} [a-z0-9]{4}|remote [a-f0-9]{64}(?:-\d+)?)\)(?=\.[^/]+$|$)/;
@@ -51,25 +51,7 @@ export async function createConflictCopy(
 	content: ArrayBuffer
 ): Promise<string> {
 	const conflictPath = getConflictFileName(originalPath);
-
-	// Create parent folders if needed
-	const folderPath = conflictPath.substring(0, conflictPath.lastIndexOf('/'));
-	if (folderPath) {
-		if (isHiddenPath(conflictPath)) {
-			try {
-				await vault.adapter.mkdir(folderPath);
-			} catch {
-				// Folder might already exist
-			}
-		} else {
-			try {
-				await vault.createFolder(folderPath);
-			} catch {
-				// Folder might already exist
-			}
-		}
-	}
-
+	await ensureParentFolder(vault, conflictPath);
 	await vault.createBinary(conflictPath, content);
 	logger.info('Created conflict copy:', conflictPath);
 	return conflictPath;

@@ -2,7 +2,7 @@ import type { ConnectionTestResult } from '../sync/types';
 import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { SyncApiClient } from '../sync/worker-api/client';
-import { applySharedSettings, buildSharedSettings } from '../sync/connection/shared-settings';
+import { buildSharedSettings } from '../sync/connection/shared-settings';
 import type { SharedSettings } from '../protocol/shared-settings';
 import { createLogger } from '../sync/logger';
 import { errorMessage } from '../platform/logger';
@@ -39,8 +39,8 @@ export async function configureCloudflareAuthorizedDevice(
 	}, signal, ...(expected ? [expected] : []));
 	signal.throwIfAborted();
 	if (shared) {
-		applySharedSettings(plugin.settings, shared);
-		await plugin.saveSettings();
+		// Normalizing adds this device's own workspace exclusion to the server's patterns.
+		await plugin.writeSettings(shared);
 		plugin.syncRuntime.updateSyncSettings();
 	} else if (shared === null) {
 		await seedSharedSettings(api, plugin.settings);

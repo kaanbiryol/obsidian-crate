@@ -67,6 +67,8 @@ describe('server maintenance settings', () => {
 		await vi.waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(plugin, 'delete'));
 		expect(confirm.mock.calls[0]![1].details.join(' ')).toContain('Your local vault files are kept');
 		expect(confirm.mock.calls[0]![1].details.join(' ')).toContain(plugin.settings.cloudflareDeployment.d1DatabaseId);
+		// Like the encryption flows, an irreversible deletion requires typing a word.
+		expect(confirm.mock.calls[0]![1]).toMatchObject({ warning: true, typedConfirmation: 'delete' });
 	});
 
 });

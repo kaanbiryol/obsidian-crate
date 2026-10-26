@@ -6,7 +6,7 @@ vi.mock('../local/file-discovery', () => ({ getAllVaultFiles: vi.fn(async () => 
 vi.mock('../transfer/prepare', () => ({
   prepareUploadFromVaultFile: vi.fn(async (_transfer: unknown, file: VaultFile) => {
     events.push(`prepare ${file.path}`);
-    return { path: file.path, content: new ArrayBuffer(1), size: 1, hash: `h-${file.path}` };
+    return { path: file.path, content: new ArrayBuffer(1), size: 1, mtime: file.mtime, hash: `h-${file.path}` };
   }),
 }));
 
@@ -79,4 +79,27 @@ it.each([['holds its token', 't', undefined], ['uploaded every server file', und
   expect(calls.slice(0, 3)).toEqual(token ? ['prune', 'upload', 'upload'] : ['token t', 'save', 'prune']);
   // Finishing releases the token.
   expect(calls.indexOf('token undefined')).toBeGreaterThan(calls.lastIndexOf('upload'));
+});
+
+it('records verified modification times, so the next scan does not reread the imported vault', async () => {
+  const setEntry = vi.fn<(path: string, entry: { modified: string; revision?: string }) => void>();
+  await runInitialImport({
+    transfer: {
+      vault: {}, localManifest: { setEntry, removeEntry: vi.fn() },
+      runConcurrent: async (tasks: Array<() => Promise<void>>) => { for (const task of tasks) await task(); },
+    } as never,
+    api: {
+      // One file is already on the server with the same bytes.
+      getManifest: async () => ({ files: { 'notes/0.md': { hash: 'h-notes/0.md', size: 1, revision: 'r0', modified: new Date(5).toISOString() } } }),
+      initialImport: {
+        begin: async () => ({ state: 'importing', token: 't' }), prune: async () => {}, finish: async () => 1,
+        upload: async (_token: string, batch: Array<{ path: string; hash: string }>) => ({ results: batch.map(file => ({ path: file.path, success: true, hash: file.hash, revision: 'r' })) }),
+      },
+    } as never,
+    shouldIgnore: () => false, throwIfDestroyed: () => {}, save: async () => {}, setLastSeq: () => {}, report: () => {},
+    getImportToken: () => 't', setImportToken: () => {},
+  }, createEmptySyncResult());
+  expect(setEntry).toHaveBeenCalledTimes(200);
+  expect(new Set(setEntry.mock.calls.map(([, entry]) => entry.modified))).toEqual(new Set([new Date(1).toISOString()]));
+  expect(setEntry).toHaveBeenCalledWith('notes/0.md', expect.objectContaining({ revision: 'r0' }));
 });

@@ -25,8 +25,9 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
   let removedObjects = 0, backlog = false;
   const bounded = (task: () => Promise<boolean>) => async () => { if (await task()) backlog = true; };
 	const tasks: Array<[string, () => Promise<unknown>]> = [
+    // Once per episode: each wake would otherwise reset a running pass's retry budget.
     ['recover Reading work', async () => {
-      if (await env.DB.prepare('SELECT 1 FROM reading_policy WHERE enabled=1').first()) {
+      if (firstPass && await env.DB.prepare('SELECT 1 FROM reading_policy WHERE enabled=1').first()) {
         if (!await wakeProjection(env)) throw new Error('Reading coordinator unavailable');
       }
     }],

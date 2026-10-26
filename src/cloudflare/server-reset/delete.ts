@@ -1,5 +1,5 @@
 import { CloudflareApiError } from '../cloudflare-api';
-import { randomHex } from '../oauth/pkce';
+import { createRandomHexToken } from '../../platform/random-hex';
 import { DeploymentRecoveryRequiredError, withDeploymentFence, type DeploymentFence } from '../deployment/fence';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { workersDevOrigin } from '../deployment/worker-origin';
@@ -18,7 +18,7 @@ export async function deleteCrateServer(input: {
 	onProgress?.('Checking the selected Cloudflare resources…');
 	const initial = await inspectDeletionResources(api, metadata);
 	if (!metadata.deletion) {
-		const id = metadata.reset?.deleteOnly ? metadata.reset.id : randomHex(16);
+		const id = metadata.reset?.deleteOnly ? metadata.reset.id : createRandomHexToken(16);
 		metadata.deletion = { id, phase: 'removing-worker', databaseId: metadata.d1DatabaseId,
 			bucketCreatedAt: initial.bucket?.creation_date ?? null, workerCreatedAt: initial.workerCreatedAt, helperName: `crate-delete-${id}` };
 		await input.persist();
@@ -33,7 +33,7 @@ export async function deleteCrateServer(input: {
 		delete job.helperUploadPending;
 		await input.persist();
 	}
-	const cleanupToken = randomHex(32), tokenHash = await sha256Hex(cleanupToken);
+	const cleanupToken = createRandomHexToken(32), tokenHash = await sha256Hex(cleanupToken);
 	const phase = async (next: typeof job.phase) => { job.phase = next; await input.persist(); };
 	const removeIfPresent = async (operation: () => Promise<void>) => {
 		try { await operation(); }

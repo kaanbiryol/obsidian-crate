@@ -1,15 +1,15 @@
-import { registerSyncStatus } from '../plugin/sync-status';
+import { registerSyncStatus } from './sync-status';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, TFile, type Events, type TAbstractFile } from 'obsidian';
-import type CratePlugin from '../plugin/CratePlugin';
-import { SyncRuntime } from './runtime/runtime';
-import { notifyConflicts } from './conflict/conflict';
+import type CratePlugin from './CratePlugin';
+import { SyncRuntime } from '../sync/runtime/runtime';
+import { notifyConflicts } from '../sync/conflict/conflict';
 import { ActivityModal } from '../ui/activity/activity-modal';
 import { errorMessage } from '../platform/logger';
-import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-state';
+import { getPluginLifecycleSignal, waitForSyncReady } from './lifecycle-state';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/notification-policy-sync';
-import type { ForegroundSyncReason } from './runtime/foreground-sync';
+import type { ForegroundSyncReason } from '../sync/runtime/foreground-sync';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 

@@ -7,8 +7,8 @@ import { dismissProjectHistory, hasProjectHistory, openProjectHistory } from '..
 export function useReminderProjectNavigation({ initialTab, initialProject, reduceMotion }: {
 	initialTab: ViewMode; initialProject?: string; reduceMotion: boolean;
 }) {
-	// Seed the real screen from the same destination as its lazy loading shell.
-	// Applying it later via the dock retains the default tab as an outgoing fade.
+	// Seed the screen from the launch destination. Applying it later via the dock
+	// would show the default tab as an outgoing fade.
 	const [viewMode, setViewMode] = useState<ViewMode>(() => initialProject ? 'browse' : initialTab);
 	const [direction, setDirection] = useState<NavigationMotion['direction']>(0);
 	const [skipProjectMotion, setSkipProjectMotion] = useState(Boolean(initialProject));

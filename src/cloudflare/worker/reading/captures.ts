@@ -13,6 +13,9 @@ import type { Publication } from './extraction/jobs';
 import { publishReading } from '@/cloudflare/worker/coordinator/coordinator';
 import { bumpReadingRevision } from './library-index';
 
+/** Page fetches per job or capture; failed fetches and failed publications both count. */
+export const MAX_FETCH_ATTEMPTS = 3;
+
 export interface CapturePublication { captureId: string; generation: string; result: Publication['result']; resolvedUrl?: string }
 export interface PendingCapture { id: string; generation: string; url_identity: string; note: string; attempts: number; available_at: number }
 export async function capturePath(env: Env, folder: string, source: ReadingNameSource | null, id: string): Promise<string> {
@@ -53,12 +56,13 @@ export async function runCapture(env: Env, state: DurableObjectState, enabled: b
   await env.DB.batch([env.DB.prepare('UPDATE reading_captures SET available_at=?, attempts=attempts+1 WHERE id=?').bind(Date.now() + 60_000, capture.id), bumpReadingRevision(env.DB)]);
   await state.storage.setAlarm(Date.now() + 60_000);
   let result: Publication['result'] = null, resolvedUrl: string | undefined;
-  if (enabled) {
+  // After its fetch attempts, a capture that still cannot publish retries as a bookmark only.
+  if (enabled && capture.attempts < MAX_FETCH_ATTEMPTS) {
     try {
       const { fetchReadingCapture } = await import('./extraction/transport');
       const captureResult = await fetchReadingCapture(parseReadingNote(capture.note)!.source_url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN);
       result = captureResult.article; resolvedUrl = captureResult.url;
-    } catch { if (capture.attempts < 2) return; }
+    } catch { if (capture.attempts < MAX_FETCH_ATTEMPTS - 1) return; }
   }
   const publication: CapturePublication = { captureId: capture.id, generation: capture.generation, result, resolvedUrl };
   if (!await publishReading(env, publication)) throw new Error('Reading capture publication unavailable');

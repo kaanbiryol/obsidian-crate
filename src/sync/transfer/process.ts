@@ -16,6 +16,7 @@ import { recordSyncError } from '../issues';
 import { errorMessage } from '../../platform/logger';
 import { isAbortError } from '../abort';
 import { fileFailure } from '../failures';
+import { HttpError } from '../worker-api/http';
 
 export async function processDiff(
   context: TransferContext,
@@ -46,7 +47,7 @@ export async function processDiff(
         uploadFile.expectedHash ?? null,
       );
       if (!uploadResult.success) {
-        throw new Error(uploadResult.error || "Upload failed");
+        throw new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code);
       }
       if (uploadResult.hash && uploadResult.hash !== uploadFile.hash) {
         throw new Error(`Hash mismatch after upload (expected ${uploadFile.hash}, got ${uploadResult.hash})`);
@@ -213,7 +214,7 @@ async function tryAutoMergeMarkdownConflict(
     localContent,
   );
   if (!uploadResult.success) {
-    throw new Error(uploadResult.error || "Upload failed");
+    throw new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code);
   }
   if (uploadResult.hash && uploadResult.hash !== mergedHash) {
     throw new Error(`Hash mismatch after upload (expected ${mergedHash}, got ${uploadResult.hash})`);

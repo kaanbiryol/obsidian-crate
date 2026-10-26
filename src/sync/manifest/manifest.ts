@@ -32,7 +32,6 @@ export type LocalManifestView = Readonly<Omit<FileManifest, 'files'>> & {
 export class LocalManifest {
 	readonly uploadJournal: UploadJournal;
 	private renames = new RenameDependencies();
-	private appliedRename?: string;
 	private app: App;
 	private manifestPath: string;
 	private tmpPath: string;
@@ -128,7 +127,6 @@ export class LocalManifest {
 			this.initialConfigPull = selected.initialConfigPull;
 			this.initialImportToken = selected.initialImportToken;
 			this.renames = new RenameDependencies(selected.renames);
-			this.appliedRename = selected.appliedRename;
 			this.persistedState = encodeLogState(selected);
 			await this.uploadJournal.load(selected.settledUploads ?? []);
 			if (this.closed) return;
@@ -182,7 +180,6 @@ export class LocalManifest {
 			authority: this.authority,
 			settledUploads: this.uploadJournal.completedSnapshot(),
 			renames: this.renames.entries,
-			appliedRename: this.appliedRename,
 			uploadDiagnostics: this.uploadDiagnostics,
 			restoreIntents: this.restoreIntents,
 			initialConfigPull: this.initialConfigPull,
@@ -199,6 +196,9 @@ export class LocalManifest {
 				if (!await this.appendChanges(changed)) await this.compact();
 			} catch (error) {
 				for (const path of changed) this.changedPaths.add(path);
+				// A failed append may have left partial bytes. Appending after them
+				// would join the next record to that torn line, so compact instead.
+				this.logActive = false;
 				throw error;
 			}
 			if (this.closed) return;
@@ -254,7 +254,6 @@ export class LocalManifest {
 		return {
 			settledUploads: this.uploadJournal.completedSnapshot(),
 			renames: this.renames.entries,
-			appliedRename: this.appliedRename,
 			uploadDiagnostics: this.uploadDiagnostics,
 			restoreIntents: this.restoreIntents,
 			initialConfigPull: this.initialConfigPull,

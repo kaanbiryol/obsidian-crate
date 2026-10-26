@@ -3,7 +3,7 @@ import { armNotificationCoordinator } from '../../notifications/lifecycle';
 import type { Env } from '../../types';
 import { isReminderPath } from '../../reminders/scope';
 import { getNotificationPolicy } from '../../notifications/policy';
-import { FRAMED_CONTENT_HEADER, frameUpload, hasFramedMarkdown, readFrame } from './staged-upload-dispatch';
+import { createsNotificationWork, FRAMED_CONTENT_HEADER, frameUpload, hasFramedMarkdown, readFrame } from './staged-upload-dispatch';
 import { commitCoordinatorNewFiles } from '../../coordinator/coordinator';
 
 export function coordinatedNewFiles(env: Env): typeof commitNewFiles {
@@ -31,13 +31,14 @@ export async function prepareCoordinatedNewFiles(request: Request, env: Env): Pr
     position += file.size;
   }
   if (framed && position !== framed.content.byteLength) throw new Error('Staged upload size mismatch');
-  const policy = await getNotificationPolicy(env.DB);
+  // Files with framed bytes need no policy fence; only the rest decide what to read from R2.
+  const policy = metadata.some(file => !attached.has(file)) ? await getNotificationPolicy(env.DB) : null;
   const files: NewFileUpload[] = [];
   for (let offset = 0; offset < metadata.length; offset += 3) {
     files.push(...await Promise.all(metadata.slice(offset, offset + 3).map(async file => {
-      file.reminderPolicyRevision = policy?.revision ?? null;
       const content = attached.get(file);
       if (content) return { ...file, content };
+      file.reminderPolicyRevision = policy?.revision ?? null;
       if (!isReminderPath(file.path, policy?.folderPath ?? null)) return { ...file, content: new ArrayBuffer(0) };
       const object = await env.BUCKET.get(file.objectKey);
       if (!object) throw new Error('Staged object unavailable');
@@ -52,6 +53,7 @@ export async function commitCoordinatedNewFiles(files: NewFileUpload[], state: D
   if (files.some(file => file.reminderPolicyRevision !== undefined && file.reminderPolicyRevision !== (policy?.revision ?? null))) {
     return Response.json({ error: 'Reminder folder changed during upload. Retry the upload.' }, { status: 503 });
   }
-  await armNotificationCoordinator(state);
+  const reading = await env.DB.prepare('SELECT folder_path FROM reading_policy WHERE id = 1').first<{ folder_path: string }>();
+  if (createsNotificationWork(files.map(file => file.path), policy?.folderPath ?? null, reading?.folder_path ?? null)) await armNotificationCoordinator(state);
   return Response.json(await commitNewFiles(env.BUCKET, env.DB, files, policy?.folderPath ?? null));
 }

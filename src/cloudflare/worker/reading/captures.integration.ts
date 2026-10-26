@@ -92,6 +92,16 @@ it.each(['https://example.com/article', 'https://youtu.be/jNQXAC9IVRw?t=42'])('l
 	expect(parseReadingNote(file.content)).toMatchObject({ extraction_status: 'unavailable', source_url: url });
 }, 15_000); // Three complete D1/R2 attempts need room for slower CI I/O.
 
+it('stops fetching a capture whose earlier attempts could not publish', async () => {
+	const { row } = await capture();
+	await env.DB.prepare('UPDATE reading_captures SET attempts=3, available_at=0 WHERE id=?').bind(row.id).run();
+	const fetch = vi.fn(async () => Response.json({}));
+	await runCapture({ ...env, READING_FETCH: { fetch } }, { storage: { setAlarm: async () => {} } } as unknown as DurableObjectState, true);
+	expect(fetch).not.toHaveBeenCalled();
+	const file = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, `Reading/example.com - ${row.id.slice(0, 8)}.md`))!;
+	expect(parseReadingNote(file.content)?.extraction_status).toBe('unavailable');
+});
+
 it('publishes a video with metadata and its timestamp through the normal capture queue', async () => {
 	const url = 'https://youtu.be/jNQXAC9IVRw?t=42#keep';
 	const { row } = await capture({ url });

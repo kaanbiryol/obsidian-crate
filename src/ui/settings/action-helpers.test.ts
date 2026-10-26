@@ -39,14 +39,14 @@ describe('runButtonTask', () => {
 			runningText: 'Syncing...',
 			progressEl: progressEl as never,
 			progressMessage: 'Starting sync...',
-			task: async ({ setButtonText, setProgress }) => {
+			task: async ({ setButtonText }) => {
 				expect(button.disabled).toBe(true);
 				expect(button.text).toBe('Syncing...');
 				expect(progressEl.style.display).toBe('');
 				expect(progressEl.textContent).toBe('Starting sync...');
 
 				setButtonText('Uploading...');
-				setProgress('Uploading files...');
+				expect(button.text).toBe('Uploading...');
 				return 3;
 			},
 		});
@@ -54,7 +54,6 @@ describe('runButtonTask', () => {
 		expect(button.disabled).toBe(false);
 		expect(button.text).toBe('Sync now');
 		expect(progressEl.style.display).toBe('none');
-		expect(progressEl.textContent).toBe('Uploading files...');
 	});
 });
 

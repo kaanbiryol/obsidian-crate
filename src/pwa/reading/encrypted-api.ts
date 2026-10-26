@@ -42,6 +42,10 @@ interface EncryptedReadingOptions {
   saveIndex?(entries: EncryptedReadingIndexEntry[]): Promise<void>;
   error(message: string, status: number, code?: string): Error;
 }
+/** A note download that failed in transit. Unlike a rejected note, it is retried
+ * even when the vault sequence has not changed. */
+class NoteUnavailableError extends Error {}
+
 function sameFile(a: WireFile, b: WireFile): boolean {
   return a.revision === b.revision && a.hash === b.hash && a.size === b.size;
 }
@@ -82,8 +86,8 @@ export class EncryptedReadingApi {
     let source = sources.get(file.path);
     if (!source || !sameFile(source.file, file)) {
       if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new Error('This Reading note is too large.');
-      const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`);
-      if (!response.ok) throw new Error('Article changed or is unavailable. Refresh to retry.');
+      const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`).catch(() => undefined);
+      if (!response?.ok) throw new NoteUnavailableError('Article changed or is unavailable. Refresh to retry.');
       const reading = { plain: this.options.folderPath, wire: this.options.wireFolder };
       const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, this.options.authority,
         'Encrypted article failed integrity verification.', (metadataPath, sealed) => resolveEncryptedPath(this.options.paths, file.path, metadataPath, sealed, reading));
@@ -111,7 +115,7 @@ export class EncryptedReadingApi {
     const candidates: ReadingItem[] = [];
     const next = new Map<string, WireFile>(), issues: Array<{ path: string; message: string }> = [];
     const nextIndex = new Map<string, EncryptedReadingIndexEntry>();
-    let downloaded = false;
+    let downloaded = false, unavailable = false;
     const nextSources = new Map(this.sources);
     let metadataBytes = 0;
     for await (const page of encryptedInventoryPages(fetchPage, {
@@ -134,7 +138,15 @@ export class EncryptedReadingApi {
           if (metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
           candidates.push(item);
           nextIndex.set(file.path, { file, item });
-        } catch (error) { issues.push({ path: file.path, message: error instanceof Error ? error.message : 'Article could not be opened.' }); }
+        } catch (error) {
+          if (error instanceof NoteUnavailableError) unavailable = true;
+          // Name a note this device has read before by its plaintext path, so the
+          // offline cache keeps its last verified copy and the user can find it.
+          // Its entry stays indexed (but unlisted) to keep that name for later failures.
+          const previous = this.indexed.get(file.path);
+          if (previous) nextIndex.set(file.path, previous);
+          issues.push({ path: previous?.item.path ?? file.path, message: error instanceof Error ? error.message : 'Article could not be opened.' });
+        }
       }
       // An oversized library fails after its last page, before the sequence is confirmed.
       if (!page.nextCursor && metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
@@ -153,7 +165,7 @@ export class EncryptedReadingApi {
     const fingerprint = JSON.stringify([[...next.values()].map(file => [file.path, file.revision, file.hash, file.size]), issues.map(issue => [issue.path, issue.message])]);
     const revision = `"e2ee-reading-${this.options.generation}-${(await sha256Hex(fingerprint)).slice(0, 32)}"`;
     const result: EncryptedReadingInventory = this.confirmed?.result.revision === revision ? this.confirmed.result : { items, issues, cursor: null, revision };
-    this.confirmed = { sequence: sequence, result };
+    if (!unavailable) this.confirmed = { sequence: sequence, result };
     if (downloaded || removed) await this.options.saveIndex?.([...nextIndex.values()]).catch(() => { /* The index is only a cache. */ });
     return result;
   }
@@ -206,7 +218,9 @@ export class EncryptedReadingApi {
    * library, or answer from a receipt the operation already committed. */
   private async prepare(action: string, body: Record<string, unknown>, id: string, rawBody: string, requestHash: string): Promise<{ attempt: Attempt } | { response: unknown }> {
     const list = await this.inventory();
-    if (list.issues.length) throw this.options.error('Refresh or resolve unreadable Reading notes before saving changes.', 409, 'reading_conflict');
+    // An unreadable note may be a failed download, so the change stays queued and
+    // retries; a rejection here would strand it for review once the note recovers.
+    if (list.issues.length) throw this.options.error('Refresh or resolve unreadable Reading notes before saving changes.', 503, 'reading_unavailable');
     let path = '', wire = '', content: string, previous: WireFile | undefined, itemId: string, before: ReadingItem | undefined;
     if (action === 'capture') {
       const link = readingUrl(body.url), saved = findSavedReadingLink(list.items, link);
