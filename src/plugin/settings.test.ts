@@ -116,6 +116,10 @@ describe('normalizeCrateSettings', () => {
 		expect(settings.debounceDelay).toBe(DEFAULT_SETTINGS.debounceDelay);
 	});
 
+	it('clamps a saved sync interval longer than browser timers can wait', () => {
+		expect(normalizeCrateSettings({ syncInterval: 3_000_000 }, 'vault-config').syncInterval).toBe(Math.floor((2 ** 31 - 1) / 1000));
+	});
+
 	it('preserves valid debugLogging and debounceDelay values', () => {
 		const settings = normalizeCrateSettings({
 			debugLogging: true,

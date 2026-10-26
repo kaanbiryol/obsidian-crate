@@ -6,6 +6,9 @@ export interface SharedSettings {
 	pushEnabled: boolean;
 }
 
+/** Browser timers use signed 32-bit milliseconds; a longer delay fires immediately. */
+export const MAX_SYNC_INTERVAL_SECONDS = Math.floor(2_147_483_647 / 1000);
+
 function normalizeStringArray(value: unknown): string[] | null {
 	if (!Array.isArray(value)) {
 		return null;
@@ -33,7 +36,7 @@ export function normalizeSharedSettingsValue(value: unknown): SharedSettings | n
 
 	const ignorePatterns = normalizeStringArray(value.ignorePatterns);
 	const syncInterval = typeof value.syncInterval === 'number' && Number.isInteger(value.syncInterval) && value.syncInterval >= 0
-		? value.syncInterval
+		? Math.min(value.syncInterval, MAX_SYNC_INTERVAL_SECONDS)
 		: null;
 	if (
 		ignorePatterns === null ||
