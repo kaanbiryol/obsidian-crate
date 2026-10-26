@@ -562,7 +562,9 @@ async function testLaunchUpdate(browser, mode) {
       expect(await page.evaluate(() => sessionStorage.getItem('test-launch-exposed-content'))).toBe('false');
       const difference = await page.evaluate(() => sessionStorage.getItem('test-launch-progress-difference'));
       expect(difference).not.toBeNull();
-      expect(Number(difference)).toBeLessThan(1);
+      // Both bars keep animating toward the same target after the copy; WebKit samples them
+      // 1-2px apart on the 128px bar. A rewound handoff would differ by tens of pixels.
+      expect(Number(difference)).toBeLessThan(3);
       const handoff = await page.evaluate(() => JSON.parse(sessionStorage.getItem('test-launch-handoff')));
       expect(handoff).toMatchObject({ opacity: '1', sameSource: true, loaded: true });
       expect(handoff.iconOffset).toBeLessThan(1);
