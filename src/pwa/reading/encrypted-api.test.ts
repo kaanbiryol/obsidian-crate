@@ -232,6 +232,22 @@ it('keeps other decrypted notes after committing an edit', async () => {
 	expect(request.mock.calls.filter(([path]) => path.startsWith('/reading/encrypted-file?')).map(([path]) => new URL(path, 'https://crate.invalid').searchParams.get('path'))).toEqual([saved[1]!.file.path]);
 });
 
+it('keeps an edit retryable while an unrelated note fails to download', async () => {
+	const saved = await notes(2);
+	const request = vi.fn<(path: string, body?: string) => Promise<Response>>(async path => {
+		if (path.startsWith('/reading/encrypted-files?')) return Response.json(page(saved.map(note => note.file)));
+		const target = new URL(path, 'https://crate.invalid').searchParams.get('path');
+		if (target === saved[1]!.file.path) return new Response(null, { status: 503 });
+		return new Response(saved.find(note => note.file.path === target)!.bytes);
+	});
+	const api = new EncryptedReadingApi({ folderPath: 'Reading', wireFolder, paths, generation: 1, authority, request,
+		readAttempt: async () => undefined, writeAttempt: async () => {}, error: (message, status, code) => Object.assign(new Error(message), { status, code }) });
+	const list = await api.request('/reading/list') as { items: Array<{ crate_reading_id: string }> };
+	await expect(api.request('/reading/update', JSON.stringify({ id: list.items[0]!.crate_reading_id, operationId: 'operation-1', changes: { favorite: true }, before: { favorite: false } })))
+		.rejects.toMatchObject({ status: 503, code: 'reading_unavailable' });
+	expect(request.mock.calls.some(([path]) => path === '/reading/encrypted-commit')).toBe(false);
+});
+
 it('rejects an oversized encrypted note before downloading it', async () => {
 	const { api, request } = harness(), saved = await article('Saved');
 	request.mockImplementation(async () => Response.json(page([{ ...saved.file, size: 4 * 1024 * 1024 + 1 }])));

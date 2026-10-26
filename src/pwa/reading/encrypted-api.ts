@@ -206,7 +206,9 @@ export class EncryptedReadingApi {
    * library, or answer from a receipt the operation already committed. */
   private async prepare(action: string, body: Record<string, unknown>, id: string, rawBody: string, requestHash: string): Promise<{ attempt: Attempt } | { response: unknown }> {
     const list = await this.inventory();
-    if (list.issues.length) throw this.options.error('Refresh or resolve unreadable Reading notes before saving changes.', 409, 'reading_conflict');
+    // An unreadable note may be a failed download, so the change stays queued and
+    // retries; a rejection here would strand it for review once the note recovers.
+    if (list.issues.length) throw this.options.error('Refresh or resolve unreadable Reading notes before saving changes.', 503, 'reading_unavailable');
     let path = '', wire = '', content: string, previous: WireFile | undefined, itemId: string, before: ReadingItem | undefined;
     if (action === 'capture') {
       const link = readingUrl(body.url), saved = findSavedReadingLink(list.items, link);
