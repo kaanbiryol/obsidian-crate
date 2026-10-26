@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 
-/** Follow only static imports; lazy editor pickers and settings stay deferred. */
+/** Follow only static imports; anything imported dynamically stays deferred. */
 export function getPwaStartupAssets(metafile) {
 	return collectAppAssets(metafile, false);
 }
