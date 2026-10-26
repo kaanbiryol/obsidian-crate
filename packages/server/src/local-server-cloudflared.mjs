@@ -7,13 +7,13 @@ import { runProcess } from './local-server-process.mjs';
 
 // Official release assets. Pin both version and SHA-256; never execute a
 // download based only on a mutable "latest" URL or an unverified API response.
-export const cloudflaredVersion = '2026.9.3';
+export const cloudflaredVersion = '2026.10.3';
 const assets = {
-	'darwin-arm64': ['cloudflared-darwin-arm64.tgz', '587c2cfb1c230fe36c7fa7727da78be459dae028cabe8c001291999350f07095'],
-	'darwin-x64': ['cloudflared-darwin-amd64.tgz', 'd1155d0837487f261183b15c1eab6c4ebcad9dc49b94675f1524c3564cea3977'],
-	'linux-x64': ['cloudflared-linux-amd64', '77e26d8d900e0b8469f416239d14b5f296525fdf79fee6f511ef55609e3fbac2'],
-	'linux-arm64': ['cloudflared-linux-arm64', 'aaeb2d7d0da3614634c7e03ab13487a1522c2e79165ed2929cfe23d5e95b326d'],
-	'win32-x64': ['cloudflared-windows-amd64.exe', 'f096265ec2fcbe9bb6e2d64268db167ced3fcbb83d894bdb9e2fcdb26f2ea7e2'],
+	'darwin-arm64': ['cloudflared-darwin-arm64.tgz', '1165d14b6f6360a3b8c283d7d1100024d6ec7cd9bc9e32519e96150645f3ec55'],
+	'darwin-x64': ['cloudflared-darwin-amd64.tgz', '81b7b85f2376815c4f59b1aa323887b62e16ce8b67555c2e1577dc23f2a82000'],
+	'linux-x64': ['cloudflared-linux-amd64', '053b80b0a23031a038fdbf3c073f59f82b8f1f152aa67971d7383ffafc0dbab0'],
+	'linux-arm64': ['cloudflared-linux-arm64', '89297ebfb9e8c99c0dc013a1140601453cf3798d8306c5591651f4a3f5210be8'],
+	'win32-x64': ['cloudflared-windows-amd64.exe', '76b2805253d0d6ffacb092a7acfbee99e7af6917835c0c5410e23f3ef5052da2'],
 };
 const hash = data => createHash('sha256').update(data).digest('hex');
 
