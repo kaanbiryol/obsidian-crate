@@ -102,8 +102,13 @@ it.each(uploadKinds)('fences %s bodies delayed across activation and reset, incl
 			await pending;
 		}
 		const response = await pending;
-		expect(response.status, await response.clone().text()).toBe(428);
-		expect(await response.json()).toMatchObject({ code: 'encryption_required' });
+		// The public Worker reads the body to forward it, so the reset can also win
+		// the transfer queue's reauthentication; that fence answers 401 instead.
+		if (response.status === 401) expect(await response.json()).toEqual({ error: 'Invalid token' });
+		else {
+			expect(response.status, await response.clone().text()).toBe(428);
+			expect(await response.json()).toMatchObject({ code: 'encryption_required' });
+		}
 		for (const table of ['files', 'changelog', 'staged_uploads', 'staged_upload_batches', 'upload_operations']) {
 			expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 		}
