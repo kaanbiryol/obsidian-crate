@@ -37,6 +37,7 @@ interface RemindersViewContentProps {
 
 export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, isFullScreen = false, onClose, isModal = Boolean(onClose), initialTab, initialProject, hideTabBar = false, renderHeader, activeTab, onTabChange, renderNavigation }) => {
     const listStyle = useRemindersSettingsStore(state => state.listStyle);
+    const upcomingDays = useRemindersSettingsStore(state => state.upcomingDaysDefault);
     const isDarkMode = useObsidianDarkMode();
     // Startup sync can defer the index scan even after the view is registered.
     // Publish readiness with its reminders so no render sees a stale empty list.
@@ -102,7 +103,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             initialProject={initialProject}
             hideTabBar={hideTabBar}
             renderHeader={renderHeader}
-            upcomingDays={plugin.remindersSettings.upcomingDaysDefault ?? 7}
+            upcomingDays={upcomingDays}
             renderCard={renderCard}
             onAdd={handleAdd}
             onReorder={handleReorder}

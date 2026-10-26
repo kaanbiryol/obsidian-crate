@@ -70,3 +70,17 @@ it('shows the new folder after the reminders folder changes while the list is op
   await act(async () => { await plugin.reminders?.index.rescanFile(file); });
   expect(cards()).toEqual(['Edited in the new folder']);
 });
+
+it('follows the upcoming days setting while the list is open', async () => {
+  const { plugin } = await createPlugin();
+  expect(await setupReminderBackend(plugin, 'Reminders')).toBe(plugin.reminders);
+  renderHook(() => null, () => {
+    for (const name of ['Node', 'Element', 'HTMLElement', 'HTMLButtonElement']) vi.stubGlobal(name, (window as unknown as Record<string, unknown>)[name]);
+    Object.assign(window, { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout });
+  }, () => React.createElement(PluginContext.Provider, { value: plugin }, React.createElement(RemindersList, { showUpcoming: true })));
+  await act(async () => {});
+  expect(document.body.textContent).toContain('No reminders in the next 7 days');
+
+  await act(async () => { useRemindersSettingsStore.setState({ upcomingDaysDefault: 3 }); });
+  expect(document.body.textContent).toContain('No reminders in the next 3 days');
+});

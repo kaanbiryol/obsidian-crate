@@ -10,6 +10,7 @@ import { createEncryptionState } from '../../encryption/server-state';
 import type { EncryptionReset } from '../encryption/reset';
 import { loadEncryptionReset, EncryptionResetRejectedError } from '../encryption/reset';
 import { SECRET_KEYS } from '../../platform/secret-keys';
+import { updateSyncProgress, type SyncSettings } from '../settings';
 
 const remote = vi.hoisted(() => vi.fn<(_reset: EncryptionReset) => Promise<void>>(async () => {}));
 vi.mock('../encryption/reset', async importOriginal => ({ ...await importOriginal<typeof import('../encryption/reset')>(), resetRemoteEncryption: remote }));
@@ -81,6 +82,21 @@ it('keeps local notes, replaces credentials and sync state, then uploads without
 		expect(h.settings.automaticSync).toBe(true);
 		expect(SyncEngine.prototype.sync).toHaveBeenCalledOnce();
 		expect(SyncEngine.prototype.forceFullSync).not.toHaveBeenCalled();
+	} finally { h.runtime.destroy(); }
+});
+
+it('keeps the sync progress of the reset upload in the saved settings', async () => {
+	const h = await setup();
+	vi.mocked(SyncEngine.prototype.sync).mockImplementationOnce(async function (this: SyncEngine) {
+		// The engine publishes progress into the settings object it was given.
+		updateSyncProgress((this as unknown as { settings: SyncSettings }).settings, { lastSeq: 42, lastSync: '2026-02-02' });
+		return createEmptySyncResult();
+	});
+	try {
+		await h.run();
+		expect(h.settings.lastSeq).toBe(42);
+		expect(h.settings.lastSync).toBe('2026-02-02');
+		expect(h.persistSettings).toHaveBeenLastCalledWith({ automaticSync: true });
 	} finally { h.runtime.destroy(); }
 });
 

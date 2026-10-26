@@ -10,7 +10,7 @@ vi.mock('@/reminders/ui/plugin/ReminderCardWrapper', () => ({
 vi.mock('@/reminders/ui/plugin/hooks/useObsidianDarkMode', () => ({ useObsidianDarkMode: () => false }));
 vi.mock('@/ui/shared/useReducedMotion', () => ({ useReducedMotion: () => true }));
 vi.mock('@/reminders/ui/plugin/hooks/useIndexRefresh', () => ({ useIndexRefresh: () => ({ refreshToken: 0, triggerRefresh: () => {} }) }));
-vi.mock('@/reminders/settings', () => ({ useRemindersSettingsStore: (select: (state: { enabled: boolean }) => unknown) => select({ enabled: true }) }));
+vi.mock('@/reminders/settings', () => ({ useRemindersSettingsStore: (select: (state: { enabled: boolean; upcomingDaysDefault: number }) => unknown) => select({ enabled: true, upcomingDaysDefault: 7 }) }));
 vi.mock('@/ui/obsidian-icon', () => ({ ObsidianIcon: () => null }));
 vi.mock('./styles.scss', () => ({}));
 vi.mock('@/reminders/ui/plugin/ShadowDOMButton', () => ({ ShadowDOMButton: () => null }));

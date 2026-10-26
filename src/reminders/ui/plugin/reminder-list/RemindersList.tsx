@@ -56,8 +56,7 @@ const ActiveRemindersList: React.FC<Props> = ({
   const isDarkMode = useObsidianDarkMode();
   const reduceMotion = useReducedMotion();
   const colorScheme = isDarkMode ? "dark" : "light";
-  // Use setting default for upcoming days
-  const effectiveDays = plugin.remindersSettings.upcomingDaysDefault ?? 7;
+  const effectiveDays = useRemindersSettingsStore(state => state.upcomingDaysDefault);
   const [showCompletedState, setShowCompletedState] = useState(showCompleted);
 
   // Subscribe to index changes for automatic refresh

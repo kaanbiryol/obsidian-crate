@@ -309,7 +309,9 @@ export class SyncRuntime {
 			throw error;
 		}
 		if (this.initializationRevision !== initializationRevision) return;
-		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, options.resumeEncryptionReset ? { ...this.settings, automaticSync: false } : this.settings);
+		// A resumed encryption reset has already saved automatic sync as off. The engine
+		// shares these settings so the reset upload's progress is persisted with them.
+		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
 		const syncEngine = this.syncEngine;
 		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
 		syncEngine.setReminderScopePreparation(this.prepareReminderScope);
