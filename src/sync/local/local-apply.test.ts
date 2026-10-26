@@ -54,6 +54,7 @@ describe('safe local application', () => {
 	it.each([
 		['a known binary format, even when valid UTF-8', 'scan.pdf', encode('%PDF-1.7 a'), encode('%PDF-1.7 b')],
 		['bytes that are not UTF-8', 'notes/data.base', new Uint8Array([255, 1]).buffer, new Uint8Array([255, 2]).buffer],
+		['bytes with NUL characters', 'image.bin', new Uint8Array([0, 1]).buffer, new Uint8Array([0, 2]).buffer],
 	])('keeps incoming bytes for review for %s', async (_case, path, original, incoming) => {
 		const h = harness(path, original);
 		const outcome = await applyRemoteContentIfUnchanged(h.context, path, incoming, await sha256Hex(original));

@@ -6,10 +6,11 @@ export function isBinaryPreviewPath(path: string): boolean {
     return BINARY_PATH.test(path);
 }
 
-/** Strict UTF-8 outside known binary formats: Obsidian's string `process()`
- * writer replaces these bytes exactly, so they can be updated atomically. */
+/** Strict UTF-8 without NUL bytes, outside known binary formats: Obsidian's string
+ * `process()` writer replaces these bytes exactly, so they can be updated atomically.
+ * Like git, a NUL byte marks content as binary even when it decodes. */
 export function isUtf8Text(path: string, bytes: ArrayBuffer): boolean {
-    if (isBinaryPreviewPath(path)) return false;
+    if (isBinaryPreviewPath(path) || new Uint8Array(bytes).includes(0)) return false;
     try { new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); return true; }
     catch { return false; }
 }
