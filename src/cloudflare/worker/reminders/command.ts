@@ -12,7 +12,7 @@ import { assertUniqueReminderSources } from './source-identity';
 import { ReminderFileSizeError } from './limits';
 import { reminderOperationEffects, type ReminderOperation } from './operations';
 import { saveReminderFileCache } from './cache/index';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 
 type ReminderAction = 'create' | 'update' | 'set-completed' | 'delete' | 'reorder';
 
@@ -62,7 +62,7 @@ export async function commitReminderCommand(env: Env, operation: ReminderOperati
 	} catch (error) {
 		return plaintextFailureResponse(error, request);
 	}
-	const files = command.files.map(file => ({ ...file, reminders: file.reminders ?? scanReminderMarkdownFile(file.path, file.content, folderPath) }));
+	const files = command.files.map(file => ({ ...file, reminders: file.reminders ?? scanReminderMarkdownContent(file.path, file.content, folderPath).reminders }));
 	// Edit routes check their identity before reading; a reorder learns its
 	// identities from the note.
 	if (action === 'reorder') await assertUniqueReminderSources(env.DB, folderPath, files[0]!.reminders.map(reminder => reminder.id));

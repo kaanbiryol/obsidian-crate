@@ -1,5 +1,6 @@
-import { findReferencedStorageKeys, type ObjectReference } from '../storage-references';
+import type { ObjectReference } from '../storage-references';
 import { STAGED_UPLOAD_TTL_MS } from '../sync/staging/staged-uploads';
+import { deleteClaimedObjects } from './staged-upload-cleanup';
 
 /** Two batches bound both D1 work and R2 requests during a maintenance pass. */
 export async function cleanStagedBatches(bucket: R2Bucket, db: D1Database, now = Date.now()): Promise<number> {
@@ -9,18 +10,8 @@ export async function cleanStagedBatches(bucket: R2Bucket, db: D1Database, now =
 	let finished = 0;
 	for (const row of rows.results) {
 		const objects = JSON.parse(row.storage_keys) as ObjectReference[];
-		const keys = objects.map(object => object.storageKey);
-		const referenced = await findReferencedStorageKeys(db, objects);
-		const visible: string[] = [];
-		const waiting: string[] = [];
-		await Promise.all(keys.filter(key => !referenced.has(key)).map(async key => {
-			try { (await bucket.head(key) ? visible : waiting).push(key); }
-			catch { waiting.push(key); }
-		}));
-		try {
-			if (visible.length) await bucket.delete(visible);
-		} catch { waiting.push(...visible); }
-		finished += keys.length - waiting.length;
+		const { waiting } = await deleteClaimedObjects(bucket, db, objects);
+		finished += objects.length - waiting.length;
 		if (!waiting.length) {
 			await db.prepare('DELETE FROM staged_upload_batches WHERE id = ? AND storage_keys = ?')
 				.bind(row.id, row.storage_keys).run();

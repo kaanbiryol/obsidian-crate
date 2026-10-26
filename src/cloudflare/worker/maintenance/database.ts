@@ -1,7 +1,8 @@
 export async function pruneExpiredTokens(db: D1Database, now = Date.now()): Promise<void> {
 	await db.batch([
-		db.prepare('DELETE FROM push_subscriptions WHERE owner_token_id IN (SELECT id FROM auth_tokens WHERE expires_at IS NOT NULL AND expires_at <= ?)').bind(now),
 		db.prepare('DELETE FROM auth_tokens WHERE expires_at IS NOT NULL AND expires_at <= ?').bind(now),
+		// Also removes subscriptions a revocation outside the coordinator lock left without an owner.
+		db.prepare('DELETE FROM push_subscriptions WHERE NOT EXISTS (SELECT 1 FROM auth_tokens WHERE id = push_subscriptions.owner_token_id)'),
 		db.prepare('DELETE FROM web_enrollment_tokens WHERE expires_at <= ?').bind(now),
 	]);
 }

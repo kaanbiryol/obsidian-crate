@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleListReminders } from './routes/list';
 import { saveReminderFileCache } from './cache/index';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 
 const { DB: db, BUCKET: bucket } = env;
@@ -148,7 +148,7 @@ describe('reminder list cache with D1 and R2', () => {
 		const oldHash = (await readCommittedMarkdownFileVersion(bucket, db, path))!.hash;
 		await replace(path, '# Inbox\n\n- [ ] Current task <!-- crate-id:r1 -->\n');
 		await list();
-		await saveReminderFileCache(db, 'Reminders', path, oldHash, scanReminderMarkdownFile(path, originalContent, 'Reminders'));
+		await saveReminderFileCache(db, 'Reminders', path, oldHash, scanReminderMarkdownContent(path, originalContent, 'Reminders').reminders);
 		const bucketGet = vi.spyOn(bucket, 'get');
 
 		const response = await list();

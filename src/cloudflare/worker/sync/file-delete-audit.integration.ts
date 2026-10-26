@@ -143,7 +143,7 @@ it('returns the exact receipt without deleting a recreation after the absent sna
 	expect(absent).toBeNull();
 	const recreated = await upload();
 	const before = await receipts();
-	const retry = await commitFileDelete(env.BUCKET, env.DB, { path, expectedHash: old.hash, expectedRevision: old.revision, previousFile: absent });
+	const retry = await commitFileDelete(env.DB, { path, expectedHash: old.hash, expectedRevision: old.revision, previousFile: absent });
 	expect(retry).toMatchObject({ committed: true, idempotent: true, deletion: {
 		revision: receipt.revision, consumedRevision: receipt.consumedRevision, deleteRequestId: receipt.deleteRequestId,
 	} });

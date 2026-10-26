@@ -2,7 +2,7 @@ import { ReminderIdentityConflictError } from './source-identity';
 import { decodeMarkdownBytes, MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import { reminderDescriptionErrorFromMessage } from '@/reminders/core/reminderDescription';
 import type { SyncIssueCode } from '@/protocol/sync-issues';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { MAX_REMINDER_NOTE_BYTES } from '@/reminders/core/constants';
 import type { RemoteReminderRecord } from './types';
 import { MAX_ENCRYPTED_PUBLIC_DATA_BYTES, parseEncryptedFile } from '../../../encryption/file-format';
@@ -39,8 +39,9 @@ export function reminderSourceByteLimit(encrypted: boolean): number {
 	return encrypted ? 2 * MAX_REMINDER_NOTE_BYTES + MAX_ENCRYPTED_PUBLIC_DATA_BYTES : MAX_REMINDER_NOTE_BYTES;
 }
 
-/** Domain parsing is optional; an uncertain source must never look like an empty note. */
-export function parseReminderSource(path: string, content: string | ArrayBuffer, folderPath = '', encrypted = false): ParsedReminderSource {
+/** Domain parsing is optional; an uncertain source must never look like an empty note.
+ * A plaintext note whose stored `size` exceeds the limit is rejected without its bytes. */
+export function parseReminderSource(path: string, content: string | ArrayBuffer, folderPath = '', encrypted = false, size?: number): ParsedReminderSource {
 	const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content;
 	if (encrypted) {
 		try {
@@ -58,11 +59,11 @@ export function parseReminderSource(path: string, content: string | ArrayBuffer,
 			}) };
 		} catch { return { reminders: [], issue: 'Encrypted reminder scheduling metadata is invalid. Sync this note from an unlocked device.' }; }
 	}
-	if (bytes.byteLength > MAX_REMINDER_NOTE_BYTES) {
+	if ((size ?? bytes.byteLength) > MAX_REMINDER_NOTE_BYTES) {
 		return { reminders: [], issue: REMINDER_SOURCE_SIZE_ISSUE };
 	}
 	try {
-		return { reminders: scanReminderMarkdownFile(path, decodeMarkdownBytes(bytes), folderPath) };
+		return { reminders: scanReminderMarkdownContent(path, decodeMarkdownBytes(bytes), folderPath).reminders };
 	} catch (error) {
 		const reason = error instanceof Error ? error.message.slice(0, 300) : 'Invalid reminder metadata';
 		return { reminders: [], issue: `Repair the reminder metadata in this note to resume its reminders. The vault file remains synced. ${reason}` };

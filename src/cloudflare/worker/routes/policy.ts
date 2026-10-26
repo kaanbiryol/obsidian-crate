@@ -41,6 +41,8 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /encryption/pairing': { scopes: LIBRARY },
 	'GET /encryption': { scopes: REMINDERS, duringEncryptionReset: true },
 	'GET /encryption/deletion-precondition': { scopes: VAULT },
+	// Authenticated under the lock, a resume waits for a begin request still in flight instead
+	// of reading 401 for its replacement credential and resending the destructive begin.
 	'GET /encryption/reset': { scopes: VAULT, execution: COORDINATOR_READ, duringEncryptionReset: true },
 	'POST /encryption/metadata': { scopes: VAULT },
 	'POST /encryption/reset': { scopes: VAULT, execution: COORDINATOR, duringEncryptionReset: true },
@@ -108,8 +110,8 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /reading/update': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 60 },
 	'POST /reading/retry': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 10 },
 	'POST /reading/policy': { scopes: VAULT, execution: COORDINATOR, rateLimit: 10 },
-	'GET /reading/policy': { scopes: VAULT, execution: COORDINATOR_READ },
-	'GET /reading/session': { scopes: LIBRARY, execution: COORDINATOR_READ, keylessEncryptedRead: true },
+	'GET /reading/policy': { scopes: VAULT },
+	'GET /reading/session': { scopes: LIBRARY, keylessEncryptedRead: true },
 	// Plaintext list and item reads may continue an index rebuild under the lock; they wake
 	// notification processing only when that rebuild ran.
 	'GET /reading/list': { scopes: LIBRARY, execution: COORDINATOR_READ },

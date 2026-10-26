@@ -5,9 +5,11 @@ import { reset, runDurableObjectAlarm } from 'cloudflare:test';
 import { applySchema } from '../../test-support/schema-test-harness';
 import { INITIAL_REMINDERS_PENDING, finishInitialReminderSetup } from './initial-import-readiness';
 import { runNotificationCoordinator } from '../../notifications/coordinator';
+import { dispatchNotificationJobs } from '../../notifications/outbox';
 import { writeCommittedMarkdownFile } from '../../storage';
 import { handleNotificationPolicy } from '../../notifications/policy';
 import { meterD1Writes } from '../../test-support/d1-write-meter-test-harness';
+import { meterD1Usage } from '../../d1-usage';
 import { SyncTestDevice } from '../../test-support/sync-engine-test-harness';
 import { REMINDER_CACHE_PARSER_VERSION } from '../../reminders/cache/types';
 import { handleListReminders } from '../../reminders/routes/list';
@@ -28,7 +30,8 @@ async function pendingImport() {
 	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(INITIAL_REMINDERS_PENDING, 'import').run();
 }
 const readiness = async (db = env.DB) => (await finishInitialReminderSetup(json({ token: 'import' }), db)).json() as Promise<ReminderSetupStatus>;
-const pass = () => runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, env);
+// A coordinator alarm dispatches due schedules after its locked pass.
+const pass = async () => { if (await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, env)) await dispatchNotificationJobs(env, true); };
 
 it('keeps readiness pending until every schedule is installed and writes nothing on pending probes', async () => {
 	await pendingImport();
@@ -159,6 +162,20 @@ it('probes ten thousand verified files with bounded reads', async () => {
 	});
 	expect(await readiness()).toEqual({ ready: true });
 	expect(reads).toBeLessThan(30);
+});
+
+it('caps the progress counts of a pending probe over a large setup queue', async () => {
+	await pendingImport();
+	const seed = (sql: string) => env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 10000) ${sql}`).run();
+	await seed(`INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified)
+    SELECT 'Reminders/'||x||'.md', 'key-'||x, ${REMINDER_CACHE_PARSER_VERSION}, 0 FROM n`);
+	await seed("INSERT INTO notification_projection_jobs(path, job_token) SELECT 'Reminders/job-'||x||'.md', 'token' FROM n");
+	await seed("INSERT INTO notification_jobs(reminder_id, job_token, operation, available_at) SELECT 'reminder-'||x, 'token', 'cancel', x FROM n");
+	const meter = meterD1Usage(env.DB);
+	expect(await readiness(meter.db)).toMatchObject({ ready: false, progress: { remainingFiles: 1000, remainingSchedules: 1000 } });
+	expect(meter.usage.complete).toBe(true);
+	// Unbounded counts would read every queued row (30,000 here) on each one-second poll.
+	expect(meter.usage.rowsRead).toBeLessThan(5000);
 });
 
 it.each([false, true])('resumes reminder setup and syncs a local repair before waiting (repair=%s)', async repair => {

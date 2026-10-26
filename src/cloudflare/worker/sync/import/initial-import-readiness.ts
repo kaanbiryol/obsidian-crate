@@ -2,6 +2,7 @@ import { corsResponse } from '../../cors';
 import { parseJsonObject } from '../../request-validation';
 import { REMINDER_CACHE_PARSER_VERSION } from '../../reminders/cache/types';
 import { reminderSourceIssueCode } from '../../reminders/source-parse';
+import { REMINDER_SETUP_PROGRESS_CAP } from '@/protocol/initial-import';
 
 export const INITIAL_REMINDERS_PENDING = 'initial_import_reminders_pending';
 
@@ -37,15 +38,17 @@ export async function finishInitialReminderSetup(request: Request, db: D1Databas
 	const sourceIssues = status.ready ? [] : (await db.prepare(
 		'SELECT path, error AS message FROM notification_file_retries ORDER BY path LIMIT 21',
 	).all<{ path: string; message: string }>()).results.map(issue => ({ ...issue, ...reminderSourceIssueCode(issue.message) }));
+	// Clients poll throughout setup, so each count stops at REMINDER_SETUP_PROGRESS_CAP rows.
 	const progress = status.ready ? undefined : await db.prepare(`SELECT
     NOT EXISTS (SELECT 1 FROM notification_policy p JOIN maintenance_state m
       ON m.key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:' || p.folder_path AND m.value = '') AS scanning,
     (SELECT COUNT(*) FROM (
-      SELECT file_path FROM reminder_source_state WHERE parser_version < ${REMINDER_CACHE_PARSER_VERSION}
-      UNION SELECT file_path FROM reminder_source_state WHERE verified = 0
-      UNION SELECT path FROM notification_projection_jobs
+      SELECT * FROM (SELECT file_path FROM reminder_source_state WHERE parser_version < ${REMINDER_CACHE_PARSER_VERSION} LIMIT ${REMINDER_SETUP_PROGRESS_CAP})
+      UNION SELECT * FROM (SELECT file_path FROM reminder_source_state WHERE verified = 0 LIMIT ${REMINDER_SETUP_PROGRESS_CAP})
+      UNION SELECT * FROM (SELECT path FROM notification_projection_jobs LIMIT ${REMINDER_SETUP_PROGRESS_CAP})
+      LIMIT ${REMINDER_SETUP_PROGRESS_CAP}
     )) AS remainingFiles,
-    (SELECT COUNT(*) FROM notification_jobs) AS remainingSchedules`).first<{
+    (SELECT COUNT(*) FROM (SELECT 1 FROM notification_jobs LIMIT ${REMINDER_SETUP_PROGRESS_CAP})) AS remainingSchedules`).first<{
 			scanning: number; remainingFiles: number; remainingSchedules: number;
 		}>();
 	return corsResponse({ ready: Boolean(status.ready),

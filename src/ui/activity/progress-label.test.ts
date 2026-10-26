@@ -27,3 +27,9 @@ it('shows remaining scheduling work without reusing upload counts', () => {
 		phase: 'reminders', reminderSetup: { scanning: false, remainingFiles: 0, remainingSchedules: 42 },
 	})).toBe('Preparing reminder schedules: 42 remaining');
 });
+
+it('marks reminder setup counts that reached the server cap as a lower bound', () => {
+	expect(formatSyncProgress(undefined, {
+		phase: 'reminders', reminderSetup: { scanning: false, remainingFiles: 1000, remainingSchedules: 37 },
+	})).toBe(`Preparing reminders: ${(1000).toLocaleString()}+ files and 37 schedules remaining`);
+});

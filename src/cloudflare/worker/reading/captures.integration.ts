@@ -41,7 +41,7 @@ it('queues durably with a receipt and publishes just one final named file', asyn
 	expect(await env.DB.prepare('SELECT count(*) AS n FROM changelog').first()).toMatchObject({ n: 1 });
 	expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).toBeNull();
 	const stored = (await getStoredFileRow(env.DB, path))!;
-	await commitFileDelete(env.BUCKET, env.DB, { path, previousFile: stored, expectedHash: stored.hash, expectedRevision: stored.storageKey });
+	await commitFileDelete(env.DB, { path, previousFile: stored, expectedHash: stored.hash, expectedRevision: stored.storageKey });
 	await publishCapture(env, row.id, row.generation, { markdown: 'Late delivery', title: 'Changed title' });
 	expect(await (await command('capture', body)).json()).toEqual(response);
 	expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();

@@ -1,12 +1,13 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
-import { reset } from 'cloudflare:test';
+import { reset, runInDurableObject } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from './routes';
 import { ensureReadingIndex, queueReadingArticles } from './library-index';
-import { publishExtraction } from './extraction/jobs';
+import { publishExtraction, runReadingExtraction } from './extraction/jobs';
 import type { Publication } from './extraction/jobs';
+import type { Env } from '../types';
 import { policy, readStoredNote } from './common';
 import { READING_LIST_PAGE } from './queries';
 import { meterD1Usage } from '../d1-usage';
@@ -140,7 +141,7 @@ it('cannot resurrect a deleted source or overwrite text changed during extractio
 	await publishExtraction(env, { job, result: { markdown: 'Stale extraction must not overwrite a changed source.', title: undefined, author: undefined } });
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))?.content).toBe(changed);
 	const file = (await getStoredFileRow(env.DB, job.path))!;
-	await commitFileDelete(env.BUCKET, env.DB, { path: job.path, previousFile: file, expectedHash: file.hash, expectedRevision: file.storageKey });
+	await commitFileDelete(env.DB, { path: job.path, previousFile: file, expectedHash: file.hash, expectedRevision: file.storageKey });
 	await publishExtraction(env, { job, result: null });
 	expect(await getStoredFileRow(env.DB, job.path)).toBeNull();
 });
@@ -187,11 +188,79 @@ it('keeps failed extractions as useful bookmarks and never extracts clipper note
 	await buildIndex();
 	expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
 });
+function extractionAlarm(runtime: Partial<Env> = {}) {
+	const setAlarm = vi.fn(async (_at: number) => {});
+	const fetch = vi.fn(async () => Response.json({}));
+	const state = { storage: { setAlarm } } as unknown as DurableObjectState;
+	return { setAlarm, fetch, run: () => runReadingExtraction(state, { ...env, READING_FETCH: { fetch }, ...runtime }) };
+}
+it('publishes due article jobs without waking notification processing', async () => {
+	for (const name of ['A', 'B', 'C']) {
+		await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Reading/${name}.md`,
+			createReadingNote({ id: crypto.randomUUID(), url: `https://example.com/${name}`, savedAt: new Date().toISOString() }), null);
+	}
+	await buildIndex();
+	// Jobs whose fetches are spent publish their bookmark without fetching the page.
+	await env.DB.prepare('UPDATE reading_jobs SET attempts = 3, available_at = 0').run();
+	const alarm = extractionAlarm();
+	for (let run = 0; run < 3; run++) await alarm.run();
+	expect(alarm.fetch).not.toHaveBeenCalled();
+	expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
+	for (const name of ['A', 'B', 'C']) {
+		expect(parseReadingNote((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, `Reading/${name}.md`))!.content)?.extraction_status).toBe('unavailable');
+	}
+	const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
+	// A coordinator wake would have recorded a notification run with a fresh retry budget.
+	expect(await runInDurableObject(coordinator, (_instance, state) => state.storage.get('notificationRun'))).toBeUndefined();
+});
+it('requeues a capture still pending after its job found a stale source', async () => {
+	const job = await capture();
+	// A full queue kept a later commit from replacing this job, so it names an earlier revision.
+	await env.DB.prepare("UPDATE reading_jobs SET source_revision = 'earlier', attempts = 2, available_at = 0").run();
+	const alarm = extractionAlarm();
+	await alarm.run();
+	expect(alarm.fetch).not.toHaveBeenCalled();
+	const file = (await getStoredFileRow(env.DB, job.path))!;
+	expect((await env.DB.prepare('SELECT path, source_revision, attempts FROM reading_jobs').all()).results).toEqual([{ path: job.path, source_revision: file.storageKey, attempts: 0 }]);
+	expect(alarm.setAlarm).toHaveBeenCalled();
+});
+it('queues a pending capture that a full queue held back once a slot frees', async () => {
+	await buildIndex();
+	const current = (await policy(env.DB))!;
+	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 1000)
+    INSERT INTO reading_jobs(path, item_id, generation, source_revision, block_hash, url, available_at)
+    SELECT 'Reading/queued-'||x||'.md', 'item-'||x, ?, 'revision', 'hash', 'https://example.com/queued', ? FROM n`).bind(current.generation, Date.now() + 3600_000).run();
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Held.md',
+		createReadingNote({ id: crypto.randomUUID(), url: 'https://example.com/held', savedAt: new Date().toISOString() }), null);
+	const held = () => env.DB.prepare("SELECT attempts FROM reading_jobs WHERE path = 'Reading/Held.md'").first();
+	expect(await held()).toBeNull();
+	await env.DB.prepare("DELETE FROM reading_jobs WHERE path = 'Reading/queued-1.md'").run();
+	await extractionAlarm().run();
+	expect(await held()).toEqual({ attempts: 0 });
+});
+it('parks an article job after eight attempts until its source changes', async () => {
+	const job = await capture();
+	await env.DB.prepare('UPDATE reading_jobs SET attempts = 7, available_at = 0').run();
+	// The coordinator cannot publish, so the eighth attempt fails too.
+	const unavailable = { idFromName: () => ({}), get: () => ({ fetch: async () => new Response(null, { status: 503 }) }) } as unknown as Env['REMINDER_ALARMS'];
+	const alarm = extractionAlarm({ REMINDER_ALARMS: unavailable });
+	await alarm.run();
+	const row = () => env.DB.prepare('SELECT attempts, available_at FROM reading_jobs WHERE path = ?').bind(job.path).first();
+	expect(await row()).toEqual({ attempts: 8, available_at: -1 });
+	// A parked job is neither retried nor queued again, and leaves no alarm behind.
+	alarm.setAlarm.mockClear();
+	await alarm.run();
+	expect(alarm.setAlarm).not.toHaveBeenCalled();
+	expect(await row()).toEqual({ attempts: 8, available_at: -1 });
+	const source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))!;
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, job.path, updateReadingNote(source.content, job.item_id, { favorite: true }), source.hash);
+	expect(await row()).toMatchObject({ attempts: 0 });
+});
 it('replays a lost receipt even after deletion and rejects expired operation identities', async () => {
 	const body = { url: 'https://example.com/retry', fetchArticle: false, operationId: id() };
 	const first = await command('capture', body); const payload: unknown = await first.json();
 	const file = (await env.DB.prepare('SELECT path FROM files').first<{ path: string }>())!, stored = (await getStoredFileRow(env.DB, file.path))!;
-	await commitFileDelete(env.BUCKET, env.DB, { path: file.path, previousFile: stored, expectedHash: stored.hash, expectedRevision: stored.storageKey });
+	await commitFileDelete(env.DB, { path: file.path, previousFile: stored, expectedHash: stored.hash, expectedRevision: stored.storageKey });
 	expect(await (await command('capture', body)).json()).toEqual(payload); expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
 	expect((await command('capture', { url: body.url, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000) - 180) })).status).toBe(410);
 });

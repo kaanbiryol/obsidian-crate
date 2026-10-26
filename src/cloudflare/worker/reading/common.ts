@@ -2,13 +2,12 @@ import { featureEnabled, parseStoredFeaturePolicy } from '../feature-policy';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
-import { getStoredFileRow, type FileStorageRow } from '../sync/storage';
+import { getStoredFileRow, readVerifiedBytes, type FileStorageRow } from '../sync/storage';
 import { MAX_READING_BYTES } from '@/reading/core/model';
 import { parseReadingNote } from '@/reading/core/notes';
 import { decodeReadingNote, READING_ENCODING_ERROR, READING_SIZE_ERROR, type StoredReadingFile } from './library-index';
 import { apiRoutePolicy } from '../routes/policy';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
-import { sha256Hex } from '@/platform/sha256';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 
 /** Preparation and capability redemption must recognize the same issuer scopes. */
@@ -40,11 +39,9 @@ export async function authority(db: D1Database, principal: AuthPrincipal, featur
 /** The verified bytes of one file revision. */
 export async function readStoredNote(env: Env, file: StoredReadingFile): Promise<ArrayBuffer> {
 	if (file.size > MAX_READING_BYTES) throw new ReadingError(READING_SIZE_ERROR, 413);
-	const object = await env.BUCKET.get(file.storageKey);
-	if (!object || object.size !== file.size) throw new ReadingError('The saved text is temporarily unavailable.', 503);
 	// Verify the stored bytes, then decode; a lossy decode would never match the hash.
-	const bytes = await object.arrayBuffer();
-	if (await sha256Hex(bytes) !== file.hash) throw new ReadingError('The saved text could not be verified.', 503);
+	const bytes = await readVerifiedBytes(env.BUCKET, file);
+	if (!bytes) throw new ReadingError('The saved text is temporarily unavailable.', 503);
 	return bytes;
 }
 function decodeStoredNote(bytes: ArrayBuffer): string {

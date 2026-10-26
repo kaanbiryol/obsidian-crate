@@ -6,6 +6,7 @@ import { getNotificationPolicy } from '../../notifications/policy';
 import { createsNotificationWork, FRAMED_CONTENT_HEADER, frameUpload, hasFramedMarkdown, readFrame } from './staged-upload-dispatch';
 import { commitCoordinatorNewFiles } from '../../coordinator/coordinator';
 import { isMarkdownPath } from '../../../../protocol/note-paths';
+import { MAX_REMINDER_NOTE_BYTES } from '../../../../reminders/core/constants';
 
 export function coordinatedNewFiles(env: Env): typeof commitNewFiles {
 	return async (bucket, db, files) => {
@@ -40,7 +41,8 @@ export async function prepareCoordinatedNewFiles(request: Request, env: Env): Pr
 			const content = attached.get(file);
 			if (content) return { ...file, content };
 			file.reminderPolicyRevision = policy?.revision ?? null;
-			if (!isReminderPath(file.path, policy?.folderPath ?? null)) return { ...file, content: new ArrayBuffer(0) };
+			// A reminder note over the limit is rejected by its size, so its bytes stay in R2.
+			if (!isReminderPath(file.path, policy?.folderPath ?? null) || file.size > MAX_REMINDER_NOTE_BYTES) return { ...file, content: new ArrayBuffer(0) };
 			const object = await env.BUCKET.get(file.objectKey);
 			if (!object) throw new Error('Staged object unavailable');
 			return { ...file, content: await object.arrayBuffer() };

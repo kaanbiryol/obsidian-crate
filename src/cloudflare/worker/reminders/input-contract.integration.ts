@@ -7,7 +7,7 @@ import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';
@@ -35,7 +35,7 @@ function editorBody(content: string, description: string, mode: 'create' | 'edit
 async function seed(description = 'Original description') {
 	const text = '# Inbox\n\n- [ ] Original task <!-- crate-id:original -->\n' + buildDescriptionBlock(description).join('\n') + '\n';
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, text, null);
-	return reminderCommandPayload(scanReminderMarkdownFile(filePath, text, 'Reminders')[0]!);
+	return reminderCommandPayload(scanReminderMarkdownContent(filePath, text, 'Reminders').reminders[0]!);
 }
 async function update(reminder: Record<string, unknown>, patch: Record<string, unknown>) {
 	return request('/reminders/update', { folderPath: 'Reminders', id: reminder.id, filePath: reminder.filePath,
@@ -49,7 +49,7 @@ it.each(['line one\nline two', 'line one\r\nline two', 'line one\tvalue\n漢字 
 	const saved = await response.json() as { reminder: ReminderRecord };
 	expect(saved.reminder.description).toBe(description);
 	const stored = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, filePath);
-	expect(scanReminderMarkdownFile(filePath, stored!.content, 'Reminders')[0]!.description).toBe(description);
+	expect(scanReminderMarkdownContent(filePath, stored!.content, 'Reminders').reminders[0]!.description).toBe(description);
 });
 
 it('preserves a plugin-created multiline description when the PWA changes the title and moves the reminder', async () => {
@@ -60,7 +60,7 @@ it('preserves a plugin-created multiline description when the PWA changes the ti
 	const { reminder } = await response.json() as { reminder: ReminderRecord };
 	expect(reminder).toMatchObject({ content: 'Changed title', description, project: 'Other' });
 	const stored = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, reminder.filePath);
-	expect(scanReminderMarkdownFile(reminder.filePath, stored!.content, 'Reminders')[0]!.description).toBe(description);
+	expect(scanReminderMarkdownContent(reminder.filePath, stored!.content, 'Reminders').reminders[0]!.description).toBe(description);
 });
 
 it.each([{ content: 'x'.repeat(1025) }, { content: null }, { content: 42 }, { description: {} },

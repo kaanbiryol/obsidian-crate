@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
@@ -9,6 +9,11 @@ import { commitNewFiles } from './staging/bulk-new-file-commit';
 import { commitStagedFile } from './mutations';
 import { handleBatchUpload } from './batch/upload';
 import { writeCommittedMarkdownFile } from '../storage';
+import { commitCoordinatedUpload, coordinatedUpload, prepareCoordinatedUpload } from './staging/staged-upload-dispatch';
+import { commitCoordinatedNewFiles, coordinatedNewFiles, prepareCoordinatedNewFiles } from './staging/bulk-upload-dispatch';
+import { COORDINATOR_PATHS } from '../coordinator/coordinator';
+import { REMINDER_SOURCE_SIZE_ISSUE } from '../reminders/source-parse';
+import type { Env } from '../types';
 
 async function initialize() {
 	await applySchema(env.DB);
@@ -136,4 +141,36 @@ it('keeps rejected revisions out of source publication and revisits an existing 
 	expect(state.retries).toEqual([]);
 	const file = await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'Reminders/existing.md'").first<{ storage_key: string }>();
 	expect(await (await env.BUCKET.get(file!.storage_key))!.text()).toBe(original);
+});
+
+it('quarantines an oversized plaintext reminder note by its size without reading it back from R2', async () => {
+	const path = 'Reminders/large.md';
+	const content = `${reminder(datedId, '2099-05-06')}\n${'Long notes. '.repeat(180_000)}`;
+	const state = { storage: { put: async () => {}, setAlarm: async () => {} } } as unknown as DurableObjectState;
+	const get = vi.spyOn(env.BUCKET, 'get');
+	const preparationReads: number[] = [];
+	// Runs the coordinator's preparation and commit in place of the Durable Object request.
+	const coordinator = { idFromName: () => ({}), get: () => ({ fetch: async (input: string, init?: RequestInit) => {
+		const request = new Request(input, init);
+		get.mockClear();
+		if (new URL(request.url).pathname === COORDINATOR_PATHS.commitUpload) {
+			const prepared = await prepareCoordinatedUpload(request, env);
+			preparationReads.push(get.mock.calls.length);
+			return prepared instanceof Response ? prepared : commitCoordinatedUpload(prepared, state, env);
+		}
+		const prepared = await prepareCoordinatedNewFiles(request, env);
+		preparationReads.push(get.mock.calls.length);
+		return commitCoordinatedNewFiles(prepared, state, env);
+	} }) } as unknown as Env['REMINDER_ALARMS'];
+	const runtime = { ...env, REMINDER_ALARMS: coordinator };
+	for (const bulkNewFiles of [false, true]) {
+		const response = await handleBatchUpload(new Request('https://test/sync/batch-upload', {
+			method: 'POST', body: JSON.stringify({ bulkNewFiles, files: [{ path, content: btoa(content), expectedHash: null,
+				operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)) }] }),
+		}), env.BUCKET, env.DB, { commitUpload: coordinatedUpload(runtime), commitNewFiles: coordinatedNewFiles(runtime) });
+		expect(await response.json()).toMatchObject({ success: true, results: [{ path, success: true }] });
+		expect((await snapshot()).retries).toEqual([{ path, attempts: 1, available_at: -1, error: REMINDER_SOURCE_SIZE_ISSUE }]);
+		await reset(); await initialize();
+	}
+	expect(preparationReads).toEqual([0, 0]);
 });

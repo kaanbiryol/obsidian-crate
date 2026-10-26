@@ -1,6 +1,7 @@
 import { runReadingExtraction } from '../reading/extraction/jobs';
 import { runMaintenanceEpisode } from '../maintenance/lifecycle';
-import { runBoundedNotificationCoordinator } from '../notifications/lifecycle';
+import { recordNotificationDispatchFailure, runBoundedNotificationCoordinator } from '../notifications/lifecycle';
+import { dispatchNotificationJobs } from '../notifications/outbox';
 import type { StateLock } from './coordinator-requests';
 import type { Env } from '../types';
 
@@ -17,7 +18,13 @@ export async function runCoordinatorAlarm(state: DurableObjectState, env: Env, w
 	if (await state.storage.get<boolean>('projectionCoordinator')) {
 		if (!env.BUCKET || !env.REMINDER_ALARMS) throw new Error('Projection bindings unavailable');
 		// Wakeups and the final idle/retry decision must share the mutation lock.
-		await withStateLock(() => runBoundedNotificationCoordinator(state, env));
+		const episode = await withStateLock(() => runBoundedNotificationCoordinator(state, env));
+		// Dispatch waits on reminder objects, so commits need not queue behind it. Each
+		// reminder object re-checks its job token and source authority.
+		if (episode !== null) {
+			try { await dispatchNotificationJobs(env, true); }
+			catch (error) { await withStateLock(() => recordNotificationDispatchFailure(state, episode, error)); }
+		}
 		return true;
 	}
 	return false;

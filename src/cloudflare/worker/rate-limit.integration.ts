@@ -95,6 +95,7 @@ it('keeps fallback budgets across real request-local metering wrappers and rotat
 
 it('authenticates coordinator routes once, inside the coordinator, and remembers its answer for admission', async () => {
 	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope) VALUES ('owner',?,'vault')").bind(await sha256Hex('owner')).run();
+	await env.DB.prepare("INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, 0, 'Reading', 'g', 'r')").run();
 	const edgeStatements: string[] = [];
 	const edgeDb = new Proxy(env.DB, { get(target, key) {
 		if (key === 'prepare') return (sql: string) => { edgeStatements.push(sql); return target.prepare(sql); };
@@ -102,7 +103,7 @@ it('authenticates coordinator routes once, inside the coordinator, and remembers
 		return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
 	} });
 	const limit = vi.fn(async () => ({ success: true }));
-	const attempt = (token: string, path = '/reading/policy') => worker.fetch(new Request(`https://once.test${path}`, { headers: { Authorization: `Bearer ${token}` } }),
+	const attempt = (token: string, path = '/reading/list') => worker.fetch(new Request(`https://once.test${path}`, { headers: { Authorization: `Bearer ${token}` } }),
 		{ ...env, DB: edgeDb, NOTIFICATION_REQUEST_LIMITER: { limit } });
 	for (const path of ['/reading/list', '/reading/item']) expect((await attempt('invalid', path)).status).toBe(401);
 	expect(limit).toHaveBeenCalledTimes(2);

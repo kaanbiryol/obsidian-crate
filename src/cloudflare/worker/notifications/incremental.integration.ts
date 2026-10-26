@@ -6,7 +6,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { handleNotificationPolicy } from './policy';
 import { writeCommittedMarkdownFile } from '../storage';
 import { drainNotificationProjections } from './projection';
-import { drainNotificationJobs } from './outbox';
+import { dispatchNotificationJobs, drainNotificationJobs } from './outbox';
 import { hasNotificationAuthority } from '../reminders/source-state';
 import { runNotificationCoordinator } from './coordinator';
 
@@ -83,20 +83,25 @@ it('continues ready batches immediately and keeps future retry deadlines', async
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	const setAlarm = vi.fn();
 	const state = { storage: { setAlarm } } as never;
+	// Like the coordinator alarm: dispatch after the pass, and the next pass decides what follows.
+	const pass = async () => { if (await runNotificationCoordinator(state, env)) await dispatchNotificationJobs(env, true); };
 	const now = Date.now();
 	vi.spyOn(Date, 'now').mockReturnValue(now);
-	await runNotificationCoordinator(state, env);
+	await pass();
 	expect(await jobs()).toHaveLength(1);
 	expect(setAlarm).toHaveBeenLastCalledWith(now + 1);
 	const retryAt = now + 60_000;
 	await env.DB.prepare('UPDATE notification_jobs SET available_at = ?').bind(retryAt).run();
 	setAlarm.mockClear();
-	await runNotificationCoordinator(state, env);
+	await pass();
 	expect(setAlarm).toHaveBeenCalledExactlyOnceWith(retryAt);
 	vi.mocked(Date.now).mockReturnValue(retryAt);
 	setAlarm.mockClear();
-	await runNotificationCoordinator(state, env);
+	await pass();
 	expect(await jobs()).toEqual([]);
+	expect(setAlarm).toHaveBeenCalledExactlyOnceWith(retryAt + 1);
+	setAlarm.mockClear();
+	await pass();
 	expect(setAlarm).not.toHaveBeenCalled();
 });
 

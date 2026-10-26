@@ -6,7 +6,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleReorderReminders } from './routes/reorder';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 
 const path = 'Reminders/Inbox.md';
 beforeEach(async () => {
@@ -33,7 +33,7 @@ it('reorders a page inside a 1,000-reminder project, retains the rest and retrie
 	expect(response.status).toBe(200);
 	const current = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path);
 	expect(current).not.toBeNull();
-	expect(scanReminderMarkdownFile(path, current!.content, 'Reminders').map(reminder => reminder.id)).toEqual(orderedIds);
+	expect(scanReminderMarkdownContent(path, current!.content, 'Reminders').reminders.map(reminder => reminder.id)).toEqual(orderedIds);
 	const changes = await env.DB.prepare('SELECT COUNT(*) AS count FROM changelog').first<{ count: number }>();
 	expect((await handleReorderReminders(reorderRequest(body), env)).status).toBe(200);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM changelog').first()).toEqual(changes);

@@ -12,7 +12,7 @@ import {
 	type ReminderFileCacheEntry,
 } from './types';
 import { parseReminderCacheEntries, selectReminderIndexWarmBatch } from './warm';
-import { getProjectFromPath } from '../scan';
+import { getProjectFromPath } from '@/reminders/core/markdownScan';
 import { buildReminderList } from '@/reminders/core/reminder-list';
 
 export { REMINDER_CACHE_PARSER_VERSION, saveReminderFileCache };

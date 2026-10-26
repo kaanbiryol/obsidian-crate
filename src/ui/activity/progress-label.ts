@@ -1,3 +1,4 @@
+import { REMINDER_SETUP_PROGRESS_CAP } from '../../protocol/initial-import';
 import type { SyncActivityProgress, SyncWork } from '../../sync/types';
 
 const labels: Record<SyncWork['phase'], string> = {
@@ -13,14 +14,17 @@ const labels: Record<SyncWork['phase'], string> = {
 	reminders: 'Preparing reminder schedules',
 };
 
+const setupCount = (count: number) => count >= REMINDER_SETUP_PROGRESS_CAP ? `${count.toLocaleString()}+` : String(count);
+
 export function formatSyncProgress(progress?: SyncActivityProgress | null, work?: SyncWork): string {
 	work ??= progress?.work;
 	if (work) {
 		const label = labels[work.phase];
 		if (work.phase === 'reminders' && work.reminderSetup) {
-			const { scanning, remainingFiles, remainingSchedules } = work.reminderSetup;
+			const { scanning } = work.reminderSetup;
+			const remainingFiles = setupCount(work.reminderSetup.remainingFiles), remainingSchedules = setupCount(work.reminderSetup.remainingSchedules);
 			if (scanning) return `Checking reminder files… ${remainingFiles} files queued`;
-			if (remainingFiles > 0) return `Preparing reminders: ${remainingFiles} files and ${remainingSchedules} schedules remaining`;
+			if (work.reminderSetup.remainingFiles > 0) return `Preparing reminders: ${remainingFiles} files and ${remainingSchedules} schedules remaining`;
 			return `${label}: ${remainingSchedules} remaining`;
 		}
 		if (work.total !== undefined && work.total > 0 && work.current !== undefined) {
