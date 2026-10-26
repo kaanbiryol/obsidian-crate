@@ -82,12 +82,12 @@ function Gallery() {
   const noop = () => setResult('Closed');
   let content: React.ReactNode;
   if (scene === 'tabs') content = <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}><AppDock section="reminders" tabs={['inbox', 'today', 'browse']} activeTab={activeTab === 'upcoming' ? 'today' : activeTab} onSelect={tab => setActiveTab(tab as TabId)} onPin={tab => setActiveTab(tab as TabId)} /></div>;
-  else if (scene === 'list-style') content = <ReminderListStyleFixture host={host} />;
+  else if (scene === 'list-style') content = <ReminderListStyleFixture host={host} colorScheme={theme} />;
   else if (scene === 'draft') content = <ReminderDraftFixture />;
   else if (scene === 'navigation') content = <NavigationFixture isDark={isDark} onAdd={setResult} />;
   else if (scene === 'lexical') content = <LexicalTrial />;
   else if (scene === 'source') content = <SourceNoticeFixture isDark={isDark} />;
-  else if (scene === 'motion') content = <MotionFixture host={host} />;
+  else if (scene === 'motion') content = <MotionFixture host={host} colorScheme={theme} />;
   else if (scene === 'controls') content = <ControlsFixture host={host} />;
   else if (scene === 'reading') content = <ReadingDialogHost.Provider value={host === 'pwa' ? PwaReadingDialog : ObsidianReadingDialog}><ReadingFixture onAdd={() => setResult('Save link opened')}
     // Match the PWA app: its dock replaces the shared fallback tab bar and add button.

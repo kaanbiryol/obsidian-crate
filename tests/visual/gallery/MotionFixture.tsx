@@ -6,7 +6,7 @@ import { ProgressMeter } from '@/reminders/ui/shared/ProgressMeter';
 import { ReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import { ReminderListLayout } from '@/reminders/ui/views/ReminderListLayout';
 
-export function MotionFixture({ host }: { host: 'plugin' | 'pwa' }) {
+export function MotionFixture({ host, colorScheme }: { host: 'plugin' | 'pwa'; colorScheme: 'light' | 'dark' }) {
   const [hasContent, setHasContent] = useState(false);
   const [activations, setActivations] = useState(0);
   const [open, setOpen] = useState(false);
@@ -17,7 +17,7 @@ export function MotionFixture({ host }: { host: 'plugin' | 'pwa' }) {
     <Button onClick={() => setComplete(value => !value)}>Toggle completion</Button>
     <output aria-label="List activations">{activations}</output>
     <ProgressMeter percentage={complete ? 100 : 25} label="Project completion" />
-    <ReminderCard reminder={{ id: 'motion', content: 'Check this reminder', completed: complete, project: 'Inbox' }} />
+    <ReminderCard reminder={{ id: 'motion', content: 'Check this reminder', completed: complete, project: 'Inbox' }} colorScheme={colorScheme} />
     <div style={{ height: 320 }}>
       <ReminderListLayout hasContent={hasContent} hasFab={false} animationConfig={{ enabled: true }} renderCard={() => null}
         emptyState={<EmptyState icon="inbox" title="No reminders" description="Add your first reminder." />}>

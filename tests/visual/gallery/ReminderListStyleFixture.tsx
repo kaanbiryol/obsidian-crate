@@ -25,7 +25,7 @@ const highlightedArticle: ReadingMetadata = {
   reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready', capture_method: 'url',
 };
 
-export function ReminderListStyleFixture({ host }: { host: 'plugin' | 'pwa' }) {
+export function ReminderListStyleFixture({ host, colorScheme }: { host: 'plugin' | 'pwa'; colorScheme: 'light' | 'dark' }) {
   usePwaInputModality();
   const { preferences, updatePreferences } = usePwaPreferences();
   const [reminders, setReminders] = useState(sampleReminders);
@@ -33,7 +33,7 @@ export function ReminderListStyleFixture({ host }: { host: 'plugin' | 'pwa' }) {
   const [openedProject, setOpenedProject] = useState('');
   const [committedOrder, setCommittedOrder] = useState<string[]>([]);
   const render = (reminder: Reminder, index: number) => <WebReminderCard reminder={reminder} index={index} hideProject={false}
-    listStyle={preferences.reminderListStyle} onEdit={setEdited}
+    listStyle={preferences.reminderListStyle} colorScheme={colorScheme} onEdit={setEdited}
     onToggleComplete={id => setReminders(items => items.map(item => item.id === id ? { ...item, completed: !item.completed } : item))} />;
   return <>
     <ListStyleSetting preferences={preferences} onPreferencesChange={updatePreferences} />
@@ -41,7 +41,7 @@ export function ReminderListStyleFixture({ host }: { host: 'plugin' | 'pwa' }) {
     <output aria-label="Opened project">{openedProject}</output>
     <output aria-label="Committed order">{committedOrder.join(',')}</output>
     <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}>
-      <TodayView reminders={reminders} renderCard={render} animationConfig={{ enabled: false }} hasFab={false} />
+      <TodayView reminders={reminders} colorScheme={colorScheme} renderCard={render} animationConfig={{ enabled: false }} hasFab={false} />
     </div>
     <div className="reminders-list-container" data-testid="embedded-list"><div className="reminders-list">
       {reminders.slice(0, 2).map((reminder, index) => <Fragment key={reminder.id}>{render(reminder, index)}</Fragment>)}
@@ -58,7 +58,7 @@ export function ReminderListStyleFixture({ host }: { host: 'plugin' | 'pwa' }) {
     </div>
     <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`} data-list-style={preferences.reminderListStyle} data-testid="projects-list" style={{ height: 600 }}>
       <BrowseView projects={['Product launch', 'Personal', 'Personal/Finance', 'Personal/Health/Visits', 'Work']}
-        reminders={[...reminders, { id: 'project-done', content: 'Completed launch task', completed: true, priority: 4, project: 'Product launch' }]} onProjectSelect={setOpenedProject} animationConfig={{ enabled: false }} />
+        reminders={[...reminders, { id: 'project-done', content: 'Completed launch task', completed: true, priority: 4, project: 'Product launch' }]} onProjectSelect={setOpenedProject} colorScheme={colorScheme} animationConfig={{ enabled: false }} />
     </div>
     <div style={{ height: 700 }}><ReadingFixture listStyle={preferences.reminderListStyle} onAdd={() => {}} /></div>
     <div className="crate-reading" data-list-style={preferences.reminderListStyle}>
