@@ -69,12 +69,12 @@ export function reminderBlockFields(mutation: ReminderBlockMutation): {
 
 /** A written line that no longer reads as its reminder would hide it in the note. */
 export function unreadableReminderTitle(): ReminderInputError {
-	return new ReminderInputError('content', 'This title cannot be saved as a reminder. Remove date, repeat or priority text from it, or change a number range at its end.');
+	return new ReminderInputError('content', 'This title cannot be saved as a reminder. Remove date, time, repeat or priority text from it.');
 }
 
-/** Every host reads the line back before writing it. A title ending in a number
- * range, such as "Read pages 13-19", can join the written date into a schedule
- * the saved-line parser rejects, which disables every reminder in the note. */
+/** Every host reads the line back before writing it. A title ending in a time, such
+ * as "Lunch at 1pm", can join the written date into a schedule the saved-line parser
+ * reads differently or rejects, which disables every reminder in the note. */
 function assertReadsBack(mutation: ReminderBlockMutation): ReminderBlockMutation {
 	let parsed;
 	try { parsed = parseCheckboxLine(mutation.checkboxLine, { persisted: true })?.parsed; }

@@ -44,6 +44,16 @@ function lastCalendarDate(result: chrono.ParsedResult, referenceDate: Date): chr
     return result;
 }
 
+/** A number right after a range dash ends the range in the title ("pages 5-10 tomorrow");
+ * Chrono would read it as the hour of the following date. Null when nothing else follows. */
+function afterNumberRange(result: chrono.ParsedResult, source: string, referenceDate: Date): chrono.ParsedResult | null {
+    const digits = /^\d+/.exec(result.text)?.[0];
+    if (!digits || !/\d[-–—]$/.test(source.slice(0, result.index))) return result;
+    const offset = result.index + digits.length;
+    const next = chrono.parse(source.slice(offset), referenceDate, { forwardDate: true })[0];
+    return next ? { ...next, index: offset + next.index, tags: () => next.tags(), date: () => next.date() } : null;
+}
+
 function chronoMatch(result: chrono.ParsedResult, source: string, referenceDate: Date): TextMatch {
     result = lastCalendarDate(result, referenceDate);
     let schedule = fromChrono(result);
@@ -132,7 +142,9 @@ export const findReminderScheduleMatches = (text: string, referenceDate: Date): 
         }
     }
 
-    for (const result of chrono.parse(remaining, referenceDate, { forwardDate: true })) {
+    for (const parsed of chrono.parse(remaining, referenceDate, { forwardDate: true })) {
+        const result = afterNumberRange(parsed, remaining, referenceDate);
+        if (!result) continue;
         if (result.end) {
             // A reminder has one date. Keep the range's earlier endpoint and
             // connector in the title. Chrono must consume both endpoints:

@@ -82,19 +82,19 @@ describe('partial reminder updates', () => {
 describe('titles that would not read back', () => {
 	it('refuses a create before writing and keeps the note readable', async () => {
 		const { files, index, repository } = await workspace();
-		await expect(repository.create({ content: 'Read pages 13-19', project: 'Inbox', priority: 4, dueDate: '2026-10-30' }))
+		await expect(repository.create({ content: 'Lunch at 1pm', project: 'Inbox', priority: 4, dueDate: '2026-10-30' }))
 			.rejects.toThrow('This title cannot be saved as a reminder');
 		expect(files.get(path)).toBe(content);
 		expect(index.sourceIssues).toEqual([]);
 		expect(index.getAll().map(reminder => reminder.id)).toEqual(['one']);
 
-		await expect(repository.create({ content: 'Slides 10-20', project: 'Reading', priority: 4, dueDate: '2026-10-30' })).rejects.toThrow(ReminderInputError);
+		await expect(repository.create({ content: 'Meet at noon', project: 'Reading', priority: 4, dueDate: '2026-10-30' })).rejects.toThrow(ReminderInputError);
 		expect(files.has('Reminders/Reading.md')).toBe(false);
 	});
 
 	it('refuses an edit before writing', async () => {
 		const { files, index, repository } = await workspace();
-		await expect(repository.update('one', { content: 'Read pages 13-19', dueDate: '2026-10-30', dueDatetime: undefined, recurrence: null }))
+		await expect(repository.update('one', { content: 'Lunch at 1pm', dueDate: '2026-10-30', dueDatetime: undefined, recurrence: null }))
 			.rejects.toThrow(ReminderInputError);
 		expect(files.get(path)).toBe(content);
 		expect(index.sourceIssues).toEqual([]);
