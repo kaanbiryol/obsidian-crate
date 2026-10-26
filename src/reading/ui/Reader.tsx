@@ -3,6 +3,8 @@ import { DEFAULT_READING_APPEARANCE, type ReadingAppearance } from './appearance
 import { readerScrollElement } from './reader-scroll';
 import { useReaderNavigation } from './useReaderNavigation';
 import { useReadingReaderActions } from './useReadingReaderActions';
+import { useDeferredEntry } from './useDeferredEntry';
+import { useReaderHighlights } from './useReaderHighlights';
 import { ReadingHighlightActions } from './ReadingHighlightActions';
 import { ReadingBody } from './ReadingBody';
 import { ReadingTagsForm } from './ReadingTagsForm';
@@ -11,7 +13,6 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { readingDocument } from '../core/markdown';
 import { renderReadingContent } from './reading-content';
-import { anchorHighlight, writeMarkdownHighlights } from '../core/markdown-highlights';
 import type { ReadingHighlight } from '../core/highlights';
 import { HighlightList } from './HighlightList';
 import { Button } from '../../ui/shared/Button';
@@ -57,17 +58,8 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		onAppearanceChange?.(next);
 	};
 	const [mode, setMode] = useState<'article' | 'highlights'>('article');
-	const [highlightsOpen, setHighlightsOpen] = useState(false);
-	const sheetAction = useRef<(() => void) | null>(null);
-	const targetAfterSheet = useRef(false);
-	const [target, setTarget] = useState<ReadingHighlight | null>(null);
-	const [annotation, setAnnotation] = useState<ReadingHighlight | null>(null), [note, setNote] = useState('');
-	const [pendingDelete, setPendingDelete] = useState<ReadingHighlight | null>(null);
-	// A note opened from the Highlights sheet stacks over it, so closing returns to the list.
-	const [noteOverHighlights, setNoteOverHighlights] = useState(false);
 	const article = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
-	const [enteredId, setEnteredId] = useState<string | null>(null);
-	const markdown = deferContentUntilEntered && enteredId !== item.crate_reading_id ? null : loadedMarkdown;
+	const markdown = useDeferredEntry(article, deferContentUntilEntered, item.crate_reading_id) ? loadedMarkdown : null;
 	const videoId = youtubeVideoId(item.source_url);
 	const kind = videoId ? 'video' : 'article';
 	const segments = useMemo(() => videoId && markdown !== null ? transcriptSegments(markdown) : [], [videoId, markdown]);
@@ -75,23 +67,10 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	const [videoPinned, setVideoPinned] = useState(true);
 	const hasVideoNotes = useMemo(() => Boolean(videoId && markdown !== null && readingDocument(markdown).text.trim()), [videoId, markdown]);
 	const showHeader = !revealContentTogether || markdown !== null || Boolean(loadingError);
-	useEffect(() => {
-		if (!deferContentUntilEntered) return;
-		let cancelled = false;
-		// Reading the pane's animations flushes its new style, including the first
-		// opening transition. Cached/network text can arrive while it is moving.
-		const animations = article.current?.closest('.crate-reading__reader-pane')?.getAnimations()
-			.filter(animation => 'transitionProperty' in animation && animation.transitionProperty === 'transform') ?? [];
-		void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
-			if (!cancelled) setEnteredId(item.crate_reading_id);
-		});
-		return () => { cancelled = true; };
-	}, [deferContentUntilEntered, item.crate_reading_id]);
 	useReaderNavigation(article, autoHideNavigation && (!segments.length || !videoPinned), item.crate_reading_id);
 	useEffect(() => {
 		if (article.current) readerScrollElement(article.current).scrollTo({ top: 0 }); (heading.current ?? article.current)?.focus({ preventScroll: true });
-		setDialog(null); setVideoSeek(null); setVideoPinned(true);
-		setMode('article'); setAnnotation(null); setPendingDelete(null); setHighlightsOpen(false); sheetAction.current = null;
+		setDialog(null); setVideoSeek(null); setVideoPinned(true); setMode('article');
 	}, [item.crate_reading_id]);
 	useEffect(() => {
 		// Transfer opening focus without taking it from a control used while loading.
@@ -103,55 +82,17 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		if (videoId) decorateTranscript(result, markdown, segments);
 		return result;
 	}, [markdown, item.source_url, highlightCode, videoId, segments]);
-	useEffect(() => { if (focusHighlight) { setMode('article'); setTarget(focusHighlight); } }, [focusHighlight]);
-	useEffect(() => {
-		if (!target || mode !== 'article' || markdown === null) return;
-		const ownerWindow = article.current?.ownerDocument.defaultView;
-		if (!ownerWindow) return;
-		const focusPassage = () => {
-			const passage = body.current?.querySelector<HTMLElement>(`[data-highlight-start="${target.start}"]`);
-			if (passage) {
-				passage.focus({ preventScroll: true });
-				passage.scrollIntoView({ block: 'center', behavior: floatingHighlights && !ownerWindow.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'instant' });
-			}
-			else setError('This passage changed. Find it in the article before highlighting again.');
-			setTarget(null);
-		};
-		if (!targetAfterSheet.current) { focusPassage(); return; }
-		// Let the closing sheet release its scroll lock and restore trigger focus first.
-		const frame = ownerWindow.requestAnimationFrame(() => { targetAfterSheet.current = false; focusPassage(); });
-		return () => ownerWindow.cancelAnimationFrame(frame);
-	}, [target, mode, markdown, content, floatingHighlights, setError]);
-	const saveHighlights = async (highlights: ReadingHighlight[]) => {
-		if (!onUpdate || markdown === null) throw new Error('Open the article before saving highlights.');
-		const document = readingDocument(markdown);
-		if (body.current && document.text !== body.current.textContent) throw new Error('This article contains unsupported formatting. Edit its highlights in Obsidian.');
-		const prepared = writeMarkdownHighlights(markdown, highlights.map(highlight => anchorHighlight(document.text, highlight)));
-		await onUpdate({ highlights: prepared.highlights });
-	};
-	const saveNote = async () => {
-		if (!annotation) return;
-		const current = item.highlights?.find(highlight => annotation.id ? highlight.id === annotation.id : highlight.start === annotation.start && highlight.end === annotation.end);
-		if (!current || current.text !== annotation.text || current.note !== annotation.note) throw new Error('This highlight changed elsewhere. Your note is still here; copy it before reopening the highlight.');
-		await saveHighlights((item.highlights ?? []).map(highlight => highlight === current ? { ...highlight, note: note.trim() } : highlight));
-	};
-	const deleteHighlight = async (target: ReadingHighlight) => {
-		const current = item.highlights?.find(highlight => target.id ? highlight.id === target.id : highlight.start === target.start && highlight.end === target.end);
-		if (!current) throw new Error('This highlight changed elsewhere. Reopen the article and try again.');
-		await saveHighlights((item.highlights ?? []).filter(highlight => highlight !== current));
-	};
-	const canSaveNote = Boolean(annotation) && !busy && !highlightsPending && note.trim() !== (annotation?.note ?? '');
-	const openNote = (highlight: ReadingHighlight, overHighlights = false) => { setError(null); setAnnotation(highlight); setNote(highlight.note ?? ''); setNoteOverHighlights(overHighlights); };
-	const perform = (action: () => void, close?: () => void) => {
-		if (close) { sheetAction.current = action; close(); } else action();
-	};
-	const noteDialog = annotation && <ReadingDialog title="Highlight note" action={{ label: 'Save', ariaLabel: 'Save note', type: 'submit', form: noteFormId, disabled: !canSaveNote, busy }} busy={busy} onClose={() => setAnnotation(null)}>{close => <ReadingHighlightNoteForm id={noteFormId} excerpt={annotation.text} note={note} busy={busy} canSave={canSaveNote} error={error} onChange={setNote} onSave={() => { void run(async isCurrent => { await saveNote(); if (!isCurrent()) return; onSaveComplete?.('note'); if (isCurrent()) close(); }); }} />}</ReadingDialog>;
+	const {
+		highlightsOpen, openHighlights, closeHighlights, annotation, note, setNote, noteOverHighlights, openNote, closeNote, canSaveNote,
+		pendingDelete, requestDelete, cancelDelete, saveHighlights, saveNote, deleteHighlight, perform, view,
+	} = useReaderHighlights({ item, markdown, content, body, article, mode, setMode, onUpdate, focusHighlight, floatingHighlights, setError, disabled: busy || highlightsPending });
+	const noteDialog = annotation && <ReadingDialog title="Highlight note" action={{ label: 'Save', ariaLabel: 'Save note', type: 'submit', form: noteFormId, disabled: !canSaveNote, busy }} busy={busy} onClose={closeNote}>{close => <ReadingHighlightNoteForm id={noteFormId} excerpt={annotation.text} note={note} busy={busy} canSave={canSaveNote} error={error} onChange={setNote} onSave={() => { void run(async isCurrent => { await saveNote(); if (!isCurrent()) return; onSaveComplete?.('note'); if (isCurrent()) close(); }); }} />}</ReadingDialog>;
 	const renderHighlights = (close?: () => void) => <>
 		{!item.highlights?.length && <EmptyState compact icon="highlighter" iconColor="secondary" title="No highlights yet" description="Select a passage in the article to save your first highlight." />}
-		<HighlightList moment={highlight => transcriptMoment(segments, highlight.start, highlight.end)} onPlay={seconds => perform(() => { setMode('article'); setVideoSeek({ seconds }); }, close)} entries={(item.highlights ?? []).map(highlight => ({ item, highlight }))} disabled={busy || highlightsPending} onView={(_item, highlight) => perform(() => { targetAfterSheet.current = Boolean(close); setMode('article'); setTarget(highlight); }, close)} onAnnotate={onUpdate ? (_item, highlight) => openNote(highlight, Boolean(close)) : undefined} onDelete={onUpdate ? (_item, highlight) => { setError(null); setPendingDelete(highlight); } : undefined} onCopy={onCopyComplete} />
+		<HighlightList moment={highlight => transcriptMoment(segments, highlight.start, highlight.end)} onPlay={seconds => perform(() => { setMode('article'); setVideoSeek({ seconds }); }, close)} entries={(item.highlights ?? []).map(highlight => ({ item, highlight }))} disabled={busy || highlightsPending} onView={(_item, highlight) => view(highlight, close)} onAnnotate={onUpdate ? (_item, highlight) => openNote(highlight, Boolean(close)) : undefined} onDelete={onUpdate ? (_item, highlight) => requestDelete(highlight) : undefined} onCopy={onCopyComplete} />
 		{!!item.highlight_recovery?.length && <details className="crate-reading__notice"><summary>{item.highlight_recovery.length} saved highlights need reselecting</summary><p>The original excerpts are preserved here. Select their current passages in the article to highlight them again.</p><HighlightList entries={item.highlight_recovery.map(highlight => ({ item, highlight }))} /></details>}
 		{close && noteOverHighlights && noteDialog}
-		{pendingDelete && <ReadingDialog title="Delete highlight" role="alertdialog" action={{ label: 'Delete', ariaLabel: 'Confirm delete highlight', type: 'submit', form: deleteFormId, tone: 'danger', disabled: busy || highlightsPending, busy }} busy={busy} onClose={() => setPendingDelete(null)}>{closeDelete => <form id={deleteFormId} className="crate-reading-note" onSubmit={event => {
+		{pendingDelete && <ReadingDialog title="Delete highlight" role="alertdialog" action={{ label: 'Delete', ariaLabel: 'Confirm delete highlight', type: 'submit', form: deleteFormId, tone: 'danger', disabled: busy || highlightsPending, busy }} busy={busy} onClose={cancelDelete}>{closeDelete => <form id={deleteFormId} className="crate-reading-note" onSubmit={event => {
 			event.preventDefault();
 			void run(async isCurrent => { await deleteHighlight(pendingDelete); if (isCurrent()) closeDelete(); });
 		}}>
@@ -162,7 +103,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	</>;
 	const minutes = useMemo(() => Math.max(1, Math.ceil((markdown ?? '').trim().split(/\s+/).length / 220)), [markdown]);
 	return <article ref={article} tabIndex={-1} className="crate-reading crate-reading-reader" data-serif={serif} style={{ '--reading-font-size': `${fontSize}px` } as React.CSSProperties}>
-		{floatingHighlights && (!videoId || hasVideoNotes) && <div className="crate-reading-reader__floating"><Button variant="outline" size="touch" className="crate-reading-reader__highlights-button" aria-label={`Highlights (${item.highlights?.length ?? 0})`} aria-haspopup="dialog" aria-expanded={highlightsOpen} onClick={() => setHighlightsOpen(true)}><ThemeIcon id="highlighter" size="m" aria-hidden="true" /><span>{item.highlights?.length ?? 0}</span></Button></div>}
+		{floatingHighlights && (!videoId || hasVideoNotes) && <div className="crate-reading-reader__floating"><Button variant="outline" size="touch" className="crate-reading-reader__highlights-button" aria-label={`Highlights (${item.highlights?.length ?? 0})`} aria-haspopup="dialog" aria-expanded={highlightsOpen} onClick={openHighlights}><ThemeIcon id="highlighter" size="m" aria-hidden="true" /><span>{item.highlights?.length ?? 0}</span></Button></div>}
 		<nav className="crate-reading-reader__nav crate-detail-navigation" aria-label={videoId ? 'Video actions' : 'Article actions'}>
 			<BackButton label="Back to reading" onClick={onBack} />
 			<div className="crate-reading-reader__quick-actions">{onUpdate && <><IconButton size="large" icon={item.reading_status === 'archived' ? 'archive-restore' : 'archive'} label={item.reading_status === 'archived' ? 'Move to inbox' : `Archive ${kind}`} disabled={mutationPending} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ reading_status: item.reading_status === 'archived' ? 'inbox' : 'archived' }))} /><IconButton size="large" icon="star" label={item.favorite ? 'Remove favorite' : `Favorite ${kind}`} aria-pressed={item.favorite} data-filled={item.favorite} disabled={mutationPending} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ favorite: !item.favorite }))} /></>}</div>
@@ -190,7 +131,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 			</div>
 		</div>
 		{onUpdate && markdown !== null && mode === 'article' && <ReadingHighlightActions key={item.crate_reading_id} body={body} article={article} content={content} highlights={item.highlights ?? []} disabled={busy || highlightsPending} onSave={saveHighlights} onAnnotate={openNote} onCopyComplete={onCopyComplete} onSelect={videoId ? highlight => { const seconds = transcriptMoment(segments, highlight.start, highlight.end); if (seconds !== undefined) setVideoSeek({ seconds, reveal: false }); } : undefined} />}
-		{floatingHighlights && highlightsOpen && <ReadingDialog title="Highlights" fullHeight onClose={() => { setHighlightsOpen(false); if (noteOverHighlights) setAnnotation(null); const action = sheetAction.current; sheetAction.current = null; action?.(); }}>{close => renderHighlights(close)}</ReadingDialog>}
+		{floatingHighlights && highlightsOpen && <ReadingDialog title="Highlights" fullHeight onClose={closeHighlights}>{close => renderHighlights(close)}</ReadingDialog>}
 		{!(floatingHighlights && highlightsOpen && noteOverHighlights) && noteDialog}
 		{dialog === 'appearance' && <ReadingDialog title="Reading appearance" onClose={() => setDialog(null)}><div className="crate-reading-reader__preferences"><span>Typeface</span><div className="crate-reading-reader__font-choice"><ToggleButton variant="outline" pressed={!serif} onPressedChange={() => updateAppearance({ serif: false })}>Modern<span>Sans serif</span></ToggleButton><ToggleButton variant="outline" pressed={serif} onPressedChange={() => updateAppearance({ serif: true })}>Literary<span>Serif</span></ToggleButton></div><div className="crate-reading-reader__font-size"><span>Text size</span><IconButton icon="minus" iconSize="s" label="Decrease text size" disabled={fontSize <= 16} onClick={() => updateAppearance({ fontSize: Math.max(16, fontSize - 1) })} /><output aria-label="Text size" aria-live="polite">{fontSize}</output><IconButton icon="plus" iconSize="s" label="Increase text size" disabled={fontSize >= 26} onClick={() => updateAppearance({ fontSize: Math.min(26, fontSize + 1) })} /></div><div className="crate-reading-reader__sample-frame"><p className="crate-reading-reader__sample" style={{ fontSize, fontFamily: serif ? 'Georgia, serif' : 'var(--font-interface)' }}>A little room to read.<br />A little space to think.</p></div></div></ReadingDialog>}
 		{dialog === 'tags' && onUpdate && <ReadingDialog title={videoId ? "Video tags" : "Article tags"} action={{ label: 'Save', ariaLabel: 'Save tags', type: 'submit', form: tagsFormId, disabled: busy, busy }} busy={busy} onClose={() => setDialog(null)}>{close => <ReadingTagsForm id={tagsFormId} initialTags={item.tags} busy={busy} error={error} onSave={tags => { void run(async isCurrent => { await onUpdate({ tags }); if (!isCurrent()) return; onSaveComplete?.('tags'); if (isCurrent()) close(); }); }} />}</ReadingDialog>}
