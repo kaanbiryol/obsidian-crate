@@ -45,7 +45,7 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | csstype | 3.2.3 | MIT |
 | date-fns | 4.4.0 | MIT |
 | debug | 4.4.3 | MIT |
-| defuddle | 0.19.5 | MIT |
+| defuddle | 0.19.6 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
 | dom-serializer | 3.1.1 | MIT |
 | domelementtype | 3.0.0 | BSD-2-Clause |
@@ -1633,7 +1633,7 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## defuddle@0.19.5
+## defuddle@0.19.6
 
 Declared license: MIT
 
