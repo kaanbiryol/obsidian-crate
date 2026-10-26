@@ -7,7 +7,7 @@ import { relative, resolve } from 'node:path';
 export async function collectServerInputs(root, metafiles, rawInputs) {
 	const deployment = await build({
 		absWorkingDir: root,
-		entryPoints: ['src/cloudflare/deployment/provisioner.ts', 'src/cloudflare/deployment/recovery.ts', 'src/cloudflare/server-reset/delete.ts',
+		entryPoints: ['src/cloudflare/deployment/provisioner.ts', 'src/cloudflare/deployment/update-recovery.ts', 'src/cloudflare/server-reset/delete.ts',
 			'scripts/build-worker.mjs', 'scripts/vite/cloudflare-artifacts-vite-plugin.mjs'],
 		bundle: true, packages: 'external', platform: 'node', format: 'esm',
 		metafile: true, write: false, outdir: '.generated/server-input-analysis',

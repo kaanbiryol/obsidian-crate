@@ -2,7 +2,7 @@ import { SERVER_RELEASE } from './database-upgrades';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudflareDeploymentMetadata } from './types';
 import { CloudflareApiError, type CloudflareWorkerSettings } from '../cloudflare-api';
-import { recoverDeployment } from './recovery';
+import { recoverDeployment } from './update-recovery';
 import type { CloudflareApiClient } from '../cloudflare-api';
 import { provisionCloudflareDeployment } from './provisioner';
 import { createFenceQueryHarness } from './fence-test-harness';

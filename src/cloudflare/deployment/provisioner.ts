@@ -10,7 +10,7 @@ import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { createRandomHexToken } from '../../platform/random-hex';
 import { deployedArtifact } from './discovery';
 import { assertDeploymentIsNotDowngrade } from './update';
-import { withDeploymentFence, isRejectedWorkerUpload, type DeploymentFence } from './fence';
+import { withDeploymentFence, isRejectedWorkerUpload, isSettledStep, parseFenceRecord, type DeploymentFence } from './fence';
 import { assertWorkerTarget } from '../server-reset/reset-ownership';
 
 async function ensureD1Database(
@@ -144,10 +144,10 @@ export async function provisionCloudflareDeployment(input: {
 }): Promise<string> {
   if (input.artifacts.development && input.artifacts.development.worker !== input.metadata.workerName) throw new Error('This development build is restricted to its designated Worker.');
   if (input.resumeUpdateValue) {
-    const record = JSON.parse(input.resumeUpdateValue) as Record<string, unknown>;
-    if (record.kind !== 'update' || record.worker !== input.metadata.workerName
+    const record = parseFenceRecord(input.resumeUpdateValue);
+    if (!record || record.kind !== 'update' || record.worker !== input.metadata.workerName
       || (record.fingerprint !== input.artifacts.fingerprint && !isRejectedWorkerUpload(record)) || record.recoveryProtocol !== 1
-      || !['confirmed', 'rejected', 'settled'].includes(String(record.stepState))) throw new Error('This update cannot be safely resumed by this build.');
+      || !isSettledStep(record)) throw new Error('This update cannot be safely resumed by this build.');
   }
 	const previousVaultName = input.metadata.vaultName;
 	const expectedRemote = await checkRemoteDeployment(input);

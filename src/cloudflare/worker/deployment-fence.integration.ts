@@ -1,5 +1,4 @@
-import { recoverDeployment } from '../deployment/recovery';
-import { completePublishedDeployment } from '../deployment/complete-published';
+import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';

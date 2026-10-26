@@ -1,8 +1,7 @@
 import type { BackupChoice } from '../restore/archive';
 import { runRestoreWorkflow } from '../restore/workflow';
 import { normalizeVaultName } from '../vault-name';
-import type { DeploymentRecoveryResult } from './recovery';
-import { resumeInterruptedUpdate } from './resume-update';
+import { resumeInterruptedUpdate, type DeploymentRecoveryResult } from './update-recovery';
 import { deleteCrateServer } from '../server-reset/delete';
 import { resetCrateServer } from '../server-reset/reset';
 import type { CrateSettings } from '../../plugin/settings';

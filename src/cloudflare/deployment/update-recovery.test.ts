@@ -1,6 +1,7 @@
-import { expect, it, vi } from 'vitest';
-import type { CloudflareWorkerSettings } from '../cloudflare-api';
-import { recoverDeployment } from './recovery';
+import { describe, expect, it, vi } from 'vitest';
+import type { CloudflareApiClient, CloudflareWorkerSettings } from '../cloudflare-api';
+import type { CloudflareDeploymentArtifacts } from './artifacts';
+import { completePublishedDeployment, recoverDeployment, resumeInterruptedUpdate } from './update-recovery';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import type { CloudflareDeploymentMetadata } from './types';
 
@@ -159,3 +160,56 @@ it.each([
     expect(h.held()).toBe(original);
     expect(h.api.queryD1.mock.calls.some(([, , sql]) => /^(UPDATE|DELETE)/.test(sql))).toBe(false);
  });
+
+const updateSteps = ['acquire-deployment', 'prepare-database', 'upload-worker', 'resume-upgraded-server', 'enable-server-address', 'record-release', 'verify-deployment'];
+const stepRecords = updateSteps.flatMap(step => ['started', 'confirmed', 'rejected', 'settled'].flatMap(stepState =>
+    [false, true].map(completionOnly => ({ verificationPending: true, step, stepState, ...(completionOnly ? { completionOnly } : {}) }))));
+it('accepts every published update that recovery offers to verify', async () => {
+    const pastPrecondition = new Error('past precondition');
+    const completionApi = {
+        getWorkerSettings: vi.fn(async () => { throw pastPrecondition; }),
+        getWorkerSubdomain: vi.fn(async () => { throw pastPrecondition; }),
+        queryD1: vi.fn(async () => { throw pastPrecondition; }),
+        verifyPublishedWorkerDeployment: vi.fn(async () => { throw pastPrecondition; }),
+    };
+    const artifacts = { version: '0.1.0', fingerprint: 'a'.repeat(64) } as CloudflareDeploymentArtifacts;
+    let offered = 0;
+    for (const overrides of stepRecords) {
+        const recovery = await recoverDeployment(harness(overrides).api, target, 'b'.repeat(64));
+        if (recovery.status !== 'verify') continue;
+        offered++;
+        await expect(completePublishedDeployment(completionApi, target, artifacts, recovery.resumeValue!), JSON.stringify(overrides)).rejects.toBe(pastPrecondition);
+    }
+    expect(offered).toBeGreaterThan(3);
+});
+
+describe('resuming an interrupted update', () => {
+    const artifacts = { version: '0.1.0', fingerprint: 'a'.repeat(64) } as CloudflareDeploymentArtifacts;
+    const resume = (overrides: Record<string, unknown>) => {
+        const h = harness(overrides);
+        const whileActive = vi.fn(async () => undefined as never), persist = vi.fn(async () => {});
+        const run = () => resumeInterruptedUpdate({ api: h.api as unknown as CloudflareApiClient, metadata: { ...target }, artifacts, whileActive, persist });
+        return { run, whileActive, persist };
+    };
+
+    it('verifies a published update, then saves the verified metadata', async () => {
+        const r = resume({ verificationPending: true, step: 'enable-server-address' });
+        expect(await r.run()).toMatchObject({ status: 'recovered' });
+        expect(r.whileActive).toHaveBeenCalledOnce();
+        expect(r.persist).toHaveBeenCalledOnce();
+    });
+
+    it('completes a confirmed update with the build that started it', async () => {
+        const r = resume({ verificationPending: true });
+        expect(await r.run()).toMatchObject({ status: 'completed' });
+        expect(r.whileActive).toHaveBeenCalledOnce();
+    });
+
+    it.each([{ stepState: 'started' }, {}])('returns any other recovery result without changing the server: %j', async overrides => {
+        const r = resume(overrides);
+        const result = await r.run();
+        expect(['blocked', 'recovered']).toContain(result.status);
+        expect(r.whileActive).not.toHaveBeenCalled();
+        expect(r.persist).not.toHaveBeenCalled();
+    });
+});

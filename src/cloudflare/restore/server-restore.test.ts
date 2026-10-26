@@ -8,8 +8,7 @@ import { createUpgradeCheckpoint } from '../deployment/upgrade-checkpoint';
 import { SERVER_RELEASE } from '../deployment/database-upgrades';
 import type { DeploymentFence } from '../deployment/fence';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
-import { recoverDeployment } from '../deployment/recovery';
-import { completePublishedDeployment } from '../deployment/complete-published';
+import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
 import { listUpgradeBackups, restoreUpgradeBackup, rowSql } from './server-restore';
 import { parseBackupRows, readBackup } from './archive';
 import type { ServerRestoreState } from './state';
@@ -18,8 +17,10 @@ import policyFixture from '../../../tests/fixtures/recovery/restore-policy.json'
 import { sha256Hex } from '../../platform/sha256';
 
 vi.mock('../deployment/provisioner', () => ({ provisionCloudflareDeployment: vi.fn(async () => undefined) }));
-vi.mock('../deployment/recovery', () => ({ recoverDeployment: vi.fn(async () => ({ status: 'ready' })) }));
-vi.mock('../deployment/complete-published', () => ({ completePublishedDeployment: vi.fn(async () => undefined) }));
+vi.mock('../deployment/update-recovery', () => ({
+	recoverDeployment: vi.fn(async () => ({ status: 'ready' })),
+	completePublishedDeployment: vi.fn(async () => undefined),
+}));
 const schema = readFileSync('src/cloudflare/schema.sql', 'utf8');
 const source = { account: 'a'.repeat(32), database: '11111111-1111-1111-1111-111111111111', bucket: 'source-bucket' };
 const destination = '22222222-2222-2222-2222-222222222222';

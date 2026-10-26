@@ -127,7 +127,7 @@ test('uses the default branch for a first branch push and previous release for t
 test('collects transitive deployment/build imports plus runtime graph and raw Sass files', async () => {
 	const h = fixture();
 	h.write('src/cloudflare/deployment/provisioner.ts', 'import "../../shared.ts";');
-	h.write('src/cloudflare/deployment/recovery.ts', 'export const recovery = true;');
+	h.write('src/cloudflare/deployment/update-recovery.ts', 'export const recovery = true;');
 	h.write('src/cloudflare/server-reset/delete.ts', 'export const deletion = true;');
 	h.write('scripts/build-worker.mjs', 'import "./helper.mjs";');
 	h.write('scripts/helper.mjs', 'export const config = true;');

@@ -31,6 +31,48 @@ export interface DeploymentFenceRecord {
 	batchHash?: string;
 }
 
+const FENCE_TABLE_SQL = "CREATE TABLE IF NOT EXISTS maintenance_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));";
+
+export async function createFenceTable(api: FenceApi, accountId: string, databaseId: string): Promise<void> {
+	await api.queryD1(accountId, databaseId, FENCE_TABLE_SQL);
+}
+
+/** A held fence is exactly one string row; anything else needs review. */
+export type StoredFence = { state: 'none' } | { state: 'invalid' } | { state: 'held'; value: string };
+
+export async function readStoredFence(api: FenceApi, accountId: string, databaseId: string): Promise<StoredFence> {
+	const rows = (await api.queryD1(accountId, databaseId,
+		'SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY])).flatMap(result => result.results ?? []);
+	if (!rows.length) return { state: 'none' };
+	return rows.length === 1 && typeof rows[0]?.value === 'string' ? { state: 'held', value: rows[0].value } : { state: 'invalid' };
+}
+
+/** The stored record as a plain object, or undefined when it is unreadable. */
+export function parseFenceRecord(value: string): Record<string, unknown> | undefined {
+	try {
+		const parsed: unknown = JSON.parse(value);
+		return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : undefined;
+	} catch { return undefined; }
+}
+
+/** No request dispatched under this step can still be in flight. */
+export function isSettledStep(record: { stepState?: unknown }): boolean {
+	return ['confirmed', 'rejected', 'settled'].includes(String(record.stepState));
+}
+
+/** Only verification of the published build remains after these confirmed steps. */
+const FINAL_UPDATE_STEPS = ['resume-upgraded-server', 'enable-server-address', 'record-release', 'verify-deployment'];
+/** Steps a verification-only retry can have reached. */
+const COMPLETION_ONLY_STEPS = ['acquire-deployment', 'record-release', 'verify-deployment'];
+
+/** The update needs only its published Worker and address verified. Callers
+ * still check the live build and storage before taking ownership. */
+export function awaitsPublicationVerification(record: Record<string, unknown>): boolean {
+	return isPendingAddressActivation(record)
+		|| record.stepState === 'confirmed' && FINAL_UPDATE_STEPS.includes(String(record.step))
+		|| record.completionOnly === true && isSettledStep(record) && COMPLETION_ONLY_STEPS.includes(String(record.step));
+}
+
 /** Protocol 1 always writes { enabled: true, previews_enabled: false } here.
  * A late repeat only applies those same route flags; it cannot publish code or
  * alter data. Recovery must read both flags and verify the published build.
@@ -62,9 +104,8 @@ export class DeploymentFence {
   }
 
 	async mutate<T>(operation: () => Promise<T>, step = 'server-change', batchHash?: string, uploadTag?: string): Promise<T> {
-		const rows = (await this.api.queryD1(this.account, this.database,
-			'SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY])).flatMap(result => result.results ?? []);
-		if (rows.length !== 1 || rows[0]?.value !== this.value) throw new DeploymentRecoveryRequiredError('Deployment ownership changed. Start again after reviewing the deployment fence.');
+		const stored = await readStoredFence(this.api, this.account, this.database);
+		if (stored.state !== 'held' || stored.value !== this.value) throw new DeploymentRecoveryRequiredError('Deployment ownership changed. Start again after reviewing the deployment fence.');
 		await this.recordStep(step, 'started', batchHash, uploadTag);
 		// Never expire or steal this fence: the provider cannot reject an old,
 		// already-dispatched upload using a D1 fencing token.
@@ -146,8 +187,7 @@ export async function withDeploymentFence<T>(input: {
 	// Any following mutation must CAS this exact record to "started" first.
 	const value = JSON.stringify({ ...input.record, recoveryProtocol: 1, owner: crypto.randomUUID(), startedAt: new Date().toISOString(),
 		step: 'acquire-deployment', stepState: 'confirmed' });
-	await input.api.queryD1(input.accountId, input.databaseId,
-		"CREATE TABLE IF NOT EXISTS maintenance_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));");
+	await createFenceTable(input.api, input.accountId, input.databaseId);
 	let acquired: Array<Record<string, unknown>>;
 	try {
 		acquired = (await input.api.queryD1(input.accountId, input.databaseId,
