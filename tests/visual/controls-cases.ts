@@ -28,7 +28,8 @@ export function registerControlTests() {
         expect((await sync.boundingBox())!.height).toBe((await pluginSync.boundingBox())!.height);
       }
       await expect(sync).toHaveCSS('font-size', '12px');
-      await expect(sync).toHaveCSS('border-radius', '4px');
+      // PWA secondary actions use a filled 6px surface.
+      await expect(sync).toHaveCSS('border-radius', host === 'pwa' ? '6px' : '4px');
       const longAction = page.getByRole('button', { name: 'Export unsynced reminders and saved changes from this device' });
       expect(await longAction.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
       expect((await page.getByRole('button', { name: 'Always a touch target' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);

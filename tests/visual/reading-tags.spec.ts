@@ -17,7 +17,10 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		const input = page.getByRole('textbox', { name: 'Tags' });
 		const dialog = page.getByRole('dialog', { name: 'Article tags' });
 		await expect(dialog.locator('.crate-dialog-actions')).toHaveCount(0);
-		await expect(dialog.locator('.reminder-modal-header').getByRole('button', { name: 'Save tags' })).toHaveText('Save');
+		const save = dialog.locator('.reminder-modal-header').getByRole('button', { name: 'Save tags' });
+		// PWA sheets submit with an up-arrow icon; the plugin keeps the text label.
+		if (host === 'pwa') await expect(save.locator('svg[data-icon="arrow-up"]')).toHaveCount(1);
+		else await expect(save).toHaveText('Save');
 		await input.fill('discarded');
 		await dialog.getByRole('button', { name: 'Close article tags' }).click();
 		await edit.click();

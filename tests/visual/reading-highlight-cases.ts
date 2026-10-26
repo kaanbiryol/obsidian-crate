@@ -91,7 +91,9 @@ export function registerReadingHighlightTests() {
         await page.mouse.move(bounds.right, bounds.y, { steps: 8 });
         await page.mouse.up();
         const menu = page.getByRole('group', { name: 'Highlight actions' });
-        await expect(menu.getByRole('button')).toHaveText(['Copy', 'Share', 'Note', '']);
+        // Share appears only where native sharing exists.
+        const canShare = await page.evaluate(() => typeof navigator.share === 'function');
+        await expect(menu.getByRole('button')).toHaveText(canShare ? ['Copy', 'Share', 'Note', ''] : ['Copy', 'Note', '']);
         const box = await menu.boundingBox();
         expect(box!.x).toBeGreaterThanOrEqual(12);
         expect(box!.x + box!.width).toBeLessThanOrEqual(390 - 12);
@@ -122,7 +124,7 @@ export function registerReadingHighlightTests() {
         await expect(note).toHaveCount(0);
         await expect(list.locator('.crate-reading-highlights__note')).toHaveText('From the list');
         await list.getByRole('button', { name: 'Delete highlight', exact: true }).click();
-        const confirmDelete = page.getByRole('dialog', { name: 'Delete highlight', exact: true });
+        const confirmDelete = page.getByRole('alertdialog', { name: 'Delete highlight', exact: true });
         await confirmDelete.getByRole('button', { name: 'Confirm delete highlight', exact: true }).click();
         await expect(confirmDelete).toHaveCount(0);
         await expect(list.locator('.crate-reading-highlights__item')).toHaveCount(0);
