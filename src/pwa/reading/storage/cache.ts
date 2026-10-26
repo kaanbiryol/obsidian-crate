@@ -66,8 +66,12 @@ function isEarlierCopyKey(key: string, sessionId: string): boolean {
 
 /** A copy this version can read; unknown or undecodable records stay exportable. */
 function isReadableCopy(key: string, raw: unknown): boolean {
-  let value: unknown;
-  try { value = decodeReadingValue(key, raw); } catch { return false; }
+  // Plaintext copies are checked by shape: once storage is private, decoding refuses them,
+  // and an earlier sign-in's plaintext copy must not outlive the switch to encryption.
+  let value: unknown = raw;
+  if (isRecord(raw) && 'encryptedReading' in raw) {
+    try { value = decodeReadingValue(key, raw); } catch { return false; }
+  }
   if (!isRecord(value)) return false;
   if (key.startsWith('article:')) return isRecord(value.item) && typeof value.markdown === 'string';
   if (key.startsWith('list:')) return Array.isArray(value.items);

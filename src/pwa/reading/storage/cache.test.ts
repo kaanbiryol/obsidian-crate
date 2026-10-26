@@ -153,3 +153,21 @@ it('replaces earlier sign-ins\' offline copies while keeping their queues, draft
   expect(Object.fromEntries([...values].filter(([key]) => key.includes(earlier)))).toEqual(kept);
   expect(values.has(articleKey(2))).toBe(true);
 });
+
+it('replaces an earlier sign-in\'s plaintext copies once Reading storage is private', async () => {
+  const earlier = 'reminders:earlier:generation';
+  const actual = vi.mocked(decodeReadingValue).getMockImplementation()!;
+  // Private storage refuses to decode plaintext; ciphertext from another vault stays sealed.
+  vi.mocked(decodeReadingValue).mockImplementation((key, value) => {
+    if (key.includes(earlier)) throw new Error('Private Reading storage needs migration before opening.');
+    return actual(key, value);
+  });
+  try {
+    const otherVault = { encryptedReading: 1, content: 'sealed with another key' };
+    values.set(`article:${earlier}:sealed`, otherVault);
+    values.set(`list:${earlier}`, { items: [item(1)], issues: [], savedAt: 1 });
+    values.set(`article:${earlier}:${item(1).crate_reading_id}`, { item: item(1), markdown: 'Plaintext body', usedAt: 1 });
+    await commitReadingCache(session, { items: [item(2)], issues: [], savedAt: 3 });
+    expect(Object.fromEntries([...values].filter(([key]) => key.includes(earlier)))).toEqual({ [`article:${earlier}:sealed`]: otherVault });
+  } finally { vi.mocked(decodeReadingValue).mockImplementation(actual); }
+});
