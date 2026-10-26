@@ -94,7 +94,7 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | web-push | 3.6.7 | MPL-2.0 |
 | web-push-browser | 1.4.2 | ISC |
 | yaml | 2.9.1 | ISC |
-| zustand | 5.0.15 | MIT |
+| zustand | 5.0.16 | MIT |
 
 ## @babel/runtime@8.0.7
 
@@ -3387,7 +3387,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-## zustand@5.0.15
+## zustand@5.0.16
 
 Declared license: MIT
 
