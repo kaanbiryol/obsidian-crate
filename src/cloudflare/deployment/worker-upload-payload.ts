@@ -1,10 +1,14 @@
 import { normalizeVaultName, VAULT_NAME_BINDING } from '../vault-name';
-import cloudSafetyCompatSource from '../worker/standalone/cloud-safety-compat.js?raw';
 import resetWorkerSource from '../worker/standalone/reset-worker.js?raw';
 import serverDeleteWorkerSource from '../worker/standalone/server-delete-worker.js?raw';
 import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from '../notification-rate-binding';
 import { randomBase64Url } from '../oauth/pkce';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
+
+// Betas 0.4.0 to 0.9.0 created an unused experimental CloudSafety namespace.
+// Cloudflare rejects an upload that drops a provisioned class without a tombstone,
+// and treats the tombstone as a no-op where no namespace exists.
+const RETIRED_EXPORTS = { CloudSafety: { type: 'durable-object', state: 'deleted' } } as const;
 
 function concatBytes(parts: Uint8Array[]): ArrayBuffer {
 	const length = parts.reduce((total, part) => total + part.byteLength, 0);
@@ -44,7 +48,7 @@ export function buildWorkerMultipartBody(input: {
 		],
 		exports: {
 			ReminderAlarm: { type: 'durable-object', storage: 'sqlite', state: 'created' },
-			CloudSafety: { type: 'durable-object', storage: 'sqlite', state: 'created' },
+			...RETIRED_EXPORTS,
 		},
 	};
 	return buildWorkerModule(metadata, input.artifacts.workerBundle);
@@ -58,10 +62,10 @@ export function buildResetWorkerMultipartBody(resetId: string, databaseId: strin
 		bindings: [{ type: 'd1', name: 'DB', id: databaseId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName },
 			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: resetId }],
 		exports: {
-			CloudSafety: { type: 'durable-object', storage: 'sqlite', state: 'created' },
+			...RETIRED_EXPORTS,
 			...(!alreadyRetired ? { ReminderAlarm: { type: 'durable-object', state: 'deleted' } } : {}),
 		},
-	}, `${resetWorkerSource}\n${cloudSafetyCompatSource}`);
+	}, resetWorkerSource);
 }
 
 export function buildServerDeletionWorkerMultipartBody(deletionId: string, bucketName: string, tokenHash: string, uploadTag: string): { body: ArrayBuffer; contentType: string } {

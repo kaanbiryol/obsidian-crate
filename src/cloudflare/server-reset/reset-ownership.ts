@@ -97,9 +97,10 @@ export async function assertOwnedNamespace(api: ResetApi, accountId: string, wor
 	if (namespaces.some(namespace => !namespace.id || !namespace.script || !namespace.class)) {
 		throw new ResetBlockedError('could not verify Durable Object ownership.');
 	}
-	// The inactive safety ledger is retained across reset; only reminder state is retired.
+	// A beta server keeps its unused CloudSafety namespace until a Worker upload from
+	// this build deletes it, which a reset resumed after retirement may not repeat.
 	const retained = namespaces.filter(namespace => namespace.script === workerName && namespace.class === 'CloudSafety');
-	if (retained.length > 1 || retained.some(namespace => namespace.id === namespaceId)) throw new ResetBlockedError('invalid retained safety namespace.');
+	if (retained.length > 1 || retained.some(namespace => namespace.id === namespaceId)) throw new ResetBlockedError('invalid leftover safety namespace.');
 	const owned = namespaces.filter(namespace => (namespace.script === workerName || namespace.id === namespaceId) && !retained.includes(namespace));
 	if (retired ? owned.length !== 0 : owned.length !== 1 || owned[0]?.id !== namespaceId
 		|| owned[0]?.script !== workerName || owned[0]?.class !== 'ReminderAlarm') {

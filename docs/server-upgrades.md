@@ -74,12 +74,15 @@ Development updates retain schema checks, migration receipts, verified backups w
 
 For each schema change, freeze a real source-schema fixture and test every supported source through the current registry. Test rollback inside a step, interruption between steps, repeat application, missing/edited receipts, two competing updaters, same-version stale builds, live verification failure and exact-artifact recovery. Assert that unchanged file contents and operation identities survive. Use realistic large-vault fixtures for backfills. Run hosted acceptance with the exact distributable artifacts before release; local D1 runtime tests alone cannot establish hosted rollout behavior.
 
-## Experimental cloud safety namespace
+## Retired cloud safety namespace
 
-The Worker keeps the experimental `CloudSafety` SQLite namespace as an inactive
-export, including in the reset Worker. No application binding calls it and it does
-not schedule alarms or modify its stored ledger. Cloud safety enforcement
-is not enabled by this export.
+Betas 0.4.0 to 0.9.0 created an unused experimental `CloudSafety` SQLite
+namespace. Worker and reset uploads now declare it `deleted`, which permanently
+removes the namespace and anything stored in it; where no namespace exists the
+tombstone has no effect. Keep the tombstone while servers created by those betas
+can still update, because Cloudflare rejects an upload that drops a provisioned
+class without one. A reset tolerates a leftover namespace until a Worker upload
+deletes it.
 
 ## Saved revision in plugin settings
 

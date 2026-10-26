@@ -142,7 +142,7 @@ describe('Crate server reset boundaries', () => {
 		expect(api.deleteR2Objects).not.toHaveBeenCalled();
 	});
 
-	it('retains the inactive safety namespace while retiring reminder state', async () => {
+	it('tolerates a leftover beta safety namespace while retiring reminder state', async () => {
 		const { input, api, metadata, worker } = harness();
 		api.listDurableObjectNamespaces.mockImplementation(async () => [
 			{ id: 'd'.repeat(32), script: metadata.workerName, class: 'CloudSafety' },

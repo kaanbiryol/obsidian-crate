@@ -78,7 +78,6 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 	--crate-divider:#e0e0e0;
 }
 .settings-group{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}
-.settings-row+.settings-row{border-color:var(--pwa-light-border)}
 .crate-progress-meter{background:var(--background-modifier-border)}
 .premium-project-chevron{opacity:.65}
 .settings-theme-picker{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border)}

@@ -46,7 +46,6 @@ html.pwa-sheet-scroll-held .pwa-modal-sheet{height:var(--pwa-sheet-layout-height
 .settings-panel__title{margin:0 0 9px 2px;color:var(--text-faint);font-size:var(--pwa-font-caption);font-weight:600;line-height:1.25;letter-spacing:0}
 .settings-group{overflow:hidden;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.018);box-shadow:inset 0 1px 0 rgba(255,255,255,.012)}
 .settings-row{display:flex;min-height:64px;align-items:center;gap:16px;padding:11px 14px}
-.settings-row+.settings-row{border-top:1px solid rgba(255,255,255,.055)}
 .settings-row__copy{display:flex;min-width:0;flex:1 1 auto;flex-direction:column;gap:3px}
 .settings-row__copy strong{color:var(--text);font-size:var(--pwa-font-body);font-weight:580;line-height:1.3;letter-spacing:-.006em}
 .settings-row__copy span{overflow:hidden;color:var(--text-faint);font-size:var(--pwa-font-detail);line-height:1.38;text-overflow:ellipsis}

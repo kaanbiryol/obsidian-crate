@@ -151,8 +151,6 @@
 	.settings-row--version { min-height: 52px; font-size: var(--reminder-font-base); }
 	.settings-row--version > strong { font-size: var(--pwa-font-detail); white-space: normal; overflow-wrap: anywhere; }
 
-	// Flat groups: no row dividers, including the legacy Worker stylesheet's.
-	.settings-row + .settings-row { border-top: 0; }
 	.settings-row--theme { flex-direction: column; align-items: stretch; gap: 10px; }
 	.settings-preference-control--select { flex-basis: 152px; width: 152px; }
 	.settings-value { color: var(--text-muted); font-size: var(--reminder-font-base); text-align: right; max-width: 60%; overflow-wrap: anywhere; }
