@@ -154,7 +154,7 @@
 		"idb": "^8.0.4",
 		"jose": "6.2.13",
 		"lexical": "0.52.0",
-		"linkedom": "0.18.13",
+		"linkedom": "0.18.14",
 		"lucide-react": "^1.61.0",
 		"marked": "18.1.1",
 		"motion": "^14.5.0",
