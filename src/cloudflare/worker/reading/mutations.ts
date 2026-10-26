@@ -12,11 +12,13 @@ import { beginOperation, operationEffects, operationStatement } from './operatio
 import { ReadingError, readingResponse, readStoredNote, sourceById } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { bumpReadingRevision, ensureReadingIndex } from './library-index';
+import { readingListEtag } from './queries';
 
 export async function mutateReading(env: Env, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string): Promise<Response> {
   const op = await beginOperation(env.DB, principal, current, body, action);
   if (op instanceof Response) return op;
-  if ((await ensureReadingIndex(env, current, file => readStoredNote(env, file))).state !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Retry this saved change shortly.', 503);
+  const index = await ensureReadingIndex(env, current, file => readStoredNote(env, file));
+  if (index.state !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Retry this saved change shortly.', 503);
   if (action === 'capture') {
     if (body.destinationFolder !== undefined && body.destinationFolder !== current.folder_path) throw new ReadingError('The Reading folder changed. Restore the original destination to finish this save.', 409);
     let url: string; try { url = readingUrl(body.url); } catch { throw new ReadingError('Enter a complete HTTP or HTTPS link without credentials.'); }
@@ -85,9 +87,13 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
     catch (error) { throw new ReadingError(error instanceof Error ? error.message : 'Invalid Reading change.'); }
   }
   const response = { saved: true, id: source.item.crate_reading_id };
+  // Reading writes run under the coordinator lock, so the library revision cannot move
+  // between the index check above and this commit. A client whose cached library has the
+  // `before` revision then needs only this item again, not the whole library.
+  const revision = crypto.randomUUID().replaceAll('-', '');
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, source.path, content, source.file.hash);
-  const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, encryptionState: null, effects: operationEffects(env.DB, op, response) });
+  const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, readingRevision: revision, encryptionState: null, effects: operationEffects(env.DB, op, response) });
   if (!result.committed) throw new ReadingError('This note changed. Refresh before editing it.', 409);
   if (action === 'retry') await env.DB.prepare('DELETE FROM reading_jobs WHERE path=?').bind(source.path).run();
-  return readingResponse(response);
+  return readingResponse({ ...response, library: { before: await readingListEtag(current, index.revision), after: await readingListEtag(current, revision) } });
 }

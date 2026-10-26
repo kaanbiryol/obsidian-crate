@@ -157,3 +157,17 @@ it('keeps a byte order mark when the Worker updates the note', async () => {
   expect([...stored.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   expect(new TextDecoder('utf-8', { ignoreBOM: true }).decode(stored)).toBe(`\uFEFF${updateReadingNote(note, id, { favorite: true })}`);
 });
+
+it('reports the library revisions around an edit so a cached library can follow it without a reload', async () => {
+  const { id } = await seed();
+  const first = await list();
+  const before = first.headers.get('ETag');
+  expect(before).toBeTruthy();
+  const response = await handleReadingRoute(new Request('https://test/reading/update', { method: 'POST', body: JSON.stringify({
+    id, changes: { favorite: true }, before: { favorite: false }, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)),
+  }) }), env, principal);
+  const body = await response.json() as { library: { before: string; after: string } };
+  expect(body.library.before).toBe(before);
+  const after = await handleReadingRoute(new Request('https://test/reading/list', { headers: { 'If-None-Match': body.library.after } }), env, principal);
+  expect(after.status).toBe(304);
+});

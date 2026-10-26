@@ -64,7 +64,7 @@ async function indexRow(change: ReadingFileChange): Promise<IndexRow | 'unknown'
 /** Statements to place after the file writes in the same batch. Each row change applies
  * only if its file write committed and the Reading folder is still `policy`'s, so a
  * rejected or raced commit leaves the index untouched. Encrypted vaults keep no index. */
-export async function readingIndexStatements(db: D1Database, changes: ReadingFileChange[], options: { policy?: ReadingIndexPolicy; encrypted?: boolean } = {}): Promise<D1PreparedStatement[]> {
+export async function readingIndexStatements(db: D1Database, changes: ReadingFileChange[], options: { policy?: ReadingIndexPolicy; encrypted?: boolean; revision?: string } = {}): Promise<D1PreparedStatement[]> {
   if (options.encrypted || !changes.some(change => change.path.toLowerCase().endsWith('.md'))) return [];
   const policy = options.policy !== undefined ? options.policy
     : await db.prepare('SELECT folder_path FROM reading_policy WHERE id = 1').first<{ folder_path: string }>();
@@ -112,12 +112,13 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
     db.prepare(`UPDATE reading_items SET duplicate = ((SELECT count(*) FROM reading_items d WHERE d.item_id = reading_items.item_id) > 1)
       WHERE portable_path IN (SELECT portable_path FROM reading_items WHERE item_id IN (SELECT value FROM json_each(?))
         UNION ALL SELECT portable_path FROM reading_items WHERE duplicate = 1)`).bind(JSON.stringify(keeps.flatMap(row => row.item_id ? [row.item_id] : []))),
-    bumpReadingRevision(db),
+    bumpReadingRevision(db, options.revision),
   ];
 }
 
 /** Every change to the listed library (notes and the capture queue) advances its ETag. */
-export const bumpReadingRevision = (db: D1Database) => db.prepare('UPDATE reading_index SET revision = lower(hex(randomblob(16))) WHERE id = 1');
+export const bumpReadingRevision = (db: D1Database, revision?: string) =>
+  db.prepare('UPDATE reading_index SET revision = coalesce(?, lower(hex(randomblob(16)))) WHERE id = 1').bind(revision ?? null);
 
 /** Queue extraction for current URL captures that have no job yet: after fetching is
  * turned on, or once a full queue drains. */

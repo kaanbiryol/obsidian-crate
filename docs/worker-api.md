@@ -97,6 +97,11 @@ reads never re-check `files`, and `GET /reading/item` reads the note's R2 object
 the revision its row names. The list ETag changes only with the library revision,
 which every indexed change and capture queue change advances in its own transaction,
 and with the article fetching setting; writes elsewhere in the vault leave it unchanged.
+Successful `POST /reading/update` and `/reading/retry` responses add `library:
+{ before, after }`, the list ETags immediately before and after that edit. Reading
+writes run under the coordinator lock, so a client whose cached library carries
+`before` re-reads only the edited item and adopts `after`; any other client, a
+replayed receipt (which omits `library`) or a capture reloads the list.
 
 A new Reading folder or generation, an index format change, a restore or an index
 whose bytes were unavailable at commit time rebuilds the index from R2, 25 files

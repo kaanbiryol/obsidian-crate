@@ -123,6 +123,8 @@ export interface StagedFileCommitInput {
 	reminderFolder?: string | null;
 	/** The current Reading policy when the caller already read it. */
 	readingPolicy?: ReadingIndexPolicy;
+	/** The library revision this commit publishes, when the caller reports it. */
+	readingRevision?: string;
 	path: string;
 	hash: string;
 	size: number;
@@ -160,7 +162,7 @@ export async function commitStagedFile(
 		publishedChangelogStatement(db, params),
 		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, false, Boolean(encryption.state), params.reminderFolder),
 		...await readingIndexStatements(db, [{ path: params.path, storageKey: params.objectKey, hash: params.hash, size: params.size, content: params.content }],
-			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state) }),
+			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state), revision: params.readingRevision }),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
 		finishStagedUpload(db, params.objectKey, params.path),
 		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),
