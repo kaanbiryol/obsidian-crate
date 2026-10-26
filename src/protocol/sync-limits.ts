@@ -4,6 +4,8 @@
  * Mutation batches stay deliberately small so a worst-case stale write remains
  * below D1's 50-query Workers Free limit after authentication and cleanup.
  */
+import { isMarkdownPath } from './note-paths';
+
 export const BATCH_UPLOAD_MAX_FILES = 3;
 // Non-Markdown files do not incur reminder-index mutations.
 export const BATCH_ASSET_UPLOAD_MAX_FILES = 4;
@@ -26,7 +28,7 @@ export function maxUploadBatchFiles(
 	bulkNewEligible: boolean,
 ): number {
 	if (bulkNewEligible && files.every(file => file.expectedHash === null)) return BULK_NEW_UPLOAD_MAX_FILES;
-	return files.some(file => file.path.toLowerCase().endsWith('.md')) ? BATCH_UPLOAD_MAX_FILES : BATCH_ASSET_UPLOAD_MAX_FILES;
+	return files.some(file => isMarkdownPath(file.path)) ? BATCH_UPLOAD_MAX_FILES : BATCH_ASSET_UPLOAD_MAX_FILES;
 }
 
 /** Largest plaintext file, in bytes, that history, restore and pending-change previews show. */

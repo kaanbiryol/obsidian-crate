@@ -4,6 +4,7 @@ import { fileRevisionGuard } from '../sync/file-identity';
 import { validateEncryptedSchedules } from '../../../encryption/notification-format';
 import { isWirePath } from '../../../protocol/encrypted-path';
 import { readServerState, saveServerState, serverStateValue } from '../server-state';
+import { isMarkdownPath } from '../../../protocol/note-paths';
 
 /** The stored state JSON, or NULL for a plaintext vault. */
 export const ENCRYPTION_STATE_SQL = serverStateValue('encryption');
@@ -93,7 +94,7 @@ function validateEncryptedContent(state: EncryptionServerState, path: string, co
 	// Devices decide which notes are reminders. The server only checks that any
 	// published schedules use this vault's notification key.
 	if (publicData === null) return descriptor;
-	if (!path.toLowerCase().endsWith('.md')) throw new EncryptionStateError('This file must not publish reminder scheduling metadata');
+	if (!isMarkdownPath(path)) throw new EncryptionStateError('This file must not publish reminder scheduling metadata');
 	validateEncryptedSchedules(publicData);
 	for (const reminder of publicData.reminders) {
 		if (reminder.notification.vaultId !== state.vaultId || reminder.notification.scopeId !== 'vault'

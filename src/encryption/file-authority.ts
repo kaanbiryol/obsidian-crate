@@ -3,6 +3,7 @@ import type { FileEncryptionAuthority } from './file-codec';
 import { validateVaultKeyBundle, type VaultKeyBundle } from './key-bundle';
 import { importSealPrivateKey } from './seal-key';
 import type { SealOpenKey } from './sealed-file-key';
+import { isMarkdownPath } from '../protocol/note-paths';
 
 /** Every encrypted file uses the vault key; paths are still validated locally.
  * Markdown may also be a note the server sealed to the vault: the path binding
@@ -25,7 +26,7 @@ export class FileKeyAuthority {
 		if (!path || path.startsWith('/') || path.includes('\\') || path.split('/').some(part => !part || part === '.' || part === '..')) {
 			throw new Error('Invalid encrypted file path');
 		}
-		return this.seal && path.toLowerCase().endsWith('.md') ? { ...this.vault, seal: this.seal } : this.vault;
+		return this.seal && isMarkdownPath(path) ? { ...this.vault, seal: this.seal } : this.vault;
 	}
 
 	forVaultMetadata(): FileEncryptionAuthority {

@@ -8,6 +8,7 @@ import { getNotificationPolicy } from '../../notifications/policy';
 import { readEncryptionState } from '../../encryption/state';
 import type { UploadCommitInput, UploadCommitters } from './upload-committers';
 import { commitCoordinatorUpload } from '../../coordinator/coordinator';
+import { isMarkdownPath } from '../../../../protocol/note-paths';
 
 type UploadParams = UploadCommitInput;
 type CommitUpload = UploadCommitters['commitUpload'];
@@ -23,7 +24,7 @@ export const FRAMED_CONTENT_HEADER = 'X-Crate-Framed-Content';
 const FRAMED_MARKDOWN_MAX_BYTES = 1024 * 1024;
 
 export function hasFramedMarkdown(file: { path: string; size: number }): boolean {
-  return file.path.toLowerCase().endsWith('.md') && file.size <= FRAMED_MARKDOWN_MAX_BYTES;
+  return isMarkdownPath(file.path) && file.size <= FRAMED_MARKDOWN_MAX_BYTES;
 }
 
 export function frameUpload(metadata: unknown, contents: Array<string | ArrayBuffer>): Uint8Array<ArrayBuffer> {
@@ -55,7 +56,7 @@ async function readUpload(request: Request): Promise<{ metadata: CoordinatedUplo
 /** File transfer and hashing finish before acquiring the coordinator lock. */
 export function coordinatedUpload(env: Env): CommitUpload {
   return async (bucket, db, params) => {
-    if (!params.path.toLowerCase().endsWith('.md')) return commitStagedFile(bucket, db, params);
+    if (!isMarkdownPath(params.path)) return commitStagedFile(bucket, db, params);
     const metadata: UploadMetadata = {
       path: params.path, hash: params.hash, size: params.size, objectKey: params.objectKey,
       expectedHash: params.expectedHash, expectedRevision: params.expectedRevision,

@@ -1,6 +1,7 @@
 import { recoveryChunks } from './recovery-chunks';
 import { SyncIssueError, withSyncFileContext } from '../issues';
-import { isMarkdownPath, type MarkdownBaseCache } from '../merge/markdown-base-cache';
+import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
+import { isMarkdownPath } from '../../protocol/note-paths';
 import type { BatchUploadFile, BatchUploadResponse, UploadResult } from '@/protocol/sync-types';
 import type { LocalManifest } from '../manifest/manifest';
 import { base64ToArrayBuffer } from '../encoding';

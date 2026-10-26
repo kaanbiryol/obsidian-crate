@@ -11,6 +11,7 @@ import type { BatchFile } from './types';
 import { isSha256Hex } from '../../../../platform/validation';
 import { createManagedObjectKey } from '../../../../protocol/storage-keys';
 import { sha256Hex } from '../../../../platform/sha256';
+import { isMarkdownPath } from '../../../../protocol/note-paths';
 
 /** Validate and decode the complete request before receipts, staging or commits. */
 export async function prepareBatchUpload(request: Request, expectedEncryption?: EncryptionServerState | null) {
@@ -31,7 +32,7 @@ export async function prepareBatchUpload(request: Request, expectedEncryption?: 
 	if (bulkNew && new Set((files as BatchFile[]).map(file => file?.operationId)).size !== files.length) {
 		return corsResponse({ error: 'Duplicate operation identity in bulk upload' }, 400);
 	}
-	const maxFiles = bulkNew ? BULK_NEW_UPLOAD_MAX_FILES : (files as BatchFile[]).every(file => typeof file?.path === 'string' && !file.path.toLowerCase().endsWith('.md'))
+	const maxFiles = bulkNew ? BULK_NEW_UPLOAD_MAX_FILES : (files as BatchFile[]).every(file => typeof file?.path === 'string' && !isMarkdownPath(file.path))
 		? BATCH_ASSET_UPLOAD_MAX_FILES : MAX_BATCH_UPLOAD_FILES;
 	if (files.length > maxFiles) {
 		return corsResponse({ error: `Maximum ${maxFiles} files per batch` }, 400);

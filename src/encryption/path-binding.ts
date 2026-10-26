@@ -1,12 +1,13 @@
 import { getPortablePathIssue, getSyncPathIssue } from '../protocol/portable-path';
 import { isWireSegment } from '../protocol/encrypted-path';
 import type { PathTags } from './path-tags';
+import { isMarkdownPath } from '../protocol/note-paths';
 
 /** The Reading folder in both forms: notes the server seals name only its server form. */
 export interface ReadingFolderForms { plain: string; wire: string }
 
 function isNoteName(name: string): boolean {
-	return name.toLowerCase().endsWith('.md') && !name.includes('/') && !getSyncPathIssue(name) && !getPortablePathIssue(name)
+	return isMarkdownPath(name) && !name.includes('/') && !getSyncPathIssue(name) && !getPortablePathIssue(name)
 		&& new TextEncoder().encode(name).length <= 255;
 }
 

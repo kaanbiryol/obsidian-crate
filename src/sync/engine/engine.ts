@@ -49,6 +49,7 @@ import { LocalContentVerifier } from './content-verifier';
 import { verifyUnchangedPendingPaths } from '../pending/pending-verification';
 import { assertNoOpenInitialImport } from './initial-import';
 import { MAX_DEBOUNCE_WAIT_MS, type SyncSettings } from '../settings';
+import { isMarkdownNoteInFolder } from '../../protocol/note-paths';
 
 const logger = createLogger('SyncEngine');
 
@@ -332,7 +333,7 @@ export class SyncEngine {
 	 * changes. Each upload is conditional; a conflict is left to the next ordinary sync. */
 	async republishMarkdown(folder: string): Promise<number> {
 		return this.runExclusiveOperation(async () => {
-			const paths = this.localManifest.getAllPaths().filter(path => path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md'));
+			const paths = this.localManifest.getAllPaths().filter(path => isMarkdownNoteInFolder(path, folder));
 			const result = createEmptySyncResult();
 			for (let offset = 0; offset < paths.length; offset += 50) {
 				this.lifecycle.throwIfDestroyed();

@@ -1,4 +1,4 @@
-import { isMarkdownPath } from '../merge/markdown-base-cache';
+import { isMarkdownPath } from '../../protocol/note-paths';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { TransferContext } from './types';
 import { sha256Hex } from '../../platform/sha256';

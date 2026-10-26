@@ -6,6 +6,7 @@ import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { sha256Hex } from '@/platform/sha256';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import type { Env } from '../types';
+import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-paths';
 
 /** `reading_items` holds one row per Reading note in the Reading folder, written in the
  * same D1 batch as the file commit, so reads never re-check `files`. Only a new scope
@@ -24,7 +25,7 @@ export type ReadingIndexPolicy = Pick<ReadingPolicy, 'folder_path'> | null;
 /** A committed file revision, or a removed path when `storageKey` is null. */
 export interface ReadingFileChange { path: string; storageKey: string | null; hash?: string; size?: number; content?: string | ArrayBuffer | null }
 
-export const isReadingNotePath = (path: string, folder: string) => path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md');
+export const isReadingNotePath = (path: string, folder: string) => isMarkdownNoteInFolder(path, folder);
 
 /** Keeps a BOM, like `decodeMarkdownBytes`: Worker Reading writes rebuild the note from this text. */
 export function decodeReadingNote(bytes: ArrayBuffer | Uint8Array): string | null {
@@ -65,7 +66,7 @@ async function indexRow(change: ReadingFileChange): Promise<IndexRow | 'unknown'
  * only if its file write committed and the Reading folder is still `policy`'s, so a
  * rejected or raced commit leaves the index untouched. Encrypted vaults keep no index. */
 export async function readingIndexStatements(db: D1Database, changes: ReadingFileChange[], options: { policy?: ReadingIndexPolicy; encrypted?: boolean; revision?: string } = {}): Promise<D1PreparedStatement[]> {
-  if (options.encrypted || !changes.some(change => change.path.toLowerCase().endsWith('.md'))) return [];
+  if (options.encrypted || !changes.some(change => isMarkdownPath(change.path))) return [];
   const policy = options.policy !== undefined ? options.policy
     : await db.prepare('SELECT folder_path FROM reading_policy WHERE id = 1').first<{ folder_path: string }>();
   if (!policy) return [];

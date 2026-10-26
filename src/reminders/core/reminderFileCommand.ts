@@ -7,6 +7,7 @@ import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildMovedRemind
 import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderReminderBlocksInContent } from './markdownReminderFile';
 import { DEFAULT_PROJECT, MAX_REMINDER_NOTE_BYTES, MAX_REMINDERS_PER_NOTE } from './constants';
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
+import { isMarkdownNoteInFolder } from '../../protocol/note-paths';
 
 /** Distinguishes conflicts that share a status and code, for hosts that answer them differently. */
 export type ReminderCommandFailure = 'exists' | 'missing' | 'duplicate' | 'stale' | 'order';
@@ -47,6 +48,11 @@ function checkSize(content: string): void {
 	if (new TextEncoder().encode(content).length > MAX_REMINDER_NOTE_BYTES) throw new ReminderCommandError('Split reminder notes larger than 1 MiB before editing them in the web app.', 413, 'file_too_large');
 }
 
+/** A command may read or write only plain Markdown notes inside the enrolled folder. */
+export function isEnrolledReminderNotePath(path: string, folderPath: string): boolean {
+	return isMarkdownNoteInFolder(path, folderPath) && !path.includes('\\') && !path.split('/').some(part => !part || part === '.' || part === '..');
+}
+
 /** Shared Markdown rules run on the enrolled client; the server receives only
  * complete encrypted replacements with immutable file preconditions. */
 export async function applyReminderFileCommand(action: string, body: Record<string, unknown>, folderPath: string,
@@ -55,8 +61,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 	const changes = new Map<string, string>();
 	const scanned = new Map<string, ScannedReminderRecord[]>();
 	const load = async (path: string) => {
-		if (!path.startsWith(`${folderPath}/`) || path.includes('\\') || path.split('/').some(part => !part || part === '.' || part === '..')
-			|| !path.toLowerCase().endsWith('.md')) throw new ReminderCommandError('File is outside this enrollment', 403, 'scope_mismatch');
+		if (!isEnrolledReminderNotePath(path, folderPath)) throw new ReminderCommandError('File is outside this enrollment', 403, 'scope_mismatch');
 		if (!originals.has(path)) originals.set(path, await read(path));
 		const content = originals.get(path)!;
 		if (content !== null) checkSize(content);

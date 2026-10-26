@@ -4,6 +4,7 @@ import { errorMessage } from '../../platform/logger';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
+import { isMarkdownPath } from '../../protocol/note-paths';
 
 const logger = createLogger('MarkdownBaseCache');
 const CACHE_DIRNAME = 'markdown-base-cache';
@@ -25,9 +26,6 @@ export interface MarkdownBaseCacheSeedOptions {
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 }
 
-export function isMarkdownPath(path: string): boolean {
-	return path.toLowerCase().endsWith('.md');
-}
 
 export class MarkdownBaseCache {
 	private readonly app: App;

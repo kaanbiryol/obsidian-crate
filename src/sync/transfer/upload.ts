@@ -2,7 +2,7 @@ import { recordSyncError } from '../issues';
 import { isAbortError } from '../abort';
 import { arrayBufferToBase64 } from "../encoding";
 import { createBatchUploadChunks, prepareUploadFromVaultFile } from "./prepare";
-import { isMarkdownPath } from "../merge/markdown-base-cache";
+import { isMarkdownPath } from "../../protocol/note-paths";
 import type { TransferContext } from "./types";
 import type { BatchUploadFile, MutationFailure } from '../../protocol/sync-types';
 import type { PreparedUpload, SyncResult } from '../types';

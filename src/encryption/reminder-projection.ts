@@ -6,6 +6,7 @@ import { decryptJson, encryptJson, importEncryptionSecret, type EncryptionKey, t
 import { validateEncryptedNotification, type EncryptedNotification, type EncryptedSchedules } from './notification-format';
 import { decodeBase64Url, encodeBase64Url } from './encoding';
 import { MAX_ENCRYPTED_PUBLIC_DATA_BYTES } from './file-format';
+import { isMarkdownPath } from '../protocol/note-paths';
 
 function context(notice: Pick<EncryptedNotification, 'vaultId' | 'scopeId' | 'reminderId'>) {
 	return { vaultId: notice.vaultId, scopeId: notice.scopeId, objectId: notice.reminderId, purpose: 'notification' as const };
@@ -79,7 +80,7 @@ async function sealNotification(vaultId: string, key: EncryptionKey, fingerprint
  * preserves the server's existing schedules via quarantine. */
 export async function createReminderProjection(keys: NotificationKeys, folders: readonly string[], path: string, bytes: ArrayBuffer): Promise<EncryptedSchedules | null> {
 	const folder = folders.filter(folder => folder && path.startsWith(`${folder}/`)).sort((left, right) => right.length - left.length)[0];
-	if (!folder || !path.toLowerCase().endsWith('.md')) return null;
+	if (!folder || !isMarkdownPath(path)) return null;
 	if (bytes.byteLength > MAX_REMINDER_NOTE_BYTES) return { version: 1, reminders: [], issue: 'size' };
 	let scanned;
 	try { scanned = scanReminderMarkdownContent(path, decodeMarkdownBytes(bytes), folder).reminders; }

@@ -3,6 +3,7 @@ import { validateRecurrence } from '@/reminders/core/recurrence/validateRecurren
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 import type { ModalDraft, ModalPickerId, ReminderRecord } from '../types';
 import { isSyncPath } from '@/protocol/sync-validation';
+import { isMarkdownPath } from '../../../protocol/note-paths';
 
 function isStoredCalendarDate(value: string): boolean {
 	return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value))
@@ -31,7 +32,7 @@ export const reminderRecordSchema = v.object({
 	project: v.string(),
 	completed: v.boolean(),
 	priority: prioritySchema,
-	filePath: v.pipe(v.string(), v.check(value => value.toLowerCase().endsWith('.md') && isSyncPath(value))),
+	filePath: v.pipe(v.string(), v.check(value => isMarkdownPath(value) && isSyncPath(value))),
 	description: optionalString,
 	revision: optionalString,
 	lineNumber: v.optional(v.pipe(v.number(), v.check(value => Number.isSafeInteger(value) && value >= 0))),

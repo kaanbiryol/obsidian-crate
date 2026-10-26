@@ -1,7 +1,7 @@
 import { assertLocalSyncPath } from '../local/local-path-safety';
 import { recordAppliedContent, UNVERIFIED_MODIFIED } from './applied-content';
 import { applyRemoteContentIfUnchanged, preserveLocalVersionsAndApplyRemote } from "../local/local-apply";
-import { isMarkdownPath } from "../merge/markdown-base-cache";
+import { isMarkdownPath } from "../../protocol/note-paths";
 import { mergeMarkdownContent } from "../merge/markdown-merge";
 import { deletePathLocallyIfUnchanged, isVaultTFileLike } from "../local/local-delete";
 import { hasUnresolvedConflict, recordResolvedRace, recordUnresolvedConflict } from "../sync-result";

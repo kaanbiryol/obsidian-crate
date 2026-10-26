@@ -19,13 +19,14 @@ import { portablePathKey } from '../../../protocol/portable-path';
 import { FILE_HASH_HEADER, REVISION_HEADER } from '../../../protocol/http-headers';
 import type { Env } from '../types';
 import { isSha256Hex } from '../../../platform/validation';
+import { isMarkdownNoteInFolder } from '../../../protocol/note-paths';
 
 interface EncryptedWebFile { path: string; content: string; expectedHash: string | null; expectedRevision?: string }
 
 function scopedPath(value: unknown, folder: string): string | null {
 	if (typeof value !== 'string') return null;
 	const path = sanitizePath(value);
-	return path && path === value && path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md') ? path : null;
+	return path && path === value && isMarkdownNoteInFolder(path, folder) ? path : null;
 }
 
 const isFolder = (value: unknown): value is string => typeof value === 'string' && !!value && sanitizePath(value) === value;

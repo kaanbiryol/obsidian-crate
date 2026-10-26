@@ -5,10 +5,11 @@ import { isReminderPath } from '../../reminders/scope';
 import { getNotificationPolicy } from '../../notifications/policy';
 import { createsNotificationWork, FRAMED_CONTENT_HEADER, frameUpload, hasFramedMarkdown, readFrame } from './staged-upload-dispatch';
 import { commitCoordinatorNewFiles } from '../../coordinator/coordinator';
+import { isMarkdownPath } from '../../../../protocol/note-paths';
 
 export function coordinatedNewFiles(env: Env): typeof commitNewFiles {
   return async (bucket, db, files) => {
-    if (!files.some(file => file.path.toLowerCase().endsWith('.md'))) return commitNewFiles(bucket, db, files);
+    if (!files.some(file => isMarkdownPath(file.path))) return commitNewFiles(bucket, db, files);
     const metadata = files.map(({ content: _content, ...file }) => file);
     // Small Markdown bytes follow the metadata in order, so the coordinator need
     // not read them back from R2.
