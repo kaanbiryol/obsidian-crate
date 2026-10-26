@@ -231,5 +231,18 @@ describe('turning encryption on', () => {
 		expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).not.toBeNull();
 		const row = await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'note.md'").first<{ storage_key: string }>();
 		expect(await (await env.BUCKET.get(row!.storage_key))!.text()).toBe('current local version\n');
+		// The keys saved for the refused setup are gone, so later syncs stay plaintext.
+		expect(loadEncryptionKeys(storage)).toBeNull();
+		expect(storage.get(SECRET_KEYS.ENCRYPTION_RECOVERY)).toBeFalsy();
+		runtime.destroy();
+		runtime = new SyncRuntime({ manifest: { dir: TEST_PLUGIN_DIR }, app: { vault: disk.vault, fileManager: {}, workspace: { layoutReady: true, onLayoutReady: () => {} } } } as never,
+			settings, storage, async update => { Object.assign(settings, update); });
+		await runtime.initialize();
+		disk.write('note.md', 'edited after the refusal\n');
+		disk.write('new.md', 'created after the refusal\n');
+		expect((await runtime.sync()).success).toBe(true);
+		const rows = (await env.DB.prepare('SELECT path, storage_key FROM files ORDER BY path').all<{ path: string; storage_key: string }>()).results;
+		expect(rows.map(file => file.path)).toEqual(['new.md', 'note.md']);
+		expect(await (await env.BUCKET.get(rows[1]!.storage_key))!.text()).toBe('edited after the refusal\n');
 	});
 });
