@@ -62,3 +62,15 @@ it('resumes an original-case path cursor from an older server after its file', a
 	expect(result.files.map(file => file.path).slice(0, 5)).toEqual(expected);
 	expect(result.files.map(file => file.path)).not.toContain(after);
 });
+
+it('reuses the encryption state authentication already read', async () => {
+	await seed();
+	const state = (await createEncryptionFixture('active')).state;
+	const statements: string[] = [];
+	const db = new Proxy(env.DB, { get: (target, key) => key === 'prepare'
+		? (sql: string) => { statements.push(sql); return target.prepare(sql); }
+		: Reflect.get(target, key, target) as unknown });
+	const response = await handleEncryptedFolderFiles(new Request('https://test/reminders/encrypted-files?folderPath=Reminders'), { ...env, DB: db }, '/reminders/encrypted-files', 'reminders', undefined, state);
+	expect(response!.status).toBe(200);
+	expect(statements.some(sql => sql.includes('server_state'))).toBe(false);
+});

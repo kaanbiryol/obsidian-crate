@@ -31,13 +31,14 @@ export async function prepareCoordinatedNewFiles(request: Request, env: Env): Pr
     position += file.size;
   }
   if (framed && position !== framed.content.byteLength) throw new Error('Staged upload size mismatch');
-  const policy = await getNotificationPolicy(env.DB);
+  // Files with framed bytes need no policy fence; only the rest decide what to read from R2.
+  const policy = metadata.some(file => !attached.has(file)) ? await getNotificationPolicy(env.DB) : null;
   const files: NewFileUpload[] = [];
   for (let offset = 0; offset < metadata.length; offset += 3) {
     files.push(...await Promise.all(metadata.slice(offset, offset + 3).map(async file => {
-      file.reminderPolicyRevision = policy?.revision ?? null;
       const content = attached.get(file);
       if (content) return { ...file, content };
+      file.reminderPolicyRevision = policy?.revision ?? null;
       if (!isReminderPath(file.path, policy?.folderPath ?? null)) return { ...file, content: new ArrayBuffer(0) };
       const object = await env.BUCKET.get(file.objectKey);
       if (!object) throw new Error('Staged object unavailable');

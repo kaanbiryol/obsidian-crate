@@ -77,12 +77,13 @@ export function coordinatedUpload(env: Env): CommitUpload {
 export async function prepareCoordinatedUpload(request: Request, env: Env): Promise<UploadParams | Response> {
   // Only the authenticated Worker calls this internal DO endpoint. No public route exposes it.
   const { metadata, content: framed } = await readUpload(request);
-  const policy = await getNotificationPolicy(env.DB);
-  metadata.reminderPolicyRevision = policy?.revision ?? null;
+  // Framed bytes need no policy fence: the commit projects whatever folder is current.
   if (framed) {
     if (framed.byteLength !== metadata.size) return Response.json({ error: 'Staged upload size mismatch' }, { status: 400 });
     return { ...metadata, content: framed };
   }
+  const policy = await getNotificationPolicy(env.DB);
+  metadata.reminderPolicyRevision = policy?.revision ?? null;
   if (!isReminderPath(metadata.path, policy?.folderPath ?? null) && !await readEncryptionState(env.DB)) return { ...metadata, content: new ArrayBuffer(0) };
   const object = await env.BUCKET.get(metadata.objectKey);
   if (!object) return Response.json({ error: 'Staged object unavailable' }, { status: 503 });

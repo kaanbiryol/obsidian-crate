@@ -31,7 +31,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
         if (!encryption) throw new ReadingError('Article downloads here are only for encrypted Reading folders.', 409);
         return await extractForEncryptedReading(request, env);
       }
-      return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path) ?? readingResponse({ error: 'Not found' }, 404);
+      return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
     }
     if (encryption && (shortcut?.kind === 'prepare' || ['/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
     if (path === '/reading/encryption' && request.method === 'GET' && principal) {

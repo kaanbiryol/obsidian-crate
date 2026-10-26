@@ -33,11 +33,12 @@ const isFolder = (value: unknown): value is string => typeof value === 'string' 
 const FEATURE_LABELS = { reminders: 'reminders', reading: 'Reading' } as const;
 
 /** Serve encrypted note inventory, downloads and commits for the reminders and Reading apps. */
-export async function handleEncryptedFolderFiles(request: Request, env: Env, path: string, feature: keyof typeof FEATURE_LABELS = 'reminders', expectedFolder?: string): Promise<Response | null> {
+/** `authenticated` is the encryption state authentication already read for this request. */
+export async function handleEncryptedFolderFiles(request: Request, env: Env, path: string, feature: keyof typeof FEATURE_LABELS = 'reminders', expectedFolder?: string, authenticated?: EncryptionServerState | null): Promise<Response | null> {
 	const prefix = `/${feature}`;
 	const label = FEATURE_LABELS[feature];
 	if (![`${prefix}/encrypted-files`, `${prefix}/encrypted-file`, `${prefix}/encrypted-commit`].includes(path)) return null;
-	const state = await readEncryptionState(env.DB);
+	const state = authenticated !== undefined ? authenticated : await readEncryptionState(env.DB);
 	if (!state || state.mode !== 'active') throw new EncryptionStateError(`Finish setting up encryption before using encrypted ${label}`);
 	if (path === `${prefix}/encrypted-commit` && request.method === 'POST') return commitEncryptedFiles(request, env, state, expectedFolder);
 	if (request.method !== 'GET') return null;
