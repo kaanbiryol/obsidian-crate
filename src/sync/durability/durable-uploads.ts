@@ -1,6 +1,6 @@
 import { recoveryChunks } from './recovery-chunks';
 import { SyncIssueError, withSyncFileContext } from '../issues';
-import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
+import { isMarkdownPath, type MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { BatchUploadFile, BatchUploadResponse, UploadResult } from '@/protocol/sync-types';
 import type { LocalManifest } from '../manifest/manifest';
 import { base64ToArrayBuffer } from '../encoding';
@@ -166,7 +166,8 @@ export class DurableUploads {
 			// snapshot is a virtual ancestor already included in the uploaded result.
 			// It remains valid after response loss, local I/O failure, or a new edit.
 			const base = file.intent.kind === 'merge' ? file.intent.preimage : file;
-			await this.cache.putBase(file.path, base.hash, base64ToArrayBuffer(base.content));
+			// Only Markdown keeps a merge base; avoid decoding other uploads again.
+			if (isMarkdownPath(file.path)) await this.cache.putBase(file.path, base.hash, base64ToArrayBuffer(base.content));
 			if (file.intent.kind === 'merge' && !await this.cache.readBase(file.path, base.hash)) throw new Error('The merged upload committed, but its recovery base could not be saved. Pending upload preserved; retry sync after storage is available.');
 			this.manifest.setEntry(file.path, { hash: base.hash, size: base.size, modified: UNVERIFIED_MODIFIED,
 				...(file.intent.kind === 'local' ? { revision: result.revision } : {}) });

@@ -197,3 +197,14 @@ it('seals concurrent uploads outside the journal write chain and checks its fold
 	expect(exists.mock.calls.filter(([path]) => path.endsWith('/pending-uploads'))).toHaveLength(1);
 	await manifest.close();
 });
+
+it('records a merge base only for Markdown uploads', async () => {
+  const { create, file } = fixture(); const manifest = create();
+  await manifest.uploadJournal.prepare([file, { ...file, path: 'scan.pdf', contentType: 'application/pdf' }], 20000);
+  const batchUpload = vi.fn(async (files: Array<{ path: string; hash: string }>) => ({ success: true, results: files.map(f => ({ path: f.path, success: true, hash: f.hash, revision: 'r' })) }));
+  const putBase = vi.fn(async () => {});
+  await new DurableUploads(manifest, { batchUpload, uploadFile: vi.fn(), getServerInfo: vi.fn() }, { putBase } as never, crypto.randomUUID()).recover();
+  expect(putBase).toHaveBeenCalledExactlyOnceWith('note.md', file.hash, expect.any(ArrayBuffer));
+  expect(manifest.getEntry('scan.pdf')).toMatchObject({ hash: file.hash, revision: 'r' });
+  await manifest.close();
+});
