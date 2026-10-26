@@ -1,5 +1,4 @@
 import { readBuiltIdentity } from "./scripts/development-build.mjs";
-import replace from "@rollup/plugin-replace";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { resolve } from "node:path";
@@ -8,26 +7,25 @@ import { testVaultDeployPlugin } from "./scripts/vite/test-vault-vite-plugin.mjs
 import { cloudflareArtifactsPlugin } from "./scripts/vite/cloudflare-artifacts-vite-plugin.mjs";
 import { readingExtractionVitePlugin } from "./scripts/reading-extraction-build.mjs";
 
+const root = import.meta.dirname;
+
 /** Reads the Worker build identity only when Vite builds, so tools that just load
  * this config (knip) work before the Worker has been built. */
 const developmentBuildDefine = () => ({
 	name: "crate-development-build",
-	config: () => ({ define: { __CRATE_DEVELOPMENT_BUILD__: JSON.stringify(readBuiltIdentity(__dirname).development ?? null) } }),
+	config: () => ({ define: { __CRATE_DEVELOPMENT_BUILD__: JSON.stringify(readBuiltIdentity(root).development ?? null) } }),
 });
 
 export default defineConfig(({ mode }) => ({
 	plugins: [
 		developmentBuildDefine(),
 		readingExtractionVitePlugin(),
-		cloudflareArtifactsPlugin({ rootDir: __dirname }),
+		cloudflareArtifactsPlugin({ rootDir: root }),
 		react(),
-		replace({
-			"process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
-			preventAssignment: true,
-		}),
-		...(mode === "development" ? [testVaultDeployPlugin({ rootDir: __dirname })] : []),
+		...(mode === "development" ? [testVaultDeployPlugin({ rootDir: root })] : []),
 	],
 	define: {
+		"process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
 		__CRATE_CLOUDFLARE_OAUTH_CLIENT_ID__: JSON.stringify(
 			process.env.CRATE_CLOUDFLARE_OAUTH_CLIENT_ID || "9c474af284e49ff0201106f3b42cca05",
 		),
@@ -35,7 +33,7 @@ export default defineConfig(({ mode }) => ({
 	build: {
 		minify: true,
 		lib: {
-			entry: resolve(__dirname, "src/main.ts"),
+			entry: resolve(root, "src/main.ts"),
 			fileName: "main",
 			formats: ["cjs"],
 		},
