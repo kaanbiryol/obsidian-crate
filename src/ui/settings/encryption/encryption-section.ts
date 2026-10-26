@@ -49,7 +49,7 @@ export function renderEncryptionSection(container: HTMLElement, plugin: CratePlu
 		loading = true;
 		show('Checking…', 'Checking this server’s encryption status.', 'Checking…');
 		try {
-			const state = await readEncryptionStatus(plugin, 7000);
+			const state = await cachedEncryptionStatus(plugin);
 			if (!active() || request !== revision) return;
 			loading = false;
 			modalTitle = encryptionModalTitle(state);
@@ -63,7 +63,7 @@ export function renderEncryptionSection(container: HTMLElement, plugin: CratePlu
 			show('Status unavailable', 'Could not check this server. Retry to see whether encryption is on.', 'Retry');
 		}
 	};
-	const changed = () => { void refresh(); };
+	const changed = () => { plugin.settingsUiState.encryptionStatus = null; void refresh(); };
 	row.addButton(button => {
 		action = button;
 		button.onClick(() => {
@@ -73,8 +73,22 @@ export function renderEncryptionSection(container: HTMLElement, plugin: CratePlu
 			else new EncryptionModal(plugin, changed, modalTitle).open();
 		});
 	});
-	changed();
+	void refresh();
 	return () => { disposed = true; };
+}
+
+/** Settings re-render on every toggle; reuse this connection's answer until the tab closes or encryption changes. */
+function cachedEncryptionStatus(plugin: CratePlugin): Promise<EncryptionServerState | null> {
+	const client = plugin.syncRuntime.getApiClient();
+	const cached = plugin.settingsUiState.encryptionStatus;
+	if (client && cached?.client === client) return cached.value;
+	const value = readEncryptionStatus(plugin, 7000);
+	if (!client) return value;
+	const entry = { client, value };
+	plugin.settingsUiState.encryptionStatus = entry;
+	// A failed check runs again on the next render.
+	value.catch(() => { if (plugin.settingsUiState.encryptionStatus === entry) plugin.settingsUiState.encryptionStatus = null; });
+	return value;
 }
 
 class EncryptionModal extends SharedModal {
@@ -193,9 +207,7 @@ class EncryptionModal extends SharedModal {
 			advanced: container => {
 				container.createEl('p', { cls: 'crate-encryption-intro', text: 'Keep this key private. It unlocks your synced vault on Obsidian devices and in the web app. Notification text is encrypted too.' });
 				const verify = createSettingsDisclosure(container, 'Check recovery key', { inline: true });
-				const verification = renderRecoveryVerification(verify, state.recovery, keys, () => {}, () => this.assertCurrentConnection());
-
-				return verification.dispose;
+				return renderRecoveryVerification(verify, state.recovery, keys, () => this.assertCurrentConnection());
 			},
 		});
 	}

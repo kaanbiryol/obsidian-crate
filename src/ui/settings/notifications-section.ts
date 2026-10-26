@@ -21,13 +21,22 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 	const policyApi = connection.api;
 	let policy: NotificationPolicy | null = null;
 	let loadError: unknown;
-	const openedPolicy = policyApi ? policyApi.getNotificationPolicy().then(result => { policy = result.policy; }).catch(error => { loadError = error; }) : Promise.resolve();
+	const openedPolicy = policyApi ? cachedNotificationPolicy(plugin, policyApi).then(result => { policy = result; }).catch(error => { loadError = error; }) : Promise.resolve();
 	const savePolicy = async (patch: Partial<NotificationPolicy>) => {
 		await openedPolicy;
 		if (loadError) throw new Error(errorMessage(loadError));
 		if (!policyApi) throw new Error('Connect to the sync server before changing notifications');
 		connection.assertCurrent();
-		await saveNotificationPolicy(policyApi, plugin, policy, patch, saved => { policy = saved; });
+		try {
+			await saveNotificationPolicy(policyApi, plugin, policy, patch, saved => {
+				policy = saved;
+				plugin.settingsUiState.notificationPolicy = { client: policyApi, folderPath: plugin.remindersSettings.remindersFolderPath, value: Promise.resolve(saved) };
+			});
+		} catch (error) {
+			// Another device may have changed the policy; the next render loads it again.
+			plugin.settingsUiState.notificationPolicy = null;
+			throw error;
+		}
 	};
 	const content = createSettingsDisclosure(containerEl, 'Notifications', {
 		summary: plugin.settings.pushEnabled ? 'On · schedule, timezone, and devices' : 'Off',
@@ -148,6 +157,19 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 	});
 
 	return () => { active = false; };
+}
+
+/** Settings re-render on every toggle; reuse this connection's policy until the tab closes. */
+function cachedNotificationPolicy(plugin: CratePlugin, client: SyncApiClient): Promise<NotificationPolicy | null> {
+	const cached = plugin.settingsUiState.notificationPolicy;
+	const folderPath = plugin.remindersSettings.remindersFolderPath;
+	if (cached?.client === client && cached.folderPath === folderPath) return cached.value;
+	const value = client.getNotificationPolicy().then(result => result.policy);
+	const entry = { client, folderPath, value };
+	plugin.settingsUiState.notificationPolicy = entry;
+	// A failed load runs again on the next render.
+	value.catch(() => { if (plugin.settingsUiState.notificationPolicy === entry) plugin.settingsUiState.notificationPolicy = null; });
+	return value;
 }
 
 function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, apiClient: SyncApiClient, isActive: () => boolean): void {

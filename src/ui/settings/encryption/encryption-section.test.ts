@@ -5,6 +5,7 @@ import { createEncryptionState, type EncryptionServerState } from '../../../encr
 import type { EncryptionProgress } from '../../../sync/encryption/server-encryption';
 import { createEncryptionSetup } from '../../../sync/encryption/reset';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
+import { createSettingsUiState } from '../../../plugin/settings-ui-state';
 
 let state: EncryptionServerState | null;
 let body: FakeElement;
@@ -55,11 +56,12 @@ afterEach(() => {
 	for (const name of ['obsidian', '../../plugin/shared-modal', '../../confirmation-modal', '../../sync/worker-api/http', '../../sync/encryption/server-encryption']) vi.doUnmock(name);
 });
 
+const apiClient = {};
 async function renderRow() {
 	const { renderEncryptionSection } = await import('./encryption-section');
 	const plugin = { app: {}, settings: { workerUrl: 'https://server.test', automaticSync: false, reading: { folderPath: 'Reading' } }, remindersSettings: { remindersFolderPath: 'Reminders' },
 		secretStorage: { get: (key: string) => values.get(key) ?? null, set: (key: string, value: string) => values.set(key, value) },
-		syncRuntime: { sync, turnOffEncryption: turnOff, turnOnEncryption: convert, runEncryptionSetup: async (work: () => Promise<void>) => work() } };
+		settingsUiState: createSettingsUiState(), syncRuntime: { getApiClient: () => apiClient, sync, turnOffEncryption: turnOff, turnOnEncryption: convert, runEncryptionSetup: async (work: () => Promise<void>) => work() } };
 	const cleanup = renderEncryptionSection(new FakeElement('div') as never, plugin as never);
 	const row = setting('End-to-end encryption');
 	return { plugin, cleanup, row, button: row.buttons[0]! };
@@ -373,6 +375,25 @@ it.each(['settings closed', 'plugin unloaded'] as const)('ignores late status re
 	await Promise.resolve(); await Promise.resolve();
 	expect(row.descEl.querySelector('strong')?.textContent).toBe('Checking…');
 	expect(button.buttonEl.classNames.has('is-disabled')).toBe(true);
+});
+
+it('reuses the status across settings re-renders until settings close', async () => {
+	await configure('active');
+	const { plugin, button } = await renderRow();
+	await vi.waitFor(() => expect(button.buttonEl.textContent).toBe('Manage encryption'));
+	const { renderEncryptionSection } = await import('./encryption-section');
+	const rerender = () => {
+		renderEncryptionSection(new FakeElement('div') as never, plugin as never);
+		return setting('End-to-end encryption').buttons[0]!;
+	};
+	const again = rerender();
+	await vi.waitFor(() => expect(again.buttonEl.textContent).toBe('Manage encryption'));
+	// Before: every toggle elsewhere in settings checked the server again.
+	expect(read).toHaveBeenCalledOnce();
+	plugin.settingsUiState.encryptionStatus = null; // What CrateSettingTab.hide() does.
+	const reopened = rerender();
+	await vi.waitFor(() => expect(reopened.buttonEl.textContent).toBe('Manage encryption'));
+	expect(read).toHaveBeenCalledTimes(2);
 });
 
 it('refreshes the row once after turning encryption off', async () => {

@@ -5,7 +5,7 @@ import type { ActivityHeader } from './activity-header';
 import { recordSyncHistory } from '../../sync/runtime/sync-activity';
 import { createEmptySyncResult } from '../../sync/sync-result';
 import { DEFAULT_SETTINGS } from '../../plugin/settings-types';
-import type { SyncState } from '../../sync/types';
+import type { ConflictRecord, SyncState } from '../../sync/types';
 
 vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('./ActivitySheet', () => ({ ActivitySheet: vi.fn() }));
@@ -78,7 +78,7 @@ it('updates progress without copying the pending list or rebuilding the empty co
 		getState: () => state, getPendingKeys, getPendingChangeCount: () => pending.length,
 	}));
 	const internal = modal as unknown as {
-		pendingPanel: FakeElement; conflictsPanel: FakeElement; header: ActivityHeader; onProgress(): void; renderConflicts(): void;
+		pendingPanel: FakeElement; conflictsPanel: FakeElement; header: ActivityHeader; onProgress(): void;
 		createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
 	};
 	internal.pendingPanel = new FakeElement('div');
@@ -86,13 +86,13 @@ it('updates progress without copying the pending list or rebuilding the empty co
 	internal.conflictsPanel = new FakeElement('div');
 	const header = new FakeElement('div');
 	internal.header = internal.createHeader(header, new FakeElement('div'));
-	const renderConflicts = vi.spyOn(internal, 'renderConflicts');
+	const rebuildConflicts = vi.spyOn(internal.conflictsPanel, 'empty');
 
 	for (let tick = 0; tick < 100; tick++) { internal.onProgress(); await Promise.resolve(); }
 
 	// Before: about 4 full copies per tick and a conflicts rebuild on every tick.
 	expect(getPendingKeys).not.toHaveBeenCalled();
-	expect(renderConflicts).toHaveBeenCalledOnce();
+	expect(rebuildConflicts).toHaveBeenCalledOnce();
 	expect(header.querySelector('.crate-activity-subtitle-label')?.textContent).toBe('Syncing…');
 });
 
@@ -138,4 +138,66 @@ it('keeps the pending file browser and its comparisons while the pending set is 
 	internal.renderPending();
 	expect(dispose).toHaveBeenCalledOnce();
 	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).not.toBe(browser);
+});
+
+it('keeps the conflicts panel and its focusable buttons across unrelated state events', () => {
+	const conflict: ConflictRecord = {
+		originalPath: 'notes/plan.md', conflictPath: 'notes/plan (conflict).md', createdAt: '2026-01-01T10:00:00.000Z',
+		cause: 'concurrent-edit', status: 'active', localHash: 'a',
+	};
+	let conflicts = [conflict];
+	const state = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 0, conflictCount: 1 } as SyncState;
+	const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({
+		getState: () => state, getActiveConflicts: () => conflicts.map(record => ({ ...record })),
+	}));
+	const internal = modal as unknown as {
+		pendingPanel: FakeElement; conflictsPanel: FakeElement; pendingCount: FakeElement; conflictsCount: FakeElement;
+		header: ActivityHeader; refresh(): void; createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
+	};
+	Object.assign(internal, {
+		pendingPanel: new FakeElement('div'), conflictsPanel: new FakeElement('div'),
+		pendingCount: new FakeElement('span'), conflictsCount: new FakeElement('span'),
+	});
+	internal.header = internal.createHeader(new FakeElement('div'), new FakeElement('div'));
+	internal.refresh();
+	const review = internal.conflictsPanel.querySelector('.crate-conflict-review-button');
+	expect(review).toBeTruthy();
+
+	// Before: every state event rebuilt the list, so a focused Review button was replaced.
+	internal.refresh();
+	expect(internal.conflictsPanel.querySelector('.crate-conflict-review-button')).toBe(review);
+
+	conflicts = [{ ...conflict, localHash: 'b' }];
+	internal.refresh();
+	expect(internal.conflictsPanel.querySelector('.crate-conflict-review-button')).not.toBe(review);
+});
+
+it('ages the last-sync label every minute while open and stops when closed', async () => {
+	vi.useFakeTimers();
+	vi.stubGlobal('window', globalThis);
+	try {
+		const state = { status: 'idle', lastSync: new Date().toISOString(), lastError: null, pendingChanges: 0, conflictCount: 0 } as SyncState;
+		const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
+		const internal = modal as unknown as {
+			pendingPanel: FakeElement; conflictsPanel: FakeElement; pendingCount: FakeElement; conflictsCount: FakeElement;
+			header: ActivityHeader; refresh(): void; createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
+		};
+		modal.onOpen();
+		const header = new FakeElement('div');
+		Object.assign(internal, {
+			pendingPanel: new FakeElement('div'), conflictsPanel: new FakeElement('div'),
+			pendingCount: new FakeElement('span'), conflictsCount: new FakeElement('span'),
+			header: internal.createHeader(header, new FakeElement('div')),
+		});
+		internal.refresh();
+		const label = () => header.querySelector('.crate-activity-subtitle-label')?.textContent;
+		expect(label()).toBe('Synced just now');
+
+		await vi.advanceTimersByTimeAsync(5 * 60_000);
+		expect(label()).toBe('Synced 5m ago');
+		expect(internal.pendingPanel.collectText()).toContain('Synced 5m ago');
+
+		modal.onClose();
+		expect(vi.getTimerCount()).toBe(0);
+	} finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
 });

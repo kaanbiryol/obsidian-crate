@@ -519,7 +519,7 @@ The plugin stores these local values through `SecretStorageService`. `platform/s
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.
 
-The service uses Obsidian's official `App.secretStorage` type. Server-scoped keys are stored under a hash of the managed deployment ID, or of the Worker URL for a self-hosted server (`plugin/lifecycle.ts`), so credentials and keys cannot leak between deployments.
+The service uses Obsidian's official `App.secretStorage` type. Server-scoped keys are stored under a hash of the managed deployment ID, or of the Worker URL for a self-hosted server (`plugin/lifecycle.ts`), so credentials and keys cannot leak between deployments. A self-hosted address change copies them into the new address's scope with `forScope()` and verifies them before switching.
 
 `plugin/settings-types.ts` separates persisted settings from the runtime device ID.
 Loading initializes settings before hydrating that ID from secret storage. Sync owns

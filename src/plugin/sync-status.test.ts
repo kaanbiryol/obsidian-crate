@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SyncEngine } from '../sync/engine/engine';
 import { createDeferred, createRuntimeHarness, initializeRuntime } from '../sync/runtime/runtime-test-harness';
 import { createEmptySyncResult } from '../sync/sync-result';
@@ -7,26 +7,28 @@ import { registerSyncStatus } from './sync-status';
 
 const { status, constructed } = vi.hoisted(() => ({
 	constructed: vi.fn(),
-	status: { setEnabled: vi.fn(), update: vi.fn<(state: SyncState) => void>(), setSyncProgress: vi.fn(), clearSyncProgress: vi.fn(), destroy: vi.fn() },
+	status: { setEnabled: vi.fn(), update: vi.fn<(state: SyncState, progress?: unknown) => void>(), destroy: vi.fn() },
 }));
 vi.mock('../ui/status', () => ({ StatusBarManager: class {
 	constructor(...args: unknown[]) { constructed(...args); return status; }
 } }));
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal('window', globalThis); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function mountStatus(settings: Parameters<typeof createRuntimeHarness>[0] = {}) {
 	const harness = createRuntimeHarness(settings);
 	const register = vi.fn<(cleanup: () => void) => void>();
+	const registerInterval = vi.fn<(id: number) => void>();
 	const onClick = vi.fn();
-	registerSyncStatus({ ...harness.plugin, register } as never, harness.runtime, onClick);
-	return { ...harness, dispose: () => register.mock.calls[0]![0](), onClick };
+	registerSyncStatus({ ...harness.plugin, register, registerInterval } as never, harness.runtime, onClick);
+	return { ...harness, dispose: () => register.mock.calls[0]![0](), onClick, registerInterval };
 }
 
 it('follows initialization, stop and restart, and unsubscribes on plugin unload', async () => {
 	const { runtime, dispose, onClick } = mountStatus();
 	expect(status.setEnabled).toHaveBeenLastCalledWith(true);
-	expect(status.update).toHaveBeenLastCalledWith(expect.objectContaining({ initializing: true }));
-	expect(constructed).toHaveBeenCalledWith(expect.anything(), false, onClick);
+	expect(status.update.mock.lastCall?.[0]).toMatchObject({ initializing: true });
+	expect(constructed).toHaveBeenCalledWith(expect.anything(), onClick);
 	await initializeRuntime(runtime);
 	expect(status.setEnabled).toHaveBeenLastCalledWith(true);
 	runtime.destroy();
@@ -52,7 +54,7 @@ it('keeps a configured vault in startup status while saved sync state loads', as
 		expect(status.update.mock.calls.every(([state]) => state.initializing)).toBe(true);
 		loaded.resolve();
 		await starting;
-		expect(status.update).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'idle', lastSync: '2026-10-01T00:00:00Z' }));
+		expect(status.update.mock.lastCall?.[0]).toMatchObject({ status: 'idle', lastSync: '2026-10-01T00:00:00Z' });
 		expect(runtime.getState().initializing).toBeFalsy();
 	} finally { loaded.resolve(); initialize.mockRestore(); }
 });
@@ -70,7 +72,7 @@ it('keeps an initialization failure visible until the runtime stops', async () =
 		await expect(runtime.initialize()).rejects.toThrow('Manifest unavailable');
 		expect(runtime.isInitialized()).toBe(false);
 		expect(status.setEnabled).toHaveBeenLastCalledWith(true);
-		expect(status.update).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'error', lastError: 'Manifest unavailable' }));
+		expect(status.update.mock.lastCall?.[0]).toMatchObject({ status: 'error', lastError: 'Manifest unavailable' });
 		runtime.destroy();
 		await vi.waitFor(() => expect(status.setEnabled).toHaveBeenLastCalledWith(false));
 	} finally { initialize.mockRestore(); }
@@ -85,12 +87,12 @@ it('shows transfer and saving progress until persistence finishes, then restores
 	} });
 	persistSettings.mockReturnValue(saved.promise);
 	const syncing = runtime.sync();
-	await vi.waitFor(() => expect(status.setSyncProgress).toHaveBeenCalledWith(2, 3));
+	await vi.waitFor(() => expect(status.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'syncing' }), expect.objectContaining({ current: 2, total: 3 })));
 	await vi.waitFor(() => expect(persistSettings).toHaveBeenCalledOnce());
-	expect(status.update).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'syncing', work: { phase: 'saving' } }));
+	expect(status.update.mock.lastCall?.[0]).toMatchObject({ status: 'syncing', work: { phase: 'saving' } });
 	saved.resolve();
 	await syncing;
-	expect(status.update).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'idle' }));
+	expect(status.update.mock.lastCall?.[0]).toMatchObject({ status: 'idle' });
 });
 
 it('renders a burst of state and progress events once', async () => {
@@ -100,7 +102,7 @@ it('renders a burst of state and progress events once', async () => {
 	status.update.mockClear();
 	const listeners = { state: [] as Array<() => void>, progress: [] as Array<() => void> };
 	const register = vi.fn<(cleanup: () => void) => void>();
-	registerSyncStatus({ register } as never, {
+	registerSyncStatus({ register, registerInterval: vi.fn() } as never, {
 		isInitialized: () => true, getState: () => runtime.getState(), getActivityProgress: () => null,
 		addStateChangeListener: listener => listeners.state.push(listener as () => void),
 		addProgressListener: listener => listeners.progress.push(listener as () => void),
@@ -111,4 +113,18 @@ it('renders a burst of state and progress events once', async () => {
 	for (let event = 0; event < 4; event++) [...listeners.state, ...listeners.progress].forEach(listener => listener());
 	await Promise.resolve();
 	expect(status.update).toHaveBeenCalledOnce();
+});
+
+it('re-renders every minute so the last-sync age stays current, and stops on unload', async () => {
+	vi.useFakeTimers();
+	const { runtime, registerInterval } = mountStatus();
+	await initializeRuntime(runtime);
+	await Promise.resolve();
+	status.update.mockClear();
+	await vi.advanceTimersByTimeAsync(5 * 60_000);
+	expect(status.update).toHaveBeenCalledTimes(5);
+	// Obsidian clears registered intervals on unload.
+	clearInterval(registerInterval.mock.calls[0]![0]);
+	await vi.advanceTimersByTimeAsync(60_000);
+	expect(status.update).toHaveBeenCalledTimes(5);
 });

@@ -7,19 +7,13 @@ type StatusRuntime = Pick<SyncRuntime, 'isInitialized' | 'getState' | 'getActivi
 
 /** Plugin UI owns its lifetime; runtime events contain no status-bar dependencies. */
 export function registerSyncStatus(plugin: Plugin, runtime: StatusRuntime, onClick: () => void): void {
-	const status = new StatusBarManager(plugin, false, onClick);
+	const status = new StatusBarManager(plugin, onClick);
 	const render = () => {
 		const state = runtime.getState();
 		// Initialization failures must remain visible even when there is no engine.
 		status.setEnabled(runtime.isInitialized() || state.initializing === true || state.status === 'error');
 		const progress = runtime.getActivityProgress();
-		if (progress) {
-			status.setSyncProgress(progress.current, progress.total);
-			status.update({ ...state, status: 'syncing', work: state.work ?? progress.work });
-		} else {
-			status.clearSyncProgress();
-			status.update(state);
-		}
+		status.update(progress ? { ...state, status: 'syncing', work: state.work ?? progress.work } : state, progress);
 	};
 	// A file's state change and progress tick arrive together; render them once.
 	let scheduled = false, disposed = false;
@@ -30,6 +24,8 @@ export function registerSyncStatus(plugin: Plugin, runtime: StatusRuntime, onCli
 	};
 	runtime.addStateChangeListener(schedule);
 	runtime.addProgressListener(schedule);
+	// "Synced 5m ago" is relative to now, so it ages without any runtime event.
+	plugin.registerInterval(window.setInterval(schedule, 60_000));
 	plugin.register(() => {
 		disposed = true;
 		runtime.removeStateChangeListener(schedule);

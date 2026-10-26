@@ -114,6 +114,8 @@ export default class CratePlugin extends Plugin {
 	clearSettingsUiState(): void {
 		this.settingsUiState.diagnostics = null;
 		this.settingsUiState.devices = null;
+		this.settingsUiState.encryptionStatus = null;
+		this.settingsUiState.notificationPolicy = null;
 	}
 
 	registerSettingsTab(settingTab: CrateSettingTab): void {

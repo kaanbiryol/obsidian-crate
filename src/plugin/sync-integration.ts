@@ -11,8 +11,6 @@ import { getPluginLifecycleSignal, waitForSyncReady } from './lifecycle-state';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/notification-policy-sync';
 import type { ForegroundSyncReason } from '../sync/runtime/foreground-sync';
 
-const registeredVaultHandlers = new WeakSet<CratePlugin>();
-
 export function initializeSyncManagers(plugin: CratePlugin): void {
 	plugin.registerDomEvent(window, 'online', () => { void refreshReminderNotificationPolicy(plugin); });
 	plugin.syncRuntime = new SyncRuntime(
@@ -117,10 +115,6 @@ async function runSyncNow(plugin: CratePlugin): Promise<void> {
 }
 
 export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
-	if (registeredVaultHandlers.has(plugin)) {
-		return;
-	}
-	registeredVaultHandlers.add(plugin);
 	plugin.registerEvent(
 		plugin.app.vault.on('create', (file: TAbstractFile) => {
 			plugin.syncRuntime.onFileChange(file);

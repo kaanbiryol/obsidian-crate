@@ -63,7 +63,8 @@ const { outputFiles } = await build({
             return el;
           },
           registerDomEvent(el, name, handler) { el.addEventListener(name, handler); },
-        }, true, () => setOpen('activity'));
+        }, () => setOpen('activity'));
+        manager.setEnabled(true);
         window.setSyncState = state => manager.update({ status:'idle', lastSync:null, lastError:null, pendingChanges:0, conflictCount:0, ...state });
         return () => manager.destroy();
       }, []);

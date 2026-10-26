@@ -8,12 +8,28 @@ export interface DiffLine {
 	words?: Array<{ text: string; changed: boolean }>;
 }
 
-export function buildDiff(before: string, after: string) {
+function diffLines(before: string, after: string) {
 	const left = before === '' ? [] : before.split('\n');
 	const right = after === '' ? [] : after.split('\n');
-	if (left.length + right.length > 4_000) return { lines: [], added: 0, removed: 0, limited: true };
+	if (left.length + right.length > 4_000) return undefined;
 	// Bound both the edit search and time spent on the UI thread.
-	const changes = diffArrays(left, right, { maxEditLength: 2_000, timeout: 50 });
+	return diffArrays(left, right, { maxEditLength: 2_000, timeout: 50 });
+}
+
+/** `buildDiff` counts without rendered lines or word highlights, for status labels. */
+export function countDiff(before: string, after: string): { added: number; removed: number; limited: boolean } {
+	const changes = diffLines(before, after);
+	if (!changes) return { added: 0, removed: 0, limited: true };
+	let added = 0, removed = 0;
+	for (const change of changes) {
+		if (change.added) added += change.value.length;
+		else if (change.removed) removed += change.value.length;
+	}
+	return { added, removed, limited: false };
+}
+
+export function buildDiff(before: string, after: string) {
+	const changes = diffLines(before, after);
 	if (!changes) return { lines: [], added: 0, removed: 0, limited: true };
 	const lines: DiffLine[] = [];
 	let oldLine = 0, newLine = 0, added = 0, removed = 0;

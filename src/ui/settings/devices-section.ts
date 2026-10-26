@@ -6,6 +6,7 @@ import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import { createLogger } from '../../sync/logger';
 import { errorMessage } from '../../platform/logger';
 import type { SettingsSectionContext } from './section-helpers';
+import { formatTimeAgo } from '../shared/format';
 
 const log = createLogger('DeviceSettings');
 
@@ -162,13 +163,7 @@ function formatDeviceLabel(token: RegisteredDevice): string {
 function formatLastSeen(value: string): string {
 	const normalized = value.includes('T') ? value : value.replace(' ', 'T');
 	const time = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}Z`).getTime();
-	if (!Number.isFinite(time)) return value;
-	const minutes = Math.max(0, Math.floor((Date.now() - time) / 60000));
-	if (minutes < 1) return 'just now';
-	if (minutes < 60) return `${minutes} min ago`;
-	if (minutes < 1440) return `${Math.floor(minutes / 60)} hr ago`;
-	const days = Math.floor(minutes / 1440);
-	return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+	return Number.isFinite(time) ? formatTimeAgo(time) : value;
 }
 
 function formatDateTime(value: string): string {

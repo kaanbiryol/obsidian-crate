@@ -13,8 +13,6 @@ export interface AnimationConfig {
 	enabled: boolean;
 	/** Animation duration in seconds (default: 0.3) */
 	duration?: number;
-	/** Stagger delay between items in milliseconds (default: 30) */
-	stagger?: number;
 }
 
 /**

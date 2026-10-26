@@ -8,6 +8,7 @@ import {
 	resetObsidianUiMocks,
 } from '../../test/fakes/obsidian-ui';
 import { fakeWithCurrentApi } from '../../test/fakes/sync-runtime';
+import { createSettingsUiState } from '../../plugin/settings-ui-state';
 
 let lastQrCodeData: string | null = null;
 const openExternalBrowserModal = vi.fn();
@@ -218,6 +219,53 @@ describe('renderNotificationsSection', () => {
 	expect(noticeMessages.some(message => message.includes('disk full'))).toBe(true);
 	});
 
+	it('reuses the shared policy across settings re-renders while settings stay open', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({ getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })) }) as unknown as {
+			remindersSettings: { remindersFolderPath: string };
+			settingsUiState: ReturnType<typeof createSettingsUiState>;
+			syncRuntime: { getApiClient(): { getNotificationPolicy: ReturnType<typeof vi.fn> } };
+		};
+		const render = () => renderNotificationsSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		const getNotificationPolicy = plugin.syncRuntime.getApiClient().getNotificationPolicy;
+		render(); render();
+		await flushMicrotasks();
+		// Before: every toggle elsewhere in settings fetched the policy again.
+		expect(getNotificationPolicy).toHaveBeenCalledOnce();
+
+		// A saved change becomes the reused policy, so the next save sends its new revision.
+		getSettingByName('Push notifications').toggles[0]?.change(false);
+		await flushMicrotasks();
+		render();
+		await flushMicrotasks();
+		[...MockSetting.instances].reverse().find(setting => setting.nameEl.textContent === 'Push notifications')!.toggles[0]?.change(true);
+		await flushMicrotasks();
+		expect(updateNotificationPolicy).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true, revision: 'policy-2' }));
+		expect(getNotificationPolicy).toHaveBeenCalledOnce();
+
+		// Moving the reminders folder updates the server's policy, and so does closing settings.
+		plugin.remindersSettings.remindersFolderPath = 'Tasks';
+		render();
+		expect(getNotificationPolicy).toHaveBeenCalledTimes(2);
+		plugin.settingsUiState.notificationPolicy = null; // What CrateSettingTab.hide() does.
+		render();
+		expect(getNotificationPolicy).toHaveBeenCalledTimes(3);
+	});
+
+	it('loads the shared policy again after a save fails', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({ getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })) }) as unknown as {
+			syncRuntime: { getApiClient(): { getNotificationPolicy: ReturnType<typeof vi.fn> } };
+		};
+		const render = () => renderNotificationsSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		render();
+		updateNotificationPolicy.mockRejectedValueOnce(new Error('Notification settings changed on another device. Refresh before saving.'));
+		getSettingByName('Push notifications').toggles[0]?.change(false);
+		await flushMicrotasks();
+		render();
+		expect(plugin.syncRuntime.getApiClient().getNotificationPolicy).toHaveBeenCalledTimes(2);
+	});
+
 	it('removes enabled notification devices through the push subscription API', async () => {
 		const { renderNotificationsSection } = await loadNotificationsSectionModule();
 		const getPushSubscriptions = vi.fn(async () => ({
@@ -346,6 +394,7 @@ function createPlugin(apiClient: Record<string, unknown>): never {
 	const plugin = {
 		secretStorage: { get: vi.fn(() => null) },
 		app: {},
+		settingsUiState: createSettingsUiState(),
 		settings: {
 			pushEnabled: true,
 			workerUrl: 'https://worker.example.com',

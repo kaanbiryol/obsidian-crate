@@ -8,14 +8,12 @@ import type { Plugin } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { StatusBarIndicator } from './StatusBarIndicator';
-import type { SyncState } from '../sync/types';
+import type { SyncActivityProgress, SyncState } from '../sync/types';
 
 export class StatusBarManager {
 	private plugin: Plugin;
 	private statusBarEl: HTMLElement | null = null;
-	private enabled: boolean;
-	private syncProgress: { current: number; total: number } | null = null;
-	private work: SyncState['work'];
+	private enabled = false;
 	private indicatorRoot: Root | null = null;
 	private iconEl: HTMLSpanElement | null = null;
 	private onClick: (() => void) | null;
@@ -32,14 +30,9 @@ export class StatusBarManager {
 		}
 	};
 
-	constructor(plugin: Plugin, enabled: boolean, onClick?: () => void) {
+	constructor(plugin: Plugin, onClick?: () => void) {
 		this.plugin = plugin;
-		this.enabled = enabled;
 		this.onClick = onClick ?? null;
-
-		if (enabled) {
-			this.create();
-		}
 	}
 
 	/**
@@ -75,28 +68,12 @@ export class StatusBarManager {
 	}
 
 	/**
-	 * Set progress for the active sync; the next syncing update renders it
+	 * Update status display; progress counts show while syncing without a named phase
 	 */
-	setSyncProgress(current: number, total: number): void {
-		this.syncProgress = { current, total };
-	}
-
-	/**
-	 * Clear sync progress
-	 */
-	clearSyncProgress(): void {
-		this.syncProgress = null;
-	}
-
-	/**
-	 * Update status display
-	 */
-	update(state: SyncState): void {
-		if (state.status !== 'syncing') this.syncProgress = null;
-		this.work = state.status === 'syncing' ? state.work : undefined;
+	update(state: SyncState, progress: SyncActivityProgress | null = null): void {
 		if (!this.statusBarEl) return;
 
-		const { text, tooltip } = this.getDisplayInfo(state);
+		const { text, tooltip } = this.getDisplayInfo(state, progress);
 		if (!this.iconEl) {
 			this.statusBarEl.empty();
 			this.iconEl = this.statusBarEl.createSpan({ cls: 'crate-status-indicator-host' });
@@ -116,7 +93,7 @@ export class StatusBarManager {
 	/**
 	 * Get display information for state
 	 */
-	private getDisplayInfo(state: SyncState): { text: string; tooltip: string | null } {
+	private getDisplayInfo(state: SyncState, progress: SyncActivityProgress | null): { text: string; tooltip: string | null } {
 		if (state.status === 'idle' && state.conflictCount > 0) {
 			return {
 				text: state.conflictCount === 1 ? '1 conflict' : `${state.conflictCount} conflicts`,
@@ -129,7 +106,7 @@ export class StatusBarManager {
 			case 'syncing':
 				return {
 					// The status bar has no progress panel, so it names the current phase.
-					text: this.work?.phase === 'applying' ? status.text : formatSyncProgress(!this.work && this.syncProgress ? { type: 'sync', ...this.syncProgress } : null, this.work),
+					text: state.work?.phase === 'applying' ? status.text : formatSyncProgress(state.work ? null : progress, state.work),
 					tooltip: 'Comparing and syncing changes. Unchanged files are skipped. Open sync activity for details.',
 				};
 
