@@ -1,22 +1,10 @@
 import { corsResponse } from './cors';
 import { requestAdmissionKind } from './routes/admission';
+import { rateLimitedActions } from './routes/policy';
 import { admitLocally, authenticatedAdmissionKey } from './auth/admission-state';
 import { sha256Hex } from '../../platform/sha256';
 
 export interface NotificationRateLimiter { limit(input: { key: string }): Promise<{ success: boolean }> }
-export const rateLimitedActions: ReadonlyMap<string, number> = new Map([
-  ['POST /reading/shortcut-pairing', 5], ['POST /reading/shortcut/v1/exchange', 10],
-  ['POST /notifications/share/reading', 30],
-  ['POST /reading/handoff', 30],
-  ['POST /reading/shortcut/v1/prepare', 30], ['POST /reading/capture', 30],
-  ['POST /reading/update', 60], ['POST /reading/retry', 10],
-  ['POST /reading/policy', 10], ['POST /features', 10],
-	['POST /notifications/reminders-exchange', 10],
-	['POST /notifications/reminders-enrollment-token', 10],
-	['POST /notifications/subscribe', 30],
-	['DELETE /notifications/subscribe', 30],
-	['POST /notifications/test', 3],
-]);
 const denied = () => corsResponse({ error: 'Too many requests. Try again in a minute.' }, 429, { 'Retry-After': '60' });
 
 export async function limitNotificationRequest(request: Request, db: D1Database, limiter?: NotificationRateLimiter): Promise<Response | null> {

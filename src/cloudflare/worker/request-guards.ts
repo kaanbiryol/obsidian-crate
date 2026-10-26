@@ -3,6 +3,7 @@ import type { EncryptionServerState } from '../../encryption/server-state';
 import { corsResponse } from './cors';
 import { EncryptionStateError, hasEncryptionAuthority } from './encryption/state';
 import { shortcutCompatibility, shortcutTransport, type ShortcutTransport } from './reading/shortcut-transport';
+import { ENCRYPTION_RESET_PATHS, KEYLESS_ENCRYPTED_READ_PATHS } from './routes/policy';
 
 /** Runs after admission, before public grants or authenticated route handling. */
 export function checkRequestProtocol(request: Request, shortcut: ShortcutTransport | null): Response | null {
@@ -18,11 +19,6 @@ export function checkRequestProtocol(request: Request, shortcut: ShortcutTranspo
 	}
 	return null;
 }
-
-/** Routes that remain available while an encryption reset is in progress. */
-export const ENCRYPTION_RESET_PATHS: readonly string[] = ['/encryption/reset', '/encryption', '/health'];
-/** Feature visibility is authenticated public policy, not private vault content. */
-export const KEYLESS_ENCRYPTED_READ_PATHS: readonly string[] = ['/features', '/reading/encryption', '/reading/session'];
 
 /** Uses freshly authenticated state before any forwarding or route dispatch. */
 export function assertRequestEncryption(request: Request, encryption: EncryptionServerState | null): void {
