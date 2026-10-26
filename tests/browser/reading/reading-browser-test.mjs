@@ -894,9 +894,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const readingUrl = await readingAppUrl();
     browser = await engine.launch({ headless: true });
-    // Linux WebKit stalls a desktop page while this service worker installs
-    // (the page stops answering and nothing is busy). Layout needs no offline shell.
-    const page = await browser.newPage({ viewport: { width: 1280, height: 844 }, serviceWorkers: 'block' });
+    const page = await browser.newPage({ viewport: { width: 1280, height: 844 } });
+    // Playwright's Linux WebKit freezes the page in PushManager.getSubscription(),
+    // even for a bare service worker. Desktop startup checks push; iPhone pages do not.
+    if (name === 'webkit' && process.platform === 'linux') await page.addInitScript(() => { PushManager.prototype.getSubscription = async () => null; });
     await page.goto(readingUrl);
     await expect(page.getByRole('heading', { name: 'Save something worth your time' })).toBeVisible();
     for (const width of [1280, 900, 390]) {
