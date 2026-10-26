@@ -3,7 +3,8 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: [master]
-    paths:
+    # Pull requests reuse this list below.
+    paths: &site-paths
       - "site/**"
       - "docs-site/**"
       - "docs/**"
@@ -39,41 +40,7 @@ on:
       - "docs/shortcuts/save-to-crate.plist"
       - "tests/fixtures/reading-shortcut-v1.plist"
   pull_request:
-    paths:
-      - "site/**"
-      - "docs-site/**"
-      - "docs/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".nvmrc"
-      - ".github/workflows/pages.yml"
-      - "scripts/download-release-shortcut.mjs"
-      - "scripts/shortcut-release.mjs"
-      - "scripts/shortcut-release.test.mjs"
-      - "scripts/shortcut-install-page.mjs"
-      - "scripts/sign-reading-shortcut.mjs"
-      - "scripts/reading-shortcut-first-run.mjs"
-      - "scripts/reading-shortcut.test.mjs"
-      - "scripts/reading-shortcut-template.mjs"
-      - "tests/browser/support/reading-shortcut-fixture.mjs"
-      - "scripts/build-shortcut-support.mjs"
-      - "scripts/raw-text-plugin.mjs"
-      - "scripts/build-site-images.mjs"
-      - "scripts/site-deployment.mjs"
-      - "scripts/site-deployment.test.mjs"
-      - "scripts/build-changelog.mjs"
-      - "scripts/build-changelog.test.mjs"
-      - "src/reading/shortcut-contract.json"
-      - "src/reading/shortcut.ts"
-      - "src/cloudflare/server-release.json"
-      - "src/cloudflare/worker/reading/save-page.ts"
-      - "src/cloudflare/worker/reading/save-client.ts"
-      - "src/platform/validation.ts"
-      - "src/protocol/server-build.ts"
-      - "src/protocol/server-info.ts"
-      - "src/pwa/shell/version.ts"
-      - "docs/shortcuts/save-to-crate.plist"
-      - "tests/fixtures/reading-shortcut-v1.plist"
+    paths: *site-paths
   release:
     types: [published]
   workflow_dispatch:
@@ -96,6 +63,7 @@ jobs:
     # The shortcut template's plutil check skips here and runs in the macOS visual job;
     # signing runs only on the maintainer’s Mac.
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       deploy: ${{ steps.website.outputs.deploy }}
     steps:
@@ -159,6 +127,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

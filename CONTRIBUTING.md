@@ -47,15 +47,23 @@ Keep shared reminder rules in shared modules so plugin, PWA predictions and Work
 
 ## Checks and pull requests
 
-Run focused tests while developing, then the release gate before requesting merge:
+Run focused tests while developing ([testing guide](docs/testing.md#suites-and-commands) lists each suite), then broad validation before requesting merge:
+
+```sh
+npm run check
+```
+
+It runs lint, the plugin, Worker and service-worker type-checks, dead-code and license-notice checks, contract docs, tooling and recovery tests, unit tests, and the Worker-runtime and local server suites. The pull request then runs the full verification, including browser, Docker and visual suites, in CI.
+
+For shared UI changes also run `npm run typecheck:visual` and, on macOS, `npm run test:visual`; the reviewed baselines are macOS screenshots. Review any intended screenshot changes; do not replace baselines just to make a failing comparison pass. Complete the relevant clean-vault smoke tests from the testing guide. Local tests do not substitute for the [public-release acceptance checks](docs/testing.md#public-release-acceptance).
+
+To reproduce a CI failure locally, run the release gate:
 
 ```sh
 npm run release:check
 ```
 
-The gate includes the npm advisory audit, pinned Gitleaks history/current-source scan, lint, both TypeScript targets, dead-code checks, license notices, Python recovery tests, unit and actual Worker-runtime tests, production artifacts, bundle budgets, and Chromium/WebKit PWA checks. The security checks require network access and fail on unavailable or incomplete results. The full release gate is supported on macOS/Linux x64/arm64; those are the platforms covered by the checksum-pinned scanner.
-
-For shared UI changes also run `npm run typecheck:visual` and `npm run test:visual`. Review any intended screenshot changes; do not replace baselines just to make a failing comparison pass. Complete the relevant clean-vault smoke tests from the testing guide. Local tests do not substitute for the [public-release acceptance checks](docs/testing.md#public-release-acceptance).
+The gate includes the npm advisory audit, pinned Gitleaks history/current-source scan, lint, all TypeScript targets, dead-code checks, license notices, Python recovery tests, unit and actual Worker-runtime tests, production artifacts, bundle budgets, visual comparisons and Chromium/WebKit PWA checks. The security checks require network access and fail on unavailable or incomplete results. The checksum-pinned scanner supports macOS and Linux on x64 and arm64, and the visual comparisons need macOS.
 
 Keep PRs focused, explain behavior and recovery implications, and state what was actually tested. Follow `AGENTS.md`: use lowercase Conventional Commits (`fix`, `feat`, `chore`, `refactor`, `perf`, `build`, or `ci`); use `ios`/`android` scopes only for platform-specific changes; omit coauthor trailers. Do not commit `node_modules/`, `.generated/`, `dist/`, vault settings or built release files.
 

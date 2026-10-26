@@ -60,6 +60,8 @@ plugin** without waiting for the release branch's own push build. Without either
 run it runs the complete verification suite.
 
 For the fastest release, prepare it from a commit whose push build already passed.
+Push builds run only for `master` and `release/**`, so that is usually a green `master`
+commit; other branches are verified through their pull requests.
 
 Reused assets retain their original candidate record, commit, workflow identity,
 toolchain and checksums. Security and server-revision checks run again, the current

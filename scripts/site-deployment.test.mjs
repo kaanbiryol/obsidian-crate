@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { mkdtemp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { parse } from 'yaml';
 import { deploymentFile, prepareSiteDeployment, siteFingerprint } from './site-deployment.mjs';
 
 async function fixture(t) {
@@ -13,6 +14,13 @@ async function fixture(t) {
 }
 const options = directory => ({ directory, previousUrl: 'https://example.invalid/deployment.json', commit: 'release-commit' });
 const response = fingerprint => Response.json({ format: 1, fingerprint, commit: 'previous-commit' });
+
+test('pull requests build the site for the same paths as pushes to master', async () => {
+	const workflow = parse(await readFile(new URL('../.github/workflows/pages.yml', import.meta.url), 'utf8'));
+	assert.deepEqual(workflow.on.push.branches, ['master']);
+	assert.ok(workflow.on.push.paths.includes('site/**'));
+	assert.deepEqual(workflow.on.pull_request, { paths: workflow.on.push.paths });
+});
 
 test('unchanged built content skips deployment even when commit and metadata change', async t => {
   const directory = await fixture(t);
