@@ -20,13 +20,11 @@ import { compareProjects } from "@/reminders/core/reminder-list";
 import { createLogger } from "@/reminders/logger";
 import type { IndexedReminder } from "./reminder-index";
 import { addReminderIdentityOwners, releaseReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
-import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from './vault-markdown';
+import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from '@/sync/local/vault-markdown';
 import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
 import { isConflictFile } from '@/sync/conflict/conflict';
 
 const log = createLogger('VaultScanner');
-
-export { getProjectFromPath } from "@/reminders/core/markdownScan";
 
 export interface ScanResult {
 	reminders: IndexedReminder[];
@@ -132,7 +130,7 @@ export async function scanFile(
 	if (signal?.aborted || isConflictFile(filePath)) return cancelled;
 
 	try {
-		const originalContent = preread ?? await readVaultMarkdown(app, file);
+		const originalContent = preread ?? await readVaultMarkdown(app.vault, file);
 		if (signal?.aborted) return cancelled;
 		// Schedule normalization and the scan below parse the same unchanged lines.
 		const parses = createPersistedCheckboxParses();
@@ -152,7 +150,7 @@ export async function scanFile(
 		if (normalized.remindersUpdated > 0) {
 			let remindersUpdated = 0;
 			let targetChanged = false;
-			const content = await processVaultMarkdown(app, file, (currentContent) => {
+			const content = await processVaultMarkdown(app.vault, file, (currentContent) => {
 				// Ownership was verified for the identifiers in the original bytes.
 				// Retry with new evidence if a concurrent edit changes the target.
 				if (ownership && currentContent !== originalContent) {

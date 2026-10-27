@@ -13,6 +13,8 @@ import { ReminderCacheNotice } from './notices/ReminderCacheNotice';
 import { ReminderSourceNotice } from './notices/ReminderSourceNotice';
 import { ReminderRecoveryNotices } from './notices/ReminderRecoveryNotices';
 import { ReminderSyncNotice } from './notices/ReminderSyncNotice';
+import { PwaNotice } from '../components/PwaNotice';
+import { PwaButton } from '../components/PwaButton';
 import { WebReminderCard } from './WebReminderCard';
 
 // Keep the editor ready for the tap's synchronous focus/keyboard activation.
@@ -26,7 +28,7 @@ export function RemindersApp() {
 	const { preferences } = usePwaPreferences();
 	const active = useContext(FeatureNavigationContext)?.active !== false;
 	const { connection, sync, mutations, editor, status, presentation, enablePushNotifications } = useRemindersRuntime();
-	const { authToken, bootstrapped, config, selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId } = connection;
+	const { authToken, bootstrapped, config, selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId, unavailableMessage } = connection;
 	const { loading, refreshing, error, issues, dataMode, isOffline, loadReminders, rebuildOfflineCache } = sync;
 	const {
 		toggleReminderCompleted, persistReorder, visibleReminders, visibleProjects, changes,
@@ -124,6 +126,9 @@ export function RemindersApp() {
 							showNotificationPrompt={canShowNotificationPrompt && !isProjectDetail}
 							onEnableNotifications={enablePushNotifications}
 						>
+							{unavailableMessage && <PwaNotice title="Unable to connect" aria-label="Unable to connect" actions={
+								<PwaButton variant="ghost" size="touch" type="button" disabled={refreshing} onClick={() => { void handlePullRefresh(); }}>Try again</PwaButton>
+							}><span role="status">{unavailableMessage}</span></PwaNotice>}
 							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
 							<ReminderCacheNotice isOffline={isOffline} onRebuild={rebuildOfflineCache} />
 							{(changes.some(change => change.status !== 'pending') || storageError) && <ReminderSyncNotice

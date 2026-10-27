@@ -48,7 +48,7 @@ describe("loadRemindersListData", () => {
 			makeReminder({ id: "overdue", dueDate: "2026-01-08" }),
 			makeReminder({ id: "completed-today", completed: true, dueDate: "2026-01-10" }),
 		];
-		const loaded = await loadRemindersListData({
+		const loaded = loadRemindersListData({
 			repository: createRepository({
 				getTodayReminders: () => todayReminders,
 			}),
@@ -65,7 +65,7 @@ describe("loadRemindersListData", () => {
 		vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
 
 		const upcomingReminder = makeReminder({ id: "upcoming", dueDate: "2026-01-12" });
-		const loaded = await loadRemindersListData({
+		const loaded = loadRemindersListData({
 			repository: createRepository({
 				getActive: () => [upcomingReminder],
 			}),
@@ -83,7 +83,7 @@ describe("loadRemindersListData", () => {
 
 		const open = makeReminder({ id: "open", dueDate: "2026-01-12" });
 		const done = makeReminder({ id: "done", completed: true, dueDate: "2026-01-11" });
-		const loaded = await loadRemindersListData({
+		const loaded = loadRemindersListData({
 			repository: createRepository({ getAll: () => [open, done] }),
 			showUpcoming: true,
 			showCompleted: true,

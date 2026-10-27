@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BatchUploadFile } from '../../protocol/sync-types';
 import type { PreparedUpload } from '../types';
-import { HttpError } from '../worker-api/client';
+import { HttpError, SyncTransportError } from '../worker-api/client';
+import { runConcurrentTasks } from '../concurrency';
+import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { uploadPreparedFiles } from './upload';
 import { BATCH_UPLOAD_CONCURRENCY } from './constants';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';
@@ -196,4 +198,28 @@ it('limits batch concurrency and reports every completed file', async () => {
 	expect(result.uploaded).toBe(15);
 	expect(result.errors).toEqual([]);
 	expect(onProcessed.mock.calls.map(([count]) => count)).toEqual([3, 3, 3, 3, 3]);
+});
+
+it.each([
+	['a timeout', () => new SyncTransportError('Request timed out after 120000ms')],
+	['revoked access', () => new HttpError('Unauthorized', 401)],
+	['rate limiting', () => new HttpError('Too many requests', 429, 30_000)],
+])('fails the remaining uploads without sending them after a batch fails with %s', async (_name, error) => {
+	const harness = createTransferHarness();
+	harness.api.batchUpload.mockRejectedValue(error());
+	const onProcessed = vi.fn<(count: number) => void>();
+	const onFailure = vi.fn();
+	const prepared = [
+		...Array.from({ length: 15 }, (_, index) => ({ path: `file-${index}.md`, content: new ArrayBuffer(1), hash: 'h', size: 1 })),
+		{ path: 'large.bin', content: new ArrayBuffer(1), hash: 'h', size: BATCH_FILE_SIZE_LIMIT },
+	];
+	const result = emptyResult();
+	const runConcurrent = <T>(tasks: Array<() => Promise<T>>, concurrency: number) => runConcurrentTasks(tasks, concurrency, () => false);
+	await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { retry: false, onProcessed, onFailure });
+	// Only the batches already in flight were sent.
+	expect(harness.api.batchUpload).toHaveBeenCalledTimes(BATCH_UPLOAD_CONCURRENCY);
+	expect(harness.api.uploadFile).not.toHaveBeenCalled();
+	expect(result.errors).toHaveLength(16);
+	expect(onFailure).toHaveBeenCalledTimes(16);
+	expect(onProcessed.mock.calls.reduce((total, [count]) => total + count, 0)).toBe(16);
 });

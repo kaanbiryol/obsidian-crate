@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildDiff, groupDiffContext } from './diff-model';
+import { buildDiff, countDiff, groupDiffContext } from './diff-model';
 
 describe('diff presentation', () => {
 	it('numbers before and after independently through multiple edits', () => {
@@ -81,4 +81,17 @@ it('highlights replacement phrases without losing whitespace or punctuation', ()
 	const diff = buildDiff('- Morning walk.', '- Sleep.');
 	expect(diff.lines.map(line => line.words?.map(word => word.text).join(''))).toEqual(['- Morning walk.', '- Sleep.']);
 	expect(diff.lines.map(line => line.words?.filter(word => word.changed).map(word => word.text).join(''))).toEqual(['Morning walk', 'Sleep']);
+});
+
+it('counts the same added and removed lines as the rendered diff', () => {
+	const many = Array.from({ length: 1_100 }, (_, i) => `line ${i}`);
+	const pairs: Array<[string, string]> = [
+		['a\nb\nc\nd', 'a\nx\ny\nc'], ['', 'hello'], ['hello', ''], ['hello', 'hello\n'], ['', ''],
+		['red\nblue\nred\nblue', 'blue\nred\nblue\nred'], ['- Morning walk.', '- Sleep.'],
+		['a\n'.repeat(4_001), ''], [many.join('\n'), many.map(line => `${line}!`).join('\n')],
+	];
+	for (const [before, after] of pairs) {
+		const { added, removed, limited } = buildDiff(before, after);
+		expect(countDiff(before, after)).toEqual({ added, removed, limited });
+	}
 });

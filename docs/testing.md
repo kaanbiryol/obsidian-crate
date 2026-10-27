@@ -17,7 +17,7 @@ Scripts in `package.json` are the source of truth. [Framework and Config](#frame
 | Server revision | `npm run test:server-revision` and `npm run check:server-revision` | The second checks the server revision and schema against the published release baseline; it needs Git history and `gh`, so it runs beside `check:source` in CI and `release:check` rather than inside it. |
 | Recovery tooling | `npm run test:recovery` | Python `unittest`. |
 | Contract docs | `npm run check:contracts` | Rejects stale values in `current-contract.md`; `node scripts/check-contract-docs.mjs --write` refreshes them. |
-| Static checks | `npm run lint`, `typecheck`, `typecheck:worker`, `typecheck:service-worker`, `typecheck:visual`, `deadcode`, `notices:check` | Run each as `npm run <name>`. |
+| Static checks | `npm run lint`, `typecheck`, `typecheck:worker`, `typecheck:service-worker`, `typecheck:visual`, `deadcode`, `notices:check` | Run each as `npm run <name>`. The type-checks keep incremental state in the ignored `.generated/tsc/`. |
 | Source checks | `npm run check:source` | Builds the Worker, then runs lint, the plugin, Worker and service-worker type-checks, `deadcode`, `notices:check`, `check:contracts`, `test:ci`, `test:server-revision`, `test:recovery` and `npm test`. |
 | Everything except browsers | `npm run check` | `check:source`, then `test:worker-runtime` and `test:local-server`. |
 | PWA preview smoke test | `npm run test:pwa-preview` | Smoke test of the built PWA preview and its asset budgets. |
@@ -32,7 +32,7 @@ Scripts in `package.json` are the source of truth. [Framework and Config](#frame
 
 ## Where suites run
 
-Pushes to any branch and pull requests run `lint.yml` ("Node.js build"), and the **Release plugin** workflow runs the same reusable `verify.yml` for a release commit. New commits cancel obsolete branch runs. `npm run release:check` is the local alternative for the whole gate.
+Pull requests and pushes to `master` and `release/**` run `lint.yml` ("Node.js build"), so each pull request commit is verified once. A branch without a pull request runs only through a manual dispatch. The **Release plugin** workflow runs the same reusable `verify.yml` for a release commit. New commits cancel obsolete branch runs. `npm run release:check` is the local alternative for the whole gate.
 
 | `verify.yml` job | Runner | What it runs |
 | --- | --- | --- |

@@ -1,6 +1,7 @@
 import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { buildDiff } from './diff-model';
 import { renderDiffLines } from './diff-renderer';
+import { formatSize } from '../shared/format';
 
 export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff, path: string, header: HTMLElement): void {
 	if (snapshot.unavailable || snapshot.before === undefined || snapshot.after === undefined) {
@@ -25,8 +26,4 @@ export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff,
 		stats.createSpan({ text: `−${diff.removed}`, cls: 'is-removed' });
 		renderDiffLines(container, diff.lines, `Changes for ${path}`);
 	}
-}
-
-function formatSize(size: number): string {
-	return size < 1_000 ? `${size} B` : `${Math.round(size / 1_000)} KB`;
 }

@@ -60,7 +60,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
 	setSyncReady(plugin, syncReady);
 	registerSharedFeatures(plugin);
 	showCloudflareServerUpdateNotice(plugin);
-	registerPluginCommands(plugin);
+	registerSyncCommands(plugin);
 	registerPluginProtocols(plugin);
 	void reconcileNotificationsAfterStartupSync(plugin, signal, syncReady);
 }
@@ -119,8 +119,6 @@ async function initializePluginSync(plugin: CratePlugin, signal: AbortSignal): P
 			await plugin.syncRuntime.initialize();
 			// The API client exists only now, so the pull during onload could not reach the server.
 			if (!signal.aborted) void sharedSettingsSync(plugin).pull();
-		} else {
-			showSetupNotice(plugin);
 		}
 	} catch (error) {
 		if (signal.aborted) return;
@@ -150,10 +148,6 @@ async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin, signa
 	}
 }
 
-function registerPluginCommands(plugin: CratePlugin): void {
-	registerSyncCommands(plugin);
-}
-
 function registerPluginProtocols(plugin: CratePlugin): void {
 	plugin.registerObsidianProtocolHandler("crate-cloudflare-oauth", (params) => {
 		void handleCloudflareOAuthProtocol(plugin, params);
@@ -180,15 +174,4 @@ async function initializePluginReminders(plugin: CratePlugin, signal: AbortSigna
 		logger.error("Reminders initialization failed:", message);
 		new Notice(`Reminders failed to initialize: ${message}`);
 	}
-}
-
-function showSetupNotice(plugin: CratePlugin): void {
-	const fragment = new DocumentFragment();
-	fragment.createSpan({ text: "Crate is not configured. " });
-	const link = fragment.createEl("a", { text: "Open settings" });
-	link.addEventListener("click", () => {
-		plugin.openSettingsTab();
-	});
-	fragment.createSpan({ text: " to set up sync." });
-	new Notice(fragment, 10000);
 }

@@ -1,5 +1,5 @@
 import { EncryptionKeyRequiredError, rememberEncryptionUnlock } from '../encryption/encryption-onboarding';
-import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../connection/encryption';
+import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError, ENCRYPTION_CHECK_TIMEOUT_MS } from '../connection/encryption';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from './private-storage';
@@ -11,7 +11,7 @@ import { unlockLocalState } from '../encryption/encryption-keys';
 import { rememberRecoveryKey } from '../encryption/web-app-unlock';
 
 type EncryptionView = { status: 'checking' | 'unencrypted' } | { status: 'ready'; folderPath: string }
-	| { status: 'locked'; message: string; converting: boolean; setupRequired: boolean; unavailable: boolean };
+	| { status: 'locked'; message: string; converting: boolean; setupRequired: boolean; unavailable: boolean; offlineCopy: boolean };
 let view: EncryptionView = { status: 'checking' };
 const listeners = new Set<() => void>();
 let pending: { token: string; promise: Promise<FeatureKeys | null> } | undefined;
@@ -43,7 +43,7 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 	// startup and reset already publish checking; changing it here races push
 	// provider selection against an ordinary concurrent reminder-list request.
 	const work = (async () => {
-		const verified = await loadEncryptionState({ token, purpose: 'reminders', fragment: fragmentCode, request: () => rawFetch('/encryption'), current });
+		const verified = await loadEncryptionState({ token, purpose: 'reminders', fragment: fragmentCode, request: () => rawFetch('/encryption', { signal: AbortSignal.timeout(ENCRYPTION_CHECK_TIMEOUT_MS) }), current });
 		const expected = verified?.state;
 		if (!verified || !expected) {
 			useUnencryptedStorage();
@@ -69,7 +69,9 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 		// Unlike Reading, which keeps a verified session's access when verification is only
 		// unavailable, any failed check locks reminders until a check succeeds.
 		// An unavailable check shows a connection error, not the recovery-key card.
-		if (current()) { requirePrivateStorageUnlock(); publish({ status: 'locked', message: error instanceof Error ? error.message : String(error), converting: !!state && state.mode !== 'active', setupRequired: error instanceof EncryptionKeyRequiredError && error.firstUnlock, unavailable: error instanceof EncryptionVerificationUnavailableError }); }
+		// Without encryption evidence the plaintext offline copy stays visible, read-only.
+		const unavailable = error instanceof EncryptionVerificationUnavailableError ? error : null;
+		if (current()) { requirePrivateStorageUnlock(); publish({ status: 'locked', message: error instanceof Error ? error.message : String(error), converting: !!state && state.mode !== 'active', setupRequired: error instanceof EncryptionKeyRequiredError && error.firstUnlock, unavailable: !!unavailable, offlineCopy: !!unavailable?.offlineCopy }); }
 		throw error;
 	});
 	pending = { token, promise: work };

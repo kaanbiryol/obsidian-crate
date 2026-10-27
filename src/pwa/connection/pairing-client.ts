@@ -5,6 +5,7 @@ import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
 import { READING_SESSION_KEY, readingSession } from '../reading/session/session';
 import { capturePwaSession } from './session-generation';
 import { reportExpiredConnection } from './expiration';
+import { responseError } from './response-error';
 
 export function pairingConnection(feature: 'reading' | 'reminders', signal: AbortSignal) {
 	const reading = readingSession();
@@ -25,9 +26,8 @@ export function pairingConnection(feature: 'reading' | 'reminders', signal: Abor
 			headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) }, ...(body ? { body: JSON.stringify(body) } : {}) });
 		current();
 		if (response.status === 401) reportExpiredConnection(token!);
-		const data = await response.json() as T & { error?: string };
-		if (!response.ok) throw Object.assign(new Error(data.error ?? 'Could not connect. Try again.'), { status: response.status });
-		return data;
+		if (!response.ok) throw Object.assign(new Error((await responseError(response, 'Could not connect. Try again.')).message), { status: response.status });
+		return await response.json() as T;
 	}
 	const transport: PairingTransport = {
 		read: id => request(`${PAIRING_PATH}${id ? `?id=${encodeURIComponent(id)}` : ''}`),

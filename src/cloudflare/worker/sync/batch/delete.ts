@@ -82,7 +82,7 @@ export async function handleBatchDelete(
 	let metadataFailure = false;
 	for (const file of validFiles) {
 		try {
-			const commit = await commitFileDelete(bucket, db, {
+			const commit = await commitFileDelete(db, {
 				path: file.path,
 				expectedHash: file.expectedHash,
 				expectedRevision: file.expectedRevision,

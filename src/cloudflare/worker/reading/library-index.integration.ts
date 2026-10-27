@@ -92,7 +92,7 @@ it('indexes edits, new notes, moves and deletions in their commits without readi
 	await writeCommittedMarkdownMove(env.BUCKET, env.DB, { source: { path: 'Reading/B.md', expectedHash: added.file.hash, expectedRevision: added.file.storageKey },
 		destination: { path: 'Archive/B.md', content: added.note } });
 	const current = (await getStoredFileRow(env.DB, 'Reading/A.md'))!;
-	await commitFileDelete(env.BUCKET, env.DB, { path: 'Reading/A.md', previousFile: current, expectedHash: current.hash, expectedRevision: current.storageKey });
+	await commitFileDelete(env.DB, { path: 'Reading/A.md', previousFile: current, expectedHash: current.hash, expectedRevision: current.storageKey });
 	expect(await (await list()).json()).toMatchObject({ items: [], issues: [] });
 	expect(await env.DB.prepare('SELECT count(*) AS n FROM reading_items').first()).toMatchObject({ n: 0 });
 	expect(read).not.toHaveBeenCalled();
@@ -105,7 +105,7 @@ it('flags duplicate Reading IDs when the second copy commits and clears them whe
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/B.md', note, null);
 	expect(await (await list()).json()).toMatchObject({ items: [], issues: [{ path: 'Reading/A.md' }, { path: 'Reading/B.md' }] });
 	const copy = (await getStoredFileRow(env.DB, 'Reading/B.md'))!;
-	await commitFileDelete(env.BUCKET, env.DB, { path: 'Reading/B.md', previousFile: copy, expectedHash: copy.hash, expectedRevision: copy.storageKey });
+	await commitFileDelete(env.DB, { path: 'Reading/B.md', previousFile: copy, expectedHash: copy.hash, expectedRevision: copy.storageKey });
 	expect(await (await list()).json()).toMatchObject({ items: [{ path: 'Reading/A.md' }], issues: [] });
 });
 

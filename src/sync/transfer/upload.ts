@@ -9,7 +9,7 @@ import type { PreparedUpload, SyncResult } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import type { VaultFile } from "../local/file-discovery";
-import { isVersionConflict } from '../failures';
+import { isAuthError, isTransientSyncFailure, isVersionConflict } from '../failures';
 import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from './constants';
 import { HttpError } from '../worker-api/http';
 
@@ -56,10 +56,19 @@ export async function uploadPreparedFiles(
 	const batchable = prepared.filter((file) => file.size < BATCH_FILE_SIZE_LIMIT);
 	const individual = prepared.filter((file) => file.size >= BATCH_FILE_SIZE_LIMIT);
 	const versionConflictPaths = new Set<string>();
+	let stopped: unknown;
+	const failUploads = (failed: readonly PreparedUpload[], error: unknown) => {
+		for (const upload of failed) recordUploadError(result, error, upload.path, options);
+	};
 
 	if (batchable.length > 0) {
 		const chunks = createBatchUploadChunks(batchable);
 		const batchTasks = chunks.map((chunk) => async () => {
+			if (stopped !== undefined) {
+				failUploads(chunk, stopped);
+				options.onProcessed?.(chunk.length);
+				return;
+			}
 			try {
 				const files: BatchUploadFile[] = chunk.map((upload) => ({
 					path: upload.path,
@@ -100,9 +109,10 @@ export async function uploadPreparedFiles(
 				}
 			} catch (error) {
 				if (isAbortError(error)) throw error;
-				for (const upload of chunk) {
-					recordUploadError(result, error, upload.path, options);
-				}
+				// A timeout, busy server or revoked access fails every later request the same
+				// way, so the remaining uploads fail without being sent, as delete batches do.
+				if (isTransientSyncFailure(error) || isAuthError(error)) stopped = error;
+				failUploads(chunk, error);
 			}
 			options.onProcessed?.(chunk.length);
 		});
@@ -110,7 +120,10 @@ export async function uploadPreparedFiles(
 		await context.runConcurrent(batchTasks, BATCH_UPLOAD_CONCURRENCY);
 	}
 
-	if (individual.length > 0) {
+	if (individual.length > 0 && stopped !== undefined) {
+		failUploads(individual, stopped);
+		options.onProcessed?.(individual.length);
+	} else if (individual.length > 0) {
 		const individualConflicts = await uploadPreparedFilesIndividually(context, individual, result, options);
 		for (const path of individualConflicts) versionConflictPaths.add(path);
 	}

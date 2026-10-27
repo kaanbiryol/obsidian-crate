@@ -234,8 +234,12 @@ protocol and encryption checks; the handler retains their ordering around
 admission, authentication, scope authorization and route dispatch. Transfer
 requests authenticate again after entering the queue. Coordinator routes are
 forwarded after edge admission and authenticate once, inside the coordinator,
-under the lock that every token revocation also takes; the edge remembers a
-credential the coordinator accepted for admission. The encrypted shortcut capture
+under the lock that device, session and reset revocations also take; the edge
+remembers a credential the coordinator accepted for admission. Two revocations run
+outside that lock: a web app enrollment exchange revokes the credential it replaces
+at the edge, and maintenance prunes expired tokens. A push subscription is therefore
+saved only while its owner token exists, and maintenance removes subscriptions
+whose owner is gone. The encrypted shortcut capture
 still authenticates at the edge, where it downloads the page. Coordinator execution
 receives the Durable Object state and persists notification wakes before mutations.
 The handler selects required `UploadCommitters` from that execution kind and passes
@@ -333,7 +337,9 @@ and settings actions; already dispatched operations can still settle safely.
 credential changes, service-worker registration and logout. Reading connects with
 the existing app credential after enrollment completes. `AppConnectionGate` presents
 one unlock/reconnect surface above the feature screens; a failure confined to one
-feature still allows opening the other. Scope-specific encryption adapters share
+feature still allows opening the other. When the startup encryption check gets no
+answer on a device without encryption evidence, both features show their plaintext
+offline copy read-only under an **Unable to connect** notice; writes stay locked. Scope-specific encryption adapters share
 verification and key-import policy through `connection/encryption.ts`, retaining
 their local storage migration and cache responsibilities. Expired credentials are
 matched against the current connection before suspension; expiry preserves drafts
@@ -457,7 +463,9 @@ The reminders web app uses a separate short-lived web enrollment token in the `/
 ## Desktop Reading capture
 
 `reading/data/obsidian-vault.ts` binds snapshots to Obsidian file identities and owns
-discovery, guarded reads/writes, and file-event revisions. `reading/runtime.ts`
+discovery, guarded reads/writes, and file-event revisions. Like reminder edits, its reads
+and writes go through `sync/local/vault-markdown.ts`, so a note that is not strict UTF-8
+is listed as an issue instead of being rewritten with replacement characters. `reading/runtime.ts`
 owns configuration, policy refresh, scheduling and lifecycle cleanup.
 `ReadingLibrary.close()` closes admission and drains its accepted mutation and
 capture queues. Runtime shutdown waits for it alongside refreshes;
@@ -519,7 +527,7 @@ The plugin stores these local values through `SecretStorageService`. `platform/s
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.
 
-The service uses Obsidian's official `App.secretStorage` type. Server-scoped keys are stored under a hash of the managed deployment ID, or of the Worker URL for a self-hosted server (`plugin/lifecycle.ts`), so credentials and keys cannot leak between deployments.
+The service uses Obsidian's official `App.secretStorage` type. Server-scoped keys are stored under a hash of the managed deployment ID, or of the Worker URL for a self-hosted server (`plugin/lifecycle.ts`), so credentials and keys cannot leak between deployments. A self-hosted address change copies them into the new address's scope with `forScope()` and verifies them before switching.
 
 `plugin/settings-types.ts` separates persisted settings from the runtime device ID.
 Loading initializes settings before hydrating that ID from secret storage. Sync owns
@@ -683,7 +691,7 @@ Styling driven by `data-status` attribute on the status bar element, which CSS s
 The plugin scans local Markdown for its UI. The server derives notification schedules from committed Markdown, using one shared folder, timezone, all-day time, and enabled flag in `notification_policy`. Startup only initializes an absent policy. Explicit settings edits compare the captured policy revision before updating it.
 
 1. Every Markdown commit records source identities and durable occurrence observations; commits and deletions record a projection job in the same D1 transaction as the file metadata and changelog.
-2. A reserved coordinator Durable Object wakes after successful mutations. Scheduled maintenance recovers missed wakeups. Each alarm verifies at most two source files (one in an encrypted vault) and projects one file; a separate invocation dispatches up to ten notification jobs, five at a time. It rearms while work remains.
+2. A reserved coordinator Durable Object wakes after successful mutations. Scheduled maintenance recovers missed wakeups. Each alarm verifies at most two source files (one in an encrypted vault) and projects one file under the coordinator lock; after releasing it, a separate invocation dispatches up to ten notification jobs, five at a time. It rearms while work remains.
 3. Projection reads and verifies the current immutable R2 object. A conditional D1 batch replaces reminder projections and outbox jobs only while the file revision, policy revision, and projection job token still match.
 4. Each projection publishes its expected notification token and policy revision. The outbox job token becomes the alarm's stable schedule token. Delivery requires all of these to match the current source and policy, closing the gap between projection and outbox application. A durable completed-occurrence receipt prevents accepted-command replay from notifying again; recipient progress survives updates to the same due time.
 5. Web app enrollment produces a folder-bound 90-day session. The authenticated session owns its push subscriptions. Logout captures its revocation request before clearing local state. Recipient selection independently checks expiry and folder authority. Every subscription has a recorded owner.

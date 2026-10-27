@@ -5,7 +5,6 @@ vi.mock('@/reminders/data/vaultScanner', () => ({
 	scanVault: vi.fn(),
 	scanFile: vi.fn(),
 	isInRemindersFolder: vi.fn(),
-	getProjectFromPath: vi.fn(),
 }));
 
 import { createReminderIndex, type IndexedReminder } from '@/reminders/data/reminder-index';
@@ -106,8 +105,6 @@ describe('reminderIndex', () => {
 		};
 
 		vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
-		vi.mocked(vaultScanner.getProjectFromPath)
-			.mockImplementation((path: string) => (path.includes('Old') ? 'Old' : 'New'));
 
 		const index = createReminderIndex(app, 'Reminders');
 		return index.load().then(() => {
@@ -136,8 +133,6 @@ describe('reminderIndex', () => {
 		};
 
 		vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
-		vi.mocked(vaultScanner.getProjectFromPath)
-			.mockImplementation((path: string) => (path.includes('Work') ? 'Work' : 'Home'));
 
 		const index = createReminderIndex(app, 'Reminders');
 		await index.load();
@@ -164,7 +159,6 @@ describe('reminderIndex', () => {
 		};
 
 		vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
-		vi.mocked(vaultScanner.getProjectFromPath).mockReturnValue('Work');
 
 		const index = createReminderIndex(app, 'Reminders');
 		const listener = vi.fn();
@@ -252,7 +246,6 @@ describe('reminderIndex', () => {
 			discoveredProjects: ['Work'],
 		});
 		vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
-		vi.mocked(vaultScanner.getProjectFromPath).mockReturnValue('Work');
 		vi.mocked(vaultScanner.scanFile).mockResolvedValue({
 			filePath: 'Reminders/Work.md',
 			reminders: [
@@ -275,6 +268,32 @@ describe('reminderIndex', () => {
 		expect(index.getAll().map((reminder) => reminder.id)).toEqual(['r1']);
 		expect(index.getById('r1')?.content).toBe('Persisted task');
 		expect(index.getById('r2')).toBeUndefined();
+	});
+
+	it('drops an optimistic create once a renamed note indexes it, and when its note is deleted', async () => {
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+			reminders: [makeReminder({ id: 'r1', filePath: 'Reminders/A.md', project: 'A' })],
+			filesScanned: 1, totalLines: 1, issues: [], scanDurationMs: 5, discoveredProjects: ['A'],
+		});
+		vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
+		vi.mocked(vaultScanner.scanFile).mockResolvedValue({
+			filePath: 'Reminders/B.md',
+			reminders: ['r1', 'r2'].map(id => makeReminder({ id, filePath: 'Reminders/B.md', project: 'B' })),
+			lineCount: 2,
+		});
+		const index = createReminderIndex(app, 'Reminders');
+		await index.load();
+		// The create's own rescan of A is still deferred when the note is renamed.
+		index.applyOptimisticCreate(makeReminder({ id: 'r2', filePath: 'Reminders/A.md', project: 'A' }));
+		index.renameFile('Reminders/A.md', 'Reminders/B.md');
+		await index.rescanFile(makeMockFile('Reminders/B.md'));
+		expect(index.getAll().map(reminder => [reminder.id, reminder.filePath])).toEqual([['r1', 'Reminders/B.md'], ['r2', 'Reminders/B.md']]);
+		expect(index.getById('r2')?.filePath).toBe('Reminders/B.md');
+
+		index.applyOptimisticCreate(makeReminder({ id: 'r3', filePath: 'Reminders/B.md', project: 'B' }));
+		index.removeFile('Reminders/B.md');
+		expect(index.getAll()).toEqual([]);
+		expect(index.getById('r3')).toBeUndefined();
 	});
 
 	it('preserves the last-known-good index when a file rescan fails', async () => {

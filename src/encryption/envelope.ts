@@ -75,7 +75,9 @@ export async function decryptBytes(envelope: string, key: EncryptionKey, context
 	const { plaintext } = await compactDecrypt(envelope, key.key, {
 		keyManagementAlgorithms: ['A256KW'], contentEncryptionAlgorithms: ['A256GCM'],
 	});
-	return new Uint8Array(plaintext);
+	// jose returns WebCrypto's fresh, whole ArrayBuffer (the header check rejects `zip`),
+	// so callers can use `.buffer` without another plaintext-sized copy.
+	return plaintext as Uint8Array<ArrayBuffer>;
 }
 
 export async function encryptJson(value: unknown, key: EncryptionKey, context: EncryptionContext): Promise<string> {

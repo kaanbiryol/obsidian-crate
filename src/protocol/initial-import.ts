@@ -19,6 +19,9 @@ export function importInventoryPages(files: Record<string, { hash: string; size:
 	return pages.length ? pages : [[]];
 }
 
+/** Servers stop each readiness count here, so a count at the cap means at least this many. */
+export const REMINDER_SETUP_PROGRESS_CAP = 1000;
+
 export interface ReminderSetupProgress {
 	scanning: boolean;
 	remainingFiles: number;

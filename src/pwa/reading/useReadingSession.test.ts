@@ -4,7 +4,7 @@ import { renderHook } from '../../test/react-hooks';
 import { useReadingConnection } from './session/useReadingConnection';
 import { useReadingSession } from './useReadingSession';
 import { AUTH_TOKEN_KEY } from '../config';
-import { readReadingCache, readReadingDraft, saveReadingDraft } from './storage/storage';
+import { adoptEarlierReadingCaptures, newestReadingShare, readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, saveReadingDraft } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { connectReadingFromReminders } from './api';
 import { prepareReadingEncryption } from './session/encryption-session';
@@ -19,7 +19,8 @@ vi.mock('./storage/storage', async importOriginal => ({
 	...await importOriginal<typeof import('./storage/storage')>(),
 	readReadingCache: vi.fn(async () => undefined), pendingReading: vi.fn(async () => []),
 	readReadingDraft: vi.fn(async () => undefined), readReadingShare: vi.fn(async () => undefined), hasEarlierReadingChanges: vi.fn(async () => false),
-	saveReadingDraft: vi.fn(async () => {}),
+	saveReadingDraft: vi.fn(async () => {}), removeReadingShare: vi.fn(async () => {}), newestReadingShare: vi.fn(async () => undefined),
+	adoptEarlierReadingCaptures: vi.fn(async () => {}),
 }));
 
 const session: ReadingSession = { token: 'enrolled-token', id: 'enrolled-session', folderPath: 'Reading', generation: 'one', expiresAt: 1 };
@@ -49,7 +50,7 @@ function start() {
 	vi.mocked(connectReadingFromReminders).mockImplementationOnce(async () => {
 		const next = await connected.promise;
 		localStorage.setItem(READING_SESSION_KEY, JSON.stringify(next));
-		return next;
+		return { session: next };
 	});
 	return { rendered: renderSession(), release: connected.resolve };
 }
@@ -124,13 +125,55 @@ describe('Reading session authority', () => {
 		expect(prepareReadingEncryption).toHaveBeenCalledTimes(2);
 	});
 
+	it('hydrates the plaintext offline copy read-only when an unanswered check finds no encryption evidence', async () => {
+		const cache = { items: [], issues: [], savedAt: 5 };
+		// Read once read-only, then again after the check is answered.
+		vi.mocked(readReadingCache).mockResolvedValueOnce(cache).mockResolvedValueOnce(cache);
+		vi.mocked(readReadingDraft).mockResolvedValueOnce({ url: 'https://saved.example/draft' }).mockResolvedValueOnce({ url: 'https://saved.example/draft' });
+		vi.mocked(prepareReadingEncryption).mockRejectedValueOnce(new EncryptionVerificationUnavailableError('Could not verify encryption. Check your connection and retry.', undefined, true));
+		const h = start();
+		await act(async () => { h.release(session); });
+		// Before: an unanswered check hid the saved library behind a full-screen error.
+		expect(h.rendered.current).toMatchObject({ ready: true, session, readOnly: true, lockedSession: session, cache, adding: false, url: '' });
+		expect(saveReadingDraft).not.toHaveBeenCalled();
+		expect(adoptEarlierReadingCaptures).not.toHaveBeenCalled();
+		expect(readReadingShare).not.toHaveBeenCalled();
+		await act(async () => window.dispatchEvent(new window.Event('online')));
+		expect(h.rendered.current).toMatchObject({ session, readOnly: false, lockedSession: null, adding: true, url: 'https://saved.example/draft' });
+		expect(adoptEarlierReadingCaptures).toHaveBeenCalledWith(session);
+	});
+
+	it('copies a shared link into the draft and removes its staged record, so dismissing keeps only the draft', async () => {
+		vi.stubGlobal('location', { hash: '', href: 'https://example.test/notifications?section=reading&share=shared' });
+		vi.mocked(readReadingShare).mockResolvedValueOnce({ url: 'https://shared.example/article' });
+		const h = start();
+		await act(async () => { h.release(session); });
+		expect(h.rendered.current).toMatchObject({ adding: true, url: 'https://shared.example/article' });
+		expect(saveReadingDraft).toHaveBeenCalledWith(session, { url: 'https://shared.example/article' });
+		expect(removeReadingShare).toHaveBeenCalledExactlyOnceWith(session, 'shared');
+		act(() => h.rendered.current.closeCapture());
+		expect(h.rendered.current).toMatchObject({ adding: false, url: 'https://shared.example/article' });
+		expect(newestReadingShare).not.toHaveBeenCalled();
+	});
+
+	it.each([[undefined, true], [{ url: 'https://saved.example/draft' }, false]])('takes the newest staged share after enrollment replaced the link (draft %o)', async (draft, taken) => {
+		vi.mocked(readReadingDraft).mockResolvedValueOnce(draft);
+		vi.mocked(newestReadingShare).mockResolvedValueOnce({ id: 'before-enrollment', url: 'https://shared.example/early' });
+		const h = start();
+		await act(async () => { h.release(session); });
+		expect(h.rendered.current).toMatchObject({ adding: true, url: taken ? 'https://shared.example/early' : 'https://saved.example/draft' });
+		// A draft link is never replaced by a share the user did not just send.
+		expect(newestReadingShare).toHaveBeenCalledTimes(taken ? 1 : 0);
+		expect(removeReadingShare).toHaveBeenCalledTimes(taken ? 1 : 0);
+	});
+
 	it('removes connection listeners after enrollment and on unmount', async () => {
 		localStorage.setItem(AUTH_TOKEN_KEY, 'reminders');
 		const rendered = renderSession();
 		await act(async () => {});
 		expect(connectReadingFromReminders).toHaveBeenCalledOnce();
 		vi.mocked(connectReadingFromReminders).mockImplementationOnce(async () => {
-			localStorage.setItem(READING_SESSION_KEY, JSON.stringify(session)); return session;
+			localStorage.setItem(READING_SESSION_KEY, JSON.stringify(session)); return { session };
 		});
 		await act(async () => window.dispatchEvent(new window.Event('online')));
 		expect(rendered.current.session).toEqual(session);

@@ -10,6 +10,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import { useReminderCardInteractions } from '@/reminders/ui/shared/useReminderCardInteractions';
 import { createLogger } from '@/reminders/logger';
+import { errorMessage } from '@/platform/logger';
 
 const log = createLogger('ReminderCardWrapper');
 import type { Reminder } from '@/reminders/types/reminder';
@@ -65,7 +66,7 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
 		} catch (error) {
 			setCompletionPreview(undefined);
 			log.error('Failed to toggle reminder', error);
-			new Notice('Failed to update reminder');
+			new Notice(errorMessage(error));
 		} finally {
 			isTogglingRef.current = false;
 		}

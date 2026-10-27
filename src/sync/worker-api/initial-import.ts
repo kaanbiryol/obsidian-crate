@@ -68,7 +68,8 @@ export class InitialImportApi {
 	async waitUntilReady(token: string, throwIfDestroyed: () => void, onProgress?: (progress: ReminderSetupProgress) => void): Promise<void> {
 		const workerUrl = this.http.getWorkerUrl();
 		// Bound a foreground wait; the durable marker survives a timeout, close or restart.
-		const deadline = Date.now() + 3 * 60 * 60 * 1000;
+		const started = Date.now();
+		const deadline = started + 3 * 60 * 60 * 1000;
 		while (Date.now() < deadline) {
 			throwIfDestroyed();
 			if (this.http.getWorkerUrl() !== workerUrl) throw new Error('Sync connection changed during reminder setup');
@@ -94,7 +95,13 @@ export class InitialImportApi {
 				if (status.moreIssues === true) issues.push({ scope: 'reminders', code: 'more-reminder-issues', message: 'More reminder notes need attention. Repair the listed notes, then sync again to review the remaining files.' });
 				throw new SyncIssueError(summary, issues.length ? issues : [{ message: summary, scope: 'reminders' }]);
 			}
-			await new Promise(resolve => setTimeout(resolve, 1000));
+			// Each poll counts the server's whole remaining setup work, so poll every second
+			// for the first minute, then every 5 s, still noticing cancellation each second.
+			const seconds = Date.now() - started < 60_000 ? 1 : 5;
+			for (let waited = 0; waited < seconds; waited++) {
+				if (waited) throwIfDestroyed();
+				await new Promise(resolve => setTimeout(resolve, 1000));
+			}
 		}
 		throw new Error('Files uploaded. Reminder setup is still running; sync again to check completion.');
 	}

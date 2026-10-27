@@ -16,6 +16,8 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 	const [encryptionSetupRequired, setEncryptionSetupRequired] = useState(false);
 	const [lockedSession, setLockedSession] = useState<ReadingSession | null>(null);
 	const [verificationUnavailable, setVerificationUnavailable] = useState(false);
+	// No answer and no encryption evidence: the plaintext offline copy is shown read-only.
+	const [offlineCopy, setOfflineCopy] = useState(false);
 	const [ready, setReady] = useState(false), [connecting, setConnecting] = useState(false);
 	const [issue, setIssue] = useState<ConnectionIssue | null>(null);
 	const [connectionState, setConnectionState] = useState<ReadingConnectionState>('available');
@@ -28,7 +30,7 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 	}, []);
 	const resetSession = useCallback(() => {
 		generation.current++; resetReadingEncryption();
-		setSession(null); setLockedSession(null); setVerificationUnavailable(false); setEncryptionSetupRequired(false); setConverting(false);
+		setSession(null); setLockedSession(null); setVerificationUnavailable(false); setOfflineCopy(false); setEncryptionSetupRequired(false); setConverting(false);
 	}, []);
 	const expire = useCallback(() => { resetSession(); setIssue(SESSION_RECOVERY_ISSUE); }, [resetSession]);
 	const hydrate = useCallback(async (current: ReadingSession) => {
@@ -43,10 +45,11 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 			setConverting(cause instanceof EncryptionTransitionError);
 			setEncryptionSetupRequired(cause instanceof EncryptionKeyRequiredError && cause.firstUnlock);
 			setVerificationUnavailable(cause instanceof EncryptionVerificationUnavailableError);
+			setOfflineCopy(cause instanceof EncryptionVerificationUnavailableError && cause.offlineCopy);
 			setLockedSession(current); setIssue(connectionIssue(cause)); return;
 		}
 		if (!currentRequest()) return;
-		setLockedSession(null); setVerificationUnavailable(false); setEncryptionSetupRequired(false); setConverting(false);
+		setLockedSession(null); setVerificationUnavailable(false); setOfflineCopy(false); setEncryptionSetupRequired(false); setConverting(false);
 		setSession(current); setIssue(null);
 		return true;
 	}, []);
@@ -55,7 +58,7 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 		const revision = generation.current;
 		connectingRef.current = true; setConnecting(true);
 		try {
-			const next = await connectReadingFromReminders();
+			const next = (await connectReadingFromReminders())?.session;
 			if (!alive.current || revision !== generation.current || !next) return;
 			setIssue(null); setConnectionState('available');
 			await hydrate(next);
@@ -94,10 +97,13 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 			document.removeEventListener('visibilitychange', resume);
 		};
 	}, [startupReady, ready, session, lockedSession, connect]);
+	const retryVerification = useCallback(async () => {
+		if (lockedSession && verificationUnavailable) await run(async () => { await hydrate(lockedSession); });
+	}, [lockedSession, verificationUnavailable, run, hydrate]);
 	useEffect(() => {
 		// An unavailable check retries in place, like Reminders' foreground refresh.
 		if (!lockedSession || !verificationUnavailable) return;
-		const retry = () => { void run(async () => { await hydrate(lockedSession); }); };
+		const retry = () => { void retryVerification(); };
 		const resume = () => { if (document.visibilityState === 'visible') retry(); };
 		window.addEventListener('online', retry); window.addEventListener('pageshow', retry);
 		document.addEventListener('visibilitychange', resume);
@@ -105,8 +111,8 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 			window.removeEventListener('online', retry); window.removeEventListener('pageshow', retry);
 			document.removeEventListener('visibilitychange', resume);
 		};
-	}, [lockedSession, verificationUnavailable, run, hydrate]);
-	return { session, lockedSession, verificationUnavailable, encryptionSetupRequired, converting, expire, ready, connecting, connect, resetSession, issue, error: issue?.message ?? null, connectionState };
+	}, [lockedSession, verificationUnavailable, retryVerification]);
+	return { session, lockedSession, verificationUnavailable, offlineCopy, retryVerification, encryptionSetupRequired, converting, expire, ready, connecting, connect, resetSession, issue, error: issue?.message ?? null, connectionState };
 }
 
 export type ReadingConnection = ReturnType<typeof useReadingConnection>;

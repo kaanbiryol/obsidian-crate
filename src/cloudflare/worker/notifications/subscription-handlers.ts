@@ -35,14 +35,16 @@ export async function handleSubscribe(request: Request, db: D1Database, ownerTok
 	}
 
 	const id = crypto.randomUUID();
+	// Some revocations commit outside the coordinator lock, so the owner must still exist here.
 	const insert = db.prepare(`INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name, owner_token_id, folder_path)
 		SELECT ?, ?, ?, ?, ?, ?, (SELECT folder_path FROM auth_tokens WHERE id = ?)
 		WHERE ((SELECT COUNT(*) FROM push_subscriptions) < 20 OR EXISTS (SELECT 1 FROM push_subscriptions WHERE endpoint = ? AND owner_token_id = ?))
 		AND ((SELECT COUNT(*) FROM push_subscriptions WHERE owner_token_id = ?) < 5 OR EXISTS (SELECT 1 FROM push_subscriptions WHERE endpoint = ? AND owner_token_id = ?))
+		AND EXISTS (SELECT 1 FROM auth_tokens WHERE id = ? AND (expires_at IS NULL OR expires_at > ?))
 		ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth,
 		device_name = excluded.device_name, disabled_at = NULL, last_error = NULL
 		WHERE push_subscriptions.owner_token_id = excluded.owner_token_id`)
-		.bind(id, endpoint, p256dh, auth, deviceName, ownerTokenId, ownerTokenId, endpoint, ownerTokenId, ownerTokenId, endpoint, ownerTokenId);
+		.bind(id, endpoint, p256dh, auth, deviceName, ownerTokenId, ownerTokenId, endpoint, ownerTokenId, ownerTokenId, endpoint, ownerTokenId, ownerTokenId, Date.now());
 	const result = await insert.run();
 	if (changedRows(result) !== 1) return corsResponse({ error: 'Subscription limit reached or endpoint already enrolled. Remove an old device before trying again.' }, 429);
 	// Confirmation retries must preserve IDs already captured by delivery work.

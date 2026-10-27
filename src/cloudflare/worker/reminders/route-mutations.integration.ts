@@ -9,7 +9,7 @@ import { handleCreateReminder } from './routes/create';
 import { handleDeleteReminder, handleUpdateReminder } from './routes/existing-reminder';
 import { handleListReminders } from './routes/list';
 import { handleReorderReminders } from './routes/reorder';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { ReminderFileSizeError } from './limits';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 
@@ -28,7 +28,7 @@ async function read(path: string) {
 /** A web app request body, with the identity, revision and order observed now. */
 async function request(route: string, fields: Record<string, unknown>, method = 'POST') {
 	const path = typeof fields.filePath === 'string' ? fields.filePath : `Reminders/${typeof fields.project === 'string' ? fields.project : 'Inbox'}.md`;
-	const reminders = scanReminderMarkdownFile(path, await read(path) ?? '', 'Reminders');
+	const reminders = scanReminderMarkdownContent(path, await read(path) ?? '', 'Reminders').reminders;
 	const reminder = reminders.find(item => item.id === fields.id);
 	const operationId = createReminderOperationId(Math.floor(Date.now() / 86_400_000));
 	return new Request(`https://worker.test/reminders/${route}`, { method, headers: { 'Content-Type': 'application/json' },

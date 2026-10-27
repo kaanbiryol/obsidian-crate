@@ -8,12 +8,10 @@ import { buildDiff } from './diff-model';
 import { renderFileText } from './history-text';
 import { renderDiffLines } from './diff-renderer';
 import { openConfirmationModal } from '../confirmation-modal';
+import { formatSize } from '../shared/format';
 
 export type FileHistoryRuntime = Pick<SyncRuntime, 'listRecentFileVersions' | 'getPendingRestores' | 'loadFileHistoryPreview' | 'restoreRecentFileVersion' | 'loadCurrentSyncedPreview'>;
 
-function formatSize(bytes: number): string {
-	return bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
-}
 function versionDate(value: string): Date { return new Date(value.includes(' ') ? `${value.replace(' ', 'T')}Z` : value); }
 function formatDate(date: Date, seconds = false): string {
 	return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', ...(seconds ? { second: '2-digit' as const } : {}) }).format(date);

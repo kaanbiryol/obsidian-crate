@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { drainReading } from '../outbox';
-import { earlierReadingChanges, exportReadingData, pendingReading, removeEarlierReadingChanges, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, readEncryptedReadingIndex, writeEncryptedReadingIndex } from './storage';
+import { adoptEarlierReadingCaptures, earlierReadingChanges, exportReadingData, newestReadingShare, pendingReading, removeEarlierReadingChanges, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, readEncryptedReadingIndex, writeEncryptedReadingIndex } from './storage';
 import { assertReadingSession, readingSession, READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
@@ -15,7 +15,8 @@ vi.mock('../../storage/single-store-database', () => ({ openSingleStoreDatabase:
 	put: async (_store: string, value: unknown, key: string) => { values.set(key, value); },
 	delete: async (_store: string, key: string) => { values.delete(key); },
 	getAllKeys: async () => [...values.keys()],
-	transaction: () => ({ store: { getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key), delete: async (key: string) => { values.delete(key); } }, done: Promise.resolve() }),
+	transaction: () => ({ store: { getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key), delete: async (key: string) => { values.delete(key); },
+		put: async (value: unknown, key: string) => { values.set(key, value); } }, done: Promise.resolve() }),
 }) }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const intent = { id: 'article', changes: { highlights: [] }, before: { highlights: undefined } };
@@ -148,4 +149,34 @@ it('removes queues from earlier sign-ins only while they match the reviewed expo
 	expect(values.has('attempt:earlier:operation')).toBe(true);
 	expect(await removeEarlierReadingChanges(session.id, JSON.stringify(await earlierReadingChanges(session.id)))).toBe(true);
 	expect([...values.keys()]).toEqual([`pending:${session.id}`, `attempt:${session.id}:operation`]);
+});
+
+it('moves unsent captures of an earlier sign-in to the same folder into the current queue', async () => {
+	const current: ReadingSession = { ...session, id: 'reminders:new-token:generation', source: 'reminders' };
+	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(current) : key === 'crate-reminders-auth-token' ? current.token : null });
+	const earlier = 'reminders:old-token:generation';
+	const unsent = { id: 'unsent', sessionId: earlier, action: 'capture', intent: { url: 'https://example.com/unsent' }, queuedAt: '2026-10-01T12:00:00Z' };
+	const capture = { url: 'https://example.com/sent' };
+	const sent = { id: 'sent', sessionId: earlier, action: 'capture', intent: capture, body: JSON.stringify({ ...capture, operationId: createReminderOperationId(20_000) }) };
+	const edit = { ...command(), sessionId: earlier, body: undefined };
+	values.set(`pending:${earlier}`, [unsent, sent, edit]);
+	// Another folder generation and an only-unsent queue that empties.
+	values.set('pending:reminders:old-token:other-generation', [{ ...unsent, sessionId: 'reminders:old-token:other-generation' }]);
+	values.set('pending:reminders:older-token:generation', [{ ...unsent, id: 'unsent-2', sessionId: 'reminders:older-token:generation' }]);
+	values.set(`pending:${current.id}`, [{ ...command(), sessionId: current.id }]);
+	await adoptEarlierReadingCaptures(current);
+	expect((await pendingReading(current)).map(op => op.id)).toEqual(['queued', 'unsent', 'unsent-2']);
+	expect(values.get(`pending:${earlier}`)).toEqual([sent, edit]);
+	expect(values.has('pending:reminders:older-token:generation')).toBe(false);
+	expect(values.get('pending:reminders:old-token:other-generation')).toHaveLength(1);
+});
+
+it('finds the newest staged share for a page that lost its share parameter', async () => {
+	values.set('share:older', { url: 'https://example.com/older', savedAt: 1 });
+	values.set('share:newest', { url: 'https://example.com/newest', savedAt: 3 });
+	values.set('share:damaged', { savedAt: 9 });
+	values.set('share:middle', { url: 'https://example.com/middle', savedAt: 2 });
+	await expect(newestReadingShare()).resolves.toEqual({ id: 'newest', url: 'https://example.com/newest' });
+	await removeReadingShare(session, 'newest');
+	await expect(newestReadingShare()).resolves.toEqual({ id: 'middle', url: 'https://example.com/middle' });
 });

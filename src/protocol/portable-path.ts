@@ -41,37 +41,23 @@ export function portablePathKey(path: string): string {
 	return path.normalize('NFC').toLowerCase();
 }
 
-export interface PortablePathCollision {
-	key: string;
-	paths: string[];
-}
-
-export function findPortablePathCollisions(paths: Iterable<string>): PortablePathCollision[] {
-	const pathsByKey = new Map<string, string[]>();
-	for (const path of paths) {
-		const key = portablePathKey(path);
-		const matches = pathsByKey.get(key) ?? [];
-		if (!matches.includes(path)) matches.push(path);
-		pathsByKey.set(key, matches);
-	}
-	return [...pathsByKey]
-		.filter(([, matches]) => matches.length > 1)
-		.map(([key, matches]) => ({ key, paths: matches }));
-}
-
+/** Rejects invalid names and paths that collide on a case-insensitive or
+ * Unicode-normalizing device, then a file that is also another path's folder. */
 export function assertPortablePaths(paths: Iterable<string>): void {
-	const allPaths = [...paths];
-	assertPortablePathNames(allPaths);
-
-	const [collision] = findPortablePathCollisions(allPaths);
-	if (collision) {
-		throw new Error(`Paths collide on a case-insensitive or Unicode-normalizing device: ${collision.paths.join(', ')}`);
+	const files = new Map<string, string>();
+	for (const path of paths) {
+		const issue = getSyncPathIssue(path);
+		if (issue) throw new Error(`Invalid sync path: ${path} (${issue})`);
+		const key = portablePathKey(path);
+		const prior = files.get(key);
+		if (prior !== undefined && prior !== path) {
+			throw new Error(`Paths collide on a case-insensitive or Unicode-normalizing device: ${prior}, ${path}`);
+		}
+		files.set(key, path);
 	}
-	const files = new Map(allPaths.map(path => [portablePathKey(path), path]));
-	for (const path of allPaths) {
-		const segments = portablePathKey(path).split('/');
-		for (let length = 1; length < segments.length; length++) {
-			const ancestor = files.get(segments.slice(0, length).join('/'));
+	for (const [key, path] of files) {
+		for (let slash = key.indexOf('/'); slash > 0; slash = key.indexOf('/', slash + 1)) {
+			const ancestor = files.get(key.slice(0, slash));
 			if (ancestor) throw new Error(`File "${ancestor}" conflicts with the parent folder of "${path}". Rename one of these files or its parent folder, then sync again.`);
 		}
 	}

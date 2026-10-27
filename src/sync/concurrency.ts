@@ -17,7 +17,9 @@ export async function runConcurrentTasks<T>(
 
 	async function next(): Promise<void> {
 		while (index < tasks.length) {
-			if (isDestroyed() || failed) break;
+			if (failed) break;
+			// Started tasks drain, but a caller must not treat unstarted ones as done.
+			if (isDestroyed()) throw createAbortError('Sync engine destroyed');
 			const currentIndex = index++;
 			const task = tasks[currentIndex];
 			if (!task) break;

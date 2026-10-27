@@ -34,7 +34,7 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
 	const readingLocked = reading.lockedSession;
 	const locked = section === 'reading' && readingLocked ? {
 		message: reading.error ?? 'Unlock Crate to continue.', setupRequired: reading.encryptionSetupRequired,
-		converting: reading.converting, unavailable: reading.verificationUnavailable,
+		converting: reading.converting, unavailable: reading.verificationUnavailable, offlineCopy: reading.offlineCopy,
 		unlock: (code: string) => unlockReadingWithCode(code, readingLocked),
 	} : section === 'reminders' && remindersLocked ? {
 		...remindersLocked, unlock: unlockRemindersWithCode,
@@ -46,10 +46,11 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
 	const connectionScreen = () => {
 		if (browserSetup) return shell(<BrowserSetup onContinue={() => setBrowserSetup(false)} />);
 		if (!app.bootstrapped) return <PwaLaunchSplash />;
-		// The check got no answer, so this may not be an encrypted vault.
-		if (locked?.unavailable) return shell(<><ErrorState issue={{ kind: 'unavailable', message: locked.message }} onRetry={() => location.reload()}
+		// The check got no answer, so this may not be an encrypted vault. Without encryption
+		// evidence the feature shows its plaintext offline copy read-only with this error.
+		if (locked?.unavailable && !locked.offlineCopy) return shell(<><ErrorState issue={{ kind: 'unavailable', message: locked.message }} onRetry={() => location.reload()}
 			onLogout={() => { void app.logOut(); }} loggingOut={app.loggingOut} />{switchFeature}</>);
-		if (locked) return shell(<EncryptionUnlockCard title={locked.converting ? 'Encryption setup in progress' : 'Unlock Crate'}
+		if (locked && !locked.offlineCopy) return shell(<EncryptionUnlockCard title={locked.converting ? 'Encryption setup in progress' : 'Unlock Crate'}
 			message={locked.message} setupRequired={locked.setupRequired} action="Unlock Crate" onUnlock={locked.converting ? undefined : locked.unlock}
 			pairing={locked.converting ? undefined : <AppPairing key={section} feature={section} />}>
 			{busy => <>

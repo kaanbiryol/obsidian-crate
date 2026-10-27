@@ -5,12 +5,12 @@ import { deletePathLocallyIfUnchanged } from '../local/local-delete';
 import { classifyPath } from './reconciliation';
 import type { IncrementalSyncPlannerContext } from './types';
 import type { DownloadRequest } from '../transfer/download';
-import { oversizedRemoteFileIssue, recordSyncError, recordSyncIssue } from '../issues';
+import { oversizedRemoteFileIssue, recordSyncError } from '../issues';
 import type { ChangelogEntry, FileEntry } from '../../protocol/sync-types';
 import type { FileDiff, SyncResult } from '../types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { isVaultTFileLike } from '../local/local-delete';
-import { assertLocalSyncPath } from '../local/local-path-safety';
+import { assertLocalSyncPath, unsupportedLocalPathIssue } from '../local/local-path-safety';
 
 export interface IncrementalRemoteReconciliation {
 	discoveredLocalChanges: Array<{ path: string; hash: string }>;
@@ -45,6 +45,8 @@ export async function reconcileIncrementalRemoteChanges(
 
 	for (const [path, entry] of changesByPath) {
 		if (context.shouldIgnore(path)) continue;
+		const unsupported = unsupportedLocalPathIssue(path);
+		if (unsupported) { (result.issues ??= []).push(unsupported); continue; }
 
 		try {
 			if (entry.action === 'delete') {
@@ -64,8 +66,11 @@ export async function reconcileIncrementalRemoteChanges(
 					}
 				}
 
-				const expectedLocalHash = context.localManifest.getEntry(path)?.hash ?? null;
-				const localDelete = await deletePathLocallyIfUnchanged(context, path, expectedLocalHash);
+				const baseline = context.localManifest.getEntry(path);
+				// This device never synced the path, so there is nothing to delete here. A
+				// local file created at it is a local change for the scan to upload.
+				if (!baseline) continue;
+				const localDelete = await deletePathLocallyIfUnchanged(context, path, baseline.hash);
 				if (localDelete.status === 'changed') {
 					resurrectPaths.add(path);
 					localChangedPaths.add(path);
@@ -82,8 +87,10 @@ export async function reconcileIncrementalRemoteChanges(
 				continue;
 			}
 
+			// This device cannot store it, like an oversized local file: report it without
+			// failing the sync, so the changelog cursor still advances past it.
 			if (entry.size > MAX_FILE_SIZE_BYTES) {
-				recordSyncIssue(result, oversizedRemoteFileIssue(path));
+				(result.issues ??= []).push(oversizedRemoteFileIssue(path));
 				continue;
 			}
 

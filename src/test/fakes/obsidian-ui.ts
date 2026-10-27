@@ -112,6 +112,10 @@ export class FakeElement {
 		}
 	}
 
+	removeClasses(classes: string[]): void {
+		this.removeClass(...classes);
+	}
+
 	toggleClass(classes: string | string[], value: boolean): void {
 		const resolved = Array.isArray(classes) ? classes : [classes];
 		if (value) {
@@ -207,7 +211,9 @@ class FakeTextInput {
 	step = '';
 	required = false;
 	readOnly = false;
-	setAttribute(_name: string, _value: string): void {}
+	private readonly attributes = new Map<string, string>();
+	setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
+	getAttribute(name: string): string | null { return this.attributes.get(name) ?? null; }
 	focus(): void {}
 	value = '';
 	maxLength = 0;

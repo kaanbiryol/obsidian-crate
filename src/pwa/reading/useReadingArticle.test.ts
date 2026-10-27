@@ -90,3 +90,19 @@ it('shows a load error without publishing invalid Markdown when no saved copy ex
 	expect(hook.current.reader).toMatchObject({ item, markdown: null, availableOffline: false, error: 'Reading article response is unreadable.' });
 	expect(cacheReadingArticle).not.toHaveBeenCalled();
 });
+
+it('downloads an article with a stale offline copy once', async () => {
+	// The offline copy predates the extraction the library now reports.
+	vi.mocked(readReadingArticle).mockResolvedValue({ ...saved, item: { ...item, extraction_status: 'pending' } });
+	let respond!: (response: Response) => void;
+	network.mockImplementationOnce(() => new Promise(resolve => { respond = resolve; }));
+	const { hook } = harness();
+	let opened!: Promise<void>;
+	await act(async () => { opened = hook.current.open(item); });
+	expect(hook.current.reader).toMatchObject({ markdown: saved.markdown, availableOffline: true });
+	// Before: the stale copy's highlights also started a background refresh, a second download.
+	expect(network).toHaveBeenCalledOnce();
+	await act(async () => { respond(Response.json({ item, markdown: 'Current online text.' })); await opened; });
+	expect(hook.current.reader).toMatchObject({ markdown: 'Current online text.' });
+	expect(network).toHaveBeenCalledOnce();
+});

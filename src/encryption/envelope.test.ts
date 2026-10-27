@@ -15,6 +15,16 @@ describe('client encryption envelopes', () => {
 		expect(key.key.extractable).toBe(false);
 	});
 
+	it('returns plaintext that owns its whole buffer, so callers can pass `.buffer` on', async () => {
+		const key = await freshKey();
+		const bytes = new Uint8Array(1024 * 1024).map((_, index) => index % 251);
+		const plaintext = await decryptBytes(await encryptBytes(bytes, key, context), key, context);
+		expect(plaintext.buffer).toBeInstanceOf(ArrayBuffer);
+		expect(plaintext.byteOffset).toBe(0);
+		expect(plaintext.byteLength).toBe(plaintext.buffer.byteLength);
+		expect(new Uint8Array(plaintext.buffer)).toEqual(bytes);
+	});
+
 	it('uses independently randomized envelopes and preserves an exact envelope for retries', async () => {
 		const key = await freshKey();
 		const first = await encryptJson({ text: 'Private reminder 🔐' }, key, context);

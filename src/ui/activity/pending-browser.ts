@@ -2,7 +2,7 @@ import { Notice, setIcon } from 'obsidian';
 import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { isBinaryPreviewPath } from '../../sync/history/preview-format';
 import { decodePendingChange } from '../../sync/pending/pending-change';
-import { buildDiff } from './diff-model';
+import { countDiff } from './diff-model';
 import { renderDiffPreview } from './pending-diff';
 import { PendingComparisons } from './pending-comparisons';
 import { createPendingActions, type PendingActions } from './pending-actions';
@@ -307,7 +307,7 @@ function describeSnapshot(snapshot: PendingDiff): string {
 	if (snapshot.kind === 'added') return 'Added';
 	if (snapshot.kind === 'deleted') return 'Deleted';
 	if (snapshot.before === snapshot.after) return 'Unchanged';
-	const diff = buildDiff(snapshot.before, snapshot.after);
+	const diff = countDiff(snapshot.before, snapshot.after);
 	if (diff.limited) return 'Modified';
 	return `+${diff.added} −${diff.removed}`;
 }

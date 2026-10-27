@@ -3,6 +3,7 @@ import type { UsageMetric } from '../../../cloudflare/usage/service';
 import type { UsageSnapshot } from '../../../cloudflare/usage/snapshot';
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import type { SettingsSectionContext } from '../section-helpers';
+import { formatTimeAgo } from '../../shared/format';
 
 export function renderUsageSection({ containerEl, plugin }: Omit<SettingsSectionContext, 'rerender'>): () => void {
 	const accountId = plugin.settings.cloudflareDeployment?.accountId;
@@ -39,10 +40,8 @@ export function renderUsageSection({ containerEl, plugin }: Omit<SettingsSection
 			return;
 		}
 		const date = new Date(snapshot.updatedAt);
-		const minutes = Math.max(0, Math.floor((Date.now() - snapshot.updatedAt) / 60_000));
-		const ago = minutes < 1 ? 'just now' : minutes < 60 ? `${minutes} min ago` : minutes < 1440 ? `${Math.floor(minutes / 60)} hr ago` : `${Math.floor(minutes / 1440)} days ago`;
 		const timestamp = date.toISOString().slice(0, 19).replace('T', ' ');
-		controls.setDesc(`Last updated ${ago} · ${timestamp} UTC. Refresh for the latest usage.`);
+		controls.setDesc(`Last updated ${formatTimeAgo(snapshot.updatedAt)} · ${timestamp} UTC. Refresh for the latest usage.`);
 		const day = date.toISOString().slice(0, 10);
 		const today = new Date().toISOString().slice(0, 10);
 		const dailyPeriod = day === today ? 'Today' : day;

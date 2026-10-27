@@ -42,7 +42,7 @@ describe('settings encryption status', () => {
 		expect(document.body.textContent).not.toContain('Encryption is off');
 	});
 	it.each([false, true])('keeps lock and conversion problems visible without expanding details (converting=%s)', converting => {
-		vi.mocked(reminderEncryptionSnapshot).mockReturnValue({ status: 'locked', message: 'Finish encryption in Obsidian.', converting, setupRequired: false, unavailable: false });
+		vi.mocked(reminderEncryptionSnapshot).mockReturnValue({ status: 'locked', message: 'Finish encryption in Obsidian.', converting, setupRequired: false, unavailable: false, offlineCopy: false });
 		const document = render(reading('locked'));
 		expect(statusRows(document)[0]).toContain(converting ? 'Setting up' : 'Locked');
 		expect(document.body.textContent).toContain('Finish encryption in Obsidian.');

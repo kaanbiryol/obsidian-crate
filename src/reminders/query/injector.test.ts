@@ -9,7 +9,7 @@ vi.mock('obsidian', async importOriginal => ({
 	MarkdownRenderChild: class { constructor(readonly containerEl: unknown) {} },
 }));
 vi.mock('@/reminders/ui/plugin/reminder-list/RemindersList', () => ({ RemindersList: () => null }));
-import { ReminderQueryInjector } from './injector';
+import { renderRemindersBlock } from './injector';
 
 type ListProps = { showCompleted?: boolean; onToggleShowCompleted?: (value: boolean) => void };
 
@@ -32,7 +32,7 @@ async function render(content = note, section: () => MarkdownSectionInformation 
 		addChild: (child: { props: ListProps }) => { props = child.props; },
 	} as unknown as MarkdownPostProcessorContext;
 	const source = content.split('\n').slice(2, content.split('\n').indexOf('```', 2)).join('\n');
-	new ReminderQueryInjector(plugin).onBlock('reminders', source, {} as HTMLElement, ctx);
+	renderRemindersBlock(plugin, 'reminders', source, {} as HTMLElement, ctx);
 	return { h, props: props! };
 }
 
@@ -58,6 +58,23 @@ it('does not rewrite the note when the block changed after it was rendered', asy
 	props.onToggleShowCompleted!(true);
 	await vi.waitFor(() => expect(Notice.messages).toEqual(['Failed to save reminder view preference: This reminders block changed. Try again.']));
 	expect((await h.readBytes(path)).toString()).toBe(edited);
+});
+
+it('writes the toggle into a tilde-fenced block', async () => {
+	const content = ['# Plan', '~~~reminders', 'project: Work', '~~~'].join('\n');
+	const { h, props } = await render(content);
+	props.onToggleShowCompleted!(true);
+	await vi.waitFor(async () => expect((await h.readBytes(path)).toString()).toBe(
+		['# Plan', '~~~reminders', 'project: Work', 'show-completed: true', '~~~'].join('\n'),
+	));
+});
+
+it('reports a block it cannot update', async () => {
+	const content = ['# Plan', '> ```reminders', '> project: Work', '> ```'].join('\n');
+	const { h, props } = await render(content);
+	props.onToggleShowCompleted!(true);
+	await vi.waitFor(() => expect(Notice.messages).toEqual(['Failed to save reminder view preference: This block cannot be updated here. Edit its show-completed line in the note.']));
+	expect((await h.readBytes(path)).toString()).toBe(content);
 });
 
 it('keeps the toggle local when the block has no section in a note', async () => {

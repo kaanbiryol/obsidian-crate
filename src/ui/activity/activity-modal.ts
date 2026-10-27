@@ -66,12 +66,13 @@ export class ActivityModal extends BaseUiModal {
 	private pendingPanel!: HTMLDivElement;
 	private readonly pendingBrowserState: PendingBrowserState = {};
 	private conflictsPanel!: HTMLDivElement;
-	private renderedCheckingConflicts: boolean | undefined;
+	private renderedConflicts: string | undefined;
 	private historyPanel!: HTMLDivElement;
 	private closed = false;
+	private clock: number | undefined;
 	private updateScheduled = false;
 	private stateChanged = false;
-	private renderedBrowserSignature: string | undefined;
+	private renderedBrowserPaths: string[] | undefined;
 	// A file's state change and progress tick arrive together; apply them once.
 	private scheduleUpdate(stateChanged: boolean): void {
 		this.stateChanged ||= stateChanged;
@@ -101,8 +102,7 @@ export class ActivityModal extends BaseUiModal {
 		const status = this.getActivityStatus();
 		this.header.updateSyncBtn(status);
 		this.header.updateSyncStatusText(status);
-		// The empty conflicts panel only changes with its checking state.
-		if (this.deps.getActiveConflicts().length === 0 && status.checkingConflicts !== this.renderedCheckingConflicts) this.renderConflicts(status);
+		this.renderConflicts(status);
 		this.renderPending();
 	}
 	private renderPending(): void {
@@ -120,13 +120,13 @@ export class ActivityModal extends BaseUiModal {
 		// Rebuilding the file browser discards its comparisons; keep it while the pending set is unchanged.
 		const showsBrowser = paths.length > 0 && state.status !== 'syncing' && !progress
 			&& !(state.initializing && state.status !== 'error' && state.status !== 'offline');
-		const browserSignature = showsBrowser ? paths.join('\0') : undefined;
-		if (browserSignature !== undefined && browserSignature === this.renderedBrowserSignature
+		const rendered = this.renderedBrowserPaths;
+		if (showsBrowser && rendered?.length === paths.length && rendered.every((key, index) => key === paths[index])
 			&& this.pendingPanel.querySelector('.crate-pending-browser')) {
 			this.header.updateSyncBtn();
 			return;
 		}
-		this.renderedBrowserSignature = browserSignature;
+		this.renderedBrowserPaths = showsBrowser ? paths : undefined;
 		this.pendingBrowserState.dispose?.();
 		this.pendingBrowserState.startChecks = undefined;
 		this.pendingBrowserState.pauseChecks = undefined;
@@ -161,6 +161,8 @@ export class ActivityModal extends BaseUiModal {
 
 	onOpen(): void {
 		this.closed = false;
+		// "Synced 5m ago" ages without runtime events.
+		this.clock = window.setInterval(() => this.scheduleUpdate(true), 60_000);
 		this.sharedHistory = new SharedHistoryLoader(() => this.deps.listSharedCheckpoints(), () => this.refresh());
 		this.modalEl.addClass('crate-reminder-editor-modal');
 		this.modalEl.toggleClass('is-mobile', Platform.isMobile);
@@ -191,6 +193,7 @@ export class ActivityModal extends BaseUiModal {
 				this.historyPanel = elements.history;
 				this.pendingCount = elements.pendingCount;
 				this.conflictsCount = elements.conflictsCount;
+				this.renderedConflicts = undefined;
 				this.refresh();
 				this.switchTab(this.initialTab === 'history' ? 2 : this.initialTab === 'conflicts' ? 1 : 0);
 				this.deps.addStateChangeListener(this.onStateChange);
@@ -261,9 +264,12 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	private renderConflicts(status = this.getActivityStatus()): void {
-		this.conflictsPanel.empty();
 		const conflicts = this.deps.getActiveConflicts();
-		this.renderedCheckingConflicts = conflicts.length ? undefined : status.checkingConflicts;
+		// Rebuilding an unchanged panel would drop keyboard focus on its Review buttons.
+		const rendered = JSON.stringify(conflicts.length ? conflicts : status.checkingConflicts);
+		if (rendered === this.renderedConflicts) return;
+		this.renderedConflicts = rendered;
+		this.conflictsPanel.empty();
 		renderConflictsPanel(this.conflictsPanel, conflicts, status.checkingConflicts, conflict => {
 			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview(conflict), () => this.refresh()).open();
 		});
@@ -293,6 +299,7 @@ export class ActivityModal extends BaseUiModal {
 
 	onClose(): void {
 		this.closed = true;
+		window.clearInterval(this.clock);
 		this.sharedHistory?.dispose();
 		this.sharedHistory = undefined;
 		this.activityHistory?.dispose();

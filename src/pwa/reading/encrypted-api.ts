@@ -13,6 +13,7 @@ import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInv
 import { mapBounded } from '@/platform/map-bounded';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
+import { responseError } from '@/pwa/connection/response-error';
 import type { PathTags } from '@/encryption/path-tags';
 import { resolveEncryptedPath } from '@/encryption/path-binding';
 
@@ -73,9 +74,11 @@ export class EncryptedReadingApi {
 	constructor(private options: EncryptedReadingOptions) {}
 	private async json<T>(path: string, body?: string): Promise<T> {
 		const response = await this.options.request(path, body);
-		const value = await response.json() as T & { error?: string; code?: string };
-		if (!response.ok) throw this.options.error(value.error ?? 'Reading request failed.', response.status, value.code);
-		return value;
+		if (!response.ok) {
+			const { message, code } = await responseError(response, 'Reading request failed.');
+			throw this.options.error(message, response.status, code);
+		}
+		return await response.json() as T;
 	}
 	// 'reminder' is the shared envelope purpose for operation objects in every scope, Reading
 	// included. The plugin binds it into each protected header, so it is a wire value, not a

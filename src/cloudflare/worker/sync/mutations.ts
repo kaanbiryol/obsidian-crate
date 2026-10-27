@@ -20,10 +20,10 @@ import {
 	FILE_VERSION_EXPIRES_AT_SQL,
 	FILE_VERSION_RETENTION_MS,
 	getStoredFileRow,
+	readVerifiedBytes,
 	type ExpectedFileHash,
 	type FileStorageRow,
 } from './storage';
-import { sha256Hex } from '@/platform/sha256';
 
 interface UploadMutationInput {
 	path: string;
@@ -162,7 +162,7 @@ export async function commitStagedFile(
 		uploadMutation(db, upload),
 		...recordEncryptedFile(db, params.path, params.objectKey, encryption.descriptor),
 		publishedChangelogStatement(db, params),
-		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, false, Boolean(encryption.state), params.reminderFolder),
+		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, false, Boolean(encryption.state), params.reminderFolder, params.size),
 		...await readingIndexStatements(db, [{ path: params.path, storageKey: params.objectKey, hash: params.hash, size: params.size, content: params.content }],
 			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state), revision: params.readingRevision }),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
@@ -188,8 +188,7 @@ export async function commitStagedFile(
 		}
 		const current = await getStoredFileRow(db, params.path);
 		if (!params.effects && current?.hash === params.hash) {
-			const object = await bucket.get(current.storageKey);
-			if (!object || object.size !== current.size || await sha256Hex(await object.arrayBuffer()) !== current.hash) {
+			if (!await readVerifiedBytes(bucket, current)) {
 				throw new Error('Committed file content is unavailable; restore a verified version before retrying');
 			}
 			await deleteBucketObjectsOrQueue(bucket, db, [{ storageKey: params.objectKey, path: params.path }]);
@@ -203,7 +202,6 @@ export async function commitStagedFile(
 }
 
 export async function commitFileDelete(
-	_bucket: R2Bucket,
 	db: D1Database,
 	params: {
 		path: string;

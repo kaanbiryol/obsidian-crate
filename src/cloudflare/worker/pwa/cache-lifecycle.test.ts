@@ -68,7 +68,7 @@ function runtimeHarness() {
 it('prepares the complete shell and leaves a failed install waiting', async () => {
 	const harness = runtimeHarness();
 	await harness.dispatch('install');
-	const urls = ['/notifications', ...['app.js', 'theme-bootstrap.js', 'crate-icon-192.png', 'crate-icon-512.png',
+	const urls = ['/notifications', ...['app.js', 'crate-icon-192.png', 'crate-icon-512.png',
 		'crate-mark-256.png', 'apple-touch-icon-180.png'].map(name => `/notifications/${name}?v=${PWA_ASSET_VERSION}`)];
 	// Downloads start in order, four at a time, so they may finish in any order.
 	expect(harness.fetch.mock.calls.map(call => call[0])).toEqual(urls);
@@ -96,7 +96,7 @@ it('serves the cached shell offline and never saves enrollment query responses',
 	expect(harness.put).toHaveBeenCalledExactlyOnceWith('/notifications', expect.any(Response));
 });
 
-it.each(['app.js', 'assets/old-editor.js', 'theme-bootstrap.js', 'icon.svg', 'crate-icon-192.png',
+it.each(['app.js', 'assets/old-editor.js', 'crate-icon-192.png',
 	'crate-icon-512.png', 'crate-mark-256.png', 'apple-touch-icon-180.png'])('uses retained cache entries for %s before requesting the network', async asset => {
 	const harness = runtimeHarness();
 	harness.matchAsset.mockResolvedValueOnce(new Response('old version'));

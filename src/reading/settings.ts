@@ -20,7 +20,8 @@ export function validateReadingFolder(value: string, remindersFolder?: string, c
 export function normalizeReadingSettings(value: unknown): ReadingSettings {
 	if (!value || typeof value !== 'object') return { ...DEFAULT_READING_SETTINGS };
 	const settings = value as Partial<ReadingSettings>;
+	const enabled = typeof settings.enabled === 'boolean' ? settings.enabled : true;
 	try {
-		return { enabled: typeof settings.enabled === 'boolean' ? settings.enabled : true, folderPath: validateReadingFolder(typeof settings.folderPath === 'string' ? settings.folderPath : 'Reading') };
-	} catch { return { ...DEFAULT_READING_SETTINGS }; }
+		return { enabled, folderPath: validateReadingFolder(typeof settings.folderPath === 'string' ? settings.folderPath : 'Reading') };
+	} catch { return { ...DEFAULT_READING_SETTINGS, enabled }; }
 }

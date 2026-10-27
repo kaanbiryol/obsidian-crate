@@ -7,7 +7,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { handleCreateReminder } from './routes/create';
 import { handleDeleteReminder, handleSetReminderCompleted, handleUpdateReminder } from './routes/existing-reminder';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import type { ReminderRecord } from '@/pwa/reminders/types';
 
 const path = 'Reminders/Inbox.md';
@@ -17,7 +17,7 @@ const { DB: db, BUCKET: bucket } = env;
 beforeEach(async () => { await applySchema(db); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 async function payload(response: Response) { expect(response.status, await response.clone().text()).toBe(200); return (await response.json()) as { reminder: ReminderRecord }; }
-async function records() { return scanReminderMarkdownFile(path, (await readCommittedMarkdownFileVersion(bucket, db, path))!.content, 'Reminders'); }
+async function records() { return scanReminderMarkdownContent(path, (await readCommittedMarkdownFileVersion(bucket, db, path))!.content, 'Reminders').reminders; }
 function loseCommit() { const batch = db.batch.bind(db); vi.spyOn(db, 'batch').mockImplementationOnce(async statements => { await batch(statements); throw new Error('Lost commit response'); }); }
 
 describe('transactional reminder retries and revisions', () => {

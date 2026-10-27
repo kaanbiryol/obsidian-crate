@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isSyncPath } from './sync-validation';
-import { assertPortablePaths, findPortablePathCollisions, getPortablePathIssue } from './portable-path';
+import { assertPortablePaths, getPortablePathIssue } from './portable-path';
 
 describe('portable sync paths', () => {
 	it('rejects Windows-reserved names and unsupported segment characters', () => {
@@ -11,8 +11,14 @@ describe('portable sync paths', () => {
 	});
 
 	it('detects case-insensitive and Unicode-normalizing collisions', () => {
-		expect(findPortablePathCollisions(['Notes/A.md', 'notes/a.md'])).toHaveLength(1);
+		expect(() => assertPortablePaths(['Notes/A.md', 'other.md', 'notes/a.md'])).toThrow('Unicode-normalizing device: Notes/A.md, notes/a.md');
 		expect(() => assertPortablePaths(['café.md', 'cafe\u0301.md'])).toThrow('Unicode-normalizing');
+	});
+
+	it('accepts a repeated path and reports a collision before a file-versus-folder conflict', () => {
+		expect(() => assertPortablePaths(['a.md', 'a.md', 'b/c.md'])).not.toThrow();
+		expect(() => assertPortablePaths(['b', 'b/c.md', 'X.md', 'x.md'])).toThrow('Unicode-normalizing device: X.md, x.md');
+		expect(() => assertPortablePaths(['Deep/A/b.md', 'deep/a', 'other.md'])).toThrow('File "deep/a" conflicts with the parent folder of "Deep/A/b.md"');
 	});
 
 	it.each([

@@ -6,6 +6,8 @@ import { attachPluginStylesheet } from "./shadowStyles";
 export interface ShadowRootMount {
 	shadowRoot: ShadowRoot;
 	mountPoint: HTMLDivElement;
+	/** Stops mirroring the theme, which otherwise ends at the first body change after the host detaches. */
+	disconnectTheme(): void;
 }
 
 export interface ShadowReactMount extends ShadowRootMount {
@@ -50,7 +52,7 @@ export function createShadowRootMount(
 	});
 	themeObserver.observe(host.doc.body, { attributes: true, attributeFilter: ["class"] });
 	options.configureMountPoint?.(mountPoint);
-	return { shadowRoot, mountPoint };
+	return { shadowRoot, mountPoint, disconnectTheme: () => themeObserver.disconnect() };
 }
 
 export async function createShadowReactRoot(
@@ -75,6 +77,7 @@ export async function createShadowReactMount(
 	const mount = createShadowRootMount(host, options);
 	const root = await createShadowReactRoot(plugin, mount, options);
 	if (!root) {
+		mount.disconnectTheme();
 		return null;
 	}
 
@@ -82,6 +85,6 @@ export async function createShadowReactMount(
 		...mount,
 		root,
 		render: (children: ReactNode) => root.render(children),
-		unmount: () => root.unmount(),
+		unmount: () => { root.unmount(); mount.disconnectTheme(); },
 	};
 }

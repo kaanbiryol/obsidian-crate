@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FakeDocumentFragment } from '../test/factories/obsidian';
 
 const noticeMessages: Array<string | object> = [];
 type ProtocolHandler = (params: Record<string, string>) => void;
@@ -129,7 +128,6 @@ beforeEach(() => {
 	cloudflareDeploymentDestroy.mockReset();
 	createCloudflareDeploymentService.mockClear();
 	secretStorageHas.mockReset().mockReturnValue(false);
-	vi.stubGlobal('DocumentFragment', FakeDocumentFragment);
 });
 
 afterEach(() => {
@@ -198,7 +196,7 @@ describe('bootstrapPlugin', () => {
 		});
 	});
 
-	it('shows the setup notice instead of starting sync when the plugin is not configured', async () => {
+	it('starts neither sync nor a setup notice when the plugin is not configured', async () => {
 		const { bootstrapPlugin } = await loadLifecycleModule();
 		const syncInitialize = vi.fn(async () => {});
 		const plugin = createPlugin();
@@ -215,8 +213,8 @@ describe('bootstrapPlugin', () => {
 
 		expect(syncInitialize).not.toHaveBeenCalled();
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
-		expect(noticeMessages).toHaveLength(1);
-		expect(noticeMessages[0]).toBeInstanceOf(FakeDocumentFragment);
+		// Reminders and Reading work without a server, so startup does not nag.
+		expect(noticeMessages).toEqual([]);
 	});
 
 	it('does not scan reminder files until a new user enables reminders', async () => {

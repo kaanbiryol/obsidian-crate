@@ -44,7 +44,7 @@ describe('getPwaPushManager', () => {
 	});
 	it.each(['checking', 'ready', 'locked'] as const)('keeps push on the decrypting service worker while encryption is %s', async status => {
 		vi.spyOn(encryptionSession, 'reminderEncryptionSnapshot').mockReturnValue(status === 'ready' ? { status, folderPath: 'Reminders' }
-			: status === 'locked' ? { status, message: 'Unlock keys', converting: false, setupRequired: false, unavailable: false } : { status });
+			: status === 'locked' ? { status, message: 'Unlock keys', converting: false, setupRequired: false, unavailable: false, offlineCopy: false } : { status });
 		const pushManager = {} as PushManager;
 		await expect(getPwaPushManager({ windowPushManager: {} as PushManager,
 			registerServiceWorker: async () => ({ pushManager }) as ServiceWorkerRegistration })).resolves.toBe(pushManager);

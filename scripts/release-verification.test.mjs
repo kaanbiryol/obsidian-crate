@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -190,6 +190,20 @@ test('draft attachment depends on the complete verifier, with reproduction gated
 	assert.ok(build.on.workflow_dispatch.inputs['release-tag']);
 	assert.equal(build.permissions.contents, 'read');
 	assert.equal(build.jobs.verify.uses, './.github/workflows/verify.yml');
+	// A pull request head runs once; release reuse needs push runs, which master and release/<tag> keep.
+	assert.deepEqual(build.on.push, { branches: ['master', 'release/**'] });
+	assert.equal(build.on.pull_request, null);
+});
+
+test('every hosted workflow job has a timeout', async () => {
+	const directory = new URL('../.github/workflows/', import.meta.url);
+	for (const name of await readdir(directory)) {
+		const workflow = parse(await readFile(new URL(name, directory), 'utf8'));
+		for (const [id, job] of Object.entries(workflow.jobs)) {
+			// Reusable workflow calls take their jobs' own timeouts.
+			if (job['runs-on']) assert.ok(Number.isInteger(job['timeout-minutes']), `${name} ${id}`);
+		}
+	}
 });
 
 test('CI mirrors check:source step by step and the local release gate runs the packed server test', async () => {

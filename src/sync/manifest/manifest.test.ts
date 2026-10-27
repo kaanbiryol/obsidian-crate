@@ -4,6 +4,7 @@ import type { FileEntry, FileManifest } from '../../protocol/sync-types';
 import { LocalManifest } from './manifest';
 import { encodeCheckpoint, parseCheckpoint } from './manifest-checkpoint';
 import { replayManifestLog } from './manifest-log';
+import { createReminderOperationId } from '../../protocol/reminder-operation';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
@@ -135,15 +136,15 @@ describe('LocalManifest', () => {
 		expect(promoted.files).toEqual(files);
 	});
 
-	it('keeps replacement manifests free of inherited file entries', () => {
+	it('keeps parsed checkpoints free of inherited file entries', () => {
 		const entry = { hash: 'f'.repeat(64), size: 1, modified: '2026-09-09T00:00:00Z' };
 		const files = Object.create({ inherited: entry }) as Record<string, typeof entry>;
 		Object.defineProperty(files, '__proto__', { value: entry, enumerable: true });
-		manifest.replaceManifest({ version: 1, files });
-		expect(manifest.getAllPaths()).toEqual(['__proto__']);
-		expect(manifest.getEntry('__proto__')).toEqual(entry);
-		expect(manifest.getEntry('inherited')).toBeUndefined();
-		expect(manifest.hasFile('constructor')).toBe(false);
+		const parsed = parseCheckpoint({ version: 1, generation: 1, files }).manifest.files;
+		expect(Object.keys(parsed)).toEqual(['__proto__']);
+		expect(Object.getOwnPropertyDescriptor(parsed, '__proto__')?.value).toEqual(entry);
+		expect('inherited' in parsed).toBe(false);
+		expect('constructor' in parsed).toBe(false);
 	});
 
 	it('persists mutations made while an earlier checkpoint is being written', async () => {
@@ -328,13 +329,6 @@ describe('LocalManifest', () => {
 		});
 	});
 
-	it('rejects an invalid replacement without changing current authority', () => {
-		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-09-09' };
-		manifest.setEntry('original.md', entry);
-		expect(() => manifest.replaceManifest({ version: 1, files: { 'bad.md': { ...entry, size: -1 } }, lastSeq: -5 })).toThrow();
-		expect(manifest.getManifest().files).toEqual({ 'original.md': entry });
-	});
-
 	describe('change log', () => {
 		const entry = (hash: string) => ({ hash: hash.repeat(64), size: 1, modified: '2026-01-01T00:00:00Z' });
 		function diskAdapter(disk: Map<string, string>) {
@@ -385,6 +379,55 @@ describe('LocalManifest', () => {
 			expect(records[0]!.length).toBeGreaterThan(50_000);
 			expect(records.slice(1).map(record => record.length).every(length => length < 300)).toBe(true);
 			expect(Object.keys((await reload()).getRenameDependencies())).toHaveLength(2000);
+		});
+
+		it('appends only new upload diagnostics to each record and reloads the newest 50', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			manifest.setEntry('a.md', entry('a'));
+			await manifest.save();
+			const hex = (value: number) => value.toString(16).padStart(64, '0');
+			const upload = { clientSession: crypto.randomUUID(), operationId: createReminderOperationId(20_000), kind: 'local' as const, pathHash: hex(1), baseHash: hex(2) };
+			for (let flush = 0; flush < 100; flush++) {
+				manifest.recordUploadDiagnostic({ ...upload, uploadHash: hex(flush), phase: 'prepared' });
+				manifest.recordUploadDiagnostic({ ...upload, uploadHash: hex(flush), phase: 'remote-committed' });
+				manifest.setEntry('a.md', { ...entry('a'), hash: hex(flush) });
+				await manifest.save();
+			}
+			const records = disk.get(log)!.trim().split('\n').slice(1);
+			expect(records).toHaveLength(100);
+			// Each record carries its own two rows and one entry, not the whole 50-row list.
+			expect(Math.max(...records.map(record => record.length))).toBeLessThan(1500);
+			const restored = (await reload()).getUploadDiagnostics();
+			expect(restored).toHaveLength(50);
+			expect(restored).toEqual(manifest.getUploadDiagnostics());
+			expect(restored.at(-1)).toMatchObject({ uploadHash: hex(99), phase: 'remote-committed' });
+		});
+
+		it('replays diagnostics written as a full list by older plugins', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			manifest.setEntry('a.md', entry('a'));
+			await manifest.save();
+			const row = { at: '2026-01-01T00:00:00.000Z', clientSession: crypto.randomUUID(), operationId: createReminderOperationId(20_000), kind: 'local',
+				phase: 'prepared', generation: 2, pathHash: 'a'.repeat(64), uploadHash: 'b'.repeat(64), baseHash: 'c'.repeat(64) };
+			disk.set(log, `{"version":1,"base":1}\n{"generation":2,"set":{},"deleted":[],"changes":{"uploadDiagnostics":${JSON.stringify([row])}}}\n`);
+			expect((await reload()).getUploadDiagnostics()).toEqual([row]);
+		});
+
+		it('keeps an equal entry and writes nothing for it', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			for (let index = 0; index < 10_000; index++) manifest.setEntry(`notes/${index}.md`, { ...entry('a'), revision: `r${index}` });
+			await manifest.save();
+			const baseline = manifest.getEntry('notes/1.md');
+			adapter.write.mockClear();
+			// A full sync sets every matching file again, without its revision.
+			for (let index = 0; index < 10_000; index++) manifest.setEntry(`notes/${index}.md`, entry('a'));
+			await manifest.save();
+			expect(manifest.getEntry('notes/1.md')).toBe(baseline);
+			expect(adapter.write).not.toHaveBeenCalled();
+			expect(adapter.append).not.toHaveBeenCalled();
 		});
 
 		it('replays a cleared recovery field', async () => {
@@ -459,11 +502,16 @@ describe('LocalManifest', () => {
 			manifest.setEntry('b.md', entry('b'));
 			await manifest.save();
 			const stale = disk.get(log)!;
-			// A crash after a compaction's checkpoint write but before its next record.
-			manifest.replaceManifest({ version: 1, files: { 'c.md': entry('c') } });
+			// A failed append makes the next save compact. A crash after that compaction's
+			// checkpoint write but before its next record leaves the older log behind.
+			adapter.append.mockRejectedValueOnce(new Error('ENOSPC'));
+			manifest.setEntry('c.md', entry('c'));
+			await expect(manifest.save()).rejects.toThrow('ENOSPC');
+			manifest.removeEntry('b.md');
 			await manifest.save();
 			disk.set(log, stale);
-			expect((await reload()).getAllPaths()).toEqual(['c.md']);
+			// Replaying the stale record would bring b.md back.
+			expect((await reload()).getAllPaths().sort()).toEqual(['a.md', 'c.md']);
 		});
 
 		it('rejects a damaged record before the end of the log', async () => {

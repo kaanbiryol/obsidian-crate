@@ -1,7 +1,14 @@
 import { TFile, TFolder, type FileManager, type TAbstractFile, type Vault } from 'obsidian';
 import { portablePathKey } from '@/protocol/portable-path';
 import { isCurrentVaultFile } from '@/sync/local/vault-file-identity';
+import { processVaultMarkdown, readVaultMarkdown } from '@/sync/local/vault-markdown';
+import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import type { ReadingFile, ReadingVault } from './library';
+
+/** The library lists the note as an issue instead of rewriting replaced bytes. */
+const strictUtf8 = (error: unknown): never => {
+	throw error instanceof MarkdownEncodingError ? new Error('Save this note as UTF-8 without null characters to use it in Reading. The original vault file remains synced.') : error;
+};
 
 /** Bind Reading snapshots to Obsidian file identities, even across equal-mtime edits. */
 export function createObsidianReadingVault(vault: Vault, folder: string, options: {
@@ -44,8 +51,8 @@ export function createObsidianReadingVault(vault: Vault, folder: string, options
 			if (file instanceof TFile) fileEvents.set(file, (fileEvents.get(file) ?? 0) + 1);
 		},
 		occupied: path => vault.getAllLoadedFiles().some(file => portablePathKey(file.path) === portablePathKey(path)),
-		read: async file => { const content = await vault.read(resolve(file)); resolve(file); return content; },
-		process: (file, update) => vault.process(resolve(file), current => { resolve(file); return update(current); }),
+		read: async file => { const content = await readVaultMarkdown(vault, resolve(file)).catch(strictUtf8); resolve(file); return content; },
+		process: (file, update) => processVaultMarkdown(vault, resolve(file), current => { resolve(file); return update(current); }).catch(strictUtf8),
 		create: async (path, content) => {
 			const segments = folder.split('/');
 			for (let i = 1; i <= segments.length; i++) {

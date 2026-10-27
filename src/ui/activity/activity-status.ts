@@ -1,14 +1,7 @@
 import type { SyncActivityProgress, SyncState } from '../../sync/types';
+import { formatTimeAgo } from '../shared/format';
 
 type SyncStatusKind = 'syncing' | 'error' | 'offline' | 'checking' | 'pending' | 'synced' | 'never';
-
-function syncedAgo(lastSync: string, now: number): string {
-	const minutes = Math.floor((now - new Date(lastSync).getTime()) / 60_000);
-	if (minutes < 1) return 'Synced just now';
-	if (minutes < 60) return `Synced ${minutes}m ago`;
-	const hours = Math.floor(minutes / 60);
-	return hours < 24 ? `Synced ${hours}h ago` : `Synced ${Math.floor(hours / 24)}d ago`;
-}
 
 function lastSyncStatus(state: SyncState, syncing: boolean, now: number): { kind: SyncStatusKind; text: string } {
 	if (syncing) return { kind: 'syncing', text: 'Syncing…' };
@@ -16,7 +9,7 @@ function lastSyncStatus(state: SyncState, syncing: boolean, now: number): { kind
 	if (state.status === 'offline') return { kind: 'offline', text: 'Server unavailable' };
 	if (state.initializing) return { kind: 'checking', text: 'Checking local files…' };
 	if (!state.lastSync) return { kind: 'never', text: 'Not synced yet' };
-	return { kind: 'synced', text: syncedAgo(state.lastSync, now) };
+	return { kind: 'synced', text: `Synced ${formatTimeAgo(new Date(state.lastSync).getTime(), now)}` };
 }
 
 /** One phrase per sync state, shared by Sync activity and the status bar. */

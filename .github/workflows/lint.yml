@@ -1,11 +1,11 @@
 name: Node.js build
 
 on:
+  # Other branches run through their pull request, so a PR head is verified once.
+  # Release reuse accepts only push runs, from master or release/<tag>.
   push:
-    # Dependabot always opens a pull request, which runs this workflow once.
-    branches-ignore: ["dependabot/**"]
+    branches: ["master", "release/**"]
   pull_request:
-    branches: ["**"]
   workflow_dispatch:
     inputs:
       release-tag:
@@ -41,6 +41,7 @@ jobs:
     needs: verify
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Require all verification jobs
         env:

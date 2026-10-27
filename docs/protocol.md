@@ -16,7 +16,7 @@ Manifest and metadata entries, changelog puts, upload acknowledgements, and batc
 
 Single uploads require `X-Crate-Upload-Operation`; every batch member requires `operationId`. The ID binds the path, verified content hash, size, content type and expected hash. The file transaction records success or rejected preconditions in `upload_operations`. A retry returns that outcome, even after a later edit or deletion, without publishing bytes again. A new logical upload needs a new ID. IDs use the server-issued UTC day and 180-date expiry mechanism below. The plugin persists exact upload bytes before dispatch, recovers unresolved receipts before reconciliation, and checkpoints acknowledgement before removing its local journal. See [upload recovery and rename preservation](upload-recovery.md).
 
-Batch uploads accept three files; batch deletes accept four. Both bound D1 work below the Free-plan 50-query limit with headroom for authentication and failure cleanup. The per-file byte limit is 25 MiB. Clients report skipped oversized files as errors.
+Batch uploads accept three files; batch deletes accept four. Both bound D1 work below the Free-plan 50-query limit with headroom for authentication and failure cleanup. The per-file byte limit is 25 MiB. Clients report oversized files on either side as skipped issues; they do not fail a sync or hold back the changelog cursor.
 
 Live file paths form a portable filesystem namespace: no file may also be another file's parent, including case-insensitive or Unicode-normalized aliases. Each publication checks this inside its D1 transaction. A conflicting upload, restore or reminder move returns `namespace_conflict` with HTTP 409 (or a per-file batch status); preserve the local bytes and rename the conflicting file or parent folder before retrying. Same-path edits and delete-then-create replacements remain valid. Historical changes and metadata requests may include paths that no longer coexist; clients validate the final live manifest separately. Existing invalid remote namespaces require explicit repair on an originating device and are never resolved by automatically deleting one side.
 
@@ -105,7 +105,8 @@ than by message text. The Worker sends `reminder-note-too-large`,
 `duplicate-reminder-id`, `invalid-markdown-encoding` and the reminder description
 codes `invalid-description-block`, `invalid-description-encoding` and
 `unsupported-description-encoding`. The plugin adds `file-too-large`,
-`vault-scan-incomplete`, `transfer-unverified` and `more-reminder-issues`. Codes are
+`unsupported-device-path`, `vault-scan-incomplete`, `transfer-unverified` and
+`more-reminder-issues`. Codes are
 additive: older plugins ignore them, newer plugins drop unknown codes, and issues
 without a code (OS, HTTP and transport errors, or older peers) fall back to message
 matching.

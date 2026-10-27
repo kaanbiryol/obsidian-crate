@@ -42,6 +42,23 @@ describe('SyncEngine incremental sync cursor/state safeguards', () => {
 		expect(state.lastError).toBe('notes/remote.md: network down');
 		expect(harness.settings.lastSeq).toBe(1);
 	});
+
+	it('reports a persistent local scan error without reading the whole server inventory', async () => {
+		const harness = createHarness({ lastSeq: 1 });
+		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 2, hasMore: false });
+		// Names that collide on a case-insensitive device fail every scan until renamed.
+		harness.vault.getFiles.mockReturnValue(['notes/A.md', 'notes/a.md'].map(path => ({ path, extension: 'md', stat: { size: 1, mtime: 1 } })));
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+
+		const result = await harness.engine.sync();
+
+		expect(result).toMatchObject({ success: false, outcome: 'failed' });
+		expect(result.errors).toEqual([expect.stringContaining('Paths collide')]);
+		expect(harness.engine.getState().status).toBe('error');
+		expect(harness.api.getManifest).not.toHaveBeenCalled();
+		expect(harness.settings.lastSeq).toBe(1);
+		harness.engine.destroy();
+	});
 });
 describe('SyncEngine full sync safeguards', () => {
 	it('skips ignored remote paths during full sync reconciliation', async () => {
@@ -72,6 +89,26 @@ describe('SyncEngine full sync safeguards', () => {
 		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 5, hasMore: false, cursorExpired: true });
 		harness.api.getManifest.mockResolvedValue({
 			version: 1,
+			files: { 'notes/remote.md': { hash: 'remote-hash', size: 10, modified: '2026-02-06T12:00:00.000Z' } },
+			lastSeq: 9,
+		});
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.api.batchDownload.mockRejectedValue(new Error('Batch response unreadable'));
+		harness.api.downloadFile.mockRejectedValue(new Error('Download unreadable'));
+
+		const result = await harness.engine.sync();
+
+		expect(result.success).toBe(false);
+		expect(result.errors).toContain('notes/remote.md: Download unreadable');
+		expect(harness.settings.lastSeq).toBe(5);
+	});
+
+	it('advances lastSeq past a remote file too large for this device during full sync', async () => {
+		const harness = createHarness({ lastSeq: 5 });
+		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 5, hasMore: false, cursorExpired: true });
+		harness.api.getManifest.mockResolvedValue({
+			version: 1,
 			files: {
 				'notes/big.bin': {
 					hash: 'remote-big',
@@ -86,9 +123,10 @@ describe('SyncEngine full sync safeguards', () => {
 
 		const result = await harness.engine.sync();
 
-		expect(result.success).toBe(false);
-		expect(result.errors).toContain('notes/big.bin: Skipped remote file larger than 25MB');
-		expect(harness.settings.lastSeq).toBe(5);
+		expect(result).toMatchObject({ success: true, errors: [] });
+		expect(result.issues).toContainEqual({ path: 'notes/big.bin', message: 'Skipped remote file larger than 25MB', code: 'file-too-large' });
+		expect(harness.api.downloadFile).not.toHaveBeenCalled();
+		expect(harness.settings.lastSeq).toBe(9);
 	});
 
 	it('reports a batch upload result rejected for revoked access with the reconnect message', async () => {

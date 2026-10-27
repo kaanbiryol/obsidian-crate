@@ -11,11 +11,12 @@ import type { ScannedReminderRecord } from "@/reminders/core/markdownScan";
 import { createLogger } from "@/reminders/logger";
 import { createReminderLookupStore } from "./lookup-store";
 import { createReminderOptimisticState } from "./optimistic-state";
-import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
+import { isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
+import { getProjectFromPath } from "@/reminders/core/markdownScan";
 import { addReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from '../reminder-identity-owners';
 import { applyFileScanResult } from './file-scan-result';
 import type { ReminderSourceIssue } from '../reminder-source-issues';
-import { readVaultMarkdown } from '../vault-markdown';
+import { readVaultMarkdown } from '@/sync/local/vault-markdown';
 import { sha256Hex } from '../../../platform/sha256';
 
 const contentDigest = sha256Hex;
@@ -134,7 +135,7 @@ export function createReminderIndex(
 			return false;
 		}
 		// A read failure here is reported by the full scan below.
-		const content = await readVaultMarkdown(app, file).catch(() => undefined);
+		const content = await readVaultMarkdown(app.vault, file).catch(() => undefined);
 		const digest = content === undefined ? undefined : await contentDigest(content);
 		if (signal?.aborted || !scan.current || file.path !== scan.path) return false;
 		if (digest && scannedDigests.get(filePath) === digest && !sourceIssues.has(filePath)) return false;
@@ -319,6 +320,7 @@ export function createReminderIndex(
 
 			lookupStore.removeFile(filePath);
 			reminders = reminders.filter((reminder) => reminder.filePath !== filePath);
+			optimisticState.clearFileState(filePath, []);
 			discoveredProjects.delete(getProjectFromPath(filePath, remindersFolderPath));
 
 			publishChange();

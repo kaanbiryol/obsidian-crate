@@ -9,6 +9,7 @@ import { readEncryptionState } from '../../encryption/state';
 import type { UploadCommitInput, UploadCommitters } from './upload-committers';
 import { commitCoordinatorUpload } from '../../coordinator/coordinator';
 import { isMarkdownPath } from '../../../../protocol/note-paths';
+import { MAX_REMINDER_NOTE_BYTES } from '../../../../reminders/core/constants';
 
 type UploadParams = UploadCommitInput;
 type CommitUpload = UploadCommitters['commitUpload'];
@@ -85,7 +86,9 @@ export async function prepareCoordinatedUpload(request: Request, env: Env): Prom
 	}
 	const policy = await getNotificationPolicy(env.DB);
 	metadata.reminderPolicyRevision = policy?.revision ?? null;
-	if (!isReminderPath(metadata.path, policy?.folderPath ?? null) && !await readEncryptionState(env.DB)) return { ...metadata, content: new ArrayBuffer(0) };
+	// Plaintext bytes matter only to a reminder note, and one over the limit is rejected by its size.
+	if ((!isReminderPath(metadata.path, policy?.folderPath ?? null) || metadata.size > MAX_REMINDER_NOTE_BYTES)
+		&& !await readEncryptionState(env.DB)) return { ...metadata, content: new ArrayBuffer(0) };
 	const object = await env.BUCKET.get(metadata.objectKey);
 	if (!object) return Response.json({ error: 'Staged object unavailable' }, { status: 503 });
 	const content = await object.arrayBuffer();

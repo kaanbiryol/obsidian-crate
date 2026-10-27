@@ -277,7 +277,7 @@ const readerUrl = 'https://browser.example.invalid/browser';
 
 /** Each scenario owns fresh Worker storage, credentials, browser state and response holds. */
 async function openReadingBrowserFixture(t, name, engine, contextOptions = {}) {
-  const faults = { article: null, update: null, list: null, loseCaptureReply: false };
+  const faults = { article: null, update: null, list: null, loseCaptureReply: false, encryptionUnavailable: false };
   const sent = [], releases = [], errors = [];
   let fixture, browser;
   t.after(async () => {
@@ -303,6 +303,7 @@ async function openReadingBrowserFixture(t, name, engine, contextOptions = {}) {
     deviceName: `Reading ${name} test`,
     handleRequest: async ({ request: req, body, dispatch }) => {
       if (req.url === '/notifications/test-share') return new Response('<!doctype html><title>Share fixture</title><body>Share fixture</body>', { headers: { 'Content-Type': 'text/html' } });
+      if (req.url === '/reading/encryption' && faults.encryptionUnavailable) return Response.json({ error: 'Temporarily unavailable' }, { status: 503 });
       const response = await dispatch();
       const kind = req.url.startsWith('/reading/item?') ? 'article' : req.url === '/reading/update' ? 'update' : req.url === '/reading/list' ? 'list' : null;
       if (kind && faults[kind]) {
@@ -831,7 +832,45 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const db = await new Promise((resolve, reject) => { const request = indexedDB.open('crate-reading-v1', 1); request.onsuccess = () => resolve(request.result); request.onerror = reject; });
     return new Promise(resolve => { const request = db.transaction('values').objectStore('values').get(`share:${id}`); request.onsuccess = () => { db.close(); resolve(request.result?.encryptedShare === 1); }; });
   }), true, 'An unconnected browser retains the shared link for enrollment');
+  // The enrollment link replaces the share parameter; the newest staged share still opens
+  // and leaves storage once the draft holds it.
+  await shared.goto(await fixture.readingAppUrl());
+  await expect(shared.getByLabel('Link', { exact: true })).toHaveValue('https://example.invalid/first-share');
+  await expect.poll(() => shared.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => { const request = indexedDB.open('crate-reading-v1', 1); request.onsuccess = () => resolve(request.result); request.onerror = reject; });
+    return new Promise(resolve => { const request = db.transaction('values').objectStore('values').getAllKeys(); request.onsuccess = () => { db.close(); resolve(request.result.filter(key => key.startsWith('share:')).length); }; });
+  })).toBe(0);
   await fresh.close();
+});
+
+for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: unanswered encryption check shows the saved library read-only`, { timeout: 90000 }, async t => {
+  const fixture = await openReadingBrowserFixture(t, name, engine);
+  const { page, readingSync, faults, sent } = fixture;
+  await fixture.enroll();
+  await page.getByRole('button',{name:'Save a link',exact:true}).click();
+  await page.getByLabel('Link',{exact:true}).fill('https://offline.example.invalid/saved');
+  await page.getByRole('button',{name:'Save link',exact:true}).click();
+  const saved = page.getByRole('button',{name:/offline.example.invalid offline.example.invalid/});
+  await saved.waitFor();
+  await expect(readingSync).toHaveAttribute('data-sync-state','synced');
+  sent.length = 0;
+  // At the HTTP boundary: WebKit does not route a service-worker-controlled page's requests.
+  faults.encryptionUnavailable = true;
+  await page.reload();
+  // Before: a full-screen error hid the saved library on a device without encryption evidence.
+  await expect(page.locator('.crate-reading__notice').filter({ hasText: 'Unable to connect.' })).toBeVisible();
+  await saved.waitFor();
+  await expect(page.locator('.crate-encryption-unlock')).toHaveCount(0);
+  await page.getByRole('button',{name:'Save a link',exact:true}).click();
+  await page.getByLabel('Link',{exact:true}).fill('https://offline.example.invalid/refused');
+  await page.getByRole('button',{name:'Save link',exact:true}).click();
+  await expect(page.getByRole('dialog', { name: 'Save a link' }).getByRole('alert')).toContainText('Could not verify encryption');
+  assert.deepEqual(sent, []);
+  faults.encryptionUnavailable = false;
+  await page.reload();
+  await saved.waitFor();
+  await expect(page.locator('.crate-reading__notice').filter({ hasText: 'Unable to connect.' })).toHaveCount(0);
+  await expect(readingSync).toHaveAttribute('data-sync-state','synced');
 });
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: enrollment, save and logout`, { timeout: 90000 }, async t => {

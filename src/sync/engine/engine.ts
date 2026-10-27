@@ -527,7 +527,7 @@ export class SyncEngine {
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			runConcurrent: (tasks, concurrency) => this.lifecycle.runConcurrent(tasks, concurrency),
 		})).catch((error) => {
-			logger.warn('Markdown base cache seed failed:', errorMessage(error));
+			if (!isAbortError(error)) logger.warn('Markdown base cache seed failed:', errorMessage(error));
 		});
 	}
 

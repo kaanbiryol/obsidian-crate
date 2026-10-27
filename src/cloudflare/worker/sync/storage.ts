@@ -2,6 +2,7 @@ import { portablePathKey } from '../../../protocol/portable-path';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { queryRows } from '../db';
 import { isSha256Hex } from '../../../platform/validation';
+import { sha256Hex } from '../../../platform/sha256';
 export {
 	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
 	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,
@@ -47,15 +48,6 @@ export function formatMutationError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
-function normalizeStorageKey(value: unknown): string | null {
-	if (typeof value !== 'string') {
-		return null;
-	}
-
-	const trimmed = value.trim();
-	return trimmed.length > 0 ? trimmed : null;
-}
-
 export function storedObjectMatchesMetadata(
 	object: { size: number; customMetadata?: Record<string, string> },
 	storedFile: FileStorageRow,
@@ -68,24 +60,22 @@ export function formatMetadataCommitFailure(actionLabel: 'Upload' | 'Delete', me
 	return `${actionLabel} outcome is unknown because the metadata response failed; reconcile before retrying: ${metadataMessage}`;
 }
 
+type FileRow = { hash: string; size: number; storage_key: string };
+const toFileStorageRow = (row: FileRow): FileStorageRow => ({ hash: row.hash, size: row.size, storageKey: row.storage_key });
+
 export async function getStoredFileRow(db: D1Database, path: string): Promise<FileStorageRow | null> {
 	const row = await db.prepare(`SELECT hash, size, storage_key FROM files WHERE ${FILE_PATH_MATCH}`)
 		.bind(...filePathArgs(path))
-		.first<{ hash?: string; size?: number; storage_key?: string }>();
-	return toFileStorageRow(row);
+		.first<FileRow>();
+	return row && toFileStorageRow(row);
 }
 
-function toFileStorageRow(row: { hash?: string | null; size?: number | null; storage_key?: string | null } | null): FileStorageRow | null {
-	const storageKey = normalizeStorageKey(row?.storage_key);
-	if (!row || !storageKey) {
-		return null;
-	}
-
-	return {
-		hash: typeof row.hash === 'string' ? row.hash : '',
-		size: typeof row.size === 'number' ? row.size : 0,
-		storageKey,
-	};
+/** The bytes of a stored revision, or null when R2 lacks them or they fail its size or SHA-256. */
+export async function readVerifiedBytes(bucket: R2Bucket, file: FileStorageRow): Promise<ArrayBuffer | null> {
+	const object = await bucket.get(file.storageKey);
+	if (!object || (file.size > 0 && object.size !== file.size)) return null;
+	const bytes = await object.arrayBuffer();
+	return await sha256Hex(bytes) === file.hash ? bytes : null;
 }
 
 export async function loadStoredFileRows(db: D1Database, paths: string[]): Promise<Map<string, FileStorageRow>> {
@@ -95,28 +85,11 @@ export async function loadStoredFileRows(db: D1Database, paths: string[]): Promi
 	}
 
 	const placeholders = paths.map(() => '?').join(', ');
-	const rows = await queryRows<{
-		path?: string;
-		hash?: string;
-		size?: number;
-		storage_key?: string;
-	}>(db.prepare(
+	const rows = await queryRows<FileRow & { path: string }>(db.prepare(
 		`SELECT path, hash, size, storage_key FROM files WHERE portable_path IN (${placeholders})`,
 	).bind(...paths.map(portablePathKey)));
-
-	const entries: Array<readonly [string, FileStorageRow]> = [];
-	for (const row of rows) {
-		const path = typeof row.path === 'string' ? row.path : null;
-		const storageKey = normalizeStorageKey(row.storage_key);
-		if (!path || !storageKey || !paths.includes(path)) continue;
-		entries.push([path, {
-			hash: typeof row.hash === 'string' ? row.hash : '',
-			size: typeof row.size === 'number' ? row.size : 0,
-			storageKey,
-		}]);
-	}
-
-	return new Map(entries);
+	// A portable key also matches other spellings of a path; keep exact matches only.
+	return new Map(rows.filter(row => paths.includes(row.path)).map(row => [row.path, toFileStorageRow(row)]));
 }
 
 // Separate indexed endpoints avoid scanning the entire retained changelog.

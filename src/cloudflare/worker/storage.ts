@@ -8,8 +8,8 @@ import {
 	getStoredFileRow,
 	MAX_FILE_BYTES,
 	type FileStorageRow,
+	readVerifiedBytes,
 } from './sync/storage';
-import { sha256Hex } from '@/platform/sha256';
 
 interface StoredTextFile {
 	path: string;
@@ -62,17 +62,8 @@ export async function readStoredMarkdownFiles(
 		const chunk = rows.slice(index, index + 6);
 		files.push(...await Promise.all(chunk.map(async (row) => {
 			if (row.size > MAX_FILE_BYTES) return null;
-			const objectKey = row.storageKey;
-			const object = await bucket.get(objectKey);
-			if (!object || (row.size > 0 && object.size !== row.size)) return null;
-
-			const bytes = await object.arrayBuffer();
-			if (await sha256Hex(bytes) !== row.hash) return null;
-			return {
-				path: row.path,
-				content: bytes,
-				hash: row.hash,
-			} satisfies StoredMarkdownFileBytes;
+			const content = await readVerifiedBytes(bucket, row);
+			return content && { path: row.path, content, hash: row.hash } satisfies StoredMarkdownFileBytes;
 		})));
 	}
 
@@ -91,18 +82,8 @@ export async function readCommittedMarkdownFileVersion(
 		return null;
 	}
 
-	const objectKey = file.storageKey;
-	const object = await bucket.get(objectKey);
-	if (!object || (file.size > 0 && object.size !== file.size)) {
-		return null;
-	}
-
-	const bytes = await object.arrayBuffer();
-	if (await sha256Hex(bytes) !== file.hash) {
-		return null;
-	}
-
-	return {
+	const bytes = await readVerifiedBytes(bucket, file);
+	return bytes && {
 		content: decodeMarkdownBytes(bytes),
 		hash: file.hash,
 	};

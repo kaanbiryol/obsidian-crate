@@ -4,7 +4,6 @@ import { portablePathKey } from '../../protocol/portable-path';
 /** Where the local manifest keeps the server path of notes with a random server name. */
 export interface WireStore {
 	wireOf(path: string): string | undefined;
-	pathOfWire(wire: string): string | undefined;
 	noteWire(path: string, wire: string): void;
 	getAllPaths(): string[];
 }
@@ -37,12 +36,13 @@ export class PathIndex {
 
 	/** The plaintext path of a server path this device has synced, if any. */
 	async plainFor(wire: string): Promise<string | undefined> {
-		const known = this.plainByWire.get(wire) ?? this.store?.pathOfWire(wire);
+		const known = this.plainByWire.get(wire);
 		if (known || this.scanned || !this.store) return known;
-		// Deletes carry no metadata. Tags of synced files are rebuilt once, on demand.
+		// Deletes carry no metadata. Server paths of synced files are rebuilt once, on
+		// demand; later ones are learned as they sync.
 		this.scanned = true;
 		for (const path of this.store.getAllPaths()) {
-			const tag = await this.tags.wire(path).catch(() => null);
+			const tag = this.store.wireOf(path) ?? await this.tags.wire(path).catch(() => null);
 			if (tag && !this.plainByWire.has(tag)) this.plainByWire.set(tag, path);
 		}
 		return this.plainByWire.get(wire);

@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../connection/session-generation';
 import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
+import { reminderEncryptionSnapshot } from './encryption-session';
 import { fetchReadyReminderList, type ReminderIndexingProgress } from './reminder-api';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from './cache/reminder-cache';
 import { createReminderRequestCoordinator } from './outbox/reminder-request-coordinator';
 import { createReminderListCursor } from './reminder-list-cursor';
 import { decideReminderListFailure, decideReminderListResponse, needsDiskFallback } from './reminder-list-response';
 import { requestSharedFeaturesRefresh } from '../shared-features';
+import { responseError } from '../connection/response-error';
 import type { ApiFetch, DataMode, StoredConfig } from '../types';
 import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue, ReminderSyncHost } from './types';
 
@@ -158,7 +160,7 @@ export function useReminderSync({
 						}
 					},
 				);
-				if (response.status !== 304 && !response.ok) throw new Error(await response.text());
+				if (response.status !== 304 && !response.ok) throw new Error((await responseError(response, 'Could not load reminders.')).message);
 				const body: unknown = response.status === 304 ? undefined : await response.json().catch(() => null);
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const outcome = decideReminderListResponse({ status: response.status, headers: response.headers, body },
@@ -272,7 +274,10 @@ export function useReminderSync({
 		void (async () => {
 			try {
 				if (!authToken) { onSignedOut(); resetReminderState(); return; }
-				await prepareSession();
+				// Startup's check got no answer on a device without encryption evidence:
+				// show the plaintext copy now. Storage stays locked; the next refresh retries.
+				const view = reminderEncryptionSnapshot();
+				if (!(view.status === 'locked' && view.offlineCopy)) await prepareSession();
 				const cached = await loadCachedReminderSnapshot(config.folderPath);
 				if (!cancelled && current() && cached) hydrateCachedSnapshot(cached);
 			} catch (cause) {

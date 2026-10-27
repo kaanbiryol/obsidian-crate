@@ -170,7 +170,7 @@ describe('replaced version retention', () => {
 	it('retains the object an upload replaces when the same bytes were recreated after its snapshot', async () => {
 		expect((await absent('first')).status).toBe(200);
 		const snapshot = (await getStoredFileRow(db, path))!;
-		expect((await commitFileDelete(bucket, db, { path, expectedHash: snapshot.hash, expectedRevision: snapshot.storageKey, previousFile: snapshot })).committed).toBe(true);
+		expect((await commitFileDelete(db, { path, expectedHash: snapshot.hash, expectedRevision: snapshot.storageKey, previousFile: snapshot })).committed).toBe(true);
 		expect((await absent('first')).status).toBe(200);
 		const recreated = (await getStoredFileRow(db, path))!;
 		expect(recreated.storageKey).not.toBe(snapshot.storageKey);

@@ -5,7 +5,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { installStorageCostMeter, type StorageCostMeter } from '../test-support/storage-cost-test-harness';
 import worker from '../index';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { sha256Hex } from '@/platform/sha256';
@@ -25,7 +25,7 @@ function send(path: string, body?: string) {
 const titles = ['Edited alpha', 'Edited bravo', 'Edited charlie', 'Edited delta', 'Edited echo', 'Edited foxtrot'];
 let edits = 0;
 async function editBody(path: string, index: number) {
-	const reminder = scanReminderMarkdownFile(path, (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.content, 'Reminders')[index]!;
+	const reminder = scanReminderMarkdownContent(path, (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.content, 'Reminders').reminders[index]!;
 	return JSON.stringify({ operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)), id: reminder.id, folderPath: 'Reminders',
 		filePath: path, expectedRevision: await reminderRevision(reminder), content: titles[edits++ % titles.length] });
 }

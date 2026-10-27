@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReadingConnection } from './session/useReadingConnection';
 import type { PendingReading } from './outbox';
-import { hasEarlierReadingChanges, pendingReading, readReadingCache, readReadingDraft, readReadingShare, saveReadingDraft, type ReadingCache } from './storage/storage';
+import { adoptEarlierReadingCaptures, hasEarlierReadingChanges, newestReadingShare, pendingReading, readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, saveReadingDraft, type ReadingCache } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { sameReadingSession } from './session/session';
 
@@ -18,7 +18,7 @@ export function useReadingSession(connection: ReadingConnection) {
 	const [cache, setCache] = useState<ReadingCache | null>(null), [pending, setPending] = useState<PendingReading[]>([]);
 	const [error, setError] = useState<string | null>(null), [storageError, setStorageError] = useState<string | null>(null);
 	const [recovery, setRecovery] = useState(false), [draftReady, setDraftReady] = useState(false);
-	const [adding, setAdding] = useState(false), [url, setUrl] = useState(''), [share, setShare] = useState<string | null>(null);
+	const [adding, setAdding] = useState(false), [url, setUrl] = useState('');
 	const alive = useRef(true), generation = useRef(0);
 	const authority = useRef<ReadingSession | null>(null);
 	const isCurrentSession = useCallback((expected: ReadingSession) => {
@@ -47,7 +47,7 @@ export function useReadingSession(connection: ReadingConnection) {
 	}, [isCurrentSession]);
 	const finishCapture = useCallback((expected: ReadingSession) => {
 		if (!isCurrentSession(expected)) return false;
-		setUrl(''); setShare(null);
+		setUrl('');
 		return true;
 	}, [isCurrentSession]);
 	const openCapture = useCallback(() => { setError(null); setAdding(true); }, []);
@@ -62,20 +62,24 @@ export function useReadingSession(connection: ReadingConnection) {
 	const resetSession = useCallback((message?: string) => {
 		generation.current++; authority.current = null; resetConnection();
 		setSession(null); setHydrated(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
-		setUrl(''); setAdding(false); setShare(null);
+		setUrl(''); setAdding(false);
 		if (message) setError(message);
 	}, [resetConnection]);
+	// An unanswered check on a device without encryption evidence shows the plaintext
+	// offline copy. Storage refuses writes, so drafts, shares and sends wait for a check.
+	const readOnly = !connection.session && connection.offlineCopy;
+	const target = connection.session ?? (readOnly ? connection.lockedSession : null);
 	useEffect(() => {
 		// A null session during unlock is not a disconnected session. Scanning here
 		// treats this session's encrypted queue as unreadable earlier-session work.
-		if (!connection.ready || connection.connecting || connection.lockedSession) return;
+		if (!connection.ready || connection.connecting || (connection.lockedSession && !readOnly)) return;
 		alive.current = true;
 		const lifetime = generation;
 		const revision = ++lifetime.current;
-		const current = connection.session;
+		const current = target;
 		authority.current = current;
 		setSession(null); setHydrated(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
-		setUrl(''); setAdding(false); setShare(null); setError(null);
+		setUrl(''); setAdding(false); setError(null);
 		const currentRequest = () => {
 			if (!alive.current || revision !== generation.current) return false;
 			if (current) assertReadingSession(current);
@@ -87,6 +91,10 @@ export function useReadingSession(connection: ReadingConnection) {
 				if (currentRequest()) setRecovery(earlier);
 				return;
 			}
+			// A read-only copy cannot write; otherwise unsent captures of an earlier sign-in
+			// join this queue first. A failure leaves them for review and export.
+			if (!readOnly) await adoptEarlierReadingCaptures(current).catch(() => {});
+			if (!currentRequest()) return;
 			// Read each lifetime separately: a disposable cache failure must not hide a
 			// saved draft, and an unreadable draft must never be replaced by empty input.
 			const results = await Promise.allSettled([
@@ -104,26 +112,32 @@ export function useReadingSession(connection: ReadingConnection) {
 				setRecovery(true);
 			}
 			setSession(current);
-			if (draft.status === 'fulfilled') {
+			if (draft.status === 'fulfilled' && !readOnly) {
 				if (draft.value?.url) { setUrl(draft.value.url); setAdding(true); }
 				setDraftReady(true);
 			}
 
 			if (!currentRequest()) return;
 			setHydrated(current);
+			if (readOnly || draft.status !== 'fulfilled') return;
+			// A staged share leaves storage once its link is in this session's draft, so
+			// a dismissed form cannot strand it. Without `?share=`, for example after an
+			// enrollment link replaced the URL, take the newest one unless the draft has a link.
 			const shareId = new URL(location.href).searchParams.get('share');
-			if (shareId) {
-				const draft = await readReadingShare(shareId);
-				if (currentRequest() && draft) { setUrl(draft.url); setAdding(true); setShare(shareId); }
-			}
+			const staged = shareId ? await readReadingShare(shareId).then(share => share && { id: shareId, url: share.url })
+				: draft.value?.url ? undefined : await newestReadingShare().catch(() => undefined);
+			if (!staged || !currentRequest()) return;
+			setUrl(staged.url); setAdding(true);
+			await saveReadingDraft(current, { url: staged.url });
+			await removeReadingShare(current, staged.id);
 		});
 		return () => { alive.current = false; authority.current = null; lifetime.current++; };
-	}, [connection.session, connection.ready, connection.connecting, connection.lockedSession, run]);
-	const ready = connection.ready && (!connection.session || hydrated === connection.session || Boolean(error));
+	}, [target, readOnly, connection.ready, connection.connecting, connection.lockedSession, run]);
+	const ready = connection.ready && (!target || hydrated === target || Boolean(error));
 	useEffect(() => {
 		if (session && ready && draftReady) void run(() => saveReadingDraft(session, { url }));
 	}, [session, ready, draftReady, url, run]);
-	return { ...connection, session, ready, resetSession, cache, pending,
-		error: storageError ?? error ?? connection.error, recovery, adding, url, setUrl, share, run,
+	return { ...connection, session, readOnly, ready, resetSession, cache, pending,
+		error: storageError ?? error ?? connection.error, recovery, adding, url, setUrl, run,
 		isCurrentSession, publishPending, publishSyncResult, refreshRecovery, reportSessionError, finishCapture, openCapture, closeCapture };
 }

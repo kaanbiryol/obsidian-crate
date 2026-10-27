@@ -24,7 +24,7 @@ describe('runConcurrentTasks', () => {
 		expect(lateWrite).toHaveBeenCalledOnce();
 		expect(neverStarted).not.toHaveBeenCalled();
 	});
-	it('stops launching new tasks when destroyed', async () => {
+	it('rejects with an abort and launches no further work when destroyed between tasks', async () => {
 		let destroyed = false;
 		const callOrder: number[] = [];
 		const tasks = [
@@ -38,9 +38,36 @@ describe('runConcurrentTasks', () => {
 			async () => { callOrder.push(4); return 4; },
 		];
 
-		await runConcurrentTasks(tasks, 1, () => destroyed);
+		await expect(runConcurrentTasks(tasks, 1, () => destroyed)).rejects.toMatchObject({ name: 'AbortError' });
 
 		expect(callOrder).toEqual([1, 2]);
+	});
+
+	it('drains a task already running when destroyed before rejecting', async () => {
+		let destroyed = false;
+		let release!: () => void;
+		const blocked = new Promise<void>(resolve => { release = resolve; });
+		const lateWrite = vi.fn();
+		const neverStarted = vi.fn(async () => {});
+		const run = runConcurrentTasks([
+			async () => { await Promise.resolve(); destroyed = true; },
+			async () => { await blocked; lateWrite(); },
+			neverStarted,
+		], 2, () => destroyed);
+		const assertion = expect(run).rejects.toMatchObject({ name: 'AbortError' });
+		await Promise.resolve();
+		release();
+		await assertion;
+		expect(lateWrite).toHaveBeenCalledOnce();
+		expect(neverStarted).not.toHaveBeenCalled();
+	});
+
+	it('resolves every result when destroyed after the last task started', async () => {
+		let destroyed = false;
+		await expect(runConcurrentTasks([
+			async () => 1,
+			async () => { destroyed = true; return 2; },
+		], 2, () => destroyed)).resolves.toEqual([1, 2]);
 	});
 });
 

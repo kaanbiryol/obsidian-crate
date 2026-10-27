@@ -75,6 +75,16 @@ describe('local Reading library', () => {
 		const writes = h.process.mock.calls.length; await h.library.refresh();
 		expect(h.process).toHaveBeenCalledTimes(writes);
 	});
+	it('imports a clip once the note is no longer open in an editor', async () => {
+		const h = harness(); h.files.set('Reading/Clip.md', clip);
+		let open = true; h.vault.editing = path => open && path === 'Reading/Clip.md';
+		await h.library.refresh();
+		expect(h.process).not.toHaveBeenCalled();
+		expect(h.library.getSnapshot().issues).toEqual([{ path: 'Reading/Clip.md', message: 'Close this note to add it to Reading.' }]);
+		open = false; await h.library.refresh();
+		expect(h.process).toHaveBeenCalledTimes(1);
+		expect(h.library.getSnapshot().items.map(item => item.title)).toEqual(['A clip']);
+	});
 	it('defers adoption during sync and imports every Markdown note only within the reading folder', async () => {
 		const h = harness(); h.files.set('Reading/Clip.md', clip); h.files.set('Reading/Personal.md', '# Personal notes'); h.files.set('Outside/Private.md', '# Private'); h.files.set('Reading/image.png', 'image'); h.files.set('ReadingElsewhere/Private.md', '# Private');
 		h.defer(); await h.library.refresh(); expect(h.process).not.toHaveBeenCalled();

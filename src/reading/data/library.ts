@@ -97,19 +97,23 @@ export class ReadingLibrary {
 					let original = await this.vault.read(file);
 					// Versioned notes need no adoption, so parse them only once.
 					let metadata = this.parse(original);
+					let deferred = false;
 					if (!metadata && this.canAdopt()) {
 						const adopted = await adoptReadingClip(original, file.path, new Date(file.modifiedAt).toISOString());
 						this.assertActive();
-						const content = adopted === original ? original : await this.vault.process(file, current => {
-							this.assertActive();
-							if (!this.canAdopt() || current !== original) throw new Error('File changed during import. It will be checked again.');
-							return adopted;
-						});
-						metadata = this.parse(content);
-						original = content;
+						// Like highlight records below, an import waits until nobody is editing the note.
+						if (adopted !== original && this.vault.editing?.(file.path)) deferred = true;
+						else {
+							const content = adopted === original ? original : await this.vault.process(file, current => {
+								this.assertActive();
+								if (!this.canAdopt() || current !== original) throw new Error('File changed during import. It will be checked again.');
+								return adopted;
+							});
+							metadata = this.parse(content);
+							original = content;
+						}
 					}
 					// Markers typed in Obsidian get stable IDs once nobody is editing the note.
-					let deferred = false;
 					if (metadata?.highlights?.some(highlight => highlight.id?.startsWith('markdown-')) && this.canAdopt()) {
 						const recorded = await recordMarkdownHighlights(original, metadata);
 						this.assertActive();
@@ -129,7 +133,7 @@ export class ReadingLibrary {
 						items.push(item);
 						if (file.revision && !deferred) this.cache.set(file.path, { revision: file.revision, metadata, item });
 					}
-					else issues.push({ path: file.path, message: 'Note is waiting for import after sync.' });
+					else issues.push({ path: file.path, message: deferred ? 'Close this note to add it to Reading.' : 'Note is waiting for import after sync.' });
 				} catch (error) {
 					this.cache.delete(file.path);
 					this.assertActive();

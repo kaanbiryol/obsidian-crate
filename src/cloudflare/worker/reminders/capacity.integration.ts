@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleListReminders } from './routes/list';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/index';
 import { sha256Hex } from '../../../platform/sha256';
 
@@ -27,7 +27,7 @@ async function seedFiles(fileCount: number, remindersPerFile: number, warm: bool
 				path,
 				hash: await sha256Hex(content),
 				size: new TextEncoder().encode(content).byteLength,
-				reminders: warm ? scanReminderMarkdownFile(path, content, 'Reminders') : [],
+				reminders: warm ? scanReminderMarkdownContent(path, content, 'Reminders').reminders : [],
 			};
 		}));
 		const json = JSON.stringify(rows);

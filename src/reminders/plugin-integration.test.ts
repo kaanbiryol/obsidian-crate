@@ -98,11 +98,7 @@ async function loadPluginIntegrationModule() {
 	vi.doMock('./data/reminder-repository', () => ({
 		createReminderRepository,
 	}));
-	vi.doMock('./query/injector', () => ({
-		ReminderQueryInjector: class ReminderQueryInjector {
-			onBlock = reminderQueryOnBlock;
-		},
-	}));
+	vi.doMock('./query/injector', () => ({ renderRemindersBlock: reminderQueryOnBlock }));
 	vi.doMock('./commands', () => ({
 		registerReminderCommands,
 	}));
@@ -237,7 +233,7 @@ describe('initializeReminders', () => {
 		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(3);
 		for (const [language, processor] of plugin.registerMarkdownCodeBlockProcessor.mock.calls as Array<[string, (source: string, el: unknown, ctx: unknown) => void]>) {
 			processor('source', 'el', 'ctx');
-			expect(reminderQueryOnBlock).toHaveBeenLastCalledWith(language, 'source', 'el', 'ctx');
+			expect(reminderQueryOnBlock).toHaveBeenLastCalledWith(plugin, language, 'source', 'el', 'ctx');
 		}
 		expect(plugin.registerView).toHaveBeenCalledWith('reminders-view', expect.any(Function));
 		expect(plugin.addRibbonIcon).toHaveBeenCalledWith('crate-logo', 'Open Crate', expect.any(Function));

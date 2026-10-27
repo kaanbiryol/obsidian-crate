@@ -1,8 +1,8 @@
 import { setReminderRibbon } from './visibility';
-import { addIcon, type MarkdownPostProcessorContext } from 'obsidian';
+import { addIcon } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { registerReminderCommands } from './commands';
-import { ReminderQueryInjector } from './query/injector';
+import { renderRemindersBlock } from './query/injector';
 import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/plugin/reminders-view';
 import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
@@ -19,19 +19,9 @@ export async function registerReminderIntegrations(plugin: CratePlugin, openView
 	}
 	registeredReminderUi.add(plugin);
 
-	const queryProcessor = new ReminderQueryInjector(plugin);
-	plugin.registerMarkdownCodeBlockProcessor(
-		'reminders',
-		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onBlock('reminders', source, el, ctx),
-	);
-	plugin.registerMarkdownCodeBlockProcessor(
-		'reminders-today',
-		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onBlock('reminders-today', source, el, ctx),
-	);
-	plugin.registerMarkdownCodeBlockProcessor(
-		'reminders-upcoming',
-		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onBlock('reminders-upcoming', source, el, ctx),
-	);
+	for (const type of ['reminders', 'reminders-today', 'reminders-upcoming'] as const) {
+		plugin.registerMarkdownCodeBlockProcessor(type, (source, el, ctx) => renderRemindersBlock(plugin, type, source, el, ctx));
+	}
 
 	addIcon(CRATE_ICON_ID, CRATE_ICON_SVG);
 	plugin.registerView(

@@ -6,7 +6,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleUpdateReminder } from './routes/existing-reminder';
-import { scanReminderMarkdownFile } from './scan';
+import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 
 const { DB: db, BUCKET: bucket } = env;
@@ -25,7 +25,7 @@ async function prepareMove(completed: boolean, destinationExists = false) {
 		'# Personal\n\n- [ ] Existing task <!-- crate-id:r-existing -->\n', null);
 	const source = (await readCommittedMarkdownFileVersion(bucket, db, sourcePath))!;
 	const destination = await readCommittedMarkdownFileVersion(bucket, db, destinationPath);
-	const [reminder] = scanReminderMarkdownFile(sourcePath, content, 'Reminders');
+	const [reminder] = scanReminderMarkdownContent(sourcePath, content, 'Reminders').reminders;
 	const operationId = createReminderOperationId(Math.floor(Date.now() / 86_400_000));
 	const request = new Request('https://worker.test/reminders/update', {
 		method: 'POST',

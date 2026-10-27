@@ -85,10 +85,12 @@ describe('checkpoint authority and reset', () => {
 		await Promise.resolve();
 		expect(closed).toBe(false);
 		release.resolve();
-		await Promise.all([saving, closing]);
+		// A save the close interrupted is not reported as a durable checkpoint.
+		await expect(saving).rejects.toMatchObject({ name: 'AbortError' });
+		await closing;
 		await deleteManifestFile(harness.plugin as never);
 		old.setEntry('late.md', entry);
-		await old.save();
+		await expect(old.save()).rejects.toMatchObject({ name: 'AbortError' });
 		const next = harness.manifest('https://new.example');
 		await next.load();
 		expect(next.getAllPaths()).toEqual([]);

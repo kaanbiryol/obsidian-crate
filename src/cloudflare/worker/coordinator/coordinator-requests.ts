@@ -13,6 +13,7 @@ import { handleBatchDownload } from '../sync/batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/staging/bulk-upload-dispatch';
 import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../sync/staging/staged-upload-dispatch';
 import { scheduleMaintenance } from '../maintenance/schedule';
+import { isCrateMutation } from '../../../protocol/server-info';
 
 export type StateLock = <T>(action: () => Promise<T>) => Promise<T>;
 
@@ -46,8 +47,8 @@ export async function handleCoordinatorRequest(
 	if (path === COORDINATOR_PATHS.maintain && request.method === 'POST' && await state.storage.get<boolean>('maintenanceCoordinator')
 		&& await state.storage.getAlarm() !== null) return new Response(null, { status: 204 });
 	// Schedule cleanup before queuing, so a running maintenance pass delays only
-	// this request rather than every coordinated mutation behind it.
-	if (request.headers.get(INTERNAL_MUTATION_HEADER) === '1') await scheduleMaintenance(env, state);
+	// this request rather than every coordinated mutation behind it. Reads arm nothing.
+	if (request.headers.get(INTERNAL_MUTATION_HEADER) === '1' && isCrateMutation(path, request.method)) await scheduleMaintenance(env, state);
 	return withStateLock(async () => {
 		if (path === COORDINATOR_PATHS.readingWake && request.method === 'POST') {
 			await state.storage.put('readingCoordinator', true);

@@ -54,7 +54,7 @@ it('merges deltas from changed notes into the same list as a full response', asy
 		['add a note', () => write('Delta.md', task('d1')), true],
 		['delete a note', async () => {
 			const file = (await getStoredFileRow(env.DB, 'Reminders/Gamma.md'))!;
-			await commitFileDelete(env.BUCKET, env.DB, { path: 'Reminders/Gamma.md', expectedHash: file.hash, expectedRevision: file.storageKey, previousFile: file });
+			await commitFileDelete(env.DB, { path: 'Reminders/Gamma.md', expectedHash: file.hash, expectedRevision: file.storageKey, previousFile: file });
 		}, true],
 		// A copied identity hides both copies; only the full index can report it.
 		['duplicate an unchanged identity', () => write('Delta.md', task('d1'), task('b1')), false],

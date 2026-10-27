@@ -4,7 +4,7 @@ import { uploadPipelined } from '../transfer/upload-pipeline';
 import { applyDiffs } from '../transfer/process';
 import { createDeleteCandidates, deleteRemoteFiles } from '../transfer/delete';
 import { isAbortError } from "../abort";
-import { fileFailure, isTransientSyncFailure } from "../failures";
+import { fileFailure, isAuthError, isTransientSyncFailure } from "../failures";
 import type { IncrementalSyncPlannerContext } from "./types";
 import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "../sync-result";
 import { createLogger } from "../logger";
@@ -30,6 +30,7 @@ export async function runIncrementalSync(
 	}
 
 	const result = createEmptySyncResult();
+	let changelogRead = false;
 	try {
 		context.reportWork?.({ phase: 'server' });
 		const changelog = await readIncrementalChangelog(context.files, context.settings.lastSeq, () => context.throwIfDestroyed());
@@ -37,6 +38,7 @@ export async function runIncrementalSync(
 			logger.warn("Changelog cursor expired - pruned entries detected, falling back to full sync");
 			return null;
 		}
+		changelogRead = true;
 		const { changesByPath, changeCount, latestSeq } = changelog;
 
 		logger.info(`Incremental sync: ${changeCount} remote changes since seq ${context.settings.lastSeq}`);
@@ -178,16 +180,19 @@ export async function runIncrementalSync(
 			return cancelSyncResult(result);
 		}
 
-		// A dropped connection or busy server is retried incrementally; falling back
-		// would re-read and hash the whole vault for a transient failure.
-		if (isTransientSyncFailure(error)) {
-			logger.warn("Incremental sync failed with a transient error:", errorMessage(error));
-			recordSyncError(result, error);
-			finalizeSyncResult(result);
-			return result;
+		// Only an unreadable changelog needs a full sync. A dropped connection or busy
+		// server is retried incrementally, and a local scan, apply or save error would
+		// fail a full sync the same way after it re-read the whole server inventory.
+		if (!changelogRead && !isTransientSyncFailure(error)) {
+			logger.warn("Reading the changelog failed, falling back to full sync:", errorMessage(error));
+			return null;
 		}
-		logger.warn("Incremental sync failed, falling back to full sync:", errorMessage(error));
-		return null;
+		// Revoked access reads the same on every path.
+		if (isAuthError(error)) throw error;
+		logger.warn("Incremental sync failed:", errorMessage(error));
+		recordSyncError(result, error);
+		finalizeSyncResult(result);
+		return result;
 	}
 }
 

@@ -11,6 +11,7 @@ import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from '../notifications/push';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 import { runNotificationCoordinator } from '../notifications/coordinator';
+import { dispatchNotificationJobs } from '../notifications/outbox';
 import { handleListReminders } from './routes/list';
 import { sha256Hex } from '../../../platform/sha256';
 
@@ -239,9 +240,11 @@ it('bounds each migration, projection and dispatch invocation and resumes every 
 	const runtime = { ...env, DB: measuredDb('projection'), REMINDER_ALARMS: namespace as never };
 	for (let pass = 0; pass < 12; pass++) {
 		counts.set('projection', 0);
-		await runNotificationCoordinator(state() as never, runtime);
+		const dispatch = await runNotificationCoordinator(state() as never, runtime);
 		peaks.set('projection', Math.max(peaks.get('projection') ?? 0, counts.get('projection')!));
 		expect(counts.get('projection')).toBeLessThanOrEqual(50);
+		// The coordinator alarm dispatches after its locked pass.
+		if (dispatch) await dispatchNotificationJobs(runtime, true);
 	}
 	expect(peaks.get('__crate__/notification-dispatch')).toBeGreaterThan(0);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_source_state WHERE verified = 1 AND parser_version = ?')

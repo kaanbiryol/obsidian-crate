@@ -1,4 +1,4 @@
-import { decodeReadingValue } from './private-storage';
+import { decodeReadingValue, encodeReadingValue } from './private-storage';
 import type { PendingReading } from '../outbox';
 import { isPendingReading, isReadingDraft } from './storage-validation';
 import { downloadJson } from '../../storage/download';
@@ -29,6 +29,19 @@ export function saveReadingDraft(session: ReadingSession, draft: ReadingDraft): 
 }
 export function readReadingShare(id: string): Promise<ReadingDraft | undefined> {
 	return readDraft(readingKeys.share(id));
+}
+/** The most recently staged share, for a page that lost its `?share=` parameter,
+ * for example to an enrollment link. Unreadable shares stay for export. */
+export async function newestReadingShare(): Promise<{ id: string; url: string } | undefined> {
+	const db = await readingDatabase();
+	let newest: { id: string; url: string; savedAt: number } | undefined;
+	for (const key of await db.getAllKeys('values')) {
+		if (!key.startsWith(readingKeys.share(''))) continue;
+		const share: (ReadingDraft & { savedAt?: unknown }) | undefined = await readDraft(key).catch(() => undefined);
+		const savedAt = typeof share?.savedAt === 'number' ? share.savedAt : 0;
+		if (share && (!newest || savedAt > newest.savedAt)) newest = { id: key.slice(readingKeys.share('').length), url: share.url, savedAt };
+	}
+	return newest && { id: newest.id, url: newest.url };
 }
 export function removeReadingShare(session: ReadingSession, id: string): Promise<void> {
 	return writeReadingValue(readingKeys.share(id), null, session);
@@ -91,6 +104,46 @@ export async function pendingReading(session: ReadingSession): Promise<PendingRe
 		ids.add(op.id); return true;
 	})) throw new Error('Pending Reading changes could not be read. Export your Reading data before changing browser storage.');
 	return data;
+}
+/** Moves captures that earlier sign-ins to this Reading folder never sent into this
+ * session's queue. Without a body a capture has no operation ID or receipt, so sending
+ * it now cannot repeat a write. Sent and other changes stay for review and export. */
+export function adoptEarlierReadingCaptures(session: ReadingSession): Promise<void> {
+	// Session IDs linked to Reminders end with the folder generation, which changes with the folder.
+	if (session.source !== 'reminders') return Promise.resolve();
+	const own = readingKeys.pending(session.id);
+	const sameFolder = (key: string) => key !== own && key.startsWith(readingKeys.pending('reminders:')) && key.endsWith(`:${session.generation}`);
+	return readingLock(async () => {
+		const db = await readingDatabase();
+		const earlier = (await db.getAllKeys('values')).filter(sameFolder);
+		if (!earlier.length) return;
+		const queue = await pendingReading(session);
+		const remaining = new Map<string, PendingReading[]>();
+		for (const key of earlier) {
+			const sessionId = key.slice(readingKeys.pending('').length);
+			let value: unknown;
+			try { value = await readReadingValue(key); } catch { continue; }
+			if (!Array.isArray(value) || !value.every((op: unknown) => isPendingReading(op, sessionId))) continue;
+			const kept = value.filter(op => {
+				if (op.action !== 'capture' || op.body !== undefined || op.error !== undefined || op.review || queue.length >= 200) return true;
+				queue.push({ ...op, sessionId: session.id });
+				return false;
+			});
+			if (kept.length !== value.length) remaining.set(key, kept);
+		}
+		if (!remaining.size) return;
+		assertReadingSession(session);
+		// One transaction, so a capture is never in both queues or in neither.
+		const tx = db.transaction('values', 'readwrite');
+		try {
+			await tx.store.put(encodeReadingValue(own, queue), own);
+			for (const [key, kept] of remaining) {
+				if (kept.length) await tx.store.put(encodeReadingValue(key, kept), key);
+				else await tx.store.delete(key);
+			}
+			await tx.done;
+		} catch (error) { await abortTransaction(tx); throw error; }
+	});
 }
 export async function readingLock<T>(action: () => Promise<T>): Promise<T> {
 	if (!navigator.locks) throw new Error('This browser cannot safely send Reading changes. Use a current Safari, Chrome, or Firefox.');
