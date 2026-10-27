@@ -55,3 +55,18 @@ it('does not add a timer when the coordinator finishes idle', async () => {
 	await runBoundedNotificationCoordinator(state, {} as never);
 	expect(storage.setAlarm).not.toHaveBeenCalled();
 });
+
+it('waits for the D1 daily reset without spending its failure budget', async () => {
+	const { state, values, storage } = fixture();
+	vi.mocked(runNotificationCoordinator).mockRejectedValue(new Error('D1_ERROR: Exceeded daily rows written limit'));
+	vi.spyOn(console, 'error').mockImplementation(() => {});
+	await armNotificationCoordinator(state);
+	storage.setAlarm.mockClear();
+	await runBoundedNotificationCoordinator(state, {} as never);
+	const midnight = (Math.floor(Date.now() / 86_400_000) + 1) * 86_400_000;
+	const [resume] = storage.setAlarm.mock.calls[0]!;
+	expect(resume).toBeGreaterThanOrEqual(midnight);
+	expect(resume).toBeLessThan(midnight + 600_000);
+	expect(values.get('notificationRun')).toEqual({ startedAt: resume, passes: 0, failures: 0 });
+	expect(storage.deleteAlarm).not.toHaveBeenCalled();
+});

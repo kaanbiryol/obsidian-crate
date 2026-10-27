@@ -1,7 +1,7 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
 import { publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
-import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
+import { ENCRYPTION_STATE_SQL, encryptionWriteGuard, parseEncryptionState, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { syncResetGenerationGuard } from './reset-generation';
 import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
@@ -129,6 +129,18 @@ export interface StagedFileCommitInput {
 	/** Only the server's own Reading capture sets this: a new note sealed to the
 	 * vault seal key inside this folder. Client uploads can never create one. */
 	sealedReadingFolder?: string;
+}
+
+/** Columns for `parseCommitContext`: the server state `commitStagedFile` otherwise
+ * reads in three statements. Read them under the coordinator lock, which serializes
+ * the writers of these rows. */
+export const COMMIT_CONTEXT_COLUMNS = `${ENCRYPTION_STATE_SQL} AS encryption,
+    (SELECT folder_path FROM notification_policy WHERE id = 1) AS reminderFolder,
+    (SELECT folder_path FROM reading_policy WHERE id = 1) AS readingFolder`;
+export interface CommitContextRow { encryption: string | null; reminderFolder: string | null; readingFolder: string | null }
+export function parseCommitContext(row: CommitContextRow | null): Pick<StagedFileCommitInput, 'encryptionState' | 'reminderFolder' | 'readingPolicy'> {
+	return { encryptionState: parseEncryptionState(row?.encryption ?? null), reminderFolder: row?.reminderFolder ?? null,
+		readingPolicy: row?.readingFolder ? { folder_path: row.readingFolder } : null };
 }
 
 export async function commitStagedFile(

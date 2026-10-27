@@ -51,8 +51,8 @@ it.each([false, true])('bounds initial-upload writes and preserves retries with 
 
 it('keeps cleanup work when a new upload replaces stale reminder state', async () => {
 	await initialize();
-	await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, file_revision, notification_token, policy_revision)
-    VALUES ('old-reminder', 'Notes/recreated.md', 'old-revision', 'old-token', 'policy')`).run();
+	await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, notification_token, policy_revision)
+    VALUES ('old-reminder', 'Notes/recreated.md', 'old-token', 'policy')`).run();
 	const result = await (await handleBatchUpload(request([file('Notes/recreated.md')]), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
 	expect(result.success).toBe(true);
 	expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toEqual({ path: 'Notes/recreated.md' });

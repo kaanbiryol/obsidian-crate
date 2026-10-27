@@ -67,7 +67,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 		const item = parseReadingNote(content)!;
 		const path = await capturePath(env, current.folder_path, { title: item.title, url: item.source_url }, id);
 		const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
-		const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, readingPolicy: current, encryptionState: null, effects: operationEffects(env.DB, op, response) });
+		const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, readingPolicy: current, reminderFolder: op.reminderFolder, encryptionState: null, effects: operationEffects(env.DB, op, response) });
 		if (!result.committed) throw new ReadingError('This note changed. Retry the same save.', 409);
 		return readingResponse(response);
 	}
@@ -92,7 +92,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	// `before` revision then needs only this item again, not the whole library.
 	const revision = crypto.randomUUID().replaceAll('-', '');
 	const staged = await stageMarkdownFile(env.BUCKET, env.DB, source.path, content, source.file.hash);
-	const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, readingRevision: revision, encryptionState: null, effects: operationEffects(env.DB, op, response) });
+	const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, readingRevision: revision, reminderFolder: op.reminderFolder, encryptionState: null, effects: operationEffects(env.DB, op, response) });
 	if (!result.committed) throw new ReadingError('This note changed. Refresh before editing it.', 409);
 	return readingResponse({ ...response, library: { before: await readingListEtag(current, index.revision), after: await readingListEtag(current, revision) } });
 }

@@ -11,6 +11,12 @@ export function isD1DailyLimitError(error: unknown): boolean {
 	return /\bdaily\b/i.test(message) && /\blimit\b/i.test(message) && /\b(?:rows?|reads?|writes?|written)\b/i.test(message);
 }
 
+/** When background work retries after the daily allowance resets at 00:00 UTC,
+ * spread over ten minutes so held work does not all retry at once. */
+export function nextD1DailyReset(now = Date.now()): number {
+	return (Math.floor(now / 86_400_000) + 1) * 86_400_000 + Math.floor(Math.random() * 600_000);
+}
+
 /** In-memory accounting of returned billing metadata; never queries or writes a log table. */
 export function meterD1Usage(database: D1Database) {
 	const usage: D1Usage = { rowsRead: 0, rowsWritten: 0, complete: true };

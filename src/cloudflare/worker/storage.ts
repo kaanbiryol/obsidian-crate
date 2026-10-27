@@ -3,10 +3,11 @@ import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import type { CommitEffects } from './commit-effects';
 import { queryRows } from './db';
 import { stageMarkdownFile } from './sync/markdown-file-staging';
-import { commitStagedFile } from './sync/mutations';
+import { commitStagedFile, type StagedFileCommitInput } from './sync/mutations';
 import {
 	getStoredFileRow,
 	MAX_FILE_BYTES,
+	type FileStorageRow,
 } from './sync/storage';
 import { sha256Hex } from '@/platform/sha256';
 
@@ -78,12 +79,14 @@ export async function readStoredMarkdownFiles(
 	return files.filter((file): file is StoredMarkdownFileBytes => file !== null);
 }
 
+/** `row` is the file's current row when the caller already read it. */
 export async function readCommittedMarkdownFileVersion(
 	bucket: R2Bucket,
 	db: D1Database,
 	path: string,
+	row?: FileStorageRow | null,
 ): Promise<{ content: string; hash: string } | null> {
-	const file = await getStoredFileRow(db, path);
+	const file = row !== undefined ? row : await getStoredFileRow(db, path);
 	if (!file) {
 		return null;
 	}
@@ -112,6 +115,7 @@ export async function writeCommittedMarkdownFile(
 	content: string,
 	expectedHash: string | null,
 	effects?: CommitEffects,
+	context?: Pick<StagedFileCommitInput, 'encryptionState' | 'reminderFolder' | 'readingPolicy'>,
 ): Promise<{ hash: string; size: number }> {
 	const staged = await stageMarkdownFile(bucket, db, path, content, expectedHash);
 
@@ -124,6 +128,7 @@ export async function writeCommittedMarkdownFile(
 			content,
 			expectedHash,
 			effects,
+			...context,
 	});
 	if (!commit.committed) {
 		throw new FileVersionConflictError(path, commit.currentHash);

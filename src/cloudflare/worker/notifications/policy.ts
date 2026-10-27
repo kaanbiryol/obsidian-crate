@@ -10,10 +10,18 @@ import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryptio
 
 const FOLDER_SCOPED_TABLES = ['auth_tokens', 'push_subscriptions', 'web_enrollment_tokens'] as const;
 
+/** Columns of `notification_policy` as `notificationPolicyFromRow` reads them. */
+export const NOTIFICATION_POLICY_COLUMNS = 'enabled, folder_path, timezone, all_day_time, revision';
+export interface NotificationPolicyRow { enabled: number | null; folder_path: string | null; timezone: string | null; all_day_time: string | null; revision: string | null }
+
+/** A missing row, or a LEFT JOIN that found none, is no policy. */
+export function notificationPolicyFromRow(row: NotificationPolicyRow | null): NotificationPolicy | null {
+	return row?.revision != null ? { enabled: row.enabled !== 0, folderPath: row.folder_path!, timezone: row.timezone!, allDayTime: row.all_day_time, revision: row.revision } : null;
+}
+
 export async function getNotificationPolicy(db: D1Database): Promise<NotificationPolicy | null> {
-	const row = await db.prepare('SELECT enabled, folder_path, timezone, all_day_time, revision FROM notification_policy WHERE id = 1')
-		.first<{ enabled: number; folder_path: string; timezone: string; all_day_time: string | null; revision: string }>();
-	return row ? { enabled: row.enabled !== 0, folderPath: row.folder_path, timezone: row.timezone, allDayTime: row.all_day_time, revision: row.revision } : null;
+	return notificationPolicyFromRow(await db.prepare(`SELECT ${NOTIFICATION_POLICY_COLUMNS} FROM notification_policy WHERE id = 1`)
+		.first<NotificationPolicyRow>());
 }
 
 /** For clients: an encrypted vault's policy also carries the folder's sealed name. */
