@@ -103,7 +103,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
         self.assertEqual(restored.execute("SELECT value FROM maintenance_state WHERE key = 'reminder_operation_floor'").fetchone()[0], '20524')
         indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
-        self.assertTrue({'reminder_operations_created_at_idx', 'reminder_occurrences_first_seen_idx'} <= indexes)
+        self.assertTrue({'reminder_sources_id_idx', 'reminder_occurrences_first_seen_idx'} <= indexes)
         self.assertEqual(len(manifest['objects']), 1)
     def test_shared_cli_and_in_app_restore_policy(self):
         fixture_dir = Path(__file__).parents[2] / 'tests/fixtures/recovery'

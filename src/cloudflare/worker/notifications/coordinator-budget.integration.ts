@@ -24,8 +24,7 @@ async function countStatements(run: () => Promise<unknown>): Promise<{ total: nu
 	let total = 0, setup = 0;
 	env.DB.prepare = (sql: string) => {
 		total += 1;
-		if (sql.includes('FROM notification_policy WHERE id = 1')
-			|| /^SELECT (encryption|features) AS value FROM server_state WHERE id = 1$/.test(sql)) setup += 1;
+		if (sql.includes('FROM notification_policy WHERE id = 1') || sql.includes('FROM server_state WHERE id = 1')) setup += 1;
 		return prepare(sql);
 	};
 	try { await run(); } finally { env.DB.prepare = prepare; }
@@ -35,12 +34,13 @@ async function countStatements(run: () => Promise<unknown>): Promise<{ total: nu
 it('reads encryption, feature and notification settings once per coordinator run', async () => {
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`, null);
 	const state = { storage: { setAlarm: vi.fn(async () => {}) } } as unknown as DurableObjectState;
-	// Before: 31 statements with 8 setup reads, then 16 with 7. A due dispatch is
-	// reported to the alarm, which sends it after releasing the coordinator lock.
+	// Before: 31 statements with 8 setup reads, then 16 with 7. Encryption, features,
+	// the import state and the notification policy now share one read. A due dispatch
+	// is reported to the alarm, which sends it after releasing the coordinator lock.
 	let due: boolean | undefined;
-	expect(await countStatements(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 26, setup: 3 });
+	expect(await countStatements(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 23, setup: 1 });
 	expect(due).toBe(true);
-	expect(await countStatements(() => runNotificationCoordinator(state, env))).toEqual({ total: 12, setup: 3 });
+	expect(await countStatements(() => runNotificationCoordinator(state, env))).toEqual({ total: 9, setup: 1 });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS jobs FROM notification_jobs').first()).toEqual({ jobs: 1 });
 	expect(dispatchNotificationJobs).not.toHaveBeenCalled();
 });
@@ -54,7 +54,7 @@ it('skips the dispatcher when no alarm update is due', async () => {
 	await env.DB.prepare('UPDATE notification_jobs SET available_at = ?').bind(retryAt).run();
 	// An idle pass reads the queue head once and does not wake the dispatcher.
 	let due: boolean | undefined;
-	expect(await countStatements(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 12, setup: 3 });
+	expect(await countStatements(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 9, setup: 1 });
 	expect(due).toBe(false);
 	expect(setAlarm).toHaveBeenLastCalledWith(retryAt);
 });

@@ -4,7 +4,7 @@ import { reminderRequestHash } from './request-hash';
 import { corsResponse } from '../cors';
 import type { CommitEffects } from '../commit-effects';
 import { reminderOperationDay, isReminderOperationId } from '@/protocol/reminder-operation';
-import { OPERATION_VALID, isRetryableOperationDay } from '../operation-receipts';
+import { OPERATION_VALID } from '../operation-receipts';
 
 function expiredReminderOperation(): Response {
 	return corsResponse({ code: 'operation_expired', error: 'This change is outside the server’s retry window. An earlier attempt may have synced. Export it and compare your current reminders before restoring missing work.' }, 410);
@@ -14,19 +14,19 @@ export interface ReminderOperation { id: string; requestHash: string; day: numbe
 export async function beginReminderOperation(db: D1Database, body: Record<string, unknown>, action: string): Promise<ReminderOperation | Response> {
 	if (!isReminderOperationId(body.operationId)) return corsResponse({ error: 'A stable operationId is required. Reload Crate before saving.' }, 428);
 	const requestHash = await reminderRequestHash(action, body);
-	const receipt = await readReminderReceipt(db, { id: body.operationId, requestHash });
-	if (receipt) return receipt;
 	const day = reminderOperationDay(body.operationId);
-	if (day === null || !await isRetryableOperationDay(db, day)) return expiredReminderOperation();
-	return { id: body.operationId, requestHash, day };
-}
-async function readReminderReceipt(db: D1Database, operation: Pick<ReminderOperation, 'id' | 'requestHash'>): Promise<Response | null> {
-	const row = await db.prepare('SELECT request_hash, response_json FROM reminder_operations WHERE operation_id = ?').bind(operation.id).first<{ request_hash: string; response_json: string }>();
-	if (!row) return null;
-	if (row.request_hash !== operation.requestHash) {
-		return corsResponse({ error: 'An operation ID cannot be reused for different changes.', code: 'operation_mismatch' }, 409);
+	// One read: a saved receipt is replayed even after its day leaves the retry window.
+	const row = await db.prepare(`SELECT r.request_hash, r.response_json, (SELECT 1 WHERE ${OPERATION_VALID}) AS retryable
+    FROM (SELECT 1) LEFT JOIN reminder_operations r ON r.operation_id = ?`).bind(day, day, body.operationId)
+		.first<{ request_hash: string | null; response_json: string | null; retryable: number | null }>();
+	if (row?.request_hash != null && row.response_json != null) {
+		if (row.request_hash !== requestHash) {
+			return corsResponse({ error: 'An operation ID cannot be reused for different changes.', code: 'operation_mismatch' }, 409);
+		}
+		return corsResponse(await readEncryptedReceipt(db, 'reminder', body.operationId, row.response_json));
 	}
-	return corsResponse(await readEncryptedReceipt(db, 'reminder', operation.id, row.response_json));
+	if (day === null || !row?.retryable) return expiredReminderOperation();
+	return { id: body.operationId, requestHash, day };
 }
 export function reminderOperationEffects(db: D1Database, operation: ReminderOperation, response: Record<string, unknown>, createdId?: string): CommitEffects {
 	return files => {

@@ -22,12 +22,17 @@ function parseCachedReminders(parsed: unknown): RemoteReminderRecord[] | null {
 }
 
 /** `rowPaths` includes rows skipped for an old parser or invalid JSON, so
- * pruning can find every cached path whose file is gone. */
+ * pruning can find every cached path whose file is gone. `paths` limits the
+ * read to those notes. */
 export async function loadReminderFileCache(
 	db: D1Database,
 	folderPath: string,
+	paths?: readonly string[],
 ): Promise<{ entries: Map<string, ReminderFileCacheEntry>; rowPaths: string[] }> {
-	const rows = await queryRows<ReminderFileCacheRow>(db.prepare(`SELECT file_path, file_hash, parser_version, reminders_json
+	const rows = await queryRows<ReminderFileCacheRow>(paths
+		? db.prepare(`SELECT file_path, file_hash, parser_version, reminders_json FROM reminder_file_cache
+			WHERE folder_path = ? AND file_path IN (SELECT value FROM json_each(?))`).bind(folderPath, JSON.stringify(paths))
+		: db.prepare(`SELECT file_path, file_hash, parser_version, reminders_json
 		FROM reminder_file_cache
 		WHERE folder_path = ?`).bind(folderPath));
 	const entries = new Map<string, ReminderFileCacheEntry>();

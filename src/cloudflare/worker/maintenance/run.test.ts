@@ -110,7 +110,7 @@ it('checks unused encryption descriptors only on the first pass of an episode', 
 		batch: vi.fn(async (batch: Array<{ run(): Promise<unknown> }>) => Promise.all(batch.map(statement => statement.run()))),
 	};
 	const bucket = { delete: vi.fn(async () => {}), get: vi.fn(async () => null), list: vi.fn(async () => ({ objects: [], truncated: false })) };
-	const descriptorChecks = () => statements.filter(statement => statement.sql.includes('consumed_revision FROM file_deletion_receipts')).length;
+	const descriptorChecks = () => statements.filter(statement => statement.sql.includes('NOT IN (SELECT consumed_revision FROM file_deletion_receipts)')).length;
 
 	await runScheduledMaintenance({ DB: db, BUCKET: bucket } as never, { firstPass: true });
 	expect(descriptorChecks()).toBe(1);

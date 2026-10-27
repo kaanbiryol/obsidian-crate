@@ -377,3 +377,20 @@ describe('reminder alarm delivery', () => {
 	 expect(harness.storedValues.get('deliveryFailure')).toMatchObject({ attempts: 10 });
 	 expect(sendToAllSubscriptions).not.toHaveBeenCalled();
  });
+
+describe('reminder alarm delivery at the D1 daily limit', () => {
+	it('waits for the 00:00 UTC reset without using a delivery attempt', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const harness = createHarness();
+		harness.first.mockRejectedValueOnce(new Error('D1_ERROR: Exceeded daily rows read limit'));
+
+		await harness.alarm.alarm();
+
+		const midnight = (Math.floor(Date.now() / 86_400_000) + 1) * 86_400_000;
+		const [resume] = harness.setAlarm.mock.calls[0]!;
+		expect(Number(resume)).toBeGreaterThanOrEqual(midnight);
+		expect(Number(resume)).toBeLessThan(midnight + 600_000);
+		expect(harness.storedValues.has('retryAttempt')).toBe(false);
+		expect(harness.run).not.toHaveBeenCalled();
+	});
+});

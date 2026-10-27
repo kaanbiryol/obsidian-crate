@@ -507,6 +507,13 @@ shared file command used by encrypted web apps. Operation-expiry and upload-retr
 integration tests exercise the shared receipt cleanup owner, including monotonic
 floors and batch rollback.
 
+`reminders/write-cost.integration.ts` uses `test-support/storage-cost-test-harness.ts`,
+which meters D1, R2 and Durable Object use including the alarms a request arms
+(the `X-Crate-D1-Usage` header leaves those out). It bounds rows written per
+reminder edit regardless of note size, request round trips, and the rows read by a
+pass with nothing to project. `reminders/list-delta.integration.ts` checks that a
+web app merging deltas built from changed notes ends with the full list.
+
 `maintenance/object-cleanup.test.ts` and `maintenance/run.test.ts` distinguish nonfatal
 post-commit cleanup from scheduled failure reporting. The corresponding
 `maintenance/object-cleanup.integration.ts` regression uses local D1/R2 bindings

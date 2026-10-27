@@ -3,7 +3,6 @@ import { corsResponse } from '../../cors';
 import type { Env } from '../../types';
 import { parseJsonObject, parseOptionalString } from '../../request-validation';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
-import { assertUniqueReminderSources } from '../source-identity';
 import { commitReminderCommand } from '../command';
 
 /** Update, deletion and completion edit one existing reminder in its source note.
@@ -26,10 +25,8 @@ async function handleExistingReminder(request: Request, env: Env, operationActio
 	if (!sourceFilePath) {
 		return corsResponse({ error: 'Valid filePath required' }, 400);
 	}
-	await assertUniqueReminderSources(env.DB, workspaceResult.folderPath, [id]);
-
 	return commitReminderCommand(env, operation, command, { ...parsedBody.value, id, filePath: sourceFilePath },
-		workspaceResult.folderPath, parsedBody.value);
+		workspaceResult.folderPath, parsedBody.value, [id]);
 }
 
 export function handleUpdateReminder(request: Request, env: Env): Promise<Response> {

@@ -20,12 +20,15 @@ export async function hasVerifiedReminderSource(db: D1Database, path: string, st
 		.bind(path, storageKey, REMINDER_CACHE_PARSER_VERSION).first());
 }
 
-/** Queued commands and existing alarms both need current source and projection authority. */
+/** Queued commands and existing alarms both need current source and projection authority.
+ * Every commit that records a verified source revision also queues that file's projection
+ * job, and a projection removes the job only with its own writes. So a verified current
+ * revision without a job proves the reminder's row was projected from that revision. */
 export async function hasNotificationAuthority(db: D1Database, reminderId: string, token: string): Promise<boolean> {
 	const projection = await db.prepare('SELECT file_path FROM reminder_projections WHERE reminder_id = ?').bind(reminderId).first<{ file_path: string }>();
 	if (!projection) return false;
 	return Boolean(await db.prepare(`SELECT 1 FROM reminder_projections p
-    JOIN files f ON f.portable_path = ? AND f.path = p.file_path AND f.storage_key = p.file_revision
+    JOIN files f ON f.portable_path = ? AND f.path = p.file_path
     JOIN reminder_source_state source ON source.file_path = p.file_path AND source.file_revision = f.storage_key
     JOIN notification_policy policy ON policy.id = 1 AND policy.revision = p.policy_revision AND policy.enabled = 1
     WHERE p.reminder_id = ? AND p.notification_token = ? AND source.parser_version = ? AND source.verified = 1

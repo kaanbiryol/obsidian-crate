@@ -21,7 +21,11 @@ export class EncryptionStateError extends Error {
 }
 
 export async function readEncryptionState(db: D1Database): Promise<EncryptionServerState | null> {
-	const value = await readServerState(db, 'encryption');
+	return parseEncryptionState(await readServerState(db, 'encryption'));
+}
+
+/** Parses a value read with `ENCRYPTION_STATE_SQL`. */
+export function parseEncryptionState(value: string | null): EncryptionServerState | null {
 	if (value === null) return null;
 	const state: unknown = JSON.parse(value);
 	validateEncryptionState(state);

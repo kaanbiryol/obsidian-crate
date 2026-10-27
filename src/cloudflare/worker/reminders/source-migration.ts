@@ -15,12 +15,14 @@ import { readEncryptionState } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 
 const SCAN_KEY = `reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}`;
+/** The `maintenance_state` key whose empty value marks a folder's completed source scan. */
+export const reminderSourceScanKey = (folder: string) => `${SCAN_KEY}:${folder}`;
 const SCAN_BATCH_SIZE = 100;
 const MAX_REPARSE_BYTES = 2 * 1024 * 1024;
 
 /** One resumable pass per parser version. Normal file commits record their own source state. */
 async function seedSourceStates(db: D1Database, folder: string): Promise<boolean> {
-	const scanKey = `${SCAN_KEY}:${folder}`;
+	const scanKey = reminderSourceScanKey(folder);
 	const saved = await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(scanKey).first<{ value: string }>();
 	// An empty saved cursor marks completion; a missing row starts the migration.
 	if (saved?.value === '') return false;
@@ -50,15 +52,17 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 	if (folder === null || cleaning) return cleaning;
 	const scanning = await seedSourceStates(env.DB, folder);
 	const count = Math.max(1, Math.min(limit, 4));
+	// Unary + keeps SQLite on the version index; the folder range would scan every source.
 	const sources = await queryRows<{ path: string }>(env.DB.prepare(`SELECT file_path AS path
-    FROM reminder_source_state WHERE parser_version < ? AND file_path >= ? AND file_path < ? ORDER BY parser_version, file_path LIMIT ?`)
+    FROM reminder_source_state WHERE parser_version < ? AND +file_path >= ? AND +file_path < ? ORDER BY parser_version, file_path LIMIT ?`)
 		.bind(REMINDER_CACHE_PARSER_VERSION, `${folder}/`, `${folder}0`, count));
 	const upgraded = new Set(sources.map(file => file.path));
 	if (sources.length < count) sources.push(...await queryRows<{ path: string }>(env.DB.prepare(`SELECT s.file_path AS path
     FROM (SELECT r.path AS file_path FROM (SELECT path, available_at FROM notification_file_retries
         WHERE path >= ? AND path < ? AND available_at >= 0 AND available_at <= unixepoch('now') * 1000
         ORDER BY available_at, path LIMIT ?) r
-      JOIN reminder_source_state s ON s.file_path = r.path
+      -- CROSS JOIN keeps the short retry queue as the outer loop.
+      CROSS JOIN reminder_source_state s ON s.file_path = r.path
       WHERE r.available_at >= 0 AND r.available_at <= unixepoch('now') * 1000
         AND s.verified = 0 AND s.parser_version = ?
       ORDER BY r.available_at, r.path) s`).bind(`${folder}/`, `${folder}0`, count - sources.length, REMINDER_CACHE_PARSER_VERSION)));
@@ -106,6 +110,6 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 			]);
 		}
 	}
-	return cleaning || scanning || Boolean(await env.DB.prepare('SELECT 1 FROM reminder_source_state WHERE parser_version < ? AND file_path >= ? AND file_path < ? LIMIT 1')
+	return cleaning || scanning || Boolean(await env.DB.prepare('SELECT 1 FROM reminder_source_state WHERE parser_version < ? AND +file_path >= ? AND +file_path < ? LIMIT 1')
 		.bind(REMINDER_CACHE_PARSER_VERSION, `${folder}/`, `${folder}0`).first());
 }

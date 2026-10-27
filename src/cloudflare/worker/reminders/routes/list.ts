@@ -4,6 +4,7 @@ import type { Env } from '../../types';
 import { parseFolderPath } from '../requests';
 import {
 	loadIncrementalReminderIndex,
+	loadReminderDelta,
 	REMINDER_CACHE_PARSER_VERSION,
 } from '../cache/index';
 import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
@@ -59,6 +60,18 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	].join('\n'))).slice(0, 32);
 	const etag = `"${changeToken}.${revision}"`;
 	if (requestEtags.includes('*') || cached.some(value => value?.revision === revision)) return notModified(etag);
+	const headers = { 'Cache-Control': 'private, no-cache' };
+	const changedPaths = await changed();
+	const delta = changedPaths && await loadReminderDelta(env, folderPath, metadata, changedPaths);
+	if (changedPaths && delta) {
+		return corsResponse({
+			delta: true,
+			changedPaths,
+			reminders: await Promise.all(delta.reminders.map(reminder => reminderCommandPayload(reminder))),
+			projects: delta.projects,
+			issues: [],
+		}, 200, { ...headers, ETag: etag, [DELTA_BASE_HEADER]: base });
+	}
 
 	const workspace = await loadIncrementalReminderIndex(env, folderPath, metadata);
 	if (!workspace.ready) {
@@ -74,9 +87,8 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	// A complete, issue-free revision can be the base of a later delta. Issues
 	// include duplicate identities, whose visibility can change in unchanged notes.
 	const complete = workspace.issues.length === 0;
-	const headers = { 'Cache-Control': 'private, no-cache', ...(complete ? { ETag: etag, [DELTA_BASE_HEADER]: base } : {}) };
-	const changedPaths = complete ? await changed() : null;
-	if (changedPaths) {
+	const fullHeaders = { ...headers, ...(complete ? { ETag: etag, [DELTA_BASE_HEADER]: base } : {}) };
+	if (complete && changedPaths) {
 		const paths = new Set(changedPaths);
 		return corsResponse({
 			delta: true,
@@ -84,12 +96,12 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 			reminders: await Promise.all(workspace.reminders.filter(reminder => paths.has(reminder.filePath)).map(reminder => reminderCommandPayload(reminder))),
 			projects: workspace.projects,
 			issues: [],
-		}, 200, headers);
+		}, 200, fullHeaders);
 	}
 	return corsResponse({
 		reminders: await Promise.all(workspace.reminders.map(reminder => reminderCommandPayload(reminder))),
 		projects: workspace.projects,
 		issues: workspace.issues,
-	}, 200, headers);
+	}, 200, fullHeaders);
 }
 

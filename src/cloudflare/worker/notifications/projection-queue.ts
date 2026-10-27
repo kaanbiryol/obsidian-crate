@@ -42,7 +42,8 @@ export async function enqueueFileProjection(db: D1Database, path: string, storag
       SELECT ?, json_extract(value, '$.id'), json_extract(value, '$.due'), json_extract(value, '$.count')
       FROM json_each(?) WHERE ${guard}
       ON CONFLICT(file_path, reminder_id) DO UPDATE SET
-        due_key = excluded.due_key, occurrences = excluded.occurrences`).bind(path, json, ...args),
+        due_key = excluded.due_key, occurrences = excluded.occurrences
+      WHERE reminder_sources.due_key IS NOT excluded.due_key OR reminder_sources.occurrences IS NOT excluded.occurrences`).bind(path, json, ...args),
 		db.prepare(`INSERT INTO reminder_occurrences (reminder_id, due_key, first_seen_at)
       SELECT json_extract(value, '$.id'), json_extract(value, '$.due'), ? FROM json_each(?)
       WHERE json_extract(value, '$.due') != '' AND ${guard}

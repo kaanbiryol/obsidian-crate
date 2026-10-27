@@ -7,8 +7,10 @@ import { corsResponse } from '../cors';
 import { parseStringArray } from '../request-validation';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
+import { COMMIT_CONTEXT_COLUMNS, parseCommitContext, type CommitContextRow } from '../sync/mutations';
+import { portablePathKey } from '@/protocol/portable-path';
 import type { Env } from '../types';
-import { assertUniqueReminderSources } from './source-identity';
+import { assertUniqueReminderSources, duplicateReminderSourcesSql, ReminderIdentityConflictError } from './source-identity';
 import { ReminderFileSizeError } from './limits';
 import { reminderOperationEffects, type ReminderOperation } from './operations';
 import { saveReminderFileCache } from './cache/index';
@@ -47,15 +49,24 @@ export function plaintextFailureResponse(error: unknown, request: Record<string,
  * publishes it with its operation receipt and refreshes the parsed caches.
  * `body` is the route's normalized command input; `request` is the body as received. */
 export async function commitReminderCommand(env: Env, operation: ReminderOperation, action: ReminderAction,
-	body: Record<string, unknown>, folderPath: string, request = body): Promise<Response> {
-	if (action === 'create' && await env.DB.prepare('SELECT reminder_id FROM reminder_identities WHERE reminder_id = ?').bind(operation.id).first()) {
-		return corsResponse({ error: REMINDER_EXISTS }, 409);
-	}
+	body: Record<string, unknown>, folderPath: string, request = body, identities: string[] = []): Promise<Response> {
+	// One read before the note: the commit context, the identity checks and the edited note's row.
+	const notePath = typeof body.filePath === 'string' ? body.filePath : null;
+	const duplicate = duplicateReminderSourcesSql(folderPath, identities);
+	const prepared = await env.DB.prepare(`SELECT ${COMMIT_CONTEXT_COLUMNS},
+    EXISTS (SELECT 1 FROM reminder_identities WHERE reminder_id = ?) AS created, ${duplicate.sql} AS duplicate,
+    f.hash, f.size, f.storage_key AS storageKey FROM (SELECT 1) LEFT JOIN files f ON f.portable_path = ? AND f.path = ?`)
+		.bind(operation.id, ...duplicate.args, notePath === null ? null : portablePathKey(notePath), notePath)
+		.first<CommitContextRow & { created: number; duplicate: number; hash: string | null; size: number | null; storageKey: string | null }>();
+	if (action === 'create' && prepared?.created) return corsResponse({ error: REMINDER_EXISTS }, 409);
+	if (prepared?.duplicate) throw new ReminderIdentityConflictError();
+	const context = parseCommitContext(prepared);
+	const noteRow = prepared?.storageKey ? { hash: prepared.hash ?? '', size: prepared.size ?? 0, storageKey: prepared.storageKey } : null;
 	const versions = new Map<string, { content: string; hash: string } | null>();
 	let command;
 	try {
 		command = await applyReminderFileCommand(action, body, folderPath, async path => {
-			const file = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path);
+			const file = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path, path === notePath ? noteRow : undefined);
 			versions.set(path, file);
 			return file?.content ?? null;
 		});
@@ -75,7 +86,7 @@ export async function commitReminderCommand(env: Env, operation: ReminderOperati
 			source: { path: source!.path, content: source!.content, expectedHash: expectedHash(source!.path)! },
 			destination: { path: destination.path, content: destination.content, expectedHash: expectedHash(destination.path) },
 		}).then(writes => [writes.source.hash, writes.destination.hash])
-		: [(await writeCommittedMarkdownFile(env.BUCKET, env.DB, source!.path, source!.content, expectedHash(source!.path), effects)).hash];
+		: [(await writeCommittedMarkdownFile(env.BUCKET, env.DB, source!.path, source!.content, expectedHash(source!.path), effects, context)).hash];
 	await Promise.all(files.map((file, index) => saveReminderFileCache(env.DB, folderPath, file.path, hashes[index]!, file.reminders)));
 	return corsResponse(command.response);
 }

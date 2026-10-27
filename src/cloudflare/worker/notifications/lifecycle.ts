@@ -1,5 +1,6 @@
 import { runNotificationCoordinator } from './coordinator';
 import type { Env } from '../types';
+import { isD1DailyLimitError, nextD1DailyReset } from '../d1-usage';
 
 const RUN_KEY = 'notificationRun';
 const MAX_RUN_AGE_MS = 24 * 60 * 60 * 1000;
@@ -42,6 +43,14 @@ export async function recordNotificationDispatchFailure(state: DurableObjectStat
 }
 
 async function recordFailure(state: DurableObjectState, run: NotificationRun, error: unknown): Promise<void> {
+	if (isD1DailyLimitError(error)) {
+		// Waiting for the daily reset is not a processing failure: resume then with a full budget.
+		const resume = nextD1DailyReset();
+		await state.storage.put<NotificationRun>(RUN_KEY, { startedAt: resume, passes: 0, failures: 0 });
+		await state.storage.setAlarm(resume);
+		console.error('Notification processing paused until the D1 daily limit resets at 00:00 UTC.');
+		return;
+	}
 	run.failures++;
 	await state.storage.put(RUN_KEY, run);
 	if (run.failures < MAX_FAILURES) await state.storage.setAlarm(Math.min(

@@ -6,6 +6,7 @@ import { parseJsonObject, parseOptionalString } from '../request-validation';
 import { listPushSubscriptions, sendToAllSubscriptions, type PushSubscriptionRow } from './push';
 import { hasNotificationAuthority } from '../reminders/source-state';
 import { NOTIFICATION_DELIVERY_WINDOW_MS } from './projection-plan';
+import { isD1DailyLimitError, nextD1DailyReset } from '../d1-usage';
 
 /** The per-reminder role of the `ReminderAlarm` Durable Object: one schedule,
  * its delivery progress and its retry state live in that object's storage. */
@@ -267,6 +268,13 @@ async function scheduleRetry({ state, env }: ReminderScheduleContext, reminder: 
 	const attempt = await state.storage.get<number>(RETRY_ATTEMPT_KEY) ?? 0;
 	const errorMessage = error instanceof Error ? error.message : String(error);
 	const dueTime = new Date(reminder.dueDatetime).getTime();
+	if (isD1DailyLimitError(error)) {
+		// Delivery needs D1, and waiting for the 00:00 UTC reset uses no attempt. A resumed
+		// delivery past its window records the failure once D1 accepts writes again.
+		await state.storage.setAlarm(nextD1DailyReset());
+		console.error(`Reminder alarm ${reminder.reminderId} is waiting for the D1 daily limit to reset.`);
+		return;
+	}
 	if (
 		error instanceof PushPayloadError
 		|| attempt >= MAX_DELIVERY_RETRY_ATTEMPTS
