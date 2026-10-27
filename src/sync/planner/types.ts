@@ -105,5 +105,4 @@ export interface FullSyncPlan {
 	uploadDiffs: UploadDiff[];
 	downloadDiffs: DownloadDiff[];
 	remainingDiffs: FileDiff[];
-	errors: string[];
 }

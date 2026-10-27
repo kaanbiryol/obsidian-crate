@@ -1,4 +1,4 @@
-import { oversizedRemoteFileIssue, recordSyncIssue, skippedFileIssue, withSyncFileContext } from '../issues';
+import { oversizedRemoteFileIssue, skippedFileIssue, withSyncFileContext } from '../issues';
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "../local/file-discovery";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./types";
@@ -68,9 +68,8 @@ export async function createFullSyncPlan(
 		if (local.hash === remoteEntry?.hash) context.localManifest.setEntry(path, { ...local, revision: remoteEntry.revision });
 	}
 
-	// Oversized local files are reported, not failures, so they never hold back the cursor.
+	// Oversized files on either side are reported, not failures, so they never hold back the cursor.
 	const issues = [...largeLocalPaths].map(skippedFileIssue);
-	const errors: string[] = [];
 	for (const [path, diff] of [...diffMap.entries()]) {
 		const remoteEntry = getPathEntry(remoteFiles, path);
 		if (context.shouldIgnore(path)) {
@@ -82,8 +81,10 @@ export async function createFullSyncPlan(
 			continue;
 		}
 		if (remoteEntry && remoteEntry.size > MAX_FILE_SIZE_BYTES) {
-			recordSyncIssue({ errors, issues }, oversizedRemoteFileIssue(path));
+			issues.push(oversizedRemoteFileIssue(path));
 			diffMap.delete(path);
+			// The local copy was never reconciled with the server, so it must not become the baseline.
+			delete localFiles[path];
 			continue;
 		}
 		if (diff.action === "download" && !remoteEntry) {
@@ -100,7 +101,6 @@ export async function createFullSyncPlan(
 		remainingDiffs: diffs.filter((diff) =>
 			diff.action === "conflict" || diff.action === "delete" || diff.action === "delete-local"
 		),
-		errors,
 		...(issues.length ? { issues } : {}),
 	};
 }

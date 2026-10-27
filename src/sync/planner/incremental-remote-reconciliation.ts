@@ -5,7 +5,7 @@ import { deletePathLocallyIfUnchanged } from '../local/local-delete';
 import { classifyPath } from './reconciliation';
 import type { IncrementalSyncPlannerContext } from './types';
 import type { DownloadRequest } from '../transfer/download';
-import { oversizedRemoteFileIssue, recordSyncError, recordSyncIssue } from '../issues';
+import { oversizedRemoteFileIssue, recordSyncError } from '../issues';
 import type { ChangelogEntry, FileEntry } from '../../protocol/sync-types';
 import type { FileDiff, SyncResult } from '../types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
@@ -87,8 +87,10 @@ export async function reconcileIncrementalRemoteChanges(
 				continue;
 			}
 
+			// This device cannot store it, like an oversized local file: report it without
+			// failing the sync, so the changelog cursor still advances past it.
 			if (entry.size > MAX_FILE_SIZE_BYTES) {
-				recordSyncIssue(result, oversizedRemoteFileIssue(path));
+				(result.issues ??= []).push(oversizedRemoteFileIssue(path));
 				continue;
 			}
 

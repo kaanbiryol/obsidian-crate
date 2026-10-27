@@ -38,7 +38,6 @@ function createContext(options: {
 			uploadDiffs: [uploadDiff],
 			downloadDiffs: [],
 			remainingDiffs: [],
-			errors: [],
 		})),
 		deleteRemoteFiles: vi.fn<SyncWorkflowContext['deleteRemoteFiles']>(async () => []),
 		processDiff: vi.fn(async () => ({ status: 'applied' as const })),

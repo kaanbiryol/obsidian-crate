@@ -131,9 +131,7 @@ async function runFullSync(
 			uploadDiffs,
 			downloadDiffs,
 			remainingDiffs,
-			errors,
 		} = plan;
-		result.errors.push(...errors);
 		if (plan.issues?.length) (result.issues ??= []).push(...plan.issues);
 		for (const [path, entry] of Object.entries(localFiles)) {
 			if (entry.hash === getPathEntry(remoteManifest.files, path)?.hash) result.settledPaths.push(pendingChangeKey('upload', path));

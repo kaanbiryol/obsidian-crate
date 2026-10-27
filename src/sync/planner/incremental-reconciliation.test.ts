@@ -244,7 +244,7 @@ describe('runIncrementalSync', () => {
 		expect(harness.settings.lastSeq).toBe(8);
 	});
 
-	it('keeps cursor unchanged when incremental sync finishes with errors', async () => {
+	it('advances the cursor past a remote file too large for this device', async () => {
 		const settings = createSettings({ lastSeq: 11 });
 		const localManifest = {
 			save: vi.fn(async () => {}),
@@ -298,10 +298,11 @@ describe('runIncrementalSync', () => {
 
 		const result = await runIncrementalSync(context, {});
 
-		expect(result?.success).toBe(false);
-		expect(result?.errors).toContain('notes/too-big.bin: Skipped remote file larger than 25MB');
+		expect(result).toMatchObject({ success: true, errors: [] });
 		expect(result?.issues).toContainEqual({ path: 'notes/too-big.bin', message: 'Skipped remote file larger than 25MB', code: 'file-too-large' });
-		expect(settings.lastSeq).toBe(11);
+		expect(context.parallelDownloadAndSaveFiles).not.toHaveBeenCalled();
+		expect(localManifest.setEntry).not.toHaveBeenCalled();
+		expect(settings.lastSeq).toBe(12);
 		expect(localManifest.save).toHaveBeenCalledTimes(1);
 	});
 });

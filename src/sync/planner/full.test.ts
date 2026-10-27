@@ -98,12 +98,39 @@ describe('createFullSyncPlan', () => {
 			{ path: 'notes/conflict.md', action: 'conflict' },
 			{ path: 'notes/deleted.md', action: 'delete', remoteHash: 'same-hash' },
 		]);
-		// A local file over the limit is reported but does not fail the sync.
-		expect(plan.errors).not.toContain(expect.stringContaining('notes/local-big.bin'));
+		// Files over the limit on either side are reported without failing the sync.
+		expect(plan).not.toHaveProperty('errors');
 		expect(plan.issues).toContainEqual({ path: 'notes/local-big.bin', message: 'Skipped local file larger than 25MB; this file is not synced', code: 'file-too-large' });
-		expect(plan.errors).toContain('notes/remote-big.md: Skipped remote file larger than 25MB');
 		expect(plan.issues).toContainEqual({ path: 'notes/remote-big.md', message: 'Skipped remote file larger than 25MB', code: 'file-too-large' });
 		expect(removeEntry).toHaveBeenCalledWith('notes/orphan.md');
+	});
+
+	it('keeps the baseline of a local file whose remote version is too large for this device', async () => {
+		const baseline = { hash: 'old-remote', size: 1, modified: new Date(0).toISOString(), revision: 'r1' };
+		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([{ path: 'notes/video.md', size: 5, mtime: 100, extension: 'md' }]);
+		conflictMocks.classifyPaths.mockReturnValue([{ path: 'notes/video.md', action: 'conflict' }]);
+		const setEntry = vi.fn();
+
+		const plan = await createFullSyncPlan(
+			{
+				vault: { adapter: { readBinary: vi.fn(async () => new TextEncoder().encode('local').buffer) } } as never,
+				localManifest: {
+					getEntry: () => baseline,
+					getManifest: () => ({ version: 1, files: { 'notes/video.md': baseline } }),
+					removeEntry: vi.fn(), setEntry,
+				} as never,
+				throwIfDestroyed: () => {}, shouldIgnore: () => false,
+				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+			},
+			{ 'notes/video.md': { hash: 'remote-big', size: MAX_FILE_SIZE_BYTES + 1, modified: new Date(0).toISOString(), revision: 'r2' } },
+			5,
+		);
+
+		// The workflow saves `localFiles` as baselines, so the unreconciled local copy must not be there.
+		expect(plan.localFiles['notes/video.md']).toBeUndefined();
+		expect(plan.diffs).toEqual([]);
+		expect(plan.issues).toEqual([{ path: 'notes/video.md', message: 'Skipped remote file larger than 25MB', code: 'file-too-large' }]);
+		expect(setEntry).not.toHaveBeenCalled();
 	});
 
 	it('hashes every file during full reconciliation regardless of matching metadata', async () => {
