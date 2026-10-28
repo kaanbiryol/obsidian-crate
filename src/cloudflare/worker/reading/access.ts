@@ -7,6 +7,7 @@ import { sha256Hex } from '@/platform/sha256';
 import { createRandomHexToken } from '@/platform/random-hex';
 import { readEncryptionState } from '../encryption/state';
 import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';
+import { MAX_JOB_ATTEMPTS } from './extraction/jobs';
 
 export async function updatePolicy(db: D1Database, body: Record<string, unknown>) {
 	const existing = await policy(db);
@@ -20,7 +21,8 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
 	try { folder = validateReadingFolder(body.folderPath, reminders?.folder_path); }
 	catch (error) { throw new ReadingError(error instanceof Error ? error.message : 'Choose a valid Reading folder.'); }
 	if (existing && folder !== existing.folder_path) {
-		if (existing.enabled || body.enabled || await db.prepare('SELECT 1 FROM reading_jobs UNION ALL SELECT 1 FROM reading_captures LIMIT 1').first()) throw new ReadingError('Let pending extraction finish, then turn off article fetching before changing its folder.', 409);
+		// Exhausted jobs only retry a bookmark in the old folder; the new generation deletes them.
+		if (existing.enabled || body.enabled || await db.prepare(`SELECT 1 FROM reading_jobs WHERE attempts < ${MAX_JOB_ATTEMPTS} UNION ALL SELECT 1 FROM reading_captures LIMIT 1`).first()) throw new ReadingError('Let pending extraction finish, then turn off article fetching before changing its folder.', 409);
 	}
 	const current: ReadingPolicy = { enabled: Number(body.enabled), folder_path: folder,
 		generation: existing && existing.folder_path === folder ? existing.generation : crypto.randomUUID(), revision: crypto.randomUUID() };

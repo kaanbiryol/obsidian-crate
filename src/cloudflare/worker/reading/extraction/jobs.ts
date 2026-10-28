@@ -18,7 +18,9 @@ import { sha256Hex } from '@/platform/sha256';
 import { DEPLOYMENT_FENCE_KEY } from '@/protocol/deployment-fence';
 
 /** Fetch and publication attempts per article job, like the other durable queues. */
-const MAX_JOB_ATTEMPTS = 8;
+export const MAX_JOB_ATTEMPTS = 8;
+/** After its attempts, a job retries hourly as a bookmark only until it publishes. */
+const EXHAUSTED_JOB_RETRY_MS = 60 * 60_000;
 
 interface Job { path: string; item_id: string; generation: string; source_revision: string; block_hash: string; url: string; attempts: number }
 export interface Publication { job: Job; result: Awaited<ReturnType<typeof extractDocument>> | null; resolvedUrl?: string }
@@ -70,12 +72,13 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 	try { await runCapture(env, state, Boolean(current.enabled)); } catch { /* The durable lease retries an uncertain publication. */ }
 	// File removals delete their jobs in the commit batch; only another generation's remain.
 	await env.DB.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation).run();
-	const job = await env.DB.prepare('SELECT * FROM reading_jobs WHERE available_at>=0 AND available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Job>();
+	const job = await env.DB.prepare('SELECT * FROM reading_jobs WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Job>();
 	if (job && current.enabled) {
 		// Lease before network access: a crash or restart repeats safely after one minute.
-		// The last attempt parks the row (-1) instead, so the article queue cannot restart it;
-		// a new source revision resets it.
-		await env.DB.prepare(`UPDATE reading_jobs SET available_at=CASE WHEN attempts+1>=${MAX_JOB_ATTEMPTS} THEN -1 ELSE ? END, attempts=attempts+1 WHERE path=?`).bind(Date.now() + 60_000, job.path).run();
+		// Exhausted jobs keep their row, so the article queue cannot restart their fetches,
+		// and retry hourly so an outage cannot leave the note pending; a new source revision resets it.
+		await env.DB.prepare(`UPDATE reading_jobs SET available_at=CASE WHEN attempts+1>=${MAX_JOB_ATTEMPTS} THEN ? ELSE ? END, attempts=attempts+1 WHERE path=?`)
+			.bind(Date.now() + EXHAUSTED_JOB_RETRY_MS, Date.now() + 60_000, job.path).run();
 		await state.storage.setAlarm(Date.now() + 60_000);
 		let result: Awaited<ReturnType<typeof extractDocument>> | null = null, resolvedUrl: string | undefined;
 		try {
@@ -98,7 +101,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 	if (current.enabled && await env.DB.prepare('SELECT 1 FROM reading_index WHERE id=1 AND scope=? AND cursor IS NULL').bind(readingIndexScope(current)).first()) {
 		await queueReadingArticles(env.DB).run();
 	}
-	const next = await env.DB.prepare('SELECT MIN(available_at) AS at FROM (SELECT available_at FROM reading_captures UNION ALL SELECT available_at FROM reading_jobs WHERE ?=1 AND available_at>=0)').bind(current.enabled).first<{ at: number | null }>();
+	const next = await env.DB.prepare('SELECT MIN(available_at) AS at FROM (SELECT available_at FROM reading_captures UNION ALL SELECT available_at FROM reading_jobs WHERE ?=1)').bind(current.enabled).first<{ at: number | null }>();
 	if (next?.at != null) await state.storage.setAlarm(Math.max(Date.now() + 1000, next.at));
 }
 
@@ -110,7 +113,7 @@ export async function scheduleReading(env: Env, loaded?: { encryption: Encryptio
 	if (!current) return null;
 	const index = await ensureReadingIndex(env, current, file => readStoredNote(env, file));
 	if (index.state === 'complete' && current.enabled) await queueReadingArticles(env.DB).run();
-	if (await env.DB.prepare('SELECT 1 FROM reading_captures UNION ALL SELECT 1 FROM reading_jobs WHERE ?=1 AND available_at>=0 LIMIT 1').bind(current.enabled).first()) {
+	if (await env.DB.prepare('SELECT 1 FROM reading_captures UNION ALL SELECT 1 FROM reading_jobs WHERE ?=1 LIMIT 1').bind(current.enabled).first()) {
 		if (!await wakeReading(env)) throw new Error('Could not schedule Reading');
 	}
 	return index.state === 'complete' ? null : Date.now() + (index.state === 'unavailable' ? 30_000 : 1);

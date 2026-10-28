@@ -213,6 +213,39 @@ it('publishes due article jobs without waking notification processing', async ()
 	// A coordinator wake would have recorded a notification run with a fresh retry budget.
 	expect(await runInDurableObject(coordinator, (_instance, state) => state.storage.get('notificationRun'))).toBeUndefined();
 });
+it('retries an exhausted article job hourly until its link publishes', async () => {
+	const job = await capture();
+	await env.DB.prepare('UPDATE reading_jobs SET attempts = 7, available_at = 0').run();
+	// The coordinator cannot publish, so the eighth attempt fails too.
+	const unavailable = { idFromName: () => ({}), get: () => ({ fetch: async () => new Response(null, { status: 503 }) }) } as unknown as Env['REMINDER_ALARMS'];
+	const failing = extractionAlarm({ REMINDER_ALARMS: unavailable });
+	const before = Date.now();
+	await failing.run();
+	const row = (await env.DB.prepare('SELECT attempts, available_at FROM reading_jobs').first<{ attempts: number; available_at: number }>())!;
+	expect(row.attempts).toBe(8);
+	expect(row.available_at).toBeGreaterThanOrEqual(before + 60 * 60_000);
+	expect(failing.setAlarm).toHaveBeenLastCalledWith(row.available_at);
+	// The row still keeps the article queue from restarting its fetches.
+	await queueReadingArticles(env.DB).run();
+	expect((await env.DB.prepare('SELECT count(*) AS n FROM reading_jobs').first<{ n: number }>())?.n).toBe(1);
+	// Once due again, it publishes the link without fetching the page.
+	await env.DB.prepare('UPDATE reading_jobs SET available_at = 0').run();
+	const alarm = extractionAlarm();
+	await alarm.run();
+	expect(alarm.fetch).not.toHaveBeenCalled();
+	expect(parseReadingNote((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))!.content)?.extraction_status).toBe('unavailable');
+	expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
+});
+it('lets only exhausted article jobs give way to a Reading folder change', async () => {
+	await capture();
+	const current = (await policy(env.DB))!;
+	expect((await command('policy', { enabled: false, folderPath: 'Reading', revision: current.revision })).status).toBe(200);
+	const off = (await policy(env.DB))!;
+	await env.DB.prepare('UPDATE reading_jobs SET attempts = 2').run();
+	expect((await command('policy', { enabled: false, folderPath: 'Articles', revision: off.revision })).status).toBe(409);
+	await env.DB.prepare('UPDATE reading_jobs SET attempts = 8').run();
+	expect((await command('policy', { enabled: false, folderPath: 'Articles', revision: off.revision })).status).toBe(200);
+});
 it('requeues a capture still pending after its job found a stale source', async () => {
 	const job = await capture();
 	// A full queue kept a later commit from replacing this job, so it names an earlier revision.
@@ -238,20 +271,14 @@ it('queues a pending capture that a full queue held back once a slot frees', asy
 	await extractionAlarm().run();
 	expect(await held()).toEqual({ attempts: 0 });
 });
-it('parks an article job after eight attempts until its source changes', async () => {
+it('waits to retry an exhausted article job until it is due or its source changes', async () => {
 	const job = await capture();
-	await env.DB.prepare('UPDATE reading_jobs SET attempts = 7, available_at = 0').run();
-	// The coordinator cannot publish, so the eighth attempt fails too.
-	const unavailable = { idFromName: () => ({}), get: () => ({ fetch: async () => new Response(null, { status: 503 }) }) } as unknown as Env['REMINDER_ALARMS'];
-	const alarm = extractionAlarm({ REMINDER_ALARMS: unavailable });
+	await env.DB.prepare('UPDATE reading_jobs SET attempts = 8, available_at = ?').bind(Date.now() + 60 * 60_000).run();
+	const alarm = extractionAlarm();
 	await alarm.run();
 	const row = () => env.DB.prepare('SELECT attempts, available_at FROM reading_jobs WHERE path = ?').bind(job.path).first();
-	expect(await row()).toEqual({ attempts: 8, available_at: -1 });
-	// A parked job is neither retried nor queued again, and leaves no alarm behind.
-	alarm.setAlarm.mockClear();
-	await alarm.run();
-	expect(alarm.setAlarm).not.toHaveBeenCalled();
-	expect(await row()).toEqual({ attempts: 8, available_at: -1 });
+	expect(alarm.fetch).not.toHaveBeenCalled();
+	expect(await row()).toMatchObject({ attempts: 8 });
 	const source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path))!;
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, job.path, updateReadingNote(source.content, job.item_id, { favorite: true }), source.hash);
 	expect(await row()).toMatchObject({ attempts: 0 });
