@@ -212,7 +212,8 @@ local file and its baseline are kept, so the conflict is found again, while the
 changelog cursor, unrelated deletes and full-sync baselines still advance. Each
 incremental sync replans the path from its current server version until the
 review is resolved. While the local file is unchanged, a saved copy is not
-downloaded again.
+downloaded again. Deleting or renaming the saved copy does not choose a version:
+while the baseline is unchanged, the next sync saves the incoming copy again.
 
 If the merge overlaps, the conflict remains unresolved:
 

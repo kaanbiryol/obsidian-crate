@@ -260,8 +260,11 @@ export class SyncEngineContexts {
 			prepareUploadFromPath: this.prepareUploadFromPath,
 			uploadPreparedFiles: this.uploadPreparedFiles,
 			reconcileVersionConflicts: d.reconcileVersionConflicts,
-			awaitingReviewPaths: () => d.conflictStore.getActiveConflicts()
-				.filter(conflict => conflict.cause === 'incoming-review' && conflict.copySide === 'remote')
+			// Deleting or renaming the saved copy resolves its record, but only choosing a
+			// version moves the baseline. Until then the incoming version is saved again.
+			awaitingReviewPaths: () => d.conflictStore.getIncomingReviews()
+				.filter(conflict => conflict.status === 'active'
+					|| !!conflict.localHash && d.localManifest.getEntry(conflict.originalPath)?.hash === conflict.localHash)
 				.map(conflict => conflict.originalPath),
 			getRemoteEntries: async paths => (await d.api.getFileMetadata(paths)).files,
 		}, {

@@ -26,7 +26,7 @@ Not sure yet? Leave both copies in place while you think it over. Don't delete c
 
 When an existing image, PDF, or other non-text file changes, Crate asks you to review it too. It keeps and shows both files, but it can't blend them together like text.
 
-Open each version in an app that can view it, then choose the one to keep.
+Open each version in an app that can view it, then choose the one to keep. If you delete the incoming copy without choosing, Crate saves it again on the next sync.
 
 ## Avoid conflicts next time
 

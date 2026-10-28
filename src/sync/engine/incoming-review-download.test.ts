@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { TAbstractFile } from 'obsidian';
 import { createPersistentEngineHarness } from './engine-persistence-test-harness';
+import { getIncomingConflictFileName } from '../conflict/conflict';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { sha256Hex } from '../../platform/sha256';
 import { arrayBufferToBase64 } from '../encoding';
@@ -90,6 +92,27 @@ it('keeps syncing other files while an incoming binary awaits review', async () 
 	expect(harness.disk.read('image.bin')).toEqual(harness.original);
 	expect(harness.localManifest.getEntry('image.bin')).toEqual(harness.baseline);
 	expect(harness.engine.getActiveConflicts()).toEqual([expect.objectContaining({ originalPath: 'image.bin', cause: 'incoming-review' })]);
+});
+
+it('saves an incoming binary again when its review copy is deleted without choosing a version', async () => {
+	const harness = await awaitingReview();
+	await harness.engine.sync();
+	const copy = getIncomingConflictFileName('image.bin', await sha256Hex(harness.incoming));
+	expect(harness.disk.read(copy)).toEqual(harness.incoming);
+
+	harness.disk.remove(copy);
+	harness.engine.onFileDelete({ path: copy } as TAbstractFile);
+	await harness.engine.waitForIdle();
+	expect(harness.engine.getActiveConflicts()).toEqual([]);
+	const result = await harness.engine.sync();
+
+	// The cursor already moved past the change, so only the unmoved baseline keeps it planned.
+	expect(result).toMatchObject({ success: true, errors: [] });
+	expect(result.issues).toContainEqual(reviewIssue);
+	expect(harness.disk.read(copy)).toEqual(harness.incoming);
+	expect(harness.disk.read('image.bin')).toEqual(harness.original);
+	expect(harness.localManifest.getEntry('image.bin')).toEqual(harness.baseline);
+	expect(harness.engine.getActiveConflicts()).toEqual([expect.objectContaining({ originalPath: 'image.bin', conflictPath: copy })]);
 });
 
 it('saves full sync baselines and the cursor around an incoming binary awaiting review', async () => {

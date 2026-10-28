@@ -160,6 +160,14 @@ export class ConflictStore {
 			.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 	}
 
+	/** Incoming versions saved for review, including ones whose copy was later
+	 * deleted or renamed. */
+	getIncomingReviews(): ConflictRecord[] {
+		return this.data.conflicts
+			.filter(conflict => conflict.cause === 'incoming-review' && conflict.copySide === 'remote')
+			.map(conflict => ({ ...conflict }));
+	}
+
 	/** The saved copy of an incoming version that is still waiting for review
 	 * while the local file is unchanged. */
 	findIncomingReview(originalPath: string, remoteHash: string, localHash: string): ConflictRecord | undefined {
