@@ -232,20 +232,80 @@ it('keeps other decrypted notes after committing an edit', async () => {
 	expect(request.mock.calls.filter(([path]) => path.startsWith('/reading/encrypted-file?')).map(([path]) => new URL(path, 'https://crate.invalid').searchParams.get('path'))).toEqual([saved[1]!.file.path]);
 });
 
-it('keeps an edit retryable while an unrelated note fails to download', async () => {
-	const saved = await notes(2);
-	const request = vi.fn<(path: string, body?: string) => Promise<Response>>(async path => {
-		if (path.startsWith('/reading/encrypted-files?')) return Response.json(page(saved.map(note => note.file)));
-		const target = new URL(path, 'https://crate.invalid').searchParams.get('path');
-		if (target === saved[1]!.file.path) return new Response(null, { status: 503 });
-		return new Response(saved.find(note => note.file.path === target)!.bytes);
+async function note(id: string, name: string, url: string) {
+	const path = `Reading/${name}.md`;
+	const text = createReadingNote({ id, url, title: name, savedAt: '2026-10-01T12:00:00Z' });
+	const sealed = await sealFile({ path, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: null }, authority);
+	return { bytes: sealed.bytes, file: { path: await paths.wire(path), hash: sealed.hash, size: sealed.bytes.length, revision: 'r1' } };
+}
+/** Serves `notes` with commits acknowledged; downloads of `failing` server paths fail in transit. */
+function library(notes: Array<Awaited<ReturnType<typeof note>>>) {
+	const state = { notes, failing: new Set<string>(), sequence: 1 };
+	const request = vi.fn<(path: string, body?: string) => Promise<Response>>(async (path, body) => {
+		if (path === '/reading/encrypted-commit') return Response.json({ encrypted: (JSON.parse(body!) as { acknowledgment: string }).acknowledgment });
+		if (path.startsWith('/reading/encrypted-files?')) return Response.json(page(state.notes.map(note => note.file), null, state.sequence));
+		const target = new URL(path, 'https://crate.invalid').searchParams.get('path')!;
+		if (state.failing.has(target)) return new Response(null, { status: 503 });
+		return new Response(state.notes.find(note => note.file.path === target)!.bytes);
 	});
 	const api = new EncryptedReadingApi({ folderPath: 'Reading', wireFolder, paths, generation: 1, authority, request,
 		readAttempt: async () => undefined, writeAttempt: async () => {}, error: (message, status, code) => Object.assign(new Error(message), { status, code }) });
-	const list = await api.request('/reading/list') as { items: Array<{ crate_reading_id: string }> };
-	await expect(api.request('/reading/update', JSON.stringify({ id: list.items[0]!.crate_reading_id, operationId: 'operation-1', changes: { favorite: true }, before: { favorite: false } })))
-		.rejects.toMatchObject({ status: 503, code: 'reading_unavailable' });
-	expect(request.mock.calls.some(([path]) => path === '/reading/encrypted-commit')).toBe(false);
+	const commits = () => request.mock.calls.filter(([path]) => path === '/reading/encrypted-commit').length;
+	return { api, state, commits };
+}
+const favorite = (id: string, operationId: string) => JSON.stringify({ id, operationId, changes: { favorite: true }, before: { favorite: false } });
+const save = (url: string, operationId: string) => JSON.stringify({ url, operationId, fetchArticle: false });
+const retryable = { status: 503, code: 'reading_unavailable' };
+const readingId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+it('edits other notes while one is unreadable, but keeps captures and changes it may hide retryable', async () => {
+	const kept = await note(readingId(201), 'Kept', 'https://example.com/kept'), unread = await note(readingId(202), 'Unread', 'https://example.com/unread');
+	const { api, state, commits } = library([kept, unread]);
+	// Before: any unreadable note refused every change with this retryable error.
+	state.failing.add(unread.file.path);
+	await expect(api.request('/reading/update', favorite(readingId(201), 'edit-kept'))).resolves.toEqual({ saved: true, id: readingId(201) });
+	expect(commits()).toBe(1);
+	// This device never read the failing note, so it may hold any ID or link.
+	await expect(api.request('/reading/update', favorite(readingId(202), 'edit-unread'))).rejects.toMatchObject(retryable);
+	await expect(api.request('/reading/update', favorite(readingId(299), 'edit-missing'))).rejects.toMatchObject(retryable);
+	await expect(api.request('/reading/capture', save('https://example.com/unread', 'save-unread'))).rejects.toMatchObject(retryable);
+	expect(commits()).toBe(1);
+
+	state.failing.clear(); state.sequence = 2;
+	await expect(api.request('/reading/capture', save('https://example.com/unread', 'save-unread'))).resolves.toMatchObject({ alreadySaved: true, id: readingId(202) });
+	await expect(api.request('/reading/update', favorite(readingId(299), 'edit-missing'))).rejects.toMatchObject({ code: 'reading_conflict' });
+	await expect(api.request('/reading/capture', save('https://example.com/new', 'save-new'))).resolves.toMatchObject({ saved: true });
+	expect(commits()).toBe(2);
+});
+
+it('keeps an edit retryable while a note last verified with its ID is unreadable', async () => {
+	const original = await note(readingId(211), 'Original', 'https://example.com/original');
+	const { api, state, commits } = library([original]);
+	await api.request('/reading/list');
+	// The note changes elsewhere and its new revision fails to download.
+	const changed = { ...original, file: { ...original.file, revision: 'r2' } };
+	state.notes = [changed]; state.failing.add(original.file.path); state.sequence = 2;
+	await expect(api.request('/reading/update', favorite(readingId(211), 'edit-1'))).rejects.toMatchObject(retryable);
+	// A readable copy with the same ID is listed as unique, but may not be the note the change was made on.
+	state.notes = [changed, await note(readingId(211), 'Copy', 'https://example.com/original')]; state.sequence = 3;
+	await expect(api.request('/reading/list')).resolves.toMatchObject({ items: [{ title: 'Copy' }] });
+	await expect(api.request('/reading/update', favorite(readingId(211), 'edit-2'))).rejects.toMatchObject(retryable);
+	expect(commits()).toBe(0);
+});
+
+it('saves links and edits other notes while two notes share a Reading ID, without choosing either', async () => {
+	const unique = await note(readingId(221), 'Unique', 'https://example.com/unique');
+	const first = await note(readingId(222), 'First', 'https://example.com/first'), second = await note(readingId(222), 'Second', 'https://example.com/second');
+	const { api, commits } = library([unique, first, second]);
+	await expect(api.request('/reading/list')).resolves.toMatchObject({ items: [{ title: 'Unique' }], issues: [{}, {}] });
+	const duplicate = { ...retryable, message: 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.' };
+	await expect(api.request('/reading/update', favorite(readingId(222), 'edit-duplicate'))).rejects.toMatchObject(duplicate);
+	// The link is saved, but its ID cannot be answered until the duplicates are resolved.
+	await expect(api.request('/reading/capture', save('https://example.com/second', 'save-duplicate'))).rejects.toMatchObject(duplicate);
+	expect(commits()).toBe(0);
+	await expect(api.request('/reading/update', favorite(readingId(221), 'edit-unique'))).resolves.toMatchObject({ saved: true });
+	await expect(api.request('/reading/capture', save('https://example.com/new', 'save-new'))).resolves.toMatchObject({ saved: true });
+	expect(commits()).toBe(2);
 });
 
 it('names a failed note by its plaintext path and retries it at the same sequence', async () => {
