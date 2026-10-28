@@ -26,9 +26,9 @@ and prints the draft and workflow links. Publication remains an explicit maintai
 action after device and hosted acceptance.
 
 Your current branch, staged changes and uncommitted files are preserved. The
-version commit stays on the remote release branch; merge that commit into the
-development branch before the next semantic bump, or supply the next explicit
-version. Preparation does not include uncommitted source changes.
+version commit stays on the remote release branch until you merge it after
+publishing (see [Test and publish](#test-and-publish)). Preparation does not
+include uncommitted source changes.
 
 Preview the version changes without signing, committing, tagging or accessing
 GitHub:
@@ -94,6 +94,13 @@ and test import, pairing, and saving on iOS 27 or later. Complete the plugin's
 [release acceptance checks](testing.md#public-release-acceptance) against its draft
 assets. Publish the draft through GitHub only after those checks pass. This remains
 an explicit maintainer action; preparing the release does not publish it.
+
+Right after publishing, merge `release/<version>` into `master`. Obsidian reads
+`manifest.json` from the default branch to list the plugin version and offer
+updates, so a published release stays invisible to users until that merge. The
+merge also lets the next `release:prepare` bump from the published version. For a
+community catalog release, publish a regular release rather than a pre-release;
+the website changelog marks pre-releases as beta.
 
 Replace the draft's generated notes with a summary for users before publishing.
 The notes become the release's entry on the website changelog at `/changelog/`.
