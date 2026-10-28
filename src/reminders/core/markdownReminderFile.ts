@@ -289,5 +289,10 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 		}
 	}
 
-	return result.join("\n");
+	// Endings stay with positions: in a CRLF note without a final newline only the
+	// last line lacks a CR, whichever block moves there or away.
+	return result.map((line, position) => {
+		const content = line.endsWith('\r') ? line.slice(0, -1) : line;
+		return lines[position]!.endsWith('\r') ? `${content}\r` : content;
+	}).join("\n");
 }

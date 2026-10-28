@@ -151,6 +151,13 @@ describe('persisted schedule decoding', () => {
 		expect(scan(normalized).recurrence).toMatchObject({ frequency: 'monthly', dayOfMonth: 31 });
 	});
 
+	it('keeps the CR of a CRLF line when resolving its typed schedule', () => {
+		clock('Europe/Berlin', '2027-01-31T10:00:00Z');
+		const normalized = normalizeReminderScheduleLine('- [ ] Pay rent every month <!-- crate-id:rent -->\r');
+		expect(normalized).toMatch(/monthly on the 31st.*<!-- crate-id:rent -->\r$/);
+		expect(normalized.indexOf('\r')).toBe(normalized.length - 1);
+	});
+
 	it('does not interpret unadopted checkboxes during durable reads', () => {
 		expect(scanReminderMarkdownContent('Notes.md', '- [ ] Call tomorrow', '').reminders).toEqual([]);
 	});

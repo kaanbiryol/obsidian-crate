@@ -82,6 +82,12 @@ describe('markdownReminderFile', () => {
 			.toBe(`${second}\n${first}\n`);
 	});
 
+	it('keeps each line ending in place when a CRLF note without a final newline is reordered', () => {
+		const first = '- [ ] First <!-- crate-id:r1 -->';
+		const second = '- [ ] Second <!-- crate-id:r2 -->';
+		expect(reorderReminderBlocksInContent(`${first}\r\n${second}`, ['r2', 'r1'])).toBe(`${second}\r\n${first}`);
+	});
+
 	it('reorders by checkbox state without parsing reminder content', () => {
 		const first = '- [ ] First tomorrow <!-- crate-id:r1 -->\r';
 		const done = '- [X] Done <!-- crate-id:r3 -->\r';

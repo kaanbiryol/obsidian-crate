@@ -41,5 +41,7 @@ export function normalizeReminderScheduleLine(
 	}
 	if (recurrence && parsed.recurrencePart) content = content.replace(parsed.recurrencePart, recurrenceToText(recurrence));
 	const normalized = appendRecurrenceMetadata(`${checkbox.indentation}- [${checkbox.isCompleted ? 'x' : ' '}] ${content}`, recurrence);
-	return checkbox.reminderId ? setReminderIdMarker(normalized, checkbox.reminderId) : normalized;
+	const rebuilt = checkbox.reminderId ? setReminderIdMarker(normalized, checkbox.reminderId) : normalized;
+	// The parsed content excludes a CRLF note's CR; keep the line's ending.
+	return line.endsWith('\r') ? `${rebuilt}\r` : rebuilt;
 }
