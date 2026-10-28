@@ -32,5 +32,6 @@ export function setReminderIdMarker(value: string, reminderId: string): string {
 		throw new Error('Reminder ID is invalid');
 	}
 
-	return `${stripReminderIdMarker(value)} <!-- crate-id:${normalizedReminderId} -->`;
+	// Keep a CRLF line's carriage return, which trimming the old marker removes.
+	return `${stripReminderIdMarker(value)} <!-- crate-id:${normalizedReminderId} -->${value.endsWith('\r') ? '\r' : ''}`;
 }

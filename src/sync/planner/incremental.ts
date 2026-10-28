@@ -1,5 +1,5 @@
 import { pendingChangeKey } from '../pending/pending-change';
-import { recordSyncError, skippedFileIssue } from '../issues';
+import { recordSyncError } from '../issues';
 import { uploadPipelined } from '../transfer/upload-pipeline';
 import { applyDiffs } from '../transfer/process';
 import { createDeleteCandidates, deleteRemoteFiles } from '../transfer/delete';
@@ -45,8 +45,8 @@ export async function runIncrementalSync(
 
 		context.reportWork?.({ phase: 'scanning' });
 		const unchangedPaths: string[] = [];
-		const { changes: localChanges, discoveredPaths, skippedPaths } = await context.getLocalChanges(path => unchangedPaths.push(path));
-		if (skippedPaths?.length) (result.issues ??= []).push(...skippedPaths.map(skippedFileIssue));
+		const { changes: localChanges, discoveredPaths, skipped } = await context.getLocalChanges(path => unchangedPaths.push(path));
+		if (skipped?.length) (result.issues ??= []).push(...skipped);
 		const localDeletes = await context.getLocalDeletes(discoveredPaths);
 		logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
 		logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);

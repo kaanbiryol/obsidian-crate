@@ -1,11 +1,11 @@
-import { recordSyncError, skippedFileIssue, SyncIssueError, withSyncFileContext } from '../issues';
+import { recordSyncError, SyncIssueError, withSyncFileContext } from '../issues';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_BYTES } from '@/protocol/sync-limits';
 import type { SyncApiClient } from '../worker-api/client';
 import type { PreparedUpload, SyncResult, SyncWork } from '../types';
 import type { TransferContext } from '../transfer/types';
 import { getAllVaultFiles } from '../local/file-discovery';
-import { isOversizedSyncFile } from '../local/local-file-changes';
+import { skippedUploadIssue } from '../local/local-file-changes';
 import { pipelineUploadChunks } from '../transfer/budget';
 import { prepareUploadFromVaultFile } from '../transfer/prepare';
 import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
@@ -65,12 +65,14 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	await context.api.initialImport.prune(session.token, obsolete.map(path => ({ path, hash: remote.files[path]!.hash })));
 	for (const path of obsolete) transfer.localManifest.removeEntry(path);
 	const inventory = createPathRecord<FileEntry>();
-	// Oversized files are reported, not uploaded; a server row they already have stays as it is.
-	const files = local.filter(file => !isOversizedSyncFile(file));
-	for (const file of local.filter(isOversizedSyncFile)) {
-		(result.issues ??= []).push(skippedFileIssue(file.path));
-		const existing = remote.files[file.path];
-		if (existing) inventory[file.path] = existing;
+	// Skipped files are reported, not uploaded; a server row they already have stays as it is.
+	const skipped = local.flatMap(file => skippedUploadIssue(file, transfer.encrypted?.() ?? false) ?? []);
+	const skippedPaths = new Set(skipped.map(issue => issue.path));
+	const files = local.filter(file => !skippedPaths.has(file.path));
+	for (const issue of skipped) {
+		(result.issues ??= []).push(issue);
+		const existing = remote.files[issue.path!];
+		if (existing) inventory[issue.path!] = existing;
 	}
 	let completed = 0;
 	try {

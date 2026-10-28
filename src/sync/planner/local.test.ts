@@ -98,7 +98,7 @@ describe('planner local diff helpers', () => {
 
 		expect(result.changes).toHaveLength(1);
 		expect(result.changes.find(file => file.path === 'notes/changed.md')?.hash).toHaveLength(64);
-		expect(result.skippedPaths).toEqual(['notes/large.bin']);
+		expect(result.skipped?.map(issue => issue.path)).toEqual(['notes/large.bin']);
 		expect(result.discoveredPaths).toEqual(new Set(['notes/changed.md', 'notes/unchanged.md', 'notes/large.bin']));
 		expect(adapter.readBinary).toHaveBeenCalledTimes(2);
 	});

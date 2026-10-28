@@ -190,6 +190,23 @@ it('round-trips an encrypted attachment at the 25 MiB plaintext limit', async ()
 	expect((await stored('large.bin'))!.size).toBeGreaterThan(content.length);
 }, 30_000); // Two-device encryption and transfer of 25 MiB is a correctness check, not a 5-second benchmark.
 
+it('skips files nested too deeply for an encrypted vault without failing the sync', async () => {
+	const folder = Array.from({ length: 37 }, (_, index) => `f${index}`).join('/');
+	const skipped = (path: string): unknown[] => [expect.objectContaining({ path, code: 'unsupported-device-path' })];
+	// First upload, then a full sync on a joining device, then incremental syncs.
+	const first = await device('deep-first');
+	await first.disk.vault.createFolder(folder); first.disk.write(`${folder}/first.md`, 'Too deep'); first.disk.write('note.md', 'Synced');
+	expect((await sync(first)).issues).toEqual(skipped(`${folder}/first.md`));
+	const second = await device('deep-second');
+	await second.disk.vault.createFolder(folder); second.disk.write(`${folder}/second.md`, 'Too deep');
+	expect((await sync(second)).issues).toEqual(skipped(`${folder}/second.md`));
+	first.disk.write('note.md', 'Edited');
+	expect((await sync(first)).issues).toEqual(skipped(`${folder}/first.md`));
+	await sync(second);
+	expect(second.disk.text('note.md')).toBe('Edited');
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first()).toEqual({ count: 1 });
+});
+
 it('preserves encrypted file renames and moves into and out of a reminders folder on another device', async () => {
 	const first = await device('move-first'), second = await device('move-second');
 	await first.disk.vault.adapter.mkdir('Reminders');

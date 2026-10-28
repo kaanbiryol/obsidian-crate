@@ -2,9 +2,19 @@ import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from './file-discovery';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { fitsEncryptedPathLimit } from '../../encryption/path-tags';
+import { deepEncryptedFileIssue, skippedFileIssue } from '../issues';
+import type { SyncIssue } from '../types';
 
 /** Oversized files stay discovered (never local deletes) but sync never transfers them. */
 export const isOversizedSyncFile = (file: Pick<VaultFile, 'size'>): boolean => file.size > MAX_FILE_SIZE_BYTES;
+
+/** Why sync leaves a local file out, if it does: it is oversized, or too deep for an encrypted vault.
+ * Such files stay discovered but are never uploaded, so they cannot fail every sync. */
+export function skippedUploadIssue(file: Pick<VaultFile, 'path' | 'size'>, encrypted: boolean): SyncIssue | null {
+	if (isOversizedSyncFile(file)) return skippedFileIssue(file.path);
+	return encrypted && !fitsEncryptedPathLimit(file.path) ? deepEncryptedFileIssue(file.path) : null;
+}
 
 /** Untracked, resized or retimed files need their bytes checked; an unreadable baseline time counts as changed. */
 export function hasLocalMetadataChange(file: Pick<VaultFile, 'size' | 'mtime'>, entry: Pick<FileEntry, 'size' | 'modified'> | undefined): boolean {

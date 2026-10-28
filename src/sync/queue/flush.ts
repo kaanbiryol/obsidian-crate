@@ -5,7 +5,7 @@ import { createLogger } from '../logger';
 import { isAbortError } from '../abort';
 import { isQueueTerminalFailure, isRetryableSyncError, isVersionConflict } from '../failures';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
-import { syncErrorIssues, formatSyncIssue, SkippedFileError, skippedFileIssue, withSyncFileContext } from '../issues';
+import { syncErrorIssues, formatSyncIssue, SkippedFileError, withSyncFileContext } from '../issues';
 import { HttpError } from '../worker-api/http';
 import { beginSyncAttempt, completeTransferResult, completeWorkflowResult, handleWorkflowError } from '../sync-outcome';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
@@ -143,7 +143,7 @@ async function uploadQueuedChanges(
 					// Settle a skipped file rather than failing its batch; a later edit
 					// queues it again and is reported the same way.
 					state.completedQueueKeys.add(pendingChangeKey('upload', path));
-					state.skipped.push(skippedFileIssue(path));
+					state.skipped.push(error.issue);
 					return null;
 				}
 			},

@@ -1,7 +1,7 @@
 import type { PlannedContent } from './planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, FileEntry, MutationFailure } from '../../protocol/sync-types';
-import type { DownloadDiff, FileDiff, PreparedUpload, SyncResult, SyncWork, UploadDiff } from '../types';
+import type { DownloadDiff, FileDiff, PreparedUpload, SyncIssue, SyncResult, SyncWork, UploadDiff } from '../types';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
@@ -40,7 +40,7 @@ export interface LocalChangeScan {
 	changes: Array<{ path: string; hash: string }>;
 	discoveredPaths: ReadonlySet<string>;
 	/** Local files left out of sync, such as those over the size limit. */
-	skippedPaths?: string[];
+	skipped?: SyncIssue[];
 }
 
 export interface LocalDiffPlannerContext {
@@ -52,6 +52,8 @@ export interface LocalDiffPlannerContext {
 	shouldIgnore(path: string): boolean;
 	verifyContent(files: VaultFile[]): Promise<boolean>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
+	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
+	encrypted?(): boolean;
 }
 
 export interface IncrementalSyncPlannerContext {
@@ -96,6 +98,8 @@ export interface FullSyncPlannerContext {
 	localManifest: PlannerManifest;
 	shouldIgnore(path: string): boolean;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
+	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
+	encrypted?(): boolean;
 }
 
 export interface FullSyncPlan {

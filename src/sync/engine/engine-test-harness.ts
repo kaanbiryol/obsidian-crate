@@ -94,6 +94,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 
 	const api = {
 		isConfigured: vi.fn().mockReturnValue(true),
+		isEncrypted: vi.fn().mockReturnValue(false),
 		setAbortSignal: vi.fn(),
 		// The engine wraps these mocks directly; see createFiles below.
 		getFileTransport: () => ({ transport: null, clientSession: 'test-session' }),

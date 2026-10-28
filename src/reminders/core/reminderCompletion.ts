@@ -5,7 +5,7 @@ import { calculateNextOccurrence } from '@/reminders/core/recurrence/recurrenceC
 import { buildStoredReminderDates, parseStoredReminderDate, reminderHasTime } from '@/reminders/core/dates/reminderDate';
 import { normalizeRecurrenceRule } from '@/reminders/core/recurrence/recurrenceRule';
 import { setReminderIdMarker } from './reminderIdentity';
-import { assertReminderBlockUnchanged, findReminderLineNumber } from './markdownReminderFile';
+import { assertReminderBlockUnchanged, findReminderLineNumber, matchLineEnding } from './markdownReminderFile';
 import type { MarkdownReminderRecord } from './markdownReminderMutation';
 
 export interface ReminderCompletionState {
@@ -124,7 +124,7 @@ export function setReminderCompletionInContent(
 	}
 
 	const plan = buildReminderCompletionPlan(reminder, completed, line, currentDue);
-	lines[lineNumber] = plan.checkboxLine;
+	lines[lineNumber] = matchLineEnding([plan.checkboxLine], line)[0]!;
 	return {
 		...plan,
 		content: lines.join('\n'),

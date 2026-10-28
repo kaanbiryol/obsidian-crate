@@ -107,6 +107,11 @@ export function assertReminderBlockUnchanged(lines: string[], reminder: Reminder
 	}
 }
 
+/** New lines take the carriage return of the line they replace, so a CRLF note keeps one line ending. */
+export function matchLineEnding(lines: string[], replaced: string): string[] {
+	return replaced.endsWith('\r') ? lines.map(line => line.endsWith('\r') ? line : `${line}\r`) : lines;
+}
+
 export function appendReminderBlockToContent(
 	fileContent: string,
 	checkboxLine: string,
@@ -114,12 +119,13 @@ export function appendReminderBlockToContent(
 ): string {
 	const descriptionLines = buildDescriptionBlock(description?.trim() || undefined);
 	const trimmed = fileContent.trimEnd();
-	const separator = trimmed.match(/^#[^\n]*$/) ? "\n\n" : "\n";
+	const eol = fileContent.includes('\r\n') ? '\r\n' : '\n';
+	const separator = trimmed.match(/^#[^\n]*$/) ? eol + eol : eol;
 	const block = descriptionLines.length > 0
-		? `${checkboxLine}\n${descriptionLines.join("\n")}`
+		? `${checkboxLine}${eol}${descriptionLines.join(eol)}`
 		: checkboxLine;
 	const prefix = `${trimmed}${separator}`;
-	const result = `${prefix}${block}\n`;
+	const result = `${prefix}${block}${eol}`;
 	if (!markdownTaskContexts(result.split('\n')).has(prefix.split('\n').length - 1)) {
 		throw new ReminderMarkdownContextError('Close the code or hidden Markdown block at the end of this note before adding a reminder; nothing was changed.');
 	}
@@ -139,7 +145,7 @@ export function replaceReminderBlockInContent(
 	assertReminderBlockUnchanged(lines, reminder, lineNumber);
 
 	const oldDescCount = readDescriptionBlock(lines, lineNumber).lineCount;
-	lines.splice(lineNumber, 1 + oldDescCount, ...replacementLines);
+	lines.splice(lineNumber, 1 + oldDescCount, ...matchLineEnding(replacementLines, lines[lineNumber]!));
 	return {
 		content: lines.join("\n"),
 		lineNumber,

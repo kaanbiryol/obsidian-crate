@@ -1,6 +1,7 @@
 import { SkippedFileError, withSyncFileContext } from '../issues';
 import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from "../local/file-discovery";
 import { isVaultTFileLike } from '../local/local-delete';
+import { skippedUploadIssue } from '../local/local-file-changes';
 import type { VaultFile } from "../local/file-discovery";
 import type { PreparedUpload } from '../types';
 import {
@@ -20,9 +21,10 @@ export async function prepareUploadFromVaultFile(
 	options?: { force?: boolean; expectedHash?: string | null },
 ): Promise<PreparedUpload | null> {
 	return withSyncFileContext(file.path, async () => {
-		if (file.size > MAX_FILE_SIZE_BYTES) {
-			logger.warn("Skipping large file:", file.path);
-			throw new SkippedFileError(file.path);
+		const skipped = skippedUploadIssue(file, context.encrypted?.() ?? false);
+		if (skipped) {
+			logger.warn("Skipping file:", file.path);
+			throw new SkippedFileError(file.path, skipped);
 		}
 
 		let source = file;

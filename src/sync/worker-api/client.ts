@@ -58,6 +58,8 @@ export class SyncApiClient {
 	}
 	private folderKeys?: { tags: PathTags; key: EncryptionKey; vaultId: string };
 
+	isEncrypted(): boolean { return this.folderKeys !== undefined; }
+
 	/** A feature folder as the server stores it: in an encrypted vault, its tag and sealed name. */
 	async serverFolder(path: string): Promise<{ folderPath: string; folderLabel?: string }> {
 		if (!this.folderKeys) return { folderPath: path };

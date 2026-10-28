@@ -82,6 +82,7 @@ export class SyncEngineContexts {
 			runConcurrent: d.runConcurrent,
 			retryWithBackoff: d.retryWithBackoff,
 			getModifiedIso: d.getModifiedIso,
+			encrypted: () => d.api.isEncrypted(),
 		};
 		this.localDiffPlanner = {
 			throwIfDestroyed: d.throwIfDestroyed,
@@ -91,6 +92,7 @@ export class SyncEngineContexts {
 			shouldIgnore: d.shouldIgnore,
 			verifyContent: d.verifyContent,
 			runConcurrent: d.runConcurrent,
+			encrypted: () => d.api.isEncrypted(),
 		};
 		// Members shared by the standard, initial and forced sync workflows.
 		const base = {
@@ -137,6 +139,7 @@ export class SyncEngineContexts {
 				localManifest: d.localManifest,
 				shouldIgnore: d.shouldIgnore,
 				runConcurrent: d.runConcurrent,
+				encrypted: () => d.api.isEncrypted(),
 			}, remoteFiles, concurrency, options),
 			processDiff: this.processDiff,
 			prepareFullSyncUpload: diff => prepareTransferUploadFromPath(this.transfer, diff.path, { force: true, expectedHash: diff.remoteHash ?? null }),
@@ -159,6 +162,7 @@ export class SyncEngineContexts {
 			prepareUploadsFromVaultFiles: (files, onPrepared) =>
 				transferPrepareUploadsFromVaultFiles(this.transfer, files, PREPARE_CONCURRENCY, onPrepared, { force: true }),
 			createVaultFileChunks: createByteBudgetedVaultFileChunks,
+			encrypted: () => d.api.isEncrypted(),
 		};
 	}
 

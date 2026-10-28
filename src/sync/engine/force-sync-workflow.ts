@@ -1,8 +1,7 @@
 import { createDeleteCandidates, type DeleteRemoteFiles } from '../transfer/delete';
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
-import { isOversizedSyncFile } from '../local/local-file-changes';
-import { skippedFileIssue } from '../issues';
+import { skippedUploadIssue } from '../local/local-file-changes';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
@@ -33,6 +32,8 @@ export interface ForceSyncWorkflowContext {
 	getLocalManifestPaths(): string[];
 	removeLocalManifestEntry(path: string): void;
 	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
+	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
+	encrypted?(): boolean;
 	prepareUploadsFromVaultFiles(
 		files: VaultFile[],
 		onPrepared?: (completed: number) => void
@@ -68,10 +69,12 @@ export async function runForceFullSyncWorkflow(
 
 		context.updateState({ work: { phase: 'scanning' } });
 		const localFiles = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
-		// Oversized files stay local paths, so their server copy is neither replaced nor deleted.
+		// Skipped files stay local paths, so their server copy is neither replaced nor deleted.
 		const localPaths = new Set(localFiles.map(file => file.path));
-		const files = localFiles.filter(file => !isOversizedSyncFile(file));
-		for (const file of localFiles.filter(isOversizedSyncFile)) (result.issues ??= []).push(skippedFileIssue(file.path));
+		const skipped = localFiles.flatMap(file => skippedUploadIssue(file, context.encrypted?.() ?? false) ?? []);
+		const skippedPaths = new Set(skipped.map(issue => issue.path));
+		const files = localFiles.filter(file => !skippedPaths.has(file.path));
+		if (skipped.length) (result.issues ??= []).push(...skipped);
 
 		const remoteOnlyPaths = [...remotePaths].filter(
 			path => !localPaths.has(path) && !context.shouldIgnore(path),

@@ -31,6 +31,13 @@ describe('reopening a recurring occurrence', () => {
 		}
 	});
 
+	it('keeps CRLF line endings when completing a recurring occurrence', () => {
+		const initial = source(true, 5).replaceAll('\n', '\r\n');
+		const content = setReminderCompletionInContent(initial, read(initial), true).content;
+		expect(read(content).recurrence?.completedCount).toBe(5);
+		expect(content.replaceAll('\r\n', '')).not.toContain('\n');
+	});
+
 	it('does not rewind an already active next occurrence or invent a negative count', () => {
 		const initial = source(true, 5);
 		const active = read(initial);

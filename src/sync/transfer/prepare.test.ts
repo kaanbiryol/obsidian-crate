@@ -26,6 +26,19 @@ describe('transfer prepare helpers', () => {
 		expect(harness.adapter.readBinary).not.toHaveBeenCalled();
 	});
 
+	it('skips files too deep for an encrypted vault without reading them', async () => {
+		const harness = createTransferHarness();
+		const path = `${Array.from({ length: 37 }, (_, index) => `f${index}`).join('/')}/deep.md`;
+		const file = { path, size: 1, mtime: 1, extension: 'md' };
+
+		await expect(prepareUploadFromVaultFile({ ...harness.context, encrypted: () => true }, file))
+			.rejects.toMatchObject({ issue: { path, code: 'unsupported-device-path' } });
+		expect(harness.adapter.readBinary).not.toHaveBeenCalled();
+		harness.adapter.readBinary.mockResolvedValue(new Uint8Array([1]).buffer);
+		harness.adapter.stat.mockResolvedValue({ type: 'file', size: 1, mtime: 1 });
+		await expect(prepareUploadFromVaultFile(harness.context, file)).resolves.toMatchObject({ path });
+	});
+
 	it('skips upload when manifest hash already matches', async () => {
 		const harness = createTransferHarness();
 		harness.adapter.readBinary.mockResolvedValue(new TextEncoder().encode('same').buffer);
