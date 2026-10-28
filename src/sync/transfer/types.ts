@@ -35,7 +35,8 @@ interface TransferApi {
 	operationId?: string,
 	mergePreimage?: ArrayBuffer,
 	): Promise<UploadResult>;
-	downloadFile(path: string): Promise<DownloadedFile>;
+	/** `size`, when known, lets a phone keep large downloads from overlapping. */
+	downloadFile(path: string, size?: number): Promise<DownloadedFile>;
 	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
 	batchDownload(paths: string[]): Promise<DownloadedBatch>;
 }

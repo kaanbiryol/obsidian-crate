@@ -57,7 +57,7 @@ export async function downloadAndSaveFile(
 	result: SyncResult,
 ): Promise<DiffApplyOutcome> {
 	const { path } = request;
-	const response = await context.files.downloadFile(path);
+	const response = await context.files.downloadFile(path, request.remoteSize);
 	const content = response.content;
 	if (content.byteLength > MAX_FILE_SIZE_BYTES) {
 		return { status: "deferred", reason: "Skipped remote file larger than 25MB" };

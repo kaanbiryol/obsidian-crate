@@ -336,7 +336,7 @@ describe('transfer download/process helpers', () => {
 		const result = emptyResult();
 		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'fallback.md', expectedLocalHash: null, expectedRemoteHash: await sha256Hex(new TextEncoder().encode('ok').buffer), remoteSize: 2 }], result, 5);
 
-		expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md');
+		expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md', 2);
 		expect(result.downloaded).toBe(1);
 	});
 
@@ -418,7 +418,7 @@ it('still downloads each file when a batch response does not match its request',
 	harness.api.downloadFile.mockResolvedValue({ content, contentType: 'text/plain', size: 2 });
 	const result = emptyResult();
 	await parallelDownloadAndSaveFiles({ ...harness.context, runConcurrent }, [{ path: 'fallback.md', expectedLocalHash: null, expectedRemoteHash: await sha256Hex(content), remoteSize: 2 }], result, 2);
-	expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md');
+	expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md', 2);
 	expect(result.downloaded).toBe(1);
 });
 
