@@ -113,6 +113,7 @@ export class PersistentTestVault {
 			append: async (path: string, text: string) => { this.write(path, (this.files.has(path) ? this.text(path) : '') + text); },
 			writeBinary: async (path: string, content: ArrayBuffer) => { this.write(path, content); },
 			remove: async (path: string) => { this.remove(path); },
+			rename: async (from: string, to: string) => { this.rename(from, to); },
 			rmdir: async (path: string, recursive: boolean) => {
 				const children = this.list(path);
 				if (recursive || children.files.length || children.folders.length) throw new Error('Directory is not empty');

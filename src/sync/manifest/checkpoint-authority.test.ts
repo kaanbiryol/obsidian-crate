@@ -113,13 +113,16 @@ describe('checkpoint authority and reset', () => {
 
 	it('archives pending upload bytes before invalidating their old server authority', async () => {
 		const journal = `${dir}/pending-uploads/operation.json`;
+		const unfinished = `${dir}/pending-uploads/unsent.json.tmp`;
 		const content = JSON.stringify({ authority: 'https://old.example', bytes: 'private pending text' });
-		const harness = createDisk({ [main]: checkpoint('https://old.example'), [`${dir}/pending-uploads`]: '', [journal]: content });
-		Object.assign(harness.adapter, { list: async () => ({ files: [journal], folders: [] }) });
+		const harness = createDisk({ [main]: checkpoint('https://old.example'), [`${dir}/pending-uploads`]: '', [journal]: content, [unfinished]: '{"trunc' });
+		Object.assign(harness.adapter, { list: async () => ({ files: [journal, unfinished], folders: [] }) });
 		await deleteManifestFile(harness.plugin as never);
 		expect(harness.disk.has(journal)).toBe(false);
 		const backup = [...harness.disk].find(([path]) => path.startsWith(`${dir}/upload-operation.json.previous-`));
 		expect(backup?.[1]).toBe(content);
+		// A record that never finished writing was never sent, so it is not kept as a backup.
+		expect([...harness.disk.keys()].filter(path => path.includes('unsent'))).toEqual([unfinished]);
 	});
 
 	it('leaves manual sync unavailable after refusing a foreign checkpoint', async () => {

@@ -5,6 +5,7 @@ import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import type { SyncSettings } from '../settings';
 import { syncStoragePaths, retiredUploadPath, previousCheckpointCopy } from '../manifest/storage-paths';
+import { isUnfinishedUploadRecord } from '../durability/upload-journal';
 
 interface ApplyInfrastructureConfigInput {
 	workerUrl: string;
@@ -30,6 +31,8 @@ export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): 
 		const listing = await adapter.list(journalDirectory);
 		for (const path of listing.files) {
 			signal?.throwIfAborted();
+			// An interrupted record write was never dispatched; the next journal load removes it.
+			if (isUnfinishedUploadRecord(path)) continue;
 			checkpoints.push({ path, content: await adapter.read(path), backupPath: retiredUploadPath(plugin.manifest.dir!, path.split('/').at(-1)!) });
 		}
 	}
