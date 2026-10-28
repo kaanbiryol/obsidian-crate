@@ -397,7 +397,8 @@ applying the update without a confirmation sheet. Offline or pending work disabl
 the action; update failures appear as toast feedback. `PwaUpdateNotice` provides the
 same action at the top of Settings. There is no floating update banner.
 At launch, a found update downloads and applies behind the Reminders launch splash
-(released only after a 30s stall or on failure, offline or backgrounding);
+(released after a 30s stall, on failure, offline or backgrounding, and at once when
+saved work needs review or a restored editor or capture form is open);
 after launch, applying an update requires an explicit action. Feature readiness
 and durable pending commands are checked before reload.
 

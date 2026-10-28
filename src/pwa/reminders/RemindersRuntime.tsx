@@ -19,7 +19,7 @@ import { toSharedReminder } from './outbox/reminder-list-state';
 import { useFeatureSettings, useSettingsOpen } from '../settings/settings-context';
 import { ReminderRecoveryNotices } from './notices/ReminderRecoveryNotices';
 import { reminderFeatureStatus, reminderSyncStatus } from '../sync/reminder-status';
-import { reminderRetryAt } from './outbox/reminder-outbox';
+import { reminderNeedsAttention, reminderRetryAt } from './outbox/reminder-outbox';
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';
 import { downloadJson } from '../storage/download';
 
@@ -165,6 +165,9 @@ function useRemindersController() {
 			interacting: Boolean(modal) || saving || loggingOut || reorderDragging,
 			preparingMutation: isPreparingMutation(), launchPending: Boolean(launchReminderId),
 			loading, refreshing, isOffline, unsettled: Boolean(storageError) || changes.length > 0 || needsRecovery,
+			// A paused feature sends nothing, so its queue waits like a rejected change.
+			editing: Boolean(modal), stalled: Boolean(storageError) || needsRecovery
+				|| changes.some(change => !enabled || reminderNeedsAttention(change)),
 		}),
 		canApplyUpdate: () => !isPreparingMutation(),
 		...reminderFeatureStatus({ enabled, syncStatus, pendingCount: changes.length, needsRecovery, storageError }),

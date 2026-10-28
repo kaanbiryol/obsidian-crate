@@ -487,8 +487,10 @@ async function testLaunchUpdate(browser, mode) {
       if (mode === 'failed-check' || mode === 'offline-signal') return sendJson(res, 503, { error: 'Unavailable' });
       if (mode === 'slow-check') await new Promise(resolve => setTimeout(resolve, 3_500));
     }
-    if (assets === after && mode === 'slow-install' && path === '/notifications/sw.js' && req.url.includes(afterVersion)) {
-      await new Promise(resolve => setTimeout(resolve, 3_500));
+    if (mode === 'blocked' && path === '/reminders/set-completed') return sendJson(res, 409, { error: 'Rejected by this test' });
+    // A blocked launch must not wait for the download either.
+    if (assets === after && (mode === 'slow-install' || mode === 'blocked') && path === '/notifications/sw.js' && req.url.includes(afterVersion)) {
+      await new Promise(resolve => setTimeout(resolve, mode === 'blocked' ? 10_000 : 3_500));
     }
     handlers.get(assets).emit('request', req, res);
   });
@@ -537,6 +539,12 @@ async function testLaunchUpdate(browser, mode) {
     await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
     await page.getByRole('group', { name: cardName, exact: true }).waitFor();
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+    if (mode === 'blocked') {
+      // A rejected change stays saved until the user reviews it; waiting cannot settle it.
+      await page.getByRole('group', { name: cardName, exact: true }).getByRole('checkbox').click();
+      await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('crate-reminder-outbox:')
+        && localStorage.getItem(key).includes('"status":"failed"')))).toBe(true);
+    }
     // Keep an old client alive so a waiting worker needs explicit activation.
     const other = await context.newPage();
     await other.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
@@ -570,6 +578,16 @@ async function testLaunchUpdate(browser, mode) {
       expect(handoff.iconOffset).toBeLessThan(1);
       expect(await page.locator('script[type="module"]').getAttribute('src')).toContain(afterVersion);
       await expect(page.locator('.pwa-update-notice')).toHaveCount(0);
+    } else if (mode === 'blocked') {
+      // Before: the splash said "Updating" until the 30s launch deadline on every open.
+      const update = page.getByRole('button', { name: 'Update available', exact: true });
+      await update.waitFor();
+      expect(Date.now() - started).toBeLessThan(3_500);
+      await expect(update).toBeDisabled();
+      await expect(page.locator('.pwa-launch-splash')).toHaveCount(0);
+      await page.waitForTimeout(2_500);
+      expect(navigations).toBe(1);
+      expect(await page.locator('script[type="module"]').getAttribute('src')).toContain(beforeVersion);
     } else {
       await page.getByRole('group', { name: cardName, exact: true }).waitFor();
       expect(Date.now() - started).toBeLessThan(3_500);
@@ -595,7 +613,7 @@ for (const browserType of [chromium, webkit]) {
   for (const mode of ['manifest', 'cookie']) {
     scenario(`Safari update, ${mode} installation and repeated Home Screen launch`, browser => testUpdate(browser, mode));
   }
-  for (const mode of ['fast', 'slow-check', 'slow-install', 'failed-check', browserType === chromium ? 'offline' : 'offline-signal']) {
+  for (const mode of ['fast', 'slow-check', 'slow-install', 'failed-check', 'blocked', browserType === chromium ? 'offline' : 'offline-signal']) {
     scenario(`${mode} launch update`, browser => testLaunchUpdate(browser, mode));
   }
   scenario('deferred update preserves editors, pending writes and other tabs', testDeferredUpdate);

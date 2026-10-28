@@ -16,9 +16,9 @@ vi.mock('./update-transition', () => ({
 beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); });
 afterEach(() => { vi.useRealTimers(); });
 
-function render() {
+function render(blocked = () => false, canApply = () => true) {
 	return renderHook(() => usePwaUpdate(vi.fn(), true, {
-		version: 'new', checkComplete: true, canApply: () => true, canManuallyApply: () => true,
+		version: 'new', checkComplete: true, canApply, blocked: blocked(), canManuallyApply: () => true,
 	}), () => {
 		vi.stubGlobal('navigator', { onLine: true });
 		Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
@@ -66,4 +66,35 @@ it('ends the launch window without an updating screen when the download stalls',
 	await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
 	expect(hook.current).toMatchObject({ launchPending: false, updating: false });
 	expect(applyPwaUpdate).not.toHaveBeenCalled();
+});
+
+it('releases the launch splash at once when durable work blocks the update', async () => {
+	vi.mocked(preparePwaUpdate).mockReturnValue(new Promise(() => {}));
+	let blocked = false;
+	const hook = render(() => blocked, () => !blocked);
+	await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+	// Hydration and syncing are still settling, so the splash waits for the download.
+	expect(hook.current.launchPending).toBe(true);
+	blocked = true;
+	hook.rerender();
+	await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+	expect(hook.current).toMatchObject({ launchPending: false, updating: false });
+	expect(applyPwaUpdate).not.toHaveBeenCalled();
+});
+
+it('does not cut off a launch update that started applying before work became blocked', async () => {
+	let finish!: (applied: boolean) => void;
+	vi.mocked(applyPwaUpdate).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+	vi.mocked(preparePwaUpdate).mockResolvedValue(null);
+	let blocked = false;
+	const hook = render(() => blocked);
+	await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+	expect(hook.current).toMatchObject({ launchPending: true, updating: true });
+	blocked = true;
+	hook.rerender();
+	await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+	// The applying update rechecks its own guards and defers to the manual notice.
+	expect(hook.current.launchPending).toBe(true);
+	await act(async () => { finish(false); await vi.advanceTimersByTimeAsync(0); });
+	expect(hook.current).toMatchObject({ launchPending: false, updating: false });
 });

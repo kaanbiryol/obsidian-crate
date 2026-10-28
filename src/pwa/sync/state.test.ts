@@ -36,6 +36,16 @@ describe('application sync coordination', () => {
 		state.reading!.unsynced = false; state.reminders!.updateReady = false;
 		expect(pwaSyncState(state).canUpdate).toBe(false);
 	});
+	it('reports durable work in either feature as blocking an update', () => {
+		const state = snapshot();
+		expect(pwaSyncState(state).updateBlocked).toBe(false);
+		state.reading!.updateBlocked = true; state.reading!.updateReady = false;
+		expect(pwaSyncState(state)).toMatchObject({ updateBlocked: true, canUpdate: false });
+		state.reading!.updateBlocked = false; state.reminders!.updateBlocked = true; state.reminders!.unsynced = true;
+		expect(pwaSyncState(state)).toMatchObject({ updateBlocked: true, canUpdate: false });
+		state.reading = null;
+		expect(pwaSyncState(state)).toMatchObject({ ready: false, updateBlocked: true });
+	});
 	it('totals pending work without hiding offline or retry deadlines', () => {
 		const state = snapshot();
 		state.reading!.pendingCount = 1; state.reading!.unsynced = true; state.reading!.retryAt = 100;

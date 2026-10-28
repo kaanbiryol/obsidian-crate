@@ -9,6 +9,8 @@ export function pwaSyncState(snapshot: Pick<SettingsSnapshot, 'reading' | 'remin
 	const pendingCount = models.reduce((sum, model) => sum + (model.pendingCount ?? 0), 0);
 	const unsynced = !ready || models.some(model => model.unsynced);
 	const canUpdate = ready && !unsynced && models.every(model => model.updateReady === true && model.canApplyUpdate?.() === true);
+	// One feature's durable work is enough; the other's readiness cannot unblock it.
+	const updateBlocked = models.some(model => model.updateBlocked === true);
 	const nextRetryAt = Math.min(...models.map(model => model.retryAt ?? Infinity));
 	const named = (feature: string, label: string) => `${feature === 'reading' ? 'Reading' : 'Reminders'}: ${label}`;
 	let status: { state: SyncIndicatorState; label: string };
@@ -25,7 +27,7 @@ export function pwaSyncState(snapshot: Pick<SettingsSnapshot, 'reading' | 'remin
 	else if (active.some(model => model.status.state === 'cached') || unsynced) status = { state: 'cached', label: 'Saved changes are waiting to sync' };
 	else if (active.length) status = { state: 'synced', label: 'All changes synced' };
 	else status = { state: 'cached', label: models.some(model => model.enabled === false) ? 'Sync paused' : 'Not connected' };
-	return { ready, unsynced, canUpdate, pendingCount, nextRetryAt, status };
+	return { ready, unsynced, canUpdate, updateBlocked, pendingCount, nextRetryAt, status };
 }
 
 /** A failed feature does not prevent the other feature's refresh from completing. */
