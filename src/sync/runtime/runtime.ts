@@ -446,12 +446,14 @@ export class SyncRuntime {
 				return this.syncEngine;
 			},
 			pushSharedSettings: () => this.pushSharedSettingsBestEffort(),
-			syncBeforeEncrypting: async () => {
-				if (!this.syncEngine) throw new Error('Connect sync on this device before enabling encryption');
-				const result = await this.syncEngine.sync();
+			syncBeforeReset: async () => {
+				const engine = this.syncEngine;
+				if (!engine) throw new Error('Connect sync on this device before replacing the server copy');
+				const result = await engine.sync();
 				if (result.outcome === 'cancelled' || !result.success || result.conflicts.length) {
 					throw new Error('Sync this device without errors or conflicts first, so no server-only changes are lost.');
 				}
+				return engine.trackedPaths();
 			},
 			resumeEvents: () => { this.vaultEvents.open(); },
 			reportError: message => { this.initializationError = message; this.emitCurrentState(); },

@@ -6,6 +6,7 @@ import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { normalizeRemindersFolderPath } from './settings';
 import { createLogger } from './logger';
 import { validateReadingFolder } from '../reading/settings';
+import { getPortablePathIssue } from '../protocol/portable-path';
 
 const logger = createLogger('Reminders');
 interface PolicySyncState {
@@ -57,6 +58,9 @@ function pendingFolder(plugin: CratePlugin, workerUrl: string) {
 /** Folder and retry intent share one local save, before any network request. */
 export async function changeReminderFolder(plugin: CratePlugin, folderPath: string): Promise<void> {
 	const folder = normalizeRemindersFolderPath(folderPath);
+	// Windows devices skip paths they cannot store, which would hide every reminder there.
+	const issue = getPortablePathIssue(folder);
+	if (issue) throw new Error(`Invalid reminders folder: ${issue}.`);
 	if (plugin.settings.reading?.enabled) validateReadingFolder(plugin.settings.reading.folderPath, folder, plugin.app.vault.configDir);
 	await plugin.writeRemindersSettings({ remindersFolderPath: folder,
 		pendingServerFolder: plugin.settings.workerUrl

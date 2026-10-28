@@ -23,6 +23,13 @@ describe('reminder ID normalization', () => {
 		expect(normalizeReminderIds(content)).toEqual({ content, remindersUpdated: 0 });
 	});
 
+	it('leaves fenced examples in CRLF notes untouched', () => {
+		const result = normalizeReminderIds('```md\r\n- [ ] Example\r\n```\r\n- [ ] Real\r\n');
+
+		expect(result.remindersUpdated).toBe(1);
+		expect(result.content.startsWith('```md\r\n- [ ] Example\r\n```\r\n- [ ] Real <!-- crate-id:')).toBe(true);
+	});
+
 	it('replaces pasted duplicate IDs while preserving the first occurrence', () => {
 		const result = normalizeReminderIds([
 			'- [ ] Original <!-- crate-id:r1 -->',

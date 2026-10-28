@@ -62,7 +62,7 @@ export function markdownTaskContexts(lines: readonly string[]): Map<number, Mark
 		const list = body.match(/^(?:[-+*]|\d+[.)])([ \t]+)/);
 		if (list) containers.push(indentation + indentationWidth(list[0]));
 		const containerBody = list ? body.slice(list[0].length) : body;
-		const openingFence = containerBody.match(/^(`{3,}|~{3,})(.*)$/);
+		const openingFence = containerBody.match(/^(`{3,}|~{3,})(.*)\r?$/);
 		if (openingFence && !(openingFence[1]![0] === '`' && openingFence[2]!.includes('`'))) {
 			fence = { character: openingFence[1]![0]!, length: openingFence[1]!.length };
 			continue;

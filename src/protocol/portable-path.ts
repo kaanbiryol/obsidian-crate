@@ -16,6 +16,13 @@ export function getPortablePathIssue(path: string): string | null {
 	return null;
 }
 
+/** Android shared storage rejects the characters FAT cannot store, but not Windows'
+ * reserved names or trailing dots and spaces. */
+export function getAndroidPathIssue(path: string): string | null {
+	return path.split('/').some(segment => WINDOWS_INVALID_SEGMENT_CHARACTERS.test(segment))
+		? 'contains a character that is not supported on Android' : null;
+}
+
 /** Sync storage accepts native filenames; device restrictions belong at local writes. */
 export function getSyncPathIssue(path: string): string | null {
 	if (!path || path.length > 1024) return 'path is empty or too long';

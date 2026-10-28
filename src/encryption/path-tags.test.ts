@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { PathTags } from './path-tags';
+import { fitsEncryptedPathLimit, PathTags } from './path-tags';
 import { resolveEncryptedPath } from './path-binding';
 import { openFolderLabel, sealFolderLabel } from './folder-label';
 import { importEncryptionSecret } from './envelope';
@@ -40,6 +40,16 @@ it('gives case and Unicode variants one identity and keeps parents, folders and 
 
 it('rejects paths nested too deeply for the server limit', async () => {
 	await expect((await tags()).wire(Array.from({ length: 40 }, (_, index) => `f${index}`).join('/'))).rejects.toThrow('nested too deeply');
+});
+
+it('predicts the encrypted depth limit without keys, at the boundary wire() enforces', async () => {
+	const t = await tags();
+	for (const name of ['Note.md', 'NOTE.MD', 'image.png']) for (const folders of [35, 36, 37]) {
+		const path = [...Array.from({ length: folders }, (_, index) => `f${index}`), name].join('/');
+		const fits = await t.wire(path).then(() => true, () => false);
+		expect(fitsEncryptedPathLimit(path), path).toBe(fits);
+		expect(fits).toBe(folders <= 36);
+	}
 });
 
 it('binds metadata paths to their server path and accepts random names only for notes created without the key', async () => {

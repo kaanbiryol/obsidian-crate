@@ -39,6 +39,8 @@ async function setup() {
 	harness.plugin.app.vault.adapter.read.mockImplementation(async (path: string) => local.get(path));
 	harness.plugin.app.vault.adapter.write.mockImplementation(async (path: string, value: string) => { local.set(path, value); });
 	harness.plugin.app.vault.adapter.remove.mockImplementation(async (path: string) => { local.delete(path); });
+	// Turning encryption off starts from a connected, unlocked device, which syncs first.
+	await harness.runtime.initialize({ skipStartupSync: true });
 	const run = () => harness.runtime.turnOffEncryption(state, () => {}, { workerUrl: harness.settings.workerUrl, authToken: values.get(SECRET_KEYS.AUTH_TOKEN)! });
 	return { ...harness, values, state, local, run };
 }
@@ -80,14 +82,15 @@ it('keeps local notes, replaces credentials and sync state, then uploads without
 		for (const key of [SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY, SECRET_KEYS.ENCRYPTION_RESET]) expect(h.values.has(key)).toBe(false);
 		expect(h.settings.lastSeq).toBe(0);
 		expect(h.settings.automaticSync).toBe(true);
-		expect(SyncEngine.prototype.sync).toHaveBeenCalledOnce();
+		// The pre-sync, then the reset upload.
+		expect(SyncEngine.prototype.sync).toHaveBeenCalledTimes(2);
 		expect(SyncEngine.prototype.forceFullSync).not.toHaveBeenCalled();
 	} finally { h.runtime.destroy(); }
 });
 
 it('keeps the sync progress of the reset upload in the saved settings', async () => {
 	const h = await setup();
-	vi.mocked(SyncEngine.prototype.sync).mockImplementationOnce(async function (this: SyncEngine) {
+	vi.mocked(SyncEngine.prototype.sync).mockResolvedValueOnce(createEmptySyncResult()).mockImplementationOnce(async function (this: SyncEngine) {
 		// The engine publishes progress into the settings object it was given.
 		updateSyncProgress((this as unknown as { settings: SyncSettings }).settings, { lastSeq: 42, lastSync: '2026-02-02' });
 		return createEmptySyncResult();
@@ -102,7 +105,7 @@ it('keeps the sync progress of the reset upload in the saved settings', async ()
 
 it('blocks startup and ordinary sync after failure, and resumes only the unfinished upload', async () => {
 	const h = await setup();
-	vi.mocked(SyncEngine.prototype.sync).mockResolvedValueOnce(createSyncFailureResult('Disconnected'));
+	vi.mocked(SyncEngine.prototype.sync).mockResolvedValueOnce(createEmptySyncResult()).mockResolvedValueOnce(createSyncFailureResult('Disconnected'));
 	try {
 		await expect(h.run()).rejects.toThrow('uploading needs attention');
 		expect(loadEncryptionReset(h.secretStorage as never)?.phase).toBe('upload');
@@ -121,7 +124,7 @@ it('blocks startup and ordinary sync after failure, and resumes only the unfinis
 
 it('retains the reset checkpoint when reconciliation returns cancellation', async () => {
 	const h = await setup();
-	vi.mocked(SyncEngine.prototype.sync).mockResolvedValueOnce(cancelSyncResult(createEmptySyncResult()));
+	vi.mocked(SyncEngine.prototype.sync).mockResolvedValueOnce(createEmptySyncResult()).mockResolvedValueOnce(cancelSyncResult(createEmptySyncResult()));
 	await expect(h.run()).rejects.toMatchObject({ name: 'AbortError' });
 	expect(loadEncryptionReset(h.secretStorage as never)?.phase).toBe('upload');
 	expect(h.settings.automaticSync).toBe(false);
@@ -157,11 +160,13 @@ it('keeps the upload checkpoint when shutdown interrupts reset initialization', 
 	const h = await setup(), initialized = createDeferred<void>();
 	vi.mocked(SyncEngine.prototype.initialize).mockReturnValueOnce(initialized.promise);
 	const running = h.run();
-	await vi.waitFor(() => expect(SyncEngine.prototype.initialize).toHaveBeenCalled());
+	// The first initialization connected this device in setup.
+	await vi.waitFor(() => expect(SyncEngine.prototype.initialize).toHaveBeenCalledTimes(2));
 	h.runtime.destroy();
 	initialized.resolve();
 	await expect(running).rejects.toMatchObject({ name: 'AbortError' });
-	expect(SyncEngine.prototype.sync).not.toHaveBeenCalled();
+	// Only the pre-sync ran.
+	expect(SyncEngine.prototype.sync).toHaveBeenCalledOnce();
 	expect(loadEncryptionReset(h.secretStorage as never)?.phase).toBe('upload');
 	expect(h.settings.automaticSync).toBe(false);
 	expect(h.runtime.getApiClient()).toBeNull();
@@ -190,7 +195,8 @@ it('reconciles again after only the shared settings save failed, without force u
 		expect(loadEncryptionReset(h.secretStorage as never)?.phase).toBe('upload');
 		await h.run();
 		expect(remote).toHaveBeenCalledOnce();
-		expect(SyncEngine.prototype.sync).toHaveBeenCalledTimes(2);
+		// One pre-sync, then the upload and its retry.
+		expect(SyncEngine.prototype.sync).toHaveBeenCalledTimes(3);
 		expect(SyncEngine.prototype.forceFullSync).not.toHaveBeenCalled();
 	} finally { h.runtime.destroy(); }
 });

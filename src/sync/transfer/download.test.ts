@@ -422,9 +422,9 @@ it('still downloads each file when a batch response does not match its request',
 	expect(result.downloaded).toBe(1);
 });
 
-it('skips a remote file whose name this Windows device cannot store', async () => {
-	const previous = Platform.isWin;
-	Object.assign(Platform, { isWin: true });
+it.each(['isWin', 'isAndroidApp'] as const)('skips a remote file whose name this device cannot store: %s', async platform => {
+	const previous = { isWin: Platform.isWin, isAndroidApp: Platform.isAndroidApp };
+	Object.assign(Platform, { [platform]: true });
 	try {
 		const harness = createTransferHarness();
 		const onProcessed = vi.fn();
@@ -435,5 +435,5 @@ it('skips a remote file whose name this Windows device cannot store', async () =
 		expect(result.errors).toEqual([]);
 		expect(result.issues).toEqual([expect.objectContaining({ path: 'notes/a:b.md', code: 'unsupported-device-path' })]);
 		expect(onProcessed).toHaveBeenCalledOnce();
-	} finally { Object.assign(Platform, { isWin: previous }); }
+	} finally { Object.assign(Platform, previous); }
 });

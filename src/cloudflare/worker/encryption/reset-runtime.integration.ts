@@ -31,6 +31,7 @@ let failSettings = false;
 let disconnectedOrigin: string | undefined;
 let loseBeginResponse = false;
 let dropBeginRequest = false;
+let revokeBeforeBegin = false;
 let settings = structuredClone(DEFAULT_SETTINGS);
 beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
@@ -46,7 +47,7 @@ beforeEach(async () => {
 	storage.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(bundle)); storage.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);
 	await env.DB.prepare('INSERT INTO server_state(id, encryption) VALUES (1, ?)').bind(JSON.stringify(state)).run();
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('original', ?, 'vault')").bind(await sha256Hex('original')).run();
-	failSettings = false; disconnectedOrigin = undefined; loseBeginResponse = false; dropBeginRequest = false;
+	failSettings = false; disconnectedOrigin = undefined; loseBeginResponse = false; dropBeginRequest = false; revokeBeforeBegin = false;
 	bridge.mockImplementation(async (options: RequestUrlParam) => {
 		const url = new URL(options.url);
 		if (url.origin === disconnectedOrigin) throw new Error('Tunnel is gone');
@@ -54,6 +55,10 @@ beforeEach(async () => {
 		if (dropBeginRequest && url.pathname === '/encryption/reset' && options.method === 'POST' && typeof options.body === 'string' && options.body.includes('delete-remote-data')) {
 			dropBeginRequest = false;
 			throw new Error('Begin request lost');
+		}
+		if (revokeBeforeBegin && url.pathname === '/encryption/reset' && options.method === 'POST') {
+			revokeBeforeBegin = false;
+			await env.DB.prepare('DELETE FROM auth_tokens').run();
 		}
 		const response = await worker.fetch(new Request(options.url, { method: options.method, body: options.body,
 			headers: { ...options.headers, ...(options.contentType ? { 'Content-Type': options.contentType } : {}) },
@@ -69,6 +74,7 @@ beforeEach(async () => {
 	});
 	runtime = new SyncRuntime({ manifest: { dir: TEST_PLUGIN_DIR }, app: { vault: disk.vault, fileManager: {}, workspace: { layoutReady: true, onLayoutReady: () => {} } } } as never,
 		settings, storage, async update => { Object.assign(settings, update); });
+	await runtime.initialize();
 });
 afterEach(async () => {
 	runtime?.destroy();
@@ -103,6 +109,32 @@ it('preserves newer remote edits and additions when resuming after the settings 
 	expect(Object.keys((await other.api.getManifest()).files).sort()).toEqual(['new.md', 'note.md']);
 });
 
+it('syncs first so a server-only change survives turning encryption off', async () => {
+	disk.write('note.md', 'local copy\n');
+	expect((await runtime.sync()).success).toBe(true);
+	const other = new SyncTestDevice('encrypted-device', env); clients.push(other);
+	await other.authorize(); await other.open();
+	await other.api.configureEncryption(loadEncryptionKeys(storage)!, () => ['Reminders'], () => 'Reading');
+	other.disk.write('remote-only.md', 'only on the server\n');
+	expect((await other.engine.sync()).success).toBe(true);
+	const messages: string[] = [];
+	await runtime.turnOffEncryption(state, message => { messages.push(message); }, { workerUrl: settings.workerUrl, authToken: storage.get(SECRET_KEYS.AUTH_TOKEN)! });
+	expect(messages[0]).toBe('Syncing this device before replacing the server copy…');
+	expect(loadEncryptionReset(storage)).toBeNull();
+	// The server-only change reached this device before the wipe, so it was uploaded again.
+	expect(disk.text('remote-only.md')).toBe('only on the server\n');
+	const rows = (await env.DB.prepare('SELECT path, storage_key FROM files ORDER BY path').all<{ path: string; storage_key: string }>()).results;
+	expect(rows.map(row => row.path)).toEqual(['note.md', 'remote-only.md']);
+	expect(await (await env.BUCKET.get(rows[1]!.storage_key))!.text()).toBe('only on the server\n');
+});
+
+it('refuses to turn encryption off while this device has sync errors', async () => {
+	await env.DB.prepare('DELETE FROM auth_tokens').run();
+	await expect(run()).rejects.toThrow('Sync this device without errors or conflicts first');
+	expect(loadEncryptionReset(storage)).toBeNull();
+	expect(await readEncryptionState(env.DB)).toMatchObject({ mode: 'active' });
+});
+
 it('relocates an interrupted reset after the old tunnel disappears and resumes against the same receipt', async () => {
 	disk.write('note.md', 'local copy\n'); failSettings = true;
 	await expect(run()).rejects.toThrow('shared settings');
@@ -118,7 +150,7 @@ it('relocates an interrupted reset after the old tunnel disappears and resumes a
 });
 
 it('unblocks reconnect after the server rejects the first reset request with a revoked credential', async () => {
-	await env.DB.prepare('DELETE FROM auth_tokens').run();
+	revokeBeforeBegin = true;
 	await expect(run()).rejects.toThrow('before it started');
 	expect(loadEncryptionReset(storage)).toBeNull();
 	expect(storage.get(SECRET_KEYS.ENCRYPTION_KEYS)).not.toBeNull();
@@ -219,6 +251,17 @@ describe('turning encryption on', () => {
 			expect(messages.at(-1)).toBe('Encryption is on. Reconnect your other devices and web apps.');
 			await expectEncryptedServer({ 'note.md': 'current local version\n' }, ['first plaintext version\n']);
 		});
+
+	it('refuses before the wipe when a synced file is nested deeper than an encrypted vault allows', async () => {
+		const folder = Array.from({ length: 37 }, (_, index) => `f${index}`).join('/'), deep = `${folder}/deep.md`;
+		await disk.vault.createFolder(folder); disk.write(deep, 'too deep to encrypt\n');
+		await expect(turnOn()).rejects.toThrow(`1 file is nested more than 36 folders deep, which an encrypted vault cannot sync. Move it higher, then try again. First: ${deep}`);
+		expect(loadEncryptionReset(storage)).toBeNull();
+		expect(loadEncryptionKeys(storage)).toBeNull();
+		expect(await readEncryptionState(env.DB)).toBeNull();
+		expect(await env.DB.prepare("SELECT 1 FROM auth_tokens WHERE id = 'original'").first()).not.toBeNull();
+		expect((await env.DB.prepare('SELECT path FROM files ORDER BY path').all<{ path: string }>()).results.map(row => row.path)).toEqual([deep, 'note.md']);
+	});
 
 	it('releases a setup the server refuses to start and leaves the plaintext server untouched', async () => {
 		await env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')").run();
