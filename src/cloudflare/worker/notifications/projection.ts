@@ -98,7 +98,8 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
         operation = excluded.operation, payload_json = excluded.payload_json, attempts = 0, available_at = 0, last_error = NULL, updated_at = datetime('now')`;
 			// Only changed alarms need commands, and only changed rows are written. Delivery
 			// authority comes from the file's verified source state and the absence of a
-			// pending projection job, which this transaction removes.
+			// pending projection job, which this transaction removes. Schema 1 keeps the
+			// unused file_revision column, so only new rows set it.
 			await env.DB.batch([
 				env.DB.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
           SELECT reminder_id, ?, 'cancel', NULL, 0, 0 FROM reminder_projections WHERE file_path = ?
@@ -110,14 +111,14 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
           ${upsertJob}`).bind(json, ...args)),
 				env.DB.prepare(`DELETE FROM reminder_projections WHERE file_path = ?
           AND reminder_id NOT IN (SELECT value FROM json_each(?)) AND ${guard}`).bind(job.path, JSON.stringify([...ids]), ...args),
-				...chunks.map(json => env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, notification_token, policy_revision)
-          SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.token'), ? FROM json_each(?) WHERE ${guard}
+				...chunks.map(json => env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, file_revision, notification_token, policy_revision)
+          SELECT json_extract(value, '$.id'), ?, ?, json_extract(value, '$.token'), ? FROM json_each(?) WHERE ${guard}
           ON CONFLICT(reminder_id) DO UPDATE SET file_path = excluded.file_path,
           notification_token = excluded.notification_token, policy_revision = excluded.policy_revision
           WHERE reminder_projections.file_path IS NOT excluded.file_path
             OR reminder_projections.notification_token IS NOT excluded.notification_token
             OR reminder_projections.policy_revision IS NOT excluded.policy_revision`)
-					.bind(job.path, policy.revision, json, ...args)),
+					.bind(job.path, file?.storageKey ?? '', policy.revision, json, ...args)),
 				env.DB.prepare(`DELETE FROM notification_file_retries WHERE path = ? AND ${guard}`).bind(job.path, ...args),
 				env.DB.prepare(`DELETE FROM notification_projection_jobs WHERE path = ? AND ${guard}`).bind(job.path, ...args),
 			]);

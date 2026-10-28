@@ -31,7 +31,7 @@ it('accepts the current schema without rewriting it', async () => {
 	expect(await env.DB.prepare('SELECT folder_path FROM reading_policy').first()).toEqual({ folder_path: 'Reading' });
 	expect(await env.DB.prepare('SELECT version,created_version FROM crate_schema').first()).toEqual({ version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion });
 	await env.DB.prepare("UPDATE crate_release SET schema_hash='edited' WHERE id=1").run();
-	await expect(inspectDeploymentDatabase(input)).rejects.toThrow('definition changed');
+	await expect(inspectDeploymentDatabase(input)).rejects.toThrow('earlier beta');
 });
 
 it.each([0, SERVER_RELEASE.schemaVersion + 1, SERVER_RELEASE.schemaVersion + 2])('rejects unsupported schema %i', async version => {

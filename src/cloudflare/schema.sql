@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS scheduled_reminders (
 	project TEXT,
 	due_datetime TEXT NOT NULL,
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
-) WITHOUT ROWID;
+);
 
 CREATE TABLE IF NOT EXISTS notification_jobs (
 	reminder_id TEXT PRIMARY KEY,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS notification_jobs (
 	available_at INTEGER NOT NULL,
 	last_error TEXT,
 	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-) WITHOUT ROWID;
+);
 
 CREATE INDEX IF NOT EXISTS notification_jobs_available_at_idx
 	ON notification_jobs(available_at);
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS file_versions (
 	reason TEXT NOT NULL CHECK (reason IN ('replaced', 'deleted')),
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	expires_at INTEGER NOT NULL
-) WITHOUT ROWID;
+);
 
 CREATE INDEX IF NOT EXISTS file_versions_expires_at_idx ON file_versions(expires_at);
 CREATE INDEX IF NOT EXISTS file_versions_created_key_idx ON file_versions(created_at DESC, storage_key DESC);
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS maintenance_state (
 	key TEXT PRIMARY KEY,
 	value TEXT NOT NULL,
 	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-) WITHOUT ROWID;
+);
 
 -- Read with every authenticated request's token. The first write creates the row.
 CREATE TABLE IF NOT EXISTS server_state (
@@ -140,18 +140,19 @@ CREATE TABLE IF NOT EXISTS reminder_file_cache (
 	reminders_json TEXT NOT NULL,
 	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
 	PRIMARY KEY (folder_path, file_path)
-) WITHOUT ROWID;
+);
 
 CREATE TABLE IF NOT EXISTS reminder_operations (
     operation_id TEXT PRIMARY KEY,
     request_hash TEXT NOT NULL,
     response_json TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
-) WITHOUT ROWID;
+);
 CREATE TABLE IF NOT EXISTS reminder_identities (
     reminder_id TEXT PRIMARY KEY,
     created_operation_id TEXT NOT NULL
-) WITHOUT ROWID;
+);
+CREATE INDEX IF NOT EXISTS reminder_operations_created_at_idx ON reminder_operations(created_at);
 
 CREATE TABLE IF NOT EXISTS notification_policy (
   enabled INTEGER NOT NULL DEFAULT 1,
@@ -166,15 +167,15 @@ CREATE INDEX IF NOT EXISTS notification_projection_ready_idx
  ON notification_projection_jobs(updated_at, path) WHERE last_error IS NULL;
 CREATE TABLE IF NOT EXISTS reminder_projections (
  notification_token TEXT, policy_revision TEXT,
- reminder_id TEXT PRIMARY KEY, file_path TEXT NOT NULL
-) WITHOUT ROWID;
+ reminder_id TEXT PRIMARY KEY, file_path TEXT NOT NULL, file_revision TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS reminder_projections_path_idx ON reminder_projections(file_path);
 
 CREATE TABLE IF NOT EXISTS reminder_sources (
  file_path TEXT NOT NULL, reminder_id TEXT NOT NULL, due_key TEXT NOT NULL,
  occurrences INTEGER NOT NULL,
  PRIMARY KEY (file_path, reminder_id)
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS reminder_sources_id_idx ON reminder_sources(reminder_id);
 CREATE TABLE IF NOT EXISTS reminder_source_state (
  file_path TEXT PRIMARY KEY, file_revision TEXT NOT NULL,
@@ -186,11 +187,11 @@ CREATE INDEX IF NOT EXISTS reminder_source_state_retry_idx ON reminder_source_st
 CREATE TABLE IF NOT EXISTS reminder_occurrences (
  reminder_id TEXT NOT NULL, due_key TEXT NOT NULL, first_seen_at INTEGER NOT NULL,
  PRIMARY KEY (reminder_id, due_key)
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS reminder_occurrences_first_seen_idx ON reminder_occurrences(first_seen_at);
 
 CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx ON push_subscriptions(endpoint);
-CREATE TABLE IF NOT EXISTS request_rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS request_rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
 
 CREATE TABLE IF NOT EXISTS file_deletion_receipts (
  consumed_revision TEXT PRIMARY KEY,
@@ -203,7 +204,7 @@ CREATE TABLE IF NOT EXISTS file_deletion_receipts (
  client_session TEXT,
  operation_id TEXT,
  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS file_deletion_receipts_created_at_idx ON file_deletion_receipts(created_at);
 
 
@@ -218,7 +219,7 @@ CREATE TABLE IF NOT EXISTS upload_operations (
 CREATE TABLE IF NOT EXISTS notification_file_retries (
  path TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0,
  available_at INTEGER, error TEXT NOT NULL
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS notification_file_retries_due_idx
  ON notification_file_retries(available_at, path) WHERE available_at IS NOT NULL;
 CREATE TABLE IF NOT EXISTS staged_uploads (
@@ -287,12 +288,12 @@ CREATE TABLE IF NOT EXISTS reading_jobs (
  path TEXT PRIMARY KEY, item_id TEXT NOT NULL, generation TEXT NOT NULL,
  source_revision TEXT NOT NULL, block_hash TEXT NOT NULL, url TEXT NOT NULL,
  attempts INTEGER NOT NULL DEFAULT 0, available_at INTEGER NOT NULL
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS reading_jobs_due_idx ON reading_jobs(available_at);
 CREATE TABLE IF NOT EXISTS reading_operations (
  operation_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL, generation TEXT NOT NULL,
  request_hash TEXT NOT NULL, response_json TEXT NOT NULL, day INTEGER NOT NULL
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS reading_operations_day_idx ON reading_operations(day);
 CREATE TABLE IF NOT EXISTS reading_enrollments (
  token_hash TEXT PRIMARY KEY, generation TEXT NOT NULL, scope TEXT NOT NULL,
@@ -307,5 +308,5 @@ CREATE TABLE IF NOT EXISTS reading_captures (
  id TEXT PRIMARY KEY, generation TEXT NOT NULL, url_identity TEXT NOT NULL,
  note TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, available_at INTEGER NOT NULL,
  UNIQUE(generation, url_identity)
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS reading_captures_due_idx ON reading_captures(available_at);
