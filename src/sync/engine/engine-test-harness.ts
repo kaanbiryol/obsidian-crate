@@ -73,7 +73,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 		rename: vi.fn(async (from: string, to: string) => { stored.set(to, stored.get(from) ?? ''); stored.delete(from); }),
 		writeBinary: vi.fn<(path: string, content: ArrayBuffer) => Promise<void>>().mockResolvedValue(),
 		mkdir: vi.fn(),
-		list: vi.fn<(path: string) => Promise<{ files: string[]; folders: string[] }>>(),
+		list: vi.fn<(path: string) => Promise<{ files: string[]; folders: string[] }>>(async () => ({ files: [], folders: [] })),
 	};
 
 	const vault = {

@@ -3,6 +3,7 @@ import type { Stat, TAbstractFile, TFile } from "obsidian";
 import { isHiddenPath } from "./file-discovery";
 import type { Vault } from "obsidian";
 import { sha256Hex } from '../../platform/sha256';
+import { localPathExists } from './stored-name';
 
 export function isVaultTFileLike(file: TAbstractFile | null): file is TFile {
 	return typeof file === "object"
@@ -38,7 +39,9 @@ async function readDeleteSnapshot(context: LocalDeleteContext, path: string): Pr
 	// untouched and settle only the file tombstone. Mid-read replacements still
 	// fail the identity check below and are retried from a fresh snapshot.
 	if (visibleFile && !isVaultTFileLike(visibleFile)) return null;
-	if (!visibleFile && !await context.vault.adapter.exists(path)) {
+	// A stored case or Unicode variant of the name, such as a file this device
+	// renamed from `todo.md` to `TODO.md`, is not the deleted file.
+	if (!visibleFile && !await localPathExists(context.vault, path)) {
 		return null;
 	}
 

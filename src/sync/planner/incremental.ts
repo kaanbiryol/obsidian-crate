@@ -13,6 +13,7 @@ import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
 import { reconcileIncrementalRemoteChanges } from './incremental-remote-reconciliation';
 import { createPathRecord } from '../../protocol/path-record';
+import { namespaceConflictLookup } from '../namespace-conflicts';
 import { addAwaitingReviewChanges, readIncrementalChangelog } from './incremental-changelog';
 
 const logger = createLogger("SyncPlanner");
@@ -110,6 +111,19 @@ export async function runIncrementalSync(
 		current = changesByPath.size;
 		options.progressCallback?.(current, total);
 
+		const deleteLocalOnly = async (paths: string[]) => {
+			if (!paths.length) return;
+			const deleteFailures = await applyIncrementalLocalDeletes(context, paths, result, count => {
+				current += count;
+				options.progressCallback?.(current, total);
+			});
+			for (const failure of deleteFailures) options.onFailure?.(failure);
+		};
+		// The server cannot store a deleted path beside an upload in its namespace, as
+		// after a case-only or Unicode-only rename, so those deletes run first.
+		const uploadConflict = namespaceConflictLookup(localOnlyChanges.map(file => file.path));
+		await deleteLocalOnly(localOnlyDeletes.filter(path => uploadConflict(path) !== undefined));
+
 		if (localOnlyChanges.length) context.reportWork?.({ phase: 'preparing' });
 		let uploadsProcessed = 0;
 		const reportUploads = (count: number) => {
@@ -158,13 +172,7 @@ export async function runIncrementalSync(
 			}
 		}
 
-		if (localOnlyDeletes.length > 0) {
-			const deleteFailures = await applyIncrementalLocalDeletes(context, localOnlyDeletes, result, count => {
-				current += count;
-				options.progressCallback?.(current, total);
-			});
-			for (const failure of deleteFailures) options.onFailure?.(failure);
-		}
+		await deleteLocalOnly(localOnlyDeletes.filter(path => uploadConflict(path) === undefined));
 
 		context.reportWork?.({ phase: 'saving' });
 		await context.localManifest.save();

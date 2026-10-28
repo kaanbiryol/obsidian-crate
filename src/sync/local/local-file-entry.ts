@@ -4,6 +4,7 @@ import { isVaultTFileLike } from './local-delete';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
+import { localPathExists } from './stored-name';
 
 /** Read the current local metadata used by all reconciliation paths. */
 export async function readLocalFileEntry(
@@ -13,7 +14,8 @@ export async function readLocalFileEntry(
 	assertLocalSyncPath(path);
 	const abstractFile = vault.getAbstractFileByPath(path);
 	const visibleFile = isVaultTFileLike(abstractFile) ? abstractFile : undefined;
-	if (!visibleFile && !await vault.adapter.exists(path)) return undefined;
+	// A stored case or Unicode variant of the name is another file.
+	if (!visibleFile && !await localPathExists(vault, path)) return undefined;
 
 	const adapterStat = visibleFile ? null : await vault.adapter.stat(path);
 	if (!visibleFile && adapterStat?.type !== 'file') return undefined;

@@ -33,8 +33,8 @@ async function open(device: SyncTestDevice) {
 	await device.open();
 	await device.api.configureEncryption(bundle, reminderFolders, () => 'Reading');
 }
-async function device(id: string) {
-	const result = new SyncTestDevice(id, env); devices.push(result);
+async function device(id: string, disk: { caseInsensitive?: boolean } = {}) {
+	const result = new SyncTestDevice(id, env, disk); devices.push(result);
 	await result.authorize(3600_000); await open(result); return result;
 }
 async function sync(device: SyncTestDevice) {
@@ -224,6 +224,16 @@ it('preserves encrypted file renames and moves into and out of a reminders folde
 	await sync(first); await sync(second);
 	expect(second.disk.paths()).toEqual(['Reminders/Renamed.md']);
 	expect(second.disk.text('Reminders/Renamed.md')).toBe('Private movable note');
+});
+
+it('syncs an encrypted case-only rename between case-insensitive devices', async () => {
+	// Both names share one server path, and the delete of the old name carries no metadata.
+	const first = await device('case-first', { caseInsensitive: true }), second = await device('case-second', { caseInsensitive: true });
+	first.disk.write('todo.md', 'Private groceries'); await sync(first); await sync(second);
+	first.disk.rename('todo.md', 'TODO.md');
+	first.engine.onFileRename(first.disk.vault.getAbstractFileByPath('TODO.md')!, 'todo.md');
+	await sync(first);
+	await converge([first, second], { 'TODO.md': 'Private groceries' });
 });
 
 it('syncs a renamed reminders folder without resurrecting its old path', async () => {

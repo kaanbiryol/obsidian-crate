@@ -2,6 +2,7 @@ import type { Vault } from 'obsidian';
 import type { LocalManifest } from './manifest';
 import { readLocalFileEntry } from '../local/local-file-entry';
 import { getSyncPathIssue } from '@/protocol/portable-path';
+import { namespaceConflictLookup } from '../namespace-conflicts';
 import { isRecord } from '@/platform/validation';
 
 /** Baseline paths renamed since their last acknowledged upload, keyed by the old
@@ -89,6 +90,10 @@ export async function assertRenamePreserved(manifest: LocalManifest, vault: Vaul
 	// The renamed copy was deleted or excluded locally, so nothing remains to
 	// upload; deleting the old path is the user's intent.
 	if (!local) return;
+	// The server cannot store both names after a case-only or Unicode-only rename,
+	// so the old copy must go first. File history retains it, and the renamed
+	// local file stays queued for upload.
+	if (namespaceConflictLookup([destination])(path) !== undefined) return;
 	const saved = manifest.getEntry(destination);
 	if (!saved?.revision || saved.hash !== local.hash) throw new Error(`Remote deletion deferred until the renamed file is uploaded: ${destination}`);
 	// Persist the acknowledgement before the old copy can be deleted.

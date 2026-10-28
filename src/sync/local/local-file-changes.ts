@@ -5,6 +5,7 @@ import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { fitsEncryptedPathLimit } from '../../encryption/path-tags';
 import { deepEncryptedFileIssue, skippedFileIssue } from '../issues';
 import type { SyncIssue } from '../types';
+import { localPathExists } from './stored-name';
 
 /** Oversized files stay discovered (never local deletes) but sync never transfers them. */
 export const isOversizedSyncFile = (file: Pick<VaultFile, 'size'>): boolean => file.size > MAX_FILE_SIZE_BYTES;
@@ -50,7 +51,7 @@ export async function hasLocalFileChanges(
 		assertActive?.();
 		if (shouldIgnore(path) || currentPaths.has(path)) continue;
 		try {
-			const exists = await vault.adapter.exists(path);
+			const exists = await localPathExists(vault, path);
 			assertActive?.();
 			if (!exists) return true;
 		} catch {

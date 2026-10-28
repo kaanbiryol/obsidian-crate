@@ -4,6 +4,7 @@ import { getAllVaultFiles } from "../local/file-discovery";
 import type { LocalChangeScan, LocalDiffPlannerContext } from "./types";
 import { sha256Hex } from '../../platform/sha256';
 import { skippedUploadIssue, hasLocalMetadataChange } from '../local/local-file-changes';
+import { localPathExists } from '../local/stored-name';
 
 export async function getLocalDeletes(
 	context: LocalDiffPlannerContext,
@@ -11,14 +12,15 @@ export async function getLocalDeletes(
 	prepareConcurrency: number,
 ): Promise<string[]> {
 	// Discovery is complete or throws, so only paths it missed can be deletes.
-	// Each candidate is still confirmed with exists() before it counts.
+	// Each candidate is still confirmed absent before it counts; a case or Unicode
+	// variant of its name, as after a case-only rename, does not keep it.
 	const candidates = context.localManifest
 		.getAllPaths()
 		.filter((path) => !context.shouldIgnore(path) && !discoveredPaths.has(path));
 
 	const tasks = candidates.map((path) => async () => {
 		context.throwIfDestroyed();
-		const exists = await withSyncFileContext(path, () => context.vault.adapter.exists(path));
+		const exists = await withSyncFileContext(path, () => localPathExists(context.vault, path));
 		context.throwIfDestroyed();
 		return exists ? null : path;
 	});

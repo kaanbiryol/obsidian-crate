@@ -3,11 +3,12 @@ import { uploadPipelined } from '../transfer/upload-pipeline';
 import { createAbortError } from '../abort';
 import { createLogger } from '../logger';
 import { isAbortError } from '../abort';
-import { isQueueTerminalFailure, isRetryableSyncError, isVersionConflict } from '../failures';
+import { isAuthFailure, isQueueTerminalFailure, isRetryableSyncError, isVersionConflict } from '../failures';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import { syncErrorIssues, formatSyncIssue, SkippedFileError, withSyncFileContext } from '../issues';
 import { HttpError } from '../worker-api/http';
 import { beginSyncAttempt, completeTransferResult, completeWorkflowResult, handleWorkflowError } from '../sync-outcome';
+import { namespaceConflictLookup } from '../namespace-conflicts';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { DeleteRemoteFiles } from '../transfer/delete';
 import type { ConditionalDeleteCandidate } from '../transfer/delete-batches';
@@ -21,6 +22,8 @@ interface QueueApi {
 
 interface QueueManifest {
 	getEntry(path: string): Readonly<FileEntry> | undefined;
+	/** Where a file renamed since its last acknowledged upload now lives. */
+	renameDestination(path: string): string | undefined;
 	save(): Promise<void>;
 }
 
@@ -229,22 +232,55 @@ export async function processPendingChanges(
 			const expectedHash = context.localManifest.getEntry(path)?.hash;
 			return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];
 		});
-		const { uploads, failures: uploadFailures } = await uploadQueuedChanges(context, batch, uploadPaths, state);
-		const failures: Array<{ path: string; error: string; status?: number }> = [...uploadFailures];
-
-		if (deletes.length > 0 && failures.length > 0) {
-			// Reconciliation runs deletes after the conflicting uploads settle. Without
-			// it, held-back deletes would wait for an unrelated event or sync.
-			const reconciling = reconciliationPaths.size > 0;
-			for (const file of deletes) {
-				const key = pendingChangeKey('delete', file.path);
-				batch.requeue([key]);
-				if (reconciling) reconciliationPaths.add(key);
-				failures.push({ path: file.path, error: 'Remote deletion deferred until uploads finish successfully' });
-			}
+		const failures: Array<{ path: string; error: string; status?: number }> = [];
+		const failedUploads = new Set<string>();
+		// The server cannot store a deleted path beside an upload in its namespace,
+		// as after a case-only or Unicode-only rename, so those deletes run first.
+		// An upload whose delete failed would only be refused, so it stays queued.
+		const uploadConflict = namespaceConflictLookup(uploadPaths);
+		const clearingDeletes = deletes.filter(file => uploadConflict(file.path) !== undefined);
+		let readyUploads = uploadPaths;
+		if (clearingDeletes.length > 0) {
+			const deleteFailures = await deletePendingFiles(context, clearingDeletes, state);
+			failures.push(...deleteFailures);
+			batch.requeue(deleteFailures.map(failure => pendingChangeKey('delete', failure.path)));
+			const blockingDelete = namespaceConflictLookup(deleteFailures.map(failure => failure.path));
+			readyUploads = uploadPaths.filter(path => {
+				const blocking = blockingDelete(path);
+				if (blocking === undefined) return true;
+				batch.requeue([pendingChangeKey('upload', path)]);
+				failedUploads.add(path);
+				failures.push({ path, error: `Upload deferred until ${blocking} is deleted on the server` });
+				return false;
+			});
 		}
-		if (deletes.length > 0 && failures.length === 0) {
-			const deleteFailures = await deletePendingFiles(context, deletes, state);
+		const { uploads, failures: uploadFailures } = await uploadQueuedChanges(context, batch, readyUploads, state);
+		failures.push(...uploadFailures);
+		for (const failure of uploadFailures) failedUploads.add(failure.path);
+
+		const otherDeletes = deletes.filter(file => uploadConflict(file.path) === undefined);
+		// A delete may be the old name of a failed upload. Reconciliation or a retry
+		// runs held-back deletes once the uploads settle; without either, they would
+		// wait for an unrelated event or sync. A terminal failure gets neither, so it
+		// holds back only deletes renamed to its path, never the rest of the vault.
+		// Revoked access would refuse every delete too.
+		const reconciling = reconciliationPaths.size > 0;
+		const holdAll = failures.length > 0
+			&& (reconciling || !state.hasTerminalFailure || failures.some(failure => isAuthFailure(failure.status)));
+		const ready: QueueDeleteCandidate[] = [];
+		for (const file of otherDeletes) {
+			const destination = context.localManifest.renameDestination(file.path);
+			if (!holdAll && (destination === undefined || !failedUploads.has(destination))) {
+				ready.push(file);
+				continue;
+			}
+			const key = pendingChangeKey('delete', file.path);
+			batch.requeue([key]);
+			if (reconciling) reconciliationPaths.add(key);
+			failures.push({ path: file.path, error: 'Remote deletion deferred until uploads finish successfully' });
+		}
+		if (ready.length > 0) {
+			const deleteFailures = await deletePendingFiles(context, ready, state);
 			failures.push(...deleteFailures);
 			batch.requeue(deleteFailures.map(failure => pendingChangeKey('delete', failure.path)));
 		}

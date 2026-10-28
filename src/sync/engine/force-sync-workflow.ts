@@ -8,6 +8,7 @@ import {
 } from '../sync-result';
 import { createLogger } from '../logger';
 import { getPathEntry } from '../../protocol/path-record';
+import { namespaceConflictLookup } from '../namespace-conflicts';
 import type { PreparedUpload, RemoteManifest, SyncResult, SyncState } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
 import {
@@ -83,6 +84,16 @@ export async function runForceFullSyncWorkflow(
 		let uploadsProcessed = 0;
 		const total = files.length + remoteOnlyPaths.length;
 		let current = 0;
+		const deleteRemoteOnly = async (paths: string[]) => {
+			failures.push(...await context.deleteRemoteFiles(createDeleteCandidates(paths.map(path => {
+				const entry = getPathEntry(remoteManifest.files, path);
+				return { path, hash: entry?.hash, revision: entry?.revision };
+			}), result), result, { onProcessed: count => { current += count; progressCallback?.(current, total); } }));
+		};
+		// The server cannot store a remote-only path beside a local file in its
+		// namespace, as after a case-only or Unicode-only rename, so it goes first.
+		const localConflict = namespaceConflictLookup(files.map(file => file.path));
+		await deleteRemoteOnly(remoteOnlyPaths.filter(path => localConflict(path) !== undefined));
 
 		// The manifest keeps its baselines while uploading, so an interrupted run
 		// leaves correct entries for every file it has not reached yet.
@@ -113,10 +124,7 @@ export async function runForceFullSyncWorkflow(
 
 		context.throwIfDestroyed();
 
-		failures.push(...await context.deleteRemoteFiles(createDeleteCandidates(remoteOnlyPaths.map(path => {
-			const entry = getPathEntry(remoteManifest.files, path);
-			return { path, hash: entry?.hash, revision: entry?.revision };
-		}), result), result, { onProcessed: count => { current += count; progressCallback?.(current, total); } }));
+		await deleteRemoteOnly(remoteOnlyPaths.filter(path => localConflict(path) === undefined));
 
 		if (!result.errors.length) {
 			for (const path of context.getLocalManifestPaths()) {

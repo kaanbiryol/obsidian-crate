@@ -289,14 +289,26 @@ export class SyncWorkerApi {
 	async getChanges(since: number): Promise<ChangesPage> {
 		const response = await this.getRawChanges(since);
 		if (!this.encryption) return response;
+		// Deletes carry no metadata, so each takes the name its server path had at that
+		// point. A case-only rename keeps one server path, and opening the later put
+		// must not rename the delete of the old name.
+		const plainAt = new Map<string, string | undefined>();
+		for (const change of response.changes) {
+			if (change.action !== 'put' && !plainAt.has(change.path)) plainAt.set(change.path, await this.encryption.paths.plainFor(change.path));
+		}
 		const puts = response.changes.filter(change => change.action === 'put');
 		const opened = await this.encryption.metadata(puts.map(entry => ({ path: entry.path, entry })));
 		let index = 0;
 		const changes: ChangelogEntry[] = [];
 		for (const change of response.changes) {
-			if (change.action === 'put') { const { path, entry } = opened[index++]!; changes.push({ ...entry, path }); continue; }
+			if (change.action === 'put') {
+				const { path, entry } = opened[index++]!;
+				plainAt.set(change.path, path);
+				changes.push({ ...entry, path });
+				continue;
+			}
 			// A deleted server path this device never synced has no local file to remove.
-			const path = await this.encryption.paths.plainFor(change.path);
+			const path = plainAt.get(change.path);
 			if (path) changes.push({ ...change, path });
 		}
 		return { ...response, changes, nextSince: response.changes.at(-1)?.seq ?? since };

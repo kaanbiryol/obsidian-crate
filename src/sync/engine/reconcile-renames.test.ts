@@ -7,6 +7,7 @@ import { LocalManifest } from '../manifest/manifest';
 import { assertRenamePreserved } from '../manifest/rename-dependencies';
 import { reconcileQueuePaths, type TargetedReconcileContext } from './reconcile-paths';
 import { sha256Hex } from '../../platform/sha256';
+import { PersistentTestVault } from '../../test/factories/sync-vault';
 
 async function harness(destinationUploaded: boolean, destinationExists = true) {
 	const source = 'Dashboard.md';
@@ -110,6 +111,45 @@ describe('targeted rename reconciliation', () => {
 		expect(h.manifest.getRenameDependencies()).toEqual({});
 		// Later deletions are no longer held back by the cleared dependency.
 		await expect(assertRenamePreserved(h.manifest, {} as Vault, h.source)).resolves.toBeUndefined();
+	});
+
+	it.each([true, false])('deletes the old name of a case-only rename before uploading the new one (case-insensitive disk: %s)', async caseInsensitive => {
+		const disk = new PersistentTestVault({ caseInsensitive });
+		disk.write('todo.md', 'Groceries');
+		disk.rename('todo.md', 'TODO.md');
+		const entry: FileEntry = { hash: await sha256Hex(disk.read('TODO.md')), size: 9, modified: new Date(1).toISOString(), revision: 'v1' };
+		const calls: string[] = [];
+		const result = await reconcileQueuePaths({
+			vault: disk.vault,
+			localManifest: { getEntry: path => path === 'todo.md' ? entry : undefined, setEntry: vi.fn(), removeEntry: vi.fn(), save: async () => {} },
+			getRemoteEntries: async paths => Object.fromEntries(paths.includes('todo.md') ? [['todo.md', entry]] : []),
+			shouldIgnore: () => false,
+			processDiff: vi.fn(),
+			deleteRemoteFiles: async (files, syncResult) => {
+				for (const file of files) { calls.push(`delete ${file.path}`); syncResult.deletedPaths.push(file.path); }
+				return [];
+			},
+			uploadDiffs: async (diffs, syncResult) => {
+				for (const diff of diffs) { calls.push(`upload ${diff.path}`); syncResult.uploadedPaths.push(diff.path); }
+				return [];
+			},
+		}, [pendingChangeKey('delete', 'todo.md'), 'TODO.md']);
+		expect(result.success).toBe(true);
+		expect(calls).toEqual(['delete todo.md', 'upload TODO.md']);
+		expect(result.settledPaths).toEqual([pendingChangeKey('delete', 'todo.md'), 'TODO.md']);
+	});
+
+	it.each(['dashboard.md', 'Dashboard.md/notes.md'])('lets the source go first when the server cannot store it beside %s', async destination => {
+		const vault = {
+			getAbstractFileByPath: (path: string) => ({ path, extension: 'md', stat: { size: 1, mtime: 1 } }),
+			adapter: { readBinary: async () => new ArrayBuffer(1) },
+		} as unknown as Vault;
+		const manifest = new LocalManifest({ vault } as App, { dir: '.obsidian/plugins/crate' } as PluginManifest);
+		manifest.setEntry('Dashboard.md', { hash: 'a'.repeat(64), size: 1, modified: new Date(1).toISOString(), revision: 'v1' });
+		manifest.recordRename('Dashboard.md', destination);
+		await expect(assertRenamePreserved(manifest, vault, 'Dashboard.md')).resolves.toBeUndefined();
+		manifest.recordRename(destination, 'Elsewhere.md');
+		await expect(assertRenamePreserved(manifest, vault, 'Dashboard.md')).rejects.toThrow('renamed file is uploaded');
 	});
 
 	it('does not upload an unselected destination or bypass the deletion guard', async () => {

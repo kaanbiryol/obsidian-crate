@@ -5,6 +5,7 @@ import { getPathEntry } from '../../protocol/path-record';
 import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
 import { sha256Hex } from '../../platform/sha256';
 import { isOversizedSyncFile, hasLocalMetadataChange } from '../local/local-file-changes';
+import { localPathExists } from '../local/stored-name';
 
 /** Rebuild the volatile queue from local bytes without changing sync authority. */
 export async function findStartupPendingPaths(context: {
@@ -34,7 +35,7 @@ export async function findStartupPendingPaths(context: {
 		&& !present.has(path));
 	const deletions = await context.runConcurrent(missing.map(path => async () => {
 		context.throwIfDestroyed();
-		return await context.vault.adapter.exists(path) ? null : pendingChangeKey('delete', path);
+		return await localPathExists(context.vault, path) ? null : pendingChangeKey('delete', path);
 	}), concurrency);
 	context.throwIfDestroyed();
 	return [...changes, ...deletions].filter((path): path is string => path !== null);
