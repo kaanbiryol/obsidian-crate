@@ -83,9 +83,12 @@ it('keeps the confirm button disabled until the typed confirmation matches', asy
 	confirm.click();
 	await Promise.resolve();
 	expect(settled).toBe(false);
+	expect(field.texts[0]!.inputEl.getAttribute('autocapitalize')).toBe('none');
+	expect(field.texts[0]!.inputEl.getAttribute('autocorrect')).toBe('off');
 	field.texts[0]!.change('encryp');
 	expect(confirm.buttonEl.classNames.has('is-disabled')).toBe(true);
-	field.texts[0]!.change('encrypt');
+	// A phone keyboard may still capitalize the first letter.
+	field.texts[0]!.change('Encrypt ');
 	expect(confirm.buttonEl.classNames.has('is-disabled')).toBe(false);
 	confirm.click();
 	await expect(result).resolves.toBe(true);

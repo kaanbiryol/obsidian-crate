@@ -9,7 +9,7 @@ export interface ConfirmationModalOptions {
 	cancelText?: string;
 	warning?: boolean;
 	checkbox?: { label: string; description?: string; onChange: (checked: boolean) => void };
-	/** The confirm button stays disabled until this exact word is typed. */
+	/** The confirm button stays disabled until this word is typed, in any case. */
 	typedConfirmation?: string;
 }
 
@@ -65,10 +65,16 @@ class ConfirmationModal extends SharedModal {
 				.setClass('crate-confirmation-option')
 				.setName('Confirm data loss')
 				.setDesc(`Type ${typedConfirmation} to continue.`)
-				.addText(text => text.setPlaceholder('Type confirmation').onChange(value => {
-					typed = value.trim() === typedConfirmation;
-					confirm?.setDisabled(!typed);
-				}));
+				.addText(text => {
+					// Phone keyboards otherwise capitalize or correct the word.
+					text.inputEl.setAttribute('autocapitalize', 'none');
+					text.inputEl.setAttribute('autocorrect', 'off');
+					text.inputEl.setAttribute('spellcheck', 'false');
+					text.setPlaceholder('Type confirmation').onChange(value => {
+						typed = value.trim().toLowerCase() === typedConfirmation.toLowerCase();
+						confirm?.setDisabled(!typed);
+					});
+				});
 		}
 
 		createModalActions(createModalFooter(this.contentEl))
