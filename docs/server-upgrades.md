@@ -77,12 +77,12 @@ For each schema change, freeze a real source-schema fixture and test every suppo
 ## Retired cloud safety namespace
 
 Betas 0.4.0 to 0.9.0 created an unused experimental `CloudSafety` SQLite
-namespace. Worker and reset uploads now declare it `deleted`, which permanently
-removes the namespace and anything stored in it; where no namespace exists the
-tombstone has no effect. Keep the tombstone while servers created by those betas
-can still update, because Cloudflare rejects an upload that drops a provisioned
-class without one. A reset tolerates a leftover namespace until a Worker upload
-deletes it.
+namespace. While Cloudflare still lists it for the Worker, Worker and reset
+uploads declare it `deleted`, which permanently removes the namespace and anything
+stored in it. Other uploads omit the tombstone. Keep this check while servers
+created by those betas can still update, because Cloudflare rejects an upload that
+drops a provisioned class without one. A reset tolerates a leftover namespace until
+a Worker upload deletes it.
 
 ## Saved revision in plugin settings
 

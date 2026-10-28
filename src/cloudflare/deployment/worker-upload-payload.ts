@@ -8,7 +8,7 @@ import { deletionWorkerMessage, releaseWorkerMessage, resetWorkerMessage } from 
 
 // Betas 0.4.0 to 0.9.0 created an unused experimental CloudSafety namespace.
 // Cloudflare rejects an upload that drops a provisioned class without a tombstone,
-// and treats the tombstone as a no-op where no namespace exists.
+// so send one only while the account still lists that namespace for this Worker.
 const RETIRED_EXPORTS = { CloudSafety: { type: 'durable-object', state: 'deleted' } } as const;
 
 function concatBytes(parts: Uint8Array[]): ArrayBuffer {
@@ -29,6 +29,7 @@ export function buildWorkerMultipartBody(input: {
 	artifacts: CloudflareDeploymentArtifacts;
 	d1DatabaseId: string;
 	r2BucketName: string;
+	retireCloudSafety?: boolean;
 }): { body: ArrayBuffer; contentType: string } {
 	const metadata = {
 		main_module: 'worker.mjs',
@@ -49,13 +50,13 @@ export function buildWorkerMultipartBody(input: {
 		],
 		exports: {
 			ReminderAlarm: { type: 'durable-object', storage: 'sqlite', state: 'created' },
-			...RETIRED_EXPORTS,
+			...(input.retireCloudSafety ? RETIRED_EXPORTS : {}),
 		},
 	};
 	return buildWorkerModule(metadata, input.artifacts.workerBundle);
 }
 
-export function buildResetWorkerMultipartBody(resetId: string, databaseId: string, bucketName: string, alreadyRetired = false): { body: ArrayBuffer; contentType: string } {
+export function buildResetWorkerMultipartBody(resetId: string, databaseId: string, bucketName: string, alreadyRetired = false, retireCloudSafety = false): { body: ArrayBuffer; contentType: string } {
 	return buildWorkerModule({
 		main_module: 'worker.mjs', compatibility_date: '2026-08-18',
 		compatibility_flags: ['global_fetch_strictly_public'],
@@ -63,7 +64,7 @@ export function buildResetWorkerMultipartBody(resetId: string, databaseId: strin
 		bindings: [{ type: 'd1', name: 'DB', id: databaseId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName },
 			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: resetId }],
 		exports: {
-			...RETIRED_EXPORTS,
+			...(retireCloudSafety ? RETIRED_EXPORTS : {}),
 			...(!alreadyRetired ? { ReminderAlarm: { type: 'durable-object', state: 'deleted' } } : {}),
 		},
 	}, resetWorkerSource);

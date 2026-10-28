@@ -11,18 +11,22 @@ const artifacts = {
 };
 
 describe('Worker upload payloads', () => {
-	it('deletes the unused experimental safety namespace while keeping reminder alarms', () => {
-		const body = new TextDecoder().decode(buildWorkerMultipartBody({ publicOrigin: 'https://crate.workers.dev', artifacts,
-			d1DatabaseId: 'database', r2BucketName: 'crate-0123456789abcdef' }).body);
+	it('deletes a listed experimental safety namespace while keeping reminder alarms', () => {
+		const upload = (retireCloudSafety?: boolean) => new TextDecoder().decode(buildWorkerMultipartBody({ publicOrigin: 'https://crate.workers.dev', artifacts,
+			d1DatabaseId: 'database', r2BucketName: 'crate-0123456789abcdef', retireCloudSafety }).body);
+		const body = upload(true);
 		expect(body).toContain('"CloudSafety":{"type":"durable-object","state":"deleted"}');
 		expect(body).toContain('"ReminderAlarm":{"type":"durable-object","storage":"sqlite","state":"created"}');
 		expect(body).not.toContain('"class_name":"CloudSafety"');
+		// New servers and servers already updated never had or no longer have the class.
+		expect(upload()).not.toContain('CloudSafety');
 	});
 
 	it('retires ReminderAlarm and the safety namespace and installs the authenticated cleanup Worker', () => {
-		const body = new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket').body);
+		const body = new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket', false, true).body);
 		expect(body).toContain('"ReminderAlarm":{"type":"durable-object","state":"deleted"}');
 		expect(body).toContain('"CloudSafety":{"type":"durable-object","state":"deleted"}');
+		expect(new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket').body)).not.toContain('CloudSafety');
 		expect(body).not.toContain('export class CloudSafety');
 		expect(body).not.toContain('export class ReminderAlarm');
 		expect(body).not.toContain('"force":true');

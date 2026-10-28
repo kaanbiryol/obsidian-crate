@@ -267,8 +267,8 @@ export class CloudflareApiClient {
 		}
 	}
 
-	async retireCrateWorker(accountId: string, workerName: string, resetId: string, databaseId: string, bucketName: string, alreadyRetired = false): Promise<void> {
-		const multipart = buildResetWorkerMultipartBody(resetId, databaseId, bucketName, alreadyRetired);
+	async retireCrateWorker(accountId: string, workerName: string, resetId: string, databaseId: string, bucketName: string, alreadyRetired = false, retireCloudSafety = false): Promise<void> {
+		const multipart = buildResetWorkerMultipartBody(resetId, databaseId, bucketName, alreadyRetired, retireCloudSafety);
 		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
 			method: 'PUT', headers: { 'Content-Type': multipart.contentType }, body: multipart.body,
 		});
@@ -308,6 +308,7 @@ export class CloudflareApiClient {
 		artifacts: CloudflareDeploymentArtifacts;
 		d1DatabaseId: string;
 		r2BucketName: string;
+		retireCloudSafety?: boolean;
 	}): Promise<void> {
 		const multipart = buildWorkerMultipartBody(input);
 		await this.request(`/accounts/${input.accountId}/workers/scripts/${encodeURIComponent(input.workerName)}`, {

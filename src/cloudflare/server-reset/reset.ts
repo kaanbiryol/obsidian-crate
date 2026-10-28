@@ -51,7 +51,7 @@ export async function resetCrateServer(input: {
 		throw new ResetBlockedError('the saved reset target changed.');
 	}
 	input.onProgress?.('Checking reminder storage ownership…');
-	await assertOwnedNamespace(api, accountId, name, namespaceId, retired);
+	const retainedCloudSafety = await assertOwnedNamespace(api, accountId, name, namespaceId, retired);
 	input.onProgress?.('Checking that other Workers do not share this server’s resources…');
 	await assertUnsharedResources(api, metadata, namespaceId);
 	const database = await api.getD1Database(accountId, databaseId);
@@ -98,7 +98,7 @@ export async function resetCrateServer(input: {
 			// Cloudflare refuses the deleted-class export if another Worker binds the
 			// namespace. The stub has no Durable Object class and cannot serve vault data.
 			input.onProgress?.('Taking the server offline and removing reminder alarms…');
-			await mutate('retireCrateWorker', () => api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, retired));
+			await mutate('retireCrateWorker', () => api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, retired, retainedCloudSafety));
 		}
 		const verifyTarget = async () => {
 			const current = await api.getWorkerSettings(accountId, name);
@@ -112,7 +112,7 @@ export async function resetCrateServer(input: {
 			}
 		};
 		await verifyTarget();
-		await assertOwnedNamespace(api, accountId, name, namespaceId, true);
+		const cloudSafetyRemains = await assertOwnedNamespace(api, accountId, name, namespaceId, true);
 		input.onProgress?.('Checking that other Workers do not share this server’s resources…');
 		await assertUnsharedResources(api, metadata, namespaceId);
 		if (bucket && check) {
@@ -121,7 +121,7 @@ export async function resetCrateServer(input: {
 				input.onProgress?.('Updating the cleanup Worker to remove recovery backups…');
 				// Keep the same reset identity and existing fence. The namespace is
 				// already retired; this only refreshes the temporary cleanup code.
-				await mutate('retireCrateWorker', () => api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, true));
+				await mutate('retireCrateWorker', () => api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, true, cloudSafetyRemains));
 				await api.verifyResetWorker(origin, checkpoint.id, true);
 			}
 			await clearBucketObjects(api, accountId, name, check, verifyTarget,

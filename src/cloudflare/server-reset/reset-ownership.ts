@@ -92,7 +92,8 @@ export async function assertUnsharedResources(api: ResetApi, metadata: Cloudflar
 	}
 }
 
-export async function assertOwnedNamespace(api: ResetApi, accountId: string, workerName: string, namespaceId: string, retired: boolean): Promise<void> {
+/** Returns whether the beta CloudSafety namespace is still listed for this Worker. */
+export async function assertOwnedNamespace(api: ResetApi, accountId: string, workerName: string, namespaceId: string, retired: boolean): Promise<boolean> {
 	const namespaces = await api.listDurableObjectNamespaces(accountId);
 	if (namespaces.some(namespace => !namespace.id || !namespace.script || !namespace.class)) {
 		throw new ResetBlockedError('could not verify Durable Object ownership.');
@@ -106,4 +107,5 @@ export async function assertOwnedNamespace(api: ResetApi, accountId: string, wor
 		|| owned[0]?.script !== workerName || owned[0]?.class !== 'ReminderAlarm') {
 		throw new ResetBlockedError('unexpected Durable Object namespaces belong to this Worker, or reminder state has not been removed.');
 	}
+	return retained.length === 1;
 }

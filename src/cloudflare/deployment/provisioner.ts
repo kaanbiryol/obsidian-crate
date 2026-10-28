@@ -181,10 +181,14 @@ export async function provisionCloudflareDeployment(input: {
 		});
 		await fence.checkpoint('prepare-database');
 		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
+		// Read before the upload is fenced, so a failed listing never leaves an uncertain step.
+		const retireCloudSafety = (await input.api.listDurableObjectNamespaces(input.accountId))
+			.some(namespace => namespace.script === input.metadata.workerName && namespace.class === 'CloudSafety');
 		input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
 		fence.requireVerification();
 		await fence.uploadWorker(uploadTag => input.api.uploadWorker({
 			uploadTag,
+			retireCloudSafety,
 			publicOrigin: workersDevOrigin(input.metadata.workerName, workersSubdomain),
 			accountId: input.accountId,
 			workerName: input.metadata.workerName,

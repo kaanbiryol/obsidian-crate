@@ -47,6 +47,9 @@ function createApi() {
 		createR2Bucket: vi.fn(),
 		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? (sql === artifacts.d1Schema ? (initialized = true, []) : sql.includes('sqlite_master') && initialized ? [{ results: [{ name: 'crate_schema' }] }] : sql.startsWith('SELECT version') ? [{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion }] }] : [])),
 		uploadWorker: vi.fn(async (_input: Parameters<CloudflareApiClient['uploadWorker']>[0]) => {}),
+		listDurableObjectNamespaces: vi.fn(async (): ReturnType<CloudflareApiClient['listDurableObjectNamespaces']> => [
+			{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' },
+		]),
 		verifyWorkerDeployment: vi.fn(async () => {}),
 		updateWorkerSchedules: vi.fn(async () => {}),
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
@@ -95,6 +98,23 @@ describe('provisionCloudflareDeployment', () => {
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
 		expect(api.uploadWorker).toHaveBeenCalledWith(expect.objectContaining({ vaultName: 'Notes', workerName: metadata.workerName }));
 		expect(metadata.vaultName).toBe('Notes');
+	});
+
+	it('deletes the beta safety namespace only while this Worker still has one', async () => {
+		const api = createApi();
+		const metadata = createMetadata();
+		api.listDurableObjectNamespaces.mockResolvedValueOnce([
+			{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' },
+			{ id: 'd'.repeat(32), script: metadata.workerName, class: 'CloudSafety' },
+			{ id: 'e'.repeat(32), script: 'another-worker', class: 'CloudSafety' },
+		]).mockResolvedValueOnce([
+			{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' },
+			{ id: 'e'.repeat(32), script: 'another-worker', class: 'CloudSafety' },
+		]);
+		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+		metadata.lastDeployedFingerprint = null;
+		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+		expect(api.uploadWorker.mock.calls.map(([input]) => input.retireCloudSafety)).toEqual([true, false]);
 	});
 
 	it('skips address activation when Cloudflare already has the exact settings', async () => {

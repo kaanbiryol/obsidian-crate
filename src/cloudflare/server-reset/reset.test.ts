@@ -148,6 +148,7 @@ describe('Crate server reset boundaries', () => {
 		]);
 		await resetCrateServer(input);
 		expect(api.retireCrateWorker).toHaveBeenCalledOnce();
+		expect(api.retireCrateWorker.mock.calls[0]?.at(-1)).toBe(true);
 		expect(await api.listDurableObjectNamespaces()).toEqual([
 			{ id: 'd'.repeat(32), script: metadata.workerName, class: 'CloudSafety' },
 		]);
@@ -345,7 +346,7 @@ it('resumes by refreshing an older cleanup Worker before removing backups', asyn
 	await resetCrateServer(h.input);
 	expect(h.api.retireCrateWorker).toHaveBeenCalledTimes(2);
 	expect(h.api.retireCrateWorker.mock.calls[1]).toEqual([
-		h.metadata.accountId, h.metadata.workerName, h.metadata.reset!.id, h.metadata.d1DatabaseId, h.metadata.r2BucketName, true,
+		h.metadata.accountId, h.metadata.workerName, h.metadata.reset!.id, h.metadata.d1DatabaseId, h.metadata.r2BucketName, true, false,
 	]);
 	expect(h.api.verifyResetWorker).toHaveBeenLastCalledWith(`https://${h.metadata.workerName}.example.workers.dev`, h.metadata.reset!.id, true);
 	expect(h.objects.size).toBe(0);
