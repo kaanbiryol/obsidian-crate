@@ -180,5 +180,20 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 		const url = data.navigate || '/notifications' + (params.toString() ? '?' + params.toString() : '');
 		event.waitUntil(focusOrOpenNotificationTarget(url));
 	});
-	// A changed push subscription is renewed by the app the next time it opens.
+
+	// A browser can expire or replace a subscription. Renew it with the same server key so
+	// reminders keep arriving. Only a page holds the credential that registers an endpoint
+	// with the Worker, so open pages confirm it now and the next launch confirms it too.
+	scope.addEventListener('pushsubscriptionchange', event => {
+		event.waitUntil((async () => {
+			// Without the old key this cannot tell a lost Crate subscription from none.
+			const applicationServerKey = event.oldSubscription?.options.applicationServerKey;
+			if (!event.newSubscription && applicationServerKey) {
+				// A refusal (permission revoked, offline) leaves the app to show notifications as off.
+				await scope.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey }).catch(() => undefined);
+			}
+			const clients = await scope.clients.matchAll({ type: 'window', includeUncontrolled: true });
+			for (const client of clients) client.postMessage({ type: 'CRATE_PUSH_SUBSCRIPTION_CHANGED' });
+		})());
+	});
 }

@@ -190,6 +190,22 @@ async function renewalAndProviderChanges(browser) {
   } finally { await state.close(); }
 }
 
+async function serviceWorkerRenewal(browser) {
+  const state = await harness(browser, true);
+  const { page, open, rows } = state;
+  try {
+    await open();
+    await on(page).waitFor();
+    // The service worker renewed a subscription the browser replaced, then told open pages.
+    await provider(page, { endpoint: nextEndpoint });
+    await page.evaluate(() => navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: { type: 'CRATE_PUSH_SUBSCRIPTION_CHANGED' } })));
+    // Registered at once, not at the next throttled foreground check.
+    await expect.poll(() => rows.get(nextEndpoint)?.owner).toBe(previewAuthToken);
+    await on(page).waitFor();
+    expect((await providerState(page)).subscribes).toBe(0);
+  } finally { await state.close(); }
+}
+
 async function logoutDuringConfirmation(browser) {
   const state = await harness(browser, true);
   const { context, page, open, renew, attempts, control, release } = state;
@@ -290,9 +306,10 @@ try {
       await stableListOnResume(browser);
       for (const failure of ['before', 'after']) await registrationFailure(browser, failure);
       await renewalAndProviderChanges(browser);
+      await serviceWorkerRenewal(browser);
       await logoutDuringConfirmation(browser);
       await pausedVault(browser);
-      console.log(`${browserType.name()}: server confirmation gates On; vault pause/resume is shown without re-subscribing, failed/lost registrations retry, renewal/restored rows repair, provider changes and unknown states stay truthful, and late logout cleanup preserves a fresh session`);
+      console.log(`${browserType.name()}: server confirmation gates On; vault pause/resume is shown without re-subscribing, failed/lost registrations retry, renewal/restored rows repair, service-worker renewals register at once, provider changes and unknown states stay truthful, and late logout cleanup preserves a fresh session`);
     } finally { await browser.close(); }
   }
 } finally { await new Promise(resolve => server.close(resolve)); }

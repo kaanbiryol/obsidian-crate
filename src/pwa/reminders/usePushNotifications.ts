@@ -134,6 +134,17 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 		return () => { disposed = true; permission?.removeEventListener('change', changed); };
 	}, [authToken, refreshPushState]);
 
+	useEffect(() => {
+		if (!authToken || !('serviceWorker' in navigator)) return;
+		// The service worker renews a replaced subscription but cannot authenticate, so
+		// register the new endpoint now instead of at the next throttled foreground check.
+		const renewed = (event: MessageEvent) => {
+			if ((event.data as { type?: unknown } | null)?.type === 'CRATE_PUSH_SUBSCRIPTION_CHANGED') void refreshPushState();
+		};
+		navigator.serviceWorker.addEventListener('message', renewed);
+		return () => navigator.serviceWorker.removeEventListener('message', renewed);
+	}, [authToken, refreshPushState]);
+
 	const disablePushNotifications = useCallback(async () => {
 		const pending = inFlight.current?.promise;
 		const operation = ++sequence.current;
