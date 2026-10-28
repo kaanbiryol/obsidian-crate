@@ -171,7 +171,9 @@ it('preserves both conflicting encrypted binary versions across retries', async 
 	first.disk.write('image.bin', new Uint8Array([0, 2]).buffer); second.disk.write('image.bin', new Uint8Array([0, 3]).buffer);
 	await sync(first);
 	const result = await second.engine.sync();
-	expect(result.success).toBe(false);
+	// The review copy is reported without failing the sync.
+	expect(result).toMatchObject({ success: true, errors: [] });
+	expect(result.issues).toContainEqual(expect.objectContaining({ path: 'image.bin', code: 'incoming-review' }));
 	const copy = second.disk.paths().find(path => path !== 'image.bin'); expect(copy).toBeDefined();
 	expect(new Uint8Array(second.disk.read(copy!))).toEqual(new Uint8Array([0, 2]));
 	expect(new Uint8Array(second.disk.read('image.bin'))).toEqual(new Uint8Array([0, 3]));

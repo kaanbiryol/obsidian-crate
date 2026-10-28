@@ -13,7 +13,7 @@ import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
 import { reconcileIncrementalRemoteChanges } from './incremental-remote-reconciliation';
 import { createPathRecord } from '../../protocol/path-record';
-import { readIncrementalChangelog } from './incremental-changelog';
+import { addAwaitingReviewChanges, readIncrementalChangelog } from './incremental-changelog';
 
 const logger = createLogger("SyncPlanner");
 
@@ -40,6 +40,7 @@ export async function runIncrementalSync(
 		}
 		changelogRead = true;
 		const { changesByPath, changeCount, latestSeq } = changelog;
+		await addAwaitingReviewChanges(context, changesByPath, latestSeq);
 
 		logger.info(`Incremental sync: ${changeCount} remote changes since seq ${context.settings.lastSeq}`);
 
@@ -53,7 +54,7 @@ export async function runIncrementalSync(
 
 		result.settledPaths.push(...unchangedPaths.filter(path => !changesByPath.has(path)).map(path => pendingChangeKey('upload', path)));
 
-		if (changeCount === 0 && localChanges.length === 0 && localDeletes.length === 0) {
+		if (changesByPath.size === 0 && localChanges.length === 0 && localDeletes.length === 0) {
 			if (unchangedPaths.length > 0) await context.localManifest.save();
 			context.setLastSeq(latestSeq);
 			return result;

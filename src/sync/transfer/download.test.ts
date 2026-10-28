@@ -15,6 +15,7 @@ const conflictMocks = vi.hoisted(() => ({
 
 vi.mock('../conflict/conflict', () => ({
 	createConflictCopy: conflictMocks.createConflictCopy,
+	getIncomingConflictFileName: (path: string) => `${path}.incoming`,
 }));
 
 describe('transfer download/process helpers', () => {
@@ -436,4 +437,35 @@ it.each(['isWin', 'isAndroidApp'] as const)('skips a remote file whose name this
 		expect(result.issues).toEqual([expect.objectContaining({ path: 'notes/a:b.md', code: 'unsupported-device-path' })]);
 		expect(onProcessed).toHaveBeenCalledOnce();
 	} finally { Object.assign(Platform, previous); }
+});
+
+it('reports an incoming binary saved for review as an issue that does not fail the sync', async () => {
+	const harness = createTransferHarness();
+	const local = new Uint8Array([255, 1]).buffer;
+	const remote = new Uint8Array([255, 2]).buffer;
+	const request = { path: 'image.bin', expectedLocalHash: await sha256Hex(local), expectedRemoteHash: await sha256Hex(remote), remoteSize: 2 };
+	harness.vault.getAbstractFileByPath.mockReturnValue({ path: 'image.bin', extension: 'bin' });
+	harness.adapter.readBinary.mockResolvedValue(local);
+	harness.adapter.exists.mockResolvedValue(false);
+	harness.api.batchDownload.mockResolvedValue({ files: [{ path: 'image.bin', content: btoa(String.fromCharCode(...new Uint8Array(remote))), hash: request.expectedRemoteHash, size: 2 }] });
+	const issue = { path: 'image.bin', code: 'incoming-review', message: expect.stringContaining('Incoming file saved at image.bin.incoming') as string };
+
+	const first = emptyResult();
+	await parallelDownloadAndSaveFiles(harness.context, [request], first, 2);
+
+	expect(harness.vault.createBinary).toHaveBeenCalledWith('image.bin.incoming', remote);
+	expect(harness.context.conflictStore.record).toHaveBeenCalledWith(expect.objectContaining({ originalPath: 'image.bin', conflictPath: 'image.bin.incoming', cause: 'incoming-review' }));
+	expect(first).toMatchObject({ errors: [], issues: [issue], downloaded: 0 });
+	expect(harness.vault.modifyBinary).not.toHaveBeenCalled();
+	expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
+
+	// A later sync finds the saved copy instead of downloading the same version again.
+	harness.context.conflictStore.findIncomingReview.mockReturnValue({ conflictPath: 'image.bin.incoming' });
+	harness.adapter.exists.mockResolvedValue(true);
+	const again = emptyResult();
+	await parallelDownloadAndSaveFiles(harness.context, [request], again, 2);
+
+	expect(harness.api.batchDownload).toHaveBeenCalledOnce();
+	expect(again).toMatchObject({ errors: [], issues: [issue] });
+	expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
 });

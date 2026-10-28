@@ -13,6 +13,7 @@ const SYNC_ISSUE_CODES = [
 	'vault-scan-incomplete',
 	'transfer-unverified',
 	'unsupported-device-path',
+	'incoming-review',
 ] as const;
 
 export type SyncIssueCode = typeof SYNC_ISSUE_CODES[number];

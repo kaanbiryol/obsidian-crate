@@ -1,6 +1,6 @@
 import { decodePendingChange, pendingChangeKey } from '../pending/pending-change';
 import { isAbortError } from '../abort';
-import { recordSyncError } from '../issues';
+import { recordDeferredChange, recordSyncError } from '../issues';
 import type { Vault } from 'obsidian';
 import { readLocalFileEntry } from '../local/local-file-entry';
 import { classifyPath } from '../planner/reconciliation';
@@ -121,13 +121,15 @@ export async function reconcileQueuePaths(
 							}
 							outcome = { status: 'applied' };
 						} else outcome = await context.processDiff(decision, localFiles, result);
-						if (outcome.status === 'deferred') {
+						if (outcome.status === 'deferred' && !outcome.review) {
 							if (attempt < MAX_RECONCILE_ATTEMPTS) {
 								await refreshRemoteEntry(context, remoteEntries, path);
 								continue;
 							}
 							throw new Error(outcome.reason);
 						}
+						// A saved review copy settles this change; the path keeps its baseline.
+						if (outcome.status === 'deferred') recordDeferredChange(result, outcome, path);
 					} else if (localEntry && remoteEntry) {
 						context.localManifest.setEntry(path, {
 							...remoteEntry,

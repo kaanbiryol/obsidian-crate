@@ -177,7 +177,13 @@ Existing files whose current and incoming bytes are both strict UTF-8 without NU
 bytes (other than known binary formats such as PDFs and images) are then compared and replaced inside
 Obsidian's atomic `process()` callback (using the adapter for hidden files). An edit
 between the hash check and that callback defers the write instead of being
-overwritten. Other existing files keep the incoming bytes for review.
+overwritten. Other existing files keep the incoming bytes for review. A file
+awaiting review is reported as an `incoming-review` issue, not a failure: the
+local file and its baseline are kept, so the conflict is found again, while the
+changelog cursor, unrelated deletes and full-sync baselines still advance. Each
+incremental sync replans the path from its current server version until the
+review is resolved. While the local file is unchanged, a saved copy is not
+downloaded again.
 
 If the merge overlaps, the conflict remains unresolved:
 

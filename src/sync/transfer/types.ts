@@ -61,4 +61,5 @@ export interface TransferContext {
 
 export type DiffApplyOutcome =
 	| { status: "applied" }
-	| { status: "deferred"; reason: string };
+	/** `review`: the incoming bytes were saved as a review copy and the local file was kept. */
+	| { status: "deferred"; reason: string; review?: true };

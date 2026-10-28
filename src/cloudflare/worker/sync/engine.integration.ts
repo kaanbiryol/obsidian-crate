@@ -128,7 +128,12 @@ describe('multiple real sync engines across Worker and storage boundaries', () =
 		if (when === 'before-choice') {
 			await expect(second.engine.runConflictResolution(() => review.resolve('current'))).rejects.toThrow('server file changed');
 			expect(second.disk.read(record.conflictPath)).toEqual(incoming);
-		} else expect((await second.engine.sync()).success).toBe(false);
+		} else {
+			// The newer edit waits for review without failing the sync.
+			const result = await second.engine.sync();
+			expect(result).toMatchObject({ success: true, errors: [] });
+			expect(result.issues).toContainEqual(expect.objectContaining({ path: 'image.bin', code: 'incoming-review' }));
+		}
 		expect(second.disk.read('image.bin')).toEqual(original);
 		expect((await first.api.downloadFile('image.bin')).content).toEqual(newer);
 		expect(second.engine.getActiveConflicts().length).toBeGreaterThan(0);
@@ -269,8 +274,9 @@ describe('multiple real sync engines across Worker and storage boundaries', () =
 		second.disk.write('image.bin', new Uint8Array([0, 3]).buffer);
 		await sync(first);
 		const result = await second.engine.sync();
-		expect(result.success).toBe(false);
-		expect(result.errors.some(error => error.includes('Incoming file saved'))).toBe(true);
+		// The review copy is reported without failing the sync.
+		expect(result).toMatchObject({ success: true, errors: [] });
+		expect(result.issues).toContainEqual(expect.objectContaining({ path: 'image.bin', code: 'incoming-review', message: expect.stringContaining('Incoming file saved') as string }));
 		const copy = second.disk.paths().find(path => path !== 'image.bin');
 		expect(copy).toBeDefined();
 		expect(new Uint8Array(second.disk.read('image.bin'))).toEqual(new Uint8Array([0, 3]));

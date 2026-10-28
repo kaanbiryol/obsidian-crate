@@ -270,6 +270,24 @@ describe('reconcileQueuePaths', () => {
 		expect(result.errors).toEqual([]);
 	});
 
+	it('settles a conflict whose incoming version was saved for review without retrying it', async () => {
+		const harness = await createHarness({
+			baseHash: 'base',
+			localText: 'local edit',
+			remoteManifests: [{ version: 1, files: { 'notes/a.md': { hash: 'remote-v2', size: 1, modified: 'now' } } }],
+		});
+		const reason = 'This file needs manual review. Incoming file saved at notes/a (incoming).md';
+		harness.processDiff.mockResolvedValueOnce({ status: 'deferred', reason, review: true });
+
+		const result = await reconcileQueuePaths(harness.context, ['notes/a.md']);
+
+		expect(harness.getRemoteEntries).toHaveBeenCalledOnce();
+		expect(harness.processDiff).toHaveBeenCalledOnce();
+		expect(result).toMatchObject({ success: true, errors: [], settledPaths: ['notes/a.md'] });
+		expect(result.issues).toEqual([{ path: 'notes/a.md', message: reason, code: 'incoming-review' }]);
+		expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
+	});
+
 	it('replans when the remote version changes between metadata lookup and download', async () => {
 		const harness = await createHarness({
 			baseHash: 'base',

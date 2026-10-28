@@ -1,4 +1,4 @@
-import { recordSyncError } from '../issues';
+import { recordDeferredChange, recordSyncError } from '../issues';
 import { isAbortError } from "../abort";
 import { base64ToArrayBuffer } from "../encoding";
 import { applyRemoteContentIfUnchanged, incomingReviewMessage } from "../local/local-apply";
@@ -107,7 +107,7 @@ export async function parallelDownloadAndSaveFiles(
 		}
 		const review = await awaitingReview(context, request);
 		if (review) {
-			recordSyncError(result, review, request.path);
+			recordDeferredChange(result, { reason: review, review: true }, request.path);
 			onProcessed?.();
 		} else if (request.remoteSize < BATCH_FILE_SIZE_LIMIT) batchable.push(request);
 		else individual.push(request);
@@ -173,7 +173,7 @@ export async function parallelDownloadAndSaveFiles(
 							downloadRequest.expectedLocalHash,
 						);
 						if (outcome.status === "deferred") {
-							recordSyncError(result, `${outcome.reason}`, file.path);
+							recordDeferredChange(result, outcome, file.path);
 							continue;
 						}
 						await recordAppliedContent(context, file.path, content, file.revision, hash);
@@ -229,7 +229,7 @@ async function downloadFilesIndividually(
 		try {
 			const outcome = await downloadAndSaveFile(context, request, result);
 			if (outcome.status === "deferred") {
-				recordSyncError(result, `${outcome.reason}`, request.path);
+				recordDeferredChange(result, outcome, request.path);
 			}
 		} catch (error) {
 			if (isAbortError(error)) throw error;

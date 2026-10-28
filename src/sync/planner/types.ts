@@ -84,6 +84,9 @@ export interface IncrementalSyncPlannerContext {
 		options: UploadPreparedFilesOptions,
 	): Promise<void>;
 	reconcileVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
+	/** Paths whose incoming version is saved for review. */
+	awaitingReviewPaths?(): string[];
+	getRemoteEntries?(paths: string[]): Promise<Record<string, FileEntry>>;
 }
 
 export interface FullSyncPlannerContext {

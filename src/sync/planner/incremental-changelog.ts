@@ -1,4 +1,5 @@
 import type { ChangelogEntry } from '../../protocol/sync-types';
+import { getPathEntry } from '../../protocol/path-record';
 import type { IncrementalSyncPlannerContext } from './types';
 
 /** Read one deduplicated changelog snapshot without advancing the saved cursor. */
@@ -34,4 +35,20 @@ export async function readIncrementalChangelog(
 		since = next;
 	}
 	return { changesByPath, changeCount, latestSeq };
+}
+
+/** The cursor moves past a change whose incoming copy awaits review. Replan those
+ * paths from their current server version until the review is resolved. */
+export async function addAwaitingReviewChanges(
+	context: Pick<IncrementalSyncPlannerContext, 'awaitingReviewPaths' | 'getRemoteEntries' | 'shouldIgnore'>,
+	changesByPath: Map<string, ChangelogEntry>,
+	seq: number,
+): Promise<void> {
+	const paths = [...new Set(context.awaitingReviewPaths?.())].filter(path => !changesByPath.has(path) && !context.shouldIgnore(path));
+	if (!paths.length || !context.getRemoteEntries) return;
+	const remote = await context.getRemoteEntries(paths);
+	for (const path of paths) {
+		const entry = getPathEntry(remote, path);
+		if (entry) changesByPath.set(path, { seq, path, action: 'put', hash: entry.hash, size: entry.size, created_at: entry.modified, revision: entry.revision });
+	}
 }

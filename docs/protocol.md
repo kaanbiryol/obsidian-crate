@@ -105,8 +105,8 @@ than by message text. The Worker sends `reminder-note-too-large`,
 `duplicate-reminder-id`, `invalid-markdown-encoding` and the reminder description
 codes `invalid-description-block`, `invalid-description-encoding` and
 `unsupported-description-encoding`. The plugin adds `file-too-large`,
-`unsupported-device-path`, `vault-scan-incomplete`, `transfer-unverified` and
-`more-reminder-issues`. Codes are
+`unsupported-device-path`, `vault-scan-incomplete`, `transfer-unverified`,
+`incoming-review` and `more-reminder-issues`. Codes are
 additive: older plugins ignore them, newer plugins drop unknown codes, and issues
 without a code (OS, HTTP and transport errors, or older peers) fall back to message
 matching.

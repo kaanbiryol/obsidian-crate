@@ -260,6 +260,10 @@ export class SyncEngineContexts {
 			prepareUploadFromPath: this.prepareUploadFromPath,
 			uploadPreparedFiles: this.uploadPreparedFiles,
 			reconcileVersionConflicts: d.reconcileVersionConflicts,
+			awaitingReviewPaths: () => d.conflictStore.getActiveConflicts()
+				.filter(conflict => conflict.cause === 'incoming-review' && conflict.copySide === 'remote')
+				.map(conflict => conflict.originalPath),
+			getRemoteEntries: async paths => (await d.api.getFileMetadata(paths)).files,
 		}, {
 			progressCallback,
 			onFailure,

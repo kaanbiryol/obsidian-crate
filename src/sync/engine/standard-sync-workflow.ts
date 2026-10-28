@@ -111,7 +111,8 @@ export async function runSyncWorkflow(
 }
 
 /** Compares the vault with the server manifest and applies every change. The
- * planned baseline entries and the changelog cursor advance only when all of them applied. */
+ * planned baseline entries and the changelog cursor advance only when all of them
+ * applied or await review; a file awaiting review keeps its existing baseline. */
 async function runFullSync(
 	context: SyncWorkflowContext,
 	result: SyncResult,
@@ -224,6 +225,8 @@ async function runFullSync(
 			onProcessed: count => { current += count; progressCallback?.(current, total); },
 		}));
 		for (const path of result.deletedPaths) delete localFiles[path];
+		// A file awaiting review keeps its baseline, so the next sync finds the conflict again.
+		for (const issue of result.issues ?? []) if (issue.code === 'incoming-review' && issue.path) delete localFiles[issue.path];
 
 		if (result.errors.length === 0) {
 			for (const [path, entry] of Object.entries(localFiles)) {

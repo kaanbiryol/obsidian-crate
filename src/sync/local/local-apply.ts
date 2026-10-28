@@ -37,7 +37,10 @@ async function prepareLocalFilePath(vault: Vault, path: string): Promise<void> {
 	catch { throw new LocalPathObstructionError(path); }
 }
 
-class IncomingFileReviewError extends Error {}
+class IncomingFileReviewError extends Error {
+	/** `saved`: the incoming bytes are preserved in a recorded review copy. */
+	constructor(message: string, readonly saved = false) { super(message); }
+}
 
 const INCOMING_REVIEW_REASON = 'This file needs manual review because it cannot be replaced atomically.';
 
@@ -66,7 +69,7 @@ async function preserveIncomingForReview(
 		await context.vault.createBinary(copy, content);
 	}
 	await context.conflictStore?.record({ originalPath: path, conflictPath: copy, cause: 'incoming-review', copySide: 'remote', localHash, remoteHash: hash });
-	throw new IncomingFileReviewError(incomingReviewMessage(copy, reason));
+	throw new IncomingFileReviewError(incomingReviewMessage(copy, reason), true);
 }
 
 const MAX_CONFLICT_COPY_ATTEMPTS = 3;
@@ -226,6 +229,8 @@ async function applySnapshot(context: LocalApplyContext, path: string, content: 
 		await writeLocalContent(context, path, content, snapshot);
 		return { status: 'applied' };
 	} catch (error) {
+		// An existing file kept with its incoming copy saved for review does not fail the sync.
+		if (error instanceof IncomingFileReviewError && error.saved) return { status: 'deferred', reason: error.message, review: true };
 		if (error instanceof LocalFileChangedError || error instanceof IncomingFileReviewError) return { status: 'deferred', reason: error.message };
 		throw error;
 	}

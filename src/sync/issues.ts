@@ -36,6 +36,14 @@ export const oversizedRemoteFileIssue = (path: string): SyncIssue => ({ path, me
 export const deepEncryptedFileIssue = (path: string): SyncIssue => ({ path, code: 'unsupported-device-path',
 	message: 'Skipped local file nested more than 36 folders deep, which an encrypted vault cannot sync. Move it higher, then sync again.' });
 
+/** Records a remote change that was not applied. Incoming bytes saved for review are
+ * reported without failing the sync, like a skipped file: the path keeps its baseline,
+ * so the conflict is found again, while the cursor and unrelated deletes continue. */
+export function recordDeferredChange(result: Pick<SyncResult, 'errors' | 'issues'>, deferral: { reason: string; review?: true }, path: string): void {
+	if (deferral.review) (result.issues ??= []).push({ path, message: deferral.reason, code: 'incoming-review' });
+	else recordSyncError(result, deferral.reason, path);
+}
+
 export function normalizeSyncIssues(value: unknown, limit = 50): SyncIssue[] {
 	if (!Array.isArray(value)) return [];
 	return value.slice(0, limit).flatMap((issue): SyncIssue[] => {

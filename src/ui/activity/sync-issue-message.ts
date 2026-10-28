@@ -44,6 +44,10 @@ const TRANSFER_UNVERIFIED: IssueExplanation = {
 	summary: 'Crate could not verify the file transfer.',
 	recovery: 'Select Sync vault to retry. If this repeats, update the plugin and server, then run sync diagnostics in Crate settings.',
 };
+const INCOMING_REVIEW: IssueExplanation = {
+	summary: 'An incoming version of this file is waiting for review.',
+	recovery: 'Open the Conflicts tab, compare both versions and choose which to keep. Other files keep syncing.',
+};
 
 const EXPLANATIONS_BY_CODE: Record<SyncIssueCode, IssueExplanation> = {
 	'more-reminder-issues': MORE_REMINDER_ISSUES,
@@ -57,6 +61,7 @@ const EXPLANATIONS_BY_CODE: Record<SyncIssueCode, IssueExplanation> = {
 	'vault-scan-incomplete': VAULT_SCAN_INCOMPLETE,
 	'transfer-unverified': TRANSFER_UNVERIFIED,
 	'unsupported-device-path': INCOMPATIBLE_PATH,
+	'incoming-review': INCOMING_REVIEW,
 };
 
 /** Message matching for OS, HTTP and transport errors, and for issues saved or
