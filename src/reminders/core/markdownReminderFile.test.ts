@@ -60,6 +60,14 @@ describe('markdownReminderFile', () => {
 			.toThrow('Reminder changed while it was being edited');
 	});
 
+	it('keeps CRLF line endings when adding and editing reminders', () => {
+		const added = appendReminderBlockToContent('# Work\r\n', '- [ ] Task <!-- crate-id:r1 -->', 'details');
+		expect(added).toBe('# Work\r\n\r\n- [ ] Task <!-- crate-id:r1 -->\r\n<!-- crate-desc:details -->\r\n');
+		const reminder = makeRecord({ rawLine: '- [ ] Task <!-- crate-id:r1 -->\r', description: 'details' });
+		const edited = replaceReminderBlockInContent(added, reminder, ['- [ ] Renamed <!-- crate-id:r1 -->', ...buildDescriptionBlock('more')]);
+		expect(edited.content).toBe('# Work\r\n\r\n- [ ] Renamed <!-- crate-id:r1 -->\r\n<!-- crate-desc:more -->\r\n');
+	});
+
 	it('rewrites an encoded description as readable text when edited', () => {
 		const reminder = makeRecord({ description: 'hello%20world\nnext line' });
 		const content = `${reminder.rawLine}\n<!-- crate-desc:v1:hello%2520world%0Anext%20line -->\n`;

@@ -1,5 +1,6 @@
 import { TFile, type Vault } from 'obsidian';
 import { getExtensionFromPath, isHiddenPath } from '../../sync/local/file-discovery';
+import { portablePathKey } from '../../protocol/portable-path';
 
 export const TEST_PLUGIN_DIR = '.obsidian/plugins/crate';
 
@@ -11,20 +12,23 @@ export class PersistentTestVault {
 	private mtime = Date.parse('2026-01-01T00:00:00Z');
 	readonly trash = new Map<string, ArrayBuffer>();
 
-	constructor() { this.mkdir(TEST_PLUGIN_DIR); }
+	/** A case-insensitive disk keeps names as written but matches adapter paths that
+	 * differ only in case or Unicode form, as macOS, iOS and Windows do. Obsidian's
+	 * index (`getAbstractFileByPath`) stays exact on every disk. */
+	constructor(private readonly options: { caseInsensitive?: boolean } = {}) { this.mkdir(TEST_PLUGIN_DIR); }
 
 	write(path: string, content: string | ArrayBuffer): void {
-		const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-		if (this.folders.has(path)) throw new Error(`Folder already exists: ${path}`);
-		if (!this.folders.has(parent)) throw new Error(`Missing parent folder: ${parent}`);
-		this.files.set(path, {
+		const existing = this.resolve(path);
+		if (existing !== undefined && this.folders.has(existing)) throw new Error(`Folder already exists: ${path}`);
+		this.files.set(existing ?? this.placement(path), {
 			content: typeof content === 'string' ? new TextEncoder().encode(content).buffer : content.slice(0),
 			mtime: ++this.mtime,
 		});
 	}
 
 	read(path: string): ArrayBuffer {
-		const file = this.files.get(path);
+		const stored = this.resolve(path);
+		const file = stored === undefined ? undefined : this.files.get(stored);
 		if (!file) throw new Error(`Missing file: ${path}`);
 		return file.content.slice(0);
 	}
@@ -36,9 +40,11 @@ export class PersistentTestVault {
 	rename(from: string, to: string): void {
 		const identity = this.fileObjects.get(from);
 		const content = this.read(from);
-		if (this.files.has(to)) throw new Error(`Destination exists: ${to}`);
-		this.write(to, content);
+		const target = this.resolve(to);
+		if (target !== undefined && target !== from) throw new Error(`Destination exists: ${to}`);
+		if (target === undefined) this.placement(to);
 		this.remove(from);
+		this.write(to, content);
 		if (identity) {
 			identity.path = to;
 			this.fileObjects.set(to, identity);
@@ -48,12 +54,30 @@ export class PersistentTestVault {
 
 	paths(): string[] { return [...this.files.keys()].filter(path => !isHiddenPath(path)).sort(); }
 
+	/** The stored spelling of an existing path; a case-insensitive disk also matches its variants. */
+	private resolve(path: string): string | undefined {
+		if (this.files.has(path) || this.folders.has(path)) return path;
+		if (!this.options.caseInsensitive) return undefined;
+		const key = portablePathKey(path);
+		return [...this.files.keys(), ...this.folders].find(stored => portablePathKey(stored) === key);
+	}
+
+	/** A new entry keeps its name inside its parent folder's stored spelling. */
+	private placement(path: string): string {
+		const slash = path.lastIndexOf('/');
+		const parent = slash < 0 ? '' : this.resolve(path.slice(0, slash));
+		if (parent === undefined || !this.folders.has(parent)) throw new Error(`Missing parent folder: ${path.slice(0, Math.max(slash, 0))}`);
+		return parent ? `${parent}/${path.slice(slash + 1)}` : path;
+	}
+
 	private mkdir(path: string): void {
-		const segments = path.split('/');
-		for (let index = 1; index <= segments.length; index++) {
-			const folder = segments.slice(0, index).join('/');
-			if (this.files.has(folder)) throw new Error(`File blocks folder: ${folder}`);
+		let parent = '';
+		for (const segment of path.split('/')) {
+			const requested = parent ? `${parent}/${segment}` : segment;
+			const folder = this.resolve(requested) ?? requested;
+			if (this.files.has(folder)) throw new Error(`File blocks folder: ${requested}`);
 			this.folders.add(folder);
+			parent = folder;
 		}
 	}
 
@@ -71,13 +95,16 @@ export class PersistentTestVault {
 	}
 
 	private list(path: string): { files: string[]; folders: string[] } {
-		if (!this.folders.has(path)) throw new Error(`Missing folder: ${path}`);
-		const prefix = path ? `${path}/` : '';
+		const folder = this.resolve(path);
+		if (folder === undefined || !this.folders.has(folder)) throw new Error(`Missing folder: ${path}`);
+		const prefix = folder ? `${folder}/` : '';
 		const child = (candidate: string) => candidate.startsWith(prefix)
-			&& candidate !== path && !candidate.slice(prefix.length).includes('/');
+			&& candidate !== folder && !candidate.slice(prefix.length).includes('/');
+		// Like a host adapter, join stored child names to the requested folder path.
+		const listed = (candidate: string) => `${path ? `${path}/` : ''}${candidate.slice(prefix.length)}`;
 		return {
-			files: [...this.files.keys()].filter(child),
-			folders: [...this.folders].filter(child),
+			files: [...this.files.keys()].filter(child).map(listed),
+			folders: [...this.folders].filter(child).map(listed),
 		};
 	}
 
@@ -88,8 +115,9 @@ export class PersistentTestVault {
 	}
 
 	private moveToTrash(path: string): void {
-		this.trash.set(path, this.read(path));
-		this.remove(path);
+		const stored = this.resolve(path) ?? path;
+		this.trash.set(stored, this.read(stored));
+		this.remove(stored);
 	}
 
 	readonly vault = {
@@ -99,33 +127,36 @@ export class PersistentTestVault {
 		readBinary: async (file: TFile) => this.read(file.path),
 		createFolder: async (path: string) => { this.mkdir(path); },
 		createBinary: async (path: string, content: ArrayBuffer) => {
-			if (this.files.has(path)) throw new Error(`File already exists: ${path}`);
+			const existing = this.resolve(path);
+			if (existing !== undefined && this.files.has(existing)) throw new Error(`File already exists: ${path}`);
 			this.write(path, content);
 			return this.file(path);
 		},
 		process: async (file: TFile, update: (content: string) => string) => this.process(file.path, update),
 		trash: async (file: TFile) => { this.moveToTrash(file.path); },
 		adapter: {
-			exists: async (path: string) => this.files.has(path) || this.folders.has(path),
+			exists: async (path: string) => this.resolve(path) !== undefined,
 			read: async (path: string) => this.text(path),
 			readBinary: async (path: string) => this.read(path),
 			write: async (path: string, text: string) => { this.write(path, text); },
-			append: async (path: string, text: string) => { this.write(path, (this.files.has(path) ? this.text(path) : '') + text); },
+			append: async (path: string, text: string) => { this.write(path, (this.files.has(this.resolve(path) ?? path) ? this.text(path) : '') + text); },
 			writeBinary: async (path: string, content: ArrayBuffer) => { this.write(path, content); },
-			remove: async (path: string) => { this.remove(path); },
+			remove: async (path: string) => { this.remove(this.resolve(path) ?? path); },
+			rename: async (from: string, to: string) => { this.rename(this.resolve(from) ?? from, to); },
 			rmdir: async (path: string, recursive: boolean) => {
 				const children = this.list(path);
 				if (recursive || children.files.length || children.folders.length) throw new Error('Directory is not empty');
-				this.folders.delete(path);
+				this.folders.delete(this.resolve(path) ?? path);
 			},
 			mkdir: async (path: string) => { this.mkdir(path); },
 			list: async (path: string) => this.list(path),
 			process: async (path: string, update: (content: string) => string) => this.process(path, update),
 			trashLocal: async (path: string) => { this.moveToTrash(path); },
 			stat: async (path: string) => {
-				const file = this.files.get(path);
+				const stored = this.resolve(path) ?? path;
+				const file = this.files.get(stored);
 				if (file) return { type: 'file', size: file.content.byteLength, mtime: file.mtime, ctime: file.mtime };
-				return this.folders.has(path) ? { type: 'folder', size: 0, mtime: 0, ctime: 0 } : null;
+				return this.folders.has(stored) ? { type: 'folder', size: 0, mtime: 0, ctime: 0 } : null;
 			},
 		},
 	} as unknown as Vault;

@@ -1,5 +1,5 @@
 import { pendingChangeKey } from '../pending/pending-change';
-import { recordSyncError, skippedFileIssue } from '../issues';
+import { recordSyncError } from '../issues';
 import { uploadPipelined } from '../transfer/upload-pipeline';
 import { applyDiffs } from '../transfer/process';
 import { createDeleteCandidates, deleteRemoteFiles } from '../transfer/delete';
@@ -13,7 +13,8 @@ import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
 import { reconcileIncrementalRemoteChanges } from './incremental-remote-reconciliation';
 import { createPathRecord } from '../../protocol/path-record';
-import { readIncrementalChangelog } from './incremental-changelog';
+import { namespaceConflictLookup } from '../namespace-conflicts';
+import { addAwaitingReviewChanges, readIncrementalChangelog } from './incremental-changelog';
 
 const logger = createLogger("SyncPlanner");
 
@@ -40,20 +41,21 @@ export async function runIncrementalSync(
 		}
 		changelogRead = true;
 		const { changesByPath, changeCount, latestSeq } = changelog;
+		await addAwaitingReviewChanges(context, changesByPath, latestSeq);
 
 		logger.info(`Incremental sync: ${changeCount} remote changes since seq ${context.settings.lastSeq}`);
 
 		context.reportWork?.({ phase: 'scanning' });
 		const unchangedPaths: string[] = [];
-		const { changes: localChanges, discoveredPaths, skippedPaths } = await context.getLocalChanges(path => unchangedPaths.push(path));
-		if (skippedPaths?.length) (result.issues ??= []).push(...skippedPaths.map(skippedFileIssue));
+		const { changes: localChanges, discoveredPaths, skipped } = await context.getLocalChanges(path => unchangedPaths.push(path));
+		if (skipped?.length) (result.issues ??= []).push(...skipped);
 		const localDeletes = await context.getLocalDeletes(discoveredPaths);
 		logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
 		logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);
 
 		result.settledPaths.push(...unchangedPaths.filter(path => !changesByPath.has(path)).map(path => pendingChangeKey('upload', path)));
 
-		if (changeCount === 0 && localChanges.length === 0 && localDeletes.length === 0) {
+		if (changesByPath.size === 0 && localChanges.length === 0 && localDeletes.length === 0) {
 			if (unchangedPaths.length > 0) await context.localManifest.save();
 			context.setLastSeq(latestSeq);
 			return result;
@@ -109,6 +111,19 @@ export async function runIncrementalSync(
 		current = changesByPath.size;
 		options.progressCallback?.(current, total);
 
+		const deleteLocalOnly = async (paths: string[]) => {
+			if (!paths.length) return;
+			const deleteFailures = await applyIncrementalLocalDeletes(context, paths, result, count => {
+				current += count;
+				options.progressCallback?.(current, total);
+			});
+			for (const failure of deleteFailures) options.onFailure?.(failure);
+		};
+		// The server cannot store a deleted path beside an upload in its namespace, as
+		// after a case-only or Unicode-only rename, so those deletes run first.
+		const uploadConflict = namespaceConflictLookup(localOnlyChanges.map(file => file.path));
+		await deleteLocalOnly(localOnlyDeletes.filter(path => uploadConflict(path) !== undefined));
+
 		if (localOnlyChanges.length) context.reportWork?.({ phase: 'preparing' });
 		let uploadsProcessed = 0;
 		const reportUploads = (count: number) => {
@@ -157,13 +172,7 @@ export async function runIncrementalSync(
 			}
 		}
 
-		if (localOnlyDeletes.length > 0) {
-			const deleteFailures = await applyIncrementalLocalDeletes(context, localOnlyDeletes, result, count => {
-				current += count;
-				options.progressCallback?.(current, total);
-			});
-			for (const failure of deleteFailures) options.onFailure?.(failure);
-		}
+		await deleteLocalOnly(localOnlyDeletes.filter(path => uploadConflict(path) === undefined));
 
 		context.reportWork?.({ phase: 'saving' });
 		await context.localManifest.save();

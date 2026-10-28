@@ -15,6 +15,7 @@ const conflictMocks = vi.hoisted(() => ({
 
 vi.mock('../conflict/conflict', () => ({
 	createConflictCopy: conflictMocks.createConflictCopy,
+	getIncomingConflictFileName: (path: string) => `${path}.incoming`,
 }));
 
 describe('transfer download/process helpers', () => {
@@ -336,7 +337,7 @@ describe('transfer download/process helpers', () => {
 		const result = emptyResult();
 		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'fallback.md', expectedLocalHash: null, expectedRemoteHash: await sha256Hex(new TextEncoder().encode('ok').buffer), remoteSize: 2 }], result, 5);
 
-		expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md');
+		expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md', 2);
 		expect(result.downloaded).toBe(1);
 	});
 
@@ -418,13 +419,13 @@ it('still downloads each file when a batch response does not match its request',
 	harness.api.downloadFile.mockResolvedValue({ content, contentType: 'text/plain', size: 2 });
 	const result = emptyResult();
 	await parallelDownloadAndSaveFiles({ ...harness.context, runConcurrent }, [{ path: 'fallback.md', expectedLocalHash: null, expectedRemoteHash: await sha256Hex(content), remoteSize: 2 }], result, 2);
-	expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md');
+	expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md', 2);
 	expect(result.downloaded).toBe(1);
 });
 
-it('skips a remote file whose name this Windows device cannot store', async () => {
-	const previous = Platform.isWin;
-	Object.assign(Platform, { isWin: true });
+it.each(['isWin', 'isAndroidApp'] as const)('skips a remote file whose name this device cannot store: %s', async platform => {
+	const previous = { isWin: Platform.isWin, isAndroidApp: Platform.isAndroidApp };
+	Object.assign(Platform, { [platform]: true });
 	try {
 		const harness = createTransferHarness();
 		const onProcessed = vi.fn();
@@ -435,5 +436,36 @@ it('skips a remote file whose name this Windows device cannot store', async () =
 		expect(result.errors).toEqual([]);
 		expect(result.issues).toEqual([expect.objectContaining({ path: 'notes/a:b.md', code: 'unsupported-device-path' })]);
 		expect(onProcessed).toHaveBeenCalledOnce();
-	} finally { Object.assign(Platform, { isWin: previous }); }
+	} finally { Object.assign(Platform, previous); }
+});
+
+it('reports an incoming binary saved for review as an issue that does not fail the sync', async () => {
+	const harness = createTransferHarness();
+	const local = new Uint8Array([255, 1]).buffer;
+	const remote = new Uint8Array([255, 2]).buffer;
+	const request = { path: 'image.bin', expectedLocalHash: await sha256Hex(local), expectedRemoteHash: await sha256Hex(remote), remoteSize: 2 };
+	harness.vault.getAbstractFileByPath.mockReturnValue({ path: 'image.bin', extension: 'bin' });
+	harness.adapter.readBinary.mockResolvedValue(local);
+	harness.adapter.exists.mockResolvedValue(false);
+	harness.api.batchDownload.mockResolvedValue({ files: [{ path: 'image.bin', content: btoa(String.fromCharCode(...new Uint8Array(remote))), hash: request.expectedRemoteHash, size: 2 }] });
+	const issue = { path: 'image.bin', code: 'incoming-review', message: expect.stringContaining('Incoming file saved at image.bin.incoming') as string };
+
+	const first = emptyResult();
+	await parallelDownloadAndSaveFiles(harness.context, [request], first, 2);
+
+	expect(harness.vault.createBinary).toHaveBeenCalledWith('image.bin.incoming', remote);
+	expect(harness.context.conflictStore.record).toHaveBeenCalledWith(expect.objectContaining({ originalPath: 'image.bin', conflictPath: 'image.bin.incoming', cause: 'incoming-review' }));
+	expect(first).toMatchObject({ errors: [], issues: [issue], downloaded: 0 });
+	expect(harness.vault.modifyBinary).not.toHaveBeenCalled();
+	expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
+
+	// A later sync finds the saved copy instead of downloading the same version again.
+	harness.context.conflictStore.findIncomingReview.mockReturnValue({ conflictPath: 'image.bin.incoming' });
+	harness.adapter.exists.mockResolvedValue(true);
+	const again = emptyResult();
+	await parallelDownloadAndSaveFiles(harness.context, [request], again, 2);
+
+	expect(harness.api.batchDownload).toHaveBeenCalledOnce();
+	expect(again).toMatchObject({ errors: [], issues: [issue] });
+	expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
 });

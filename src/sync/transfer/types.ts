@@ -35,7 +35,8 @@ interface TransferApi {
 	operationId?: string,
 	mergePreimage?: ArrayBuffer,
 	): Promise<UploadResult>;
-	downloadFile(path: string): Promise<DownloadedFile>;
+	/** `size`, when known, lets a phone keep large downloads from overlapping. */
+	downloadFile(path: string, size?: number): Promise<DownloadedFile>;
 	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
 	batchDownload(paths: string[]): Promise<DownloadedBatch>;
 }
@@ -54,8 +55,11 @@ export interface TransferContext {
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	retryWithBackoff<T>(fn: () => Promise<T>): Promise<T>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
+	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
+	encrypted?(): boolean;
 }
 
 export type DiffApplyOutcome =
 	| { status: "applied" }
-	| { status: "deferred"; reason: string };
+	/** `review`: the incoming bytes were saved as a review copy and the local file was kept. */
+	| { status: "deferred"; reason: string; review?: true };

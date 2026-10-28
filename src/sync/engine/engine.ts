@@ -316,6 +316,7 @@ export class SyncEngine {
 
 	async saveSharedHistoryCheckpoint() { return this.trackWork(() => this.history().saveShared()); }
 	trackedFileCount(): number { return this.localManifest.getAllPaths().length; }
+	trackedPaths(): string[] { return this.localManifest.getAllPaths(); }
 
 	async loadHistoryComparison(checkpoint: string, shared = false) {
 		return this.history().compare(checkpoint, shared);

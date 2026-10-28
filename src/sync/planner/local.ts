@@ -3,7 +3,8 @@ import { withSyncFileContext } from '../issues';
 import { getAllVaultFiles } from "../local/file-discovery";
 import type { LocalChangeScan, LocalDiffPlannerContext } from "./types";
 import { sha256Hex } from '../../platform/sha256';
-import { isOversizedSyncFile, hasLocalMetadataChange } from '../local/local-file-changes';
+import { skippedUploadIssue, hasLocalMetadataChange } from '../local/local-file-changes';
+import { localPathExists } from '../local/stored-name';
 
 export async function getLocalDeletes(
 	context: LocalDiffPlannerContext,
@@ -11,14 +12,15 @@ export async function getLocalDeletes(
 	prepareConcurrency: number,
 ): Promise<string[]> {
 	// Discovery is complete or throws, so only paths it missed can be deletes.
-	// Each candidate is still confirmed with exists() before it counts.
+	// Each candidate is still confirmed absent before it counts; a case or Unicode
+	// variant of its name, as after a case-only rename, does not keep it.
 	const candidates = context.localManifest
 		.getAllPaths()
 		.filter((path) => !context.shouldIgnore(path) && !discoveredPaths.has(path));
 
 	const tasks = candidates.map((path) => async () => {
 		context.throwIfDestroyed();
-		const exists = await withSyncFileContext(path, () => context.vault.adapter.exists(path));
+		const exists = await withSyncFileContext(path, () => localPathExists(context.vault, path));
 		context.throwIfDestroyed();
 		return exists ? null : path;
 	});
@@ -37,11 +39,12 @@ export async function getLocalChanges(
 	await context.verifyContent(allFiles);
 	context.throwIfDestroyed();
 
-	// Oversized files stay discovered (never local deletes) but are not changes:
+	// Skipped files stay discovered (never local deletes) but are not changes:
 	// each would fail every sync and hold back the changelog cursor.
-	const skippedPaths = allFiles.filter(isOversizedSyncFile).map(file => file.path);
+	const skipped = allFiles.flatMap(file => skippedUploadIssue(file, context.encrypted?.() ?? false) ?? []);
+	const skippedPaths = new Set(skipped.map(issue => issue.path));
 
-	const candidates = allFiles.filter(file => !isOversizedSyncFile(file)
+	const candidates = allFiles.filter(file => !skippedPaths.has(file.path)
 		&& (context.pendingKeys?.has(pendingChangeKey('upload', file.path))
 			|| hasLocalMetadataChange(file, context.localManifest.getEntry(file.path))));
 
@@ -73,5 +76,5 @@ export async function getLocalChanges(
 		}
 	}
 
-	return { changes, discoveredPaths: new Set(allFiles.map((file) => file.path)), skippedPaths };
+	return { changes, discoveredPaths: new Set(allFiles.map((file) => file.path)), skipped };
 }

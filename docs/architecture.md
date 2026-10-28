@@ -456,7 +456,7 @@ Disconnecting locally preserves non-secret deployment metadata so reconnecting t
 
 Authenticated requests carry a Bearer token in the `Authorization` header. The Worker hashes the bearer token and checks the `auth_tokens` D1 table. Missing or expired tokens are rejected, and D1 failures return `503` without falling back to a second credential system.
 
-Push subscriptions are created with an authenticated session and record that session as their owner.
+Push subscriptions are created with an authenticated session and record that session as their owner. When a browser replaces a subscription, the service worker renews it with the same server key and asks open pages to register the new endpoint. It holds no credential, so a closed app registers the endpoint at its next launch.
 
 The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for a 90-day, reminder-only bearer token stored locally by the browser. The token is bound to the exact enrolled reminders folder; in an encrypted vault that is the folder's tag, and the link carries the plaintext folder only in its fragment (`crateFolder`). Route and folder authorization prevent that token from reading or mutating the vault sync API, shared settings, device list, push administration, or enrollment-token API, so it cannot renew itself. When Obsidian changes the reminders folder, the server moves these tokens, their push subscriptions and unused enrollment links to the new folder, and the web app switches to it on its next request (in an encrypted vault, by opening the new folder's label). Open a fresh link from the plugin after the session expires.
 

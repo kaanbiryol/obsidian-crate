@@ -157,7 +157,8 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		await runtime.db.prepare("INSERT INTO notification_policy (id, folder_path, timezone, revision, enabled) VALUES (1, 'Reminders', 'UTC', 'policy', 1)").run();
 		await runtime.db.prepare("INSERT INTO reminder_source_state (file_path, file_revision, parser_version, verified) VALUES ('hello.txt', ?, ?, 1)")
 			.bind(file.storage_key, parserVersion).run();
-		await runtime.db.prepare("INSERT INTO reminder_projections (reminder_id, file_path, notification_token, policy_revision) VALUES ('restart-alarm', 'hello.txt', 'job', 'policy')").run();
+		await runtime.db.prepare("INSERT INTO reminder_projections (reminder_id, file_path, file_revision, notification_token, policy_revision) VALUES ('restart-alarm', 'hello.txt', ?, 'job', 'policy')")
+			.bind(file.storage_key).run();
 		await runtime.db.prepare("INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, available_at) VALUES ('restart-alarm', 'job', 'schedule', '{}', ?)")
 			.bind(Date.now() + 60_000).run();
 		const alarms = await runtime.mf.getDurableObjectNamespace('REMINDER_ALARMS');

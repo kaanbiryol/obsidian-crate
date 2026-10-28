@@ -135,6 +135,7 @@ function createFlushHarness(overrides: Partial<{
 					size: 1,
 					modified: '2026-02-15T00:00:00.000Z',
 				})),
+				renameDestination: vi.fn((_path: string): string | undefined => undefined),
 				setEntry,
 				removeEntry,
 				save,
@@ -418,6 +419,56 @@ describe('processPendingChanges', () => {
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 		expect(harness.state.lastError).toContain('Rename the conflicting file');
+	});
+
+	it('deletes the old name of a case-only rename before uploading the new one', async () => {
+		const calls: string[] = [];
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({ path, content: new ArrayBuffer(1), hash: 'local', size: 1, contentType: 'text/markdown' }),
+			uploadFile: async ({ path }) => { calls.push(`upload ${path}`); return { success: true, path }; },
+			batchDelete: async paths => { calls.push(`delete ${paths.join(', ')}`); return { success: true, deleted: paths }; },
+		});
+		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/todo.md'));
+		harness.pendingKeys.add('notes/TODO.md');
+		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/old.md'));
+		await processPendingChanges(harness.context);
+		expect(calls).toEqual(['delete notes/todo.md', 'upload notes/TODO.md', 'delete notes/old.md']);
+		expect(harness.pendingKeys.size).toBe(0);
+		expect(harness.state.status).not.toBe('error');
+	});
+
+	it('keeps the new name queued without sending it while the old name cannot be deleted', async () => {
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({ path, content: new ArrayBuffer(1), hash: 'local', size: 1, contentType: 'text/markdown' }),
+			batchDelete: async () => { throw new HttpError('Storage unavailable', 503); },
+		});
+		harness.pendingKeys.add(pendingChangeKey('delete', 'todo.md'));
+		harness.pendingKeys.add('TODO.md');
+		harness.pendingKeys.add(pendingChangeKey('delete', 'old.md'));
+		await processPendingChanges(harness.context);
+		expect(harness.uploadFile).not.toHaveBeenCalled();
+		// The failed delete retries automatically, so the other delete waits for that retry.
+		expect(harness.batchDelete).toHaveBeenCalledExactlyOnceWith(['todo.md'], expect.anything(), expect.anything());
+		expect([...harness.pendingKeys].sort()).toEqual([pendingChangeKey('delete', 'old.md'), pendingChangeKey('delete', 'todo.md'), 'TODO.md']);
+		expect(harness.state.lastError).toContain('Upload deferred until todo.md is deleted on the server');
+		expect(harness.context.retryAfterFailure).toHaveBeenCalledOnce();
+	});
+
+	it('holds back only deletes renamed to an upload the server refused for good', async () => {
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({ path, content: new ArrayBuffer(1), hash: 'local', size: 1 }),
+			uploadFile: async () => { throw new HttpError('Rename the conflicting file or parent folder', 409, null, 'namespace_conflict'); },
+		});
+		harness.context.localManifest.renameDestination.mockImplementation(path => path === 'drafts/plan.md' ? 'Projects.md' : undefined);
+		harness.pendingKeys.add(pendingChangeKey('delete', 'drafts/plan.md'));
+		harness.pendingKeys.add('Projects.md');
+		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/old.md'));
+		await processPendingChanges(harness.context);
+		expect(harness.batchDelete).toHaveBeenCalledExactlyOnceWith(['notes/old.md'], expect.anything(), expect.anything());
+		expect([...harness.pendingKeys].sort()).toEqual([pendingChangeKey('delete', 'drafts/plan.md'), 'Projects.md']);
+		expect(harness.requestReconciliation).not.toHaveBeenCalled();
+		expect(harness.context.retryAfterFailure).not.toHaveBeenCalled();
+		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 	});
 
 	it('chunks mass deletes to the shared server limit', async () => {

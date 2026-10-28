@@ -13,7 +13,9 @@ Worker API layer (`worker-api/sync.ts` with `encryption/encrypted-files.ts` and
 `encryption/path-index.ts`) maps plaintext paths to server paths on every request
 and maps responses back, so planning, conflict detection and the local manifest use
 plaintext paths. Server deletes carry no metadata; the client maps them back through
-paths it has synced and ignores server paths it never knew. If two server files
+paths it has synced and ignores server paths it never knew. Each delete takes the
+name its server path had at that point in the changelog, so after a case-only
+rename, which keeps one server path, the delete still names the old file. If two server files
 claim the same plaintext name, the one stored at that name's own tag keeps it and
 the other syncs locally as `<name> - <first 8 characters of its server name>.<ext>`.
 
@@ -97,7 +99,7 @@ Entry point: `engine/engine.ts:sync()` -> `engine/initial-import.ts:runInitialIm
 
 ### 6. Force Full Sync
 
-Uploads all local files regardless of hash, conditioned on the server's current hash, and only then deletes remote-only files. Files over 25 MB are reported as skipped, and their server copy is neither replaced nor deleted. The local manifest keeps its baselines throughout and each acknowledged upload replaces its entry, so a failed, stopped or interrupted run leaves correct baselines for every file it did not reach. If any upload fails or the operation is aborted, remote deletion never begins. Only after a run without errors does it drop manifest entries for paths that are no longer local. Replaced and deleted remote objects remain recoverable for 30 days. Restoring a retained version verifies its bytes and stages them under a fresh immutable object key before the conditional metadata commit. The retained key stays eligible for its original expiry, so cleanup cannot remove the newly restored content. An uncertain commit response leaves the staged object for reference-aware orphan cleanup. Orphan reference lookups check at most 50 keys per query (100 D1 bindings across live files and retained versions).
+Uploads all local files regardless of hash, conditioned on the server's current hash, and only then deletes remote-only files. The exception is a remote-only file the server cannot store beside a local file, such as `todo.md` after a local rename to `TODO.md` (see [case-only renames](#case-only-renames)): it is deleted before the uploads. Files over 25 MB are reported as skipped, and their server copy is neither replaced nor deleted. The local manifest keeps its baselines throughout and each acknowledged upload replaces its entry, so a failed, stopped or interrupted run leaves correct baselines for every file it did not reach. If any upload fails or the operation is aborted, remote deletion never begins. Only after a run without errors does it drop manifest entries for paths that are no longer local. Replaced and deleted remote objects remain recoverable for 30 days. Restoring a retained version verifies its bytes and stages them under a fresh immutable object key before the conditional metadata commit. The retained key stays eligible for its original expiry, so cleanup cannot remove the newly restored content. An uncertain commit response leaves the staged object for reference-aware orphan cleanup. Orphan reference lookups check at most 50 keys per query (100 D1 bindings across live files and retained versions).
 
 Entry point: `engine/engine.ts:forceFullSync()`
 
@@ -129,6 +131,33 @@ Delete/edit races use an edit-wins rule:
 | Deleted | Edited | Restore remote edit and record an automatically resolved race |
 
 "Changed" = current hash differs from manifest hash at last sync.
+
+## Case-only renames
+
+The server stores one file per portable name, so `todo.md` and `TODO.md`, or
+two Unicode forms of one name, cannot both exist; neither can a file and a
+folder of the same name. When a change replaces one such name with another, as
+a rename from `todo.md` to `TODO.md` does, every sync mode (queue flushes and
+their reconciliation, selected-file, incremental, full and force full sync)
+sends the conditional delete of the old name before the upload of the new one,
+and the rename guard lets the old copy go first. File history retains
+the deleted version. If the delete fails, the new name stays pending (the queue
+does not send it); if the upload fails afterwards, the local file keeps its bytes
+and the upload retries.
+
+On case-insensitive or Unicode-normalizing file systems (macOS, iOS, Windows),
+`exists('todo.md')` is also true for `TODO.md`. Local absence checks, local
+delete detection and local reads therefore count a name as present only when
+the vault index or its folder listing has that exact name; a listing that shows
+neither the name nor a variant of it keeps the adapter's answer. Only the file's
+own name is compared, so files inside a folder stored under another spelling
+stay present. A folder renamed only in letter case is therefore still reported as
+a namespace conflict for its files.
+
+A receiving device deletes the old name before writing the new one: incremental
+sync applies remote deletes before its downloads, and full sync removes a local
+file whose name a download takes before downloading. The local delete still
+requires unchanged bytes, and an edited file is uploaded instead.
 
 ## Conflict Resolution
 
@@ -177,7 +206,13 @@ Existing files whose current and incoming bytes are both strict UTF-8 without NU
 bytes (other than known binary formats such as PDFs and images) are then compared and replaced inside
 Obsidian's atomic `process()` callback (using the adapter for hidden files). An edit
 between the hash check and that callback defers the write instead of being
-overwritten. Other existing files keep the incoming bytes for review.
+overwritten. Other existing files keep the incoming bytes for review. A file
+awaiting review is reported as an `incoming-review` issue, not a failure: the
+local file and its baseline are kept, so the conflict is found again, while the
+changelog cursor, unrelated deletes and full-sync baselines still advance. Each
+incremental sync replans the path from its current server version until the
+review is resolved. While the local file is unchanged, a saved copy is not
+downloaded again.
 
 If the merge overlaps, the conflict remains unresolved:
 
@@ -214,7 +249,7 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
    - Non-hidden folders are walked iteratively at any depth while looking for nested hidden subfolders
 3. **Deduplication:** via Set to avoid processing the same file twice
 4. **Early filtering:** ignore patterns applied during discovery, before hashing
-5. **Portability validation:** reject invalid sync paths (empty, `.` or `..` segments, control characters, backslashes) plus case and Unicode-normalization collisions before any upload begins. Names Windows cannot store (`< > : " | ? *`, a trailing dot or space, reserved names) are checked only before local file access on Windows. There, a remote file with such a name is skipped with an `unsupported-device-path` issue, like an oversized file, so it never fails a sync or holds back the changelog cursor. A remote delete of a path this device never synced is skipped without touching the filesystem
+5. **Portability validation:** reject invalid sync paths (empty, `.` or `..` segments, control characters, backslashes) plus case and Unicode-normalization collisions before any upload begins. Names Windows cannot store (`< > : " | ? *`, a trailing dot or space, reserved names) are checked only before local file access on Windows; Android checks only those characters, which its shared storage rejects. There, a remote file with such a name is skipped with an `unsupported-device-path` issue, like an oversized file, so it never fails a sync or holds back the changelog cursor. A remote delete of a path this device never synced is skipped without touching the filesystem
 
 The active Obsidian configuration folder's entire `plugins/` tree is always excluded, including plugin JavaScript, manifests, styles, and data files.
 
@@ -236,6 +271,7 @@ Release and transfer values are also checked against source in [current contract
 | `DOWNLOAD_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `PREPARE_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer/budget.ts` |
+| Large transfers on mobile | Files of 8 MiB or more transfer one at a time | `transfer/large-transfers.ts` |
 | `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
 | `BATCH_DELETE_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `MAX_RETRIES` | 3 | `engine/lifecycle.ts` |
@@ -260,6 +296,8 @@ use `transfer/delete.ts:deleteRemoteFiles()`. It waits for preceding uploads and
 reconciliation to succeed, rechecks local absence, and uses `delete-batches.ts`
 to send up to 4 conditional deletes per request with 2 requests in flight.
 Rename preservation, expected hashes and revisions still guard every deletion.
+A delete that clears an upload's name in the same run, as after a
+[case-only rename](#case-only-renames), runs before the uploads instead.
 Accepted sibling requests drain before cancellation returns; acknowledged
 deletions are checkpointed. Activity reports **Deleting X of Y files** as batches
 complete. Queue settlement and conflict retries remain with the calling mode.
@@ -280,6 +318,7 @@ File events (create, modify, delete, rename) are debounced before syncing:
 6. Each event receives a revision so reconciliation cannot clear a newer edit that arrived while the sync was running; opposite upload/delete events for one path are coalesced
 7. After successful reconciliation, pending events from applied downloads, merges, and deletions are checked against the committed local baseline. Matching contents clear in the same run; newer events or differing contents stay pending. Incremental paths whose local and remote hashes already match also settle without another transfer.
 8. A conditional-write conflict sends only the affected queue keys through a bounded three-attempt reconciliation pass; current remote metadata is fetched only for those paths, and unrelated vault paths are not scanned
+9. A failed upload holds back the batch's remaining deletes while a retry or reconciliation will run them after the uploads settle, since a delete may be the old name of a failed upload. A failure the queue does not retry, such as a namespace conflict, holds back only deletes whose file was renamed to the failed path; every other delete proceeds
 
 If a local Markdown file changes after an automatic merge has already been accepted remotely, Crate keeps the uploaded local snapshot as a virtual merge base and immediately replans the path. This prevents both overwriting the newer local edit and duplicating changes already included in the remote merge.
 
@@ -357,7 +396,7 @@ Implementation: `manifest.ts:LocalManifest`
 - **Retry:** failed uploads retry up to 3 times with exponential backoff (1s base delay)
 - **Cancellation:** abort and timeout stop the caller's wait and ignore late responses. Stopping the engine rejects concurrent transfers that have not started yet and any manifest save after the manifest closes, so a partial run can never be reported as a completed one. Vault discovery checks cancellation before and after every directory listing and hidden-file stat; a cancelled scan never returns a partial inventory. Local hashing also checks cancellation before updating a baseline. Obsidian's HTTP transport may still finish and commit a mutation remotely. Uncertain queued paths remain pending; retries use expected-hash writes and reconciliation, and cancelled incremental runs do not advance the changelog cursor. Concurrent workers and filesystem reads already in progress are drained before a failed operation unwinds. **Stop sync** clears displayed progress immediately, then waits for local work, saves automatic sync as off, and reloads the idle engine.
 - **Local deletion recovery:** visible files use Obsidian's local vault trash (`vault.trash(file, false)`); hidden/unindexed files use the adapter's local trash. The vault's `.trash/` directory is always excluded from sync. A trash failure never falls back to permanent removal. The hash check and deletion are not atomic: an edit arriving between them remains recoverable in trash.
-- **Upload memory:** incremental and queued uploads reserve room for the next maximum-size file before preparation, using the 48 MiB mobile / 128 MiB desktop budget and a 128-file cap. Chunks finish uploading before further contents are prepared; history retains paths rather than file buffers. These budgets cover prepared binary contents, not total process memory or request encoding overhead.
+- **Upload memory:** incremental and queued uploads reserve room for the next maximum-size file before preparation, using the 48 MiB mobile / 128 MiB desktop budget and a 128-file cap. Chunks finish uploading before further contents are prepared; history retains paths rather than file buffers. These budgets cover prepared binary contents, not total process memory or request encoding overhead. Because a transfer in flight holds several full-size copies (base64, ciphertext, decrypted bytes), mobile uploads and downloads of files of 8 MiB or more run one at a time, while smaller files keep transferring in parallel.
 - **Incremental-to-full fallback:** if incremental sync returns `null` (changelog read error or cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
 - **Startup event recovery:** the startup sync scans the vault itself, and vault events that arrive while it runs are queued once it finishes, keeping the latest change per path. Pending verification settles download echoes and other files that still match their baseline; real edits flush like live events

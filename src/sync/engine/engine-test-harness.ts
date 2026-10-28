@@ -21,6 +21,7 @@ type MockAdapter = {
 	stat: ReturnType<typeof vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>>;
 	exists: ReturnType<typeof vi.fn>;
 	remove: ReturnType<typeof vi.fn<(path: string) => Promise<void>>>;
+	rename: ReturnType<typeof vi.fn<(from: string, to: string) => Promise<void>>>;
 	writeBinary: ReturnType<typeof vi.fn<(path: string, content: ArrayBuffer) => Promise<void>>>;
 	mkdir: ReturnType<typeof vi.fn>;
 	list: ReturnType<typeof vi.fn<(path: string) => Promise<{ files: string[]; folders: string[] }>>>;
@@ -69,9 +70,10 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 		stat: vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>(),
 		exists: vi.fn(async (path: string) => stored.has(path)),
 		remove: vi.fn(async (path: string) => { stored.delete(path); }),
+		rename: vi.fn(async (from: string, to: string) => { stored.set(to, stored.get(from) ?? ''); stored.delete(from); }),
 		writeBinary: vi.fn<(path: string, content: ArrayBuffer) => Promise<void>>().mockResolvedValue(),
 		mkdir: vi.fn(),
-		list: vi.fn<(path: string) => Promise<{ files: string[]; folders: string[] }>>(),
+		list: vi.fn<(path: string) => Promise<{ files: string[]; folders: string[] }>>(async () => ({ files: [], folders: [] })),
 	};
 
 	const vault = {
@@ -94,6 +96,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 
 	const api = {
 		isConfigured: vi.fn().mockReturnValue(true),
+		isEncrypted: vi.fn().mockReturnValue(false),
 		setAbortSignal: vi.fn(),
 		// The engine wraps these mocks directly; see createFiles below.
 		getFileTransport: () => ({ transport: null, clientSession: 'test-session' }),

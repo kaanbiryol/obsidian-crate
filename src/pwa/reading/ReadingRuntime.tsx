@@ -51,7 +51,9 @@ function useReadingController() {
 		retryAt: Math.min(...pending.map(readingRetryAt).filter(deadline => deadline !== undefined)),
 		status: enabled ? status : { state: recovery ? 'error' : 'cached', label: pending.length ? `Paused: ${pending.length} ${pending.length === 1 ? 'change' : 'changes'} saved on this device` : 'Paused' },
 		...readingUpdateReadiness({ ready, connecting, enabled, connected: Boolean(session), hasCache: Boolean(cache),
-			hasError: Boolean(error), adding, saving, preparingChange, syncing, isOffline }),
+			hasError: Boolean(error), adding, saving, preparingChange, syncing, isOffline,
+			// A refresh in flight can clear its error; a paused feature sends nothing.
+			stalled: recovery || pending.some(op => !enabled || readingNeedsAttention(op)) || Boolean(error && !readingDisabled && !syncing) }),
 		canApplyUpdate,
 		attention: status.state === 'error' && !readingDisabled ? error || status.label : null,
 		unsynced: pending.length > 0 || recovery || Boolean(error && !readingDisabled),

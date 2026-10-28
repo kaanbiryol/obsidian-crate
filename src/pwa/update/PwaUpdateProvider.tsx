@@ -58,6 +58,7 @@ export function PwaUpdateProvider({ activeSection, children }: { activeSection: 
 		version, checkComplete,
 		// Preserve automatic updates behind the Reminders launch splash only.
 		canApply: () => activeSection === 'reminders' && Boolean(store.getSnapshot().reminders?.connected) && !store.getOpen() && canApply(),
+		blocked: pwaSyncState(models).updateBlocked,
 		canManuallyApply: canApply,
 	});
 	const blockedReason = !online ? 'Connect to the internet to update.'

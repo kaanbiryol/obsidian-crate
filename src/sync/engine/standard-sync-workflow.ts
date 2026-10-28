@@ -13,6 +13,7 @@ import { createLogger } from '../logger';
 import type { FileDiff, RemoteManifest, SyncResult, SyncState } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { getPathEntry } from '../../protocol/path-record';
+import { namespaceConflictLookup } from '../namespace-conflicts';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { FullSyncPlan } from '../planner/types';
@@ -111,7 +112,8 @@ export async function runSyncWorkflow(
 }
 
 /** Compares the vault with the server manifest and applies every change. The
- * planned baseline entries and the changelog cursor advance only when all of them applied. */
+ * planned baseline entries and the changelog cursor advance only when all of them
+ * applied or await review; a file awaiting review keeps its existing baseline. */
 async function runFullSync(
 	context: SyncWorkflowContext,
 	result: SyncResult,
@@ -147,6 +149,31 @@ async function runFullSync(
 		let current = 0;
 		progressCallback?.(current, total);
 		const failures: MutationFailure[] = [];
+		const deleteRemote = async (deletes: Array<Extract<FileDiff, { action: 'delete' }>>) => {
+			failures.push(...await context.deleteRemoteFiles(createDeleteCandidates(deletes.map(diff => (
+				{ path: diff.path, hash: diff.remoteHash, revision: diff.remoteRevision }
+			)), result), result, {
+				onProcessed: count => { current += count; progressCallback?.(current, total); },
+			}));
+		};
+		const applyRemaining = (applied: FileDiff[]) => applyDiffs(context, applied, result, {
+			localFiles: () => localFiles,
+			onFailure: failure => { failures.push(failure); },
+			afterDiff: () => {
+				current++;
+				progressCallback?.(current, total);
+			},
+		});
+
+		// The server cannot store a path beside another in its namespace, as after a
+		// case-only or Unicode-only rename, so a remote delete clearing an upload's
+		// name runs first. A case-insensitive device likewise removes the local file
+		// whose name a download takes before writing it.
+		const uploadConflict = namespaceConflictLookup(uploadDiffs.map(diff => diff.path));
+		const downloadConflict = namespaceConflictLookup(downloadDiffs.map(diff => diff.path));
+		const clearing = new Set(remainingDiffs.filter(diff => (diff.action === 'delete' && uploadConflict(diff.path) !== undefined)
+			|| (diff.action === 'delete-local' && downloadConflict(diff.path) !== undefined)));
+		await deleteRemote([...clearing].filter(diff => diff.action === 'delete'));
 
 		if (uploadDiffs.length > 0) {
 			context.updateState({ work: { phase: 'preparing' } });
@@ -157,6 +184,7 @@ async function runFullSync(
 		}
 
 		context.throwIfDestroyed();
+		await applyRemaining([...clearing].filter(diff => diff.action === 'delete-local'));
 
 		if (downloadDiffs.length > 0) {
 			const downloadRequests: DownloadRequest[] = [];
@@ -206,24 +234,16 @@ async function runFullSync(
 
 		context.throwIfDestroyed();
 
-		const remoteDeletes = remainingDiffs.filter(diff => diff.action === 'delete');
-		const otherDiffs = remainingDiffs.filter(diff => diff.action !== 'delete');
+		const unapplied = remainingDiffs.filter(diff => !clearing.has(diff));
+		const remoteDeletes = unapplied.filter(diff => diff.action === 'delete');
+		const otherDiffs = unapplied.filter(diff => diff.action !== 'delete');
 		if (otherDiffs.length) context.updateState({ work: { phase: 'applying' } });
-		await applyDiffs(context, otherDiffs, result, {
-			localFiles: () => localFiles,
-			onFailure: failure => { failures.push(failure); },
-			afterDiff: () => {
-				current++;
-				progressCallback?.(current, total);
-			},
-		});
+		await applyRemaining(otherDiffs);
 
-		failures.push(...await context.deleteRemoteFiles(createDeleteCandidates(remoteDeletes.map(diff => (
-			{ path: diff.path, hash: diff.remoteHash, revision: diff.remoteRevision }
-		)), result), result, {
-			onProcessed: count => { current += count; progressCallback?.(current, total); },
-		}));
+		await deleteRemote(remoteDeletes);
 		for (const path of result.deletedPaths) delete localFiles[path];
+		// A file awaiting review keeps its baseline, so the next sync finds the conflict again.
+		for (const issue of result.issues ?? []) if (issue.code === 'incoming-review' && issue.path) delete localFiles[issue.path];
 
 		if (result.errors.length === 0) {
 			for (const [path, entry] of Object.entries(localFiles)) {

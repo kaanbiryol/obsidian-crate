@@ -17,6 +17,8 @@ interface FeatureSettings {
 	updateReady: boolean;
 	/** Check transient work again even before React publishes its next render. */
 	canApplyUpdate: () => boolean;
+	/** Durable work blocks updates until the user acts, so launch need not wait for it. */
+	updateBlocked?: boolean;
 	updateContentReady: boolean;
 	onRefresh: () => Promise<unknown>;
 	onLogout: () => Promise<void>;

@@ -1,6 +1,7 @@
 import { DurableUploads } from './durable-uploads';
 import { expect, it, vi } from 'vitest';
 import { LocalManifest } from '../manifest/manifest';
+import { UploadJournal } from './upload-journal';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 
 function fixture() {
@@ -44,6 +45,73 @@ it('refuses a foreign or torn journal without deleting its only copy', async () 
 	expect(disk.text(path)).toBe('{"truncated":');
 });
 
+
+it('never dispatches an upload whose journal write stopped before its rename', async () => {
+	const { disk, create, file } = fixture();
+	const manifest = create();
+	const adapter = disk.vault.adapter;
+	const write = adapter.write.bind(adapter);
+	// The app is killed while a large record is being written, so cleanup never runs either.
+	vi.spyOn(adapter, 'write').mockImplementation(async (path, data) => {
+		if (!path.endsWith('.json.tmp')) return write(path, data);
+		await write(path, data.slice(0, 40));
+		throw new Error('App killed');
+	});
+	vi.spyOn(adapter, 'remove').mockRejectedValue(new Error('App killed'));
+	const uploadFile = vi.fn();
+	const uploads = new DurableUploads(manifest, { assertPreparedUpload: async () => {}, getServerInfo: async () => ({ reminderOperationDay: 20000 }), uploadFile, batchUpload: vi.fn() }, { putBase: async () => {} } as never, crypto.randomUUID());
+
+	await expect(uploads.single(file)).rejects.toThrow('App killed');
+	vi.restoreAllMocks();
+
+	expect(uploadFile).not.toHaveBeenCalled();
+	const journal = (await adapter.list(`${TEST_PLUGIN_DIR}/pending-uploads`)).files;
+	expect(journal).toEqual([expect.stringMatching(/\.json\.tmp$/)]);
+	const restarted = create();
+	await restarted.load();
+	expect(restarted.uploadJournal.pending()).toEqual([]);
+	expect((await adapter.list(`${TEST_PLUGIN_DIR}/pending-uploads`)).files).toEqual([]);
+	await restarted.close();
+});
+
+it('loads a final record beside an unfinished write of the same and another upload', async () => {
+	const { disk, create, file } = fixture();
+	const [upload] = await create().uploadJournal.prepare([file], 20000);
+	const path = `${TEST_PLUGIN_DIR}/pending-uploads/${upload!.operationId}.json`;
+	const bytes = disk.text(path);
+	disk.write(`${path}.tmp`, bytes.slice(0, 30));
+	const other = `${TEST_PLUGIN_DIR}/pending-uploads/${upload!.operationId.replace(/.{4}$/, '0000')}.json.tmp`;
+	disk.write(other, '{"truncated":');
+
+	const restarted = create();
+	await restarted.load();
+
+	expect(restarted.uploadJournal.pending()).toEqual([upload]);
+	expect(disk.text(path)).toBe(bytes);
+	expect(disk.has(`${path}.tmp`)).toBe(false);
+	expect(disk.has(other)).toBe(false);
+	await restarted.close();
+	// A damaged final record still means storage was corrupted after its upload may have been sent.
+	disk.write(path, '{"truncated":');
+	disk.write(`${path}.tmp`, bytes);
+	await expect(create().load()).rejects.toThrow('Unreadable upload journal');
+	expect(disk.text(path)).toBe('{"truncated":');
+});
+
+it('refuses to replace a record already saved under the same upload identity', async () => {
+	const { disk, file } = fixture();
+	const directory = `${TEST_PLUGIN_DIR}/pending-uploads`;
+	const [upload] = await new UploadJournal(disk.vault.adapter, directory, 'https://server.test').prepare([file], 20000);
+	const path = `${directory}/${upload!.operationId}.json`;
+	const bytes = disk.text(path);
+
+	const reused = new UploadJournal(disk.vault.adapter, directory, 'https://server.test');
+	await expect(reused.prepare([{ ...file, content: btoa('replacement'), operationId: upload!.operationId }], 20000)).rejects.toThrow('reused upload operation identity');
+
+	expect(disk.text(path)).toBe(bytes);
+	expect(disk.has(`${path}.tmp`)).toBe(false);
+	expect(reused.pending()).toEqual([]);
+});
 
 it('drops already-pruned receipt IDs on restart instead of accumulating them forever', async () => {
 	const { create, file, disk } = fixture();

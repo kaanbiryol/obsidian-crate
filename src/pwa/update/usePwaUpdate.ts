@@ -7,12 +7,15 @@ import type { ShowToast } from '../types';
 
 // Launch waits for a found update to download and apply. This only releases a
 // splash stuck on a stalled network or a feature that never becomes ready.
+// Work that waits for the user releases it at once (see `blocked`).
 const LAUNCH_UPDATE_TIMEOUT_MS = 30_000;
 
 export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: {
 	version: string | null;
 	checkComplete: boolean;
 	canApply: () => boolean;
+	/** Durable work such as a rejected change or an open form blocks the update. */
+	blocked: boolean;
 	canManuallyApply: () => boolean;
 }) {
 	const canAutoApply = useRef(auto.canApply);
@@ -49,6 +52,11 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: 
 	useEffect(() => {
 		if (auto.checkComplete && !auto.version) finishLaunch();
 	}, [auto.checkComplete, auto.version, finishLaunch]);
+	useEffect(() => {
+		// Waiting cannot settle durable work, so show the content and the manual update
+		// notice instead. Hydration and in-flight syncing never set `blocked`.
+		if (auto.blocked && !inFlight.current) finishLaunch();
+	}, [auto.blocked, finishLaunch]);
 	useEffect(() => {
 		if (document.documentElement.dataset.pwaUpdating !== 'restore') return;
 		document.getElementById('app')?.setAttribute('inert', '');

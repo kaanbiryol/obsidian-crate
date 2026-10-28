@@ -33,8 +33,8 @@ async function open(device: SyncTestDevice) {
 	await device.open();
 	await device.api.configureEncryption(bundle, reminderFolders, () => 'Reading');
 }
-async function device(id: string) {
-	const result = new SyncTestDevice(id, env); devices.push(result);
+async function device(id: string, disk: { caseInsensitive?: boolean } = {}) {
+	const result = new SyncTestDevice(id, env, disk); devices.push(result);
 	await result.authorize(3600_000); await open(result); return result;
 }
 async function sync(device: SyncTestDevice) {
@@ -171,7 +171,9 @@ it('preserves both conflicting encrypted binary versions across retries', async 
 	first.disk.write('image.bin', new Uint8Array([0, 2]).buffer); second.disk.write('image.bin', new Uint8Array([0, 3]).buffer);
 	await sync(first);
 	const result = await second.engine.sync();
-	expect(result.success).toBe(false);
+	// The review copy is reported without failing the sync.
+	expect(result).toMatchObject({ success: true, errors: [] });
+	expect(result.issues).toContainEqual(expect.objectContaining({ path: 'image.bin', code: 'incoming-review' }));
 	const copy = second.disk.paths().find(path => path !== 'image.bin'); expect(copy).toBeDefined();
 	expect(new Uint8Array(second.disk.read(copy!))).toEqual(new Uint8Array([0, 2]));
 	expect(new Uint8Array(second.disk.read('image.bin'))).toEqual(new Uint8Array([0, 3]));
@@ -190,6 +192,23 @@ it('round-trips an encrypted attachment at the 25 MiB plaintext limit', async ()
 	expect((await stored('large.bin'))!.size).toBeGreaterThan(content.length);
 }, 30_000); // Two-device encryption and transfer of 25 MiB is a correctness check, not a 5-second benchmark.
 
+it('skips files nested too deeply for an encrypted vault without failing the sync', async () => {
+	const folder = Array.from({ length: 37 }, (_, index) => `f${index}`).join('/');
+	const skipped = (path: string): unknown[] => [expect.objectContaining({ path, code: 'unsupported-device-path' })];
+	// First upload, then a full sync on a joining device, then incremental syncs.
+	const first = await device('deep-first');
+	await first.disk.vault.createFolder(folder); first.disk.write(`${folder}/first.md`, 'Too deep'); first.disk.write('note.md', 'Synced');
+	expect((await sync(first)).issues).toEqual(skipped(`${folder}/first.md`));
+	const second = await device('deep-second');
+	await second.disk.vault.createFolder(folder); second.disk.write(`${folder}/second.md`, 'Too deep');
+	expect((await sync(second)).issues).toEqual(skipped(`${folder}/second.md`));
+	first.disk.write('note.md', 'Edited');
+	expect((await sync(first)).issues).toEqual(skipped(`${folder}/first.md`));
+	await sync(second);
+	expect(second.disk.text('note.md')).toBe('Edited');
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first()).toEqual({ count: 1 });
+});
+
 it('preserves encrypted file renames and moves into and out of a reminders folder on another device', async () => {
 	const first = await device('move-first'), second = await device('move-second');
 	await first.disk.vault.adapter.mkdir('Reminders');
@@ -205,6 +224,16 @@ it('preserves encrypted file renames and moves into and out of a reminders folde
 	await sync(first); await sync(second);
 	expect(second.disk.paths()).toEqual(['Reminders/Renamed.md']);
 	expect(second.disk.text('Reminders/Renamed.md')).toBe('Private movable note');
+});
+
+it('syncs an encrypted case-only rename between case-insensitive devices', async () => {
+	// Both names share one server path, and the delete of the old name carries no metadata.
+	const first = await device('case-first', { caseInsensitive: true }), second = await device('case-second', { caseInsensitive: true });
+	first.disk.write('todo.md', 'Private groceries'); await sync(first); await sync(second);
+	first.disk.rename('todo.md', 'TODO.md');
+	first.engine.onFileRename(first.disk.vault.getAbstractFileByPath('TODO.md')!, 'todo.md');
+	await sync(first);
+	await converge([first, second], { 'TODO.md': 'Private groceries' });
 });
 
 it('syncs a renamed reminders folder without resurrecting its old path', async () => {

@@ -24,7 +24,7 @@ from the server’s persisted marker; committed files are kept. Local edits sync
 before the readiness wait so correcting an invalid reminder note can unblock setup.
 
 
-Normal sync binds every upload to a stable operation ID, exact content hash, size, path, content type and expected remote hash. The plugin saves the exact payload in its private `pending-uploads/` directory before dispatch. Each batch member has its own identity. A disk-write failure prevents dispatch.
+Normal sync binds every upload to a stable operation ID, exact content hash, size, path, content type and expected remote hash. The plugin saves the exact payload in its private `pending-uploads/` directory before dispatch. Each batch member has its own identity. A disk-write failure prevents dispatch. Because adapter writes are not atomic, each record is written to `<operation>.json.tmp` and renamed to `<operation>.json`; the request is sent only after the rename. A leftover temporary file was never sent, so the next start removes it, and an existing record is never replaced. A damaged final record still stops sync.
 
 D1 atomically records both successful commits and rejected preconditions. Replaying a successful upload returns its original revision even if another device has since edited or deleted the file; it never recreates that file. A rejected request cannot become a write when the state changes. Reusing an ID with different input fails.
 

@@ -45,6 +45,7 @@ Step 5 removes your files, file history, and checkpoints from the server. Make s
 <summary>If setup stops or is interrupted</summary>
 
 - If this device has sync errors or conflicts, setup stops before deleting anything. Resolve them and try again.
+- If a synced file is nested more than 36 folders deep, setup stops before deleting anything. Move it higher and try again.
 - If your server is still downloading saved links, setup asks you to wait and try again later.
 - If setup is interrupted, select **Retry** in the dialog, or go back to the same settings and select **Resume reset**, then **Resume**. Keep your saved recovery key and this device's Crate configuration until it finishes.
 
@@ -126,7 +127,7 @@ Turning encryption off doesn't decrypt the server copy. Instead, it starts the s
 2. Under **Turn off encryption**, select **Turn off**, and review **Reset sync and turn off encryption**.
 
 :::caution[This deletes the server copy]
-The reset deletes your server files and file history, then uploads this device's files without encryption. Files that exist only on the server are lost.
+Crate syncs this device first and stops if that sync has errors or conflicts. The reset then deletes your server files and file history, and uploads this device's files without encryption. Files this device doesn't sync, such as excluded folders, are lost.
 :::
 
 Afterwards, other Obsidian devices must reconnect, and web apps must log out and use a fresh setup link. Save any pending browser work before logging out. Keep your old recovery key for any encrypted backups.

@@ -14,6 +14,15 @@ export async function derivePathTagKey(vaultId: string, secret: EncryptionSecret
 }
 
 const MAX_CACHED_FOLDERS = 4096;
+// A tag is 16 bytes in unpadded base32.
+const TAG_LENGTH = 26;
+
+/** Whether `path` fits the server path limit once encrypted. Every name becomes a tag,
+ * plus `.md` for a note, so only the depth matters and no keys are needed. */
+export function fitsEncryptedPathLimit(path: string): boolean {
+	const segments = path.split('/'), note = portablePathKey(segments[segments.length - 1]!).endsWith('.md');
+	return !getSyncPathIssue(segments.map(() => 'a'.repeat(TAG_LENGTH)).join('/') + (note ? '.md' : ''));
+}
 
 /** Maps plaintext paths to their server form. Each tag covers the case- and
  * Unicode-insensitive name and its parent, so case variants share one server

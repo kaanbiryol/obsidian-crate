@@ -255,7 +255,7 @@ it.each([8, INITIAL_IMPORT_MAX_FILES])('measures 10,000-note import writes with 
 	expect((await finish(token, meter.db)).status).toBe(200);
 	await revalidateReminderSources({ ...env, DB: meter.db }, 4);
 	expect(meter.writes()).toBeLessThan(16000);
-	expect(meter.writes()).toBe(batchSize === 8 ? 15009 : 11261);
+	expect(meter.writes()).toBe(batchSize === 8 ? 15010 : 11262);
 	console.info('Initial import D1 writes:', meter.writes());
 }, 120000);
 

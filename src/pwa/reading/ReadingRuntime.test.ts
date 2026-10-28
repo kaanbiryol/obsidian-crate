@@ -84,6 +84,24 @@ it.each([
 	expect(showToast).toHaveBeenCalledOnce();
 });
 
+it('reports only work that waits for the user as blocking a launch update', async () => {
+	const h = await harness();
+	const blocked = () => h.store.getSnapshot().reading?.updateBlocked;
+	expect(blocked()).toBe(false);
+	const change: PendingReading = { ...commands[1]!, id: 'change', sessionId: session.id };
+	act(() => { h.hook.current.connection.publishPending(session, [change]); });
+	expect(blocked()).toBe(false);
+	act(() => { h.hook.current.connection.publishPending(session, [{ ...change, error: 'Temporarily unavailable', attempts: 1, retryAt: Date.now() + 2_000 }]); });
+	expect(blocked()).toBe(false);
+	act(() => { h.hook.current.connection.publishPending(session, [{ ...change, review: true }]); });
+	expect(blocked()).toBe(true);
+	act(() => { h.hook.current.connection.publishPending(session, []); });
+	expect(blocked()).toBe(false);
+	act(() => { h.hook.current.connection.openCapture(); });
+	expect(blocked()).toBe(true);
+	expect(pwaSyncState(h.store.getSnapshot())).toMatchObject({ updateBlocked: true, canUpdate: false });
+});
+
 it.each(commands)('blocks reload while a $action command waits for storage and then publishes its durable queue', async command => {
 	const h = await harness();
 	let pending!: ReturnType<typeof h.hook.current.queueChange>;

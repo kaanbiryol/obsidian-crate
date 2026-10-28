@@ -62,7 +62,7 @@ Limits are application guardrails, not a promise that every workload fits a free
 
 ## Supported storage formats
 
-The [generated release contract](current-contract.md) lists current D1 schema versions and registered migrations. Other formats are parser version 1, IndexedDB version 1, version-1 generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered version-1 upload journals, and literal `crate-desc:` description comments, including multiline text. URI-encoded `crate-desc:v1:` comments are also supported and are written only when text contains HTML comment syntax (`--`), literal carriage returns or a leading encoding-like `v<number>:` prefix. Percent signs in literal descriptions remain unchanged; unknown version prefixes and malformed blocks remain errors. Provisioning uses the complete schema-1 baseline; unsupported database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
+The [generated release contract](current-contract.md) lists current D1 schema versions and registered migrations. Other formats are parser version 2, IndexedDB version 1, version-1 generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered version-1 upload journals, and literal `crate-desc:` description comments, including multiline text. URI-encoded `crate-desc:v1:` comments are also supported and are written only when text contains HTML comment syntax (`--`), literal carriage returns or a leading encoding-like `v<number>:` prefix. Percent signs in literal descriptions remain unchanged; unknown version prefixes and malformed blocks remain errors. Provisioning uses the complete schema-1 baseline; unsupported database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
 
 ## Source and occurrence integrity
 
@@ -105,8 +105,8 @@ than by message text. The Worker sends `reminder-note-too-large`,
 `duplicate-reminder-id`, `invalid-markdown-encoding` and the reminder description
 codes `invalid-description-block`, `invalid-description-encoding` and
 `unsupported-description-encoding`. The plugin adds `file-too-large`,
-`unsupported-device-path`, `vault-scan-incomplete`, `transfer-unverified` and
-`more-reminder-issues`. Codes are
+`unsupported-device-path`, `vault-scan-incomplete`, `transfer-unverified`,
+`incoming-review` and `more-reminder-issues`. Codes are
 additive: older plugins ignore them, newer plugins drop unknown codes, and issues
 without a code (OS, HTTP and transport errors, or older peers) fall back to message
 matching.

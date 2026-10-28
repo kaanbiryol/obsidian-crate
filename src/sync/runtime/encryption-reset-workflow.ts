@@ -2,6 +2,7 @@ import { createAbortError } from '../abort';
 import { createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { loadEncryptionKeys, saveEncryptionKeys } from '../encryption/key-storage';
+import { fitsEncryptedPathLimit } from '../../encryption/path-tags';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { createEncryptionReset, createEncryptionSetup, loadEncryptionReset, saveEncryptionReset, resetRemoteEncryption, EncryptionResetRejectedError } from '../encryption/reset';
 import type { SyncEngine } from '../engine/engine';
@@ -20,8 +21,9 @@ interface EncryptionResetContext {
 	/** Also pauses vault event capture until resumeEvents runs. */
 	getResetEngine: () => Pick<SyncEngine, 'sync' | 'updateSettings'>;
 	pushSharedSettings: () => Promise<boolean>;
-	/** Sync once more so the wipe cannot discard changes that exist only on the server. */
-	syncBeforeEncrypting: () => Promise<void>;
+	/** Sync once more so the wipe cannot discard changes that exist only on the server.
+	 * Returns the paths this device syncs. */
+	syncBeforeReset: () => Promise<readonly string[]>;
 	resumeEvents: () => void;
 	reportError: (message: string) => void;
 }
@@ -32,7 +34,7 @@ export type EncryptionResetRequest = { target: 'plain'; state: EncryptionServerS
 /** Keep remote reset, local invalidation and reconciliation in their durable order. A
  * saved reset always resumes in its own direction, whatever the request. */
 export async function runEncryptionReset(
-	{ settings, secretStorage, transition, persistSettings, clearLocalState, getResetEngine, pushSharedSettings, syncBeforeEncrypting, resumeEvents, reportError }: EncryptionResetContext,
+	{ settings, secretStorage, transition, persistSettings, clearLocalState, getResetEngine, pushSharedSettings, syncBeforeReset, resumeEvents, reportError }: EncryptionResetContext,
 	request: EncryptionResetRequest, progress: (message: string) => void,
 	expected: { workerUrl: string; authToken: string }, signal?: AbortSignal,
 ): Promise<void> {
@@ -47,9 +49,13 @@ export async function runEncryptionReset(
 	}
 	if (!reset) {
 		if (request.target === 'plain' && !request.state) throw new Error('No encryption reset is pending');
+		progress('Syncing this device before replacing the server copy…');
+		const synced = await syncBeforeReset();
+		verify();
 		if (request.target === 'encrypted') {
-			progress('Syncing this device before replacing the server copy…');
-			await syncBeforeEncrypting();
+			// Refuse before the wipe: an encrypted upload cannot carry these paths.
+			const deep = synced.filter(path => !fitsEncryptedPathLimit(path));
+			if (deep.length) throw new Error(`${deep.length === 1 ? '1 file is' : `${deep.length} files are`} nested more than 36 folders deep, which an encrypted vault cannot sync. Move ${deep.length === 1 ? 'it' : 'them'} higher, then try again. First: ${deep[0]}`);
 			// Keys are saved before the checkpoint, so a resumed setup always has them.
 			saveEncryptionKeys(secretStorage, request.bundle, request.recovery);
 		}

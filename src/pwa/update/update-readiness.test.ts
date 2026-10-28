@@ -3,13 +3,13 @@ import { readingUpdateReadiness, reminderUpdateReadiness } from './update-readin
 
 const reminders = { bootstrapped: true, enabled: true, connected: true, mutationsReady: true,
 	initialContentReady: true, interacting: false, preparingMutation: false, launchPending: false,
-	loading: false, refreshing: false, isOffline: false, unsettled: false };
+	loading: false, refreshing: false, isOffline: false, unsettled: false, editing: false, stalled: false };
 const reading = { ready: true, connecting: false, enabled: true, connected: true, hasCache: true,
-	hasError: false, adding: false, saving: false, preparingChange: false, syncing: false, isOffline: false };
+	hasError: false, adding: false, saving: false, preparingChange: false, syncing: false, isOffline: false, stalled: false };
 
 it('allows paused reminder updates without a network refresh but still protects local work', () => {
 	const paused = { ...reminders, enabled: false, initialContentReady: false, loading: true, isOffline: true };
-	expect(reminderUpdateReadiness(paused)).toEqual({ updateReady: true, updateContentReady: true });
+	expect(reminderUpdateReadiness(paused)).toEqual({ updateReady: true, updateContentReady: true, updateBlocked: false });
 	for (const blocked of [{ unsettled: true }, { preparingMutation: true }, { interacting: true }, { mutationsReady: false }]) {
 		expect(reminderUpdateReadiness({ ...paused, ...blocked }).updateReady).toBe(false);
 	}
@@ -30,11 +30,33 @@ it('restores Reading content after an error or disconnection, but not during hyd
 	for (const restored of [{ hasError: true }, { enabled: false }, { connected: false }]) {
 		expect(readingUpdateReadiness({ ...reading, hasCache: false, ...restored }).updateContentReady).toBe(true);
 	}
-	expect(readingUpdateReadiness({ ...reading, connecting: true })).toEqual({ updateReady: false, updateContentReady: false });
+	expect(readingUpdateReadiness({ ...reading, connecting: true })).toEqual({ updateReady: false, updateContentReady: false, updateBlocked: false });
 });
 
 it('protects Reading forms, commands, and sync work even when the feature is paused', () => {
 	for (const blocked of [{ adding: true }, { saving: true }, { preparingChange: true }, { syncing: true }, { isOffline: true }]) {
 		expect(readingUpdateReadiness({ ...reading, enabled: false, ...blocked }).updateReady).toBe(false);
+	}
+});
+
+it('reports durable reminder work as blocking only once hydrated, and never transient work', () => {
+	for (const settling of [{ unsettled: true }, { loading: true }, { refreshing: true }, { launchPending: true }, { preparingMutation: true }, { initialContentReady: false }]) {
+		expect(reminderUpdateReadiness({ ...reminders, ...settling }).updateBlocked).toBe(false);
+	}
+	for (const durable of [{ editing: true }, { stalled: true }]) {
+		const state = { ...reminders, unsettled: true, interacting: true, ...durable };
+		expect(reminderUpdateReadiness(state)).toMatchObject({ updateReady: false, updateBlocked: true });
+		expect(reminderUpdateReadiness({ ...state, bootstrapped: false }).updateBlocked).toBe(false);
+	}
+});
+
+it('reports a restored Reading form or stalled work as blocking only after hydration', () => {
+	for (const settling of [{ syncing: true }, { saving: true }, { preparingChange: true }, { hasError: true }]) {
+		expect(readingUpdateReadiness({ ...reading, ...settling }).updateBlocked).toBe(false);
+	}
+	for (const durable of [{ adding: true }, { stalled: true }]) {
+		expect(readingUpdateReadiness({ ...reading, ...durable }).updateBlocked).toBe(true);
+		expect(readingUpdateReadiness({ ...reading, ready: false, ...durable }).updateBlocked).toBe(false);
+		expect(readingUpdateReadiness({ ...reading, connecting: true, ...durable }).updateBlocked).toBe(false);
 	}
 });

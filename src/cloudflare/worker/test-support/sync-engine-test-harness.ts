@@ -19,7 +19,7 @@ interface PausedResponse {
 
 /** Each instance is a separate device; only its disk and settings survive reopen. */
 export class SyncTestDevice {
-	readonly disk = new PersistentTestVault();
+	readonly disk: PersistentTestVault;
 	readonly settings: CrateSettings;
 	readonly requests: string[] = [];
 	readonly responses: Array<{ route: string; status: number; bytes: number; wallMs: number }> = [];
@@ -28,7 +28,8 @@ export class SyncTestDevice {
 	engine!: SyncEngine;
 	files!: EngineFileOperations;
 
-	constructor(readonly id: string, private readonly runtimeEnv: Env) {
+	constructor(readonly id: string, private readonly runtimeEnv: Env, disk: { caseInsensitive?: boolean } = {}) {
+		this.disk = new PersistentTestVault(disk);
 		this.settings = { ...structuredClone(DEFAULT_SETTINGS), deviceId: id, workerUrl: 'https://worker.test', syncInterval: 0 };
 	}
 

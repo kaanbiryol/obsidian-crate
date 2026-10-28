@@ -6,6 +6,9 @@ import { validateUploadIntent, type IntendedUpload, type JournalUpload, type Pre
 
 export const UPLOAD_JOURNAL_VERSION = 1;
 
+/** A record whose write never reached its final name. Its request was never dispatched. */
+export const isUnfinishedUploadRecord = (path: string): boolean => path.endsWith('.json.tmp');
+
 /** One immutable file per dispatched upload, separate from the large manifest.
  * Receipts are removed only after their resulting checkpoint is durable. */
 export class UploadJournal {
@@ -27,6 +30,11 @@ export class UploadJournal {
 		const ordered: Array<{ file: JournalUpload; sequence: number }> = [];
 		for (const path of listing.files) {
 			if (path.endsWith('/.DS_Store')) continue;
+			// Discard an interrupted write. A final record for the same id is read on its own.
+			if (isUnfinishedUploadRecord(path)) {
+				try { await this.adapter.remove(path); } catch { /* Still never dispatched; ignored on every load. */ }
+				continue;
+			}
 			const fileId = path.slice(this.directory.length + 1, -5);
 			if (path === this.path(fileId) && this.completed.has(fileId)) continue;
 			let raw: unknown;
@@ -81,11 +89,21 @@ export class UploadJournal {
 				if (!await this.adapter.exists(this.directory)) await this.adapter.mkdir(this.directory);
 				this.directoryReady = true;
 			}
-			// A failed write must not dispatch the request. A partial journal file
-			// makes restart fail closed instead of guessing that no upload ran.
+			// A failed write must not dispatch the request. Adapter writes are not atomic,
+			// so the record is written beside its final name and renamed: an interrupted
+			// write leaves only a temporary file, and a damaged final record still fails closed.
+			const path = this.path(durable.operationId);
+			const temporary = `${path}.tmp`;
 			try {
-				await this.adapter.write(this.path(durable.operationId), JSON.stringify({ version: UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));
-			} catch (error) { this.directoryReady = false; throw error; }
+				// A record already at this name may have been sent; never replace it.
+				if (await this.adapter.exists(path)) throw new Error('Invalid or reused upload operation identity');
+				await this.adapter.write(temporary, JSON.stringify({ version: UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));
+				await this.adapter.rename(temporary, path);
+			} catch (error) {
+				this.directoryReady = false;
+				try { await this.adapter.remove(temporary); } catch { /* Removed on the next load. */ }
+				throw error;
+			}
 			this.entries.set(durable.operationId, durable);
 			return durable;
 		});

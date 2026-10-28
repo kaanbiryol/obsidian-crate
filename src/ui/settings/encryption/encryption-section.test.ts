@@ -299,7 +299,7 @@ it('requires typed data-loss confirmation before starting the destructive reset'
 	await configure('active');
 	const plugin = await open();
 	setting('Turn off encryption').buttons[0]!.click();
-	expect(body.collectText()).toContain('Files that exist only on the server will be lost');
+	expect(body.collectText()).toContain('Crate syncs this device first');
 	expect(body.collectText()).toContain('Existing backup copies stay as they are');
 	const action = MockSetting.instances.at(-1)!.buttons[0]!;
 	expect(action.buttonEl.classNames.has('is-disabled')).toBe(true);

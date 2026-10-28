@@ -21,7 +21,7 @@ function createController(options: Partial<{
 		automaticSyncEnabled: () => options.automaticSync ?? false,
 		recoverUploads: async () => {},
 		api: { isConfigured },
-		localManifest: { getEntry: () => undefined, save: async () => {} },
+		localManifest: { getEntry: () => undefined, renameDestination: () => undefined, save: async () => {} },
 		shouldIgnore: (path: string) => path.startsWith('.trash/'),
 		updateState,
 		setLastSync: vi.fn(),

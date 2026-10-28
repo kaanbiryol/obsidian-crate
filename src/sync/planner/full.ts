@@ -1,4 +1,5 @@
-import { oversizedRemoteFileIssue, skippedFileIssue, withSyncFileContext } from '../issues';
+import { oversizedRemoteFileIssue, withSyncFileContext } from '../issues';
+import { skippedUploadIssue } from '../local/local-file-changes';
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "../local/file-discovery";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./types";
@@ -19,10 +20,9 @@ export async function createFullSyncPlan(
 ): Promise<FullSyncPlan> {
 	const localFiles = createPathRecord<FileEntry>();
 	const files = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.throwIfDestroyed());
-	const largeLocalPaths = new Set(
-		files.filter((file) => file.size > MAX_FILE_SIZE_BYTES).map((file) => file.path),
-	);
-	const eligible = files.filter((file) => file.size <= MAX_FILE_SIZE_BYTES);
+	const skipped = files.flatMap(file => skippedUploadIssue(file, context.encrypted?.() ?? false) ?? []);
+	const skippedLocalPaths = new Set(skipped.map(issue => issue.path));
+	const eligible = files.filter((file) => !skippedLocalPaths.has(file.path));
 
 	const hashTasks = eligible
 		.map((file) => () => withSyncFileContext(file.path, async () => {
@@ -68,15 +68,15 @@ export async function createFullSyncPlan(
 		if (local.hash === remoteEntry?.hash) context.localManifest.setEntry(path, { ...local, revision: remoteEntry.revision });
 	}
 
-	// Oversized files on either side are reported, not failures, so they never hold back the cursor.
-	const issues = [...largeLocalPaths].map(skippedFileIssue);
+	// Skipped files on either side are reported, not failures, so they never hold back the cursor.
+	const issues = [...skipped];
 	for (const [path, diff] of [...diffMap.entries()]) {
 		const remoteEntry = getPathEntry(remoteFiles, path);
 		if (context.shouldIgnore(path)) {
 			diffMap.delete(path);
 			continue;
 		}
-		if (largeLocalPaths.has(path)) {
+		if (skippedLocalPaths.has(path)) {
 			diffMap.delete(path);
 			continue;
 		}

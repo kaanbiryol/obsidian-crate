@@ -1,4 +1,4 @@
-const REMINDER_ID_MARKER_REGEX = /\s*<!--\s*crate-id:([A-Za-z0-9_-]+)\s*-->\s*$/;
+const REMINDER_ID_MARKER_REGEX = /<!--\s*crate-id:([A-Za-z0-9_-]+)\s*-->\s*$/;
 
 function normalizeReminderId(id: string): string | null {
 	const trimmed = id.trim();
@@ -32,5 +32,6 @@ export function setReminderIdMarker(value: string, reminderId: string): string {
 		throw new Error('Reminder ID is invalid');
 	}
 
-	return `${stripReminderIdMarker(value)} <!-- crate-id:${normalizedReminderId} -->`;
+	// Keep a CRLF line's carriage return, which trimming the old marker removes.
+	return `${stripReminderIdMarker(value)} <!-- crate-id:${normalizedReminderId} -->${value.endsWith('\r') ? '\r' : ''}`;
 }

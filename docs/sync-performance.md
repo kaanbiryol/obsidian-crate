@@ -37,10 +37,10 @@ the plugin require a fresh confirmation; failed requests remain eligible for ret
 
 ## Initial upload write budget
 
-The local workerd/D1 billing-metadata regression measures **11,261 row writes for
+The local workerd/D1 billing-metadata regression measures **11,262 row writes for
 10,000 ordinary notes**, including import setup and paged completion with 32-file batches.
 The same fixture used 31,256 writes before the pre-release inventory redesign: a
-20,000-write (64%) reduction. Eight-file batches now cost 15,009 writes, down from
+20,000-write (64%) reduction. Eight-file batches now cost 15,010 writes, down from
 45,004 before these optimizations. Replaying a committed batch writes zero rows
 and uploads no R2 objects.
 
@@ -49,8 +49,8 @@ and uploads no R2 objects.
 | Current file records | 10,000 | Remote identity, original spelling, content hash, size and object pointer |
 | Shared staging leases | 939 | 313 batches, each with an insert, expiry-index entry and lease removal |
 | Import generation checkpoints | 313 | Fence completion against batches still in flight |
-| Session and completion | 9 | Open the import (1) and publish its sync baseline (8) |
-| Total | 11,261 | No per-note history, upload receipts or reminder indexing |
+| Session and completion | 10 | Open the import (1) and publish its sync baseline (9) |
+| Total | 11,262 | No per-note history, upload receipts or reminder indexing |
 
 When a reminder policy is configured, tracking and acknowledging initial reminder
 readiness adds **two row writes per vault**, independent of note count, in addition

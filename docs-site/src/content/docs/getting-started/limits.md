@@ -34,7 +34,7 @@ Sizes are rounded down, so a file under the listed size always fits. The Reading
 <summary>Good to know about files</summary>
 
 - **Attachments:** new attachments download on their own. When an existing image, PDF, or other attachment changes, you [review it](/docs/troubleshooting/conflicts/#attachments-and-binary-files) before it's replaced.
-- **File names have to work on every device.** Names that differ only by capitalization, names Windows reserves, and names ending in a dot or space can block sync. Rename the file named in the error and sync again.
+- **File names have to work on every device.** Names that differ only by capitalization, names Windows reserves, and names ending in a dot or space can block sync. Windows and Android devices skip files with `< > : " | ? *` in their names. Rename the file named in the error and sync again.
 - **With [encryption](/docs/features/encryption/),** files can be nested at most 36 folders deep.
 
 </details>

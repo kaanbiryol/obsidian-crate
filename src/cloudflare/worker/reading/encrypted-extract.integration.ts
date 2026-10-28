@@ -55,6 +55,14 @@ it('reports a failed download without echoing the link, so the client keeps its 
 	expect(await storedText()).not.toContain('missing-article');
 });
 
+it('downloads links up to the longest one Reading saves', async () => {
+	const { fetch, extract } = await setup();
+	const long = `${link}?q=${'a'.repeat(8192 - link.length - 3)}`;
+	expect(long).toHaveLength(8192);
+	expect((await extract(long)).status).toBe(422);
+	expect((fetch.mock.calls[0]![0]).url).toBe(long);
+});
+
 it('stays closed to unencrypted folders, capture-only credentials and invalid links', async () => {
 	expect((await (await setup(false)).extract(link)).status).toBe(409);
 	await reset(); await applySchema(env.DB);

@@ -22,6 +22,7 @@ export const MAX_READING_FILES = 10_000;
 const MAX_READING_METADATA_BYTES = 12 * 1024 * 1024;
 // Changed notes download in parallel, a few at a time, in page order.
 const SOURCE_CONCURRENCY = 6;
+const DUPLICATE_ID_ISSUE = 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.';
 /** `revision` fingerprints the Reading files and issues, so edits elsewhere in the vault keep it. */
 interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: null; revision: string }
 
@@ -67,6 +68,9 @@ export class EncryptedReadingApi {
 	private indexed = new Map<string, EncryptedReadingIndexEntry>();
 	// Server path of each note by its plaintext path, from the last inventory.
 	private wires = new Map<string, string>();
+	// What the last inventory's issues hide from its listed items: every readable note,
+	// including those sharing a Reading ID, and each unreadable note's last verified ID.
+	private library: { readable: ReadingItem[]; duplicateIds: Set<string>; unreadable: Array<string | undefined> } = { readable: [], duplicateIds: new Set(), unreadable: [] };
 	private indexLoaded = false;
 	// The last complete inventory and the vault sequence it was confirmed at. An
 	// unchanged first page answers from it, so polling is one request.
@@ -115,7 +119,7 @@ export class EncryptedReadingApi {
 			try { if (!this.indexed.size) for (const entry of await this.options.loadIndex?.() ?? []) this.indexed.set(entry.file.path, entry); }
 			catch { /* A missing or unreadable local index only costs downloads. */ }
 		}
-		const candidates: ReadingItem[] = [];
+		const candidates: ReadingItem[] = [], unreadable: Array<string | undefined> = [];
 		const next = new Map<string, WireFile>(), issues: Array<{ path: string; message: string }> = [];
 		const nextIndex = new Map<string, EncryptedReadingIndexEntry>();
 		let downloaded = false, unavailable = false;
@@ -148,6 +152,7 @@ export class EncryptedReadingApi {
 					// Its entry stays indexed (but unlisted) to keep that name for later failures.
 					const previous = this.indexed.get(file.path);
 					if (previous) nextIndex.set(file.path, previous);
+					unreadable.push(previous?.item.crate_reading_id);
 					issues.push({ path: previous?.item.path ?? file.path, message: error instanceof Error ? error.message : 'Article could not be opened.' });
 				}
 			}
@@ -162,7 +167,8 @@ export class EncryptedReadingApi {
 		for (const path of nextSources.keys()) if (!next.has(path)) nextSources.delete(path);
 		this.sources = nextSources;
 		const { unique: items, duplicates } = filterUniqueReadingIds(candidates);
-		for (const item of duplicates) issues.push({ path: item.path, message: 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.' });
+		for (const item of duplicates) issues.push({ path: item.path, message: DUPLICATE_ID_ISSUE });
+		this.library = { readable: candidates, duplicateIds: new Set(duplicates.map(item => item.crate_reading_id)), unreadable };
 		// Unrelated vault edits advance the sequence; an unchanged fingerprint lets
 		// callers keep their saved library instead of rewriting and redrawing it.
 		const fingerprint = JSON.stringify([[...next.values()].map(file => [file.path, file.revision, file.hash, file.size]), issues.map(issue => [issue.path, issue.message])]);
@@ -220,21 +226,31 @@ export class EncryptedReadingApi {
 	/** Build and persist exact ciphertext for one operation against the current
 	 * library, or answer from a receipt the operation already committed. */
 	private async prepare(action: string, body: Record<string, unknown>, id: string, rawBody: string, requestHash: string): Promise<{ attempt: Attempt } | { response: unknown }> {
-		const list = await this.inventory();
-		// An unreadable note may be a failed download, so the change stays queued and
-		// retries; a rejection here would strand it for review once the note recovers.
-		if (list.issues.length) throw this.options.error('Refresh or resolve unreadable Reading notes before saving changes.', 503, 'reading_unavailable');
+		const list = await this.inventory(), { readable, duplicateIds, unreadable } = this.library;
+		// An unreadable note may be a failed download, so a change it blocks stays queued
+		// and retries; a rejection here would strand it for review once the note recovers.
+		const unavailable = (message = 'Refresh or resolve unreadable Reading notes before saving changes.') => this.options.error(message, 503, 'reading_unavailable');
 		let path = '', wire = '', content: string, previous: WireFile | undefined, itemId: string, before: ReadingItem | undefined;
 		if (action === 'capture') {
-			const link = readingUrl(body.url), saved = findSavedReadingLink(list.items, link);
+			// Any unreadable note may already save this link; a new note would duplicate it.
+			if (unreadable.length) throw unavailable();
+			const link = readingUrl(body.url), saved = findSavedReadingLink(readable, link);
 			if (saved.kind === 'many') throw this.options.error('Several notes already save this link.', 409);
-			if (saved.kind === 'one') return { response: { saved: true, alreadySaved: true, id: saved.item.crate_reading_id } };
+			if (saved.kind === 'one') {
+				if (duplicateIds.has(saved.item.crate_reading_id)) throw unavailable(DUPLICATE_ID_ISSUE);
+				return { response: { saved: true, alreadySaved: true, id: saved.item.crate_reading_id } };
+			}
 			// Stable even if preparation is interrupted before ciphertext persistence.
 			itemId = typeof body.captureId === 'string' ? body.captureId : await readingImportId(id, rawBody);
 			content = createReadingNote({ id: itemId, url: link, title: typeof body.title === 'string' ? body.title : undefined, savedAt: new Date().toISOString() });
 			if (body.fetchArticle === false) content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' });
 		} else {
+			// Never choose between notes sharing the target's ID.
+			if (typeof body.id === 'string' && duplicateIds.has(body.id)) throw unavailable(DUPLICATE_ID_ISSUE);
 			const item = list.items.find(item => item.crate_reading_id === body.id);
+			// An unreadable note may be the target: one last verified with its ID, or any
+			// note when the target is not listed. Other unreadable notes do not block it.
+			if (unreadable.length && (!item || unreadable.includes(item.crate_reading_id))) throw unavailable();
 			if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
 			wire = this.wires.get(item.path)!;
 			const source = await this.source(this.files.get(wire)!); path = item.path; previous = source.file; itemId = item.crate_reading_id; before = item;
@@ -257,7 +273,8 @@ export class EncryptedReadingApi {
 		}
 		// Notes are named after the article once its title is known; a name the user chose is kept.
 		const saved = parseReadingNote(content)!, source = { title: saved.title, url: saved.source_url };
-		const occupied = (candidate: string) => list.items.some(item => item.crate_reading_id !== itemId && portablePathKey(item.path) === portablePathKey(candidate));
+		// Notes sharing a Reading ID are unlisted but still own their names.
+		const occupied = (candidate: string) => readable.some(item => item.crate_reading_id !== itemId && portablePathKey(item.path) === portablePathKey(candidate));
 		let removed: WireFile | undefined;
 		if (action === 'capture') {
 			path = await readingCapturePath(this.options.folderPath, source, itemId, occupied);

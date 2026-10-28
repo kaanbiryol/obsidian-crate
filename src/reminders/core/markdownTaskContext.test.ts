@@ -31,6 +31,14 @@ describe('Markdown task context', () => {
 		const lines = ['````', '~~~', '```', '- [ ] Example', '````', '- [ ] Real'];
 		expect([...markdownTaskContexts(lines).keys()]).toEqual([5]);
 	});
+	it.each([
+		'```md\r\n- [ ] Example\r\n```',
+		'~~~\r\n- [ ] Example\r\n~~~',
+		'- ```md\r\n  - [ ] Example\r\n  ```',
+	])('excludes fenced examples in CRLF notes: %j', example => {
+		const lines = `${example}\r\n\r\n- [ ] Real`.split('\n');
+		expect([...markdownTaskContexts(lines).keys()]).toEqual([lines.length - 1]);
+	});
 	it('does not treat an indented code fence as opening a root fence', () => {
 		expect([...markdownTaskContexts(['    ```', '    - [ ] Code', '', '- [ ] Real']).keys()]).toEqual([3]);
 	});

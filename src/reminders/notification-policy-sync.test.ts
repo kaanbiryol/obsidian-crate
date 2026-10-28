@@ -147,6 +147,14 @@ it('does not use a late pre-reconnect response to confirm the new connection', a
 	expect(h.ensureNotificationPolicy).toHaveBeenCalledTimes(2);
 });
 
+it.each(['Tasks: Work', 'Projects/CON', 'Tasks.'])('rejects a folder Windows devices cannot store before saving: %s', async folder => {
+	const h = harness();
+	await expect(changeReminderFolder(h.plugin, folder)).rejects.toThrow('Invalid reminders folder: contains');
+	expect(h.plugin.remindersSettings.remindersFolderPath).toBe('Reminders');
+	expect(h.saveData).not.toHaveBeenCalled();
+	expect(h.ensureNotificationPolicy).not.toHaveBeenCalled();
+});
+
 it('does not send a folder change if the local save fails', async () => {
 	const h = harness(); h.saveData.mockRejectedValueOnce(new Error('disk full'));
 	await expect(changeReminderFolder(h.plugin, 'Tasks')).rejects.toThrow('disk full');

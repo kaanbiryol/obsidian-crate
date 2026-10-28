@@ -6,7 +6,7 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 
 | Contract | Current value |
 | --- | --- |
-| Server candidate revision | 1 |
+| Server candidate revision | 2 |
 | Fresh database schema | 1 |
 | Oldest supported database schema | 1 |
 | Wire protocol | 1 |

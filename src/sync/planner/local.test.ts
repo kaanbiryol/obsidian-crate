@@ -28,15 +28,19 @@ describe('planner local diff helpers', () => {
 	});
 
 	it('confirms only non-ignored manifest paths missing from discovery', async () => {
+		// A case-insensitive file system also reports `notes/todo.md` for the renamed `notes/TODO.md`.
 		const adapter = {
-			exists: vi.fn(async (path: string) => path === 'notes/unindexed.md'),
+			exists: vi.fn(async (path: string) => ['notes/unindexed.md', 'notes/todo.md'].includes(path)),
+			list: vi.fn(async (path: string) => path
+				? { files: ['notes/present.md', 'notes/unindexed.md', 'notes/TODO.md'], folders: [] }
+				: { files: [], folders: ['notes'] }),
 		};
 
 		const result = await getLocalDeletes(
 			{
-				vault: { adapter } as never,
+				vault: { adapter, getAbstractFileByPath: () => null } as never,
 				localManifest: {
-					getAllPaths: () => ['notes/present.md', 'notes/missing.md', 'notes/unindexed.md', '.trash/ignore.md'],
+					getAllPaths: () => ['notes/present.md', 'notes/missing.md', 'notes/unindexed.md', 'notes/todo.md', '.trash/ignore.md'],
 				} as never,
 				throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith('.trash/'),
 				verifyContent: async () => false,
@@ -46,8 +50,8 @@ describe('planner local diff helpers', () => {
 			5,
 		);
 
-		expect(result).toEqual(['notes/missing.md']);
-		expect(adapter.exists.mock.calls.map(([path]) => path)).toEqual(['notes/missing.md', 'notes/unindexed.md']);
+		expect(result).toEqual(['notes/missing.md', 'notes/todo.md']);
+		expect(adapter.exists.mock.calls.map(([path]) => path)).toEqual(['notes/missing.md', 'notes/unindexed.md', 'notes/todo.md']);
 	});
 
 	it('detects changed local files by hash and skips unchanged ones', async () => {
@@ -98,7 +102,7 @@ describe('planner local diff helpers', () => {
 
 		expect(result.changes).toHaveLength(1);
 		expect(result.changes.find(file => file.path === 'notes/changed.md')?.hash).toHaveLength(64);
-		expect(result.skippedPaths).toEqual(['notes/large.bin']);
+		expect(result.skipped?.map(issue => issue.path)).toEqual(['notes/large.bin']);
 		expect(result.discoveredPaths).toEqual(new Set(['notes/changed.md', 'notes/unchanged.md', 'notes/large.bin']));
 		expect(adapter.readBinary).toHaveBeenCalledTimes(2);
 	});

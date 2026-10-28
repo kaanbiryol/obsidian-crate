@@ -21,7 +21,7 @@ export class EncryptionResetModal extends SharedModal {
 		try { saved = loadEncryptionReset(this.plugin.secretStorage); } catch { /* Resuming reports the invalid checkpoint. */ }
 		if (saved?.target === 'encrypted') { this.resumeSetup(); return; }
 		this.openLayout(resuming ? 'Resume encryption reset' : 'Reset sync and turn off encryption');
-		this.bodyEl.createEl('p', { text: 'Crate will delete all synced server files, retained history, checkpoints and saved sync state. Files that exist only on the server will be lost. This cannot be undone.' });
+		this.bodyEl.createEl('p', { text: 'Crate syncs this device first, then deletes all synced server files, retained history, checkpoints and saved sync state. Files this device does not sync, such as excluded folders, will be lost. This cannot be undone.' });
 		this.bodyEl.createEl('p', { text: 'Files in this device’s local Obsidian vault stay on this device and will be uploaded again using your current sync exclusions. The server will be able to read their contents. Sync and notifications pause during the reset.' });
 		this.bodyEl.createEl('p', { text: 'Other Obsidian devices must disconnect and reconnect. Web apps must log out and open a fresh enrollment link; logging out discards their drafts and pending edits. Enable notifications again after enrollment.' });
 		this.bodyEl.createEl('p', { text: 'Existing backup copies stay as they are. Encrypted copies still need your old recovery key; save it before continuing if you need those copies.' });

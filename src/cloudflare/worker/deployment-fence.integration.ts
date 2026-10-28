@@ -416,7 +416,7 @@ it('refuses a schema edit hidden inside a code-only release and preserves storag
 	const h = await harness();
 	await h.deploy();
 	const changed = { ...artifact(), d1SchemaSha256: 'changed-schema' };
-	await expect(h.deploy(changed)).rejects.toThrow('schema version change');
+	await expect(h.deploy(changed)).rejects.toThrow('earlier beta');
 	expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
 	expect(await held()).toBeNull();
 });

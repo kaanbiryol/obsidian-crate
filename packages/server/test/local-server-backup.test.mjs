@@ -20,7 +20,7 @@ test('verified backup restores files, credentials and durable alarm storage into
 		await runtime.db.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('backup.txt', 'backup.txt', 'backup-test')").run();
 		await runtime.db.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision, enabled) VALUES (1, 'Reminders', 'UTC', 'policy', 1)").run();
 		await runtime.db.prepare("INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified) VALUES ('backup.txt', 'backup-test', ?, 1)").bind(parserVersion).run();
-		await runtime.db.prepare("INSERT INTO reminder_projections(reminder_id, file_path, notification_token, policy_revision) VALUES ('backup-reminder', 'backup.txt', 'job', 'policy')").run();
+		await runtime.db.prepare("INSERT INTO reminder_projections(reminder_id, file_path, file_revision, notification_token, policy_revision) VALUES ('backup-reminder', 'backup.txt', 'backup-test', 'job', 'policy')").run();
 		await runtime.db.prepare("INSERT INTO notification_jobs(reminder_id, job_token, operation, payload_json, available_at) VALUES ('backup-reminder', 'job', 'schedule', '{}', ?)").bind(Date.now() + 60_000).run();
 		const namespace = await runtime.mf.getDurableObjectNamespace('REMINDER_ALARMS');
 		const response = await namespace.get(namespace.idFromName('backup-reminder')).fetch('https://do/', {

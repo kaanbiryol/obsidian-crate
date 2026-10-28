@@ -12,7 +12,7 @@ import type { ConflictDiff, FileDiff, SyncResult } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
-import { recordSyncError } from '../issues';
+import { recordDeferredChange, recordSyncError } from '../issues';
 import { errorMessage } from '../../platform/logger';
 import { isAbortError } from '../abort';
 import { fileFailure } from '../failures';
@@ -268,7 +268,7 @@ export interface ApplyDiffsOptions {
 }
 
 /** Applies diffs in order. A deferred or failed diff is recorded against its path
- * and the rest continue; cancellation stops them all. */
+ * (a review copy only as an issue) and the rest continue; cancellation stops them all. */
 export async function applyDiffs(
 	context: { processDiff(diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult): Promise<DiffApplyOutcome> },
 	diffs: readonly FileDiff[],
@@ -281,7 +281,7 @@ export async function applyDiffs(
 			options.beforeDiff?.(diff);
 			const outcome = await context.processDiff(diff, localFiles, result);
 			if (outcome.status === "deferred") {
-				recordSyncError(result, `${outcome.reason}`, diff.path);
+				recordDeferredChange(result, outcome, diff.path);
 			}
 		} catch (error) {
 			if (isAbortError(error)) throw error;
