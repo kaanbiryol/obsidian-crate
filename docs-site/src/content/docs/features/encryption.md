@@ -93,20 +93,23 @@ Encryption only protects data from now on. Earlier exports, hosting provider sna
 
 Your notes, attachments, file and folder names, file history, shared settings, reminder text, and notification text are all encrypted. So are Reading articles, links, tags, highlights, and queued saves.
 
-Your server can still see some details about your data, such as folder structure, approximate file sizes, and when reminders are due.
+Your server can still see some details about your data, such as folder structure, file sizes, and when reminders are due.
 
 <details>
 <summary>Everything the server can still see</summary>
 
 - Folder structure: how deep folders go and how many items each holds
 - Which files are Markdown notes
-- Approximate file sizes
+- Exact file sizes and how long each file's full path is
 - When files change and sync
 - Reminder IDs, whether reminders are complete, and due times
 - Notification delivery information
 - When a file gets back a name it had before in the same folder
+- How long each notification's text is, and whether it changed
 
 Without encryption, your server can also read your synced content.
+
+Encryption stops the server from reading or forging your content, but someone with write access to your server could still bring back an older version of a file or a note you deleted.
 
 </details>
 

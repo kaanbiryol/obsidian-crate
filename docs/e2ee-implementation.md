@@ -71,11 +71,11 @@ This works on Cloudflare and self-hosted servers. External backups, provider sna
 
 | Protected content | Server-visible metadata |
 | --- | --- |
-| Note and attachment bytes, file and folder names, original content hashes and content types | Folder structure (depth and how many items each folder holds), which files are Markdown, approximate sizes, revisions and change timing |
+| Note and attachment bytes, file and folder names, original content hashes and content types | Folder structure (depth and how many items each folder holds), which files are Markdown, exact file sizes and the length of each full path (no padding), revisions and change timing |
 | Retained file versions | Checkpoint dates, file counts, revisions and storage references |
 | Shared settings, reminder titles/descriptions/recurrence and saved operation responses | Current reminder IDs, completion state, due times, notification policy and delivery state |
 | Reading articles, URLs, tags, highlights and queued captures; Reading and Reminders folder names | Which tagged folders hold Reading and Reminders, session and feature-policy metadata; links and articles saved from the iPhone shortcut while the server downloads them |
-| Notification display text | Push endpoints, delivery timing and payload sizes |
+| Notification display text | Push endpoints, delivery timing, payload sizes (which follow the length of the reminder text) and whether that text changed |
 
 The server stores every file and folder name as a 26-character keyed tag and keeps only the `.md` extension readable, so it can apply Markdown rules. A tag depends only on the name and its parent folder: the same name in the same folder always gets the same tag, so the server can tell when a file returns to an earlier name, and names that differ only in letter case or Unicode form share one server path. Equal names in different folders get unrelated tags. Renaming a folder changes the tag of everything inside it, so the server sees each of those files move.
 
@@ -111,6 +111,8 @@ Selecting a different Reading or Reminders folder in settings works as in an une
 Plugin requests without local encryption keys check server encryption before sending sync, settings, Reading or Reminders mutation bodies. This also protects queued Reading URLs after another device enables encryption. A fresh PWA link containing an encryption key stays locked if the server reports no encryption; it cannot fall back to submitting plaintext.
 
 ## Current limits
+
+Encryption gives confidentiality and per-file authenticity, not freshness. Each ciphertext is bound to its path, so the server cannot move content between files or forge new content, but a party with server write access can serve an older version of a file, bring back a note you deleted, or replay older shared settings and folder labels. Clients accept those as ordinary remote changes. Keep an independent backup if this matters to you.
 
 Data-key rotation is not available in this version. Changing server credentials or revoking a browser does not rotate content keys. Turning encryption off requires the destructive reset described above; there is no in-place decryption of server history. The setup UI discloses these limits before activation.
 

@@ -49,9 +49,10 @@ Automatic sync is off by default on each device. After connecting, run **Crate: 
 ## Accounts, costs and network use
 
 - **Accounts and payment:** Crate has no account or payment of its own. Hosting on Cloudflare needs a Cloudflare account with R2 activated; Cloudflare asks for a payment method during R2 checkout even if you stay within the free allowance, and bills any usage beyond it to you. Local hosting on your own computer needs neither.
-- **Your Crate server:** sync, reminders, Reading and the web app connect only to the server you deploy or run (your Cloudflare Worker or your local server).
+- **Your Crate server:** sync, reminders and the web app connect to the server you deploy or run (your Cloudflare Worker or your local server).
 - **Cloudflare:** connecting, updating, deleting a server and showing its usage call Cloudflare's API after you sign in. The sign-in returns through `https://crate.kaanbiryol.com/oauth/callback/`, a static page that hands the authorization code back to Obsidian and stores nothing.
-- **Websites you save or paste:** Reading downloads saved links, and pasting a link into a reminder fetches its page title through your server.
+- **Websites you save or paste:** Reading downloads each saved link from its original site, directly from Obsidian or through your server for the web app and iPhone shortcut. For X, Reddit, Bilibili and C2 wiki links it may also call a fixed list of public APIs. Pasting a link into a reminder fetches its page title through your server.
+- **YouTube:** saved YouTube links show thumbnails from `i.ytimg.com` and play in YouTube's privacy-enhanced `youtube-nocookie.com` player.
 - **Push service:** only when you turn on notifications, your server sends encrypted payloads through your browser's or device's push service.
 
 ## Privacy and security
