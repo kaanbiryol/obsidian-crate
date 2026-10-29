@@ -10,6 +10,11 @@ import type { PathTags } from '../../../encryption/path-tags';
 import { SyncWorkerApi } from '../../../sync/worker-api/sync';
 import { createReadingNote } from '../../../reading/core/notes';
 import { commitSealedReadingNote } from '../reading/sealed-note';
+import { sealFileForVault } from '../../../encryption/sealed-file';
+import { createOpaqueWireName } from '../../../protocol/encrypted-path';
+import { readEncryptionState } from './state';
+import { stageMarkdownFile } from '../sync/markdown-file-staging';
+import { commitStagedFile } from '../sync/mutations';
 
 const devices: SyncTestDevice[] = [];
 let bundle: VaultKeyBundle;
@@ -312,4 +317,77 @@ it('syncs a shortcut note under its random server name, keeps that name through 
 	expect(await server()).toEqual([]);
 	await sync(first);
 	expect(first.disk.paths()).not.toContain(name);
+});
+
+async function readingFolder() {
+	const folder = await paths.wire('Reading');
+	await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,?,'policy','revision')").bind(folder).run();
+	return folder;
+}
+/** A party with server write access stores a note sealed to the vault at `wire`,
+ * replacing any file there, which no Worker route allows. */
+async function forgeSealed(wire: string, name: string, content: string) {
+	const state = (await readEncryptionState(env.DB))!, folder = wire.slice(0, wire.lastIndexOf('/'));
+	await env.DB.prepare('DELETE FROM files WHERE path = ?').bind(wire).run();
+	const sealed = await sealFileForVault({ path: `${folder}/${name}`, content: new TextEncoder().encode(content), contentType: 'text/markdown' },
+		{ vaultId: state.vaultId, keyId: state.seal.keyId, publicKey: state.seal.publicKey });
+	const text = new TextDecoder().decode(sealed.bytes);
+	const staged = await stageMarkdownFile(env.BUCKET, env.DB, wire, text, null, true);
+	expect((await commitStagedFile(env.BUCKET, env.DB, { ...staged, content: text, encryptionState: state, sealedReadingFolder: folder })).committed).toBe(true);
+}
+const rejected = (result: { issues?: Array<{ path?: string; message: string }> }) =>
+	(result.issues ?? []).filter(issue => issue.message.includes('note the server created')).map(issue => issue.path).sort();
+
+it('never applies a sealed note over a synced Reading note or under its name, and keeps syncing other files', async () => {
+	const folder = await readingFolder();
+	const first = await device('first'), second = await device('second');
+	await first.disk.vault.adapter.mkdir('Reading'); first.disk.write('Reading/My article.md', 'My highlights\n'); first.disk.write('Reading/Other.md', 'Other\n');
+	await sync(first); await sync(second);
+	// Replace a note at its own server path, and plant one under another note's name.
+	const planted = `${folder}/${createOpaqueWireName()}`;
+	await forgeSealed(await paths.wire('Reading/My article.md'), 'My article.md', 'Server-chosen\n');
+	await forgeSealed(planted, 'Other.md', 'Planted\n');
+	first.disk.write('Unrelated.md', 'Still syncs\n'); await sync(first);
+	const result = await sync(second);
+	// Before: the sealed note was applied as a remote edit of each note.
+	expect(rejected(result)).toEqual(['Reading/My article.md', `Reading/Other - ${planted.slice(planted.lastIndexOf('/') + 1, planted.lastIndexOf('/') + 9)}.md`]);
+	expect(second.disk.text('Unrelated.md')).toBe('Still syncs\n');
+	for (const client of [first, second]) {
+		expect(client.disk.text('Reading/My article.md')).toBe('My highlights\n');
+		expect(client.disk.text('Reading/Other.md')).toBe('Other\n');
+		expect(client.disk.paths().filter(path => path.startsWith('Reading/'))).toEqual(['Reading/My article.md', 'Reading/Other.md']);
+	}
+	// A full sync after a restart neither applies them nor treats the replaced note as deleted.
+	second.close(); await open(second); second.settings.lastSeq = 0; second.requests.length = 0;
+	const full = await sync(second);
+	expect(second.requests).toContain('GET /sync/manifest');
+	expect(rejected(full)).toHaveLength(2);
+	expect(second.disk.text('Reading/My article.md')).toBe('My highlights\n');
+	// The planted note did not take over the other note's server path.
+	second.disk.write('Reading/Other.md', 'Other, edited\n'); await sync(second);
+	expect((await first.engine.sync()).errors).toEqual([]);
+	expect(first.disk.text('Reading/Other.md')).toBe('Other, edited\n');
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM files WHERE path = ?').bind(planted).first()).toEqual({ count: 1 });
+	// Force sync puts this device's note back and leaves the planted note reported.
+	const forced = await second.engine.forceFullSync();
+	expect(forced).toMatchObject({ success: true, errors: [] });
+	expect(rejected(forced)).toHaveLength(1);
+	expect(rejected(await sync(first))).toEqual([]);
+	expect(first.disk.text('Reading/My article.md')).toBe('My highlights\n');
+});
+
+it('never replaces an untouched shortcut note with another sealed note', async () => {
+	const folder = await readingFolder();
+	const id = crypto.randomUUID(), name = `Shared - private.example - ${id.slice(0, 8)}.md`;
+	const note = createReadingNote({ id, url: 'https://private.example/a', title: 'Shared', savedAt: '2026-10-01T12:00:00Z' });
+	expect(await commitSealedReadingNote(env, { id, content: note, folder, generation: 'policy' })).toBe(true);
+	const { path: wire } = (await env.DB.prepare('SELECT path FROM files').first<{ path: string }>())!;
+	const first = await device('first'); await sync(first);
+	expect(first.disk.text(`Reading/${name}`)).toBe(note);
+	// The same sealed note is still accepted after a restart.
+	first.close(); await open(first);
+	expect(rejected(await first.engine.forceFullSync())).toEqual([]);
+	await forgeSealed(wire, name, `${note}\nServer-chosen.\n`);
+	expect(rejected(await sync(first))).toEqual([`Reading/${name}`]);
+	expect(first.disk.text(`Reading/${name}`)).toBe(note);
 });

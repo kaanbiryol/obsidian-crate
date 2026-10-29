@@ -1,6 +1,6 @@
 import type { ConnectionTestResult } from '../types';
 import type { EncryptedFiles, UploadPreconditions } from '../encryption/encrypted-files';
-import type { WireStore } from '../encryption/path-index';
+import { distinctLocalName, type WireStore } from '../encryption/path-index';
 import type { JournalUpload } from '../durability/upload-intent';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';
 import { base64ToArrayBuffer } from '../encoding';
@@ -12,7 +12,6 @@ import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
 import { errorMessage } from '../../platform/logger';
 import { refusedUploadResult } from '../failures';
-import { insertBeforeExtension } from '../local/file-discovery';
 import type {
 	BatchDeleteResponse,
 	BatchDeleteFile,
@@ -70,7 +69,7 @@ export function assignPlainPaths(entries: ReadonlyArray<{ path: string; wire: st
 		const { wire } = entries[index]!;
 		let { path } = entries[index]!;
 		if (claimed.has(portablePathKey(path))) {
-			path = insertBeforeExtension(path, ` - ${wire.slice(wire.lastIndexOf('/') + 1, wire.lastIndexOf('/') + 9)}`);
+			path = distinctLocalName(path, wire);
 		}
 		claimed.add(portablePathKey(path));
 		return { index, path };
@@ -120,6 +119,8 @@ export class SyncWorkerApi {
 		for (const { index, path } of assignPlainPaths(entries, tagged)) {
 			const { wire, entry } = entries[index]!;
 			const renamed = path !== entries[index]!.path;
+			// A rejected sealed note is reported, never mapped to a local file.
+			if (entry.rejected) { plain[path] = entry; continue; }
 			if (renamed) await encryption.paths.learn(path, wire);
 			plain[path] = tagged[index] && !renamed ? entry : { ...entry, wire };
 		}

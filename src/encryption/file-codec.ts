@@ -43,8 +43,9 @@ async function fileKey(descriptor: EncryptedFileDescriptor, authority: FileEncry
 }
 
 /** How a reader checks the path a file claims: an exact path, or a check that compares
- * it with where the file is stored and returns the plaintext path. */
-export type PathBinding = string | ((metadataPath: string, sealed: boolean) => Promise<string>);
+ * it with where the file is stored and returns the plaintext path. `hash` is the
+ * authenticated plaintext hash. */
+export type PathBinding = string | ((metadataPath: string, sealed: boolean, hash: string) => Promise<string>);
 
 function validateMetadata(value: unknown): asserts value is PrivateFileMetadata {
 	if (!value || typeof value !== 'object') throw new Error('Invalid encrypted file metadata');
@@ -89,7 +90,7 @@ async function openMetadataWithKey(descriptor: EncryptedFileDescriptor, binding:
 	const key = await fileKey(descriptor, authority);
 	const metadata = await decryptJson(descriptor.metadata, key, context(descriptor, 'file-metadata'));
 	validateMetadata(metadata);
-	const path = typeof binding === 'string' ? metadata.path === binding ? binding : null : await binding(metadata.path, !!descriptor.seal);
+	const path = typeof binding === 'string' ? metadata.path === binding ? binding : null : await binding(metadata.path, !!descriptor.seal, metadata.hash);
 	if (path === null) throw new Error('Encrypted file metadata does not match the requested file');
 	return { metadata: { ...metadata, path }, key };
 }

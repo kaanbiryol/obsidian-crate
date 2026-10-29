@@ -16,6 +16,9 @@ export interface FileEntry {
 	/** Local only: an encrypted file's server path, kept where it cannot be recomputed
 	 * from `path`, as for notes with a random server name. */
 	wire?: string;
+	/** Local only: a note the server sealed that would replace or take the name of a
+	 * file this device holds. Sync reports it and leaves the local copy alone. */
+	rejected?: true;
 }
 
 export interface FileMetadataResponse {
@@ -30,6 +33,8 @@ export interface ChangelogEntry {
 	revision?: string;
 	size: number;
 	created_at: string;
+	/** Local only: see `FileEntry.rejected`. */
+	rejected?: true;
 }
 
 export interface ChangesResponse {

@@ -14,7 +14,8 @@ import type { RestoreIntent } from '../durability/restore-intent';
 import { parseFileVersions } from '../worker-api/version-contract';
 import { BATCH_DOWNLOAD_MAX_FILES, ENCRYPTION_METADATA_BATCH } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
-import { PathIndex } from './path-index';
+import { distinctLocalName, PathIndex, type SyncedFile } from './path-index';
+import { portablePathKey } from '../../protocol/portable-path';
 
 interface WireMetadata { hash: string; size: number; revision?: string }
 const METADATA_CONCURRENCY = 4;
@@ -35,6 +36,14 @@ function conflictError(): HttpError {
 
 function namespaceConflict(path: string, existing: string): HttpError {
 	return new HttpError(`${path} conflicts with ${existing}, which differs only in letter case or Unicode form`, 409, null, 'namespace_conflict');
+}
+
+/** A note the server sealed that would replace or take the name of a file this device
+ * holds. `path` is where sync lists it: the file it would replace, or a distinct name. */
+class SealedReplacementError extends Error {
+	constructor(readonly path: string, readonly hash: string) {
+		super('The server created a note that would replace one already synced here. It was not applied, and the local copy is unchanged.');
+	}
 }
 
 /** Boundary between ciphertext transport identities and local sync identities.
@@ -61,13 +70,33 @@ export class EncryptedFiles {
 	}
 
 	/** Checks a file's claimed path against its server path. Live files also teach the
-	 * index where they are stored; retained versions must not. */
-	private binding(wire: string, live: boolean): PathBinding {
-		return async (metadataPath, sealed) => {
-			const path = await resolveEncryptedPath(this.paths.tags, wire, metadataPath, sealed, await this.reading());
+	 * index where they are stored; retained versions must not. `synced` shares one read
+	 * of the Reading folder's synced files across a listing. */
+	private binding(wire: string, live: boolean, synced?: (folder: string) => Promise<SyncedFile[]>): PathBinding {
+		return async (metadataPath, sealed, hash) => {
+			const reading = await this.reading();
+			const path = await resolveEncryptedPath(this.paths.tags, wire, metadataPath, sealed, reading);
+			if (sealed && live && reading) {
+				await this.acceptSealed(path, wire, hash, await (synced ? synced(reading.plain) : this.paths.syncedIn(reading.plain)));
+			}
 			if (live) await this.paths.learn(path, wire);
 			return path;
 		};
+	}
+
+	/** The server may only create sealed notes. One is accepted at a server path this
+	 * device already holds only with the bytes it holds, and never under the name of a
+	 * note stored at another server path. This includes an untouched Shortcut note. */
+	private async acceptSealed(path: string, wire: string, hash: string, synced: SyncedFile[]): Promise<void> {
+		const held = synced.find(file => file.wire === wire);
+		if (held) {
+			if (held.path === path && held.hash === hash) return;
+			throw new SealedReplacementError(held.path, hash);
+		}
+		const key = portablePathKey(path);
+		if (synced.some(file => portablePathKey(file.path) === key)) {
+			throw new SealedReplacementError(distinctLocalName(path, wire), hash);
+		}
 	}
 
 	/** Open the metadata of files listed by server path, returning their plaintext paths. */
@@ -77,14 +106,17 @@ export class EncryptedFiles {
 		const chunks: Array<Array<{ path: string; entry: T }>> = [];
 		for (let offset = 0; offset < entries.length; offset += ENCRYPTION_METADATA_BATCH) chunks.push(entries.slice(offset, offset + ENCRYPTION_METADATA_BATCH));
 		const results: Array<Array<PlainEntry<T>>> = [];
+		let synced: Promise<SyncedFile[]> | undefined;
+		const syncedOnce = (folder: string) => synced ??= this.paths.syncedIn(folder);
 		for (let start = 0; start < chunks.length; start += METADATA_CONCURRENCY) {
-			const group = await Promise.all(chunks.slice(start, start + METADATA_CONCURRENCY).map(chunk => this.metadataChunk(chunk, live)));
+			const group = await Promise.all(chunks.slice(start, start + METADATA_CONCURRENCY).map(chunk => this.metadataChunk(chunk, live, syncedOnce)));
 			results.push(...group);
 		}
 		return results.flat();
 	}
 
-	private async metadataChunk<T extends WireMetadata>(chunk: Array<{ path: string; entry: T }>, live: boolean): Promise<Array<PlainEntry<T>>> {
+	private async metadataChunk<T extends WireMetadata>(chunk: Array<{ path: string; entry: T }>, live: boolean,
+		synced: (folder: string) => Promise<SyncedFile[]>): Promise<Array<PlainEntry<T>>> {
 		const result: Array<PlainEntry<T>> = [];
 		const cached = new Map<string, VerifiedRevision>();
 		const missing = new Set<string>();
@@ -102,7 +134,15 @@ export class EncryptedFiles {
 			if (!verified) {
 				const descriptor = response?.descriptors?.[entry.revision!];
 				validateFileDescriptor(descriptor);
-				verified = { metadata: await openFileMetadata(descriptor, this.binding(path, live), this.keys.forPath(path)), wireHash: entry.hash, wire: path };
+				let metadata: PrivateFileMetadata;
+				try { metadata = await openFileMetadata(descriptor, this.binding(path, live, synced), this.keys.forPath(path)); }
+				catch (error) {
+					// Listed but never cached or learned, so sync reports it without applying it.
+					if (!(error instanceof SealedReplacementError)) throw error;
+					result.push({ path: error.path, wire: path, entry: { ...entry, hash: error.hash, rejected: true } });
+					continue;
+				}
+				verified = { metadata, wireHash: entry.hash, wire: path };
 				cached.set(entry.revision!, verified);
 				this.verifiedMetadata.set(entry.revision!, verified);
 				while (this.verifiedMetadata.size > MAX_VERIFIED_METADATA) this.verifiedMetadata.delete(this.verifiedMetadata.keys().next().value!);

@@ -32,6 +32,9 @@ export class SkippedFileError extends Error {
 
 export const skippedFileIssue = (path: string): SyncIssue => ({ path, message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' });
 export const oversizedRemoteFileIssue = (path: string): SyncIssue => ({ path, message: 'Skipped remote file larger than 25MB', code: 'file-too-large' });
+/** The server may only create sealed notes; one that would replace or take the name of a synced file is not applied. */
+export const rejectedSealedNoteIssue = (path: string): SyncIssue => ({ path,
+	message: 'Skipped a note the server created because it would replace or take the name of a note already synced here. The local copy is unchanged.' });
 /** Every encrypted folder name becomes a tag, so a file this deep exceeds the server path limit. */
 export const deepEncryptedFileIssue = (path: string): SyncIssue => ({ path, code: 'unsupported-device-path',
 	message: 'Skipped local file nested more than 36 folders deep, which an encrypted vault cannot sync. Move it higher, then sync again.' });

@@ -2,6 +2,7 @@ import { createDeleteCandidates, type DeleteRemoteFiles } from '../transfer/dele
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
 import { skippedUploadIssue } from '../local/local-file-changes';
+import { rejectedSealedNoteIssue } from '../issues';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
@@ -77,8 +78,11 @@ export async function runForceFullSyncWorkflow(
 		const files = localFiles.filter(file => !skippedPaths.has(file.path));
 		if (skipped.length) (result.issues ??= []).push(...skipped);
 
+		// A rejected sealed note has no local name to delete it by, so it stays reported.
+		const rejected = [...remotePaths].filter(path => !localPaths.has(path) && getPathEntry(remoteManifest.files, path)?.rejected);
+		if (rejected.length) (result.issues ??= []).push(...rejected.map(rejectedSealedNoteIssue));
 		const remoteOnlyPaths = [...remotePaths].filter(
-			path => !localPaths.has(path) && !context.shouldIgnore(path),
+			path => !localPaths.has(path) && !context.shouldIgnore(path) && !getPathEntry(remoteManifest.files, path)?.rejected,
 		);
 
 		let uploadsProcessed = 0;

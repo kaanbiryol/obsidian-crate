@@ -5,7 +5,7 @@ import { deletePathLocallyIfUnchanged } from '../local/local-delete';
 import { classifyPath } from './reconciliation';
 import type { IncrementalSyncPlannerContext } from './types';
 import type { DownloadRequest } from '../transfer/download';
-import { oversizedRemoteFileIssue, recordSyncError } from '../issues';
+import { oversizedRemoteFileIssue, recordSyncError, rejectedSealedNoteIssue } from '../issues';
 import type { ChangelogEntry, FileEntry } from '../../protocol/sync-types';
 import type { FileDiff, SyncResult } from '../types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
@@ -84,6 +84,12 @@ export async function reconcileIncrementalRemoteChanges(
 					result.deleted++;
 					result.deletedPaths.push(path);
 				}
+				continue;
+			}
+
+			// A sealed note that would replace a synced one keeps the local copy and its baseline.
+			if (entry.rejected) {
+				(result.issues ??= []).push(rejectedSealedNoteIssue(path));
 				continue;
 			}
 
