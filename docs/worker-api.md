@@ -470,7 +470,7 @@ The **History** view groups retained update/deletion versions by day, rather tha
 The server advertises `shared-history-checkpoints-v1`. Checkpoints store metadata in R2, not extra copies of vault
 files. Creation snapshots the complete server inventory, not a client-supplied list.
 The 20-entry index uses conditional ETags, and stale inventory captures receive 409.
-Expired or evicted IDs receive 410. Captures are bounded to 100,000 files and 32 MiB of
+Expired or evicted IDs receive 410, and an index write deletes the inventories it drops. Captures are bounded to 100,000 files and 32 MiB of
 metadata (413 beyond that limit), and in-progress initial imports receive 409. The Worker
 encodes inventory pages as it reads them and streams stored documents after matching the
 object's metadata to the index, so neither path parses the whole inventory.

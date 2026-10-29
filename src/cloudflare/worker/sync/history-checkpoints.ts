@@ -67,20 +67,30 @@ export async function createSharedCheckpoint(bucket: R2Bucket, db: D1Database): 
 		httpMetadata: { contentType: 'application/json' }, customMetadata: { checkpoint: JSON.stringify(checkpoint) } });
 	// Publish only after the complete inventory exists. Failed/uncertain index
 	// writes leave the object for delayed collection, never delete a possible commit.
+	// Each conditional write that did not apply leaves it unpublished.
 	for (let attempt = 0; attempt < 5; attempt++) {
 		const index = await readIndex(bucket);
 		const current = index.checkpoints.filter(entry => entry.expiresAt > Date.now());
 		const duplicate = current.find(entry => entry.sequence === checkpoint.sequence);
-		if (duplicate) return response({ checkpoint: duplicate });
+		if (duplicate) return deleteCheckpointObjects(bucket, [checkpoint], response({ checkpoint: duplicate }));
 		const checkpoints = [...current, checkpoint].sort((a, b) => b.sequence - a.sequence || b.timestamp.localeCompare(a.timestamp)).slice(0, MAX_SHARED_CHECKPOINTS);
-		if (!checkpoints.some(entry => entry.id === checkpoint.id)) return response({ error: 'Newer checkpoints replaced this state. Sync again.' }, 409);
+		if (!checkpoints.some(entry => entry.id === checkpoint.id)) return deleteCheckpointObjects(bucket, [checkpoint], response({ error: 'Newer checkpoints replaced this state. Sync again.' }, 409));
 		const written = await bucket.put(HISTORY_INDEX_KEY, JSON.stringify({ version: 1, checkpoints }), {
 			onlyIf: index.etag ? { etagMatches: index.etag } : { etagDoesNotMatch: '*' },
 			httpMetadata: { contentType: 'application/json' },
 		});
-		if (written) return response({ checkpoint });
+		// The conditional write replaced exactly the index read above, and later writers
+		// start from this one, so entries it dropped (evicted or expired) never return.
+		if (written) return deleteCheckpointObjects(bucket, index.checkpoints.filter(entry => !checkpoints.some(kept => kept.id === entry.id)), response({ checkpoint }));
 	}
-	return response({ error: 'Checkpoint history is busy. Sync again to retry.' }, 409);
+	return deleteCheckpointObjects(bucket, [checkpoint], response({ error: 'Checkpoint history is busy. Sync again to retry.' }, 409));
+}
+
+/** Deletes inventories no index can reference. Failures leave them to maintenance. */
+async function deleteCheckpointObjects(bucket: R2Bucket, checkpoints: SharedCheckpoint[], result: Response): Promise<Response> {
+	try { if (checkpoints.length) await bucket.delete(checkpoints.map(entry => keyFor(entry.id))); }
+	catch { /* The maintenance sweep collects them. */ }
+	return result;
 }
 
 export async function listSharedCheckpoints(bucket: R2Bucket): Promise<Response> {
@@ -126,15 +136,19 @@ export async function downloadCheckpointFile(request: Request, bucket: R2Bucket,
 	return new Response(object.body, { headers: { ...corsHeaders(), ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(object.size), [FILE_HASH_HEADER]: file.hash } });
 }
 
-/** Bounded sweep. Objects younger than a day may still be publishing their index. */
-export async function pruneSharedCheckpoints(bucket: R2Bucket, db: D1Database): Promise<void> {
+/** Bounded fallback sweep for expired checkpoints and inventories whose deletion or
+ * publication did not finish. Objects younger than a day may still be publishing
+ * their index. Returns true while a listing page found garbage and more objects remain. */
+export async function pruneSharedCheckpoints(bucket: R2Bucket, db: D1Database): Promise<boolean> {
 	const cursorKey = 'shared_checkpoint_cleanup_cursor';
 	const cursor = (await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(cursorKey).first<{ value: string }>())?.value;
-	const listing = await bucket.list({ prefix: PREFIX, limit: 100, ...(cursor ? { cursor } : {}) });
+	// One R2 list and delete call each handle up to 1,000 keys.
+	const listing = await bucket.list({ prefix: PREFIX, limit: 1000, ...(cursor ? { cursor } : {}) });
 	const index = await readIndex(bucket);
 	const retained = new Set(index.checkpoints.filter(entry => entry.expiresAt > Date.now()).map(entry => keyFor(entry.id)));
 	const garbage = listing.objects.filter(object => object.uploaded.getTime() < Date.now() - 86_400_000 && !retained.has(object.key));
 	if (garbage.length) await bucket.delete(garbage.map(object => object.key));
 	if (listing.truncated) await putMaintenanceValue(db, cursorKey, listing.cursor!).run();
 	else await db.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(cursorKey).run();
+	return listing.truncated && garbage.length > 0;
 }

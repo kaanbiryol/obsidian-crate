@@ -34,7 +34,7 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
 				if (!await wakeProjection(env)) throw new Error('Reading coordinator unavailable');
 			}
 		}],
-				['prune shared checkpoints', () => pruneSharedCheckpoints(env.BUCKET, env.DB)],
+				['prune shared checkpoints', bounded(() => pruneSharedCheckpoints(env.BUCKET, env.DB))],
 		// Changelog entries and deletion receipts usually expire before the versions of
 		// their revisions, so each descriptor is released with its last reference.
 		['prune changelog', bounded(() => pruneChangelog(env.DB, encrypted ? expired => releasePrunedChangelogDescriptors(env.DB, expired) : undefined))],

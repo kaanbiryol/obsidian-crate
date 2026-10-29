@@ -456,9 +456,14 @@ generation before and after capture. An incomplete initial import or concurrent
 mutation rejects capture. Current limits are 100,000 files and 32 MiB of metadata;
 exceeding them never publishes a partial inventory, and vaults above these limits
 get no checkpoints. The small shared index is
-published conditionally only after its immutable inventory exists. Uncertain writes
-retain their possible committed objects; a bounded, cursor-based maintenance sweep
-removes unreferenced metadata after a one-day grace period.
+published conditionally only after its immutable inventory exists. A successful
+conditional index write deletes the inventories of the entries it dropped (evicted
+beyond 20 or expired); later writers start from that index, so those entries never
+return. A save whose inventory was never published (a same-generation duplicate, a newer
+state that displaced it, or a busy index) deletes its own inventory. Uncertain writes
+retain their possible committed objects. A cursor-based maintenance sweep removes the
+remaining unreferenced inventories after a one-day grace period, 1,000 objects per pass,
+and requests further passes while a page finds some and more remain.
 
 Expiry uses server time. Kept replaced/deleted versions retain at least 30 days from the
 D1 commit time, so a checkpoint expires no later than those retained bytes. A checkpoint

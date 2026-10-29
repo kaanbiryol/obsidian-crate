@@ -524,6 +524,9 @@ post-commit cleanup from scheduled failure reporting. The corresponding
 to retain failed cleanup and its diagnostic until a successful retry. It also
 drains 6,000 expired versions in 13 maintenance passes, each within the Free D1
 query limit, without sorting the queue, while referenced objects survive.
+`sync/checkpoint-cleanup.integration.ts` checks that index rewrites delete evicted,
+expired and unpublished checkpoint inventories, including with a concurrent index
+writer, and that the maintenance sweep continues across passes while a backlog remains.
 
 ### Sync outcomes and reader action lifetimes
 
