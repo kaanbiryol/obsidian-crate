@@ -12,18 +12,19 @@ const article = '<!doctype html><html><head><title>Confidential title</title></h
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
 
-async function setup(encrypted = true, scope = 'reading') {
+async function setup(encrypted = true, scope = 'reading', fetching = true) {
 	const { state } = await createEncryptionFixture('active');
 	await env.DB.batch([
 		...(encrypted ? [env.DB.prepare('INSERT INTO server_state(id,encryption) VALUES (1,?)').bind(JSON.stringify(state))] : []),
-		env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','policy','revision')"),
+		env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,?,'Reading','policy','revision')").bind(Number(fetching)),
 		env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES ('reader',?,?,'Reading','policy')").bind(await sha256Hex('reader-token'), scope),
 	]);
 	const fetch = vi.fn(async (request: Request) => request.url === link
 		? new Response(article, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }) : new Response('Missing', { status: 404 }));
 	const extract = (url: string) => worker.fetch(new Request('https://test/reading/encrypted-extract', { method: 'POST', body: JSON.stringify({ url }),
 		headers: { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '1', ...(encrypted ? { 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) } : {}) } }),
-	{ ...env, READING_FETCH: { fetch } });
+	// The edge limiter is per source address and shared; these tests check the per-credential limit.
+	{ ...env, READING_FETCH: { fetch }, NOTIFICATION_REQUEST_LIMITER: { limit: async () => ({ success: true }) } });
 	return { fetch, extract };
 }
 
@@ -71,4 +72,21 @@ it('stays closed to unencrypted folders, capture-only credentials and invalid li
 	const { fetch, extract } = await setup();
 	expect((await extract('http://user:secret@private.example/')).status).toBe(400);
 	expect(fetch).not.toHaveBeenCalled();
+});
+
+it('refuses to download while article fetching is off, so the web app keeps a bookmark', async () => {
+	const { fetch, extract } = await setup(true, 'reading', false);
+	const response = await extract(link);
+	expect(response.status).toBe(403);
+	expect(await response.json()).toMatchObject({ code: 'reading_fetching_off' });
+	expect(fetch).not.toHaveBeenCalled();
+});
+
+it('limits downloads per credential like other Reading saves', async () => {
+	const { fetch, extract } = await setup();
+	for (let index = 0; index < 30; index++) expect((await extract(`https://private.example/missing-${index}`)).status).toBe(422);
+	const limited = await extract(link);
+	expect(limited.status).toBe(429);
+	expect(limited.headers.get('Retry-After')).toBe('60');
+	expect(fetch).toHaveBeenCalledTimes(30);
 });

@@ -83,6 +83,17 @@ it('still saves a bookmark when the server cannot download the page', async () =
 	expect(await storedText()).not.toContain('private.example/blocked');
 });
 
+it('saves the link without downloading its article while article fetching is off', async () => {
+	const h = await setup();
+	await env.DB.prepare('UPDATE reading_policy SET enabled=0').run();
+	const response = await h.prepare(link, 'Shared title');
+	expect(response.status, await response.clone().text()).toBe(200);
+	expect(h.fetch).not.toHaveBeenCalled();
+	const file = (await env.DB.prepare('SELECT path, storage_key FROM files').first<{ path: string; storage_key: string }>())!;
+	expect(parseReadingNote(new TextDecoder().decode((await h.open(file)).content)))
+		.toMatchObject({ source_url: link, title: 'Shared title', extraction_status: 'unavailable' });
+});
+
 it('refuses while an encryption reset is in progress and for links with credentials', async () => {
 	const h = await setup();
 	await env.DB.prepare('UPDATE server_state SET encryption=? WHERE id=1').bind(JSON.stringify({ ...h.state, mode: 'resetting' })).run();

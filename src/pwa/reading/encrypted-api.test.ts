@@ -1,9 +1,10 @@
 import { beforeAll, expect, it, vi } from 'vitest';
 import { generateEncryptionSecret, importEncryptionSecret } from '@/encryption/envelope';
-import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
+import { openFile, sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
 import type { EncryptedInventoryFile } from '@/encryption/file-inventory';
 import { EncryptedReadingApi, type EncryptedReadingIndexEntry } from './encrypted-api';
-import { createReadingNote } from '../../reading/core/notes';
+import { createReadingNote, parseReadingNote } from '../../reading/core/notes';
+import { captureServerArticle } from './capture-article';
 import { PathTags } from '@/encryption/path-tags';
 
 let authority: FileEncryptionAuthority;
@@ -328,4 +329,23 @@ it('rejects an oversized encrypted note before downloading it', async () => {
 	request.mockImplementation(async () => Response.json(page([{ ...saved.file, size: 4 * 1024 * 1024 + 1 }])));
 	await expect(api.request('/reading/list')).resolves.toMatchObject({ issues: [{ path: saved.file.path, message: 'This Reading note is too large.' }] });
 	expect(request.mock.calls.some(([path]) => path.startsWith('/reading/encrypted-file?'))).toBe(false);
+});
+
+it('saves a bookmark marked unavailable when the server will not download its article', async () => {
+	const commits: string[] = [];
+	const request = vi.fn<(path: string, body?: string) => Promise<Response>>(async (path, body) => {
+		if (path !== '/reading/encrypted-commit') return Response.json(page());
+		commits.push(body!);
+		return Response.json({ encrypted: (JSON.parse(body!) as { acknowledgment: string }).acknowledgment });
+	});
+	// The server refuses while article fetching is off.
+	const extract = vi.fn(async () => Response.json({ error: 'Allow article fetching in Reading settings before downloading articles.', code: 'reading_fetching_off' }, { status: 403 }));
+	const api = new EncryptedReadingApi({ folderPath: 'Reading', wireFolder, paths, generation: 1, authority, request,
+		captureArticle: url => captureServerArticle(url, extract),
+		readAttempt: async () => undefined, writeAttempt: async () => {}, error: message => new Error(message) });
+	await expect(api.request('/reading/capture', JSON.stringify({ url: 'https://example.com/off', operationId: 'save-off', fetchArticle: true }))).resolves.toMatchObject({ saved: true });
+	expect(extract).toHaveBeenCalledOnce();
+	const [committed] = (JSON.parse(commits[0]!) as { files: Array<{ content: string }> }).files;
+	const opened = await openFile(new TextEncoder().encode(committed!.content), async path => path, authority);
+	expect(parseReadingNote(new TextDecoder().decode(opened.content))).toMatchObject({ source_url: 'https://example.com/off', extraction_status: 'unavailable' });
 });

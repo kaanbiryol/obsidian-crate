@@ -31,7 +31,7 @@ describe('worker route tables', () => {
 		expect(Object.fromEntries(rateLimitedActions)).toEqual({
 			'POST /reading/shortcut-pairing': 5, 'POST /reading/shortcut/v1/exchange': 10,
 			'POST /notifications/share/reading': 30, 'POST /reading/handoff': 30,
-			'POST /reading/shortcut/v1/prepare': 30, 'POST /reading/capture': 30,
+			'POST /reading/shortcut/v1/prepare': 30, 'POST /reading/capture': 30, 'POST /reading/encrypted-extract': 30,
 			'POST /reading/update': 60, 'POST /reading/retry': 10,
 			'POST /reading/policy': 10, 'POST /features': 10,
 			'POST /notifications/reminders-exchange': 10, 'POST /notifications/reminders-enrollment-token': 10,

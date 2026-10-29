@@ -29,6 +29,8 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 			const limited = await limitNotificationAction(request, env.DB, principal.tokenId); if (limited) return limited;
 			if (path === '/reading/encrypted-extract' && request.method === 'POST') {
 				if (!encryption) throw new ReadingError('Article downloads here are only for encrypted Reading folders.', 409);
+				// As in unencrypted vaults, the web app then saves the link as a bookmark.
+				if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before downloading articles.', 403, 'reading_fetching_off');
 				return await extractForEncryptedReading(request, env);
 			}
 			return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);

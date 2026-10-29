@@ -26,14 +26,15 @@ export async function captureSealedReading(request: Request, env: Env, principal
 	const id = crypto.randomUUID();
 	const note = createReadingNote({ id, url, title: typeof parsed.value.title === 'string' ? parsed.value.title.slice(0, 1000) : undefined, savedAt: new Date().toISOString() });
 	const item = parseReadingNote(note)!;
-	let content: string;
-	try {
-		const { article, url: resolvedUrl } = await fetchReadingCapture(url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN);
-		({ content } = assembleReadingArticle(note, item, { kind: 'capture', article, resolvedUrl }));
-	} catch {
-		// A page the server cannot read is still saved, with Try again in the reader.
-		({ content } = assembleReadingArticle(note, item, { kind: 'capture', article: null }));
+	let content: string | undefined;
+	// With article fetching off, the link is saved without its article, as in unencrypted vaults.
+	if (current.enabled) {
+		try {
+			const { article, url: resolvedUrl } = await fetchReadingCapture(url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN);
+			({ content } = assembleReadingArticle(note, item, { kind: 'capture', article, resolvedUrl }));
+		} catch { /* A page the server cannot read is still saved, with Try again in the reader. */ }
 	}
+	content ??= assembleReadingArticle(note, item, { kind: 'capture', article: null }).content;
 	if (!await commitSealedReading(env, { id, content, folder: current.folder_path, generation: current.generation })) {
 		throw new ReadingError('Crate could not save this link. Share it again.', 503, 'reading_save_failed');
 	}

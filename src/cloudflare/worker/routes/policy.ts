@@ -54,7 +54,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /reading/encrypted-file': { scopes: LIBRARY },
 	'POST /reading/encrypted-commit': { scopes: LIBRARY, execution: COORDINATOR },
 	// Outside the coordinator: a slow page download must not hold the write lock.
-	'POST /reading/encrypted-extract': { scopes: LIBRARY },
+	'POST /reading/encrypted-extract': { scopes: LIBRARY, rateLimit: 30 },
 	'GET /health': { scopes: REMINDERS, duringEncryptionReset: true },
 	'GET /diagnostics': { scopes: VAULT },
 	'GET /settings': { scopes: VAULT },
