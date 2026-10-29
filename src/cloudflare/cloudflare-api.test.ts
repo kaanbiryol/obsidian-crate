@@ -263,3 +263,61 @@ it('writes restored bytes only to a separate Crate bucket and encodes object key
 	await api.putRestoredObject('account', 'original', bucket, 'folder/a?b#c', new Uint8Array([0, 255]));
 	expect(transport).toHaveBeenCalledWith(`https://api.cloudflare.com/client/v4/accounts/account/r2/buckets/${bucket}/objects/folder/a%3Fb%23c`, expect.objectContaining({ method: 'PUT', body: new Uint8Array([0, 255]).buffer }));
 });
+
+describe('Cloudflare rate limits', () => {
+	const limited = (headers?: Record<string, string>) => ({ status: 429, text: JSON.stringify({ success: false, errors: [{ code: 971, message: 'Please wait and consider throttling your request speed' }] }), headers });
+	const ok = { status: 200, text: JSON.stringify({ success: true, result: [{ results: [] }] }) };
+
+	it('waits for Retry-After before repeating a rejected request', async () => {
+		const transport = vi.fn<HttpTransport>().mockResolvedValueOnce(limited({ 'retry-after': '30' })).mockResolvedValueOnce(ok);
+		const sleep = vi.fn(async () => undefined);
+		await new CloudflareApiClient('token', transport, { sleep }).queryD1('account', 'database', 'SELECT 1;');
+		expect(sleep.mock.calls).toEqual([[30_000]]);
+		expect(transport).toHaveBeenCalledTimes(2);
+	});
+
+	it('reads an HTTP-date Retry-After and backs off exponentially without one', async () => {
+		const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-29T10:00:00Z'));
+		try {
+			const transport = vi.fn<HttpTransport>()
+				.mockResolvedValueOnce(limited({ 'Retry-After': 'Thu, 29 Oct 2026 10:00:45 GMT' }))
+				.mockResolvedValueOnce(limited()).mockResolvedValueOnce(limited()).mockResolvedValueOnce(limited())
+				.mockResolvedValueOnce({ status: 200, text: '', arrayBuffer: new Uint8Array([7]).buffer });
+			const sleep = vi.fn(async () => undefined);
+			expect(await new CloudflareApiClient('token', transport, { sleep }).getRecoveryObject('account', 'bucket', 'key')).toEqual(new Uint8Array([7]));
+			expect(sleep.mock.calls).toEqual([[45_000], [2_000], [4_000], [8_000]]);
+		} finally { now.mockRestore(); }
+	});
+
+	it('stops waiting after one full rate-limit block and reports the rejection', async () => {
+		const transport = vi.fn<HttpTransport>(async () => limited({ 'retry-after': '300' }));
+		const sleep = vi.fn(async () => undefined);
+		await expect(new CloudflareApiClient('token', transport, { sleep }).queryD1('account', 'database', 'SELECT 1;')).rejects.toMatchObject({ name: 'CloudflareApiError', status: 429 });
+		expect(sleep.mock.calls).toEqual([[300_000]]);
+		expect(transport).toHaveBeenCalledTimes(2);
+		const later = vi.fn<HttpTransport>(async () => limited({ 'retry-after': '3600' }));
+		await expect(new CloudflareApiClient('token', later, { sleep }).listR2Objects('account', 'bucket')).rejects.toMatchObject({ status: 429 });
+		expect(later).toHaveBeenCalledOnce();
+	});
+
+	it('never repeats a tagged Worker upload', async () => {
+		const transport = vi.fn<HttpTransport>(async () => limited({ 'retry-after': '1' }));
+		const sleep = vi.fn(async () => undefined);
+		await expect(new CloudflareApiClient('token', transport, { sleep }).uploadWorker({
+			publicOrigin: 'https://crate.example', accountId: 'account', workerName: 'crate-server', d1DatabaseId: 'database', r2BucketName: 'crate-0123456789abcdef', uploadTag: `crate-${crypto.randomUUID()}`,
+			artifacts: { version: '1', fingerprint: 'fingerprint', workerBundle: 'export default {}', workerBundleSha256: 'a'.repeat(64), d1Schema: '', d1SchemaSha256: 'b'.repeat(64) },
+		})).rejects.toMatchObject({ status: 429 });
+		expect(transport).toHaveBeenCalledOnce();
+		expect(sleep).not.toHaveBeenCalled();
+	});
+
+	it('spaces bulk requests below the account-wide limit', async () => {
+		const sleep = vi.fn(async () => undefined);
+		const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+		try {
+			const api = new CloudflareApiClient('token', vi.fn<HttpTransport>(), { sleep });
+			for (let index = 0; index < 4; index++) await api.throttle();
+			expect(sleep.mock.calls).toEqual([[300], [600], [900]]);
+		} finally { now.mockRestore(); }
+	});
+});

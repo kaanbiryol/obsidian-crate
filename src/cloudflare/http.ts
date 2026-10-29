@@ -8,6 +8,7 @@ export interface HttpRequest {
 
 interface HttpResponse {
  arrayBuffer?: ArrayBuffer;
+	headers?: Record<string, string>;
 	status: number;
 	text: string;
 }
@@ -26,7 +27,7 @@ export const obsidianHttpTransport: HttpTransport = async (url, request) => {
 	}), new Promise<never>((_resolve, reject) => {
 				timeout = window.setTimeout(() => reject(new Error('Cloudflare did not respond within 60 seconds. The request may still finish remotely.')), 60_000);
 		})]);
-	return { status: response.status, text: response.text, arrayBuffer: response.arrayBuffer };
+	return { status: response.status, text: response.text, arrayBuffer: response.arrayBuffer, headers: response.headers };
 		} finally {
 				if (timeout !== undefined) window.clearTimeout(timeout);
 		}

@@ -150,6 +150,8 @@ Provisioning initializes empty databases from the hash-verified `src/cloudflare/
 
 The ordered server revision and schema identity are recorded in D1 after live verification. Different stable artifacts sharing a server revision cannot replace each other. Explicitly targeted development builds use a separate ordered build number and may promote to stable; see [development deployments](server-upgrades.md#testing-development-deployments). Updates preserve the database and bucket bindings, file references, history and receipts. The deployment fence stays held until the exact Worker, database version and metadata endpoint are verified.
 
+Cloudflare allows about 1,200 API requests per five minutes per user and then rejects requests for five minutes. Crate repeats a request rejected with HTTP 429 after its `Retry-After` delay, or after bounded exponential backoff, waiting at most six minutes per request before reporting the limit. Long loops such as upgrade backups pace themselves near 1,000 requests per five minutes. Tagged Worker uploads are never repeated.
+
 **Check and recover update** resumes confirmed or definitively rejected steps with the exact artifact under new ownership. Uncertain provider requests remain blocked until their outcome is settled. Recovery archives preserve the baseline without rewriting their source. See the [server upgrade contract](server-upgrades.md) for future migrations, backup requirements and safe operator recovery, and the [compatibility matrix](compatibility.md) for client formats.
 
 ### Reminder parser upgrades

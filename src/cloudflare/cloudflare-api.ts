@@ -8,6 +8,11 @@ import type { CloudflareDeploymentArtifacts } from './deployment/artifacts';
 import type { HttpRequest, HttpTransport } from './http';
 
 const API_BASE_URL = 'https://api.cloudflare.com/client/v4';
+// Cloudflare allows about 1,200 API requests per five minutes per user and then
+// rejects every request for five minutes. Wait out one full block per request.
+const RATE_LIMIT_WAIT_BUDGET_MS = 6 * 60_000;
+// Bulk loops stay near 1,000 requests per five minutes, leaving headroom for other clients.
+const BULK_REQUEST_INTERVAL_MS = 300;
 
 interface CloudflareErrorShape {
 	code?: number;
@@ -91,11 +96,40 @@ function apiError(status: number, envelope: CloudflareEnvelope<unknown> | null, 
 	return new CloudflareApiError(firstError?.message || fallback, status, typeof firstError?.code === 'number' ? firstError.code : null);
 }
 
+/** Milliseconds requested by a Retry-After header in seconds or HTTP-date form. */
+function retryAfterMilliseconds(headers: Record<string, string> | undefined): number | null {
+	const value = Object.entries(headers ?? {}).find(([name]) => name.toLowerCase() === 'retry-after')?.[1]?.trim();
+	if (!value) return null;
+	if (/^\d+(?:\.\d+)?$/.test(value)) return Number(value) * 1000;
+	const date = Date.parse(value);
+	return Number.isNaN(date) ? null : Math.max(0, date - Date.now());
+}
+
+const wait = (milliseconds: number) => new Promise<void>(resolve => { window.setTimeout(resolve, milliseconds); });
+
+export interface CloudflareApiOptions {
+	/** Waits before retrying a rate-limited request or pacing a bulk loop. */
+	sleep?: (milliseconds: number) => Promise<void>;
+}
+
 export class CloudflareApiClient {
+	private readonly sleep: (milliseconds: number) => Promise<void>;
+	private nextBulkRequestAt = 0;
+
 	constructor(
 		private readonly accessToken: string,
 		private readonly transport: HttpTransport,
-	) {}
+		options: CloudflareApiOptions = {},
+	) {
+		this.sleep = options.sleep ?? wait;
+	}
+
+	/** Call before each request of a long loop to stay below the account-wide API limit. */
+	async throttle(): Promise<void> {
+		const delay = this.nextBulkRequestAt - Date.now();
+		this.nextBulkRequestAt = Math.max(Date.now(), this.nextBulkRequestAt) + BULK_REQUEST_INTERVAL_MS;
+		if (delay > 0) await this.sleep(delay);
+	}
 
 	async listAuthorizedAccounts(): Promise<CloudflareAccount[]> {
 		const result = await this.request<Array<{
@@ -226,7 +260,7 @@ export class CloudflareApiClient {
 	}
 
 	async getRecoveryObject(accountId: string, bucketName: string, key: string): Promise<Uint8Array> {
-		const response = await this.transport(`${API_BASE_URL}${this.r2ObjectPath(accountId, bucketName, key)}`, {
+		const response = await this.dispatch(`${API_BASE_URL}${this.r2ObjectPath(accountId, bucketName, key)}`, {
 			method: 'GET', headers: { Authorization: `Bearer ${this.accessToken}` },
 		});
 		if (response.status !== 200 || !response.arrayBuffer) throw new CloudflareApiError(`Recovery object unavailable (${response.status})`, response.status, null);
@@ -271,14 +305,14 @@ export class CloudflareApiClient {
 		const multipart = buildResetWorkerMultipartBody(resetId, databaseId, bucketName, alreadyRetired, retireCloudSafety);
 		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
 			method: 'PUT', headers: { 'Content-Type': multipart.contentType }, body: multipart.body,
-		});
+		}, false);
 	}
 
 	async uploadServerDeletionWorker(accountId: string, workerName: string, deletionId: string, bucketName: string, tokenHash: string, uploadTag: string): Promise<void> {
 		const multipart = buildServerDeletionWorkerMultipartBody(deletionId, bucketName, tokenHash, uploadTag);
 		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
 			method: 'PUT', headers: { 'Content-Type': multipart.contentType }, body: multipart.body,
-		});
+		}, false);
 	}
 
 	async queryD1(
@@ -315,7 +349,7 @@ export class CloudflareApiClient {
 			method: 'PUT',
 			headers: { 'Content-Type': multipart.contentType },
 			body: multipart.body,
-		});
+		}, false);
 	}
 
 	async verifyWorkerDeployment(origin: string, fingerprint: string): Promise<void> {
@@ -377,26 +411,42 @@ export class CloudflareApiClient {
 		return `/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`;
 	}
 
-	private async request<T>(path: string, request: HttpRequest = { method: 'GET' }): Promise<T> {
-		return (await this.requestEnvelope<T>(path, request)).result;
+	/** Worker uploads pass `retryRateLimit: false`: each dispatch carries a single-use tag. */
+	private async request<T>(path: string, request: HttpRequest = { method: 'GET' }, retryRateLimit = true): Promise<T> {
+		return (await this.requestEnvelope<T>(path, request, retryRateLimit)).result;
 	}
 
-	private async requestEnvelope<T>(path: string, request: HttpRequest = { method: 'GET' }): Promise<CloudflareEnvelope<T>> {
-		const { response, envelope } = await this.send<T>(path, request);
+	private async requestEnvelope<T>(path: string, request: HttpRequest = { method: 'GET' }, retryRateLimit = true): Promise<CloudflareEnvelope<T>> {
+		const { response, envelope } = await this.send<T>(path, request, retryRateLimit);
 		if (response.status < 200 || response.status >= 300 || !envelope?.success) {
-			throw apiError(response.status, envelope, `Cloudflare request failed with HTTP ${response.status}`);
+			throw apiError(response.status, envelope, response.status === 429
+				? 'Cloudflare is limiting API requests from this account. Wait a few minutes, then try again.'
+				: `Cloudflare request failed with HTTP ${response.status}`);
 		}
 		return envelope;
 	}
 
-	private async send<T>(path: string, request: HttpRequest) {
-		const response = await this.transport(`${API_BASE_URL}${path}`, {
+	private async send<T>(path: string, request: HttpRequest, retryRateLimit = true) {
+		const response = await this.dispatch(`${API_BASE_URL}${path}`, {
 			...request,
 			headers: {
 				...request.headers,
 				Authorization: `Bearer ${this.accessToken}`,
 			},
-		});
+		}, retryRateLimit);
 		return { response, envelope: asEnvelope<T>(parseJson(response.text)) };
+	}
+
+	/** Cloudflare rejects a rate-limited request before processing it, so repeating it is safe. */
+	private async dispatch(url: string, request: HttpRequest, retryRateLimit = true) {
+		let waited = 0;
+		for (let attempt = 0; ; attempt++) {
+			const response = await this.transport(url, request);
+			if (response.status !== 429 || !retryRateLimit) return response;
+			const delay = Math.max(1000, retryAfterMilliseconds(response.headers) ?? Math.min(60_000, 1000 * 2 ** attempt));
+			if (waited + delay > RATE_LIMIT_WAIT_BUDGET_MS) return response;
+			waited += delay;
+			await this.sleep(delay);
+		}
 	}
 }

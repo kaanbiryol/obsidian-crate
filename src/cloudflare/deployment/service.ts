@@ -353,7 +353,17 @@ export class CloudflareDeploymentService {
 			if (authorization === 'saved' && new URL(url).origin === 'https://api.cloudflare.com'
 				&& (response.status === 401 || response.status === 403)) throw new CloudflareReauthorizationRequired();
 			return response;
-		}));
+		}), { sleep: milliseconds => this.pause(milliseconds) });
+	}
+
+	/** Rate-limit waits end when the plugin unloads instead of keeping a timer alive. */
+	private pause(milliseconds: number): Promise<void> {
+		const signal = this.lifetime.signal;
+		return new Promise((resolve, reject) => {
+			const abort = () => { window.clearTimeout(timer); reject(new Error('Crate stopped before retrying the Cloudflare request.')); };
+			const timer = window.setTimeout(() => { signal.removeEventListener('abort', abort); resolve(); }, milliseconds);
+			if (signal.aborted) abort(); else signal.addEventListener('abort', abort, { once: true });
+		});
 	}
 
 	private checkSavedTarget(expected: CloudflareDeploymentMetadata, intent: DeploymentIntent): void {
