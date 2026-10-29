@@ -60,19 +60,21 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 				setting.setDesc(formatDeviceDescription(token));
 			}
 			if (token.is_current) continue;
+			const kind = token.platform === 'pwa' ? 'session' : token.platform === 'shortcut' ? 'shortcut' : 'device';
 			setting.addButton(button => {
-				button.setButtonText(token.platform === 'pwa' ? 'Disconnect session' : 'Disconnect device').setDestructive();
+				button.setButtonText(`Disconnect ${kind}`).setDestructive();
 				button.onClick(async () => {
-					const webSession = token.platform === 'pwa';
 					const confirmed = await openConfirmationModal(plugin.app, {
-						title: webSession ? 'Remove session' : 'Remove device',
-						message: `${label} will lose ${webSession ? 'access to reminders' : 'sync access'}.`,
-						details: [webSession
+						title: `Remove ${kind}`,
+						message: `${label} will ${kind === 'session' ? 'lose access to reminders' : kind === 'shortcut' ? 'stop saving to Reading' : 'lose sync access'}.`,
+						details: [kind === 'session'
 							? 'Open a fresh app link from Crate in Obsidian to reconnect.'
-							: plugin.settings.cloudflareDeployment
-								? 'Sign in with Cloudflare on that device to reconnect.'
-								: 'Generate a new access token on your server to reconnect that device.'],
-						confirmText: webSession ? 'Remove session' : 'Remove device',
+							: kind === 'shortcut'
+								? 'Pair it again from Reading settings in the web app to reconnect.'
+								: plugin.settings.cloudflareDeployment
+									? 'Sign in with Cloudflare on that device to reconnect.'
+									: 'Generate a new access token on your server to reconnect that device.'],
+						confirmText: `Remove ${kind}`,
 						warning: true,
 					});
 					if (!confirmed || !isActive()) return;

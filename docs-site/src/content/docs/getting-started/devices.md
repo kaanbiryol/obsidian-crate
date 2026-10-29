@@ -59,6 +59,6 @@ Before signing out or clearing browser data, check for pending work. [Recovery](
 
 **This device:** open **Settings → Crate → Account and devices** and select **Disconnect this device**. Your local files and server data are kept, and your other devices stay connected. If you use encryption, make sure you have your recovery key first: disconnecting removes this device's saved encryption keys.
 
-**Another device:** find it under **Account and devices → Connected devices and sessions** and select **Disconnect device** or **Disconnect session**. Browsers and Home Screen apps are listed separately, even on the same phone. Disconnecting removes access but doesn't erase files already on that device.
+**Another device:** find it under **Account and devices → Connected devices and sessions** and select **Disconnect device**, **Disconnect session** or **Disconnect shortcut**. Browsers and Home Screen apps are listed separately, even on the same phone. A disconnected iPhone shortcut needs pairing again. Disconnecting removes access but doesn't erase files already on that device.
 
 Just want a break? [Pause a feature or sync](/docs/features/settings/) instead. To stop only notifications on a phone, [turn its alerts off](/docs/features/notifications/#turn-alerts-off).

@@ -157,6 +157,31 @@ describe('renderDevicesSection', () => {
 		expect(tokens).toHaveLength(1);
 		expect(tokens[0]?.device_name).toBe('iPhone · Home Screen app');
 	});
+
+	it('explains that removing a shortcut stops it saving to Reading until it is paired again', async () => {
+		const { renderDevicesSection } = await loadDevicesSectionModule();
+		const shortcut = { id: 'shortcut-id', device_id: null, device_name: 'Save to Crate shortcut', platform: 'shortcut',
+			created_at: '2026-09-07 10:00:00', last_seen_at: null, is_current: false };
+		const revokeToken = vi.fn(async () => ({ success: true }));
+		const client = { listTokens: vi.fn(async () => ({ tokens: [shortcut] })), revokeToken };
+		openConfirmationModal.mockResolvedValue(true);
+		renderDevicesSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: { app: {}, settings: { cloudflareDeployment: { accountId: 'account' } }, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } } as never,
+		});
+		await flushMicrotasks();
+		const button = getSettingByName('Save to Crate shortcut').buttons[0];
+		expect(button?.buttonEl.textContent).toBe('Disconnect shortcut');
+		button?.click();
+		await flushMicrotasks();
+		expect(openConfirmationModal).toHaveBeenCalledWith({}, expect.objectContaining({
+			title: 'Remove shortcut',
+			message: 'Save to Crate shortcut will stop saving to Reading.',
+			details: ['Pair it again from Reading settings in the web app to reconnect.'],
+			confirmText: 'Remove shortcut',
+		}));
+		expect(revokeToken).toHaveBeenCalledExactlyOnceWith('shortcut-id');
+	});
 });
 
 describe('device list caching', () => {
