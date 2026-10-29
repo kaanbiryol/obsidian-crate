@@ -233,10 +233,16 @@ export class CloudflareApiClient {
 	}
 
 	async listR2Objects(accountId: string, bucketName: string, cursor?: string, prefix?: string): Promise<{ keys: string[]; cursor?: string }> {
+		const page = await this.listR2ObjectSizes(accountId, bucketName, cursor, prefix);
+		return { keys: page.objects.map(object => object.key), ...(page.cursor ? { cursor: page.cursor } : {}) };
+	}
+
+	/** Like listR2Objects, with each object's size when Cloudflare reports one. */
+	async listR2ObjectSizes(accountId: string, bucketName: string, cursor?: string, prefix?: string): Promise<{ objects: Array<{ key: string; size: number | null }>; cursor?: string }> {
 		const params = new URLSearchParams({ per_page: '1000' });
 		if (cursor) params.set('cursor', cursor);
 		if (prefix) params.set('prefix', prefix);
-		const response = await this.requestEnvelope<Array<{ key?: string }>>(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects?${params}`);
+		const response = await this.requestEnvelope<Array<{ key?: string; size?: unknown }>>(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects?${params}`);
 		const info = response.result_info;
 		const invalid = (reason: string) => new Error(`Could not verify the complete R2 object listing. ${reason}`);
 		if (!Array.isArray(response.result) || response.result.some(object => !object || typeof object.key !== 'string' || !object.key)) {
@@ -256,7 +262,8 @@ export class CloudflareApiClient {
 		if (next && next === cursor) throw invalid('The continuation cursor did not advance.');
 		// The REST API uses CursorPagination in Cloudflare's SDK: is_truncated
 		// is optional; an absent/empty cursor ends the listing.
-		return { keys: response.result.map(object => object.key!), ...(next ? { cursor: next } : {}) };
+		const objects = response.result.map(object => ({ key: object.key!, size: Number.isSafeInteger(object.size) && Number(object.size) >= 0 ? Number(object.size) : null }));
+		return { objects, ...(next ? { cursor: next } : {}) };
 	}
 
 	async getRecoveryObject(accountId: string, bucketName: string, key: string): Promise<Uint8Array> {

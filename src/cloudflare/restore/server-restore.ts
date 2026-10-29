@@ -4,20 +4,22 @@ import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
 import { workersDevOrigin } from '../deployment/worker-origin';
-import { literal, parseBackupRows, PREFIX, quote, readBackup, type BackupChoice, type BackupRow, type BackupSource } from './archive';
+import { backupObjectKey, literal, parseBackupRows, PREFIX, quote, readBackup, readBackupDatabase, type BackupChoice, type BackupRow, type BackupSource } from './archive';
 import { validRestoreState, type ServerRestoreState } from './state';
 import { sha256Hex } from '../../platform/sha256';
-import { UPGRADE_BACKUP_PREFIX } from '../../protocol/storage-keys';
+import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE } from '../../protocol/storage-keys';
 
 export async function listUpgradeBackups(api: CloudflareApiClient, source: BackupSource): Promise<BackupChoice[]> {
 	const choices: BackupChoice[] = [], cursors = new Set<string>(); let cursor: string | undefined;
 	do {
 		const page = await api.listR2Objects(source.account, source.bucket, cursor, UPGRADE_BACKUP_PREFIX);
-		for (const key of page.keys) {
+		// Shared file copies sort after every backup and hold no manifests.
+		const store = page.keys.findIndex(key => key.startsWith(`${UPGRADE_BACKUP_STORE}/`));
+		for (const key of store < 0 ? page.keys : page.keys.slice(0, store)) {
 			const prefix = key.replace(/\/archive\.json$/, '');
 			if (key.endsWith('/archive.json') && PREFIX.test(prefix)) choices.push(await readBackup(api, source, prefix));
 		}
-		cursor = page.cursor;
+		cursor = store < 0 ? page.cursor : undefined;
 		if (cursor && cursors.has(cursor)) throw new Error('Backup listing did not advance');
 		if (cursor) cursors.add(cursor);
 	} while (cursor);
@@ -82,16 +84,12 @@ export async function restoreUpgradeBackup(input: {
 	if (state.phase === 'complete') return workersDevOrigin(target.workerName, target.workersSubdomain!);
 	if (state.phase === 'copying') {
 		onProgress('Verifying the backup database and file inventory…');
-		const databaseBytes = await api.getRecoveryObject(account, source.bucket, `${state.prefix}/database.sql`);
-		if (databaseBytes.length > 128 * 1024 * 1024) throw new Error('Backup database is too large for in-app recovery. Use the recovery CLI.');
-		if (await sha256Hex(databaseBytes) !== backup.manifest.databaseSha256) throw new Error('Backup database checksum does not match');
-		const rows = prepareRows(parseBackupRows(new TextDecoder().decode(databaseBytes)), backup.manifest, artifacts.d1Schema, state.restoredAt);
+		const rows = prepareRows(parseBackupRows(await readBackupDatabase(api, source, backup)), backup.manifest, artifacts.d1Schema, state.restoredAt);
 		const plan = await sha256Hex(JSON.stringify([state.archiveHash, state.fingerprint, state.restoredAt, rows]));
 		const batches = rowBatches(rows, plan);
 		// Verify every archived object before creating destination resources.
-		const backupKey = async (key: string) => `${state.prefix}/objects/${await sha256Hex(key)}`;
 		for (const [index, item] of backup.manifest.objects.entries()) {
-			const bytes = await api.getRecoveryObject(account, source.bucket, await backupKey(item.key));
+			const bytes = await api.getRecoveryObject(account, source.bucket, await backupObjectKey(backup, item));
 			if (bytes.length !== item.size || await sha256Hex(bytes) !== item.sha256) throw new Error('A backup file failed verification');
 			onProgress(`Verifying backup: ${index + 1} of ${backup.manifest.objects.length} files and versions…`);
 		}
@@ -129,7 +127,7 @@ export async function restoreUpgradeBackup(input: {
 			try { bytes = await api.getRecoveryObject(account, target.r2BucketName, item.key); }
 			catch (error) {
 				if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
-				const original = await api.getRecoveryObject(account, source.bucket, await backupKey(item.key));
+				const original = await api.getRecoveryObject(account, source.bucket, await backupObjectKey(backup, item));
 				if (original.length !== item.size || await sha256Hex(original) !== item.sha256) throw new Error('Backup file changed during restore');
 				await api.putRestoredObject(account, source.bucket, target.r2BucketName, item.key, original);
 				bytes = await api.getRecoveryObject(account, target.r2BucketName, item.key);

@@ -55,7 +55,7 @@ Install the enrolled Crate web app in a browser supporting Web Share Target. **S
 
 ## Existing server upgrade
 
-For future registered migrations, Cloudflare updates take a verified paired database/file checkpoint before applying the migration. Database triggers pause writes by the old Worker while the checkpoint and migration run. The update retains its deployment fence after an uncertain failure; use the existing **Check and recover update** flow. The backup prefix is recorded in `maintenance_state` as `crate_upgrade_checkpoint`. `scripts/crate-recovery.py download-checkpoint --help` describes copying it into the ordinary paired recovery archive format. Backups consume additional R2 storage and are retained for recovery.
+For future registered migrations, Cloudflare updates take a verified paired database/file checkpoint before applying the migration. Files are copied while sync continues; database triggers then pause writes by the old Worker while the database is exported and the migration runs. An interrupted backup resumes from progress saved as `crate_upgrade_backup`. The update retains its deployment fence after an uncertain failure; use the existing **Check and recover update** flow. The backup prefix is recorded in `maintenance_state` as `crate_upgrade_checkpoint`. `scripts/crate-recovery.py download-checkpoint --help` describes copying it into the ordinary paired recovery archive format. Backups consume additional R2 storage and are retained for recovery.
 
 For a future supported self-hosted upgrade, stop the server first, then run:
 

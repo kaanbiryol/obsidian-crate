@@ -10,11 +10,12 @@ import type { DeploymentFence } from '../deployment/fence';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
 import { listUpgradeBackups, restoreUpgradeBackup, rowSql } from './server-restore';
-import { parseBackupRows, readBackup } from './archive';
+import { parseBackupRows, readBackup, readBackupDatabase } from './archive';
 import type { ServerRestoreState } from './state';
 import { normalizeCrateSettings } from '../../plugin/settings';
 import policyFixture from '../../../tests/fixtures/recovery/restore-policy.json';
 import { sha256Hex } from '../../platform/sha256';
+import { upgradeBackupStoreKey } from '../../protocol/storage-keys';
 
 vi.mock('../deployment/provisioner', () => ({ provisionCloudflareDeployment: vi.fn(async () => undefined) }));
 vi.mock('../deployment/update-recovery', () => ({
@@ -48,17 +49,23 @@ async function fixture(extraRows = 0) {
 			const db = databases.get(id)!;
 			if (/^(SELECT|PRAGMA)/.test(sql.trim())) return [{ results: db.prepare(sql).all(...params) }];
 			db.exec('BEGIN');
-			try { if (params.length) db.prepare(sql).run(...params); else db.exec(sql); db.exec('COMMIT'); }
-			catch (error) { db.exec('ROLLBACK'); throw error; }
+			let results: unknown[] = [];
+			try {
+				if (/\bRETURNING\b/.test(sql)) results = db.prepare(sql).all(...params);
+				else if (params.length) db.prepare(sql).run(...params); else db.exec(sql);
+				db.exec('COMMIT');
+			} catch (error) { db.exec('ROLLBACK'); throw error; }
 			if (id !== source.database) afterQuery?.(sql);
-			return [{ results: [] }];
+			return [{ results }];
 		}),
 		getRecoveryObject: vi.fn(async (_account: string, bucket: string, key: string) => {
 			const bytes = buckets.get(bucket)?.get(key); if (!bytes) throw new CloudflareApiError('Object not found', 404, null); return bytes;
 		}),
 		putRecoveryObject: vi.fn(async (_account: string, bucket: string, key: string, bytes: Uint8Array) => { buckets.get(bucket)!.set(key, bytes); }),
 		putRestoredObject: vi.fn(async (_account: string, _sourceBucket: string, bucket: string, key: string, bytes: Uint8Array) => { buckets.get(bucket)!.set(key, bytes); }),
-		listR2Objects: vi.fn(async (_account: string, bucket: string, _cursor?: string, prefix?: string) => ({ keys: [...buckets.get(bucket)!.keys()].filter(key => key.startsWith(prefix ?? '')) })),
+		listR2Objects: vi.fn(async (_account: string, bucket: string, _cursor?: string, prefix?: string): Promise<{ keys: string[]; cursor?: string }> => ({ keys: [...buckets.get(bucket)!.keys()].filter(key => key.startsWith(prefix ?? '')).sort() })),
+		listR2ObjectSizes: vi.fn(async (_account: string, bucket: string, _cursor?: string, prefix?: string) => ({ objects: [...buckets.get(bucket)!].filter(([key]) => key.startsWith(prefix ?? '')).map(([key, value]) => ({ key, size: value.length })) })),
+		throttle: vi.fn(async () => undefined),
 		findD1Database: vi.fn(async (_account: string, name: string) => names.has(name) ? { uuid: names.get(name), name } : null),
 		createD1Database: vi.fn(async (_account: string, name: string) => { databases.set(destination, database()); names.set(name, destination); return { uuid: destination, name }; }),
 		getD1Database: vi.fn(async (_account: string, id: string) => ({ uuid: id, name: [...names].find(([, value]) => value === id)?.[0] })),
@@ -78,16 +85,29 @@ async function fixture(extraRows = 0) {
 	const snapshots: ServerRestoreState[] = [];
 	const save = vi.fn(async () => { snapshots.push(structuredClone(state)); });
 	const run = () => restoreUpgradeBackup({ api: client, state, artifacts, save, onProgress: vi.fn() });
-	const rewriteSQL = async (transform: (sql: string) => string) => {
-		const bucket = buckets.get(source.bucket)!;
-		const bytes = new TextEncoder().encode(transform(new TextDecoder().decode(bucket.get(`${choice.prefix}/database.sql`))));
-		bucket.set(`${choice.prefix}/database.sql`, bytes);
-		choice.manifest.databaseSha256 = await sha256Hex(bytes);
+	const writeManifest = async () => {
 		const manifest = new TextEncoder().encode(JSON.stringify(choice.manifest));
-		bucket.set(`${choice.prefix}/archive.json`, manifest); state.archiveHash = await sha256Hex(manifest);
+		buckets.get(source.bucket)!.set(`${choice.prefix}/archive.json`, manifest); state.archiveHash = await sha256Hex(manifest);
+	};
+	const rewriteSQL = async (transform: (sql: string) => string) => {
+		const bytes = new TextEncoder().encode(transform(await readBackupDatabase(client, source, choice)));
+		const sha256 = await sha256Hex(bytes);
+		buckets.get(source.bucket)!.set(`${choice.prefix}/objects/${sha256}`, bytes);
+		choice.manifest = { ...choice.manifest, format: 2, databaseParts: [{ sha256, size: bytes.length }] };
+		await writeManifest();
+	};
+	/** Rewrites the backup in the single-file layout written before database parts and shared file copies. */
+	const toFormat1 = async () => {
+		const bucket = buckets.get(source.bucket)!, sql = new TextEncoder().encode(await readBackupDatabase(client, source, choice));
+		bucket.set(`${choice.prefix}/database.sql`, sql);
+		for (const item of choice.manifest.objects) bucket.set(`${choice.prefix}/objects/${await sha256Hex(item.key)}`, bucket.get(upgradeBackupStoreKey(item.sha256))!);
+		for (const key of [...bucket.keys()]) if (key.startsWith('__crate__/backups/schema-upgrade-ffffffff-')) bucket.delete(key);
+		const { databaseParts: _parts, ...manifest } = choice.manifest as Extract<typeof choice.manifest, { format: 2 }>;
+		choice.manifest = { ...manifest, format: 1, databaseSha256: await sha256Hex(sql) };
+		await writeManifest();
 	};
 	api.queryD1.mockClear(); api.putRecoveryObject.mockClear();
-	return { api, client, state, choice, artifacts, run, snapshots, buckets, original, databases, rewriteSQL, interrupt: (handler: (sql: string) => void) => { afterQuery = handler; } };
+	return { api, client, state, choice, artifacts, run, snapshots, buckets, original, databases, rewriteSQL, toFormat1, interrupt: (handler: (sql: string) => void) => { afterQuery = handler; } };
 }
 
 it('restores launch-baseline checkpoints, keeps history and receipts, and requires fresh enrollment', async () => {
@@ -116,6 +136,33 @@ it('lists backups with one request limited to upgrade backup keys', async () => 
 	f.api.listR2Objects.mockClear();
 	expect((await listUpgradeBackups(f.client, source)).map(choice => choice.prefix)).toEqual([f.choice.prefix]);
 	expect(f.api.listR2Objects.mock.calls).toEqual([[source.account, source.bucket, undefined, '__crate__/backups/schema-upgrade-']]);
+});
+
+it('stops listing backups at the shared file copies that sort after them', async () => {
+	const f = await fixture();
+	const keys = (await f.api.listR2Objects(source.account, source.bucket, undefined, '__crate__/backups/schema-upgrade-')).keys;
+	expect(keys.at(-1)).toMatch(/^__crate__\/backups\/schema-upgrade-ffffffff-ffff-ffff-ffff-ffffffffffff\/objects\/[a-f0-9]{64}$/);
+	f.api.listR2Objects.mockReset().mockResolvedValueOnce({ keys, cursor: 'more-shared-copies' });
+	expect((await listUpgradeBackups(f.client, source)).map(choice => choice.prefix)).toEqual([f.choice.prefix]);
+	expect(f.api.listR2Objects).toHaveBeenCalledOnce();
+});
+
+it('restores a backup in the original single-file layout', async () => {
+	const f = await fixture();
+	await f.toFormat1();
+	expect(f.choice.manifest.format).toBe(1);
+	await expect(f.run()).resolves.toContain('.workers.dev');
+	const restored = f.databases.get(destination)!;
+	expect(restored.prepare('SELECT * FROM files').all()).toEqual(f.original.prepare('SELECT * FROM files').all());
+	expect([...f.buckets.get(f.state.target.r2BucketName)!.keys()].sort()).toEqual(['__crate__/settings.json', 'live-object', 'old-object']);
+});
+
+it('rejects a corrupt database part before creating any destination', async () => {
+	const f = await fixture();
+	if (f.choice.manifest.format !== 2) throw new Error('Expected a parted backup');
+	f.buckets.get(source.bucket)!.set(`${f.choice.prefix}/objects/${f.choice.manifest.databaseParts[0]!.sha256}`, new TextEncoder().encode('DROP TABLE files;'));
+	await expect(f.run()).rejects.toThrow('checksum does not match');
+	expect(f.api.createD1Database).not.toHaveBeenCalled();
 });
 
 it('applies the shared CLI/in-app policy fixture without retaining source operation markers', async () => {
@@ -175,7 +222,7 @@ it('resumes an upload with a lost acknowledgement by verifying its bytes', async
 });
 
 it.each(['corrupt', 'missing'])('rejects a %s archived object before creating any destination', async mode => {
-	const f = await fixture(); const key = `${f.choice.prefix}/objects/${await sha256Hex('live-object')}`;
+	const f = await fixture(); const key = upgradeBackupStoreKey(f.choice.manifest.objects.find(item => item.key === 'live-object')!.sha256);
 	if (mode === 'corrupt') f.buckets.get(source.bucket)!.set(key, new Uint8Array([1])); else f.buckets.get(source.bucket)!.delete(key);
 	await expect(f.run()).rejects.toThrow();
 	expect(f.api.createD1Database).not.toHaveBeenCalled(); expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
@@ -264,7 +311,7 @@ it('preserves queued schema-2 captures and their policy across a restore', async
 
 it('rejects a future restore target before allocating destination resources', async () => {
 	const f = await fixture();
-	const rows = parseBackupRows(new TextDecoder().decode(f.buckets.get(source.bucket)!.get(`${f.choice.prefix}/database.sql`)));
+	const rows = parseBackupRows(await readBackupDatabase(f.client, source, f.choice));
 	const version = SERVER_RELEASE.schemaVersion;
 	try {
 		SERVER_RELEASE.schemaVersion = 3;

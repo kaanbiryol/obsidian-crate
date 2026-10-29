@@ -1,10 +1,16 @@
 import type { CloudflareApiClient } from '../cloudflare-api';
 import { isSha256Hex } from '../../platform/validation';
 import { sha256Hex } from '../../platform/sha256';
+import { UPGRADE_BACKUP_STORE, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 
 export interface BackupSource { account: string; database: string; bucket: string }
 interface BackupObject { key: string; sha256: string; size: number; contentType?: string }
-export interface UpgradeBackup { format: 1; complete: true; createdAt: string; source: BackupSource; databaseSha256: string; objects: BackupObject[] }
+interface BackupPart { sha256: string; size: number }
+/** Format 1 stores `database.sql` and a copy of each file under the backup.
+ * Format 2 stores the database in ordered parts under the backup, named by
+ * checksum, and shares checksum-named file copies through the backup store. */
+export type UpgradeBackup = { complete: true; createdAt: string; source: BackupSource; objects: BackupObject[] }
+	& ({ format: 1; databaseSha256: string } | { format: 2; databaseParts: BackupPart[] });
 export interface BackupChoice { prefix: string; manifest: UpgradeBackup; hash: string }
 export type Cell = string | number | null;
 export interface BackupRow { table: string; columns: string[]; values: Cell[] }
@@ -12,13 +18,16 @@ export const PREFIX = /^__crate__\/backups\/schema-upgrade-[a-f0-9-]{36}$/;
 export const quote = (name: string) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('Unsupported backup identifier'); return `"${name}"`; };
 export const literal = (value: Cell): string => value === null ? 'NULL' : typeof value === 'number' ? String(value) : `'${value.replace(/'/g, "''")}'`;
 export async function readBackup(api: Pick<CloudflareApiClient, 'getRecoveryObject'>, source: BackupSource, prefix: string): Promise<BackupChoice> {
-	if (!PREFIX.test(prefix)) throw new Error('Invalid backup location');
+	if (!PREFIX.test(prefix) || prefix === UPGRADE_BACKUP_STORE) throw new Error('Invalid backup location');
 	const bytes = await api.getRecoveryObject(source.account, source.bucket, `${prefix}/archive.json`);
 	if (bytes.length > 32 * 1024 * 1024) throw new Error('Backup inventory is too large for in-app recovery');
 	const value = JSON.parse(new TextDecoder().decode(bytes)) as UpgradeBackup;
-	if (!value || value.format !== 1 || value.complete !== true || !Number.isFinite(Date.parse(value.createdAt))
+	const database = value?.format === 1 ? isSha256Hex(value.databaseSha256)
+		: value?.format === 2 && Array.isArray(value.databaseParts) && value.databaseParts.length > 0
+			&& value.databaseParts.every(part => part && isSha256Hex(part.sha256) && Number.isSafeInteger(part.size) && part.size > 0);
+	if (!value || !database || value.complete !== true || !Number.isFinite(Date.parse(value.createdAt))
 		|| !value.source || Object.keys(source).some(key => source[key as keyof BackupSource] !== value.source[key as keyof BackupSource])
-		|| !isSha256Hex(value.databaseSha256) || !Array.isArray(value.objects)) throw new Error('Backup is incomplete or belongs to a different server');
+		|| !Array.isArray(value.objects)) throw new Error('Backup is incomplete or belongs to a different server');
 	const keys = new Set<string>();
 	for (const item of value.objects) {
 		if (!item || typeof item.key !== 'string' || !item.key || item.key.length > 1024 || keys.has(item.key)
@@ -26,6 +35,32 @@ export async function readBackup(api: Pick<CloudflareApiClient, 'getRecoveryObje
 		keys.add(item.key);
 	}
 	return { prefix, manifest: value, hash: await sha256Hex(bytes) };
+}
+
+/** Where a backup keeps its verified copy of an original object. */
+export async function backupObjectKey(backup: BackupChoice, item: BackupObject): Promise<string> {
+	return backup.manifest.format === 2 ? upgradeBackupStoreKey(item.sha256) : `${backup.prefix}/objects/${await sha256Hex(item.key)}`;
+}
+
+const IN_APP_DATABASE_LIMIT = 128 * 1024 * 1024;
+const tooLarge = () => new Error('Backup database is too large for in-app recovery. Use the recovery CLI.');
+/** Reads and verifies the backup's SQL export. Format 2 parts end at statement boundaries. */
+export async function readBackupDatabase(api: Pick<CloudflareApiClient, 'getRecoveryObject'>, source: BackupSource, backup: BackupChoice): Promise<string> {
+	const { manifest, prefix } = backup;
+	if (manifest.format === 1) {
+		const bytes = await api.getRecoveryObject(source.account, source.bucket, `${prefix}/database.sql`);
+		if (bytes.length > IN_APP_DATABASE_LIMIT) throw tooLarge();
+		if (await sha256Hex(bytes) !== manifest.databaseSha256) throw new Error('Backup database checksum does not match');
+		return new TextDecoder().decode(bytes);
+	}
+	if (manifest.databaseParts.reduce((total, part) => total + part.size, 0) > IN_APP_DATABASE_LIMIT) throw tooLarge();
+	let sql = '';
+	for (const part of manifest.databaseParts) {
+		const bytes = await api.getRecoveryObject(source.account, source.bucket, `${prefix}/objects/${part.sha256}`);
+		if (bytes.length !== part.size || await sha256Hex(bytes) !== part.sha256) throw new Error('Backup database checksum does not match');
+		sql += new TextDecoder().decode(bytes);
+	}
+	return sql;
 }
 
 /** Decode only the literal INSERTs emitted by our checkpoint writer. Never execute downloaded SQL. */

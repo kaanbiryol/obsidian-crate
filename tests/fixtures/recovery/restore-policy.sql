@@ -1,5 +1,6 @@
 INSERT INTO "maintenance_state" ("key","value","updated_at") VALUES ('crate_deployment_fence','old owner','2026-09-29 00:00:00');
 INSERT INTO "maintenance_state" ("key","value","updated_at") VALUES ('crate_upgrade_checkpoint','old bucket checkpoint','2026-09-29 00:00:00');
+INSERT INTO "maintenance_state" ("key","value","updated_at") VALUES ('crate_upgrade_backup','{"format":2,"phase":"dumping"}','2026-09-29 00:00:00');
 INSERT INTO "maintenance_state" ("key","value","updated_at") VALUES ('crate_restore_progress','old plan:3','2026-09-29 00:00:00');
 INSERT INTO "maintenance_state" ("key","value","updated_at") VALUES ('reminder_source_scan_fixture','old scan','2026-09-29 00:00:00');
 INSERT INTO "maintenance_state" ("key","value","updated_at") VALUES ('reminder_operation_floor','20524','2026-09-29 00:00:00');

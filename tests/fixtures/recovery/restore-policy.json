@@ -1,5 +1,5 @@
 {
-  "discardedKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint", "crate_restore_progress", "reminder_source_scan_fixture"],
+  "discardedKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint", "crate_upgrade_backup", "crate_restore_progress", "reminder_source_scan_fixture"],
   "retainedState": {"reminder_operation_floor": "20524"},
   "emptyTables": ["auth_tokens", "reading_jobs", "reading_enrollments"],
   "preservedRows": {

@@ -6,7 +6,7 @@
     "request_rate_limits", "notification_projection_jobs", "reminder_source_state",
     "reading_items", "reading_index", "reading_jobs", "reading_enrollments", "reading_handoffs"
   ],
-  "resetMaintenanceKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint"],
+  "resetMaintenanceKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint", "crate_upgrade_backup"],
   "resetMaintenancePrefixes": ["crate_restore_", "reminder_source_scan"],
   "fileVersionRetentionMs": 2592000000
 }
