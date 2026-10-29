@@ -14,6 +14,9 @@ type MockPlugin = {
 			layoutReady: boolean;
 			onLayoutReady: ReturnType<typeof vi.fn<(callback: () => void) => void>>;
 			detachLeavesOfType: ReturnType<typeof vi.fn>;
+			getLeavesOfType: ReturnType<typeof vi.fn>;
+			on: ReturnType<typeof vi.fn<(name: string, callback: () => void) => object>>;
+			offref: ReturnType<typeof vi.fn>;
 		};
 	};
 	settings: {
@@ -75,6 +78,7 @@ const gatedIndexOptions: Record<keyof ReminderIndexOptions, unknown> = {
 	signal: expect.any(AbortSignal),
 	shouldDeferScan: expect.any(Function),
 	shouldDeferCollisionRepair: expect.any(Function),
+	editor: expect.any(Object),
 };
 
 async function flushMicrotasks(): Promise<void> {
@@ -87,6 +91,7 @@ async function loadPluginIntegrationModule() {
 		addIcon: vi.fn(),
 		normalizePath: (path: string) => path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''),
 		Notice: class { constructor(message: unknown) { notices(message); } },
+		MarkdownView: class MarkdownView {},
 	}));
 	vi.doMock('./data/reminder-move-journal', () => ({ createReminderMoveJournal: createMoveJournal }));
 	vi.doMock('./data/reminder-index', () => ({
@@ -139,6 +144,9 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 					layoutReadyHandler = callback;
 				}),
 				detachLeavesOfType: vi.fn(),
+				getLeavesOfType: vi.fn(() => []),
+				on: vi.fn((name: string, callback: () => void) => ({ name, callback })),
+				offref: vi.fn(),
 			},
 		},
 		settings: {
@@ -481,6 +489,39 @@ it('does not start normalization when unloaded during journal recovery', async (
 	await flushMicrotasks();
 	expect(reminderIndexFlushDeferredScans).not.toHaveBeenCalled();
  });
+
+it('retries editor writes after a held line and on layout changes, until the backend stops', async () => {
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const { stopReminderBackend } = await import('./runtime');
+	const { MarkdownView } = await import('obsidian');
+	vi.useFakeTimers();
+	vi.stubGlobal('window', { setTimeout, clearTimeout });
+	try {
+		const plugin = createPlugin();
+		await initializeReminders(plugin as never);
+		const editor = indexOptions().editor!;
+		const typing = { getValue: () => '- [ ] Typing', hasFocus: () => true, listSelections: () => [{ anchor: { line: 0, ch: 12 }, head: { line: 0, ch: 12 } }], transaction: vi.fn() };
+		const view = Object.assign(Object.create(MarkdownView.prototype) as object, { file: { path: 'Reminders/Inbox.md' }, getMode: () => 'source', editor: typing });
+		plugin.app.workspace.getLeavesOfType.mockImplementation((type: string) => type === 'markdown' ? [{ view }] : []);
+		expect(editor.isOpen('Reminders/Inbox.md')).toBe(true);
+		reminderIndexFlushDeferredScans.mockClear();
+		expect(editor.write('Reminders/Inbox.md', '- [ ] Typing', '- [ ] Typing <!-- crate-id:new -->')).toEqual({ content: '- [ ] Typing', complete: false });
+		expect(typing.transaction).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(2000);
+		expect(reminderIndexFlushDeferredScans).toHaveBeenCalledOnce();
+
+		const [[event, onLayoutChange]] = plugin.app.workspace.on.mock.calls as [[string, () => void]];
+		expect(event).toBe('layout-change');
+		onLayoutChange();
+		expect(reminderIndexFlushDeferredScans).toHaveBeenCalledTimes(2);
+
+		editor.write('Reminders/Inbox.md', '- [ ] Typing', '- [ ] Typing <!-- crate-id:new -->');
+		stopReminderBackend(plugin as never);
+		expect(plugin.app.workspace.offref).toHaveBeenCalledWith(plugin.app.workspace.on.mock.results[0]?.value);
+		await vi.advanceTimersByTimeAsync(2000);
+		expect(reminderIndexFlushDeferredScans).toHaveBeenCalledTimes(2);
+	} finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});
 
 it('stops the backend signal and watcher when reminders are disabled', async () => {
 	const { initializeReminders } = await loadPluginIntegrationModule();

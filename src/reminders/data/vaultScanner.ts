@@ -23,6 +23,7 @@ import { addReminderIdentityOwners, releaseReminderIdentityOwners, resolveRemind
 import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from '@/sync/local/vault-markdown';
 import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
 import { isConflictFile } from '@/sync/conflict/conflict';
+import type { ReminderEditorWriter } from './editor-normalization';
 
 const log = createLogger('VaultScanner');
 
@@ -36,6 +37,8 @@ export interface ScanResult {
 	deferred?: boolean;
 	/** Set when every file was read and only these files were held back. */
 	deferredPaths?: string[];
+	/** Indexed files whose normalization is still to be written. */
+	writeDeferredPaths?: string[];
 	ambiguousOwners?: ReminderIdentityOwner[];
 }
 
@@ -47,6 +50,8 @@ export interface FileScanResult {
 	diagnostic?: ReminderSourceIssue['diagnostic'];
 	releasedOwners?: ReminderIdentityOwner[];
 	deferred?: boolean;
+	/** Only reminders that need no write were indexed; a later scan writes the rest. */
+	writeDeferred?: boolean;
 }
 
 /**
@@ -100,6 +105,8 @@ interface ScanFileOptions {
 	identityOwners?: ReminderIdentityOwners;
 	shouldDeferNormalization?: () => boolean;
 	shouldDeferCollisionRepair?: () => boolean;
+	/** Writes normalization through a loaded editor that shows the file instead of the vault. */
+	editor?: ReminderEditorWriter;
 	/** Content the caller just read; writes still verify it as their preimage. */
 	preread?: string;
 }
@@ -120,6 +127,7 @@ export async function scanFile(
 		identityOwners,
 		shouldDeferNormalization = () => false,
 		shouldDeferCollisionRepair = () => false,
+		editor,
 		preread,
 	}: ScanFileOptions = {},
 ): Promise<FileScanResult> {
@@ -146,10 +154,28 @@ export async function scanFile(
 			|| (currentReservedIds.size > 0 && shouldDeferCollisionRepair())
 			|| (ownership !== undefined && !ownership.isCurrent());
 		if (mustDefer()) return deferred();
+		// Index the lines normalization would keep; the rest wait for a later scan.
+		const pending = (content: string): FileScanResult => {
+			const lines = content.split("\n");
+			const normalizedLines = normalizeReminderIds(content, currentReservedIds).content.split("\n");
+			const result = scanReminderMarkdownContent(filePath, content, remindersFolderPath, { skipUnresolvedSchedules: true });
+			return {
+				filePath,
+				reminders: result.reminders.filter(reminder => normalizedLines[reminder.lineNumber] === lines[reminder.lineNumber]),
+				lineCount: result.lineCount,
+				writeDeferred: true,
+				...(ownership?.releasedOwners.length ? { releasedOwners: ownership.releasedOwners } : {}),
+			};
+		};
 		let normalized = normalizeReminderIds(originalContent, currentReservedIds, parses.remember);
-		if (normalized.remindersUpdated > 0) {
+		// Nothing has been awaited since the checks above, so they also guard this editor write.
+		const edited = normalized.remindersUpdated > 0 ? editor?.write(filePath, originalContent, normalized.content) : undefined;
+		if (edited && !edited.complete) return pending(edited.content);
+		if (edited) log.info(` Added ${normalized.remindersUpdated} reminder identifiers to ${filePath} through its editor`);
+		else if (normalized.remindersUpdated > 0) {
 			let remindersUpdated = 0;
 			let targetChanged = false;
+			let writeDeferred = false;
 			const content = await processVaultMarkdown(app.vault, file, (currentContent) => {
 				// Ownership was verified for the identifiers in the original bytes.
 				// Retry with new evidence if a concurrent edit changes the target.
@@ -158,11 +184,20 @@ export async function scanFile(
 					return currentContent;
 				}
 				if (signal?.aborted || mustDefer()) return currentContent;
+				// A note opened since the editor check is written through its editor later.
+				if (editor?.isOpen(filePath)) {
+					writeDeferred = true;
+					return currentContent;
+				}
 				const currentNormalization = normalizeReminderIds(currentContent, currentReservedIds, parses.remember);
 				remindersUpdated = currentNormalization.remindersUpdated;
 				return currentNormalization.content;
 			});
 			if (targetChanged) return deferred();
+			if (writeDeferred) {
+				if (signal?.aborted) return cancelled;
+				return mustDefer() ? deferred() : pending(content);
+			}
 			normalized = { content, remindersUpdated };
 			if (remindersUpdated > 0) {
 				log.info(` Added ${remindersUpdated} reminder identifiers to ${filePath}`);
@@ -197,6 +232,7 @@ interface ScanVaultOptions {
 	/** Called without a path before each file, then with the path during its normalization. */
 	shouldDeferNormalization?: (filePath?: string) => boolean;
 	shouldDeferCollisionRepair?: () => boolean;
+	editor?: ReminderEditorWriter;
 	knownOwners?: ReminderIdentityOwner[];
 }
 
@@ -212,6 +248,7 @@ export async function scanVault(
 		signal,
 		shouldDeferNormalization = () => false,
 		shouldDeferCollisionRepair = () => false,
+		editor,
 		knownOwners = [],
 	}: ScanVaultOptions = {},
 ): Promise<ScanResult> {
@@ -244,13 +281,16 @@ export async function scanVault(
 	let deferred = false;
 	let complete = true;
 	const deferredPaths: string[] = [];
+	const writeDeferredPaths: string[] = [];
 	for (const file of reminderFiles) {
 		if (signal?.aborted) break;
 		if (shouldDeferNormalization()) { deferred = true; complete = false; break; }
 		const result = await scanFile(app, file, remindersFolderPath, {
 			signal, identityOwners, shouldDeferNormalization: () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair,
+			editor,
 		});
 		if (result.deferred) { deferred = true; deferredPaths.push(file.path); }
+		if (result.writeDeferred) writeDeferredPaths.push(file.path);
 		if (result.error) {
 			issues.push({ path: result.filePath, reason: result.error, ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}) });
 			continue;
@@ -281,6 +321,7 @@ export async function scanVault(
 		discoveredProjects: Array.from(discoveredProjects).sort(compareProjects),
 		...(deferred ? { deferred: true } : {}),
 		...(deferred && complete ? { deferredPaths } : {}),
+		...(writeDeferredPaths.length ? { writeDeferredPaths } : {}),
 		...(deferred ? { ambiguousOwners: allReminders.filter(reminder => (identityCounts.get(reminder.id) ?? 0) > 1)
 			.map(({ id, filePath }) => ({ id, filePath })) } : {}),
 	};

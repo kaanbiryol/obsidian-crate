@@ -54,6 +54,8 @@ Each note in your reminders folder is a project. `Reminders/Travel.md`, for exam
 
 Crate adds small hidden comments to each checkbox line so it can recognize the same reminder after edits and sync. Leave those comments in place when you edit existing tasks.
 
+When the note is open, Crate adds these comments and turns words like "tomorrow" into a date through the editor, so your cursor and unsaved typing stay put. It leaves the line you're typing until you move off it.
+
 Crate picks up every checkbox in the reminders folder. Use a dedicated folder so checkboxes in your other notes don't become reminders.
 
 <details>

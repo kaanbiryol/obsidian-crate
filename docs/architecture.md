@@ -424,6 +424,15 @@ scan re-reads its inventory if one of those events occurs before publication.
 The same invalidation also stops the scanner's ID normalization, preventing a late
 read from rewriting a note after it moves out of the reminder folder. This keeps
 immediate index updates authoritative over older asynchronous reads.
+Rewriting a note under its editor can drop unsaved typing, so
+`reminders/data/editor-normalization.ts` writes normalization (identifiers, typed
+dates, duplicate repair) of a note shown in a loaded source-mode editor as one editor
+transaction of the changed spans. Obsidian copies it to the note's other tabs and
+saves the file. The write requires the editor text to equal the scanned note;
+otherwise the editor's save starts the next scan. The line under a focused cursor is
+left for a retry about two seconds later. Deferred background tabs, reading views and
+closed notes keep `vault.process`, which skips a note that gained an editor during
+its read; a `layout-change` flush retries it. Skipped lines are indexed once written.
 
 The sync HTTP client binds compatibility checks, dispatch and response publication
 to one connection generation. Replacing credentials or the lifecycle signal

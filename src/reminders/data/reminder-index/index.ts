@@ -18,6 +18,7 @@ import { applyFileScanResult } from './file-scan-result';
 import type { ReminderSourceIssue } from '../reminder-source-issues';
 import { readVaultMarkdown } from '@/sync/local/vault-markdown';
 import { sha256Hex } from '../../../platform/sha256';
+import type { ReminderEditorWriter } from '../editor-normalization';
 
 const contentDigest = sha256Hex;
 
@@ -60,12 +61,14 @@ export interface ReminderIndexOptions {
 	shouldDeferScan?: (filePath?: string) => boolean;
 	/** Holds duplicate-ID repair until sync has reconciled file ownership. */
 	shouldDeferCollisionRepair?: () => boolean;
+	/** Writes normalization of notes open in an editor through that editor. */
+	editor?: ReminderEditorWriter;
 }
 
 export function createReminderIndex(
 	app: App,
 	remindersFolderPath: string,
-	{ signal, shouldDeferScan = () => false, shouldDeferCollisionRepair = () => false }: ReminderIndexOptions = {},
+	{ signal, shouldDeferScan = () => false, shouldDeferCollisionRepair = () => false, editor }: ReminderIndexOptions = {},
 ): ReminderIndex {
 	let reminders: IndexedReminder[] = [];
 	let isLoaded = false;
@@ -148,13 +151,19 @@ export function createReminderIndex(
 			identityOwners,
 			shouldDeferNormalization: () => !scan.current || file.path !== scan.path || shouldDeferScan(filePath),
 			shouldDeferCollisionRepair,
+			editor,
 			preread: content,
 		});
 		if (signal?.aborted || !scan.current || file.path !== scan.path) return false;
 		if (result.deferred) { deferredPaths.add(filePath); return false; }
+		if (result.writeDeferred) {
+			// Without a digest, a later flush reads the note again.
+			scannedDigests.delete(filePath);
+			deferredPaths.add(filePath);
+		}
 		const outcome = applyFileScanResult({
 			reminders, ambiguousOwners, sourceIssues, scannedDigests, discoveredProjects, lookupStore, optimisticState, batchOwners: batch?.owners,
-		}, { filePath, project: getProjectFromPath(filePath, remindersFolderPath), digest, result });
+		}, { filePath, project: getProjectFromPath(filePath, remindersFolderPath), digest: result.writeDeferred ? undefined : digest, result });
 		if (!outcome.applied) {
 			log.error(` Keeping the previous reminder index for ${filePath}: ${outcome.error}`);
 			publishChange();
@@ -165,7 +174,8 @@ export function createReminderIndex(
 		publishChange();
 
 		log.info(` File rescanned, found ${result.reminders.length} reminders`);
-		return true;
+		// A pending write waits for a later flush rather than repeating this one.
+		return !result.writeDeferred;
 	}
 
 	function getMergedReminders(): IndexedReminder[] {
@@ -213,6 +223,7 @@ export function createReminderIndex(
 					signal,
 					shouldDeferNormalization: path => revision !== structureRevision || shouldDeferScan(path),
 					shouldDeferCollisionRepair,
+					editor,
 					knownOwners: [...reminders, ...ambiguousOwners],
 				});
 				// A rename or deletion updates the visible index immediately. Re-read
@@ -245,6 +256,8 @@ export function createReminderIndex(
 				if (issue) sourceIssues.set(path, issue);
 				deferredPaths.add(path);
 			}
+			// Notes whose normalization is still to be written retry on a later flush.
+			for (const path of result.writeDeferredPaths ?? []) deferredPaths.add(path);
 			// Before the first load there are no previous records, so held-back files
 			// show what could be read without normalizing them.
 			const fresh = isLoaded ? result.reminders.filter(reminder => !heldBack.has(reminder.filePath)) : result.reminders;

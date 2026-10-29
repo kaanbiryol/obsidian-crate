@@ -568,6 +568,8 @@ export class PluginSettingTab {
 
 export class Plugin {}
 
+export class MarkdownView {}
+
 export const Platform = {
 	isDesktopApp: true,
 };

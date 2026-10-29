@@ -9,6 +9,10 @@ import { Notice } from 'obsidian';
 import { validateReadingFolder } from '../reading/settings';
 import { createReminderMoveJournal } from './data/reminder-move-journal';
 import { createReminderScanGate } from './scan-gate';
+import { createReminderEditorWriter } from './data/editor-normalization';
+
+/** How soon a line left under a focused cursor is tried again. */
+const EDITOR_RETRY_MS = 2000;
 
 /** The loaded reminders folder. A folder change replaces it; disabling reminders clears it. */
 export interface ReminderBackend {
@@ -91,10 +95,19 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	if (controller.signal.aborted) return undefined;
 
 	const gate = createReminderScanGate({ workspace: plugin.app.workspace, syncRuntime: plugin.syncRuntime, journal });
+	const flushPendingWrites = () => {
+		void index.flushDeferredScans().catch((error: unknown) => { if (!controller.signal.aborted) remindersLogger.error('Failed to update reminders in an open note:', error); });
+	};
+	let editorRetry: number | undefined;
+	const editor = createReminderEditorWriter(plugin.app.workspace, () => {
+		window.clearTimeout(editorRetry);
+		editorRetry = window.setTimeout(flushPendingWrites, EDITOR_RETRY_MS);
+	});
 	const index = createReminderIndex(plugin.app, folderPath, {
 		signal: controller.signal,
 		shouldDeferScan: gate.shouldDeferScan,
 		shouldDeferCollisionRepair: gate.shouldDeferCollisionRepair,
+		editor,
 	});
 	const onSyncStateChanged = () => {
 		gate.onSyncStateChanged();
@@ -112,6 +125,12 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	};
 	plugin.syncRuntime.addStateChangeListener(onSyncStateChanged);
 	controller.signal.addEventListener('abort', () => plugin.syncRuntime.removeStateChangeListener(onSyncStateChanged), { once: true });
+	// Opening or closing a tab retries a write that found the note opened mid-write or its editor out of date.
+	const layoutRef = plugin.app.workspace.on('layout-change', flushPendingWrites);
+	controller.signal.addEventListener('abort', () => {
+		plugin.app.workspace.offref(layoutRef);
+		if (editorRetry !== undefined) window.clearTimeout(editorRetry);
+	}, { once: true });
 	try {
 		await index.load();
 	} catch (error) {

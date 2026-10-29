@@ -33,7 +33,7 @@ async function createPlugin() {
 	});
 	fixtures.push(h);
 	Object.assign(h.vault, { on: () => ({}), offref: () => {} });
-	Object.assign(h.app, { workspace: { layoutReady: true, onLayoutReady: () => {} } });
+	Object.assign(h.app, { workspace: { layoutReady: true, onLayoutReady: () => {}, getLeavesOfType: () => [], on: () => ({}), offref: () => {} } });
 	useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS, enabled: true, confirmed: true }, true);
 	const plugin = {
 		app: h.app,
