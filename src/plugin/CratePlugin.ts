@@ -7,9 +7,11 @@ import type { CloudflareSavedLogin } from '../cloudflare/saved-login';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment/service';
 import {
 	type RemindersSettings,
+	DEFAULT_REMINDERS_SETTINGS,
 	normalizeRemindersSettings,
 	useRemindersSettingsStore,
 } from '../reminders/settings';
+import { DEFAULT_READING_SETTINGS } from '../reading/settings';
 import { type ReminderBackend } from '../reminders/runtime';
 import { configureLogger as configureRemindersLogger } from '../reminders/logger';
 import { SyncRuntime } from '../sync/runtime/runtime';
@@ -62,8 +64,10 @@ export default class CratePlugin extends Plugin {
 		const signal = getPluginLifecycleSignal(this);
 		const data = await this.loadData() as PluginData | null;
 		if (signal.aborted) return;
-		this.settings = normalizeCrateSettings(data, this.app.vault.configDir);
-		const remindersSettings = normalizeRemindersSettings(data?.reminders);
+		// Without saved data this is a fresh install: no feature changes notes until it is turned on in this vault.
+		const saved: PluginData = data ?? { reading: DEFAULT_READING_SETTINGS, reminders: DEFAULT_REMINDERS_SETTINGS };
+		this.settings = normalizeCrateSettings(saved, this.app.vault.configDir);
+		const remindersSettings = normalizeRemindersSettings(saved.reminders);
 		useRemindersSettingsStore.setState(remindersSettings, true);
 		configureSyncLogger({ enabled: this.settings.debugLogging });
 		configureRemindersLogger({ prefix: 'Crate', enabled: this.settings.debugLogging });

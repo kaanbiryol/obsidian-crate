@@ -34,3 +34,42 @@ it('uses a startup toggle and preserves the saved reminder defaults', async () =
 	expect(tab.dropdowns[0]!.value).toBe('today');
 	expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Reminders debug logging')).toBe(false);
 });
+
+it('changes no notes until this vault confirms turning reminders on with their folder', async () => {
+	vi.doMock('../../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
+	const confirm = vi.fn(async (_app: unknown, _options: { message: string }) => false);
+	vi.doMock('../../../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
+	const setRemindersEnabled = vi.fn(async (target: { remindersSettings: { enabled: boolean } }, enabled: boolean) => { target.remindersSettings.enabled = enabled; });
+	vi.doMock('../../plugin-integration', () => ({ setRemindersEnabled }));
+	try {
+		const { renderRemindersSettings } = await import('./settings-section');
+		const plugin = {
+			app: {},
+			settings: { workerUrl: '', reading: { enabled: false, confirmed: false, folderPath: 'Reading' } },
+			secretStorage: { get: () => null },
+			remindersSettings: { enabled: false, confirmed: false, remindersFolderPath: 'Tasks' },
+			writeRemindersSettings: vi.fn(async (update: object) => { Object.assign(plugin.remindersSettings, update); }),
+		};
+		const rerender = vi.fn();
+		renderRemindersSettings({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender });
+		// The folder can be chosen before turning reminders on; device preferences wait.
+		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual(['Enable reminders', 'Reminders folder']);
+		const toggle = MockSetting.instances[0]!.toggles[0]!;
+
+		toggle.change(true);
+		await vi.waitFor(() => expect(rerender).toHaveBeenCalledOnce());
+		expect(confirm.mock.calls[0]![1].message).toContain('"Tasks"');
+		expect(plugin.writeRemindersSettings).not.toHaveBeenCalled();
+		expect(setRemindersEnabled).not.toHaveBeenCalled();
+
+		confirm.mockResolvedValueOnce(true);
+		toggle.change(true);
+		await vi.waitFor(() => expect(rerender).toHaveBeenCalledTimes(2));
+		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ confirmed: true }, expect.any(Function));
+		expect(setRemindersEnabled).toHaveBeenCalledWith(plugin, true, expect.any(Function));
+		expect(plugin.remindersSettings).toMatchObject({ enabled: true, confirmed: true });
+	} finally {
+		vi.doUnmock('../../../ui/confirmation-modal');
+		vi.doUnmock('../../plugin-integration');
+	}
+});

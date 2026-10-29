@@ -23,14 +23,19 @@ describe('normalizeCrateSettings', () => {
 			.toEqual([...ignorePatterns, '.obsidian/workspace*']);
 	});
 
-	it('enables reading by default for new installs and missing preferences', () => {
-		expect(normalizeCrateSettings(undefined, '.obsidian').reading.enabled).toBe(true);
+	it('keeps Reading on and confirmed for settings saved before those preferences existed', () => {
+		expect(normalizeCrateSettings(undefined, '.obsidian').reading).toEqual({ enabled: true, confirmed: true, folderPath: 'Reading' });
 		expect(normalizeCrateSettings({ reading: { folderPath: 'Articles' } as never }, '.obsidian').reading)
-			.toEqual({ enabled: true, folderPath: 'Articles' });
+			.toEqual({ enabled: true, confirmed: true, folderPath: 'Articles' });
 	});
 
 	it('preserves explicitly disabled Reading', () => {
-		expect(normalizeCrateSettings({ reading: { enabled: false, folderPath: 'Reading' } }, '.obsidian').reading.enabled).toBe(false);
+		expect(normalizeCrateSettings({ reading: { enabled: false, folderPath: 'Reading', confirmed: true } }, '.obsidian').reading.enabled).toBe(false);
+	});
+
+	it('never runs Reading in a vault that has not confirmed it', () => {
+		expect(normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading', confirmed: false } }, '.obsidian').reading)
+			.toEqual({ enabled: false, confirmed: false, folderPath: 'Reading' });
 	});
 
 	it.each([undefined, null, {}])('defaults to manual sync when settings are %s', saved => {

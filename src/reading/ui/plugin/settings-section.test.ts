@@ -3,6 +3,7 @@ import { FakeElement, MockSetting, openSettingsDisclosures, createObsidianUiModu
 
 const request = vi.fn();
 const validate = vi.fn();
+const confirm = vi.fn(async (_app: unknown, _options: { message: string }) => true);
 const policy = { enabled: 1, folder_path: 'Articles', generation: 'g', revision: 'r' };
 
 beforeEach(() => {
@@ -10,6 +11,7 @@ beforeEach(() => {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isDesktopApp: true } }));
 	vi.doMock('../../../plugin/server-request', async () => ({ ...await vi.importActual<typeof import('../../../plugin/server-request')>('../../../plugin/server-request'), serverRequest: request }));
 	vi.doMock('../../runtime', () => ({ restartReading: vi.fn(), validateReadingConfiguration: validate }));
+	vi.doMock('../../../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	request.mockImplementation(async () => ({ policy }));
 });
 afterEach(() => {
@@ -19,18 +21,20 @@ afterEach(() => {
 	vi.doUnmock('../../ui/settings/folder-suggest');
 	vi.doUnmock('../../../plugin/server-request');
 	vi.doUnmock('../runtime');
+	vi.doUnmock('../../../ui/confirmation-modal');
 	request.mockReset();
+	confirm.mockClear();
 	validate.mockReset();
 });
 
-async function setup(connected = true, enabled = true) {
+async function setup(connected = true, enabled = true, confirmed = true) {
 	const plugin = {
 		app: { workspace: { detachLeavesOfType: vi.fn() } },
 		syncRuntime: { getApiClient: () => null },
-		remindersSettings: { enabled: true },
+		remindersSettings: { enabled: true, confirmed: true },
 		secretStorage: { get: (key: string) => key === 'crate-auth-token' ? 'synthetic' : null },
-		settings: { reading: { enabled, folderPath: 'Reading' }, workerUrl: connected ? 'https://crate.example' : '' },
-		writeSettings: vi.fn(async ({ reading }: { reading: { enabled: boolean; folderPath: string } }) => { plugin.settings.reading = reading; }),
+		settings: { reading: { enabled, folderPath: 'Reading', confirmed }, workerUrl: connected ? 'https://crate.example' : '' },
+		writeSettings: vi.fn(async ({ reading }: { reading: { enabled: boolean; folderPath: string; confirmed: boolean } }) => { plugin.settings.reading = reading; }),
 	};
 	const container = Object.assign(new FakeElement('div'), { isConnected: true });
 	const rerender = vi.fn();
@@ -55,15 +59,41 @@ it.each([true, false])('sets local Reading to %s without changing another device
  const { plugin, toggle, rerender } = await setup(false, !enabled);
  toggle.change(enabled);
  await vi.waitFor(() => expect(rerender).toHaveBeenCalled());
- expect(plugin.settings.reading).toEqual({ enabled, folderPath: 'Reading' });
+ expect(plugin.settings.reading).toEqual({ enabled, folderPath: 'Reading', confirmed: true });
  expect(request).not.toHaveBeenCalled();
+ expect(confirm).not.toHaveBeenCalled();
  const { restartReading } = await import('../../runtime');
  expect(restartReading).toHaveBeenCalledExactlyOnceWith(plugin, enabled);
 });
 
-it('hides preferences when Reading is disabled', async () => {
- await setup(false, false);
- expect(MockSetting.instances.map(row => row.nameEl.textContent)).toEqual(['Enable reading']);
+it('shows the folder while Reading is off, so it can be chosen before turning it on', async () => {
+ await setup(false, false, false);
+ expect(MockSetting.instances.map(row => row.nameEl.textContent)).toEqual(['Enable reading', 'Reading folder']);
+});
+
+it('changes no notes until this vault confirms turning Reading on with its folder', async () => {
+ const { plugin, toggle, rerender } = await setup(false, false, false);
+ confirm.mockResolvedValueOnce(false);
+ toggle.change(true);
+ await vi.waitFor(() => expect(rerender).toHaveBeenCalled());
+ expect(confirm.mock.calls[0]![1].message).toContain('"Reading"');
+ expect(plugin.writeSettings).not.toHaveBeenCalled();
+ const { restartReading } = await import('../../runtime');
+ expect(restartReading).not.toHaveBeenCalled();
+
+ toggle.change(true);
+ await vi.waitFor(() => expect(restartReading).toHaveBeenCalledExactlyOnceWith(plugin, true));
+ expect(plugin.settings.reading).toEqual({ enabled: true, folderPath: 'Reading', confirmed: true });
+});
+
+it('names the folder from the server when a connected vault turns Reading on', async () => {
+ const { plugin, toggle, rerender } = await setup(true, false, false);
+ confirm.mockResolvedValueOnce(false);
+ toggle.change(true);
+ await vi.waitFor(() => expect(rerender).toHaveBeenCalled());
+ expect(request).toHaveBeenCalledExactlyOnceWith(plugin, '/reading/policy');
+ expect(confirm.mock.calls[0]![1].message).toContain('"Articles"');
+ expect(plugin.writeSettings).not.toHaveBeenCalled();
 });
 
 it('keeps the feature enabled if saving its preference fails', async () => {
@@ -108,5 +138,5 @@ it('keeps a pause made while a folder change waits for the server', async () => 
  await vi.waitFor(() => expect(plugin.settings.reading.enabled).toBe(false));
  release();
  await vi.waitFor(() => expect(plugin.settings.reading.folderPath).toBe('New reading'));
- expect(plugin.settings.reading).toEqual({ enabled: false, folderPath: 'New reading' });
+ expect(plugin.settings.reading).toEqual({ enabled: false, folderPath: 'New reading', confirmed: true });
 });

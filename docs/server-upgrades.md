@@ -125,7 +125,11 @@ capture requests remain supported.
 article-extraction preferences. Both features default on. The policy is stored in
 the `features` column of the single `server_state` row, which authentication reads
 with the token. Local enabled flags cache the
-server state rather than overwriting it.
+server state rather than overwriting it. The policy never starts a feature in a
+vault that has not confirmed it: the plugin keeps the local flag off, shows a notice
+once per load, and records `confirmed` only when the feature is turned on in that
+vault's settings after a prompt naming its folder. Plugin data saved before the flag
+existed counts as confirmed; a vault without plugin data starts with both off.
 
 Pausing stops server APIs and background work without deleting sources, indexes,
 credentials, or queued work. Reading checks before fetching and publication;

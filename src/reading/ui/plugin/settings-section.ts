@@ -1,4 +1,4 @@
-import { setSharedFeature } from '../../../plugin/feature-settings';
+import { confirmFeatureFolder, setSharedFeature } from '../../../plugin/feature-settings';
 import { captureServerConnection } from '../../../plugin/server-request';
 import { Notice, Setting } from 'obsidian';
 import { createSettingsDisclosure } from '../../../ui/plugin/settings-disclosure';
@@ -10,17 +10,17 @@ import { restartReading, validateReadingConfiguration } from '../../runtime';
 
 export function renderReadingSettings({ containerEl: container, plugin, rerender }: SettingsSectionContext): () => void {
 	let folderSuggest: FolderSuggest | undefined;
-	createSettingsDisclosure(container, 'Reading', { summary: plugin.settings.reading.enabled ? `Folder: ${plugin.settings.reading.folderPath}` : 'Paused', onOpen: options => {
+	const reading = plugin.settings.reading;
+	createSettingsDisclosure(container, 'Reading', { summary: reading.enabled ? `Folder: ${reading.folderPath}` : reading.confirmed ? 'Paused' : 'Off', onOpen: options => {
 		new Setting(options).setName('Enable reading')
 			.setDesc('All devices · pause or resume reading and article downloads. This device downloads saved links directly into your vault. YouTube links also request available transcripts. Playback connects to YouTube only when you select play. Saved notes and vault sync are preserved.')
 			.addToggle(toggle => toggle.setValue(plugin.settings.reading.enabled).onChange(async enabled => {
 				toggle.setDisabled(true);
 				try {
-					await setSharedFeature(plugin, 'reading', enabled);
+					if (!enabled || await confirmFeatureFolder(plugin, 'reading')) await setSharedFeature(plugin, 'reading', enabled);
 				} catch (error) { new Notice(error instanceof Error ? error.message : 'Could not change Reading.'); }
 				finally { rerender(); }
 			}));
-		if (!plugin.settings.reading.enabled) return;
 
 		new Setting(options).setName('Reading folder')
 			.setDesc('Notes in this folder appear in reading. Changing the folder does not move files.')

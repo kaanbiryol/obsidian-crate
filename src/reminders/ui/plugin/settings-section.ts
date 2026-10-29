@@ -1,4 +1,4 @@
-import { setSharedFeature } from '../../../plugin/feature-settings';
+import { confirmFeatureFolder, setSharedFeature } from '../../../plugin/feature-settings';
 import { Notice, Setting } from 'obsidian';
 import { changeReminderFolder } from '../../notification-policy-sync';
 import {
@@ -26,17 +26,20 @@ export function renderRemindersSettings(context: SettingsSectionContext): () => 
 	};
 
 	let folderSuggest: FolderSuggest | undefined;
-	const preferences = createSettingsDisclosure(containerEl, 'Reminders', { summary: settings.enabled ? `Folder: ${settings.remindersFolderPath}` : 'Paused' });
+	const preferences = createSettingsDisclosure(containerEl, 'Reminders', {
+		summary: settings.enabled ? `Folder: ${settings.remindersFolderPath}` : settings.confirmed ? 'Paused' : 'Off',
+	});
 
 	new Setting(preferences).setName('Enable reminders')
 		.setDesc('All devices · pause or resume reminders and their notifications. Notes and vault sync are preserved.')
 		.addToggle(toggle => toggle.setValue(settings.enabled).onChange(async enabled => {
 			toggle.setDisabled(true);
-			try { await setSharedFeature(plugin, 'reminders', enabled); }
+			try {
+				if (!enabled || await confirmFeatureFolder(plugin, 'reminders')) await setSharedFeature(plugin, 'reminders', enabled);
+			}
 			catch (error) { new Notice(`Could not change reminders: ${errorMessage(error)}`); }
 			finally { rerender(); }
 		}));
-	if (!settings.enabled) return () => {};
 
 	new Setting(preferences)
 		.setName('Reminders folder')
@@ -74,6 +77,7 @@ export function renderRemindersSettings(context: SettingsSectionContext): () => 
 			});
 		});
 
+	if (!settings.enabled) return () => folderSuggest?.close();
 	const viewPreferences = preferences.createDiv();
 
 	new Setting(viewPreferences)

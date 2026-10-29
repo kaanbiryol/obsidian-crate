@@ -5,20 +5,21 @@ import type { SyncState } from '../sync/types';
 import { restartReading } from '../reading/runtime';
 import { serverRequest } from './server-request';
 import { setRemindersEnabled } from '../reminders/plugin-integration';
+import { Notice } from '../test/mocks/obsidian';
 vi.mock('./server-request', async importOriginal => ({ ...await importOriginal<typeof import('./server-request')>(), serverRequest: vi.fn() }));
 vi.mock('../reading/runtime', () => ({ restartReading: vi.fn() }));
 vi.mock('../reminders/plugin-integration', () => ({
 	setRemindersEnabled: vi.fn(async (plugin: { remindersSettings: { enabled: boolean } }, enabled: boolean) => { plugin.remindersSettings.enabled = enabled; }),
 }));
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { vi.clearAllMocks(); Notice.reset(); });
 function fixture() {
 	const plugin = {
-		settings: { workerUrl: 'https://crate.example', reading: { enabled: true, folderPath: 'Reading' } },
-		remindersSettings: { enabled: true },
+		settings: { workerUrl: 'https://crate.example', reading: { enabled: true, folderPath: 'Reading', confirmed: true } },
+		remindersSettings: { enabled: true, confirmed: true },
 		secretStorage: { get: () => 'synthetic' },
 		app: { vault: { configDir: '.obsidian' }, workspace: { detachLeavesOfType: vi.fn() } }, refreshSettingsTab: vi.fn(),
-		writeSettings: vi.fn(async (value: { reading: { enabled: boolean; folderPath: string } }) => { plugin.settings.reading = value.reading; }),
-		writeRemindersSettings: vi.fn(async (value: { enabled: boolean }) => { plugin.remindersSettings = value; }),
+		writeSettings: vi.fn(async (value: { reading: { enabled: boolean; folderPath: string; confirmed: boolean } }) => { plugin.settings.reading = value.reading; }),
+		writeRemindersSettings: vi.fn(async (value: Partial<{ enabled: boolean; confirmed: boolean }>) => { plugin.remindersSettings = { ...plugin.remindersSettings, ...value }; }),
 	};
 	return plugin;
 }
@@ -55,6 +56,32 @@ it('resumes local backends when another device resumes the server features', asy
 	expect(restartReading).toHaveBeenCalledExactlyOnceWith(plugin, true);
 	expect(setRemindersEnabled).toHaveBeenCalledWith(plugin, true, expect.any(Function));
 	expect(plugin.refreshSettingsTab).toHaveBeenCalledOnce();
+});
+it('waits for this vault to confirm before a server policy starts a feature, and says so once', async () => {
+	const plugin = fixture();
+	plugin.settings.reading = { enabled: false, folderPath: 'Reading', confirmed: false };
+	plugin.remindersSettings = { enabled: false, confirmed: false };
+	vi.mocked(serverRequest).mockResolvedValue({ reading: true, reminders: true, revision: 'one' });
+	await refreshSharedFeatures(plugin as unknown as CratePlugin);
+	await refreshSharedFeatures(plugin as unknown as CratePlugin);
+	expect(plugin.writeSettings).not.toHaveBeenCalled();
+	expect(plugin.writeRemindersSettings).not.toHaveBeenCalled();
+	expect(restartReading).not.toHaveBeenCalled();
+	expect(setRemindersEnabled).not.toHaveBeenCalled();
+	expect(plugin.refreshSettingsTab).not.toHaveBeenCalled();
+	expect(Notice.messages).toEqual([
+		'Reminders are on for your Crate server. To use them in this vault, turn them on in Crate settings.',
+		'Reading is on for your Crate server. To use it in this vault, turn it on in Crate settings.',
+	]);
+});
+it('starts a feature the server already has on once this vault turns it on', async () => {
+	const plugin = fixture();
+	plugin.settings.reading = { enabled: false, folderPath: 'Reading', confirmed: false };
+	vi.mocked(serverRequest).mockResolvedValue({ reading: true, reminders: true, revision: 'one' });
+	await setSharedFeature(plugin as unknown as CratePlugin, 'reading', true);
+	expect(plugin.settings.reading).toEqual({ enabled: true, folderPath: 'Reading', confirmed: true });
+	expect(restartReading).toHaveBeenCalledExactlyOnceWith(plugin, true);
+	expect(Notice.messages).toEqual([]);
 });
 it('checks the shared policy at startup and after completed syncs at most every ten minutes, not on a timer', async () => {
 	vi.useFakeTimers({ toFake: ['Date'] });

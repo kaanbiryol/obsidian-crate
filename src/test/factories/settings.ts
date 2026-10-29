@@ -5,7 +5,6 @@ import { DEFAULT_SETTINGS, type CrateSettings } from '../../plugin/settings-type
 export function createTestSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	return {
 		...structuredClone(DEFAULT_SETTINGS),
-		reading: { enabled: false, folderPath: 'Reading' },
 		workerUrl: 'https://worker.example',
 		automaticSync: true,
 		syncInterval: 0,

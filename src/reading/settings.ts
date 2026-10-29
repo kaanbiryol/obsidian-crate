@@ -1,7 +1,13 @@
 import { getPortablePathIssue, getSyncPathIssue, portablePathKey } from '../protocol/portable-path';
 
-export interface ReadingSettings { enabled: boolean; folderPath: string }
-export const DEFAULT_READING_SETTINGS: ReadingSettings = { enabled: true, folderPath: 'Reading' };
+export interface ReadingSettings {
+	enabled: boolean;
+	folderPath: string;
+	/** This vault agreed to let Crate change notes in the folder. A server policy alone never sets it. */
+	confirmed: boolean;
+}
+/** A fresh install: Reading changes no notes until it is turned on in this vault. */
+export const DEFAULT_READING_SETTINGS: ReadingSettings = { enabled: false, folderPath: 'Reading', confirmed: false };
 
 export function validateReadingFolder(value: string, remindersFolder?: string, configDir?: string): string {
 	const folder = value.trim();
@@ -17,11 +23,13 @@ export function validateReadingFolder(value: string, remindersFolder?: string, c
 	return folder;
 }
 
+/** Saved settings without a field predate it, from installs that already ran Reading in this vault.
+ * Reading runs only in a vault that confirmed it. */
 export function normalizeReadingSettings(value: unknown): ReadingSettings {
-	if (!value || typeof value !== 'object') return { ...DEFAULT_READING_SETTINGS };
-	const settings = value as Partial<ReadingSettings>;
-	const enabled = typeof settings.enabled === 'boolean' ? settings.enabled : true;
+	const settings = value && typeof value === 'object' ? value as Partial<ReadingSettings> : {};
+	const confirmed = typeof settings.confirmed === 'boolean' ? settings.confirmed : true;
+	const enabled = confirmed && (typeof settings.enabled === 'boolean' ? settings.enabled : true);
 	try {
-		return { enabled, folderPath: validateReadingFolder(typeof settings.folderPath === 'string' ? settings.folderPath : 'Reading') };
-	} catch { return { ...DEFAULT_READING_SETTINGS, enabled }; }
+		return { enabled, confirmed, folderPath: validateReadingFolder(typeof settings.folderPath === 'string' ? settings.folderPath : 'Reading') };
+	} catch { return { enabled, confirmed, folderPath: DEFAULT_READING_SETTINGS.folderPath }; }
 }

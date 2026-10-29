@@ -211,6 +211,24 @@ describe('CratePlugin settings persistence', () => {
 		expect(plugin.remindersSettings.enabled).toBe(true);
 	});
 
+	it('starts a fresh install with reading and reminders off until this vault turns them on', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } }, loadData: vi.fn(async () => null) });
+		await plugin.loadSettings();
+		expect(plugin.settings.reading).toEqual({ enabled: false, confirmed: false, folderPath: 'Reading' });
+		expect(plugin.remindersSettings).toMatchObject({ enabled: false, confirmed: false, remindersFolderPath: 'Reminders' });
+	});
+
+	it.each([true, false])('keeps the feature state saved by an earlier version without asking again (%s)', async enabled => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } }, loadData: vi.fn(async () => ({
+			workerUrl: 'https://crate.example', reading: { enabled, folderPath: 'Articles' }, reminders: { enabled, remindersFolderPath: 'Tasks' },
+		})) });
+		await plugin.loadSettings();
+		expect(plugin.settings.reading).toEqual({ enabled, confirmed: true, folderPath: 'Articles' });
+		expect(plugin.remindersSettings).toMatchObject({ enabled, confirmed: true, remindersFolderPath: 'Tasks' });
+	});
+
 	it('does not publish settings from an unloaded instance after a newer instance loads', async () => {
 		const { endPluginLifecycle } = await import('./lifecycle-state');
 		const old = new CratePlugin({} as never, {} as never);

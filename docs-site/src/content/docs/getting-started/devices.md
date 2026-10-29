@@ -18,7 +18,8 @@ There are two ways to use Crate on another device:
 4. If you use encryption, open **Manage encryption** in Crate’s Sync settings and enter your recovery key.
 5. Run **Crate: Sync now** and wait for it to finish.
 6. Open a note on both devices to check that it matches. If both devices changed the same content, [review the conflicts](/docs/troubleshooting/conflicts/).
-7. If you want this device to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync**. It starts off on every new device.
+7. To use Reading or Reminders here, turn them on under **Settings → Crate**. Crate doesn't start them in a new vault on its own, even when your server has them on.
+8. If you want this device to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync**. It starts off on every new device.
 
 :::caution[One vault per server]
 Connecting two different vaults to the same server merges their files. Give each unrelated vault its own server.

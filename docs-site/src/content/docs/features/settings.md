@@ -5,7 +5,7 @@ description: Turn Crate features on or off, understand which devices a setting a
 
 Crate does several things: vault sync, Reading, and Reminders. Use one, two, or all three. Notifications and encryption are optional extras you can add whenever you like.
 
-Everything lives under **Settings → Crate** in Obsidian. Once a server is connected, expand **Reading**, **Reminders**, or **Notifications** to see their controls. Sync controls are under **Sync**.
+Everything lives under **Settings → Crate** in Obsidian. Expand **Reading** or **Reminders** to see their controls, with or without a server. **Notifications** and the **Sync** controls appear once a server is connected.
 
 ## What starts on?
 
@@ -14,16 +14,18 @@ Here's what a new installation looks like. If you connect to a server you alread
 | Feature | Starts | Where to change it |
 | --- | --- | --- |
 | Automatic vault sync | Off on each Obsidian device | **Sync → Automatic sync** |
-| Reading | On, using the `Reading` folder | **Reading → Enable reading** |
-| Reminders | On, using the `Reminders` folder | **Reminders → Enable reminders** |
+| Reading | Off until you turn it on in this vault | **Reading → Enable reading** |
+| Reminders | Off until you turn them on in this vault | **Reminders → Enable reminders** |
 | Reminder notifications | Off | **Notifications → Push notifications**, then [register each receiving device](/docs/features/notifications/) |
 | End-to-end encryption | Off | **Sync → End-to-end encryption** |
 
+Reading and Reminders change the notes in their folders: Reading adds properties to every Markdown note in the `Reading` folder, and Reminders adds hidden tracking IDs to checkboxes in the `Reminders` folder. That's why neither starts on its own. When you turn one on, Crate names the folder it will use and asks first. To use a different folder, change **Reading folder** or **Reminders folder** before turning the feature on.
+
 A few common setups:
 
-- **Just sync:** turn off **Enable reading** and **Enable reminders**.
-- **Reminders without alerts:** leave Reminders on and **Push notifications** off.
-- **Try before you set up a server:** [Reading](/docs/features/reading/#save-your-first-article) and [Reminders](/docs/features/reminders/#create-a-reminder) work locally with their commands and default folders. The settings screen shows feature controls after a server is connected.
+- **Just sync:** leave **Enable reading** and **Enable reminders** off.
+- **Reminders without alerts:** turn on Reminders and leave **Push notifications** off.
+- **Try before you set up a server:** turn on [Reading](/docs/features/reading/#save-your-first-article) or [Reminders](/docs/features/reminders/#create-a-reminder). Both work locally with their commands.
 
 ## Pause Reading or Reminders
 
@@ -35,6 +37,8 @@ Turn off **Enable reading** or **Enable reminders** in its section. Turn it back
 
 :::note[These switches affect every device]
 They apply to **all devices connected to this server**, so changing them needs a connection. Other devices pick up the change when they next check the server. An offline device keeps its last known setting until it reconnects.
+
+A vault that has never used a feature doesn't start it from the server's setting. Crate shows a notice instead, and you turn the feature on in that vault's settings after checking its folder.
 :::
 
 ## Pause sync on one device

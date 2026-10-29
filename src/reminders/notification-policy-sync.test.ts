@@ -8,7 +8,7 @@ import { reinitializeWithFolder } from './plugin-integration';
 
 vi.mock('../plugin/lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
 vi.mock('./plugin-integration', () => ({ reinitializeWithFolder: vi.fn(async () => {}) }));
-beforeEach(() => useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS, enabled: true }, true));
+beforeEach(() => useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS, enabled: true, confirmed: true }, true));
 afterEach(() => vi.restoreAllMocks());
 
 function harness() {

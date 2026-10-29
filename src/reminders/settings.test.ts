@@ -21,6 +21,7 @@ describe('normalizeRemindersSettings', () => {
 
 		expect(settings).toEqual({
 			enabled: true,
+			confirmed: true,
 			listStyle: 'flat',
 			taskCreationDefaultDueDate: 'tomorrow',
 			remindersFolderPath: 'Reminders/Work',
@@ -42,21 +43,31 @@ describe('normalizeRemindersSettings', () => {
 
 		expect(settings).toEqual({
 			...DEFAULT_REMINDERS_SETTINGS,
+			enabled: true,
+			confirmed: true,
 		});
 	});
 
-	it('enables reminders by default for new installs and missing preferences', () => {
-		expect(normalizeRemindersSettings(undefined).enabled).toBe(true);
+	it('starts a fresh install with reminders off and unconfirmed', () => {
+		expect(DEFAULT_REMINDERS_SETTINGS).toMatchObject({ enabled: false, confirmed: false });
+	});
+
+	it('keeps reminders on and confirmed for settings saved before those preferences existed', () => {
+		const upgraded = { ...DEFAULT_REMINDERS_SETTINGS, enabled: true, confirmed: true };
 		expect(normalizeRemindersSettings({}).enabled).toBe(true);
-		expect(normalizeRemindersSettings(undefined)).toEqual(DEFAULT_REMINDERS_SETTINGS);
-		expect(normalizeRemindersSettings(null)).toEqual(DEFAULT_REMINDERS_SETTINGS);
+		expect(normalizeRemindersSettings(undefined)).toEqual(upgraded);
+		expect(normalizeRemindersSettings(null)).toEqual(upgraded);
+	});
+
+	it('never runs reminders in a vault that has not confirmed them', () => {
+		expect(normalizeRemindersSettings({ enabled: true, confirmed: false })).toMatchObject({ enabled: false, confirmed: false });
 	});
 
 	it('drops retired embedded-block preferences from saved settings', () => {
 		const saved = { enabled: false, queryViewPreferences: { abc123: { showCompleted: true } } };
 		const settings = normalizeRemindersSettings(saved);
 		expect(settings).not.toHaveProperty('queryViewPreferences');
-		expect(settings).toEqual({ ...DEFAULT_REMINDERS_SETTINGS, enabled: false });
+		expect(settings).toEqual({ ...DEFAULT_REMINDERS_SETTINGS, enabled: false, confirmed: true });
 	});
 
 	it('preserves explicitly disabled Reminders', () => {

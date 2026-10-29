@@ -9,11 +9,12 @@ Crate reminders are ordinary Markdown checkboxes in your vault. Plan your day in
 
 ## Create a reminder
 
-1. Open Obsidian's command palette and run **Crate: Create reminder**.
-2. Type something natural, like "Send the proposal tomorrow at 12", and check the date Crate picked up. You can also set the date yourself, choose a project, add a description, set a priority, or make it repeat.
-3. Save it, then run **Crate: Open sidebar** to see your reminders.
+1. Open **Settings → Crate → Reminders** and turn on **Enable reminders**. Crate adds hidden tracking IDs to checkboxes in your reminders folder, so it names the folder and asks first. To use another folder, change **Reminders folder** before turning reminders on.
+2. Open Obsidian's command palette and run **Crate: Create reminder**.
+3. Type something natural, like "Send the proposal tomorrow at 12", and check the date Crate picked up. You can also set the date yourself, choose a project, add a description, set a priority, or make it repeat.
+4. Save it, then run **Crate: Open sidebar** to see your reminders.
 
-Reminders are saved in the `Reminders` folder and work without a server. You need a server for syncing and notifications. Once connected, you can pick another folder under **Settings → Crate → Reminders → Reminders folder**.
+Reminders are saved in your reminders folder, `Reminders` unless you choose another, and work without a server. You need a server for syncing and notifications.
 
 Words like "tomorrow" become a real date when you save, so the reminder doesn't keep drifting forward each time you open it.
 

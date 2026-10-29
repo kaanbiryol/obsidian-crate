@@ -18,6 +18,8 @@ export type RemindersSettings = {
 	/** Explicit local edit waiting for this server, never copied to another connection. */
 	pendingServerFolder?: { id: string; workerUrl: string; folderPath: string };
 	enabled: boolean;
+	/** This vault agreed to let Crate change notes in the folder. A server policy alone never sets it. */
+	confirmed: boolean;
 	/** Shared by reminders and Reading; retained here for saved-setting compatibility. */
 	listStyle: ListStyle;
 	taskCreationDefaultDueDate: DueDateDefaultSetting;
@@ -28,8 +30,10 @@ export type RemindersSettings = {
 	allDayNotificationTime: string | null;
 };
 
+/** A fresh install: reminders change no notes until they are turned on in this vault. */
 export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
-	enabled: true,
+	enabled: false,
+	confirmed: false,
 	listStyle: DEFAULT_LIST_STYLE,
 	taskCreationDefaultDueDate: 'none',
 	remindersFolderPath: DEFAULT_REMINDERS_FOLDER_PATH,
@@ -97,16 +101,20 @@ export function normalizeRemindersFolderPath(rawPath: string | null | undefined)
 	return normalizePath(safeSegments.join('/'));
 }
 
+/** Saved settings without a field predate it, from installs that already ran reminders in this vault.
+ * Reminders run only in a vault that confirmed them. */
 export function normalizeRemindersSettings(
 	value: Partial<RemindersSettings> | null | undefined,
 ): RemindersSettings {
+	const confirmed = typeof value?.confirmed === 'boolean' ? value.confirmed : true;
 	return {
 		...(isRecord(value?.pendingServerFolder) && typeof value.pendingServerFolder.id === 'string'
 			&& typeof value.pendingServerFolder.workerUrl === 'string' && value.pendingServerFolder.workerUrl
 			&& typeof value.pendingServerFolder.folderPath === 'string'
 			? { pendingServerFolder: { id: value.pendingServerFolder.id, workerUrl: value.pendingServerFolder.workerUrl,
 				folderPath: normalizeRemindersFolderPath(value.pendingServerFolder.folderPath) } } : {}),
-		enabled: typeof value?.enabled === 'boolean' ? value.enabled : true,
+		enabled: confirmed && (typeof value?.enabled === 'boolean' ? value.enabled : true),
+		confirmed,
 		listStyle: normalizeListStyle(value?.listStyle),
 
 		taskCreationDefaultDueDate: isDueDateDefaultSetting(value?.taskCreationDefaultDueDate)

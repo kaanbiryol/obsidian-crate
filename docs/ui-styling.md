@@ -982,7 +982,8 @@ remain in the feature adapters.
 
 Plugin settings use three top-level groups: **Sync** for connection status,
 sync options, and web app access; **Features** for the matching **Reminders**,
-**Reading**, and **Notifications** disclosures; and **Management** for
+**Reading**, and **Notifications** disclosures, where Reminders and Reading also
+show without a server; and **Management** for
 **Account and devices**, **Usage**, **Server**, and **Troubleshooting**. **Usage**
 shows Cloudflare account metrics and allowances when an account is configured. Feature switches
 live inside their disclosures. Collapsed rows summarize folder choices or status.

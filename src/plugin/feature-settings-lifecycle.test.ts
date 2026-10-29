@@ -18,7 +18,7 @@ vi.mock('../reminders/ui/plugin/workspaceLayout', () => ({ activateOrRevealRemin
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS, enabled: true }, true);
+	useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS, enabled: true, confirmed: true }, true);
 });
 
 function fixture() {
@@ -29,7 +29,7 @@ function fixture() {
 	const detachLeaves = vi.fn();
 	Object.assign(plugin, {
 		app: { vault: { configDir: '.obsidian' }, workspace: { detachLeavesOfType: detachLeaves } },
-		settings: normalizeCrateSettings({ workerUrl: 'https://original.example', reading: { enabled: true, folderPath: 'Reading' } }, '.obsidian'),
+		settings: normalizeCrateSettings({ workerUrl: 'https://original.example', reading: { enabled: true, folderPath: 'Reading', confirmed: true } }, '.obsidian'),
 		secretStorage: { get: () => token }, saveData, refreshSettingsTab: refresh,
 	});
 	return { plugin, saveData, refresh, detachLeaves, changeToken: () => { token = 'replacement'; } };

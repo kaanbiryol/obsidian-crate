@@ -8,6 +8,7 @@ import { createReadingNote, parseReadingNote, updateReadingNote } from './core/n
 import { getReadingLibrary, restartReading, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
 import { readReadingPolicy, writeReadingPolicy } from './server';
 import { SECRET_KEYS } from '../platform/secret-keys';
+import { DEFAULT_READING_SETTINGS } from './settings';
 
 vi.mock('./desktop-capture', () => ({ captureDesktopArticle: vi.fn(async () => ({ markdown: 'Downloaded article text from the desktop.', title: 'Desktop article' })) }));
 vi.mock('./server', () => ({ readReadingPolicy: vi.fn(), writeReadingPolicy: vi.fn() }));
@@ -31,7 +32,7 @@ function harness() {
 		adapter: { readBinary: async (path: string) => new TextEncoder().encode(await vault.read(Object.assign(new TFile(), { path }))).buffer },
 	};
 	const workspace = { layoutReady: false, on: () => ({}), offref: vi.fn(), getLeavesOfType: () => [], onLayoutReady: (callback: () => void) => { callbacks.push(callback); if (workspace.layoutReady) callback(); } };
-	const plugin = { secretStorage: { get: () => null }, settings: normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading' } }, '.obsidian'),
+	const plugin = { secretStorage: { get: () => null }, settings: normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading', confirmed: true } }, '.obsidian'),
 		remindersSettings: { remindersFolderPath: 'Reminders' }, app: { vault, workspace }, registerEvent: vi.fn(),
 		syncRuntime: { getState: () => ({ status }), addStateChangeListener: (listener: () => void) => { syncListeners.add(listener); }, removeStateChangeListener: (listener: () => void) => { syncListeners.delete(listener); } },
 	} as unknown as CratePlugin;
@@ -224,6 +225,16 @@ describe('Reading runtime lifecycle', () => {
 		expect(getReadingLibrary(h.plugin)!.getSnapshot().items[0]).toMatchObject({ title: 'article', source_url: 'https://example.com/article', reading_status: 'inbox', favorite: false });
 		expect(h.vault.process).toHaveBeenCalledTimes(1);
 		stopReading(h.plugin);
+	});
+	it('leaves notes in an existing Reading folder unchanged on a fresh install', async () => {
+		const h = harness();
+		h.plugin.settings.reading = { ...DEFAULT_READING_SETTINGS };
+		h.edit(() => '# Personal notes');
+		h.workspace.layoutReady = true; startReading(h.plugin);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(getReadingLibrary(h.plugin)).toBeUndefined();
+		expect(h.vault.read).not.toHaveBeenCalled();
+		expect(h.vault.process).not.toHaveBeenCalled();
 	});
 	it('waits for the vault and startup sync, then cancels every watcher on unload', async () => {
 		const h = harness(); startReading(h.plugin);
