@@ -10,6 +10,10 @@ vi.mock('../reminders/encryption-session', () => ({
 	reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }),
 }));
 vi.mock('../config', async () => ({ ...await vi.importActual('../config'), adoptReminderFolder: vi.fn() }));
+vi.mock('./server-compatibility', async () => {
+	const { CRATE_PLUGIN_PROTOCOL } = await vi.importActual<typeof import('@/protocol/server-info')>('@/protocol/server-info');
+	return { requireCompatibleProtocol: async () => CRATE_PLUGIN_PROTOCOL.current };
+});
 
 beforeEach(() => {
 	vi.stubGlobal('localStorage', { getItem: () => 'session' });
@@ -49,6 +53,67 @@ it('reuses the startup probe in the app client instead of probing again', async 
 	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
 });
 
+it.each([401, 403, 423, 428])('probes again after a %i instead of trusting an earlier unencrypted response', async status => {
+	let refused: number | null = null;
+	const fetchMock = vi.fn(async (_path: string, _init?: RequestInit) => refused
+		? Response.json({ error: 'Refused' }, { status: refused })
+		: Response.json({ encryption: null, success: true }, { headers: { 'X-Crate-Encryption-State': 'off' } }));
+	vi.stubGlobal('fetch', fetchMock);
+	const api = makeApiFetch('session', vi.fn());
+	await api('/reminders/update', { method: 'POST', body: 'Plain' });
+	// Another device turned encryption on and revoked or locked this credential.
+	refused = status;
+	await api('/reminders/update', { method: 'POST', body: 'Raced' }).catch(() => undefined);
+	await api('/reminders/update', { method: 'POST', body: 'Later' }).catch(() => undefined);
+	// Before: the refusal carried no state, so "off" stayed cached and the next change sent plaintext.
+	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
+	const later = fetchMock.mock.calls.findIndex(([, init]) => init?.body === 'Later');
+	if (status === 401) expect(later).toBe(-1);
+	else expect(fetchMock.mock.calls[later - 1]?.[0]).toBe('/encryption');
+});
+
+it('trusts an unencrypted response only briefly before sending a change', async () => {
+	let now = 1_000;
+	const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+	const fetchMock = vi.fn(async (_path: string, _init?: RequestInit) => Response.json({ encryption: null, reminders: [] }, { headers: { 'X-Crate-Encryption-State': 'off' } }));
+	vi.stubGlobal('fetch', fetchMock);
+	const api = makeApiFetch('session', vi.fn());
+	await api('/reminders/update', { method: 'POST', body: 'Plain' });
+	now += 29_000;
+	await api('/reminders/update', { method: 'POST', body: 'Recent' });
+	now += 60_000;
+	// Reads send nothing private and keep trusting the verdict.
+	await api('/reminders/list?folderPath=Reminders');
+	expect(prepareReminderEncryption).toHaveBeenCalledOnce();
+	now += 31_000;
+	await api('/reminders/update', { method: 'POST', body: 'Idle' });
+	// Before: the verdict never expired, so a change after any idle period skipped the probe.
+	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
+	expect(fetchMock.mock.calls.map(([path]) => path).slice(-2)).toEqual(['/encryption', '/reminders/update']);
+	clock.mockRestore();
+});
+
+it('does not let a response already in flight restore a dropped unencrypted verdict', async () => {
+	let releaseSlow!: () => void;
+	const slow = new Promise<void>(resolve => { releaseSlow = resolve; });
+	const fetchMock = vi.fn(async (_path: string, init?: RequestInit) => {
+		// The server handled this change before revoking the credential; its response arrives last.
+		if (init?.body === 'Slow') { await slow; return Response.json({ success: true }, { headers: { 'X-Crate-Encryption-State': 'off' } }); }
+		if (init?.body === 'Raced') return Response.json({ error: 'Revoked' }, { status: 401 });
+		return Response.json({ encryption: null, success: true }, { headers: { 'X-Crate-Encryption-State': 'off' } });
+	});
+	vi.stubGlobal('fetch', fetchMock);
+	const api = makeApiFetch('session', vi.fn());
+	await api('/reminders/update', { method: 'POST', body: 'Plain' });
+	const slowChange = api('/reminders/update', { method: 'POST', body: 'Slow' });
+	await vi.waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.body === 'Slow')).toBe(true));
+	await expect(api('/reminders/update', { method: 'POST', body: 'Raced' })).rejects.toThrow('Session expired');
+	releaseSlow();
+	await slowChange;
+	await api('/reminders/update', { method: 'POST', body: 'Later' });
+	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
+	expect(fetchMock.mock.calls.map(([path]) => path).slice(-2)).toEqual(['/encryption', '/reminders/update']);
+});
 
 it('switches to the folder the server moved this session to', async () => {
 	const off = { 'X-Crate-Encryption-State': 'off' };

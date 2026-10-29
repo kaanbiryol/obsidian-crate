@@ -15,6 +15,10 @@ import { ENCRYPTION_CAPABILITY, ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_H
 const logger = createLogger('ApiClient');
 
 export const TRANSFER_TIMEOUT_MS = 120_000;
+/** How long a response saying this vault is not encrypted lets a plaintext mutation skip the probe. */
+const ENCRYPTION_OFF_TRUST_MS = 30_000;
+/** Refusals that may mean another device turned encryption on and revoked or locked this credential. */
+const ENCRYPTION_VERDICT_RESETS = new Set([401, 403, 423, 428]);
 
 export interface ApiRequestOptions {
 	body?: string | ArrayBuffer;
@@ -158,12 +162,19 @@ export class WorkerApiHttpClient {
 	private serverInfo?: { expires: number; value: CrateServerInfo };
 	private serverInfoRequest?: Promise<CrateServerInfo>;
 	private requestGeneration = 0;
-	/** The server's last response said this vault is not encrypted. */
-	private encryptionOff = false;
+	/** When a request whose response said this vault is not encrypted was dispatched. */
+	private encryptionOffAt: number | null = null;
+	/** Bumped whenever that verdict is dropped, so a response already in flight cannot restore it. */
+	private encryptionOffResets = 0;
+
+	private forgetEncryptionOff(): void {
+		this.encryptionOffAt = null;
+		this.encryptionOffResets++;
+	}
 
 	private invalidateRequests(): void {
 		this.requestGeneration++;
-		this.encryptionOff = false;
+		this.forgetEncryptionOff();
 		this.serverInfo = undefined;
 		this.serverInfoRequest = undefined;
 	}
@@ -233,13 +244,14 @@ export class WorkerApiHttpClient {
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
 			protocol = Math.min(protocol, info.protocol.current);
 			const route = path.split('?')[0]!;
-			if (info.capabilities.includes(ENCRYPTION_CAPABILITY) && !this.encryptionHeaders[ENCRYPTION_VAULT_HEADER] && !this.encryptionOff
+			const encryptionOffConfirmed = this.encryptionOffAt !== null && performance.now() - this.encryptionOffAt < ENCRYPTION_OFF_TRUST_MS;
+			if (info.capabilities.includes(ENCRYPTION_CAPABILITY) && !this.encryptionHeaders[ENCRYPTION_VAULT_HEADER] && !encryptionOffConfirmed
 				&& (['/sync/', '/reading/', '/reminders/'].some(prefix => route.startsWith(prefix))
 					|| route === '/settings' || route === '/notifications/reminders-enrollment-token')) {
 				// Another device may have enabled encryption since this client last
 				// synced. Probe without a private body before dispatching plaintext,
-				// unless the previous response already confirmed it is still off; the
-				// server rejects plaintext into an encrypted vault either way.
+				// unless a recent response confirmed it is still off; the server
+				// rejects plaintext into an encrypted vault either way.
 				const state = await this.requestJson<{ encryption: unknown }>('/encryption', {}, Math.min(timeout, 30_000));
 				if (state.encryption !== null) throw new HttpError('Unlock this vault in Manage encryption before sending changes', 428, null, 'encryption_required');
 			}
@@ -253,6 +265,7 @@ export class WorkerApiHttpClient {
 			?? undefined;
 		const operationId = crypto.randomUUID();
 		const started = performance.now();
+		const encryptionOffResets = this.encryptionOffResets;
 		const timings = this.requestTimings;
 		const uploadOperationIds = normalizeUploadOperationIds((getHeader(options.headers ?? {}, UPLOAD_OPERATION_HEADER)
 			?? getHeader(options.headers ?? {}, UPLOAD_OPERATIONS_HEADER) ?? '').split(','));
@@ -276,7 +289,8 @@ export class WorkerApiHttpClient {
 				cleanup();
 				record('response', response);
 				const encryptionState = getHeader(response.headers, ENCRYPTION_STATE_HEADER);
-				if (encryptionState === 'off' || encryptionState === 'on') this.encryptionOff = encryptionState === 'off';
+				if (encryptionState === 'on' || ENCRYPTION_VERDICT_RESETS.has(response.status)) this.forgetEncryptionOff();
+				else if (encryptionState === 'off' && encryptionOffResets === this.encryptionOffResets) this.encryptionOffAt = started;
 				resolve(response);
 			};
 			const rejectOnce = (error: unknown) => {

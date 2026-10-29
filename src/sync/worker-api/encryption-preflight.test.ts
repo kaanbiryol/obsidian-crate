@@ -6,7 +6,7 @@ import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '
 import { createEncryptionState } from '../../encryption/server-state';
 
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 function response(value: unknown) {
 	const text = JSON.stringify(value);
 	return { status: 200, text, arrayBuffer: new TextEncoder().encode(text).buffer, headers: {} };
@@ -59,4 +59,75 @@ it('skips the encryption probe while server responses confirm the vault is unenc
 	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'After' })).rejects.toMatchObject({ code: 'encryption_required' });
 	expect(probes()).toBe(2);
 	expect(transport.mock.calls.every(([request]) => request.body !== 'After')).toBe(true);
+});
+
+function unencryptedServer(refuse: () => number | null) {
+	const off = { 'X-Crate-Encryption-State': 'off' };
+	return vi.fn<ApiHttpTransport>(async request => {
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
+		// A revoked or locked credential gets a refusal without the encryption state.
+		const status = refuse();
+		if (status) return { ...response({ error: 'Refused' }), status };
+		if (request.url.endsWith('/encryption')) return { ...response({ encryption: null }), headers: off };
+		return { ...response({ success: true }), headers: off };
+	});
+}
+
+it.each([401, 403, 423, 428])('probes again after a %i instead of trusting an earlier unencrypted response', async status => {
+	let refused: number | null = null;
+	const transport = unencryptedServer(() => refused);
+	const http = new WorkerApiHttpClient('https://crate.test', 'token', transport);
+	await http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Plain' });
+	// Another device turned encryption on and revoked this credential.
+	refused = status;
+	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Raced' })).rejects.toMatchObject({ status });
+	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Later' })).rejects.toMatchObject({ status });
+	// Before: the refusal carried no state, so "off" stayed cached and later edits sent plaintext.
+	expect(transport.mock.calls.at(-1)?.[0].url).toBe('https://crate.test/encryption');
+	expect(transport.mock.calls.every(([request]) => request.body !== 'Later')).toBe(true);
+});
+
+it('trusts an unencrypted response only briefly before sending plaintext', async () => {
+	let now = 1_000;
+	vi.spyOn(performance, 'now').mockImplementation(() => now);
+	let enabled = false;
+	const transport = vi.fn<ApiHttpTransport>(async request => {
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
+		if (request.url.endsWith('/encryption')) return { ...response({ encryption: enabled ? { mode: 'active' } : null }), headers: { 'X-Crate-Encryption-State': enabled ? 'on' : 'off' } };
+		return { ...response({ success: true }), headers: { 'X-Crate-Encryption-State': 'off' } };
+	});
+	const http = new WorkerApiHttpClient('https://crate.test', 'token', transport);
+	const probes = () => transport.mock.calls.filter(([request]) => request.url.endsWith('/encryption')).length;
+	await http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Plain' });
+	now += 29_000;
+	await http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Recent' });
+	expect(probes()).toBe(1);
+	enabled = true;
+	now += 31_000;
+	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Idle' })).rejects.toMatchObject({ code: 'encryption_required' });
+	// Before: the verdict never expired, so an edit after any idle period skipped the probe.
+	expect(probes()).toBe(2);
+	expect(transport.mock.calls.every(([request]) => request.body !== 'Idle')).toBe(true);
+});
+
+it('does not let a response already in flight restore a dropped unencrypted verdict', async () => {
+	let refused: number | null = null;
+	let releaseSlow!: () => void;
+	const slow = new Promise<void>(resolve => { releaseSlow = resolve; });
+	const server = unencryptedServer(() => refused);
+	const transport = vi.fn<ApiHttpTransport>(async request => {
+		// The server handled this upload before revoking the credential; its response arrives last.
+		if (request.body === 'Slow') { const handled = await server(request); await slow; return handled; }
+		return server(request);
+	});
+	const http = new WorkerApiHttpClient('https://crate.test', 'token', transport);
+	await http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Plain' });
+	const slowUpload = http.requestJson('/sync/upload?path=slow.md', { method: 'PUT', body: 'Slow' });
+	await vi.waitFor(() => expect(transport.mock.calls.some(([request]) => request.body === 'Slow')).toBe(true));
+	refused = 401;
+	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Raced' })).rejects.toMatchObject({ status: 401 });
+	releaseSlow();
+	await slowUpload;
+	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Later' })).rejects.toMatchObject({ status: 401 });
+	expect(transport.mock.calls.every(([request]) => request.body !== 'Later')).toBe(true);
 });
