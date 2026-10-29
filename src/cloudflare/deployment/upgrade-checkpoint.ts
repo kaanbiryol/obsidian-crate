@@ -3,6 +3,7 @@ import type { DeploymentFence } from './fence';
 import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, SHARED_SETTINGS_KEY, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 import { sha256Hex } from '../../platform/sha256';
 import { isSha256Hex } from '../../platform/validation';
+import { listBackupObjects, pruneUpgradeBackups } from './upgrade-backups';
 
 const CONTROL = new Set(['maintenance_state', 'crate_schema', 'crate_migrations', 'crate_release']);
 const quoteName = (name: string) => `"${name.replace(/"/g, '""')}"`;
@@ -93,21 +94,6 @@ async function saveProgress(query: Query, expected: string | null, next: BackupP
 		: await query(`UPDATE maintenance_state SET value = ? WHERE key = '${PROGRESS_KEY}' AND value = ? RETURNING value;`, [value, expected]);
 	if (saved.length !== 1 || saved[0]?.value !== value) throw progressChanged();
 	return value;
-}
-
-/** Keys below `prefix` mapped to their reported sizes. */
-export async function listBackupObjects(api: Pick<CloudflareApiClient, 'listR2ObjectSizes' | 'throttle'>, account: string, bucket: string, prefix: string): Promise<Map<string, number | null>> {
-	const objects = new Map<string, number | null>(), cursors = new Set<string>();
-	let cursor: string | undefined;
-	do {
-		await api.throttle();
-		const page = await api.listR2ObjectSizes(account, bucket, cursor, prefix);
-		for (const object of page.objects) objects.set(object.key.slice(prefix.length), object.size);
-		cursor = page.cursor;
-		if (cursor && cursors.has(cursor)) throw new Error('Backup listing did not advance');
-		if (cursor) cursors.add(cursor);
-	} while (cursor);
-	return objects;
 }
 
 interface BackupContext { api: CloudflareApiClient; accountId: string; bucketName: string; query: Query; definitions: Array<Record<string, unknown>> }
@@ -232,6 +218,8 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
 	// Guards stay until the upgraded server is verified, so this paused upgrade already has its backup.
 	if (progress?.phase === 'complete' && paused) return;
 	if (!progress || progress.phase === 'complete') {
+		// Pruning runs only between backups, so it never removes copies a backup in progress relies on.
+		await pruneUpgradeBackups({ api, accountId, databaseId, bucketName, onProgress: input.onProgress });
 		progress = { format: 2, phase: 'copying', prefix: `${UPGRADE_BACKUP_PREFIX}${crypto.randomUUID()}` };
 		raw = await saveProgress(query, raw, progress);
 	} else if (progress.phase !== 'copying' && !paused) {

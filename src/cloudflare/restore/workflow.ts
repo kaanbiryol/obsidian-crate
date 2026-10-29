@@ -3,6 +3,7 @@ import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { createRandomHexToken } from '../../platform/random-hex';
 import type { BackupChoice } from './archive';
+import { holdUpgradeBackup, releaseUpgradeBackupHold } from '../deployment/upgrade-backups';
 import type { ServerRestoreState } from './state';
 
 /** Keep checkpoint selection and durable destination identity ahead of remote work. */
@@ -41,6 +42,11 @@ export async function runRestoreWorkflow(input: {
 	}
 	const save = () => persist(state);
 	await save(); // Persist destination identity before any remote mutation.
+	// Upgrade backup pruning on any device keeps a backup that a pending restore reads.
+	if (state.phase !== 'complete') await holdUpgradeBackup(api, state.source, state.id, state.prefix);
 	const { restoreUpgradeBackup } = await import('./server-restore');
-	return restoreUpgradeBackup({ api, state, artifacts, save, onProgress });
+	const origin = await restoreUpgradeBackup({ api, state, artifacts, save, onProgress });
+	// A hold left behind only delays pruning; the restore itself has completed.
+	await releaseUpgradeBackupHold(api, state.source, state.id, state.prefix).catch(() => undefined);
+	return origin;
 }

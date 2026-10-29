@@ -36,19 +36,36 @@ async function harness() {
 		listR2ObjectSizes: vi.fn(async (_account: string, _bucket: string, _cursor?: string, prefix: string = '') => ({
 			objects: [...objects].filter(([key]) => key.startsWith(prefix)).sort(([a], [b]) => a < b ? -1 : 1).map(([key, value]) => ({ key, size: value.length })),
 		})),
+		listR2Objects: vi.fn(async (_account: string, _bucket: string, _cursor?: string, prefix: string = '') => ({ keys: [...objects.keys()].filter(key => key.startsWith(prefix)).sort() })),
+		deleteRecoveryObject: vi.fn(async (_account: string, _bucket: string, key: string) => { objects.delete(key); }),
 		throttle: vi.fn(async () => undefined),
 	};
 	const fence = { requireVerification: vi.fn(), mutate: vi.fn(<T>(operation: () => Promise<T>, _step: string) => operation()) };
 	const run = (onProgress?: (message: string) => void, client: CloudflareApiClient = api as unknown as CloudflareApiClient) =>
 		createUpgradeCheckpoint({ api: client, accountId: 'account', databaseId: 'database', bucketName: 'bucket', fence: fence as unknown as DeploymentFence, onProgress });
 	const progress = () => JSON.parse(String((db.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_upgrade_backup'").get() as { value?: string } | undefined)?.value ?? 'null')) as Record<string, unknown> | null;
-	const manifestKeys = () => [...objects.keys()].filter(key => key.endsWith('/archive.json'));
+	const seeded = new Set<string>();
+	const manifestKeys = () => [...objects.keys()].filter(key => key.endsWith('/archive.json') && !seeded.has(key.slice(0, -'/archive.json'.length)));
+	/** Adds an earlier backup; `parts` and `files` become checksum-named objects. */
+	const seed = async (id: string, manifest: Record<string, unknown> | string | null, files: string[] = [], extra: string[] = []) => {
+		const prefix = `__crate__/backups/schema-upgrade-${id.repeat(8)}-${id.repeat(4)}-4${id.repeat(3)}-8${id.repeat(3)}-${id.repeat(12)}`;
+		seeded.add(prefix);
+		const part = new TextEncoder().encode(`-- ${id}`);
+		objects.set(`${prefix}/objects/${await sha256Hex(part)}`, part);
+		for (const file of files) objects.set(upgradeBackupStoreKey(await sha256Hex(file)), new TextEncoder().encode(file));
+		for (const key of extra) objects.set(`${prefix}/${key}`, new Uint8Array([1]));
+		if (manifest !== null) objects.set(`${prefix}/archive.json`, new TextEncoder().encode(typeof manifest === 'string' ? manifest : JSON.stringify({
+			complete: true, format: 2, objects: await Promise.all(files.map(async file => ({ key: file, sha256: await sha256Hex(file), size: file.length }))), ...manifest,
+		})));
+		return prefix;
+	};
 	const manifest = () => JSON.parse(decode(objects.get(manifestKeys()[0]!))) as Manifest;
 	const prefix = () => manifestKeys()[0]!.slice(0, -'/archive.json'.length);
 	/** The restore tools read a format 2 export as its parts in order. */
 	const exported = () => manifest().databaseParts.map(part => decode(objects.get(`${prefix()}/objects/${part.sha256}`))).join('');
 	const gets = (key: string) => api.getRecoveryObject.mock.calls.filter(([, , requested]) => requested === key).length;
-	return { db, objects, api, fence, run, progress, manifest, manifestKeys, prefix, exported, gets, live, history };
+	const keysBelow = (prefix: string) => [...objects.keys()].filter(key => key.startsWith(`${prefix}/`)).sort();
+	return { db, objects, api, fence, run, progress, manifest, manifestKeys, prefix, exported, gets, live, history, seed, keysBelow };
 }
 
 it('copies files before pausing writers, then exports a paused database that restores independently', async () => {
@@ -239,4 +256,44 @@ it('pages large tables by key so each row is read once', async () => {
 	for (const table of ['upload_operations', 'reminder_identities']) {
 		expect(restored.prepare(`SELECT * FROM ${table} ORDER BY 1`).all()).toEqual(h.db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all());
 	}
+});
+
+it('keeps the newest and still-needed backups and removes older backups and unused shared copies', async () => {
+	const h = await harness();
+	const oldest = await h.seed('a', { format: 1, createdAt: '2026-01-01T00:00:00Z', databaseSha256: 'd'.repeat(64), objects: [] }, [], ['database.sql', `objects/${'e'.repeat(64)}`, 'private.txt']);
+	const upgrading = await h.seed('b', { createdAt: '2026-01-15T00:00:00Z' }, ['needed by an interrupted upgrade']);
+	const restoring = await h.seed('c', { createdAt: '2026-02-01T00:00:00Z' }, ['needed by a pending restore']);
+	const newest = await h.seed('d', { createdAt: '2026-03-01T00:00:00Z' }, ['Existing note.']);
+	const abandoned = await h.seed('e', null);
+	const unused = await h.seed('f', { createdAt: '2026-02-15T00:00:00Z' }, ['only in a removed backup']);
+	h.db.prepare("INSERT INTO maintenance_state(key, value) VALUES ('crate_upgrade_checkpoint', ?), ('crate_restore_hold:0123456789abcdef', ?)").run(upgrading, restoring);
+	await h.run();
+	expect(h.keysBelow(oldest)).toEqual([`${oldest}/private.txt`]);
+	const deleted = h.api.deleteRecoveryObject.mock.calls.map(([, , key]) => key);
+	expect(deleted.filter(key => key.startsWith(oldest))[0]).toBe(`${oldest}/archive.json`);
+	for (const prefix of [abandoned, unused]) expect(h.keysBelow(prefix)).toEqual([]);
+	for (const prefix of [upgrading, restoring, newest]) expect(h.keysBelow(prefix)).toContain(`${prefix}/archive.json`);
+	expect(h.objects.has(upgradeBackupStoreKey(await sha256Hex('only in a removed backup')))).toBe(false);
+	for (const file of ['needed by an interrupted upgrade', 'needed by a pending restore']) expect(h.objects.has(upgradeBackupStoreKey(await sha256Hex(file)))).toBe(true);
+	// The new backup shares the newest backup's copy instead of reading the file again.
+	expect(h.gets('existing-object')).toBe(0);
+	expect(h.manifest().objects.find(item => item.key === 'existing-object')?.sha256).toBe(await sha256Hex('Existing note.'));
+	expect(deleted.some(key => key.startsWith(h.prefix()))).toBe(false);
+});
+
+it('does not prune while a backup is in progress and keeps shared copies when a manifest is unreadable', async () => {
+	const h = await harness();
+	const older = await h.seed('a', { createdAt: '2026-01-01T00:00:00Z' }, ['older']);
+	await h.seed('b', { createdAt: '2026-02-01T00:00:00Z' }, ['newer']);
+	const orphan = upgradeBackupStoreKey(await sha256Hex('orphan'));
+	h.objects.set(orphan, new TextEncoder().encode('orphan'));
+	h.db.prepare("INSERT INTO maintenance_state(key, value) VALUES ('crate_upgrade_backup', ?)").run(JSON.stringify({ format: 2, phase: 'copying', prefix: `__crate__/backups/schema-upgrade-${crypto.randomUUID()}` }));
+	await h.run();
+	expect(h.api.deleteRecoveryObject).not.toHaveBeenCalled();
+	await releaseUpgradeGuards(h.api, 'account', 'database', h.fence as unknown as DeploymentFence);
+	const unreadable = await h.seed('c', 'not a manifest');
+	await h.run();
+	expect(h.keysBelow(older)).toEqual([]);
+	expect(h.keysBelow(unreadable)).toContain(`${unreadable}/archive.json`);
+	expect(h.objects.has(orphan)).toBe(true);
 });

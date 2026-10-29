@@ -264,6 +264,19 @@ it('writes restored bytes only to a separate Crate bucket and encodes object key
 	expect(transport).toHaveBeenCalledWith(`https://api.cloudflare.com/client/v4/accounts/account/r2/buckets/${bucket}/objects/folder/a%3Fb%23c`, expect.objectContaining({ method: 'PUT', body: new Uint8Array([0, 255]).buffer }));
 });
 
+it('deletes only generated upgrade backup objects and treats a missing object as removed', async () => {
+	const transport = vi.fn<HttpTransport>(async () => ({ status: 404, text: JSON.stringify({ success: false, errors: [{ code: 10007, message: 'Not found' }] }) }));
+	const api = new CloudflareApiClient('token', transport), key = `__crate__/backups/schema-upgrade-${crypto.randomUUID()}/objects/${'a'.repeat(64)}`;
+	for (const unsafe of ['__crate__/files/a/b', '__crate__/settings.json', key.replace(/objects\/.*/, 'private.txt')]) {
+		await expect(api.deleteRecoveryObject('account', 'bucket', unsafe)).rejects.toThrow('Invalid backup object');
+	}
+	expect(transport).not.toHaveBeenCalled();
+	await api.deleteRecoveryObject('account', 'bucket', key);
+	expect(transport).toHaveBeenCalledWith(`https://api.cloudflare.com/client/v4/accounts/account/r2/buckets/bucket/objects/${key}`, expect.objectContaining({ method: 'DELETE' }));
+	transport.mockResolvedValueOnce({ status: 403, text: JSON.stringify({ success: false, errors: [{ code: 10000, message: 'Forbidden' }] }) });
+	await expect(api.deleteRecoveryObject('account', 'bucket', key)).rejects.toMatchObject({ status: 403 });
+});
+
 describe('Cloudflare rate limits', () => {
 	const limited = (headers?: Record<string, string>) => ({ status: 429, text: JSON.stringify({ success: false, errors: [{ code: 971, message: 'Please wait and consider throttling your request speed' }] }), headers });
 	const ok = { status: 200, text: JSON.stringify({ success: true, result: [{ results: [] }] }) };

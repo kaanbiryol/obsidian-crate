@@ -59,6 +59,36 @@ it.each([
 	});
 	await f.service.restoreBackup(authorize, choice, vi.fn());
 });
+it('holds the selected backup on the original server until the restore completes', async () => {
+	const f = harness();
+	// Each query as "<database> <statement> <parameters>".
+	const queries = () => f.transport.mock.calls.filter(([url]) => url.endsWith('/query')).map(([url, request]) => {
+		const body = JSON.parse(request.body as string) as { sql: string; params?: string[] };
+		return [url.split('/').at(-2), body.sql.split(' ')[0], ...body.params ?? []].join(' ');
+	});
+	const source = f.settings.cloudflareDeployment!.d1DatabaseId!;
+	vi.mocked(restoreUpgradeBackup).mockImplementationOnce(async input => {
+		expect(queries()).toEqual([`${source} INSERT crate_restore_hold:${input.state.id} ${f.choice.prefix}`]);
+		throw new Error('Interrupted');
+	});
+	await expect(f.service.restoreBackup(authorize, f.choice, vi.fn())).rejects.toThrow('Interrupted');
+	const hold = `crate_restore_hold:${f.settings.cloudflareRestore!.id} ${f.choice.prefix}`;
+	expect(queries()).toEqual([`${source} INSERT ${hold}`]);
+	vi.mocked(restoreUpgradeBackup).mockImplementationOnce(async input => { input.state.phase = 'complete'; return 'restored'; });
+	await f.service.restoreBackup(authorize, null, vi.fn());
+	expect(queries().slice(1)).toEqual([`${source} INSERT ${hold}`, `${source} DELETE ${hold}`]);
+});
+it.each([[200, false], [404, true]])('when the hold cannot be saved and the original database lookup returns %s, restores: %s', async (lookup, restores) => {
+	const f = harness();
+	f.transport.mockImplementation(async (url, request) => url.endsWith('/query') ? { status: 404, text: JSON.stringify({ success: false, errors: [{ code: 7404, message: 'Database not found' }] }) }
+		: request.method === 'GET' && url.includes('/d1/database/') ? { status: lookup, text: JSON.stringify({ success: lookup === 200, result: { uuid: '11111111-1111-1111-1111-111111111111' } }) }
+			: { status: 200, text: JSON.stringify({ success: true, result: [] }) });
+	vi.mocked(restoreUpgradeBackup).mockResolvedValueOnce('restored');
+	const restore = f.service.restoreBackup(authorize, f.choice, vi.fn());
+	if (restores) await expect(restore).resolves.toBe('restored');
+	else await expect(restore).rejects.toMatchObject({ status: 404 });
+	expect(restoreUpgradeBackup).toHaveBeenCalledTimes(restores ? 1 : 0);
+});
 it('does not start remote restore when the initial checkpoint cannot be saved', async () => {
 	const f = harness();
 	f.writeSettings.mockRejectedValueOnce(new Error('Storage unavailable'));
