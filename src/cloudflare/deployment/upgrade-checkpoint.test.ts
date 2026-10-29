@@ -17,7 +17,7 @@ it('freezes old writers, verifies paired bytes, migrates atomically and restores
 	const objects = new Map<string, Uint8Array>([['existing-object', bytes], ['historical-object', historyBytes]]);
 	const api = {
 		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params: string[] = []) => {
-			if (sql.trim().startsWith('SELECT')) return [{ results: db.prepare(sql).all(...params) }];
+			if (/^(SELECT|PRAGMA)/.test(sql.trim())) return [{ results: db.prepare(sql).all(...params) }];
 			if (params.length) db.prepare(sql).run(...params); else db.exec(sql);
 			return [{ results: [] }];
 		}),
@@ -56,4 +56,48 @@ it('freezes old writers, verifies paired bytes, migrates atomically and restores
 		await releaseUpgradeGuards(api, 'account', 'database', fence);
 		expect(() => db.exec("UPDATE auth_tokens SET device_name='Updated'")).not.toThrow();
 	} finally { now.mockRestore(); db.close(); }
+});
+
+it('pages large tables by key so each row is read once', async () => {
+	const db = new DatabaseSync(':memory:'); db.exec(readFileSync('src/cloudflare/schema.sql', 'utf8'));
+	const receipt = db.prepare('INSERT INTO upload_operations(operation_id,request_hash,response_json) VALUES (?,?,?)');
+	for (let index = 0; index < 1234; index++) receipt.run(`op-${String(index).padStart(5, '0')}`, `hash-${index}`, `{"index":${index}}`);
+	const identity = db.prepare('INSERT INTO reminder_identities(reminder_id,created_operation_id) VALUES (?,?)');
+	for (let index = 0; index < 1001; index++) identity.run(`reminder-${index}`, 'operation');
+	const objects = new Map<string, Uint8Array>();
+	const pages: Array<{ sql: string; rows: number }> = [];
+	const api = {
+		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params: string[] = []) => {
+			if (/^(SELECT|PRAGMA)/.test(sql.trim())) {
+				const results = db.prepare(sql).all(...params);
+				if (/FROM "(upload_operations|reminder_identities)"/.test(sql)) pages.push({ sql, rows: results.length });
+				return [{ results }];
+			}
+			if (params.length) db.prepare(sql).run(...params); else db.exec(sql);
+			return [{ results: [] }];
+		}),
+		getRecoveryObject: vi.fn(async (_account: string, _bucket: string, key: string) => { const value = objects.get(key); if (!value) throw new CloudflareApiError('Object not found', 404, null); return value; }),
+		putRecoveryObject: vi.fn(async (_account: string, _bucket: string, key: string, value: Uint8Array) => { objects.set(key, value); }),
+	};
+	const fence = { requireVerification: vi.fn(), mutate: <T>(fn: () => Promise<T>) => fn() } as unknown as DeploymentFence;
+	try {
+		await createUpgradeCheckpoint({ api: api as unknown as CloudflareApiClient, accountId: 'account', databaseId: 'database', bucketName: 'bucket', fence });
+		expect(api.queryD1.mock.calls.some(([, , sql]) => /\bOFFSET\b/i.test(sql))).toBe(false);
+		for (const [table, count] of [['upload_operations', 1234], ['reminder_identities', 1001]] as const) {
+			const tablePages = pages.filter(page => page.sql.includes(`FROM "${table}"`));
+			expect(tablePages.reduce((sum, page) => sum + page.rows, 0)).toBe(count);
+			expect(tablePages).toHaveLength(Math.floor(count / 500) + 1);
+			for (const page of tablePages.slice(1)) {
+				expect(page.sql).toContain(' WHERE ');
+				const plan = db.prepare(`EXPLAIN QUERY PLAN ${page.sql}`).all().map(row => String(row.detail)).join('\n');
+				expect(plan).toMatch(/^SEARCH /m);
+			}
+		}
+		const sqlKey = [...objects.keys()].find(key => key.endsWith('/database.sql'))!;
+		const restored = new DatabaseSync(':memory:'); restored.exec(new TextDecoder().decode(objects.get(sqlKey)));
+		for (const table of ['upload_operations', 'reminder_identities']) {
+			expect(restored.prepare(`SELECT * FROM ${table} ORDER BY 1`).all()).toEqual(db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all());
+		}
+		restored.close();
+	} finally { db.close(); }
 });

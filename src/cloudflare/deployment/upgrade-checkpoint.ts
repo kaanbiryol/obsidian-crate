@@ -10,6 +10,31 @@ export function upgradeGuards(table: string): string {
 	if (CONTROL.has(table)) return '';
 	return ['INSERT', 'UPDATE', 'DELETE'].map(action => `CREATE TRIGGER IF NOT EXISTS ${quoteName(`crate_upgrade_${table}_${action}`)} BEFORE ${action} ON ${quoteName(table)} BEGIN SELECT RAISE(ABORT, 'Crate server upgrade in progress'); END;`).join('\n');
 }
+const PAGE_ROWS = 500;
+const ROWID = 'crate_upgrade_rowid';
+type Query = (sql: string) => Promise<Array<Record<string, unknown>>>;
+
+/** Keyset paging reads each row once, unlike OFFSET paging. Ordinary tables page
+ * by rowid; WITHOUT ROWID tables page by their primary key. Both are scan order. */
+async function pageKey(rows: Query, table: string, definition: string): Promise<string[] | null> {
+	if (!/\bWITHOUT\s+ROWID\b/i.test(definition)) return null;
+	const key = (await rows(`PRAGMA table_info(${quoteName(table)});`)).filter(row => Number(row.pk) > 0)
+		.sort((a, b) => Number(a.pk) - Number(b.pk)).map(row => String(row.name));
+	if (!key.length) throw new Error('Cannot back up an unrecognized server table');
+	return key;
+}
+function pageSql(table: string, key: string[] | null, after: unknown[] | null): string {
+	if (!key) return `SELECT rowid AS ${ROWID}, * FROM ${quoteName(table)}${after ? ` WHERE rowid > ${quoteValue(after[0])}` : ''} ORDER BY rowid LIMIT ${PAGE_ROWS};`;
+	const columns = key.map(quoteName).join(',');
+	return `SELECT * FROM ${quoteName(table)}${after ? ` WHERE (${columns}) > (${after.map(quoteValue).join(',')})` : ''} ORDER BY ${columns} LIMIT ${PAGE_ROWS};`;
+}
+/** Splits a keyset page row into its key and the stored columns. */
+function pageRow(row: Record<string, unknown>, key: string[] | null): { after: unknown[]; record: Record<string, unknown> } {
+	if (key) return { after: key.map(column => row[column]), record: row };
+	const { [ROWID]: rowid, ...record } = row;
+	return { after: [rowid], record };
+}
+
 export function removeUpgradeGuards(table: string): string {
 	return ['INSERT', 'UPDATE', 'DELETE'].map(action => `DROP TRIGGER IF EXISTS ${quoteName(`crate_upgrade_${table}_${action}`)};`).join('\n');
 }
@@ -28,10 +53,15 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
 	let sql = 'PRAGMA foreign_keys=OFF;\n';
 	for (const row of definitions.filter(row => row.type === 'table')) {
 		const table = String(row.name); sql += `${String(row.sql)};\n`;
-		for (let offset = 0;; offset += 500) {
-			const page = await rows(`SELECT * FROM ${quoteName(table)} LIMIT 500 OFFSET ${offset};`);
-			for (const record of page) sql += `INSERT INTO ${quoteName(table)} (${Object.keys(record).map(quoteName).join(',')}) VALUES (${Object.values(record).map(quoteValue).join(',')});\n`;
-			if (page.length < 500) break;
+		const key = await pageKey(rows, table, String(row.sql));
+		for (let after: unknown[] | null = null;;) {
+			const page = await rows(pageSql(table, key, after));
+			for (const item of page) {
+				const { after: next, record } = pageRow(item, key);
+				sql += `INSERT INTO ${quoteName(table)} (${Object.keys(record).map(quoteName).join(',')}) VALUES (${Object.values(record).map(quoteValue).join(',')});\n`;
+				after = next;
+			}
+			if (page.length < PAGE_ROWS) break;
 			if (sql.length > 128 * 1024 * 1024) throw new Error('Database checkpoint exceeds the in-app backup limit. Use Crate recovery tools before upgrading.');
 		}
 	}
