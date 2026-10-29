@@ -22,6 +22,12 @@ export interface SyncQueueControllerContext extends Pick<QueueFlushContext,
 }
 
 const MAX_RETRY_DELAY_MS = 5 * 60_000;
+/** Every upload keeps a copy in file history, so an automatic flush holds back an
+ * edited synced file of this size until it has been quiet for a minute, for at
+ * most five minutes. Manual and full syncs still upload it at once. */
+const LARGE_UPLOAD_BYTES = 1024 * 1024;
+const LARGE_UPLOAD_QUIET_MS = 60_000;
+const LARGE_UPLOAD_MAX_WAIT_MS = 5 * 60_000;
 
 export class SyncQueueController {
 	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -30,6 +36,7 @@ export class SyncQueueController {
 	private pendingKeys: Set<string> = new Set();
 	private inFlightPaths: Set<string> = new Set();
 	private pendingRevisions = new Map<string, number>();
+	private pendingTimes = new Map<string, { first: number; last: number }>();
 	private nextRevision = 0;
 	private flushTasks = new Set<Promise<void>>();
 	private reconciliationScheduled = false;
@@ -115,6 +122,9 @@ export class SyncQueueController {
 		this.pendingRevisions.delete(oppositePath);
 		this.verificationKeys.delete(oppositePath);
 		this.pendingKeys.add(path);
+		this.pendingTimes.delete(oppositePath);
+		const now = Date.now();
+		this.pendingTimes.set(path, { first: this.pendingTimes.get(path)?.first ?? now, last: now });
 		this.nextRevision += 1;
 		this.pendingRevisions.set(path, this.nextRevision);
 		this.verificationKeys.add(path);
@@ -140,6 +150,7 @@ export class SyncQueueController {
 			if (currentRevision !== startRevision) return;
 			this.pendingKeys.delete(key);
 			this.pendingRevisions.delete(key);
+			this.pendingTimes.delete(key);
 		};
 
 		for (const path of result.uploadedPaths) clearIfUnchanged(pendingChangeKey('upload', path));
@@ -166,6 +177,7 @@ export class SyncQueueController {
 		this.pendingKeys.clear();
 		this.inFlightPaths.clear();
 		this.pendingRevisions.clear();
+		this.pendingTimes.clear();
 		this.reconciliationScheduled = false;
 		this.reconciliationPaths.clear();
 	}
@@ -183,12 +195,15 @@ export class SyncQueueController {
 	}
 
 	private beginFlushBatch(): QueueFlushBatch {
-		const paths = [...this.pendingKeys];
+		const now = Date.now();
+		const paths = [...this.pendingKeys].filter(key => this.largeUploadReadyAt(key, now) === null);
 		const revisions = new Map(paths.map(path => [path, this.pendingRevisions.get(path)]));
 		for (const path of paths) {
 			this.pendingKeys.delete(path);
+			this.pendingTimes.delete(path);
 			this.inFlightPaths.add(path);
 		}
+		this.scheduleHeldUploads(now);
 		let released = false;
 		return {
 			paths,
@@ -269,8 +284,32 @@ export class SyncQueueController {
 		this.scheduleFlush(delay);
 	}
 
+	/** When a held-back large upload becomes due, or null when `key` is not held. */
+	private largeUploadReadyAt(key: string, now: number): number | null {
+		const times = this.pendingTimes.get(key);
+		const change = decodePendingChange(key);
+		if (!times || change.kind !== 'upload' || (this.context.localManifest.getEntry(change.path)?.size ?? 0) < LARGE_UPLOAD_BYTES) return null;
+		const readyAt = Math.min(times.last + LARGE_UPLOAD_QUIET_MS, times.first + LARGE_UPLOAD_MAX_WAIT_MS);
+		return readyAt > now ? readyAt : null;
+	}
+
+	/** Schedules a flush for the earliest held-back upload; returns whether any is held. */
+	private scheduleHeldUploads(now: number): boolean {
+		let readyAt = Infinity;
+		for (const key of this.pendingKeys) readyAt = Math.min(readyAt, this.largeUploadReadyAt(key, now) ?? Infinity);
+		if (readyAt === Infinity) return false;
+		if (!this.debounceTimer) this.debounceTimer = setTimeout(() => {
+			this.debounceTimer = null;
+			this.maxWaitStart = null;
+			void this.processPendingChanges();
+		}, readyAt - now);
+		return true;
+	}
+
 	private async processPendingChanges(): Promise<void> {
 		if (this.context.automaticSyncEnabled?.() === false) return;
+		const now = Date.now();
+		if ([...this.pendingKeys].every(key => this.largeUploadReadyAt(key, now) !== null) && this.scheduleHeldUploads(now)) return;
 		const task = flushPendingQueueChanges(this.getQueueFlushContext());
 		this.flushTasks.add(task);
 		try { await task; } finally { this.flushTasks.delete(task); }

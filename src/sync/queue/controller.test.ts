@@ -271,3 +271,55 @@ describe('clearSyncedPendingPaths', () => {
 		expect(h.revisions()).toEqual(['notes/a.md']);
 	});
 });
+
+describe('large upload pacing', () => {
+	function createPacedController() {
+		const prepared: string[] = [];
+		const controller = new SyncQueueController({
+			finishInitialSetup: async () => {},
+			uploadPreparedFiles: async () => {},
+			deleteRemoteFiles: async () => [],
+			automaticSyncEnabled: () => true,
+			recoverUploads: async () => {},
+			api: { isConfigured: () => true },
+			localManifest: {
+				getEntry: (path: string) => ({ hash: 'a'.repeat(64), size: path.endsWith('.excalidraw') ? 2 * 1024 * 1024 : 100, modified: '2026-10-01T00:00:00.000Z' }),
+				renameDestination: () => undefined, save: async () => {},
+			},
+			shouldIgnore: () => false,
+			updateState: vi.fn(),
+			setLastSync: vi.fn(),
+			reconnectNotice: new ReconnectNotice(),
+			isDestroyed: () => false,
+			currentStatus: () => 'idle',
+			verifyPendingPaths: async () => [],
+			prepareUploadFromPath: async (path: string) => { prepared.push(path); return null; },
+			getDebounceDelayMs: () => 25,
+			maxDebounceWaitMs: 30_000,
+			reconcile: async () => createEmptySyncResult(),
+			onFlushResult: vi.fn(),
+		});
+		return { controller, prepared };
+	}
+
+	it('holds an edited large file until it is quiet for a minute while small files flush', async () => {
+		const h = createPacedController();
+		h.controller.onFileChange({ path: 'drawing.excalidraw' });
+		h.controller.onFileChange({ path: 'note.md' });
+		await vi.advanceTimersByTimeAsync(30);
+		expect(h.prepared).toEqual(['note.md']);
+		expect(h.controller.getPendingKeys()).toEqual(['drawing.excalidraw']);
+
+		await vi.advanceTimersByTimeAsync(60_000);
+		expect(h.prepared).toEqual(['note.md', 'drawing.excalidraw']);
+	});
+
+	it('uploads a large file edited without pause after five minutes', async () => {
+		const h = createPacedController();
+		for (let elapsed = 0; elapsed < 5 * 60_000; elapsed += 30_000) {
+			h.controller.onFileChange({ path: 'drawing.excalidraw' });
+			await vi.advanceTimersByTimeAsync(30_000);
+		}
+		expect(h.prepared).toEqual(['drawing.excalidraw']);
+	});
+});

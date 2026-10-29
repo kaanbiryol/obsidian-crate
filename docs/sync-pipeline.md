@@ -262,6 +262,7 @@ Release and transfer values are also checked against source in [current contract
 |---|---|---|
 | `debounceDelay` default | 5 seconds | `types.ts` |
 | `MAX_DEBOUNCE_WAIT_MS` | 30,000 ms | `types.ts` |
+| Large upload quiet / maximum wait | 1 MiB files: 60 s / 5 min | `queue/controller.ts` |
 | `MAX_FILE_SIZE_BYTES` | 25 MB | `types.ts` |
 | `BATCH_UPLOAD_MAX_FILES` | 3 | `protocol/sync-limits.ts` |
 | `BATCH_DELETE_MAX_FILES` | 4 | `protocol/sync-limits.ts` |
@@ -315,7 +316,7 @@ File events (create, modify, delete, rename) are debounced before syncing:
 2. Delete events are keyed with a `\0delete:` prefix (e.g. `\0delete:notes/old.md`). NUL cannot occur in a sync path, so delete keys never collide with a file literally named `delete:...`. Only `src/sync/pending/pending-change.ts` builds or parses these keys
 3. Rename events emit both a delete key for the old path and an upload key for the new path
 4. Debounce timer (default 5s) resets with each new event, with a 30s maximum wait
-5. After the quiet period or maximum wait, `processPendingChanges()` flushes the queue
+5. After the quiet period or maximum wait, `processPendingChanges()` flushes the queue. An edit to an already synced file of 1 MiB or more stays pending until the file has been quiet for one minute, for at most five minutes, because each upload keeps a copy in file history; other files in the queue still flush. **Sync now** and full syncs upload it immediately
 6. Each event receives a revision so reconciliation cannot clear a newer edit that arrived while the sync was running; opposite upload/delete events for one path are coalesced
 7. After successful reconciliation, pending events from applied downloads, merges, and deletions are checked against the committed local baseline. Matching contents clear in the same run; newer events or differing contents stay pending. Incremental paths whose local and remote hashes already match also settle without another transfer.
 8. A conditional-write conflict sends only the affected queue keys through a bounded three-attempt reconciliation pass; current remote metadata is fetched only for those paths, and unrelated vault paths are not scanned
