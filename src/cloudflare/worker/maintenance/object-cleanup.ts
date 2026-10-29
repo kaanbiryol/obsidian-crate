@@ -1,4 +1,4 @@
-import { changedRows, queryRows } from '../db';
+import { changedRows, queryRows, type SqlGuard } from '../db';
 import { findReferencedStorageKeys, type ObjectReference } from '../storage-references';
 
 // R2 deletes up to 1,000 keys per call. 500 keeps the reference lookup's single
@@ -49,15 +49,19 @@ export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database):
 // The queue drains 500 objects per pass; larger batches only grow its backlog.
 const EXPIRED_VERSION_BATCH = 1000;
 
-/** Moves the oldest expired versions in one transaction. Returns true when more may remain. */
-export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now()): Promise<boolean> {
-	const expired = `SELECT storage_key FROM file_versions WHERE expires_at <= ? ORDER BY expires_at LIMIT ${EXPIRED_VERSION_BATCH}`;
-	const [, removed] = await db.batch([
+/** Moves the oldest expired versions in one transaction. `alongside` runs in it
+ * before the versions are deleted, given their storage keys. Returns true when more
+ * may remain. */
+export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now(),
+	alongside?: (expired: SqlGuard<unknown>) => D1PreparedStatement): Promise<boolean> {
+	const expired: SqlGuard<unknown> = { sql: `SELECT storage_key FROM file_versions WHERE expires_at <= ? ORDER BY expires_at LIMIT ${EXPIRED_VERSION_BATCH}`, args: [now] };
+	const results = await db.batch([
 		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key, file_path)
-			SELECT storage_key, path FROM file_versions WHERE storage_key IN (${expired})`).bind(now),
-		db.prepare(`DELETE FROM file_versions WHERE storage_key IN (${expired})`).bind(now),
+			SELECT storage_key, path FROM file_versions WHERE storage_key IN (${expired.sql})`).bind(...expired.args),
+		...(alongside ? [alongside(expired)] : []),
+		db.prepare(`DELETE FROM file_versions WHERE storage_key IN (${expired.sql})`).bind(...expired.args),
 	]);
-	return changedRows(removed) === EXPIRED_VERSION_BATCH;
+	return changedRows(results.at(-1)) === EXPIRED_VERSION_BATCH;
 }
 
 /** Cleanup must never turn an already-committed file mutation into a failure. */

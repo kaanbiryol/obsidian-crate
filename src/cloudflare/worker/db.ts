@@ -26,14 +26,19 @@ export function changedRows(result: unknown): number {
 export const MAINTENANCE_DELETE_LIMIT = 5000;
 
 /** Deletes the oldest expired rows in (created_at, seq) index order, so the
- * retained changelog stays contiguous. Returns true when more rows may remain. */
-export async function pruneChangelog(db: D1Database): Promise<boolean> {
-	const result = await db.prepare(
-			`DELETE FROM changelog WHERE seq IN (SELECT seq FROM changelog
+ * retained changelog stays contiguous. `alongside` runs first in the same
+ * transaction, given the sequence numbers about to be deleted. Returns true when
+ * more rows may remain. */
+export async function pruneChangelog(db: D1Database, alongside?: (expired: SqlGuard<unknown>) => D1PreparedStatement): Promise<boolean> {
+	// A statement that runs earlier sees an earlier clock, so it selects a subset of these rows.
+	const expired: SqlGuard<unknown> = { sql: `SELECT seq FROM changelog
 			WHERE created_at < datetime('now', '-' || ? || ' days')
-			AND seq < (SELECT MAX(seq) FROM changelog) ORDER BY created_at, seq LIMIT ?)`,
-	).bind(CHANGELOG_RETENTION_DAYS, MAINTENANCE_DELETE_LIMIT).run();
-	return changedRows(result) === MAINTENANCE_DELETE_LIMIT;
+			AND seq < (SELECT MAX(seq) FROM changelog) ORDER BY created_at, seq LIMIT ?`, args: [CHANGELOG_RETENTION_DAYS, MAINTENANCE_DELETE_LIMIT] };
+	const results = await db.batch([
+		...(alongside ? [alongside(expired)] : []),
+		db.prepare(`DELETE FROM changelog WHERE seq IN (${expired.sql})`).bind(...expired.args),
+	]);
+	return changedRows(results.at(-1)) === MAINTENANCE_DELETE_LIMIT;
 }
 
 /** Sets a `maintenance_state` value. Conflicts keep the row's `updated_at`; the

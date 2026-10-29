@@ -10,7 +10,7 @@ import { pruneFileDeletionReceipts } from '../sync/file-delete-audit';
 import { pruneReminderOccurrences } from './reminder-history';
 import { pruneOperationReceipts } from './operation-receipts';
 import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
-import { pruneEncryptionMetadata } from './encryption-metadata';
+import { pruneEncryptionMetadata, releaseExpiredVersionDescriptors, releasePrunedChangelogDescriptors } from './encryption-metadata';
 import { wakeProjection } from '../coordinator/coordinator';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 
@@ -20,7 +20,10 @@ export interface MaintenanceResult { removedObjects: number; backlog: boolean }
  * is false for the follow-up passes of one maintenance episode. */
 export async function runScheduledMaintenance(env: Env, { firstPass = true }: { firstPass?: boolean } = {}): Promise<MaintenanceResult> {
 	if (await env.DB.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first()) return { removedObjects: 0, backlog: false };
-	if ((await readEncryptionState(env.DB))?.mode === 'resetting') return { removedObjects: 0, backlog: false };
+	const encryption = await readEncryptionState(env.DB);
+	if (encryption?.mode === 'resetting') return { removedObjects: 0, backlog: false };
+	// Descriptors exist only in an active encrypted vault; each release rechecks that.
+	const encrypted = encryption?.mode === 'active';
 	const errors: string[] = [];
 	let removedObjects = 0, backlog = false;
 	const bounded = (task: () => Promise<boolean>) => async () => { if (await task()) backlog = true; };
@@ -32,10 +35,13 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
 			}
 		}],
 				['prune shared checkpoints', () => pruneSharedCheckpoints(env.BUCKET, env.DB)],
-		['expire file versions', bounded(() => enqueueExpiredFileVersions(env.DB))],
-		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, env.DB); }],
-		['prune changelog', bounded(() => pruneChangelog(env.DB))],
+		// Changelog entries and deletion receipts usually expire before the versions of
+		// their revisions, so each descriptor is released with its last reference.
+		['prune changelog', bounded(() => pruneChangelog(env.DB, encrypted ? expired => releasePrunedChangelogDescriptors(env.DB, expired) : undefined))],
 		['prune file deletion receipts', bounded(() => pruneFileDeletionReceipts(env.DB))],
+		['expire file versions', bounded(() => enqueueExpiredFileVersions(env.DB, Date.now(),
+			encrypted ? expired => releaseExpiredVersionDescriptors(env.DB, expired) : undefined))],
+		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, env.DB); }],
 		['prune obsolete reminder occurrences', () => pruneReminderOccurrences(env.DB)],
 		['prune expired operation receipts', bounded(() => pruneOperationReceipts(env.DB))],
 		['prune request limits', () => env.DB.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
@@ -44,9 +50,7 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
 		['clean unfinished upload batches', async () => { removedObjects += await cleanStagedBatches(env.BUCKET, env.DB); }],
 		['prune expired encrypted response chunks', () => pruneEncryptedReceiptChunks(env.DB)],
 	];
-	// Its reference check scans several whole tables, so run it once per episode
-	// rather than on every backlog pass; unused descriptors are small and harmless.
-	if (firstPass) tasks.push(['prune unused encryption metadata', () => pruneEncryptionMetadata(env.DB)]);
+	if (encrypted) tasks.push(['prune unused encryption metadata', bounded(() => pruneEncryptionMetadata(env.DB, firstPass))]);
 	for (const [name, task] of tasks) {
 		try {
 			await task();

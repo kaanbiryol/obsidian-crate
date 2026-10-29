@@ -103,19 +103,16 @@ describe('scheduled Worker maintenance', () => {
 	});
 });
 
-it('checks unused encryption descriptors only on the first pass of an episode', async () => {
+it('adds no encryption descriptor statements to passes in a plaintext vault', async () => {
 	const statements: ReturnType<typeof createStatement>[] = [];
 	const db = {
 		prepare: vi.fn((sql: string) => { const statement = createStatement(sql); statements.push(statement); return statement; }),
 		batch: vi.fn(async (batch: Array<{ run(): Promise<unknown> }>) => Promise.all(batch.map(statement => statement.run()))),
 	};
 	const bucket = { delete: vi.fn(async () => {}), get: vi.fn(async () => null), list: vi.fn(async () => ({ objects: [], truncated: false })) };
-	const descriptorChecks = () => statements.filter(statement => statement.sql.includes('NOT IN (SELECT consumed_revision FROM file_deletion_receipts)')).length;
-
-	await runScheduledMaintenance({ DB: db, BUCKET: bucket } as never, { firstPass: true });
-	expect(descriptorChecks()).toBe(1);
-	// Before: every backlog pass (up to 200 per episode) rescanned the referencing tables.
-	await runScheduledMaintenance({ DB: db, BUCKET: bucket } as never, { firstPass: false });
-	expect(descriptorChecks()).toBe(1);
+	// Before: every first pass scanned the referencing tables, encrypted or not.
+	for (const firstPass of [true, false]) await runScheduledMaintenance({ DB: db, BUCKET: bucket } as never, { firstPass });
+	// Descriptor releases and the sweep check deletion receipts as references.
+	expect(statements.filter(statement => statement.sql.includes('file_deletion_receipts') && !statement.sql.startsWith('DELETE FROM file_deletion_receipts'))).toEqual([]);
 	expect(statements.filter(statement => statement.sql.startsWith('DELETE FROM request_rate_limits')).length).toBe(2);
 });
