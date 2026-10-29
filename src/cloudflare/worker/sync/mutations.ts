@@ -1,5 +1,5 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
-import { publishedChangelogStatement } from './file-publication-statements';
+import { keepReplacedVersionSql, publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { ENCRYPTION_STATE_SQL, encryptionWriteGuard, parseEncryptionState, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
@@ -79,22 +79,27 @@ export function uploadMutation(db: D1Database, input: UploadMutationInput): D1Pr
 }
 
 /** Runs before the upload's UPDATE in the same batch and reads the live row, so a
- * same-bytes recreate since the caller's snapshot cannot leave its object untracked. */
-function retainReplacedUpload(db: D1Database, input: UploadMutationInput): D1PreparedStatement[] {
+ * same-bytes recreate since the caller's snapshot cannot leave its object untracked.
+ * Unless `always`, a replaced copy is kept only as `keepReplacedVersionSql` allows;
+ * the cleanup statement after it queues a copy that was not kept. */
+function retainReplacedUpload(db: D1Database, input: UploadMutationInput, always: boolean): D1PreparedStatement[] {
 	if (input.expectedHash === null) return [];
 	const replaced = replacedRow({ ...input, expectedHash: input.expectedHash });
 	return [db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, expires_at)
 		SELECT storage_key, path, hash, size, 'replaced', ${FILE_VERSION_EXPIRES_AT_SQL}
-		FROM files WHERE ${replaced.sql} AND storage_key != ?`)
-		.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...replaced.args, input.objectKey)];
+		FROM files WHERE ${replaced.sql} AND storage_key != ?${always ? '' : ` AND ${keepReplacedVersionSql('files')}`}`)
+		.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...replaced.args, input.objectKey),
+	...queueReplacedUploadCleanup(db, input)];
 }
 
-/** Like retainReplacedUpload, for writers that clean up replaced objects instead of keeping versions. */
+/** Queues the object an upload replaces for reference-aware cleanup unless a
+ * retained version keeps it. Writers that keep no versions use this alone. */
 export function queueReplacedUploadCleanup(db: D1Database, input: UploadMutationInput): D1PreparedStatement[] {
 	if (input.expectedHash === null) return [];
 	const replaced = replacedRow({ ...input, expectedHash: input.expectedHash });
 	return [db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key, file_path)
-		SELECT storage_key, path FROM files WHERE ${replaced.sql} AND storage_key != ?`)
+		SELECT storage_key, path FROM files WHERE ${replaced.sql} AND storage_key != ?
+		AND NOT EXISTS (SELECT 1 FROM file_versions WHERE storage_key = files.storage_key)`)
 		.bind(...replaced.args, input.objectKey)];
 }
 
@@ -129,6 +134,8 @@ export interface StagedFileCommitInput {
 	/** Only the server's own Reading capture sets this: a new note sealed to the
 	 * vault seal key inside this folder. Client uploads can never create one. */
 	sealedReadingFolder?: string;
+	/** Keep the replaced copy without coalescing, so an explicit restore can be undone. */
+	keepReplacedVersion?: boolean;
 }
 
 /** Columns for `parseCommitContext`: the server state `commitStagedFile` otherwise
@@ -156,7 +163,7 @@ export async function commitStagedFile(
 		expectedHash: params.expectedHash, expectedRevision: params.expectedRevision,
 		operation: params.operation, encryptionState: encryption.state, resetGeneration: params.resetGeneration,
 	};
-	const retained = retainReplacedUpload(db, upload);
+	const retained = retainReplacedUpload(db, upload, params.keepReplacedVersion === true);
 	const results: unknown[] = await db.batch([
 		...retained,
 		uploadMutation(db, upload),

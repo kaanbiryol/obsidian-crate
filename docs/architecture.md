@@ -649,7 +649,7 @@ aggregation in `worker/reminders/source-summary.ts`. Their specialized SQL and
 atomic file-publication transactions remain separate.
 
 `worker/sync/file-publication-statements.ts` constructs per-file changelog and retained
-version statements. Single-file publication requires its committed revision;
+version statements, including the coalescing rule for replaced copies. Single-file publication requires its committed revision;
 atomic moves retain both revision conditions. Each writer still owns transaction
 assembly, receipts, projection work and recovery; bulk publication keeps its
 specialized SQL.

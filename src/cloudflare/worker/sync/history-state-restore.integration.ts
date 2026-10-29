@@ -119,6 +119,27 @@ it('discovers a checkpoint on another Mac and rolls back without the originating
 	}
 });
 
+it('restores the rest of a shared checkpoint and reports a file whose saved version was coalesced away', async () => {
+	const device = new SyncTestDevice('shared-coalesced', env); clients.push(device);
+	await device.authorize(); await device.open();
+	device.disk.write('edited.md', 'first'); device.disk.write('deleted.md', 'bring back');
+	await sync(device);
+	device.disk.write('edited.md', 'checkpointed'); await sync(device);
+	const checkpoint = (await device.api.sharedHistory.save())!;
+	// Replaced seconds after it was saved, right after another version was kept.
+	device.disk.write('edited.md', 'later edit'); device.disk.remove('deleted.md'); await sync(device);
+	const runtime = historyRuntime(device, '');
+	const entry = device.settings.syncHistory[0]!;
+	delete entry.historyCheckpoint; entry.sharedCheckpoint = checkpoint.id;
+	const review = await runtime.createHistoryRestore(entry);
+	expect(review.items.map(item => item.path)).toEqual(['deleted.md', 'edited.md']);
+	expect(await review.restore()).toEqual(['edited.md']);
+	expect(device.disk.paths()).toEqual(['deleted.md', 'edited.md']);
+	expect(device.disk.text('deleted.md')).toBe('bring back');
+	expect(device.disk.text('edited.md')).toBe('later edit');
+	expect(Object.keys((await device.api.getManifest()).files).sort()).toEqual(['deleted.md', 'edited.md']);
+});
+
 it('downloads retained checkpoint attachments larger than the file-preview limit', async () => {
 	const device = new SyncTestDevice('shared-binary', env); clients.push(device);
 	await device.authorize(); await device.open();

@@ -15,7 +15,7 @@ import { writeCommittedMarkdownFile } from '../storage';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
 import { drainObjectCleanupQueue } from '../maintenance/object-cleanup';
 import { FILE_VERSION_RETENTION_MS, getStoredFileRow } from './storage';
-import { retainReplacedVersionStatement } from './file-publication-statements';
+import { retainReplacedVersionStatements } from './file-publication-statements';
 
 const { DB: db, BUCKET: bucket } = env;
 beforeEach(async () => {
@@ -153,11 +153,12 @@ describe('publication history and derived state', () => {
 	it.each([sourcePath, destinationPath])('requires every published move revision before retaining history (stale: %s)', async stalePath => {
 		const source = (await getStoredFileRow(db, sourcePath))!;
 		const destination = (await getStoredFileRow(db, destinationPath))!;
-		await db.batch([retainReplacedVersionStatement(db, { ...source, path: sourcePath }, [
+		await db.batch(retainReplacedVersionStatements(db, { ...source, path: sourcePath, modified: '2000-01-01 00:00:00' }, [
 			{ path: sourcePath, objectKey: stalePath === sourcePath ? 'unpublished-source' : source.storageKey },
 			{ path: destinationPath, objectKey: stalePath === destinationPath ? 'unpublished-destination' : destination.storageKey },
-		])]);
+		]));
 		expect(await db.prepare('SELECT 1 FROM file_versions').first()).toBeNull();
+		expect(await db.prepare('SELECT 1 FROM object_cleanup_queue').first()).toBeNull();
 	});
 });
 
@@ -167,13 +168,15 @@ describe('replaced version retention', () => {
 		method: 'PUT', headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent' }, body,
 	}), bucket, db, { commitUpload: commitStagedFile, commitNewFiles });
 
-	it('retains the object an upload replaces when the same bytes were recreated after its snapshot', async () => {
+	it.each([true, false])('tracks the object an upload replaces when the same bytes were recreated after its snapshot (kept: %s)', async kept => {
 		expect((await absent('first')).status).toBe(200);
 		const snapshot = (await getStoredFileRow(db, path))!;
 		expect((await commitFileDelete(db, { path, expectedHash: snapshot.hash, expectedRevision: snapshot.storageKey, previousFile: snapshot })).committed).toBe(true);
 		expect((await absent('first')).status).toBe(200);
 		const recreated = (await getStoredFileRow(db, path))!;
 		expect(recreated.storageKey).not.toBe(snapshot.storageKey);
+		// A copy live for the whole coalescing window is kept; a newer one is queued for cleanup.
+		if (kept) await db.prepare("UPDATE files SET modified = datetime('now', '-11 minutes')").run();
 
 		const content = new TextEncoder().encode('second').buffer;
 		const hash = await sha256Hex(content);
@@ -185,6 +188,7 @@ describe('replaced version retention', () => {
 		});
 
 		expect(result.committed).toBe(true);
-		expect(await db.prepare('SELECT reason FROM file_versions WHERE storage_key = ?').bind(recreated.storageKey).first()).toEqual({ reason: 'replaced' });
+		if (kept) expect(await db.prepare('SELECT reason FROM file_versions WHERE storage_key = ?').bind(recreated.storageKey).first()).toEqual({ reason: 'replaced' });
+		else expect(await db.prepare('SELECT file_path FROM object_cleanup_queue WHERE storage_key = ?').bind(recreated.storageKey).first()).toEqual({ file_path: path });
 	});
 });

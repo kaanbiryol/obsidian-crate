@@ -25,7 +25,7 @@ The web app and scheduled notifications talk to your server directly, so Obsidia
 | 1 MB per Reading note | Bigger notes are reported instead of opened in Reading. Shorten the note or read the original source. |
 | 1 MB per reminder note in the web app | Bigger notes, or notes with a very large number of reminders, are left out with an explanation. Split them into smaller project notes to edit and schedule them in the web app again. |
 | 200 articles or 50 MB in the web app's article cache | Articles you've opened are kept first, then your newest inbox articles. Open the web app while online before going offline so it can catch up. |
-| 30 days of server history for replaced or deleted files | Recover promptly. Files that only ever existed on one device may have no server history. |
+| 30 days of server history for replaced or deleted files, about one version every 10 minutes while editing (every hour for files of 1 MB or more) | Recover promptly. Files that only ever existed on one device may have no server history. |
 | Latest 20 checkpoints, for up to 30 days | Checkpoints are saved states of your whole vault you can return to. They cover recent syncs, not an unlimited backup archive. |
 
 Sizes are rounded down, so a file under the listed size always fits. The Reading and reminder limits can apply even when a note is small enough to sync.

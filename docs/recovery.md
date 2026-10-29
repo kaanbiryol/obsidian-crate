@@ -86,7 +86,8 @@ Run `npm run build && npm run test:file-history-browser` for the production file
 
 Whole-vault history restore is covered by `src/sync/history/restore.test.ts`,
 `src/sync/runtime/history-restore.test.ts`, and
-`src/cloudflare/worker/sync/history-state-restore.integration.ts`. The file-history browser
+`src/cloudflare/worker/sync/history-state-restore.integration.ts`, including a checkpoint
+whose saved version of one file was coalesced away. The file-history browser
 harness also checks the checkpoint action, per-file preview, cancellation, busy
 controls, unavailable versions, and retry in both engines and viewport sizes.
 History rows show second-level timestamps; restore-point IDs appear in the confirmation. Browser checks

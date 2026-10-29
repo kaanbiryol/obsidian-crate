@@ -2,10 +2,11 @@ import { parseSharedCheckpoint, parseSharedCheckpointList, parseSharedCheckpoint
 import { isRecord } from '../../platform/validation';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
-import { TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
+import { HttpError, TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
 import type { EncryptedFiles } from '../encryption/encrypted-files';
 import { sha256Hex } from '../../platform/sha256';
 import { createPathRecord } from '../../protocol/path-record';
+import { HistoryVersionUnavailableError } from '../history/source';
 
 export class SharedHistoryApi {
 	constructor(private http: WorkerApiHttpClient) {}
@@ -33,7 +34,13 @@ export class SharedHistoryApi {
 	}
 	async download(id: string, path: string, file: FileEntry): Promise<ArrayBuffer> {
 		const wire = this.encryption ? file.wire ?? await this.encryption.paths.wireFor(path) : path;
-		let { body } = await this.http.requestBinary(`/sync/checkpoint-file?id=${encodeURIComponent(id)}&path=${encodeURIComponent(wire)}&revision=${encodeURIComponent(file.revision ?? '')}`, {}, TRANSFER_TIMEOUT_MS);
+		let body: ArrayBuffer;
+		try {
+			({ body } = await this.http.requestBinary(`/sync/checkpoint-file?id=${encodeURIComponent(id)}&path=${encodeURIComponent(wire)}&revision=${encodeURIComponent(file.revision ?? '')}`, {}, TRANSFER_TIMEOUT_MS));
+		} catch (error) {
+			if (error instanceof HttpError && error.status === 410 && error.code === 'version_unavailable') throw new HistoryVersionUnavailableError(path);
+			throw error;
+		}
 		if (this.encryption) body = (await this.encryption.download(wire, body, undefined, path, false)).content;
 		if (body.byteLength > MAX_FILE_SIZE_BYTES || body.byteLength !== file.size || await sha256Hex(body) !== file.hash) throw new Error(`${path}: checkpoint file failed integrity validation.`);
 		return body;

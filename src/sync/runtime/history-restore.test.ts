@@ -17,6 +17,7 @@ function harness(automaticSync = true) {
 		expect(h.persistSettings).toHaveBeenCalledWith({ automaticSync: false });
 	});
 	const verifySynced = vi.fn(async () => {});
+	const unavailable: string[] = [];
 	const engine = {
 		sync: vi.fn(async () => createEmptySyncResult()),
 		updateSettings: vi.fn(),
@@ -25,10 +26,10 @@ function harness(automaticSync = true) {
 		createHistoryRestore: vi.fn(async (_id: string, beforeApply: () => Promise<void>) => ({
 			items: [{ path: 'note.md', action: 'revert' as const }], unchangedCount: 2,
 			preview: async () => ({ current: 'new', saved: 'old' }),
-			restore: async () => { await beforeApply(); await apply(); }, verifySynced,
+			restore: async () => { await beforeApply(); await apply(); return unavailable; }, verifySynced,
 		})),
 	};
-	return { ...h, engine, entry, apply, verifySynced, disconnect: () => { current = false; },
+	return { ...h, engine, entry, apply, verifySynced, unavailable, disconnect: () => { current = false; },
 		prepare: (selected: SyncHistoryEntry) => createRuntimeHistoryRestore({
 			engine, settings: h.settings, verify, clearForegroundSyncTimer: vi.fn(), persistSettings: h.persistSettings,
 			runSyncOperation: operation => operation(engine, () => {}),
@@ -56,6 +57,15 @@ describe('history restore orchestration', () => {
 		expect(h.engine.sync).toHaveBeenCalledOnce();
 		expect(h.verifySynced).toHaveBeenCalledOnce();
 		expect(h.settings.automaticSync).toBe(automaticSync);
+	});
+
+	it('reports files whose saved versions are gone after syncing and verifying the rest', async () => {
+		const h = harness();
+		h.unavailable.push('gone.md');
+		expect(await (await h.prepare(h.entry)).restore()).toEqual(['gone.md']);
+		expect(h.engine.sync).toHaveBeenCalledOnce();
+		expect(h.verifySynced).toHaveBeenCalledOnce();
+		expect(h.settings.automaticSync).toBe(true);
 	});
 
 	it.each(['apply', 'sync', 'verify'])('keeps automatic sync off after a failed %s', async step => {

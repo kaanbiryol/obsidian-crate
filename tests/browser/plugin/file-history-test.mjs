@@ -58,7 +58,7 @@ const { outputFiles } = await build({
     if(window.statePreviewError) throw new Error('This version is no longer available. No files were changed.');
     return {items:window.stateNoChanges?[]:[{path:'Notes/Plan.md',action:'revert'},{path:'Archive/Deleted.md',action:'restore'},{path:'Notes/Added later.md',action:'remove'}],unchangedCount:12,
      preview:async () => {window.stateFilePreviews++;return {current:'current',saved:'saved'};},
-     restore:async () => {window.stateRestores++;if(window.stateRestoreError) throw new Error('Restore failed');await new Promise(resolve=>window.finishStateRestore=resolve);}};
+     restore:async () => {window.stateRestores++;if(window.stateRestoreError) throw new Error('Restore failed');await new Promise(resolve=>window.finishStateRestore=resolve);return [];}};
    }, () => {});
    window.restoreModal.open();
   };

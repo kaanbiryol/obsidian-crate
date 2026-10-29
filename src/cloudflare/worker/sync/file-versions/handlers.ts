@@ -84,6 +84,7 @@ export async function handleRestoreFileVersion(
 			expectedHash,
 			expectedRevision: expectedRevision ?? undefined,
 			operation,
+			keepReplacedVersion: true,
 		});
 		if (!result.committed) {
 			return corsResponse(result.failure ?? { error: 'Remote file changed before the version could be restored', currentHash: result.currentHash }, 409);

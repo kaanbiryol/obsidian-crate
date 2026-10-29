@@ -53,9 +53,9 @@ export async function createRuntimeHistoryRestore({ engine, settings, verify, cl
 				return preview;
 		}, restore: async () => {
 				verify();
-				await review.restore();
+				const unavailable = await review.restore();
 				verify();
-				if (!review.items.length) return;
+				if (!review.items.length) return unavailable;
 				const result = await runSyncOperation(async (current, progress) => {
 						const removed = new Set(review.items.filter(item => item.action === 'remove').map(item => item.path));
 						const keys = removed.size ? current.getPendingKeys().filter(key => removed.has(decodePendingChange(key).path)) : [];
@@ -82,5 +82,6 @@ export async function createRuntimeHistoryRestore({ engine, settings, verify, cl
 				verify();
 				settings.automaticSync = automaticSync;
 				engine.updateSettings(settings);
+				return unavailable;
 		} };
 }

@@ -103,7 +103,7 @@ Exclusions apply to all your Obsidian devices. Adding a rule stops future syncin
 ## When something goes wrong
 
 - **Two devices changed the same note:** Crate keeps both versions for you to compare. See [Resolve conflicts](/docs/troubleshooting/conflicts/).
-- **You need an earlier version:** the server keeps replaced and deleted files for 30 days, and you can restore your whole vault to an earlier synced state. See [History and recovery](/docs/troubleshooting/recovery/) before you restore.
+- **You need an earlier version:** the server keeps replaced and deleted files for 30 days, about one version every 10 minutes while you edit, and you can restore your whole vault to an earlier synced state. See [History and recovery](/docs/troubleshooting/recovery/) before you restore.
 
 :::caution[Sync is not a backup]
 Deleting a file on one device deletes it everywhere. Keep a separate backup of notes you can't afford to lose.

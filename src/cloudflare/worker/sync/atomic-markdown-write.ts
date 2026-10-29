@@ -1,5 +1,5 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
-import { publishedChangelogStatement, retainReplacedVersionStatement } from './file-publication-statements';
+import { publishedChangelogStatement, retainReplacedVersionStatements } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
 import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
@@ -14,7 +14,14 @@ import { FileVersionConflictError } from '../storage';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import {
 	getStoredFileRow,
+	type FileStorageRow,
 } from './storage';
+
+/** The replaced row, including when it became live for version coalescing. */
+function getReplacedFileRow(db: D1Database, path: string): Promise<(FileStorageRow & { path: string; modified: string }) | null> {
+	return db.prepare(`SELECT path, hash, size, storage_key AS storageKey, modified FROM files WHERE ${FILE_PATH_MATCH}`)
+		.bind(...filePathArgs(path)).first();
+}
 
 function destinationMutation(
 	db: D1Database,
@@ -115,8 +122,8 @@ export async function writeCommittedMarkdownFilePair(
 	const destinationEncryption = await prepareEncryptedFileCommit(db, params.destination.path, params.destination.content);
 
 	const [previousSource, previousDestination] = await Promise.all([
-		getStoredFileRow(db, params.source.path),
-		getStoredFileRow(db, params.destination.path),
+		getReplacedFileRow(db, params.source.path),
+		getReplacedFileRow(db, params.destination.path),
 	]);
 	const stagedFiles: StagedMarkdownFile[] = [];
 	try {
@@ -145,12 +152,8 @@ export async function writeCommittedMarkdownFilePair(
 	source.expectedRevision = params.source.expectedRevision;
 	destination.expectedRevision = params.destination.expectedRevision;
 	const previousVersions = [
-		...(previousSource && previousSource.storageKey !== source.objectKey
-			? [{ path: source.path, ...previousSource }]
-			: []),
-		...(previousDestination && previousDestination.storageKey !== destination.objectKey
-			? [{ path: destination.path, ...previousDestination }]
-			: []),
+		...(previousSource && previousSource.storageKey !== source.objectKey ? [previousSource] : []),
+		...(previousDestination && previousDestination.storageKey !== destination.objectKey ? [previousDestination] : []),
 	];
 
 	// An exception may follow a committed transaction. Never reclaim those keys
@@ -162,7 +165,7 @@ export async function writeCommittedMarkdownFilePair(
 			...recordEncryptedFile(db, destination.path, destination.objectKey, destinationEncryption.descriptor),
 			publishedChangelogStatement(db, destination),
 			publishedChangelogStatement(db, source),
-			...previousVersions.map(previous => retainReplacedVersionStatement(db, previous, [source, destination])),
+			...previousVersions.flatMap(previous => retainReplacedVersionStatements(db, previous, [source, destination])),
 			...await enqueueFileProjection(db, source.path, source.objectKey, params.source.content, false, Boolean(sourceEncryption.state)),
 			...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, false, Boolean(destinationEncryption.state)),
 			...await readingIndexStatements(db, [

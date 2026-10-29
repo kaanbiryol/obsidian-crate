@@ -1,5 +1,5 @@
 import type { Vault } from 'obsidian';
-import { findHistorySource } from './source';
+import { findHistorySource, HistoryVersionUnavailableError } from './source';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { LocalManifestView } from '../manifest/manifest';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
@@ -20,7 +20,8 @@ export interface HistoryRestoreReview {
 	items: HistoryRestoreItem[];
 	unchangedCount: number;
 	preview(path: string): Promise<HistoryRestorePreview>;
-	restore(): Promise<void>;
+	/** Resolves with the files left unchanged because their saved version is gone. */
+	restore(): Promise<string[]>;
 }
 interface Context {
 	vault: Vault;
@@ -51,18 +52,33 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 	const items: HistoryRestoreItem[] = paths.filter(path => local[path]?.hash !== target[path]?.hash || remote[path]?.hash !== target[path]?.hash).map(path => ({
 		path, action: !target[path] ? 'remove' : local[path] ? 'revert' : 'restore',
 	}));
-	// Resolve the exact bytes while previewing. Expired history disables the whole
-	// restore; it must never silently skip a file and report a complete rollback.
+	// Resolve the exact bytes while previewing. A file whose saved version is gone
+	// keeps its current contents and is reported; it is never silently skipped.
 	const sources = new Map<string, () => Promise<ArrayBuffer>>();
+	const unavailable = new Set<string>();
 	for (const item of items) {
 		const wanted = target[item.path];
 		if (!wanted) continue;
 		if (wanted.size > MAX_FILE_SIZE_BYTES) throw new Error(`${item.path}: file is too large to restore.`);
-		sources.set(item.path, local[item.path]?.hash === wanted.hash
-			? () => vault.adapter.readBinary(item.path)
-			: context.readTarget ? () => context.readTarget!(item.path, wanted) : await findHistorySource(api, item.path, wanted, remote[item.path]));
+		try {
+			sources.set(item.path, local[item.path]?.hash === wanted.hash
+				? () => vault.adapter.readBinary(item.path)
+				: context.readTarget ? () => context.readTarget!(item.path, wanted) : await findHistorySource(api, item.path, wanted, remote[item.path]));
+		} catch (error) {
+			if (!(error instanceof HistoryVersionUnavailableError)) throw error;
+			unavailable.add(item.path);
+		}
 	}
 	context.verify();
+	/** The target state, with unavailable files kept as they are now. */
+	const expectedFiles = (): Files => {
+		const files = Object.assign(Object.create(null) as Files, target);
+		for (const path of unavailable) {
+			if (local[path]) files[path] = local[path];
+			else delete files[path];
+		}
+		return files;
+	};
 	let used = false;
 	const verify = async () => {
 		context.verify();
@@ -76,14 +92,15 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 			context.verify();
 			if (used) throw new Error('Reopen the restore point to review its files.');
 			if (!items.some(item => item.path === path)) throw new Error('This file is not part of the restore review.');
+			const source = sources.get(path);
 			const preview = await loadHistoryRestorePreview(path, local[path], target[path],
-				() => vault.adapter.readBinary(path), () => sources.get(path)!());
+				() => vault.adapter.readBinary(path), () => source ? source() : Promise.reject(new HistoryVersionUnavailableError(path)));
 			context.verify();
 			return preview;
 		},
 		verifySynced: async () => {
 			context.verify();
-			if (!sameFiles(target, filter((await api.getManifest()).files)) || !sameFiles(target, await scanLocal(context))) {
+			if (!sameFiles(expectedFiles(), filter((await api.getManifest()).files)) || !sameFiles(expectedFiles(), await scanLocal(context))) {
 				throw new Error('Files changed during the final sync. Automatic sync is off; review the remaining changes before continuing.');
 			}
 			context.verify();
@@ -91,7 +108,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 		restore: async () => {
 			if (used) throw new Error('Review the restore again before retrying.');
 			used = true;
-			if (!items.length) return;
+			if (!items.length) return [];
 			const folder = `${context.recoveryRoot}/${crypto.randomUUID()}`;
 			if (!await vault.adapter.exists(context.recoveryRoot)) await vault.adapter.mkdir(context.recoveryRoot);
 			await vault.adapter.mkdir(folder);
@@ -101,20 +118,27 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 			// Originals and the inventory remain on disk across interruption/restart.
 			for (const [index, item] of items.entries()) {
 				context.verify();
+				const wanted = target[item.path];
+				let content: ArrayBuffer | undefined;
+				if (wanted && !unavailable.has(item.path)) {
+					try { content = await sources.get(item.path)!(); }
+					catch (error) { if (!(error instanceof HistoryVersionUnavailableError)) throw error; }
+				}
+				if (wanted && !content) { unavailable.add(item.path); continue; }
 				const entry: { original?: string; target?: string } = {};
 				const current = local[item.path];
 				if (current) {
 					entry.original = `${folder}/${index}.original`;
 					await stage(vault, entry.original, await vault.adapter.readBinary(item.path), current.hash);
 				}
-				const wanted = target[item.path];
 				if (wanted) {
 					entry.target = `${folder}/${index}.target`;
-					await stage(vault, entry.target, await sources.get(item.path)!(), wanted.hash);
+					await stage(vault, entry.target, content!, wanted.hash);
 				}
 				staged.set(item.path, entry);
 			}
-			const inventory = JSON.stringify({ version: 1, savedAt: new Date().toISOString(), items: items.map(item => ({ ...item, ...staged.get(item.path), before: local[item.path], after: target[item.path] })) });
+			const restored = items.filter(item => !unavailable.has(item.path));
+			const inventory = JSON.stringify({ version: 1, savedAt: new Date().toISOString(), items: restored.map(item => ({ ...item, ...staged.get(item.path), before: local[item.path], after: target[item.path] })) });
 			await vault.adapter.write(`${folder}/recovery.json`, inventory);
 			if (await vault.adapter.read(`${folder}/recovery.json`) !== inventory) throw new Error('Could not verify the recovery inventory. No files were changed.');
 			await verify();
@@ -122,7 +146,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 			try {
 				// Remove later additions first, including files that now obstruct
 				// a historical folder. Only empty folders may be removed on create.
-				for (const item of [...items].sort((a, b) => Number(b.action === 'remove') - Number(a.action === 'remove'))) {
+				for (const item of [...restored].sort((a, b) => Number(b.action === 'remove') - Number(a.action === 'remove'))) {
 					context.verify();
 					const originalHash = local[item.path]?.hash ?? null;
 					if ((await readLocalFileEntry(vault, item.path))?.hash !== local[item.path]?.hash) throw new Error(`${item.path} changed. Its new contents were kept.`);
@@ -146,10 +170,11 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 					}
 					context.applied(item.path, item.action === 'remove');
 				}
-				if (!sameFiles(target, await scanLocal(context))) throw new Error('The vault changed during restore. Review the remaining changes.');
+				if (!sameFiles(expectedFiles(), await scanLocal(context))) throw new Error('The vault changed during restore. Review the remaining changes.');
 			} catch (error) {
 				throw new Error(`${error instanceof Error ? error.message : 'Restore interrupted.'} Some files may already be restored. Automatic sync is off; review this checkpoint again to finish. Recovery copies: ${folder}`);
 			}
+			return [...unavailable].sort();
 		},
 	};
 }

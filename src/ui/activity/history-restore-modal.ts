@@ -75,11 +75,13 @@ export class HistoryRestoreModal extends SharedModal {
 		if (close) close.disabled = true;
 		this.status.setText('Saving recovery copies, restoring files, and syncing…');
 		try {
-			await review.restore();
+			const unavailable = await review.restore();
 			this.busy = false;
 			this.onRestored();
 			this.close();
-			new Notice('Synced vault returned to the selected state.');
+			new Notice(unavailable.length
+				? `Synced vault returned to the selected state, except ${unavailable.length} ${unavailable.length === 1 ? 'file' : 'files'} whose saved version is no longer kept. ${unavailable.length === 1 ? 'It was' : 'They were'} left unchanged: ${listPaths(unavailable)}`
+				: 'Synced vault returned to the selected state.', unavailable.length ? 0 : undefined);
 		} catch (error) {
 			this.onRestored();
 			if (isAbortError(error)) {
@@ -104,4 +106,8 @@ export class HistoryRestoreModal extends SharedModal {
 
 	close(): void { if (!this.busy) super.close(); }
 	onClose(): void { this.active = false; super.onClose(); }
+}
+
+function listPaths(paths: string[]): string {
+	return paths.length > 5 ? `${paths.slice(0, 5).join(', ')} and ${paths.length - 5} more` : paths.join(', ');
 }

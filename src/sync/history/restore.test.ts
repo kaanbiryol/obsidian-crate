@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FileEntry, RemoteFileVersion } from '../../protocol/sync-types';
 import { createHistoryRestore } from './restore';
+import { HistoryVersionUnavailableError } from './source';
 import { HistoryCheckpoints } from './checkpoint';
 import { writeLegacyCheckpoint } from './checkpoint-test-harness';
 import { sha256Hex } from '../../platform/sha256';
@@ -147,11 +148,40 @@ describe('whole synced vault restore', () => {
 		expect(h.files.get('a.md')).toEqual(bytes('current'));
 	});
 
-	it('fails the entire preview if any required version expired', async () => {
-		const h = await harness({ 'a.md': 'current', 'later.md': 'new' }, { 'a.md': 'old' });
-		h.versions.length = 0;
-		await expect(createHistoryRestore(h.context)).rejects.toThrow('no longer available');
-		expect(h.trash).not.toHaveBeenCalled();
+	it('restores the rest and reports a file whose saved version expired, keeping its current contents', async () => {
+		const h = await harness({ 'a.md': 'current', 'later.md': 'new' }, { 'a.md': 'old', 'b.md': 'saved' });
+		h.versions.splice(h.versions.findIndex(version => version.path === 'a.md'), 1);
+		const review = await createHistoryRestore(h.context);
+		await expect(review.preview('a.md')).rejects.toThrow('no longer available');
+		expect(await review.restore()).toEqual(['a.md']);
+		expect(h.files.get('a.md')).toEqual(bytes('current'));
+		expect(h.files.get('b.md')).toEqual(bytes('saved'));
+		expect(h.files.has('later.md')).toBe(false);
+		expect(h.context.applied).not.toHaveBeenCalledWith('a.md', false);
+		Object.assign(h.remote, await metadata({ 'b.md': 'saved' }));
+		delete h.remote['later.md'];
+		await review.verifySynced();
+	});
+
+	it.each([
+		['the server no longer keeps it', new HistoryVersionUnavailableError('a.md'), 'restores'],
+		['the download fails', new Error('Offline'), 'changes nothing'],
+	])('%s while staging a shared checkpoint file, so it %s', async (_case, error, outcome) => {
+		const h = await harness({ 'a.md': 'current', 'later.md': 'new' }, { 'a.md': 'old', 'b.md': 'saved' });
+		const readTarget = vi.fn(async (path: string) => {
+			if (path === 'a.md') throw error;
+			return bytes('saved');
+		});
+		const review = await createHistoryRestore({ ...h.context, readTarget });
+		if (outcome === 'restores') {
+			expect(await review.restore()).toEqual(['a.md']);
+			expect(h.files.get('a.md')).toEqual(bytes('current'));
+			expect(h.files.get('b.md')).toEqual(bytes('saved'));
+		} else {
+			await expect(review.restore()).rejects.toThrow('Offline');
+			expect(h.context.beforeApply).not.toHaveBeenCalled();
+			expect(h.files.has('b.md')).toBe(false);
+		}
 	});
 
 	it('stages every version before deleting or replacing any file', async () => {

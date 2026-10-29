@@ -124,7 +124,9 @@ index, capped at 20 states and 30 days. Creation rejects a changing inventory;
 publication retries deduplicate by monotonic server generation. No database schema
 change or duplicate file-content storage is introduced. Retained-version expiry is
 computed no earlier than 30 days after the D1 commit, preventing an older request
-start time from expiring bytes before a checkpoint.
+start time from expiring bytes before a checkpoint. Replaced copies are coalesced, so a
+checkpoint can reference a revision that is no longer kept; its file download returns
+410 with `code: "version_unavailable"`, and restore leaves that file unchanged and reports it.
 
 ## End-to-end encryption
 

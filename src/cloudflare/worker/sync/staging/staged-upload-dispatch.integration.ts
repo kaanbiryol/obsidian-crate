@@ -20,13 +20,15 @@ beforeEach(async () => {
 });
 afterEach(async () => { await reset(); });
 
-it('retains the current revision when another same-content save finished during upload preparation', async () => {
+it.each([true, false])('tracks the current revision when another same-content save finished during upload preparation (kept: %s)', async kept => {
 	const path = 'Notes/Example.md';
 	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, 'Old', null);
 	const staleSnapshot = await getStoredFileRow(env.DB, path);
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, 'Old', first.hash);
 	const current = await getStoredFileRow(env.DB, path);
 	expect(current!.storageKey).not.toBe(staleSnapshot!.storageKey);
+	// A copy live for the whole coalescing window is kept; a newer one is queued for cleanup.
+	if (kept) await env.DB.prepare("UPDATE files SET modified = datetime('now', '-11 minutes')").run();
 	const hash = await sha256Hex('New');
 	const objectKey = createManagedObjectKey(hash);
 	await trackStagedUpload(env.DB, objectKey, path);
@@ -35,7 +37,7 @@ it('retains the current revision when another same-content save finished during 
 		path, hash, size: 3, objectKey, content: 'New', expectedHash: first.hash,
 	});
 	expect(result.committed).toBe(true);
-	expect(await env.DB.prepare('SELECT storage_key FROM file_versions WHERE storage_key = ?').bind(current!.storageKey).first())
+	expect(await env.DB.prepare(`SELECT storage_key FROM ${kept ? 'file_versions' : 'object_cleanup_queue'} WHERE storage_key = ?`).bind(current!.storageKey).first())
 		.toEqual({ storage_key: current!.storageKey });
 });
 

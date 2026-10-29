@@ -200,7 +200,7 @@ Both `settle` and `release` use the exact inspected row and cannot erase a repla
 - If the browser handoff fails, select **Open Obsidian** on the callback page.
 - If OAuth expires, return to Crate settings and start again. Authorization state and PKCE material are intentionally not recoverable after plugin reload.
 - **Disconnect this device** clears the Worker URL and device secret but retains the non-secret deployment identity, allowing a later Cloudflare sign-in to reuse the same Worker. It never deletes Cloudflare resources.
-- Replaced and deleted sync objects remain recoverable for 30 days through **File history** in a file’s context menu or **Sync Activity → History → File history** (including deleted files). Recovery verifies the retained bytes and refuses to overwrite a remote path that changed after the recovery screen was opened.
+- Replaced and deleted sync objects remain recoverable for 30 days, with frequent saves kept about once per 10 minutes (60 minutes for files of 1 MiB or more), through **File history** in a file’s context menu or **Sync Activity → History → File history** (including deleted files). Recovery verifies the retained bytes and refuses to overwrite a remote path that changed after the recovery screen was opened.
 - **Run diagnostics** reports manifest access, pending backend queues, and the last scheduled-maintenance result. Use it after a server upgrade and before relying on a newly seeded vault.
 - To destroy the server and synced data, select **Advanced server actions → Delete server and all data**. The Cloudflare dashboard remains available for manual administration.
 
