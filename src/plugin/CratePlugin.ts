@@ -21,6 +21,7 @@ import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { createSettingsUiState, type SettingsUiState } from './settings-ui-state';
 import { SecretStorageService } from './secret-storage';
+import { keepLastGoodPluginData, loadPluginData } from './plugin-data';
 import {
 	buildPersistedCrateSettings,
 	normalizeCrateSettings,
@@ -62,13 +63,15 @@ export default class CratePlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		const signal = getPluginLifecycleSignal(this);
-		const data = await this.loadData() as PluginData | null;
+		const data = await loadPluginData(this) as PluginData | null;
 		if (signal.aborted) return;
 		// Without saved data this is a fresh install: no feature changes notes until it is turned on in this vault.
 		const saved: PluginData = data ?? { reading: DEFAULT_READING_SETTINGS, reminders: DEFAULT_REMINDERS_SETTINGS };
 		this.settings = normalizeCrateSettings(saved, this.app.vault.configDir);
 		const remindersSettings = normalizeRemindersSettings(saved.reminders);
 		useRemindersSettingsStore.setState(remindersSettings, true);
+		// Saved in the background, in the shape `persist` writes, so startup does not wait for it.
+		if (data) void keepLastGoodPluginData(this, { ...buildPersistedCrateSettings(this.settings), reminders: remindersSettings });
 		configureSyncLogger({ enabled: this.settings.debugLogging });
 		configureRemindersLogger({ prefix: 'Crate', enabled: this.settings.debugLogging });
 	}

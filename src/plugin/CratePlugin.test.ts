@@ -390,6 +390,57 @@ describe('CratePlugin settings persistence', () => {
 		for (const saved of persisted) expect(saved).not.toHaveProperty('deviceId');
 	});
 
+	describe('damaged plugin data', () => {
+		const dir = '.obsidian/plugins/crate';
+		function withDisk(files: Record<string, string>) {
+			const disk = new Map(Object.entries(files).map(([name, text]) => [`${dir}/${name}`, text]));
+			const plugin = new CratePlugin({} as never, {} as never);
+			Object.assign(plugin, {
+				manifest: { dir },
+				app: { vault: { configDir: '.obsidian', adapter: {
+					exists: async (path: string) => disk.has(path),
+					read: async (path: string) => disk.get(path)!,
+					write: async (path: string, text: string) => { disk.set(path, text); },
+					remove: async (path: string) => { disk.delete(path); },
+					rename: async (from: string, to: string) => { disk.set(to, disk.get(from)!); disk.delete(from); },
+				} } },
+				loadData: async (): Promise<unknown> => disk.has(`${dir}/data.json`) ? JSON.parse(disk.get(`${dir}/data.json`)!) : null,
+				saveData: async (data: unknown) => { disk.set(`${dir}/data.json`, JSON.stringify(data)); },
+			});
+			return { plugin, file: (name: string) => disk.get(`${dir}/${name}`), names: () => [...disk.keys()] };
+		}
+		const saved = { workerUrl: 'https://crate.example', reading: { enabled: true, folderPath: 'Articles', confirmed: true }, reminders: { enabled: true, confirmed: true, remindersFolderPath: 'Tasks' } };
+
+		it('loads the last good copy instead of failing and keeps the damaged file', async () => {
+			const { plugin, file, names } = withDisk({ 'data.json': '{"workerUrl":"https://cr', 'data.last-good.json': JSON.stringify(saved) });
+			await plugin.loadSettings();
+			expect(plugin.settings).toMatchObject({ workerUrl: 'https://crate.example', reading: saved.reading });
+			expect(plugin.remindersSettings).toMatchObject(saved.reminders);
+			expect(names().some(name => name.startsWith(`${dir}/data.json.corrupt-`))).toBe(true);
+			expect(JSON.parse(file('data.json')!)).toEqual(saved);
+		});
+
+		it('starts disconnected with features off when no good copy exists', async () => {
+			const { plugin, file } = withDisk({ 'data.json': '{"workerUrl":"https://cr' });
+			await plugin.loadSettings();
+			expect(plugin.settings.workerUrl).toBe('');
+			expect(plugin.settings.reading).toMatchObject({ enabled: false, confirmed: false });
+			expect(plugin.remindersSettings).toMatchObject({ enabled: false, confirmed: false });
+			expect(file('data.json')).toBeUndefined();
+			expect(file('data.last-good.json')).toBeUndefined();
+		});
+
+		it('keeps a good copy of normalized settings only, so stray fields such as old secrets are not duplicated', async () => {
+			const { plugin, file } = withDisk({ 'data.json': JSON.stringify({ ...saved, authToken: 'synthetic-secret', deviceId: 'synthetic-device' }) });
+			await plugin.loadSettings();
+			await vi.waitFor(() => expect(file('data.last-good.json')).toBeDefined());
+			const copy = file('data.last-good.json')!;
+			expect(JSON.parse(copy)).toMatchObject({ workerUrl: 'https://crate.example', reminders: { remindersFolderPath: 'Tasks' } });
+			expect(copy).not.toContain('synthetic-secret');
+			expect(copy).not.toContain('synthetic-device');
+		});
+	});
+
 	it('opens its settings tab when the host exposes the settings controller', () => {
 		const plugin = new CratePlugin({} as never, {} as never);
 		const open = vi.fn();

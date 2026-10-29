@@ -64,6 +64,15 @@ Export pending work before you clear browser data.
 
 If that doesn't fix it, keep any export you have and write down the error before you change browser storage by hand.
 
+## Crate's settings were damaged
+
+If Obsidian closes while Crate is saving, its settings file can be left incomplete. On the next start, Crate moves the damaged file aside as `data.json.corrupt-<number>` in its plugin folder and tells you which of these it did:
+
+- **Restored the last good copy:** Crate keeps a copy of the settings it loaded when Obsidian last started. Check your recent setting changes and make them again if needed.
+- **Started with defaults:** sync is disconnected, and Reading and Reminders are off. Open **Settings → Crate** to reconnect to the same server, then turn the features back on.
+
+Your notes aren't changed. Neither file holds sign-in credentials; those stay in Obsidian's secret storage.
+
 ## Keep a backup of your own
 
 Crate's history only goes back so far, and deletions sync like any other change. Keep a separate backup of vaults that matter to you.
