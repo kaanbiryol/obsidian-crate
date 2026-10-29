@@ -2,20 +2,22 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type CratePlugin from '../plugin/CratePlugin';
 import { serverRequest } from '../plugin/server-request';
 import { readReadingPolicy, writeReadingPolicy } from './server';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 vi.mock('../plugin/server-request', async importOriginal => ({
 	...await importOriginal<typeof import('../plugin/server-request')>(),
 	serverRequest: vi.fn(),
 }));
 beforeEach(() => vi.resetAllMocks());
-let api: { localFolder: (path: string, label: string) => Promise<string>; serverFolder: (path: string) => Promise<{ folderPath: string; folderLabel?: string }> } | null = null;
+let api: { isEncrypted: () => boolean; localFolder: (path: string, label: string) => Promise<string>; serverFolder: (path: string) => Promise<{ folderPath: string; folderLabel?: string }> } | null = null;
+let encryptionKeys: string | null = null;
 const plugin = {
 	settings: { workerUrl: 'https://server.example' },
-	secretStorage: { get: () => 'token' },
+	secretStorage: { get: (key: string) => key === SECRET_KEYS.ENCRYPTION_KEYS ? encryptionKeys : 'token' },
 	syncRuntime: { getApiClient: () => api },
 } as unknown as CratePlugin;
 const policy = { enabled: 1, folder_path: 'Reading', generation: 'g', revision: 'r' };
-beforeEach(() => { api = null; });
+beforeEach(() => { api = null; encryptionKeys = null; });
 
 it('reads a missing or saved Reading policy', async () => {
 	vi.mocked(serverRequest).mockResolvedValueOnce({ policy: null }).mockResolvedValueOnce({ policy });
@@ -43,7 +45,7 @@ it('rejects a write that returns no policy', async () => {
 });
 
 it('maps an encrypted folder with the client of the connection that made the request', async () => {
-	api = { localFolder: async () => 'Reading', serverFolder: async () => ({ folderPath: 'tag', folderLabel: 'label' }) };
+	api = { isEncrypted: () => true, localFolder: async () => 'Reading', serverFolder: async () => ({ folderPath: 'tag', folderLabel: 'label' }) };
 	const encrypted = { ...policy, folder_path: 'tag', folder_label: 'label' };
 	vi.mocked(serverRequest).mockResolvedValueOnce({ policy: encrypted });
 	await expect(writeReadingPolicy(plugin, { enabled: true, folderPath: 'Reading', revision: null })).resolves.toEqual(policy);
@@ -51,8 +53,20 @@ it('maps an encrypted folder with the client of the connection that made the req
 
 	// A sync client replaced while the request ran holds another connection's keys.
 	vi.mocked(serverRequest).mockImplementationOnce(async () => {
-		api = { localFolder: async () => 'Other', serverFolder: async () => ({ folderPath: 'other' }) };
+		api = { isEncrypted: () => true, localFolder: async () => 'Other', serverFolder: async () => ({ folderPath: 'other' }) };
 		return { policy: encrypted };
 	});
 	await expect(readReadingPolicy(plugin)).rejects.toMatchObject({ name: 'AbortError' });
+});
+
+it.each([
+	['there is no sync client', () => null],
+	['the sync client has not opened them yet', () => ({ isEncrypted: () => false, localFolder: async () => 'Reading', serverFolder: async (path: string) => ({ folderPath: path }) })],
+])('never sends the readable Reading folder while encryption keys are saved and %s', async (_case, client) => {
+	// For example after an encryption reset whose upload failed.
+	encryptionKeys = '{"vaultId":"vault"}';
+	api = client();
+	await expect(writeReadingPolicy(plugin, { enabled: true, folderPath: 'Reading', revision: null })).rejects.toThrow('Encrypted sync is not ready');
+	// Before: the folder fell back to its plaintext name.
+	expect(serverRequest).not.toHaveBeenCalled();
 });

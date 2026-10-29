@@ -2,6 +2,7 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { captureSyncApiConnection, serverRequest } from '../plugin/server-request';
 import { isRecord } from '../platform/validation';
 import { parseReadingPolicy, type ReadingPolicy, type ReadingPolicyUpdate } from '../protocol/reading-policy';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 type SyncApiConnection = ReturnType<typeof captureSyncApiConnection>;
 
@@ -26,6 +27,11 @@ export async function readReadingPolicy(plugin: CratePlugin): Promise<ReadingPol
 }
 export async function writeReadingPolicy(plugin: CratePlugin, update: ReadingPolicyUpdate): Promise<ReadingPolicy> {
 	const connection = captureSyncApiConnection(plugin);
+	// With saved keys the folder is sent only as its tag, never under its readable name,
+	// including after an encryption reset whose upload has not finished.
+	if (!connection.api?.isEncrypted() && plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_KEYS)) {
+		throw new Error('Encrypted sync is not ready on this device. Finish or resume encryption setup in Manage encryption, then try again.');
+	}
 	const folder = await connection.api?.serverFolder(update.folderPath) ?? { folderPath: update.folderPath };
 	connection.assertCurrent();
 	const policy = await responsePolicy(connection, await serverRequest<unknown>(plugin, '/reading/policy', { ...update, ...folder }));
