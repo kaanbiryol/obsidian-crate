@@ -40,7 +40,11 @@ export async function limitNotificationAction(request: Request, db: D1Database, 
 	if (!limit) return null;
 	const now = Date.now();
 	const midnight = (Math.floor(now / 86_400_000) + 1) * 86_400_000;
-	const dailyKey = url.pathname.startsWith('/reading/') ? `reading-daily:${await sha256Hex(actor)}` : url.pathname === '/notifications/reminders-exchange' ? 'notification-exchange-daily' : 'notification-daily';
+	// Each credential spends only its own daily budget, so no token can deny another's
+	// actions. Enrollment grants are single-use and only vault credentials issue them, so
+	// their exchanges share one pool that caps the web app credentials created per day.
+	const actorHash = await sha256Hex(actor);
+	const dailyKey = url.pathname.startsWith('/reading/') ? `reading-daily:${actorHash}` : url.pathname === '/notifications/reminders-exchange' ? 'notification-exchange-daily' : `notification-daily:${actorHash}`;
 	const dailyLimit = url.pathname.startsWith('/reading/') ? 500 : 1000;
 	const key = await sha256Hex(`${actor}\0${action}`);
 	const results = await db.batch<{ results: Array<{ count: number }> }>([

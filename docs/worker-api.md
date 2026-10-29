@@ -566,6 +566,9 @@ of 6,000 per minute per credential so vault bootstrap can proceed. Every request
 still checks token validity, expiry and authorization against D1; an authentication
 failure removes the hint. This is not an authentication cache. Action/day limits
 remain enforced after authentication. Denial returns 429 with Retry-After: 60.
+Daily action budgets belong to each credential (1,000 per UTC day for management
+and push actions, 500 for Reading), so one token cannot exhaust another's.
+Enrollment exchanges share one 1,000-per-day pool, because each grant is single-use.
 
 When a Cloudflare Free plan account has used its daily D1 read or write allowance,
 any route that reaches D1 returns 429 with `code: "d1_daily_limit"`. It sends no

@@ -21,28 +21,60 @@ it('rejects arbitrary routes and edge-denied traffic without touching D1', async
 it('stops incrementing per-action counters for denied requests and resets an expired window', async () => {
 		for (let index = 0; index < 3; index++) expect(await limitNotificationAction(request(), env.DB, 'actor')).toBeNull();
 	for (let index = 0; index < 100; index++) expect((await limitNotificationAction(request(), env.DB, 'actor'))?.status).toBe(429);
-	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key != 'notification-daily'").first()).toEqual({ count: 3 });
-	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key = 'notification-daily'").first()).toEqual({ count: 3 });
+	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key NOT LIKE 'notification-daily:%'").first()).toEqual({ count: 3 });
+	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key = ?").bind(await dailyKey('actor')).first()).toEqual({ count: 3 });
 	await env.DB.prepare('UPDATE request_rate_limits SET expires_at = 0').run();
 	expect(await limitNotificationAction(request(), env.DB, 'actor')).toBeNull();
-	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key != 'notification-daily'").first()).toEqual({ count: 1 });
+	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key NOT LIKE 'notification-daily:%'").first()).toEqual({ count: 1 });
 });
 
+const dailyKey = async (actor: string) => `notification-daily:${await sha256Hex(actor)}`;
+const exhaust = async (actor: string, count = 999) => env.DB.prepare('INSERT INTO request_rate_limits(key,count,expires_at) VALUES (?,?,?)')
+	.bind(await dailyKey(actor), count, Date.now() + 86400000).run();
 
 it('caps daily admissions across rotating addresses without growing or updating denied counters', async () => {
-		await env.DB.prepare("INSERT INTO request_rate_limits(key,count,expires_at) VALUES('notification-daily', 999, ?)").bind(Date.now() + 86400000).run();
+	await exhaust('actor');
 	expect(await limitNotificationAction(request(), env.DB, 'actor')).toBeNull();
 	const rows = (await env.DB.prepare('SELECT * FROM request_rate_limits ORDER BY key').all()).results;
 	for (let index = 0; index < 100; index++) {
 		const attempt = request(); attempt.headers.set('CF-Connecting-IP', `192.0.2.${index}`);
-		expect((await limitNotificationAction(attempt, env.DB, `actor-${index}`))?.status).toBe(429);
+		const denied = await limitNotificationAction(attempt, env.DB, 'actor');
+		expect(denied?.status).toBe(429);
+		expect(Number(denied?.headers.get('Retry-After'))).toBeGreaterThan(60);
 	}
 	expect((await env.DB.prepare('SELECT * FROM request_rate_limits ORDER BY key').all()).results).toEqual(rows);
 });
 
+it('one credential cannot spend the daily budget of any other credential', async () => {
+	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope) VALUES ('owner',?,'vault')").bind(await sha256Hex('owner')).run();
+	// A reminders token alternates subscribe and unsubscribe. Each minute's per-action
+	// windows are cleared, as they expire, until its daily budget runs out.
+	const windows = await Promise.all(['POST', 'DELETE'].map(method => sha256Hex(`stolen\0${method} /notifications/subscribe`)));
+	const subscribe = (method: string) => new Request('https://test/notifications/subscribe', { method });
+	let admitted = 0;
+	for (let minute = 0; ; minute++) {
+		let denied: Response | null = null;
+		for (let index = 0; index < 60 && !denied; index++) {
+			denied = await limitNotificationAction(subscribe(index % 2 ? 'DELETE' : 'POST'), env.DB, 'stolen');
+			if (!denied) admitted++;
+		}
+		if (denied) { expect(await denied.json()).toMatchObject({ error: expect.stringContaining('daily') as string }); break; }
+		await env.DB.prepare('DELETE FROM request_rate_limits WHERE key IN (?, ?)').bind(...windows).run();
+		expect(minute).toBeLessThan(20);
+	}
+	expect(admitted).toBe(1000);
+	// Other web app sessions and the vault's administration keep their own budgets.
+	expect(await limitNotificationAction(subscribe('POST'), env.DB, 'other')).toBeNull();
+	const post = (path: string, body: unknown) => worker.fetch(new Request(`https://test${path}`, {
+		method: 'POST', headers: { Authorization: 'Bearer owner', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current), 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+	}), { ...env, NOTIFICATION_REQUEST_LIMITER: { limit: async () => ({ success: true }) } });
+	expect((await post('/features', { feature: 'reading', enabled: true, revision: null })).status).toBe(200);
+	expect((await post('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' })).status).toBe(200);
+});
+
 it('invalid bearers and enrollment grants cannot spend authenticated capacity', async () => {
 	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope) VALUES ('owner',?,'vault')").bind(await sha256Hex('owner')).run();
-	await env.DB.prepare("INSERT INTO request_rate_limits(key,count,expires_at) VALUES ('notification-daily',999,?)").bind(Date.now()+86400000).run();
+	await exhaust('owner');
 	const post = (path: string, token: string, body: unknown) => worker.fetch(new Request(`https://test${path}`, {
 		method:'POST', headers: {Authorization:`Bearer ${token}`, [CRATE_PROTOCOL_HEADER]:String(CRATE_PLUGIN_PROTOCOL.current),'Content-Type':'application/json'}, body:JSON.stringify(body),
 	}), { ...env, NOTIFICATION_REQUEST_LIMITER: { limit: async () => ({success:true}) } });
@@ -50,7 +82,7 @@ it('invalid bearers and enrollment grants cannot spend authenticated capacity', 
 		expect((await post('/notifications/subscribe',`invalid-${i}`,{})).status).toBe(401);
 		expect((await post('/notifications/reminders-exchange','',{token:`invalid-${i}`})).status).toBe(401);
 	}
-	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key='notification-daily'").first()).toEqual({count:999});
+	expect((await env.DB.prepare('SELECT key, count FROM request_rate_limits').all()).results).toEqual([{ key: await dailyKey('owner'), count: 999 }]);
 	expect((await post('/notifications/reminders-enrollment-token','owner',{folderPath:'Reminders'})).status).toBe(200);
 });
 
