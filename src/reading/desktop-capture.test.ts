@@ -6,7 +6,14 @@ import { captureDesktopArticle } from './desktop-capture';
 beforeEach(() => { vi.stubGlobal('window', { DOMParser, setTimeout: (callback: () => void, delay?: number) => setTimeout(callback, delay), clearTimeout: (id: number) => clearTimeout(id) }); });
 vi.mock('obsidian', () => ({ requestUrl: vi.fn() }));
 const html = '<html><head><title>Local article</title></head><body><article><h1>Local article</h1><p>A useful article with enough text to extract, keep locally, and read again without a server connection.</p><script>window.bad = true</script><img src="https://tracking.example.org/pixel"><p>Read <a href="/next">the next article</a> at your own pace.</p></article></body></html>';
-const response = (body = html, status = 200, contentType = 'text/html; charset=utf-8') => ({ status, headers: { 'Content-Type': contentType }, arrayBuffer: new TextEncoder().encode(body).buffer, text: body, json: null });
+const response = (body = html, status = 200, contentType = 'text/html; charset=utf-8', headers: Record<string, string> = {}) => ({ status, headers: { 'Content-Type': contentType, ...headers }, arrayBuffer: new TextEncoder().encode(body).buffer, text: body, json: null });
+/** Answers HEAD and GET separately; an Error makes HEAD fail like a refused request. */
+function byMethod(head: ReturnType<typeof response> | Error, get = response()) {
+	vi.mocked(requestUrl).mockImplementation(request => ((request as { method?: string }).method === 'HEAD'
+		? head instanceof Error ? Promise.reject(head) : Promise.resolve(head)
+		: Promise.resolve(get)) as unknown as ReturnType<typeof requestUrl>);
+}
+const MAX = 2 * 1024 * 1024;
 afterEach(() => { vi.resetAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('desktop article capture', () => {
@@ -32,7 +39,35 @@ describe('desktop article capture', () => {
 		expect(article.markdown).not.toContain('tracking.example.org');
 		expect(article.markdown).not.toContain('window.bad');
 		expect(fetch).not.toHaveBeenCalled();
-		expect(requestUrl).toHaveBeenCalledExactlyOnceWith({ url: 'https://example.com/article', method: 'GET', throw: false, headers: { Accept: 'text/html, application/xhtml+xml' } });
+		expect(requestUrl).toHaveBeenCalledTimes(2);
+		expect(requestUrl).toHaveBeenNthCalledWith(1, { url: 'https://example.com/article', method: 'HEAD', throw: false, headers: { Accept: 'text/html, application/xhtml+xml' } });
+		expect(requestUrl).toHaveBeenNthCalledWith(2, { url: 'https://example.com/article', method: 'GET', throw: false, headers: { Accept: 'text/html, application/xhtml+xml', Range: `bytes=0-${MAX}` } });
+	});
+	it.each([
+		['a media file', response('', 200, 'video/mp4', { 'Content-Length': String(4 * 1024 ** 3) }), 'readable article'],
+		['an oversized page', response('', 200, 'text/html', { 'Content-Length': String(MAX + 1) }), '2 MB'],
+	])('rejects %s from its HEAD headers without downloading it', async (_name, head, message) => {
+		byMethod(head);
+		await expect(captureDesktopArticle('https://example.com/large', new AbortController().signal)).rejects.toThrow(message);
+		expect(requestUrl).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ method: 'HEAD' }));
+	});
+	it.each([['refuses HEAD', response('', 405)], ['fails HEAD', new Error('net::ERR_FAILED')], ['omits HEAD headers', response('', 200, '')]])(
+		'falls back to a bounded GET when the server %s', async (_name, head) => {
+			byMethod(head, response('x'.repeat(MAX + 1), 206, 'video/mp4', { 'Content-Range': `bytes 0-${MAX}/${4 * 1024 ** 3}` }));
+			await expect(captureDesktopArticle('https://example.com/video', new AbortController().signal)).rejects.toThrow('readable article');
+			expect(vi.mocked(requestUrl).mock.lastCall?.[0]).toMatchObject({ method: 'GET', headers: { Range: `bytes=0-${MAX}` } });
+		});
+	it('extracts a page that a server returned whole as a partial response', async () => {
+		byMethod(response('', 405), response(html, 206, 'text/html', { 'Content-Range': `bytes 0-${html.length - 1}/${html.length}` }));
+		expect((await captureDesktopArticle('https://example.com/article', new AbortController().signal)).title).toBe('Local article');
+	});
+	it.each([
+		['the rest of a large page', `bytes 0-${MAX}/${MAX * 3}`, '2 MB'],
+		['a smaller range than requested', `bytes 0-999/${MAX - 1}`, 'readable article'],
+		['an unknown total', `bytes 0-999/*`, 'readable article'],
+	])('rejects a partial response missing %s', async (_name, range, message) => {
+		byMethod(response('', 405), response(html, 206, 'text/html', { 'Content-Range': range }));
+		await expect(captureDesktopArticle('https://example.com/article', new AbortController().signal)).rejects.toThrow(message);
 	});
 	it.each(['file:///private/note', 'https://user:password@example.com', 'http://127.0.0.1/', 'http://192.168.1.1/', 'https://site.local/'])('rejects unsupported source %s before requesting it', async url => {
 		await expect(captureDesktopArticle(url, new AbortController().signal)).rejects.toThrow();

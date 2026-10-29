@@ -108,6 +108,14 @@ The mobile plugin uses the same native capture path. Unencrypted PWA captures us
 the server queue; encrypted PWA captures ask the server to download the page and
 encrypt the result in the browser. A failed download leaves a bookmark with **Try again**.
 
+Obsidian's `requestUrl` buffers a whole response and cannot stop a download, so native
+capture decides from headers first. A `HEAD` request rejects a link whose declared type
+is not HTML or whose declared size exceeds 2 MB. The `GET` then asks for at most 2 MB
+plus one byte with a `Range` header, and a partial response must cover the whole page.
+Servers that refuse `HEAD` or ignore `Range` still work; one that does both and omits
+its headers can still send a large page in full. YouTube details, transcripts and
+Defuddle's allowlisted extractor requests keep their own limits.
+
 Automated coverage: `src/reading/desktop-capture.test.ts`,
 `src/reading/data/library.test.ts`, `src/reading/runtime.test.ts`, and
 `npm run test:reading-extraction`. Native request transport, redirects, installed
