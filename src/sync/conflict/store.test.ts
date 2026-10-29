@@ -178,6 +178,20 @@ describe('ConflictStore', () => {
 		expect(harness.counts.at(-1)).toBe(0);
 	});
 
+	it('remembers the baseline revision of an incoming copy removed without a choice until it is saved again', async () => {
+		const harness = createHarness();
+		await harness.store.load();
+		const review = { originalPath: 'image.png', conflictPath: 'image (conflict remote abc).png', cause: 'incoming-review' as const, copySide: 'remote' as const, localHash: 'local', remoteHash: 'abc' };
+		await harness.store.record(review);
+		await harness.store.markResolved(review.conflictPath, path => path === 'image.png' ? 'r1' : undefined);
+
+		const reloaded = createHarness(Object.fromEntries(harness.files));
+		await reloaded.store.load();
+		expect(reloaded.store.getIncomingReviews()).toMatchObject([{ status: 'resolved', reviewBaseRevision: 'r1' }]);
+		await reloaded.store.record(review);
+		expect(reloaded.store.getIncomingReviews()[0]).not.toHaveProperty('reviewBaseRevision');
+	});
+
 	it('serializes discovery and metadata recording for the same conflict copy', async () => {
 		const harness = createHarness();
 		await harness.store.load();

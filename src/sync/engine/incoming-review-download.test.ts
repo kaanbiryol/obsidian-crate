@@ -115,6 +115,25 @@ it('saves an incoming binary again when its review copy is deleted without choos
 	expect(harness.engine.getActiveConflicts()).toEqual([expect.objectContaining({ originalPath: 'image.bin', conflictPath: copy })]);
 });
 
+it('stops replanning a removed review copy once keeping the local version uploads it again', async () => {
+	const harness = await awaitingReview();
+	await harness.engine.sync();
+	const copy = getIncomingConflictFileName('image.bin', await sha256Hex(harness.incoming));
+	harness.disk.remove(copy);
+	harness.engine.onFileDelete({ path: copy } as TAbstractFile);
+	await harness.engine.waitForIdle();
+	// Keep local republishes the same local bytes, so only the revision shows the choice.
+	harness.localManifest.setEntry('image.bin', { ...harness.baseline, revision: 'r3' });
+	await harness.localManifest.save();
+	harness.requests.metadata.length = 0;
+
+	await harness.engine.sync();
+	await harness.engine.sync();
+
+	expect(harness.requests.metadata).toEqual([]);
+	expect(harness.disk.has(copy)).toBe(false);
+});
+
 it('saves full sync baselines and the cursor around an incoming binary awaiting review', async () => {
 	const harness = await awaitingReview({ expiredCursor: true });
 

@@ -260,11 +260,11 @@ export class SyncEngineContexts {
 			prepareUploadFromPath: this.prepareUploadFromPath,
 			uploadPreparedFiles: this.uploadPreparedFiles,
 			reconcileVersionConflicts: d.reconcileVersionConflicts,
-			// Deleting or renaming the saved copy resolves its record, but only choosing a
-			// version moves the baseline. Until then the incoming version is saved again.
+			// Removing the saved copy outside the review records the baseline revision;
+			// until a choice or sync moves it, the incoming version is saved again.
 			awaitingReviewPaths: () => d.conflictStore.getIncomingReviews()
-				.filter(conflict => conflict.status === 'active'
-					|| !!conflict.localHash && d.localManifest.getEntry(conflict.originalPath)?.hash === conflict.localHash)
+				.filter(conflict => conflict.status === 'active' || conflict.reviewBaseRevision !== undefined
+					&& d.localManifest.getEntry(conflict.originalPath)?.revision === conflict.reviewBaseRevision)
 				.map(conflict => conflict.originalPath),
 			getRemoteEntries: async paths => (await d.api.getFileMetadata(paths)).files,
 		}, {

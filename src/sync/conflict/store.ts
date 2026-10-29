@@ -105,6 +105,7 @@ export class ConflictStore {
 	async recoverFromVault(
 		shouldIgnore: (path: string) => boolean,
 		isCancelled: () => boolean = () => false,
+		baseRevisionOf?: (originalPath: string) => string | undefined,
 	): Promise<void> {
 		if (this.closed || isCancelled()) return;
 
@@ -139,7 +140,7 @@ export class ConflictStore {
 				if (conflict.status !== 'active' || discoveredPaths.has(conflict.conflictPath)) continue;
 				try {
 					if (!await this.app.vault.adapter.exists(conflict.conflictPath)) {
-						conflict.status = 'resolved';
+						resolveRecord(conflict, baseRevisionOf);
 						this.dirty = true;
 						changed = true;
 					}
@@ -161,7 +162,7 @@ export class ConflictStore {
 	}
 
 	/** Incoming versions saved for review, including ones whose copy was later
-	 * deleted or renamed. */
+	 * removed without choosing a version. */
 	getIncomingReviews(): ConflictRecord[] {
 		return this.data.conflicts
 			.filter(conflict => conflict.cause === 'incoming-review' && conflict.copySide === 'remote')
@@ -191,6 +192,7 @@ export class ConflictStore {
 			const byPath = new Map(this.data.conflicts.map(conflict => [conflict.conflictPath, conflict]));
 			for (const entry of pending) {
 				const existing = byPath.get(entry.conflictPath);
+				if (existing) delete existing.reviewBaseRevision;
 				const record: ConflictRecord = {
 					...entry,
 					createdAt: existing?.createdAt ?? new Date().toISOString(),
@@ -210,11 +212,13 @@ export class ConflictStore {
 		return done;
 	}
 
-	markResolved(conflictPath: string): Promise<void> {
+	/** `baseRevisionOf` marks a copy removed outside the review, which keeps an
+	 * incoming review planned; choosing a version resolves without it. */
+	markResolved(conflictPath: string, baseRevisionOf?: (originalPath: string) => string | undefined): Promise<void> {
 		return this.enqueueMutation(async () => {
 			const existing = this.data.conflicts.find((conflict) => conflict.conflictPath === conflictPath);
 			if (!existing || existing.status === 'resolved') return;
-			existing.status = 'resolved';
+			resolveRecord(existing, baseRevisionOf);
 			this.dirty = true;
 			await this.save();
 			this.notifyCountChanged();
@@ -307,6 +311,12 @@ export class ConflictStore {
 	}
 }
 
+function resolveRecord(conflict: ConflictRecord, baseRevisionOf?: (originalPath: string) => string | undefined): void {
+	conflict.status = 'resolved';
+	const revision = conflict.cause === 'incoming-review' && conflict.copySide === 'remote' ? baseRevisionOf?.(conflict.originalPath) : undefined;
+	if (revision) conflict.reviewBaseRevision = revision;
+}
+
 function normalizeStore(value: unknown): ConflictStoreData | null {
 	if (!isRecord(value) || !Array.isArray(value.conflicts)) return null;
 	const normalized = value.conflicts
@@ -356,5 +366,6 @@ function normalizeConflictRecord(value: unknown): ConflictRecord | null {
 		...(value.copySide === 'remote' ? { copySide: 'remote' as const } : {}),
 		...(typeof value.remoteHash === 'string' ? { remoteHash: value.remoteHash } : {}),
 		...(typeof value.baseHash === 'string' ? { baseHash: value.baseHash } : {}),
+		...(typeof value.reviewBaseRevision === 'string' ? { reviewBaseRevision: value.reviewBaseRevision } : {}),
 	};
 }

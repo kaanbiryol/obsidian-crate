@@ -72,6 +72,9 @@ export interface ConflictRecord {
 	localHash?: string;
 	remoteHash?: string;
 	baseHash?: string;
+	/** Baseline revision of the original when its incoming copy was removed without
+	 * choosing a version. The review stays planned until that baseline moves. */
+	reviewBaseRevision?: string;
 }
 
 export interface ResolvedSyncRace {

@@ -538,6 +538,7 @@ export class SyncEngine {
 		void this.trackWork(() => this.conflictStore.recoverFromVault(
 			(path) => shouldIgnoreConfiguredPath(path, ignoreMatcherContext),
 			() => this.lifecycle.isDestroyed,
+			this.baselineRevision,
 		)).catch((error) => {
 			logger.warn('Conflict recovery failed:', errorMessage(error));
 		});
@@ -590,7 +591,7 @@ export class SyncEngine {
 	onFileDelete(file: TAbstractFile): void {
 		if (this.lifecycle.isDestroyed) return;
 		if (isConflictFile(file.path)) {
-			this.updateConflictCopy(() => this.conflictStore.markResolved(file.path), 'Failed to resolve conflict copy:');
+			this.updateConflictCopy(() => this.conflictStore.markResolved(file.path, this.baselineRevision), 'Failed to resolve conflict copy:');
 		}
 		this.queueController.onFileDelete(file);
 	}
@@ -600,13 +601,15 @@ export class SyncEngine {
 		if (this.lifecycle.isDestroyed) return;
 		if (!this.shouldIgnore(oldPath) && !this.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path, file instanceof TFolder ? 'folder' : 'file');
 		if (isConflictFile(oldPath)) {
-			this.updateConflictCopy(() => this.conflictStore.markResolved(oldPath), 'Failed to resolve renamed conflict copy:');
+			this.updateConflictCopy(() => this.conflictStore.markResolved(oldPath, this.baselineRevision), 'Failed to resolve renamed conflict copy:');
 		}
 		if (isConflictFile(file.path)) {
 			this.updateConflictCopy(() => this.conflictStore.registerDiscovered(file.path), 'Failed to register renamed conflict copy:');
 		}
 		this.queueController.onFileRename(file, oldPath);
 	}
+
+	private readonly baselineRevision = (path: string): string | undefined => this.localManifest.getEntry(path)?.revision;
 
 	private updateConflictCopy(update: () => Promise<void>, failureMessage: string): void {
 		void this.trackWork(update).catch((error) => {
