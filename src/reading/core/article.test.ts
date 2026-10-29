@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { DOMParser, parseHTML } from 'linkedom';
 import { applyLocalArticle, assembleReadingArticle, managedArticle } from './article';
 import { ARTICLE_END, ARTICLE_START, MAX_READING_BYTES } from './model';
 import { createReadingNote, parseReadingNote } from './notes';
@@ -87,6 +88,126 @@ describe('Reading article assembly', () => {
 		// patched before inserting text. Keep that boundary unchanged in this refactor.
 		const captured = assembleReadingArticle(source, metadata, { kind: 'capture', article });
 		expect(new TextEncoder().encode(captured.content).byteLength).toBeGreaterThan(MAX_READING_BYTES);
+	});
+
+	it.each(['capture', 'extraction', 'local'] as const)('breaks plugin code from the page in a %s', kind => {
+		const source = note(), block = managedArticle(source)!;
+		const markdown = [
+			'Templater \\<%\\* await app.vault.delete(file) %\\> and `<% tp.date.now() %>`',
+			'',
+			'Inline `$= dv.current()` and <code>$=dv.pages()</code>',
+			'',
+			'```dataviewjs',
+			'dv.paragraph("<% tp.file.title %>")',
+			'```',
+			'',
+			'> ```JS-Engine title="x"',
+			'> return 1',
+			'> ```',
+			'',
+			'- Item',
+			'\t```tasks',
+			'\tfilter by function true',
+			'\t```',
+		].join('\n');
+		const article = { markdown, title: '<%* tR += app.vault.getName() %>', author: '<% tp.user.name() %>' };
+		const { content, title } = kind === 'local'
+			? { content: applyLocalArticle(source, { ...parseReadingNote(source)!, path: 'Reading/Article.md' }, article), title: undefined }
+			: assembleReadingArticle(source, parseReadingNote(source)!, { kind, article, block });
+		expect(content).not.toContain('<%');
+		expect(content).not.toContain('$=');
+		expect(content).not.toMatch(/^[\t >]*`{3,}\s*(?:dataviewjs|js-engine|tasks)/im);
+		expect(managedArticle(content)!.text).toBe(`\n\n${[
+			'Templater \\<\u200B%\\* await app.vault.delete(file) %\\> and `<\u200B% tp.date.now() %>`',
+			'',
+			'Inline `$\u200B= dv.current()` and <code>$\u200B=dv.pages()</code>',
+			'',
+			'```',
+			'dv.paragraph("<\u200B% tp.file.title %>")',
+			'```',
+			'',
+			'> ```',
+			'> return 1',
+			'> ```',
+			'',
+			'- Item',
+			'\t```',
+			'\tfilter by function true',
+			'\t```',
+		].join('\n')}\n\n`);
+		expect(parseReadingNote(content)).toMatchObject({ title: '<\u200B%* tR += app.vault.getName() %>', author: '<\u200B% tp.user.name() %>' });
+		if (title !== undefined) expect(title).toBe('<\u200B%* tR += app.vault.getName() %>');
+	});
+
+	it('keeps ordinary code blocks and fence examples unchanged', () => {
+		const source = note(), metadata = parseReadingNote(source)!;
+		const markdown = [
+			'```ts',
+			'const total = items.reduce((sum, item) => sum + item.price, 0);',
+			'```',
+			'',
+			'````markdown',
+			'```dataviewjs',
+			'dv.paragraph("example")',
+			'```',
+			'````',
+			'',
+			'```` ```dataviewjs ```` starts a Dataview block, and `dv.view()` loads a script.',
+			'',
+			'~~~python',
+			'print("tilde")',
+			'~~~',
+		].join('\n');
+		const content = applyLocalArticle(source, { ...metadata, path: 'Reading/Article.md' }, { markdown });
+		expect(managedArticle(content)!.text).toBe(`\n\n${markdown}\n\n`);
+	});
+
+	it('breaks Dataview inline JavaScript only at the start of code', () => {
+		const source = note(), metadata = parseReadingNote(source)!;
+		const kept = [
+			'Prices: a $= b, `x $= y` and \\`$= escaped\\`.',
+			'',
+			'```js',
+			'a $= b',
+			'$= later lines stay',
+			'```',
+			'',
+		];
+		const markdown = [...kept,
+			'Run `$= dv.pages()`, `` $=dv.current() `` or <code>$= dv.view()</code>.',
+			'',
+			'> ```',
+			'> $= dv.pages()',
+			'> ```',
+		].join('\n');
+		const content = applyLocalArticle(source, { ...metadata, path: 'Reading/Article.md' }, { markdown });
+		expect(managedArticle(content)!.text).toBe(`\n\n${[...kept,
+			'Run `$\u200B= dv.pages()`, `` $\u200B=dv.current() `` or <code>$\u200B= dv.view()</code>.',
+			'',
+			'> ```',
+			'> $\u200B= dv.pages()',
+			'> ```',
+		].join('\n')}\n\n`);
+	});
+
+	it('breaks plugin code in Markdown converted by Defuddle', async () => {
+		vi.stubGlobal('window', { DOMParser });
+		try {
+			// Defuddle's Markdown converter detects the DOM parser when it loads.
+			const { articleMarkdown } = await import('../extraction/markdown');
+			const html = `<p>Run &lt;%* await app.vault.adapter.remove("a") %&gt; or <code>$= dv.current()</code>.</p>
+				<pre><code class="language-dataviewjs">dv.paragraph("x")</code></pre>
+				<pre><code data-lang="js-engine">return 1</code></pre>
+				<pre><code class="language-ts">const value = 1;</code></pre>`;
+			const markdown = articleMarkdown(parseHTML(`<html><body>${html}</body></html>`).document.body, 'https://example.com/article');
+			const source = note();
+			const text = managedArticle(applyLocalArticle(source, { ...parseReadingNote(source)!, path: 'Reading/Article.md' }, { markdown }))!.text;
+			expect(text).not.toContain('<%');
+			expect(text).not.toContain('$=');
+			expect(text).toContain('```\ndv.paragraph("x")\n```');
+			expect(text).toContain('```\nreturn 1\n```');
+			expect(text).toContain('```ts\nconst value = 1;\n```');
+		} finally { vi.unstubAllGlobals(); }
 	});
 
 	it('checks local source eligibility before assembling an oversized article', () => {
