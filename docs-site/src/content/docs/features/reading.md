@@ -103,7 +103,7 @@ Highlights are saved in the note, so they sync with it. Most use Obsidian's own 
 
 With iOS 27 or later, open **Reading settings → Set up iPhone shortcut** and follow the steps to install and pair **Save to Crate**. After that, select **Share → Save to Crate** from any app. The shortcut needs a connection.
 
-Pairing codes work once and expire after ten minutes. You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/): select **Download shortcut**, then **Add Shortcut**, and return to Reading settings to create a pairing code. If the page says the shortcut isn't available yet, use **Reading → Save a link** until it is.
+Pairing codes work once and expire after ten minutes. You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/): select **Download shortcut**, then **Add Shortcut**, and return to Reading settings to create a pairing code. If the page says the shortcut isn't available yet, use **Reading → Save a link** until it is. Logging out of the web app you paired from, or removing that session from connected devices in Obsidian, also disconnects the shortcut.
 
 The shortcut works with encryption too: your server downloads the article and saves it locked to your vault, and your devices open it. Sharing the same link twice saves it twice.
 

@@ -73,8 +73,11 @@ export async function handleExchangeRemindersEnrollmentToken(
 			.bind(enrollmentHash, id, tokenHash),
 		// Possession of the replaced reminder credential permits revocation even
 		// after expiry. Remove its subscriptions so this browser can enroll again.
+		// The Shortcut credentials it paired move to the replacement session.
 		...(previousHash ? [
 			db.prepare(`DELETE FROM push_subscriptions WHERE owner_token_id IN (SELECT id FROM auth_tokens WHERE token_hash = ? AND scope = 'reminders') AND ${createdGuard}`).bind(previousHash, id, tokenHash),
+			db.prepare(`UPDATE auth_tokens SET device_id = ? WHERE scope = 'reading_capture'
+				AND device_id IN (SELECT id FROM auth_tokens WHERE token_hash = ? AND scope = 'reminders') AND ${createdGuard}`).bind(id, previousHash, id, tokenHash),
 			db.prepare(`DELETE FROM auth_tokens WHERE token_hash = ? AND scope = 'reminders' AND ${createdGuard}`).bind(previousHash, id, tokenHash),
 		] : []),
 	]);

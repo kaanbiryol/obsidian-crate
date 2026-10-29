@@ -252,7 +252,7 @@ Response: `{ files: { "notes/file.md": { hash, size, modified } } }`. Missing pa
 
 ### DELETE /auth/tokens
 
-Revoke a token by its ID.
+Revoke a token by its ID, with the Shortcut capture credentials it paired.
 
 Request: `{ id: "<uuid>" }`
 
@@ -260,13 +260,13 @@ Response: `{ success: true }`
 
 ### GET /auth/tokens
 
-List all registered tokens (does not expose hashes). The current token is marked with `is_current`.
+List all registered tokens (does not expose hashes). The current token is marked with `is_current`. Shortcut capture credentials have `device_id: null`.
 
 Response: `{ tokens: [{ id, device_id, device_name, platform, created_at, last_seen_at, is_current }] }`
 
 ### DELETE /auth/session
 
-Revokes the bearer token used for the request. Crate calls this before clearing its local credential when the user disconnects the current device.
+Revokes the bearer token used for the request and the Shortcut capture credentials it paired. Crate calls this before clearing its local credential when the user disconnects the current device.
 
 Response: `{ success: true }`
 
@@ -381,7 +381,7 @@ Consumes a one-time web enrollment token and creates a per-device PWA auth token
 
 Request: `{ token, deviceName?, previousAuthToken? }`
 
-When replacing a browser session, the optional previous reminder credential revokes that session and its push subscriptions in the transaction that creates the replacement. Expired reminder credentials can be replaced; vault credentials cannot be revoked through this endpoint.
+When replacing a browser session, the optional previous reminder credential revokes that session and its push subscriptions, and moves the Shortcut capture credentials it paired to the new session, in the transaction that creates the replacement. Expired reminder credentials can be replaced; vault credentials cannot be revoked through this endpoint.
 
 Response: `{ authToken }`
 
@@ -482,7 +482,7 @@ retention, cleanup, and restore validation.
 
 Server revision 67 advertises `reading-shortcut-pairing-v1`. `POST /reading/shortcut-pairing` requires an active Reading or vault credential and HTTPS. It returns `{ pairingCode, expiresAt }`, with a ten-minute, single-use secret in the code’s URL fragment. Only one outstanding code per issuer is retained. The browser cannot issue library or vault access through this route.
 
-`POST /reading/shortcut/v1/exchange` accepts `{ token }` without a bearer credential. The Shortcut strips the fragment locally and sends it only in this body. Atomic redemption rechecks the issuer, policy, folder and generation and returns `{ endpoint, authorization }` for a new capture-only token. Its expiry is the earlier of 90 days and the issuer’s expiry. Replay, expiry, issuer revocation or a changed policy generation returns 410. A lost reply requires a new code. Pairing creation requires the app protocol; exchange uses the independent shortcut contract. Both have separate per-minute action limits and return `Cache-Control: no-store`. Grant hashes use existing `reading_enrollments` rows with scope `reading_capture:<issuer-id>`; normal library/install exchanges reject this scope.
+`POST /reading/shortcut/v1/exchange` accepts `{ token }` without a bearer credential. The Shortcut strips the fragment locally and sends it only in this body. Atomic redemption rechecks the issuer, policy, folder and generation and returns `{ endpoint, authorization }` for a new capture-only token. Its expiry is the earlier of 90 days and the issuer’s expiry. The token records its issuer in `auth_tokens.device_id`, so revoking the issuer revokes it too. Replacing a web app session with a fresh link moves it to the new session. Capture tokens paired before server revision 2 have no recorded issuer and stay valid until they expire or are removed. Replay, expiry, issuer revocation or a changed policy generation returns 410. A lost reply requires a new code. Pairing creation requires the app protocol; exchange uses the independent shortcut contract. Both have separate per-minute action limits and return `Cache-Control: no-store`. Grant hashes use existing `reading_enrollments` rows with scope `reading_capture:<issuer-id>`; normal library/install exchanges reject this scope.
 
 Reading updates also accept optional `highlights` alongside their `before.highlights`
 precondition. Each entry contains `start`, `end` (UTF-16 offsets in sanitized reader

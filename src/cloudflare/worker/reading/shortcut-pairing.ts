@@ -43,9 +43,10 @@ export async function exchangeShortcutPairing(db: D1Database, body: Record<strin
 	const token = createRandomHexToken(), id = crypto.randomUUID();
 	// Recheck the grant and its issuer within the consume transaction. Concurrent
 	// exchanges can create only one credential. A lost reply requires a new code.
+	// The issuer is recorded so that revoking it revokes this credential too.
 	const results = await db.batch([
-		db.prepare(`INSERT INTO auth_tokens(id,token_hash,device_name,platform,scope,folder_path,reading_generation,expires_at)
-      SELECT ?,?, 'Save to Crate shortcut','shortcut','reading_capture',p.folder_path,p.generation,
+		db.prepare(`INSERT INTO auth_tokens(id,token_hash,device_id,device_name,platform,scope,folder_path,reading_generation,expires_at)
+      SELECT ?,?, a.id, 'Save to Crate shortcut','shortcut','reading_capture',p.folder_path,p.generation,
         min(?,coalesce(a.expires_at,?)) ${grantSql}`)
 			.bind(id, await sha256Hex(token), now + 90 * 86400_000, now + 90 * 86400_000, hash, Date.now(), Date.now()),
 		db.prepare('DELETE FROM reading_enrollments WHERE token_hash=?').bind(hash),

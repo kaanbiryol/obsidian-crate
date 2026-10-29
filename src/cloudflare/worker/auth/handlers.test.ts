@@ -69,7 +69,7 @@ function createDb() {
 						? [{ name: 'path' }, { name: 'storage_key' }]
 						: sql.includes('PRAGMA table_info(auth_tokens)')
 							? [{ name: 'id' }, { name: 'token_hash' }, { name: 'device_id' }, { name: 'device_name' }, { name: 'platform' }, { name: 'last_seen_at' }]
-							: sql.includes('SELECT id, device_id, device_name, platform, created_at, last_seen_at FROM auth_tokens')
+							: sql.includes('FROM auth_tokens ORDER BY')
 								? Array.from(tokens.values())
 								: [],
 				})),
