@@ -105,7 +105,7 @@ try {
           const setup = page.getByRole('heading', { name: 'Finish setting up Crate', exact: true });
           await expect(setup).toBeVisible();
           await expect(page.locator('.toast.is-error')).toHaveCount(0);
-          await expect(page.getByRole('button', { name: 'Retry connection', exact: true })).not.toBeVisible();
+          await expect(page.getByRole('button', { name: 'Retry connection', exact: true })).toBeVisible();
           await page.emulateMedia({ colorScheme: 'dark' });
           await expect(page.locator('html')).toHaveAttribute('data-pwa-color-scheme', 'dark');
           await page.screenshot({ path: `.generated/encryption-onboarding/${engine.name()}-${reading ? 'reading' : 'reminders'}-setup.png`, fullPage: true });
@@ -137,7 +137,6 @@ try {
           await page.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
           await expect(page.getByRole('button', { name: 'Unlocking…', exact: true })).toBeDisabled();
           await expect(input).toBeDisabled();
-          await page.locator('.crate-encryption-unlock__options summary').click();
           await expect(page.getByRole('button', { name: 'Retry connection', exact: true })).toBeDisabled();
           await expect.poll(() => page.evaluate(() => typeof window.releaseUnlock)).toBe('function');
           const unlockedReload = page.waitForEvent('domcontentloaded');

@@ -41,8 +41,10 @@ export function AuthLayout({ title, description, notice, children, className = '
 interface SessionResetProps { onLogout?: () => void; loggingOut?: boolean }
 function SessionReset({ onLogout, loggingOut }: SessionResetProps) {
 	return onLogout ? <>
-		<p>If encryption was turned off in Obsidian, log out to discard this browser’s saved keys, drafts and pending edits before opening a fresh app link.</p>
-		<Button className="secondary-button" type="button" disabled={loggingOut} onClick={onLogout}>Log out</Button>
+		<div className="auth-card__group">
+			<Button tone="danger" type="button" disabled={loggingOut} onClick={onLogout}>Log out</Button>
+		</div>
+		<p className="auth-card__note">If encryption was turned off in Obsidian, log out to discard this browser’s saved keys, drafts and pending edits before opening a fresh app link.</p>
 	</> : null;
 }
 
@@ -54,7 +56,7 @@ export function EmptyAuthState(reset: SessionResetProps) {
 				? 'Open Crate in Obsidian and send a new app link to connect this app.'
 				: 'Open a new app link from Crate in Obsidian to connect this browser.'}
 		>
-			<Button variant="primary" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
+			<Button variant="primary" size="touch" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
 			<SessionReset {...reset} />
 		</AuthLayout>
 	);
@@ -82,16 +84,20 @@ export function ErrorState({ issue, onRetry, ...reset }: { issue: ConnectionIssu
 			}
 		>
 			{needsCleanup ? (
-				<Button variant="primary" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
+				<Button variant="primary" size="touch" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
 			) : needsLink ? (
 				<>
-					<Button variant="primary" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
-					<Button className="secondary-button" type="button" onClick={onRetry}><RefreshCw size={16} aria-hidden="true" />Try again</Button>
+					<Button variant="primary" size="touch" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
+					<div className="auth-card__group">
+						<Button type="button" onClick={onRetry}>Try again<RefreshCw aria-hidden="true" /></Button>
+					</div>
 				</>
 			) : (
 				<>
-					<Button variant="primary" className="primary-button" type="button" onClick={onRetry}><RefreshCw size={16} aria-hidden="true" />Try again</Button>
-					<Button className="secondary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
+					<Button variant="primary" size="touch" className="primary-button" type="button" onClick={onRetry}><RefreshCw size={16} aria-hidden="true" />Try again</Button>
+					<div className="auth-card__group">
+						<Button type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink aria-hidden="true" /></Button>
+					</div>
 				</>
 			)}
 			<SessionReset {...reset} />

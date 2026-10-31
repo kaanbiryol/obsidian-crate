@@ -107,12 +107,9 @@ try {
           await m.evaluate(payload=>{window.testPayload=payload;},{bundle});
           await p.goto(`${origin}/notifications?token=pairing-${initial}&section=${initial}`);
           await expect(p.getByRole('button',{name:'Connect with Obsidian',exact:true})).toBeVisible();
-          await expect(p.getByRole('button',{name:'Retry connection',exact:true})).not.toBeVisible();
-          const options=p.locator('.crate-encryption-unlock__options summary');
-          await options.focus(); await p.keyboard.press('Enter');
+          await expect(p.getByRole('region',{name:'Trouble connecting?',exact:true})).toBeVisible();
           await expect(p.getByRole('button',{name:'Retry connection',exact:true})).toBeVisible();
           await expect(p.getByRole('button',{name:'Log out',exact:true})).toBeVisible();
-          await options.click();
           assert.ok((await p.getByRole('heading',{name:'Finish setting up Crate',exact:true}).boundingBox()).y < 180,'Setup should not start halfway down the screen');
           await p.screenshot({path:`.generated/pwa-pairing/${engine.name()}-${initial}-setup.png`,fullPage:true});
           assert.deepEqual(await savedKeys(p),[],'Installed app begins without Safari keys');

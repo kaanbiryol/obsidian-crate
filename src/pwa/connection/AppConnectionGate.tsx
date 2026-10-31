@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Download, RotateCw } from 'lucide-react';
 import { useAppConnection } from './AppConnection';
 import { EncryptionUnlockCard } from '../components/EncryptionUnlockCard';
 import { EmptyAuthState, ErrorState } from '../components/AuthStates';
@@ -56,11 +57,15 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
 			{busy => <>
 				{locked.converting && <p>In Obsidian, open <strong>Crate settings → Sync → Manage encryption</strong> and resume setup.</p>}
 				{exportError && <p role="alert">{exportError}</p>}
-				<Button disabled={busy} onClick={() => location.reload()}>Retry connection</Button>
-				{switchFeature}
-				{readingLocked && <Button disabled={busy} onClick={() => { void exportReadingData().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : String(cause))); }}>Export saved changes</Button>}
-				<p>Logging out removes this app’s saved content and unsynced changes from this device.</p>
-				<Button disabled={busy || app.loggingOut} onClick={() => { void app.logOut(); }}>Log out</Button>
+				<div className="auth-card__group">
+					<Button disabled={busy} onClick={() => location.reload()}>Retry connection<RotateCw aria-hidden="true" /></Button>
+					{switchFeature}
+					{readingLocked && <Button disabled={busy} onClick={() => { void exportReadingData().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : String(cause))); }}>Export saved changes<Download aria-hidden="true" /></Button>}
+				</div>
+				<div className="auth-card__group">
+					<Button tone="danger" disabled={busy || app.loggingOut} onClick={() => { void app.logOut(); }}>Log out</Button>
+				</div>
+				<p className="auth-card__note">Removes this app’s saved content and unsynced changes from this device.</p>
 			</>}
 		</EncryptionUnlockCard>);
 		if (section === 'reading' && !reading.ready) return <PwaLaunchSplash />;

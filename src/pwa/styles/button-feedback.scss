@@ -17,7 +17,7 @@
 
 // Secondary text actions use a borderless filled surface. Rows, toggles and
 // floating reader controls keep their own treatment.
-.crate-reminders-ui .crate-action-button[data-variant="outline"]:not(.settings-action-row, .settings-navigation-row, .pwa-update-button, .crate-reading-reader__highlights-button, [aria-pressed]) {
+.crate-reminders-ui .crate-action-button[data-variant="outline"]:not(.settings-action-row, .settings-navigation-row, .auth-card__group > *, .pwa-update-button, .crate-reading-reader__highlights-button, [aria-pressed]) {
   border: 0 !important;
   border-radius: 6px;
   background: color-mix(in srgb, var(--text-normal) 7%, transparent);

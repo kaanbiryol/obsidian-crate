@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { isIosOrIpados, isStandaloneApp } from '../config';
 import { TextField } from '@/ui/shared/TextField';
 import { PwaButton as Button } from './PwaButton';
@@ -14,6 +14,7 @@ export function EncryptionUnlockCard({ title, message, setupRequired = false, ac
 	const [code, setCode] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
 	const pending = useRef(false);
 	const [manual, setManual] = useState(false);
+	const optionsTitle = useId();
 	const setup = setupRequired && isIosOrIpados() && isStandaloneApp();
 	return <AuthLayout className="crate-encryption-unlock" title={setup ? 'Finish setting up Crate' : title}
 		description={pairing && !manual ? 'Connect once to unlock Reading and Reminders.' : setup ? 'Unlock Reading and Reminders with your saved recovery key.' : message}>
@@ -37,9 +38,9 @@ export function EncryptionUnlockCard({ title, message, setupRequired = false, ac
 				</form>
 			</>}
 			{pairing && <Button variant="ghost" size="touch" disabled={busy} aria-expanded={manual} onClick={() => { setCode(''); setError(''); setManual(value => !value); }}>{manual ? 'Connect with Obsidian instead' : 'Use recovery key instead'}</Button>}
-			{onUnlock ? <details className="crate-encryption-unlock__options">
-				<summary>More options</summary>
-				<div className="auth-card__actions">{children(busy)}</div>
-			</details> : children(busy)}
+			{onUnlock ? <section className="crate-encryption-unlock__options" aria-labelledby={optionsTitle}>
+				<h2 id={optionsTitle} className="auth-card__section-title">Trouble connecting?</h2>
+				{children(busy)}
+			</section> : children(busy)}
 	</AuthLayout>;
 }
