@@ -73,11 +73,15 @@ export function hiddenReminderIdRanges(state: EditorState, visible: readonly { f
 	return ranges;
 }
 
+/** Where a line's text starts, after its indentation and any task checkbox. */
+const TEXT_START = /^\s*(?:-\s*\[[ xX]\]\s*)?/;
+
 /**
- * Keeps a hidden marker at its line end, where it names the reminder. Typing,
- * Enter and deletes at the end of a reminder land before the marker, and a
- * forward delete of the marker alone joins the next line instead. Edits the
- * editor cannot see are healed by `normalizeReminderIds`.
+ * Keeps a hidden marker at its line end, where it names the reminder. Typing
+ * and deletes at the end of a reminder land before the marker, a line break
+ * there continues after it, and a forward delete of the marker alone joins the
+ * next line instead. Deleting a selection of the whole text deletes the marker
+ * too. Edits the editor cannot see are healed by `normalizeReminderIds`.
  */
 export function protectReminderIdMarker(transaction: Transaction): Transaction | TransactionSpec | readonly (Transaction | TransactionSpec)[] {
 	const { startState } = transaction;
@@ -90,16 +94,23 @@ export function protectReminderIdMarker(transaction: Transaction): Transaction |
 		if (line && marker) {
 			const { fromA, toA, text } = change!;
 			const userEvent = transaction.annotation(Transaction.userEvent);
-			const spec = (from: number, to: number, insert: string, cursor: number): TransactionSpec => ({
-				changes: { from, to, insert }, selection: { anchor: cursor }, scrollIntoView: true, ...(userEvent ? { userEvent } : {}),
+			const spec = (changes: ChangeSpec, cursor: number): TransactionSpec => ({
+				changes, selection: { anchor: cursor }, scrollIntoView: true, ...(userEvent ? { userEvent } : {}),
 			});
-			// Enter before the marker splits after it, so the ID stays on its reminder.
-			if (fromA === marker.from && toA === marker.from && text.startsWith('\n')) return spec(line.to, line.to, text, line.to + text.length);
+			// Enter or pasted lines at the marker continue after it, so the ID stays on its reminder.
+			const newline = text.indexOf('\n');
+			if (newline >= 0 && toA >= marker.from) {
+				const from = Math.min(fromA, marker.from), first = text.slice(0, newline), rest = text.slice(newline);
+				return spec([{ from, to: marker.from, insert: first }, { from: line.to, insert: rest }], line.to + first.length - (marker.from - from) + rest.length);
+			}
+			// A cut or delete of the whole text removes the reminder; a marker left behind would name the next text typed there.
+			if (!text && toA >= marker.from && fromA <= line.from + TEXT_START.exec(line.text)![0].length
+				&& startState.selection.ranges.some(range => !range.empty && range.from <= fromA && range.to >= toA)) return spec({ from: fromA, to: line.to }, fromA);
 			if (toA > marker.from) {
 				// Edits reaching into the marker stop before it.
-				if (fromA < marker.from) return spec(fromA, marker.from, text, fromA + text.length);
-				if (text) return spec(marker.from, marker.from, text, marker.from + text.length);
-				return line.number < startState.doc.lines ? spec(line.to, line.to + 1, '', marker.from) : [];
+				if (fromA < marker.from) return spec({ from: fromA, to: marker.from, insert: text }, fromA + text.length);
+				if (text) return spec({ from: marker.from, insert: text }, marker.from + text.length);
+				return line.number < startState.doc.lines ? spec({ from: line.to, to: line.to + 1 }, marker.from) : [];
 			}
 		}
 	}

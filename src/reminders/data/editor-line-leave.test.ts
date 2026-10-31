@@ -66,8 +66,8 @@ describe('reminder ID marker protection', () => {
 	const line = '- [ ] Buy milk <!-- crate-id:a -->';
 	const end = line.indexOf(' <!--');
 
-	function edit(doc: string, cursor: number, spec: TransactionSpec) {
-		const state = EditorState.create({ doc, selection: EditorSelection.cursor(cursor), extensions: EditorState.transactionFilter.of(protectReminderIdMarker) });
+	function edit(doc: string, cursor: number, spec: TransactionSpec, anchor = cursor) {
+		const state = EditorState.create({ doc, selection: EditorSelection.single(anchor, cursor), extensions: EditorState.transactionFilter.of(protectReminderIdMarker) });
 		const next = state.update(spec).state;
 		return { text: next.doc.toString(), cursor: next.selection.main.head };
 	}
@@ -85,6 +85,23 @@ describe('reminder ID marker protection', () => {
 	it('types in front of the marker and keeps it when a selection reaches into it', () => {
 		expect(edit(line, end, { changes: { from: line.length, insert: '!' }, userEvent: 'input.type' }).text).toBe('- [ ] Buy milk! <!-- crate-id:a -->');
 		expect(edit(line, 6, { changes: { from: 6, to: line.length, insert: 'Call Sam' }, userEvent: 'input.type' }).text).toBe('- [ ] Call Sam <!-- crate-id:a -->');
+	});
+
+	it('keeps the ID on the reminder when pasted lines break it in front of the marker', () => {
+		const pasted = edit(line, end, { changes: { from: end, insert: ' and eggs\n- [ ] Bread' }, userEvent: 'input.paste' });
+		expect(pasted.text).toBe('- [ ] Buy milk and eggs <!-- crate-id:a -->\n- [ ] Bread');
+		expect(pasted.cursor).toBe(pasted.text.length);
+		// A line break the editor places after the hidden marker also stays below it.
+		expect(edit(line, end, { changes: { from: line.length, insert: '\n- [ ] ' }, userEvent: 'input.type' }).text).toBe(`${line}\n- [ ] `);
+	});
+
+	it('deletes the ID with a selection of the whole reminder text, so no hidden marker is left behind', () => {
+		const cut = edit(`${line}\nNext`, 0, { changes: { from: 0, to: end }, userEvent: 'delete.cut' }, end);
+		expect(cut).toEqual({ text: '\nNext', cursor: 0 });
+		expect(edit(line, 6, { changes: { from: 6, to: end }, userEvent: 'delete.selection' }, end).text).toBe('- [ ] ');
+		// Erasing one character at a time is an edit of the same reminder.
+		const short = '- [ ] a <!-- crate-id:a -->';
+		expect(edit(short, 7, { changes: { from: 6, to: 7 }, userEvent: 'delete.backward' }).text).toBe('- [ ]  <!-- crate-id:a -->');
 	});
 
 	it('joins the next line instead of deleting the marker alone', () => {
