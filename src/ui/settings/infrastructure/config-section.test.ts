@@ -9,6 +9,10 @@ import {
 	resetObsidianUiMocks,
 } from '../../../test/fakes/obsidian-ui';
 
+// Each test imports the settings section afresh with its own mocks. Under parallel load the
+// first import can exceed the default 5 s, so match the coverage run's 30 s timeout.
+vi.setConfig({ testTimeout: 30_000 });
+
 const openConfirmationModal = vi.fn();
 const startCloudflareDeployment = vi.fn();
 const checkAndRecoverUpdate = vi.fn();
