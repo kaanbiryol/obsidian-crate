@@ -125,6 +125,8 @@
     border: 0;
     border-radius: var(--radius-m, 8px);
     background: var(--background-secondary);
+    /* Obsidian drops the last modal row's bottom padding; keep the card inset even. */
+    &:last-child { padding-bottom: var(--crate-settings-row-padding); }
   }
 }
 
