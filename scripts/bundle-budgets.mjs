@@ -34,8 +34,8 @@ export const bundleBudgets = {
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
-		// Server-side extraction for encrypted Reading removes Defuddle: 1.864 MB raw / 613.0 KB gzip.
-		maxBytes: 1890000,
-		maxGzipBytes: 622000,
+		// Importing Web Clipper highlight dates and notes measures 1.888 MB raw / 622.8 KB gzip.
+		maxBytes: 1920000,
+		maxGzipBytes: 634000,
 	}],
 };
