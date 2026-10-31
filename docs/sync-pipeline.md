@@ -252,7 +252,7 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
 4. **Early filtering:** ignore patterns applied during discovery, before hashing
 5. **Portability validation:** reject invalid sync paths (empty, `.` or `..` segments, control characters, backslashes) plus case and Unicode-normalization collisions before any upload begins. Names Windows cannot store (`< > : " | ? *`, a trailing dot or space, reserved names) are checked only before local file access on Windows; Android checks only those characters, which its shared storage rejects. There, a remote file with such a name is skipped with an `unsupported-device-path` issue, like an oversized file, so it never fails a sync or holds back the changelog cursor. A remote delete of a path this device never synced is skipped without touching the filesystem
 
-The active Obsidian configuration folder's entire `plugins/` tree is always excluded, including plugin JavaScript, manifests, styles, and data files.
+Crate's own plugin folder (`<config folder>/plugins/crate/`, which holds its checkpoint, journals and Markdown base cache) is always excluded. Other plugins and their settings sync with the vault; exclude any that store credentials or device-specific values with an ignore pattern.
 
 ## Constants
 
