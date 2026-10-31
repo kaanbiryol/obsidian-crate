@@ -27,10 +27,10 @@ export const bundleBudgets = {
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
-		// Every feature loads at startup. Server-side extraction for encrypted Reading
-		// removes Defuddle: 1.143 MB raw / 372.5 KB gzip.
-		maxBytes: 1160000,
-		maxGzipBytes: 380000,
+		// Every feature loads at startup. Deleting Reading articles and reader sync
+		// feedback in the web app measure 1.166 MB raw / 380.3 KB gzip.
+		maxBytes: 1185000,
+		maxGzipBytes: 388000,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
