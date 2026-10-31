@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 2 and schema 1, with no registered migrations. Servers deployed by the 0.9.0 beta (revision 1, schema 1) update in place. Earlier betas reused revision 1 with a different schema 1 definition and cannot be upgraded; the update reports this and asks users to delete and recreate the server. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 2 and schema 1, with no registered migrations. Servers deployed by the 0.9.0 beta (revision 1, schema 1) update in place. Vaults that ran the 0.9.0 beta plugin keep their notes and connection, but Reminders and Reading stay off until each is turned on again in Crate settings, because that plugin saved no `confirmed` flag. Earlier betas reused revision 1 with a different schema 1 definition and cannot be upgraded; the update reports this and asks users to delete and recreate the server. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 
@@ -112,8 +112,8 @@ metadata has not been confirmed.
 
 ## Optional local features and full article saves
 
-Reading and Reminders start enabled in the plugin; explicit disabled preferences
-are preserved. Their switches stop local scanning without changing other devices.
+Reading and Reminders stay off in a vault until it confirms them; explicit disabled
+preferences are preserved. Their switches stop local scanning without changing other devices.
 Reading saves request full article extraction. A library client's explicit full
 article save also enables extraction when the server policy has it disabled.
 Capture-only Shortcut credentials cannot change that policy. Bookmark-only
@@ -128,8 +128,9 @@ with the token. Local enabled flags cache the
 server state rather than overwriting it. The policy never starts a feature in a
 vault that has not confirmed it: the plugin keeps the local flag off, shows a notice
 once per load, and records `confirmed` only when the feature is turned on in that
-vault's settings after a prompt naming its folder. Plugin data saved before the flag
-existed counts as confirmed; a vault without plugin data starts with both off.
+vault's settings after a prompt naming its folder. Plugin data without the flag,
+including data saved by the 0.9.0 beta, counts as unconfirmed, and a vault without
+plugin data starts with both off.
 
 Pausing stops server APIs and background work without deleting sources, indexes,
 credentials, or queued work. Reading checks before fetching and publication;
