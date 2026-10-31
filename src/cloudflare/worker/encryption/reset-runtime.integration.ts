@@ -291,3 +291,42 @@ describe('turning encryption on', () => {
 		expect(await (await env.BUCKET.get(rows[1]!.storage_key))!.text()).toBe('edited after the refusal\n');
 	});
 });
+
+describe('turning encryption on for a vault that last synced encrypted', () => {
+	let setup: Awaited<ReturnType<typeof createEncryptionFixture>>;
+	beforeEach(async () => {
+		// A new server reports no encryption, and this device has no keys for it.
+		await env.DB.prepare('UPDATE server_state SET encryption = NULL WHERE id = 1').run();
+		storage.delete(SECRET_KEYS.ENCRYPTION_KEYS); storage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
+		settings.encryptedVaultId = 'previous-vault';
+		setup = await createEncryptionFixture('active');
+		await runtime.initialize();
+		disk.write('note.md', 'private note\n');
+	});
+	const turnOn = () => runtime.turnOnEncryption(setup.bundle, setup.recovery, () => {}, { workerUrl: settings.workerUrl, authToken: storage.get(SECRET_KEYS.AUTH_TOKEN)! });
+	const sentBeforeReset = () => {
+		const calls = bridge.mock.calls.map(([options]) => options as RequestUrlParam);
+		const reset = calls.findIndex(call => new URL(call.url).pathname === '/encryption/reset');
+		return calls.slice(0, reset < 0 ? undefined : reset).filter(call => (call.method ?? 'GET') !== 'GET').map(call => new URL(call.url).pathname);
+	};
+
+	it('encrypts an empty server without sending this vault as plaintext first', async () => {
+		await turnOn();
+		expect(sentBeforeReset().filter(path => path.startsWith('/sync/'))).toEqual([]);
+		expect(loadEncryptionKeys(storage)).toEqual(setup.bundle);
+		expect(settings.encryptedVaultId).toBe(setup.bundle.vaultId);
+		const rows = (await env.DB.prepare('SELECT storage_key FROM files').all<{ storage_key: string }>()).results;
+		expect(rows).toHaveLength(1);
+		expect(await (await env.BUCKET.get(rows[0]!.storage_key))!.text()).not.toContain('private note');
+	});
+
+	it('refuses before the wipe when the server already has unencrypted files', async () => {
+		const other = await secondDevice();
+		other.disk.write('remote-only.md', 'only on the server\n');
+		expect((await other.engine.sync()).success).toBe(true);
+		await expect(turnOn()).rejects.toThrow('This server already has files without encryption');
+		expect(await readEncryptionState(env.DB)).toBeNull();
+		expect(loadEncryptionKeys(storage)).toBeNull();
+		expect(sentBeforeReset().filter(path => path.startsWith('/sync/'))).toEqual([]);
+	});
+});

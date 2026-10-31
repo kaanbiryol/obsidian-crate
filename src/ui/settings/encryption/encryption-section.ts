@@ -142,6 +142,9 @@ class EncryptionModal extends SharedModal {
 		if (state?.mode === 'active' && keys) { this.clearContent(); this.ready(keys, state); return; }
 		if (!state && !keys && this.plugin.settings.encryptedVaultId) { this.clearContent(); this.downgraded(); return; }
 		// Only an unencrypted server reaches setup: an encrypted one is unlocked or managed above.
+		await this.setup(keys);
+	}
+	private async setup(keys: VaultKeyBundle | null): Promise<void> {
 		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin, keys);
 		if (!recovery) { this.clearContent(); this.bodyEl.createEl('p', { text: 'Restore the recovery key from your saved copy before enabling encryption.' }); return; }
 		await verifySetupRecovery(null, bundle, recovery);
@@ -175,9 +178,18 @@ class EncryptionModal extends SharedModal {
 	/** This vault synced encrypted before, but the server now reports no encryption. */
 	private downgraded(): void {
 		this.bodyEl.createEl('p', { text: 'This vault was synced with end-to-end encryption, but this server reports that encryption is off. Crate does not send notes to it until you choose.' });
-		this.bodyEl.createEl('p', { text: 'If you turned encryption off or moved to a new server on purpose, sync without encryption. Otherwise, check the server address.' });
+		this.bodyEl.createEl('p', { text: 'If you moved to a new, empty server, turn encryption on for it. If you turned encryption off on purpose, sync without encryption. Otherwise, check the server address.' });
 		const status = this.bodyEl.createEl('p', { attr: { role: 'status' } });
-		createModalActions(this.bodyEl).addButton(button => button.setButtonText('Sync without encryption').setDestructive().onClick(async () => {
+		const actions = createModalActions(this.bodyEl);
+		actions.addButton(button => button.setButtonText('Turn on encryption').setCta().onClick(async () => {
+			button.setDisabled(true);
+			try {
+				this.assertCurrentConnection();
+				this.clearContent();
+				await this.setup(null);
+			} catch (error) { this.unavailable(error); }
+		}));
+		actions.addButton(button => button.setButtonText('Sync without encryption').setDestructive().onClick(async () => {
 			const confirmed = await openConfirmationModal(this.app, {
 				title: 'Sync without encryption?',
 				message: 'Crate will send this vault’s notes to this server as readable text.',

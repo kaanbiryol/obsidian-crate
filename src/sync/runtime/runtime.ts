@@ -451,7 +451,15 @@ export class SyncRuntime {
 			pushSharedSettings: () => this.pushSharedSettingsBestEffort(),
 			syncBeforeReset: async () => {
 				const engine = this.syncEngine;
-				if (!engine) throw new Error('Connect sync on this device before replacing the server copy');
+				if (!engine || !this.apiClient) throw new Error('Connect sync on this device before replacing the server copy');
+				// A vault that last synced encrypted refuses plaintext here, so a sync would only
+				// fail its uploads. An empty server has nothing the wipe could lose.
+				if (this.settings.encryptedVaultId && !loadEncryptionKeys(this.secretStorage)) {
+					if (Object.keys((await this.apiClient.getManifest()).files).length) {
+						throw new Error('This server already has files without encryption. Choose Sync without encryption first, or connect an empty server.');
+					}
+					return engine.trackedPaths();
+				}
 				const result = await engine.sync();
 				if (result.outcome === 'cancelled' || !result.success || result.conflicts.length) {
 					throw new Error('Sync this device without errors or conflicts first, so no server-only changes are lost.');
