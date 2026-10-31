@@ -167,6 +167,7 @@
 		"zustand": "^5.0.16"
 	},
 	"overrides": {
+		"minimatch": "11.0.3",
 		"miniflare": {
 			"sharp": "0.35.5",
 			"undici": "7.30.1"
