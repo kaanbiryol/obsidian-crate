@@ -31,7 +31,7 @@ export function renderRemindersSettings(context: SettingsSectionContext): () => 
 	});
 
 	new Setting(preferences).setName('Enable reminders')
-		.setDesc('All devices · pause or resume reminders and their notifications. Notes and vault sync are preserved.')
+		.setDesc(`All devices · pause or resume reminders and their notifications. Notes and vault sync are preserved.${plugin.settings.workerUrl ? '' : ' Connect a server to get notifications.'}`)
 		.addToggle(toggle => toggle.setValue(settings.enabled).onChange(async enabled => {
 			toggle.setDisabled(true);
 			try {

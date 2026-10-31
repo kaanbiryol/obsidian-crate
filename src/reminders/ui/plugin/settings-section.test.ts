@@ -20,6 +20,7 @@ it('uses a startup toggle and preserves the saved reminder defaults', async () =
 	const { renderRemindersSettings } = await import('./settings-section');
 	const plugin = {
 		app: {},
+		settings: { workerUrl: 'https://crate.example' },
 		remindersSettings: { enabled: true, listStyle: 'flat', autoOpenView: 'sidebar', sidebarDefaultTab: 'today', upcomingDaysDefault: 7, remindersFolderPath: 'Reminders', taskCreationDefaultDueDate: 'none' },
 		writeRemindersSettings: vi.fn(async () => {}),
 	};
@@ -54,6 +55,7 @@ it('changes no notes until this vault confirms turning reminders on with their f
 		renderRemindersSettings({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender });
 		// The folder can be chosen before turning reminders on; device preferences wait.
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual(['Enable reminders', 'Reminders folder']);
+		expect(MockSetting.instances[0]!.descEl.textContent).toContain('Connect a server to get notifications.');
 		const toggle = MockSetting.instances[0]!.toggles[0]!;
 
 		toggle.change(true);

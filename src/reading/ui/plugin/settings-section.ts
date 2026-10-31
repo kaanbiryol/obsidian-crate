@@ -13,7 +13,7 @@ export function renderReadingSettings({ containerEl: container, plugin, rerender
 	const reading = plugin.settings.reading;
 	createSettingsDisclosure(container, 'Reading', { summary: reading.enabled ? `Folder: ${reading.folderPath}` : reading.confirmed ? 'Paused' : 'Off', onOpen: options => {
 		new Setting(options).setName('Enable reading')
-			.setDesc('All devices · pause or resume reading and article downloads. This device downloads saved links directly into your vault. YouTube links also request available transcripts. Playback connects to YouTube only when you select play. Saved notes and vault sync are preserved.')
+			.setDesc(`All devices · pause or resume reading and article downloads. This device downloads saved links directly into your vault. YouTube links also request available transcripts. Playback connects to YouTube only when you select play. Saved notes and vault sync are preserved.${plugin.settings.workerUrl ? '' : ' Connect a server to save and read articles from your phone.'}`)
 			.addToggle(toggle => toggle.setValue(plugin.settings.reading.enabled).onChange(async enabled => {
 				toggle.setDisabled(true);
 				try {
