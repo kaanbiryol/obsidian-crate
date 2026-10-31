@@ -184,6 +184,10 @@ export class WorkerApiHttpClient {
 	refusePlaintext(refused: boolean): void { this.plaintextRefused = refused; }
 	refusesPlaintext(): boolean { return this.plaintextRefused; }
 
+	/** Called whenever an authenticated response reports that this vault is encrypted. */
+	private onEncrypted?: () => void;
+	observeEncryption(callback: (() => void) | undefined): void { this.onEncrypted = callback; }
+
 	private forgetEncryptionOff(): void {
 		this.encryptionOffAt = null;
 		this.encryptionOffResets++;
@@ -311,6 +315,7 @@ export class WorkerApiHttpClient {
 				const encryptionState = getHeader(response.headers, ENCRYPTION_STATE_HEADER);
 				if (encryptionState === 'on' || ENCRYPTION_VERDICT_RESETS.has(response.status)) this.forgetEncryptionOff();
 				else if (encryptionState === 'off' && encryptionOffResets === this.encryptionOffResets) this.encryptionOffAt = started;
+				if (encryptionState === 'on') this.onEncrypted?.();
 				resolve(response);
 			};
 			const rejectOnce = (error: unknown) => {

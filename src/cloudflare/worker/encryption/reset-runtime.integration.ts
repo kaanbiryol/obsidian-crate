@@ -347,3 +347,21 @@ describe('turning encryption on for a vault that last synced encrypted', () => {
 		expect(sentBeforeReset().filter(path => path.startsWith('/sync/'))).toEqual([]);
 	});
 });
+
+describe('a device without keys for an encrypted vault', () => {
+	beforeEach(async () => {
+		storage.delete(SECRET_KEYS.ENCRYPTION_KEYS); storage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
+		// As on a device that connected before the vault record existed.
+		settings.encryptedVaultId = null;
+		await runtime.initialize();
+	});
+
+	it('remembers the vault and refuses plaintext once the server reports encryption off', async () => {
+		await runtime.sync();
+		await vi.waitFor(() => expect(settings.encryptedVaultId).toBe(state.vaultId));
+		await env.DB.prepare('UPDATE server_state SET encryption = NULL WHERE id = 1').run();
+		disk.write('private.md', 'private note\n');
+		expect((await runtime.sync()).success).toBe(false);
+		expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
+	});
+});

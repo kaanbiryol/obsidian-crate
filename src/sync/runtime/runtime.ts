@@ -299,7 +299,10 @@ export class SyncRuntime {
 			if (keys) {
 				await this.apiClient.configureEncryption(keys, this.reminderFolders, this.readingFolder);
 				if (this.settings.encryptedVaultId !== keys.vaultId) await this.persistSettings({ encryptedVaultId: keys.vaultId });
-			} else this.apiClient.refusePlaintext(Boolean(this.settings.encryptedVaultId));
+			} else {
+				this.apiClient.refusePlaintext(Boolean(this.settings.encryptedVaultId));
+				if (!this.settings.encryptedVaultId) this.rememberEncryptedVault(this.apiClient);
+			}
 		} catch (error) {
 			if (this.initializationRevision !== initializationRevision) return;
 			this.initializationError = errorMessage(error);
@@ -474,6 +477,26 @@ export class SyncRuntime {
 			resumeEvents: () => { this.vaultEvents.open(); },
 			reportError: message => { this.initializationError = message; this.emitCurrentState(); },
 		}, request, progress, expected, signal), signal);
+	}
+
+	/** Record the vault the first time its server reports encryption to this keyless device,
+	 * so a later report that encryption is off cannot receive plaintext unprompted. */
+	private rememberEncryptedVault(client: SyncApiClient): void {
+		let reading: Promise<void> | null = null;
+		client.observeEncryption(() => {
+			reading ??= (async () => {
+				const state = await client.getEncryptionState();
+				if (this.apiClient !== client || this.settings.encryptedVaultId || loadEncryptionKeys(this.secretStorage)) {
+					client.observeEncryption(undefined);
+					return;
+				}
+				if (!state) return;
+				client.refusePlaintext(true);
+				await this.persistSettings({ encryptedVaultId: state.vaultId });
+				client.observeEncryption(undefined);
+			})().catch(error => { logger.warn('Could not record that this vault is encrypted:', errorMessage(error)); })
+				.finally(() => { reading = null; });
+		});
 	}
 
 	private configurationTransition(signal?: AbortSignal): RuntimeConfigurationTransition {
