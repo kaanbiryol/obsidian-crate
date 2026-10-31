@@ -1,7 +1,7 @@
 {
 	"font": {
 		"src/pwa/reading/web.scss": 7,
-		"src/pwa/styles/_browser-setup.scss": 13,
+		"src/pwa/styles/_browser-setup.scss": 16,
 		"src/pwa/styles/_editor-layout.scss": 1,
 		"src/pwa/styles/_mobile-layout.scss": 2,
 		"src/pwa/styles/_settings.scss": 7,
