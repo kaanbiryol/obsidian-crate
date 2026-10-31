@@ -42,7 +42,10 @@ Maintainer and contributor documentation for the plugin, Worker and PWA. User-fa
 
 - [PWA storage recovery](pwa-storage-recovery.md) - browser storage for confirmed offline copies, pending commands and drafts, and how it recovers.
 - [Tab convergence](pwa-tab-convergence.md) - how confirmed reminder changes reach other open tabs, and how Reading tabs share one queue.
-- [UI styling](ui-styling.md) - shared plugin and PWA components, Sass and visual rules.
+- [UI styling](ui-styling.md) - shared plugin and PWA components, tokens, Sass and visual rules.
+- [PWA UI](pwa-ui.md) - PWA updates, launch appearance, sizing and settings.
+- [Plugin UI](plugin-ui.md) - Obsidian dialogs and the plugin settings tab.
+- [Reading UI](reading-ui.md) - Reading workspace layout and article rendering.
 
 ## Server and deployment
 

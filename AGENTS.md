@@ -35,7 +35,7 @@ The Worker stores data, serves the PWA/API and schedules notifications; it never
 - Sync: [sync pipeline](docs/sync-pipeline.md), [protocol](docs/protocol.md), [sync checkpoint recovery](docs/sync-checkpoint-recovery.md)
 - API or compatibility: [Worker API](docs/worker-api.md), [compatibility](docs/compatibility.md), [server upgrades](docs/server-upgrades.md)
 - Encryption: [e2ee implementation](docs/e2ee-implementation.md)
-- UI: [UI styling](docs/ui-styling.md). Shared components render in Obsidian Shadow DOM and the PWA document; verify both
+- UI: [UI styling](docs/ui-styling.md), with host-specific rules in [PWA UI](docs/pwa-ui.md), [plugin UI](docs/plugin-ui.md) and [Reading UI](docs/reading-ui.md). Shared components render in Obsidian Shadow DOM and the PWA document; verify both
 - PWA persistence: [storage recovery](docs/pwa-storage-recovery.md), [tab convergence](docs/pwa-tab-convergence.md)
 - Reading: [reading highlights](docs/reading-highlights.md), [reading shortcuts](docs/reading-shortcuts.md)
 - Deployment and releases: [deployment](docs/deployment.md), [releases](docs/releases.md), [self-hosting](docs/self-hosting.md)

@@ -453,7 +453,10 @@ Coverage notes, commands and manual checks for individual features live in each 
 - [reminder source recovery](reminder-source-recovery.md#testing-notes): reminder descriptions and diagnostics
 - [Test Reading](read-it-later-testing.md#testing-notes): optimistic Reading actions, saved YouTube videos, Reading fetching consent
 - [PWA storage recovery](pwa-storage-recovery.md#testing-notes): PWA sync coordinator
-- [shared UI](ui-styling.md#testing-notes): unified PWA settings, app updates, portable visual baselines, pasted links and page titles, Reading touch feedback, motion continuity, plugin navigation parity, plugin dialog consistency
+- [shared UI](ui-styling.md#testing-notes): portable visual baselines, motion continuity
+- [PWA UI](pwa-ui.md#testing-notes): unified PWA settings, app updates
+- [Reading UI](reading-ui.md#testing-notes): pasted links and page titles, Reading touch feedback
+- [plugin UI](plugin-ui.md#testing-notes): plugin navigation parity, plugin dialog consistency
 - [sync capacity](sync-capacity.md#testing-notes): reminder capacity measurements
 - [backup and recovery](recovery.md#testing-notes): file history browser checks
 - [deployment](deployment.md#testing-notes): connection recovery
