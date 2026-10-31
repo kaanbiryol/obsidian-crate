@@ -367,6 +367,8 @@ async function verifyRepeatPicker(browser, origin) {
     await fetch(`${origin}/preview/reset`, { method: 'POST' });
     const page = await browser.newPage({ timezoneId: 'Europe/Berlin', viewport: { width: 390, height: 844 }, hasTouch: true });
     try {
+      // A new monthly rule starts on today's day of month, which cannot increase on the 31st.
+      await page.clock.setFixedTime(new Date('2026-10-29T12:00:00.000Z'));
       const rule = {
         frequency: scenario === 'implicit monthly' ? 'monthly' : 'weekly',
         ...(scenario === 'implicit monthly' ? {} : { daysOfWeek: [1, 3] }),
