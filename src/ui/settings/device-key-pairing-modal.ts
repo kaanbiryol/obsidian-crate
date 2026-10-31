@@ -58,8 +58,9 @@ export class DeviceKeyPairingModal extends SharedModal {
 		};
 		const poll = async () => {
 			if (polling || this.finished || this.controller.signal.aborted) return;
-			polling = true;
 			window.clearTimeout(this.timer);
+			if (document.hidden) { this.timer = window.setTimeout(() => { void poll(); }, 2500); return; }
+			polling = true;
 			try {
 				if (!this.attempt) {
 					expected = await readServerEncryption(http) ?? undefined;

@@ -49,6 +49,7 @@ export class AddDeviceModal extends SharedModal {
 				const remaining = issued.expiresAt - Date.now();
 				if (remaining <= 0) { expiry.setText('This code expired. Close this window and add the device again.'); return; }
 				expiry.setText(`This one-use code expires in ${Math.ceil(remaining / 60_000)} min.`);
+				if (document.hidden) { this.timer = window.setTimeout(() => { void poll(); }, 2500); return; }
 				try {
 					const device = (await api?.listTokens())?.tokens.find(token => token.id === issued.tokenId);
 					current();
