@@ -10,6 +10,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { sha256Hex } from '@/platform/sha256';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
+import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 
 // Costs include the notification pass each request arms, which the usage header omits.
 let meter: StorageCostMeter;
@@ -74,7 +75,7 @@ it('keeps the request to a few D1 round trips and its replay to a cheap pass', a
 
 it('does not read every reminder note on a pass with nothing to project', async () => {
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 2000)
-    INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified) SELECT 'Reminders/Other ' || x || '.md', 'revision', 2, 1 FROM n`).run();
+    INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified) SELECT 'Reminders/Other ' || x || '.md', 'revision', ?, 1 FROM n`).bind(REMINDER_CACHE_PARSER_VERSION).run();
 	const { body } = await edit(SMALL, 14);
 	const { cost } = await meter.measure(() => send('/reminders/update', body));
 	console.info('no-op pass cost with 2,002 reminder notes', cost);

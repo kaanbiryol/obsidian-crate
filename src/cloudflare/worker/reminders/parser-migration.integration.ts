@@ -271,3 +271,22 @@ it('quarantines previously indexed invalid UTF-8 without changing source bytes o
 	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
 	expect(new Uint8Array(await (await env.BUCKET.get(h.file.storageKey))!.arrayBuffer())).toEqual(bytes);
 });
+
+it('re-reads notes cached by parser version 2, which named a reminder by the marker at its line end', async () => {
+	// Older plugins appended a second marker when text was typed after a visible one.
+	const lineEndId = '22222222-2222-4222-8222-222222222222';
+	const content = `- [ ] Buy milk <!-- crate-id:${id} --> and eggs <!-- crate-id:${lineEndId} -->`;
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+	const hash = await sha256Hex(content);
+	// What version 2 recorded for these bytes.
+	await env.DB.batch([
+		env.DB.prepare('UPDATE reminder_sources SET reminder_id = ?').bind(lineEndId),
+		env.DB.prepare('UPDATE reminder_source_state SET parser_version = 2'),
+		env.DB.prepare(`INSERT OR REPLACE INTO reminder_file_cache (folder_path, file_path, file_hash, parser_version, reminders_json)
+      VALUES ('Reminders', ?, ?, 2, ?)`).bind(path, hash, JSON.stringify([{ id: lineEndId, content: 'Buy milk and eggs', priority: 4, completed: false, project: 'Inbox', filePath: path, lineNumber: 0 }])),
+	]);
+	await revalidateReminderSources(env, 3);
+	expect(await env.DB.prepare('SELECT reminder_id FROM reminder_sources WHERE file_path = ?').bind(path).first()).toEqual({ reminder_id: id });
+	const list = await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env);
+	expect(await list.json()).toMatchObject({ reminders: [{ id, content: 'Buy milk and eggs' }] });
+});
