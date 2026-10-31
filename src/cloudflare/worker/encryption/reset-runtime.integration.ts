@@ -351,7 +351,7 @@ describe('turning encryption on for a vault that last synced encrypted', () => {
 describe('a device without keys for an encrypted vault', () => {
 	beforeEach(async () => {
 		storage.delete(SECRET_KEYS.ENCRYPTION_KEYS); storage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
-		// As on a device that connected before the vault record existed.
+		// A device that has never unlocked this vault has no record yet.
 		settings.encryptedVaultId = null;
 		await runtime.initialize();
 	});
