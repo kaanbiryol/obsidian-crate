@@ -137,6 +137,53 @@ it('keeps pace with a descriptor backlog across scheduled passes within the quer
 	expect(passes).toBe(3);
 });
 
+it('keeps worst-case passes within the query budget when every maintenance task has work', async () => {
+	await storeEncryptionState(env.DB, (await createEncryptionFixture('active')).state);
+	// Tasks whose statements grow with work have enough for two passes. Reading recovery
+	// and checkpoint pruning cost the same with or without it.
+	await many(2 * DESCRIPTOR_CLEANUP_PAGE + 10);
+	await put('pruned', 'pruned.md', '-35 days');
+	await put('newest', 'newest.md', '-1 minute');
+	const staged = Array.from({ length: 15 }, (_, i) => `staged-${i}`);
+	const batches = Array.from({ length: 4 }, (_, i) => `batch-${i}`);
+	await Promise.all([...staged, ...batches].map(key => env.BUCKET.put(key, 'bytes')));
+	await env.DB.batch([
+		env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 600)
+			INSERT INTO object_cleanup_queue(storage_key, file_path) SELECT 'queued-'||x, 'queued.md' FROM n`),
+		env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('expired', 'expired.md', 'hash', 1, 'replaced', 0)"),
+		env.DB.prepare("INSERT INTO file_deletion_receipts(consumed_revision, revision, changelog_seq, path, consumed_hash, request_id, created_at) VALUES ('consumed', 'deleted', 99, 'deleted.md', 'hash', 'request', datetime('now', '-40 days'))"),
+		env.DB.prepare("INSERT INTO reminder_occurrences(reminder_id, due_key, first_seen_at) VALUES ('reminder', '2020-01-01', 0)"),
+		env.DB.prepare("INSERT INTO upload_operations(operation_id, request_hash, response_json) VALUES (?, 'hash', '{}')").bind(createReminderOperationId(1)),
+		env.DB.prepare("INSERT INTO request_rate_limits(key, count, expires_at) VALUES ('limit', 1, 0)"),
+		env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, expires_at) VALUES ('token', 'hash', 0)"),
+		env.DB.prepare("INSERT INTO staged_uploads(storage_key, file_path, expires_at) SELECT value, value || '.md', 0 FROM json_each(?)").bind(JSON.stringify(staged)),
+		env.DB.prepare(`INSERT INTO staged_upload_batches(id, storage_keys, expires_at)
+			SELECT value, json_array(json_object('storageKey', value, 'path', value || '.md')), 0 FROM json_each(?)`).bind(JSON.stringify(batches)),
+		env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('e2ee:receipt:upload:orphan:000', 'chunk')"),
+	]);
+	const values = new Map<string, unknown>();
+	const setAlarm = vi.fn();
+	const state = { storage: { get: async (key: string) => values.get(key),
+		put: async (key: string, value: unknown) => { values.set(key, value); }, setAlarm } } as never;
+	const statements: number[] = [];
+	do {
+		setAlarm.mockClear();
+		const prepare = vi.spyOn(env.DB, 'prepare');
+		await runMaintenanceEpisode(state, env);
+		statements.push(prepare.mock.calls.length);
+		prepare.mockRestore();
+	} while (setAlarm.mock.calls.length && statements.length < 10);
+	// Before: 52 statements on the first pass and 51 on the second, both position reads included.
+	expect(statements.filter(count => count > 50)).toEqual([]);
+	expect(statements).toHaveLength(3);
+	expect(await retained()).toEqual([]);
+	for (const table of ['object_cleanup_queue', 'staged_uploads', 'staged_upload_batches', 'file_versions', 'file_deletion_receipts', 'reminder_occurrences', 'upload_operations', 'request_rate_limits', 'auth_tokens']) {
+		expect(await env.DB.prepare(`SELECT count(*) AS n FROM ${table}`).first(), table).toEqual({ n: 0 });
+	}
+	expect(await env.DB.prepare("SELECT key FROM maintenance_state WHERE key GLOB 'e2ee:receipt:*'").first()).toBeNull();
+	expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'last_error'").first()).toBeNull();
+}, 60_000);
+
 it('replays an encrypted upload receipt after its revision and descriptor are gone', async () => {
 	const fixture = await createEncryptionFixture('active');
 	await storeEncryptionState(env.DB, fixture.state);
