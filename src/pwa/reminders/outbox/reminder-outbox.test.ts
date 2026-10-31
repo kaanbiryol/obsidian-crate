@@ -415,6 +415,26 @@ describe('optimistic reminder outbox', () => {
 		expect(state.storage.load()[0]?.body).toBe(change.body);
 	});
 
+	it('holds back only changes to the project a pending reorder covers', () => {
+		const state = harness();
+		const operationId = crypto.randomUUID();
+		state.enqueue({ operationId, kind: 'reorder', project: 'Work', orderedIds: ['w2', 'w1'], path: '/reminders/reorder', method: 'POST',
+			body: JSON.stringify({ operationId, folderPath: 'Reminders', project: 'Work', orderedIds: ['w2', 'w1'], expectedOrder: ['w1', 'w2'] }),
+			status: 'pending', attempts: 0, retryAt: 0 });
+		// Before: any pending reorder refused every change, in every project.
+		expect(() => state.enqueue(completion('inbox-1'))).not.toThrow();
+		const work = completion('w1');
+		expect(() => state.enqueue({ ...work, previous: { ...work.previous!, project: 'Work' }, optimistic: { ...work.optimistic!, project: 'Work' } })).toThrow('pending change');
+		const moved = save();
+		expect(() => state.enqueue({ ...moved, optimistic: { ...moved.optimistic!, project: 'Work' } })).toThrow('pending change');
+		const otherId = crypto.randomUUID();
+		expect(() => state.enqueue({ operationId: otherId, kind: 'reorder', project: 'Work', orderedIds: ['w1', 'w2'], path: '/reminders/reorder', method: 'POST',
+			body: JSON.stringify({ operationId: otherId, folderPath: 'Reminders', project: 'Work', orderedIds: ['w1', 'w2'], expectedOrder: ['w2', 'w1'] }),
+			status: 'pending', attempts: 0, retryAt: 0 })).toThrow('pending change');
+		const unknown = completion('unknown-project');
+		expect(() => state.enqueue({ ...unknown, previous: undefined, optimistic: undefined })).toThrow('pending change');
+	});
+
 	it('accepts a corrected draft after definite rejection using the original identity', async () => {
 		const state = harness();
 		const original = save();

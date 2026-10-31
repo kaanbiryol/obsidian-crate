@@ -14,6 +14,20 @@ export function reminderRetryAt(change: PendingReminderChange): number | undefin
 	return change.status === 'uncertain' && !change.reviewRequired && hasAutomaticRetry(change.attempts) ? change.retryAt : undefined;
 }
 
+/** Projects whose order a change can alter; null when unknown, which overlaps every project. */
+function touchedProjects(change: PendingReminderChange): string[] | null {
+	if (change.kind === 'reorder') return [change.project];
+	const projects = [change.previous?.project, change.optimistic?.project].filter(project => project !== undefined);
+	return projects.length ? projects : null;
+}
+
+/** A reorder's expected order covers one project, so it conflicts only with changes there. */
+function conflicts(a: PendingReminderChange, b: PendingReminderChange): boolean {
+	if (a.kind !== 'reorder' && b.kind !== 'reorder') return a.recordId === b.recordId;
+	const left = touchedProjects(a), right = touchedProjects(b);
+	return !left || !right || left.some(project => right.includes(project));
+}
+
 /** Rejected commands and uncertain ones past their automatic retry budget need the user. */
 export function reminderNeedsAttention(change: PendingReminderChange): boolean {
 	return change.status === 'failed' || change.status === 'uncertain' && !hasAutomaticRetry(change.attempts);
@@ -71,8 +85,7 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 	const enqueue = (change: PendingReminderChange) => {
 		if (!isCurrent()) throw new Error('Session changed. Reopen Crate before saving.');
 		const current = storage.load();
-		const conflict = current.find(item => item.operationId !== change.operationId
-			&& (item.kind === 'reorder' || change.kind === 'reorder' || item.recordId === change.recordId));
+		const conflict = current.find(item => item.operationId !== change.operationId && conflicts(item, change));
 		if (conflict) throw new Error('Resolve the pending change before changing this reminder again.');
 		const previous = current.find(item => item.operationId === change.operationId);
 		if (previous && (previous.status !== 'failed' || previous.ambiguous)) throw new Error('This change is still syncing. Use Retry to check its status.');
