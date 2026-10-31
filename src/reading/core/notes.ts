@@ -13,10 +13,17 @@ export function parseReadingNote(markdown: string): ReadingMetadata | null {
 	return { ...metadata, highlights, ...(recovery.length ? { highlight_recovery: [...(metadata.highlight_recovery ?? []), ...recovery] } : {}) };
 }
 
+/** Templater runs `<% ... %>` anywhere in a new note, including code and frontmatter.
+ * A zero-width space keeps the text readable while breaking the tag. */
+export function inertTemplater(text: string): string {
+	return text.split('<%').join('<\u200B%');
+}
+
+/** A shared title comes from the page, so it is made inert like article text. */
 export function createReadingNote(input: { id: string; url: string; title?: string; savedAt: string }): string {
 	const url = readingUrl(input.url);
 	const metadata = validateReadingMetadata({ crate_reading_version: 1, crate_reading_id: input.id,
-		title: input.title?.trim() || new URL(url).hostname, source_url: url, saved_at: input.savedAt,
+		title: inertTemplater(input.title?.trim() || new URL(url).hostname), source_url: url, saved_at: input.savedAt,
 		reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'pending', capture_method: 'url' });
 	return `---\n${Object.entries(metadata).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n${ARTICLE_START}\n${ARTICLE_END}\n`;
 }

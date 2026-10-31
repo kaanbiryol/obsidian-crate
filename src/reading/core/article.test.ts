@@ -126,7 +126,7 @@ describe('Reading article assembly', () => {
 			'dv.paragraph("<\u200B% tp.file.title %>")',
 			'```',
 			'',
-			'> ```',
+			'> ``` title="x"',
 			'> return 1',
 			'> ```',
 			'',
@@ -139,32 +139,39 @@ describe('Reading article assembly', () => {
 		if (title !== undefined) expect(title).toBe('<\u200B%* tR += app.vault.getName() %>');
 	});
 
-	it('keeps ordinary code blocks unchanged and drops executable names from fence examples', () => {
+	it('keeps ordinary code blocks and drops executable languages even from fence examples', () => {
 		const source = note(), metadata = parseReadingNote(source)!;
 		const kept = [
 			'```ts',
 			'const total = items.reduce((sum, item) => sum + item.price, 0);',
 			'```',
 			'',
-			'```` ```dataviewjs ```` starts a Dataview block, and `dv.view()` loads a script.',
-			'',
 			'~~~python',
 			'print("tilde")',
 			'~~~',
 		];
-		const example = ['````markdown', '```dataviewjs', 'dv.paragraph("example")', '```', '````'];
-		const content = applyLocalArticle(source, { ...metadata, path: 'Reading/Article.md' }, { markdown: [...kept, '', ...example].join('\n') });
-		// Raw HTML can make an example's inner fence real, so its name goes too.
-		expect(managedArticle(content)!.text).toBe(`\n\n${[...kept, '', '````markdown', '```', 'dv.paragraph("example")', '```', '````'].join('\n')}\n\n`);
+		// No Markdown reading decides which fence is real, so examples lose the language too.
+		const example = (language: string) => [
+			'````markdown',
+			'```' + language,
+			'dv.paragraph("example")',
+			'```',
+			'````',
+			'',
+			'```` ```' + language + ' ```` starts a Dataview block, and `dv.view()` loads a script.',
+		];
+		const content = applyLocalArticle(source, { ...metadata, path: 'Reading/Article.md' }, { markdown: [...kept, '', ...example('dataviewjs')].join('\n') });
+		expect(managedArticle(content)!.text).toBe(`\n\n${[...kept, '', ...example('')].join('\n')}\n\n`);
 	});
 
-	it('breaks every Dataview inline JavaScript prefix', () => {
+	it('breaks every Dataview inline JavaScript prefix, in code or prose', () => {
 		const source = note(), metadata = parseReadingNote(source)!;
 		const markdown = [
-			'Prices: a $= b and `x $= y`.',
+			'Prices: a $= b, `x $= y` and \\`$= escaped\\`.',
 			'',
 			'```js',
-			'$= dv.pages()',
+			'a $= b',
+			'$= later lines',
 			'```',
 			'',
 			'Run `$= dv.pages()`, `` $=dv.current() `` or <code class="x>y">$= dv.view()</code>.',
@@ -221,6 +228,34 @@ describe('Reading article assembly', () => {
 			expect(text).toContain('<code>​<b>$</b>=');
 			expect(text).toContain('```\ndv.el("p", "fenced")\n```');
 		} finally { vi.unstubAllGlobals(); }
+	});
+
+	it('breaks plugin code in list items and after them in Markdown converted by Defuddle', async () => {
+		vi.stubGlobal('window', { DOMParser });
+		try {
+			const { articleMarkdown } = await import('../extraction/markdown');
+			// A list item's code block keeps its fence on the marker line, and its indented
+			// closing fence must not hide the executable blocks that follow it.
+			const html = `<ul><li><pre><code class="language-dataviewjs">dv.paragraph("listed")</code></pre></li></ul>
+				<ol><li><pre><code class="language-text">first</code></pre></li></ol>
+				<pre><code class="language-tasks">filter by function true</code></pre>
+				<pre><code class="language-js-engine">return 1</code></pre>
+				<p>Then <code>$= dv.current()</code>.</p>`;
+			const markdown = articleMarkdown(parseHTML(`<html><body>${html}</body></html>`).document.body, 'https://example.com/article');
+			const source = note();
+			const text = managedArticle(applyLocalArticle(source, { ...parseReadingNote(source)!, path: 'Reading/Article.md' }, { markdown }))!.text;
+			expect(text).not.toMatch(/(?:`{3,}|~{3,})[ \t]*(?:dataviewjs|js-engine|tasks)/i);
+			expect(text).not.toContain('$=');
+			expect(text).toContain('dv.paragraph("listed")');
+			expect(text).toContain('filter by function true');
+		} finally { vi.unstubAllGlobals(); }
+	});
+
+	it('leaves no executable fence when an info string repeats the language', () => {
+		const source = note();
+		const markdown = '```dataviewjs dataviewjs\ndv.paragraph(1)\n```\n\n~~~ Tasks\tjs-engine\nreturn 1\n~~~';
+		const text = managedArticle(applyLocalArticle(source, { ...parseReadingNote(source)!, path: 'Reading/Article.md' }, { markdown }))!.text;
+		expect(text).toBe('\n\n```\ndv.paragraph(1)\n```\n\n~~~\nreturn 1\n~~~\n\n');
 	});
 
 	it('checks local source eligibility before assembling an oversized article', () => {

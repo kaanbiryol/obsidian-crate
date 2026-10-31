@@ -63,6 +63,12 @@ describe('reading Markdown', () => {
 		const markdown = createReadingNote({ id, url: 'https://example.com', title, savedAt: '2026-09-21T12:00:00Z' });
 		expect(parseReadingNote(markdown)).toMatchObject({ title, favorite: false, reading_status: 'inbox', extraction_status: 'pending' });
 	});
+	it('breaks Templater tags in a shared title before it reaches frontmatter', () => {
+		// Templater runs tags anywhere in a new note, frontmatter included.
+		const markdown = createReadingNote({ id, url: 'https://example.com', title: '<%* await app.vault.adapter.remove("a") %> Article', savedAt });
+		expect(markdown).not.toContain('<%');
+		expect(parseReadingNote(markdown)!.title).toBe('<​%* await app.vault.adapter.remove("a") %> Article');
+	});
 	it('preserves unknown YAML, formatting, and every body byte during metadata edits', () => {
 		fc.assert(fc.property(fc.string(), body => {
 			const source = note().replace('\n---\n', '\nuser: { keep: \'spacing\' } # comment\n---\n') + body;

@@ -1,6 +1,6 @@
 import { youtubeVideoId } from './youtube';
 import { ARTICLE_START, ARTICLE_END, MAX_READING_BYTES, type ReadingItem, type ReadingMetadata } from './model';
-import { parseReadingNote } from './notes';
+import { inertTemplater, parseReadingNote } from './notes';
 import { patchReadingFrontmatter } from './frontmatter';
 import { transcriptMetadata, type CapturedArticle } from '../extraction/types';
 
@@ -20,25 +20,18 @@ function replaceArticle(content: string, block: NonNullable<ReturnType<typeof ma
 }
 
 // Dataview JS, Datacore, JS Engine, Meta Bind JS views and Tasks custom filter/group/sort
-// functions run these code blocks when the note renders.
-const EXECUTABLE_FENCES = new Set(['dataviewjs', 'datacorejs', 'datacorejsx', 'datacorets', 'datacoretsx', 'js-engine', 'meta-bind-js-view', 'tasks']);
+// functions run these code blocks when the note renders. Every fence marker loses these
+// leading languages, wherever it sits, so list items and raw HTML cannot hide one.
+const EXECUTABLE_FENCE = /(`{3,}|~{3,})(?:[ \t]*(?:dataviewjs|datacorejsx?|datacoretsx?|js-engine|meta-bind-js-view|tasks)(?![\w-]))+/gi;
 // A zero-width space keeps the text readable while breaking a plugin's trigger.
 const BREAK = '\u200B';
-
-/** Templater runs `<% ... %>` anywhere in a new note, including code and frontmatter. */
-function inertTemplater(text: string): string {
-	return text.split('<%').join(`<${BREAK}%`);
-}
 
 /** Saved web pages must not bring plugin code into the vault. Raw HTML blocks are not
  * parsed as Markdown, so they can hide a fence or code span from line-based tracking.
  * Every rule therefore applies everywhere, including inside code blocks, where the
  * breaks are invisible; executable code blocks stay readable as plain code. */
 function inertArticle(article: CapturedArticle): CapturedArticle {
-	const markdown = article.markdown.split('\n').map(line => {
-		const fence = /^((?:[ \t]*>)*[ \t]*)(`{3,}|~{3,})(.*)$/.exec(line);
-		return fence && EXECUTABLE_FENCES.has(fence[3]!.trim().split(/\s/)[0]!.toLowerCase()) ? fence[1]! + fence[2]! : line;
-	}).join('\n')
+	const markdown = article.markdown.replace(EXECUTABLE_FENCE, '$1')
 		// Dataview runs inline code and code blocks whose text starts with `$=`. Raw HTML
 		// `<code>` can split the prefix across child elements, so its text also starts with
 		// the break, which `trim()` keeps.
