@@ -33,7 +33,7 @@ export function createEngineFileOperations(
 			for (const path of paths) await assertRenamePreserved(manifest, vault, path);
 			return transport.batchDelete(paths, expectedHashes, expectedRevisions);
 		},
-		downloadFile: (path: string, size?: number) => largeTransfers(size, () => transport.downloadFile(path)),
+		downloadFile: (path: string, size?: number) => largeTransfers(size, () => transport.downloadFile(path, size)),
 		batchDownload: (paths: string[]) => transport.batchDownload(paths),
 		getChanges: (since: number) => transport.getChanges(since),
 		restoreFileVersion: (version: RemoteFileVersion) => restores.restore(version),

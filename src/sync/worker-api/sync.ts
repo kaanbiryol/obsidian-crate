@@ -43,6 +43,7 @@ import { FILE_HASH_HEADER, FILE_SIZE_HEADER, EXPECTED_HASH_HEADER, UPLOAD_OPERAT
 import {
 	getHeader,
 	TRANSFER_TIMEOUT_MS,
+	transferTimeout,
 	HttpError,
 	type WorkerApiHttpClient,
 } from './http';
@@ -254,7 +255,7 @@ export class SyncWorkerApi {
 				[FILE_SIZE_HEADER]: String(size),
 				[EXPECTED_HASH_HEADER]: expectedHash === null ? 'absent' : expectedHash,
 			},
-		}, TRANSFER_TIMEOUT_MS);
+		}, transferTimeout(content.byteLength));
 	}
 
 	private async newUploadOperationId(): Promise<string> {
@@ -263,10 +264,11 @@ export class SyncWorkerApi {
 		return createReminderOperationId(day);
 	}
 
-	async downloadFile(path: string): Promise<DownloadedFile> {
+	/** `size`, when known, extends the timeout for a large file. */
+	async downloadFile(path: string, size?: number): Promise<DownloadedFile> {
 		const wire = await this.wireFor(path);
 		const encodedPath = encodeURIComponent(wire);
-		const { body, headers } = await this.http.requestBinary(`/sync/download?path=${encodedPath}`, {}, TRANSFER_TIMEOUT_MS);
+		const { body, headers } = await this.http.requestBinary(`/sync/download?path=${encodedPath}`, {}, transferTimeout(size ?? 0));
 		const contentLengthHeader = getHeader(headers, 'Content-Length');
 		const contentLength = contentLengthHeader && /^\d+$/.test(contentLengthHeader)
 			? Number(contentLengthHeader)
@@ -352,11 +354,12 @@ export class SyncWorkerApi {
 			return { success: results.every(result => result.success), results };
 		}
 
+		const body = JSON.stringify({ files, ...(bulkNew ? { bulkNewFiles: true } : {}) });
 		return this.http.requestJson<BatchUploadResponse>('/sync/batch-upload', {
 			method: 'POST',
-			body: JSON.stringify({ files, ...(bulkNew ? { bulkNewFiles: true } : {}) }),
+			body,
 			headers: { [UPLOAD_OPERATIONS_HEADER]: files.map(file => file.operationId).join(',') },
-		}, TRANSFER_TIMEOUT_MS);
+		}, transferTimeout(body.length));
 	}
 
 	async batchDownload(paths: string[]): Promise<DownloadedBatch> {

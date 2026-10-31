@@ -15,6 +15,14 @@ import { ENCRYPTION_CAPABILITY, ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_H
 const logger = createLogger('ApiClient');
 
 export const TRANSFER_TIMEOUT_MS = 120_000;
+/** Slowest sustained link a body transfer still completes on, about 0.26 Mbit/s. */
+const MIN_TRANSFER_BYTES_PER_SECOND = 32 * 1024;
+
+/** A timed-out upload stays journaled and is replayed in full before every later
+ * sync, so the limit grows with the body instead of capping it at a fast link. */
+export function transferTimeout(bytes: number): number {
+	return TRANSFER_TIMEOUT_MS + Math.floor(bytes * 1000 / MIN_TRANSFER_BYTES_PER_SECOND);
+}
 /** How long a response saying this vault is not encrypted lets a plaintext mutation skip the probe. */
 const ENCRYPTION_OFF_TRUST_MS = 30_000;
 /** Refusals that may mean another device turned encryption on and revoked or locked this credential. */

@@ -1,7 +1,7 @@
 import { INITIAL_IMPORT_CAPABILITY, importInventoryPages, type InitialImport, type ReminderSetupProgress, type ReminderSetupStatus } from '@/protocol/initial-import';
 import { normalizeSyncIssues, SyncIssueError } from '../issues';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
-import { TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
+import { transferTimeout, type WorkerApiHttpClient } from './http';
 import { arrayBufferToBase64 } from '../encoding';
 import type { PreparedUpload } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '@/protocol/sync-limits';
@@ -30,10 +30,11 @@ export class InitialImportApi {
 				method: 'PUT', headers: { [INITIAL_IMPORT_HEADER]: token, [FILE_HASH_HEADER]: first.hash,
 					[EXPECTED_HASH_HEADER]: first.expectedHash ?? 'absent', 'Content-Type': first.contentType || 'application/octet-stream' },
 				body: first.content,
-			}, TRANSFER_TIMEOUT_MS);
+			}, transferTimeout(first.content.byteLength));
 		}
-		return this.http.requestJson('/sync/import/upload', { method: 'POST', headers: { [INITIAL_IMPORT_HEADER]: token }, body: JSON.stringify({ files: files.map(file => ({ path: file.path, hash: file.hash, size: file.size,
-			content: arrayBufferToBase64(file.content), contentType: file.contentType, expectedHash: file.expectedHash ?? null })) }) }, TRANSFER_TIMEOUT_MS);
+		const body = JSON.stringify({ files: files.map(file => ({ path: file.path, hash: file.hash, size: file.size,
+			content: arrayBufferToBase64(file.content), contentType: file.contentType, expectedHash: file.expectedHash ?? null })) });
+		return this.http.requestJson('/sync/import/upload', { method: 'POST', headers: { [INITIAL_IMPORT_HEADER]: token }, body }, transferTimeout(body.length));
 	}
 
 	async prune(token: string, files: Array<{ path: string; hash: string }>): Promise<void> {
