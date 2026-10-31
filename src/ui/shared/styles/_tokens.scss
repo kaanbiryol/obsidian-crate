@@ -67,8 +67,8 @@
   --crate-action-border: var(--crate-choice-border, color-mix(in srgb, var(--background-modifier-border) 90%, transparent));
   --crate-action-text: color-mix(in srgb, var(--text-normal) 92%, var(--text-muted));
   --crate-icon-button-size: var(--clickable-icon-size, var(--input-height, 36px));
-  --crate-view-title-size: var(--reminder-font-title);
-  --crate-view-title-weight: var(--reminder-font-weight-semibold);
+  --crate-view-title-size: var(--crate-font-title);
+  --crate-view-title-weight: var(--crate-font-weight-semibold);
   --crate-view-title-spacing: normal;
   --crate-view-title-leading: 1.2;
   --crate-view-header-padding: 14px 16px 10px;
@@ -176,30 +176,30 @@
    * Maps to Obsidian's CSS variables for consistent theming
    */
   /* Font sizes - mapped to Obsidian variables */
-  --reminder-font-base: var(--font-ui-medium, var(--font-text-size));
-  --reminder-font-sm: var(--font-ui-small, var(--font-small));
-  --reminder-font-xs: var(--font-ui-smaller, var(--font-smaller));
-  --reminder-font-xxs: var(--font-smallest, var(--font-ui-smaller));
-  --reminder-font-title: var(--font-ui-large, var(--font-ui-medium));
-  --reminder-font-editor-title: clamp(
-    var(--reminder-font-base),
-    calc(var(--reminder-font-title) - 2px),
-    var(--reminder-font-title)
+  --crate-font-base: var(--font-ui-medium, var(--font-text-size));
+  --crate-font-sm: var(--font-ui-small, var(--font-small));
+  --crate-font-xs: var(--font-ui-smaller, var(--font-smaller));
+  --crate-font-xxs: var(--font-smallest, var(--font-ui-smaller));
+  --crate-font-title: var(--font-ui-large, var(--font-ui-medium));
+  --crate-font-editor-title: clamp(
+    var(--crate-font-base),
+    calc(var(--crate-font-title) - 2px),
+    var(--crate-font-title)
   );
 
   /* Font families */
-  --reminder-font-ui: var(--font-interface);
-  --reminder-font-text: var(--font-text);
+  --crate-font-ui: var(--font-interface);
+  --crate-font-text: var(--font-text);
 
   /* Font weights */
-  --reminder-font-weight-normal: var(--font-normal, 400);
-  --reminder-font-weight-medium: var(--font-medium, 500);
-  --reminder-font-weight-semibold: var(--font-semibold, 600);
-  --reminder-font-weight-bold: var(--font-bold, 700);
+  --crate-font-weight-normal: var(--font-normal, 400);
+  --crate-font-weight-medium: var(--font-medium, 500);
+  --crate-font-weight-semibold: var(--font-semibold, 600);
+  --crate-font-weight-bold: var(--font-bold, 700);
 
   /* Line heights */
-  --reminder-line-height-tight: var(--line-height-tight, 1.2);
-  --reminder-line-height-normal: var(--line-height-normal, 1.4);
-  --reminder-line-height-relaxed: var(--line-height-normal, 1.6);
+  --crate-line-height-tight: var(--line-height-tight, 1.2);
+  --crate-line-height-normal: var(--line-height-normal, 1.4);
+  --crate-line-height-relaxed: var(--line-height-normal, 1.6);
 
 }

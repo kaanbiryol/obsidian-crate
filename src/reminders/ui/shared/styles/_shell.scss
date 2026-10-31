@@ -93,7 +93,7 @@
         color: var(--crate-tab-active-color, var(--interactive-accent));
 
         .bottom-tab-label {
-            font-weight: var(--reminder-font-weight-semibold);
+            font-weight: var(--crate-font-weight-semibold);
         }
     }
 }
@@ -130,8 +130,8 @@
 
 .bottom-tab-label {
     color: currentColor;
-    font-size: var(--reminder-font-sm);
-    font-weight: var(--reminder-font-weight-medium);
+    font-size: var(--crate-font-sm);
+    font-weight: var(--crate-font-weight-medium);
     letter-spacing: normal;
     white-space: nowrap;
     transition: color var(--crate-motion-duration-fast) var(--crate-motion-easing);
@@ -242,8 +242,8 @@
     margin-bottom: 12px;
     padding-left: 4px;
     color: var(--text-muted);
-    font-size: var(--reminder-font-xs);
-    font-weight: var(--reminder-font-weight-semibold);
+    font-size: var(--crate-font-xs);
+    font-weight: var(--crate-font-weight-semibold);
     letter-spacing: normal;
     text-transform: uppercase;
 }
@@ -297,7 +297,7 @@
     padding: 1px 6px;
     border-radius: var(--tag-radius, var(--radius-s));
     font-size: inherit;
-    font-weight: var(--reminder-font-weight-medium, 500);
+    font-weight: var(--crate-font-weight-medium, 500);
     letter-spacing: normal;
     vertical-align: baseline;
     box-decoration-break: clone;
@@ -374,8 +374,8 @@
 .project-autocomplete-label {
     overflow: hidden;
     color: var(--text-normal);
-    font-size: var(--reminder-font-base);
-    font-weight: var(--reminder-font-weight-medium);
+    font-size: var(--crate-font-base);
+    font-weight: var(--crate-font-weight-medium);
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;

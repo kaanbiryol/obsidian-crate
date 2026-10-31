@@ -131,3 +131,21 @@ it('does not let a response already in flight restore a dropped unencrypted verd
 	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Later' })).rejects.toMatchObject({ status: 401 });
 	expect(transport.mock.calls.every(([request]) => request.body !== 'Later')).toBe(true);
 });
+
+it.each([['an unencrypted', ['e2ee-v1']], ['an encryption-incapable', []]])('refuses plaintext to %s server while this vault last synced encrypted', async (_kind, capabilities) => {
+	const off = { 'X-Crate-Encryption-State': 'off' };
+	const transport = vi.fn<ApiHttpTransport>(async request => {
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities });
+		if (request.url.endsWith('/encryption')) return { ...response({ encryption: null }), headers: off };
+		return { ...response({ success: true }), headers: off };
+	});
+	const http = new WorkerApiHttpClient('https://crate.test', 'token', transport);
+	http.refusePlaintext(true);
+	await http.requestJson('/sync/changes?since=0');
+	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Private' })).rejects.toMatchObject({ status: 428, code: 'encryption_downgrade' });
+	expect(transport.mock.calls.every(([request]) => request.body !== 'Private')).toBe(true);
+	// Confirming the downgrade lets the same client sync without encryption.
+	http.refusePlaintext(false);
+	await http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Private' });
+	expect(transport.mock.calls.some(([request]) => request.body === 'Private')).toBe(true);
+});

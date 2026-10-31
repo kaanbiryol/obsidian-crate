@@ -296,7 +296,10 @@ export class SyncRuntime {
 		);
 		try {
 			const keys = loadEncryptionKeys(this.secretStorage);
-			if (keys) await this.apiClient.configureEncryption(keys, this.reminderFolders, this.readingFolder);
+			if (keys) {
+				await this.apiClient.configureEncryption(keys, this.reminderFolders, this.readingFolder);
+				if (this.settings.encryptedVaultId !== keys.vaultId) await this.persistSettings({ encryptedVaultId: keys.vaultId });
+			} else this.apiClient.refusePlaintext(Boolean(this.settings.encryptedVaultId));
 		} catch (error) {
 			if (this.initializationRevision !== initializationRevision) return;
 			this.initializationError = errorMessage(error);

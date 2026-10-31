@@ -28,7 +28,7 @@
 	.setup-step__content { display: grid; gap: var(--crate-space-4); min-width: 0; }
 	.setup-step__title { @include list-item.title; margin: 0; color: var(--text-normal); }
 	.setup-step__instruction, .setup-step__detail { margin: 0; overflow-wrap: anywhere; }
-	.setup-step__instruction { color: var(--text-normal); font-size: var(--reminder-font-base); line-height: 1.5; }
+	.setup-step__instruction { color: var(--text-normal); font-size: var(--crate-font-base); line-height: 1.5; }
 	.setup-step__detail { color: var(--text-muted); font-size: var(--pwa-font-detail); line-height: 1.5; }
 	.setup-step__detail strong, .setup-steps-note strong { color: var(--text-normal); font-weight: 500; }
 	.setup-step__instruction strong { font-weight: 600; }

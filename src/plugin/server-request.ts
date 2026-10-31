@@ -58,6 +58,7 @@ export async function serverRequest<T>(
 	client.setAbortSignal(signal);
 	const keys = loadEncryptionKeys(plugin.secretStorage);
 	if (keys) client.setEncryptionAuthority(keys.vaultId, keys.generation);
+	else client.refusePlaintext(Boolean(plugin.settings.encryptedVaultId));
 	const info = await client.getServerInfo(timeout);
 	assertCurrent();
 	for (const [capability, message] of Object.entries(capabilities)) {

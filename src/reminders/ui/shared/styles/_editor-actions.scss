@@ -36,9 +36,9 @@
   background: transparent;
   box-shadow: none;
   color: var(--text-faint);
-  font-size: var(--reminder-font-sm);
-  font-weight: var(--reminder-font-weight-medium);
-  line-height: var(--reminder-line-height-tight);
+  font-size: var(--crate-font-sm);
+  font-weight: var(--crate-font-weight-medium);
+  line-height: var(--crate-line-height-tight);
   letter-spacing: normal;
   transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), border-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
@@ -117,8 +117,8 @@
     border-radius: var(--crate-radius-control);
     background: transparent;
     box-shadow: none;
-    font-size: var(--reminder-font-sm);
-    line-height: var(--reminder-line-height-tight);
+    font-size: var(--crate-font-sm);
+    line-height: var(--crate-line-height-tight);
 
     &.is-active {
       border-color: var(--crate-semantic-border);

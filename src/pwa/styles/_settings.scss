@@ -24,9 +24,9 @@
 
 .pwa-settings-root {
 	&.crate-reminders-ui {
-		--reminder-font-base: var(--pwa-font-body);
-		--reminder-font-sm: var(--pwa-font-detail);
-		--reminder-font-weight-medium: 400;
+		--crate-font-base: var(--pwa-font-body);
+		--crate-font-sm: var(--pwa-font-detail);
+		--crate-font-weight-medium: 400;
 	}
 	position: absolute;
 	inset: 0;
@@ -46,7 +46,7 @@
 		margin-inline: calc(-1 * var(--crate-space-16)); gap: var(--crate-settings-row-gap);
 		padding: var(--crate-settings-row-padding) var(--crate-space-16);
 		border: 0; border-radius: 0; background: transparent; box-shadow: none;
-		color: var(--text-normal); font: inherit; font-size: var(--reminder-font-base); font-weight: var(--reminder-font-weight-medium);
+		color: var(--text-normal); font: inherit; font-size: var(--crate-font-base); font-weight: var(--crate-font-weight-medium);
 		line-height: 1.4; text-align: left; white-space: normal; cursor: pointer;
 	}
 	.crate-action-button.settings-action-row { border: 0 !important; }
@@ -104,7 +104,7 @@
 		min-height: 40px; padding: 0 8px; gap: 6px;
 		border: 0; border-radius: 9px;
 		background: transparent; box-shadow: none;
-		font-size: var(--reminder-font-sm); font-weight: var(--reminder-font-weight-medium); color: var(--text-muted);
+		font-size: var(--crate-font-sm); font-weight: var(--crate-font-weight-medium); color: var(--text-muted);
 	}
 	.settings-theme-option.is-active {
 		background: color-mix(in srgb, var(--text-normal) 12%, transparent);
@@ -123,9 +123,9 @@
 		// briefly puts the new text color against the previous theme.
 		transition: none;
 	}
-	.settings-preference-control .settings-preference-input { font-weight: var(--reminder-font-weight-normal); }
+	.settings-preference-control .settings-preference-input { font-weight: var(--crate-font-weight-normal); }
 	.settings-preference-control--select { justify-content: flex-end; background: transparent; }
-	.settings-preference-control--select .settings-preference-input { padding: 0 22px 0 0; text-align: right; text-align-last: right; color: var(--text-normal); font-size: var(--reminder-font-base); }
+	.settings-preference-control--select .settings-preference-input { padding: 0 22px 0 0; text-align: right; text-align-last: right; color: var(--text-normal); font-size: var(--crate-font-base); }
 	.settings-preference-control--select svg { right: 0; color: var(--text-faint); }
 	.settings-preference-control--days { flex-basis: 100px; width: 100px; }
 	.settings-preference-control--days input { width: 60px; }
@@ -145,17 +145,17 @@
 	.settings-panel__section > .settings-group { padding-inline: var(--crate-space-16); }
 	.settings-install-instructions { flex-shrink: 0; margin-top: var(--crate-space-24); }
 	.settings-row { box-sizing: border-box; padding: var(--crate-settings-row-padding) 0; min-height: 52px; gap: var(--crate-settings-row-gap); }
-	.settings-row--value { font-size: var(--reminder-font-base); }
+	.settings-row--value { font-size: var(--crate-font-base); }
 	.settings-row--value, .settings-row--value > strong { color: var(--text-normal); font-weight: 400; }
 	.settings-row--value > strong { color: var(--text-muted); font-size: var(--pwa-font-detail); }
-	.settings-row--version { min-height: 52px; font-size: var(--reminder-font-base); }
+	.settings-row--version { min-height: 52px; font-size: var(--crate-font-base); }
 	.settings-row--version > strong { font-size: var(--pwa-font-detail); white-space: normal; overflow-wrap: anywhere; }
 
 	.settings-row--theme { flex-direction: column; align-items: stretch; gap: 10px; }
 	.settings-preference-control--select { flex-basis: 152px; width: 152px; }
-	.settings-value { color: var(--text-muted); font-size: var(--reminder-font-base); text-align: right; max-width: 60%; overflow-wrap: anywhere; }
-	.settings-status { font-size: var(--reminder-font-base); font-weight: 400; }
-	.settings-navigation-row { font-size: var(--reminder-font-base); font-weight: var(--reminder-font-weight-medium); }
+	.settings-value { color: var(--text-muted); font-size: var(--crate-font-base); text-align: right; max-width: 60%; overflow-wrap: anywhere; }
+	.settings-status { font-size: var(--crate-font-base); font-weight: 400; }
+	.settings-navigation-row { font-size: var(--crate-font-base); font-weight: var(--crate-font-weight-medium); }
 	.settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; }
 	.settings-actions > button { max-width: 100%; white-space: normal; }
 	.settings-actions > .crate-action-button {
@@ -193,7 +193,7 @@
 	.settings-tab-row[data-lifted] .settings-tab-handle { color: var(--text-muted); cursor: grabbing; }
 	.settings-tab-choice { position: relative; display: flex; flex: 1; min-width: 0; align-items: center; }
 	// Give the native picker an opaque snapshot surface when it opens on iOS.
-	.settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: var(--background-primary); color: var(--text-normal); font: inherit; font-size: 16px; font-weight: var(--reminder-font-weight-medium); box-shadow: none; }
+	.settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: var(--background-primary); color: var(--text-normal); font: inherit; font-size: 16px; font-weight: var(--crate-font-weight-medium); box-shadow: none; }
 	.settings-tab-choice > svg { position: absolute; right: 0; pointer-events: none; color: var(--text-muted); }
 	.settings-tabs-reset { --crate-action-text: var(--crate-accent-text); --crate-action-font-size: var(--pwa-font-caption); position: absolute; top: 50%; right: calc(var(--crate-space-16) - 8px); min-height: 44px; padding-inline: 8px; transform: translateY(-50%); color: var(--crate-accent-text); font-size: var(--pwa-font-caption); font-weight: 400; }
 }

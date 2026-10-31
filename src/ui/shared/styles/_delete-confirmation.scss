@@ -14,7 +14,7 @@
   background: var(--crate-modal-bg);
   box-shadow: var(--crate-elevation-sheet);
   color: var(--text-normal);
-  font-family: var(--reminder-font-ui);
+  font-family: var(--crate-font-ui);
 }
 
 .delete-confirmation-surface .reminder-modal-header-title { white-space: normal; }
@@ -28,7 +28,7 @@
 .delete-confirmation-message {
   margin: 0;
   color: var(--text-normal);
-  font-size: var(--reminder-font-sm);
+  font-size: var(--crate-font-sm);
   line-height: 1.5;
   text-align: start;
   overflow-wrap: anywhere;

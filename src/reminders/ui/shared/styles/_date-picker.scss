@@ -26,8 +26,8 @@
   border-radius: 0;
   background: transparent;
   color: var(--text-muted);
-  font-size: var(--reminder-font-sm);
-  font-weight: var(--reminder-font-weight-medium);
+  font-size: var(--crate-font-sm);
+  font-weight: var(--crate-font-weight-medium);
   cursor: pointer;
 
   @media (hover: hover) and (pointer: fine) {
@@ -74,14 +74,14 @@
 
   strong {
     color: var(--text-normal);
-    font-size: var(--reminder-font-sm);
-    font-weight: var(--reminder-font-weight-medium);
+    font-size: var(--crate-font-sm);
+    font-weight: var(--crate-font-weight-medium);
   }
 
   small {
     color: var(--text-faint);
-    font-size: var(--reminder-font-xxs);
-    font-weight: var(--reminder-font-weight-medium);
+    font-size: var(--crate-font-xxs);
+    font-weight: var(--crate-font-weight-medium);
   }
 }
 
@@ -160,13 +160,13 @@
   gap: 12px;
 
   strong {
-    font-size: var(--reminder-font-xs);
-    font-weight: var(--reminder-font-weight-medium);
+    font-size: var(--crate-font-xs);
+    font-weight: var(--crate-font-weight-medium);
   }
 
   small {
     flex: 0 0 auto;
-    font-weight: var(--reminder-font-weight-normal);
+    font-weight: var(--crate-font-weight-normal);
     line-height: 1.15;
     text-align: right;
   }
@@ -217,6 +217,6 @@
 
 .reminder-date-picker .picker-schedule-fields .picker-field-copy strong {
   color: var(--text-normal);
-  font-weight: var(--reminder-font-weight-medium);
+  font-weight: var(--crate-font-weight-medium);
 }
 }

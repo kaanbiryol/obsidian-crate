@@ -48,8 +48,8 @@
   outline: 0;
   color: var(--text-normal);
   caret-color: var(--text-normal);
-  font-size: var(--reminder-font-editor-title);
-  font-weight: var(--reminder-font-weight-medium);
+  font-size: var(--crate-font-editor-title);
+  font-weight: var(--crate-font-weight-medium);
   // Inline chips extend beyond the text glyphs; leave room between wrapped rows.
   line-height: 1.7;
   letter-spacing: normal;
@@ -69,9 +69,9 @@
 ) {
   display: inline;
   margin: 0 0.08em;
-  font-size: clamp(var(--reminder-font-base), 0.92em, var(--reminder-font-editor-title));
-  font-weight: var(--reminder-font-weight-normal);
-  line-height: var(--reminder-line-height-tight);
+  font-size: clamp(var(--crate-font-base), 0.92em, var(--crate-font-editor-title));
+  font-weight: var(--crate-font-weight-normal);
+  line-height: var(--crate-line-height-tight);
   vertical-align: baseline;
   white-space: nowrap;
 }
@@ -186,16 +186,16 @@
   color: var(--text-muted);
   caret-color: var(--text-muted);
   font-family: inherit;
-  font-size: var(--reminder-font-base);
-  font-weight: var(--reminder-font-weight-normal);
-  line-height: var(--reminder-line-height-normal);
+  font-size: var(--crate-font-base);
+  font-weight: var(--crate-font-weight-normal);
+  line-height: var(--crate-line-height-normal);
   resize: none;
   appearance: none;
 
   &::placeholder,
   &::before {
     color: var(--text-faint);
-    font-size: var(--reminder-font-sm);
+    font-size: var(--crate-font-sm);
     opacity: 1;
   }
 }

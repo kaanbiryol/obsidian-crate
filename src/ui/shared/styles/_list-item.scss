@@ -42,8 +42,8 @@
 }
 
 @mixin title {
-    font-size: var(--reminder-font-base);
-    font-weight: var(--reminder-font-weight-medium);
+    font-size: var(--crate-font-base);
+    font-weight: var(--crate-font-weight-medium);
     line-height: 1.4;
     letter-spacing: normal;
 }

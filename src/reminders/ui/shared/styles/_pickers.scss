@@ -37,7 +37,7 @@
 .reminder-picker .recurrence-frequency-button.is-selected {
   background: color-mix(in srgb, var(--text-normal) 10%, transparent);
   color: var(--text-normal);
-  font-weight: var(--reminder-font-weight-semibold);
+  font-weight: var(--crate-font-weight-semibold);
 
   @media (hover: hover) and (pointer: fine) {
     &:hover:not(:disabled) {

@@ -266,7 +266,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('overscroll-behavior: contain;');
 		expect(html).toContain('height: min(var(--pwa-editor-content-height, 224px) + env(safe-area-inset-bottom), 100%);');
 		expect(html).toContain('height: min(var(--pwa-editor-content-height, 224px) + 16px + var(--pwa-keyboard-inset, 0px), 100%);');
-		expect(html).toContain('--reminder-font-base: 16px;');
+		expect(html).toContain('--crate-font-base: 16px;');
 		expect(html).toContain('.crate-reminders-ui .reminder-description-input {');
 		expect(html).toContain('max-height: 108px;');
 		expect(html).toContain('.crate-reminders-ui .reminder-action-chip {');

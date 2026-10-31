@@ -57,7 +57,7 @@
 
     .premium-reminder-description {
         margin-top: 0;
-        font-size: var(--reminder-font-xs);
+        font-size: var(--crate-font-xs);
         line-height: 1.4;
     }
 
@@ -67,7 +67,7 @@
 
     .premium-pill {
         border-radius: var(--tag-radius, var(--radius-s));
-        font-size: var(--reminder-font-xxs);
+        font-size: var(--crate-font-xxs);
     }
 
     .reminders-fab {
@@ -95,8 +95,8 @@
         margin: 2px 0 var(--crate-space-8);
         padding-left: 2px;
         color: var(--text-faint);
-        font-size: var(--reminder-font-xs);
-        font-weight: var(--reminder-font-weight-medium);
+        font-size: var(--crate-font-xs);
+        font-weight: var(--crate-font-weight-medium);
         letter-spacing: normal;
         text-transform: none;
     }
@@ -120,8 +120,8 @@
     }
 
     .premium-project-name {
-        font-size: var(--reminder-font-base);
-        font-weight: var(--reminder-font-weight-medium);
+        font-size: var(--crate-font-base);
+        font-weight: var(--crate-font-weight-medium);
         letter-spacing: normal;
     }
 
@@ -130,13 +130,13 @@
     }
 
     :is(.premium-project-stat, .premium-project-stat-empty, .premium-project-stat-complete) {
-        font-size: var(--reminder-font-xxs);
+        font-size: var(--crate-font-xxs);
         font-weight: var(--font-normal, 400);
     }
 
     .premium-project-percentage {
-        font-size: var(--reminder-font-xxs);
-        font-weight: var(--reminder-font-weight-medium);
+        font-size: var(--crate-font-xxs);
+        font-weight: var(--crate-font-weight-medium);
     }
 }
 
@@ -187,7 +187,7 @@
 
 .bottom-tab-label {
     font-size: var(--font-ui-smaller, 12px);
-    font-weight: var(--reminder-font-weight-semibold);
+    font-weight: var(--crate-font-weight-semibold);
     line-height: 16px;
     letter-spacing: normal;
     transition: color var(--crate-motion-duration-moderate) var(--crate-motion-easing);

@@ -133,6 +133,6 @@ Turning encryption off doesn't decrypt the server copy. Instead, it starts the s
 Crate syncs this device first and stops if that sync has errors or conflicts. The reset then deletes your server files and file history, and uploads this device's files without encryption. Files this device doesn't sync, such as excluded folders, are lost.
 :::
 
-Afterwards, other Obsidian devices must reconnect, and web apps must log out and use a fresh setup link. Save any pending browser work before logging out. Keep your old recovery key for any encrypted backups.
+Afterwards, other Obsidian devices must reconnect, and web apps must log out and use a fresh setup link. A device that synced this vault encrypted refuses to send notes to a server without encryption until you select **Sync without encryption** in **Manage encryption** on that device. Save any pending browser work before logging out. Keep your old recovery key for any encrypted backups.
 
 For more detail, see the [privacy policy](/privacy/) and the [encryption implementation reference](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/e2ee-implementation.md).

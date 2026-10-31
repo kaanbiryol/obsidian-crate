@@ -44,6 +44,7 @@ export { HttpError, SyncTransportError } from './http';
 
 export class SyncApiClient {
 	getEncryptionState() { return readServerEncryption(this.http); }
+	refusePlaintext(refused: boolean): void { this.http.refusePlaintext(refused); }
 	/** Notes inside `reminderFolders()` carry encrypted notification schedules; notes the
 	 * server sealed to the vault are accepted only inside `readingFolder()`. */
 	async configureEncryption(bundle: VaultKeyBundle, reminderFolders: () => readonly string[], readingFolder?: () => string | null): Promise<void> {

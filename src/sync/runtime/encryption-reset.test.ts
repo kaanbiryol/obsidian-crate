@@ -41,6 +41,8 @@ async function setup() {
 	harness.plugin.app.vault.adapter.remove.mockImplementation(async (path: string) => { local.delete(path); });
 	// Turning encryption off starts from a connected, unlocked device, which syncs first.
 	await harness.runtime.initialize({ skipStartupSync: true });
+	// That start records the encrypted vault; tests check only the reset's own saves.
+	harness.persistSettings.mockClear();
 	const run = () => harness.runtime.turnOffEncryption(state, () => {}, { workerUrl: harness.settings.workerUrl, authToken: values.get(SECRET_KEYS.AUTH_TOKEN)! });
 	return { ...harness, values, state, local, run };
 }
@@ -75,7 +77,10 @@ it.each(['before dispatch', 'behind another operation'] as const)('cancels an en
 it('keeps local notes, replaces credentials and sync state, then uploads without encryption', async () => {
 	const h = await setup();
 	try {
+		// An unlocked start records the encrypted vault so a later downgrade needs confirmation.
+		expect(h.settings.encryptedVaultId).toBe((JSON.parse(h.values.get(SECRET_KEYS.ENCRYPTION_KEYS)!) as { vaultId: string }).vaultId);
 		await h.run();
+		expect(h.settings.encryptedVaultId).toBeNull();
 		expect(h.local.get('local-note.md')).toBe('keep this note');
 		expect(h.local.has(h.plugin.manifest.dir + '/file-manifest.json')).toBe(false);
 		expect(h.values.get(SECRET_KEYS.AUTH_TOKEN)).toMatch(/^[a-f0-9]{64}$/);
@@ -202,3 +207,13 @@ it('reconciles again after only the shared settings save failed, without force u
 });
 
 /* eslint-enable @typescript-eslint/unbound-method -- End of prototype-spy tests. */
+
+it('refuses plaintext after keys are gone from a vault that last synced encrypted', async () => {
+	const refuse = vi.spyOn(WorkerApiHttpClient.prototype, 'refusePlaintext');
+	const h = createRuntimeHarness({ encryptedVaultId: 'previous-vault' });
+	h.secretStorage.get.mockImplementation(key => key === SECRET_KEYS.AUTH_TOKEN ? 'auth-token' : null);
+	try {
+		await h.runtime.initialize({ skipStartupSync: true });
+		expect(refuse).toHaveBeenLastCalledWith(true);
+	} finally { h.runtime.destroy(); }
+});

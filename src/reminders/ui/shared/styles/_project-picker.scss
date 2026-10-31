@@ -53,8 +53,8 @@
   flex: 1;
   overflow: hidden;
   color: currentColor;
-  font-size: var(--reminder-font-xs);
-  font-weight: var(--reminder-font-weight-medium);
+  font-size: var(--crate-font-xs);
+  font-weight: var(--crate-font-weight-medium);
   line-height: 1.4;
   letter-spacing: normal;
   text-align: left;
@@ -62,7 +62,7 @@
   white-space: nowrap;
 
   &.is-selected {
-    font-weight: var(--reminder-font-weight-medium);
+    font-weight: var(--crate-font-weight-medium);
   }
 }
 

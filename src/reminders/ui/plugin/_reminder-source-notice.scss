@@ -9,7 +9,7 @@
 	padding: 11px 10px 3px;
 	border-radius: var(--crate-radius-card);
 	background: color-mix(in srgb, var(--crate-danger) 3%, var(--crate-app-bg));
-	font-family: var(--reminder-font-ui);
+	font-family: var(--crate-font-ui);
 	font-size: var(--crate-settings-description-size);
 	line-height: 1.45;
 	overflow-wrap: anywhere;
@@ -19,7 +19,7 @@
 	&__icon, &__icon svg, > svg { width: 14px; height: 14px; }
 	&__content { min-width: 0; }
 	p { margin: 0; }
-	&__title { color: var(--text-normal); font-weight: var(--reminder-font-weight-semibold); }
+	&__title { color: var(--text-normal); font-weight: var(--crate-font-weight-semibold); }
 	&__path { padding-top: 1px; user-select: text; }
 	&__reason { padding-top: 1px; color: var(--text-normal); user-select: text; }
 	&__guidance {
@@ -43,7 +43,7 @@
 		gap: 4px;
 	}
 	&__actions { margin: 2px 0 0 -8px; }
-	&__open { --crate-action-text: var(--text-normal); font-weight: var(--reminder-font-weight-semibold); }
+	&__open { --crate-action-text: var(--text-normal); font-weight: var(--crate-font-weight-semibold); }
 	&__retry { --crate-action-text: color-mix(in srgb, var(--text-muted) 85%, var(--crate-app-bg)); }
 	&__footer { justify-content: space-between; padding-top: 4px; }
 	&__error { padding-top: 6px; color: var(--crate-danger); }

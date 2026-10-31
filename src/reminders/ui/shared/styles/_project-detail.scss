@@ -14,8 +14,8 @@
     margin: 10px 14px 0;
     width: fit-content;
     flex-shrink: 0;
-    font-size: var(--reminder-font-sm);
-    font-weight: var(--reminder-font-weight-medium);
+    font-size: var(--crate-font-sm);
+    font-weight: var(--crate-font-weight-medium);
     color: var(--text-muted);
     cursor: pointer;
 
@@ -98,8 +98,8 @@
 }
 
 .project-detail-title {
-    font-size: var(--reminder-font-title);
-    font-weight: var(--reminder-font-weight-bold);
+    font-size: var(--crate-font-title);
+    font-weight: var(--crate-font-weight-bold);
     letter-spacing: normal;
     color: var(--text-normal);
     margin: 0;
@@ -132,15 +132,15 @@
 }
 
 .project-detail-stat {
-    font-size: var(--reminder-font-xs);
-    font-weight: var(--reminder-font-weight-normal);
+    font-size: var(--crate-font-xs);
+    font-weight: var(--crate-font-weight-normal);
     font-variant-numeric: tabular-nums;
     color: var(--text-muted);
 }
 
 .project-detail-stat-dot {
     color: var(--text-faint);
-    font-size: var(--reminder-font-xxs);
+    font-size: var(--crate-font-xxs);
     line-height: 1;
 }
 

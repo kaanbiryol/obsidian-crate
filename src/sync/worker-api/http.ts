@@ -146,6 +146,8 @@ function parseJsonResponse<T>(responseText: string, path: string): T {
 	}
 }
 
+const encryptionDowngradeError = () => new HttpError('This vault was synced with end-to-end encryption, but this server reports none. Open Manage encryption to unlock it, or confirm syncing without encryption.', 428, null, 'encryption_downgrade');
+
 export class WorkerApiHttpClient {
 	private readonly clientSession = crypto.randomUUID();
 	private requestDiagnostics: RequestDiagnostic[] = [];
@@ -166,6 +168,12 @@ export class WorkerApiHttpClient {
 	private encryptionOffAt: number | null = null;
 	/** Bumped whenever that verdict is dropped, so a response already in flight cannot restore it. */
 	private encryptionOffResets = 0;
+
+	/** Set while this vault last synced encrypted but holds no keys: an unencrypted
+	 * server must not receive private plaintext until the user confirms it. */
+	private plaintextRefused = false;
+
+	refusePlaintext(refused: boolean): void { this.plaintextRefused = refused; }
 
 	private forgetEncryptionOff(): void {
 		this.encryptionOffAt = null;
@@ -244,16 +252,19 @@ export class WorkerApiHttpClient {
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
 			protocol = Math.min(protocol, info.protocol.current);
 			const route = path.split('?')[0]!;
-			const encryptionOffConfirmed = this.encryptionOffAt !== null && performance.now() - this.encryptionOffAt < ENCRYPTION_OFF_TRUST_MS;
-			if (info.capabilities.includes(ENCRYPTION_CAPABILITY) && !this.encryptionHeaders[ENCRYPTION_VAULT_HEADER] && !encryptionOffConfirmed
+			const encryptionOffConfirmed = !this.plaintextRefused && this.encryptionOffAt !== null && performance.now() - this.encryptionOffAt < ENCRYPTION_OFF_TRUST_MS;
+			const capable = info.capabilities.includes(ENCRYPTION_CAPABILITY);
+			if ((capable || this.plaintextRefused) && !this.encryptionHeaders[ENCRYPTION_VAULT_HEADER] && !encryptionOffConfirmed
 				&& (['/sync/', '/reading/', '/reminders/'].some(prefix => route.startsWith(prefix))
 					|| route === '/settings' || route === '/notifications/reminders-enrollment-token')) {
+				if (!capable) throw encryptionDowngradeError();
 				// Another device may have enabled encryption since this client last
 				// synced. Probe without a private body before dispatching plaintext,
 				// unless a recent response confirmed it is still off; the server
 				// rejects plaintext into an encrypted vault either way.
 				const state = await this.requestJson<{ encryption: unknown }>('/encryption', {}, Math.min(timeout, 30_000));
 				if (state.encryption !== null) throw new HttpError('Unlock this vault in Manage encryption before sending changes', 428, null, 'encryption_required');
+				if (this.plaintextRefused) throw encryptionDowngradeError();
 			}
 		}
 

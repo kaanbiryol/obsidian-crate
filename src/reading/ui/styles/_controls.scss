@@ -1,7 +1,7 @@
 .crate-reading-view { height: 100%; overflow: hidden; padding: 0 !important; }
 .crate-reading-mount { height: 100%; overflow: hidden; }
 .crate-reminders-ui .crate-reading {
-	color: var(--text-normal); background: var(--crate-app-bg); font: var(--reminder-font-base, 15px)/1.5 var(--font-interface, system-ui, sans-serif);
+	color: var(--text-normal); background: var(--crate-app-bg); font: var(--crate-font-base, 15px)/1.5 var(--font-interface, system-ui, sans-serif);
 	*, *::before, *::after { box-sizing: border-box; }
 	button, a, input { -webkit-tap-highlight-color: transparent; }
 	:where(button) { font: inherit; cursor: pointer; touch-action: manipulation; }

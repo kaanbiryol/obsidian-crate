@@ -15,12 +15,12 @@ $selection: color-mix(in srgb, var(--text-normal) 5%, var(--background-primary))
   border-radius: 4px;
 }
 @mixin title {
-  font-size: var(--reminder-font-sm);
-  font-weight: var(--reminder-font-weight-medium);
-  line-height: var(--reminder-line-height-normal);
+  font-size: var(--crate-font-sm);
+  font-weight: var(--crate-font-weight-medium);
+  line-height: var(--crate-line-height-normal);
 }
 @mixin metadata {
-  font-size: var(--reminder-font-xs);
+  font-size: var(--crate-font-xs);
   color: var(--text-muted);
   line-height: 1.4;
 }

@@ -52,8 +52,8 @@
       flex: 1 1 12em;
       min-width: 0;
       flex-wrap: wrap;
-      font-size: var(--reminder-font-sm);
-      font-weight: var(--reminder-font-weight-medium);
+      font-size: var(--crate-font-sm);
+      font-weight: var(--crate-font-weight-medium);
       color: var(--text-muted);
       display: flex;
       align-items: center;
@@ -61,12 +61,12 @@
 
       .reminders-count-title {
         color: var(--text-normal);
-        font-weight: var(--reminder-font-weight-semibold);
+        font-weight: var(--crate-font-weight-semibold);
       }
 
       .reminders-count-active {
         color: var(--text-normal);
-        font-weight: var(--reminder-font-weight-medium);
+        font-weight: var(--crate-font-weight-medium);
       }
 
     }
@@ -147,7 +147,7 @@
 
     p {
       margin: 0;
-      font-size: var(--reminder-font-sm);
+      font-size: var(--crate-font-sm);
       color: var(--text-muted);
     }
   }
@@ -165,8 +165,8 @@
 
       .reminders-date-group {
         .reminders-date-header {
-          font-size: var(--reminder-font-xs);
-          font-weight: var(--reminder-font-weight-semibold);
+          font-size: var(--crate-font-xs);
+          font-weight: var(--crate-font-weight-semibold);
           text-transform: uppercase;
           letter-spacing: normal;
           color: var(--text-muted);

@@ -21,6 +21,9 @@ export interface PersistedSyncSettings {
 	debounceDelay: number;
 	/** Replicated to other devices through shared settings. */
 	pushEnabled: boolean;
+	/** The encrypted vault this Obsidian vault last synced with. Kept when keys are
+	 * removed, so a server reporting no encryption cannot silently receive plaintext. */
+	encryptedVaultId: string | null;
 }
 
 export interface SyncSettings extends PersistedSyncSettings {
@@ -50,6 +53,7 @@ export const DEFAULT_SYNC_SETTINGS: PersistedSyncSettings = {
 	syncHistory: [],
 	pushEnabled: false,
 	debounceDelay: 5,
+	encryptedVaultId: null,
 };
 
 /** Every device also excludes its own workspace files, whatever its shared patterns say. */
@@ -83,6 +87,7 @@ export function normalizePersistedSyncSettings(
 		syncHistory: normalizeSyncHistory(value?.syncHistory),
 		pushEnabled: normalizeBoolean(value?.pushEnabled, defaults.pushEnabled),
 		debounceDelay: Math.min(normalizeNonNegativeInteger(value?.debounceDelay, defaults.debounceDelay), MAX_TIMER_SECONDS),
+		encryptedVaultId: normalizeNullableString(value?.encryptedVaultId),
 	};
 }
 

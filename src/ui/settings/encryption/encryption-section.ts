@@ -140,6 +140,7 @@ class EncryptionModal extends SharedModal {
 		if (state?.mode === 'resetting') { this.clearContent(); this.bodyEl.createEl('p', { text: 'An encryption reset is in progress. Resume it on the Obsidian device that started it.' }); return; }
 		if (state && !keys) { this.clearContent(); this.status(); this.recover(state); return; }
 		if (state?.mode === 'active' && keys) { this.clearContent(); this.ready(keys, state); return; }
+		if (!state && !keys && this.plugin.settings.encryptedVaultId) { this.clearContent(); this.downgraded(); return; }
 		// Only an unencrypted server reaches setup: an encrypted one is unlocked or managed above.
 		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin, keys);
 		if (!recovery) { this.clearContent(); this.bodyEl.createEl('p', { text: 'Restore the recovery key from your saved copy before enabling encryption.' }); return; }
@@ -170,6 +171,29 @@ class EncryptionModal extends SharedModal {
 				await encryptVault(this.plugin, bundle, verifiedRecovery, progress, () => this.assertCurrentConnection());
 			} finally { this.running = false; this.onChanged(); }
 		} });
+	}
+	/** This vault synced encrypted before, but the server now reports no encryption. */
+	private downgraded(): void {
+		this.bodyEl.createEl('p', { text: 'This vault was synced with end-to-end encryption, but this server reports that encryption is off. Crate does not send notes to it until you choose.' });
+		this.bodyEl.createEl('p', { text: 'If you turned encryption off or moved to a new server on purpose, sync without encryption. Otherwise, check the server address.' });
+		const status = this.bodyEl.createEl('p', { attr: { role: 'status' } });
+		createModalActions(this.bodyEl).addButton(button => button.setButtonText('Sync without encryption').setDestructive().onClick(async () => {
+			const confirmed = await openConfirmationModal(this.app, {
+				title: 'Sync without encryption?',
+				message: 'Crate will send this vault’s notes to this server as readable text.',
+				confirmText: 'Sync without encryption',
+				warning: true,
+			});
+			if (!confirmed) return;
+			button.setDisabled(true);
+			try {
+				this.assertCurrentConnection();
+				await this.plugin.writeSettings({ encryptedVaultId: null }, () => this.assertCurrentConnection());
+				this.plugin.syncRuntime.getApiClient()?.refusePlaintext(false);
+				this.close();
+				this.onChanged();
+			} catch (error) { status.setText(errorMessage(error)); button.setDisabled(false); }
+		}));
 	}
 	/** An encrypted server that this device cannot unlock yet. */
 	private status(): void {

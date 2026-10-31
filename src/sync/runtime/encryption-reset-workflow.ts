@@ -97,9 +97,13 @@ export async function runEncryptionReset(
 			secretStorage.set(SECRET_KEYS.AUTH_TOKEN, reset.replacementToken);
 			if (secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== reset.replacementToken) throw new Error('Could not save the new device credential');
 			if (encrypting) savedKeys();
-			else for (const key of [SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]) {
-				secretStorage.delete(key);
-				if (secretStorage.has(key)) throw new Error('Could not clear this device’s previous encryption keys');
+			else {
+				for (const key of [SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]) {
+					secretStorage.delete(key);
+					if (secretStorage.has(key)) throw new Error('Could not clear this device’s previous encryption keys');
+				}
+				// Turning encryption off here is the user's choice to sync this vault without it.
+				settings.encryptedVaultId = null;
 			}
 			resetStoredSyncState(settings);
 			await persistSettings();

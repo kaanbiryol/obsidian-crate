@@ -2,18 +2,18 @@
 @mixin styles {
   @media (max-width: 759px) {
     .modal-card.pwa-reminder-editor {
-      --reminder-font-base: 16px;
-      --reminder-font-sm: 15px;
-      --reminder-font-xs: 14px;
-      --reminder-font-xxs: 13px;
+      --crate-font-base: 16px;
+      --crate-font-sm: 15px;
+      --crate-font-xs: 14px;
+      --crate-font-xxs: 13px;
     }
 
     .pwa-reminders-view.is-primary, .pwa-opening-screen, &.pwa-reading-root, &.reading-gallery {
-      --reminder-font-base: 16px;
-      --reminder-font-sm: 15px;
-      --reminder-font-xs: 14px;
-      --reminder-font-xxs: 13px;
-      --reminder-font-title: 24px;
+      --crate-font-base: 16px;
+      --crate-font-sm: 15px;
+      --crate-font-xs: 14px;
+      --crate-font-xxs: 13px;
+      --crate-font-title: 24px;
       --crate-radius-card: 16px;
       --checkbox-size: 16px;
       --icon-l: 24px;

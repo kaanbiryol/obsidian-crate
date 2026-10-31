@@ -9,9 +9,9 @@
   // Let Obsidian own the surrounding surface.
   background-color: transparent;
   color: var(--text-normal);
-  font-family: var(--reminder-font-ui);
-  font-size: var(--reminder-font-base);
-  line-height: var(--reminder-line-height-normal);
+  font-family: var(--crate-font-ui);
+  font-size: var(--crate-font-base);
+  line-height: var(--crate-line-height-normal);
 
   &,
   &::before,
