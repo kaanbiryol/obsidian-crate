@@ -4,7 +4,20 @@ import { DEFAULT_SETTINGS } from './settings';
 import { SyncApiClient } from '../sync/worker-api/client';
 import { configureCloudflareAuthorizedDevice } from './cloudflare-connection';
 
-const remote = { ignorePatterns: ['remote-pattern'], syncInterval: 60, pushEnabled: true };
+// An unencrypted server, so a test can send the seeding request through the real client.
+const sent = vi.hoisted(() => [] as Array<{ url: string; method?: string; body?: unknown }>);
+vi.mock('obsidian', async importOriginal => ({
+	...await importOriginal<object>(),
+	requestUrl: async (request: { url: string; method?: string; body?: unknown }) => {
+		sent.push(request);
+		const text = JSON.stringify(request.url.endsWith('/.well-known/crate')
+			? { service: 'crate', serverVersion: 'test', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['e2ee-v1', 'settings-v1'] }
+			: request.url.endsWith('/encryption') ? { encryption: null } : { success: true, settingsVersion: 'seeded' });
+		return { status: 200, headers: { 'X-Crate-Encryption-State': 'off' }, text, arrayBuffer: new TextEncoder().encode(text).buffer };
+	},
+}));
+
+const remote ={ ignorePatterns: ['remote-pattern'], syncInterval: 60, pushEnabled: true };
 
 function plugin() {
 	return {
@@ -94,6 +107,19 @@ it('seeds a fresh deployment with this device\'s shared settings after connectin
 	expect(owner.syncRuntime.applyInfrastructureConfig.mock.invocationCallOrder[0]).toBeLessThan(server.createSettings.mock.invocationCallOrder[0]!);
 	expect(owner.syncRuntime.pushSharedSettingsBestEffort).not.toHaveBeenCalled();
 	expect(owner.writeSettings).not.toHaveBeenCalled();
+});
+
+it.each([[null, true], ['previous-vault', false]] as const)('seeds an unencrypted server in plaintext only when this vault never synced encrypted (%s)', async (encryptedVaultId, seeded) => {
+	vi.stubGlobal('window', { setTimeout, clearTimeout });
+	try {
+		sent.length = 0;
+		const owner = plugin();
+		Object.assign(owner.settings, { encryptedVaultId, ignorePatterns: ['Private project/**'] });
+		server.sharedSettings.mockResolvedValue({ settings: null, settingsVersion: null });
+		server.createSettings.mockRestore();
+		await expect(configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token')).resolves.toEqual({ success: true });
+		expect(sent.some(request => request.method === 'PUT' && String(request.body).includes('Private project/**'))).toBe(seeded);
+	} finally { vi.unstubAllGlobals(); }
 });
 
 it('keeps the connection when seeding loses to another device', async () => {

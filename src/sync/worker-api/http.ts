@@ -182,6 +182,7 @@ export class WorkerApiHttpClient {
 	private plaintextRefused = false;
 
 	refusePlaintext(refused: boolean): void { this.plaintextRefused = refused; }
+	refusesPlaintext(): boolean { return this.plaintextRefused; }
 
 	private forgetEncryptionOff(): void {
 		this.encryptionOffAt = null;

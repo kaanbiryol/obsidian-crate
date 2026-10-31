@@ -24,6 +24,8 @@ export async function configureCloudflareAuthorizedDevice(
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
 	const api = new SyncApiClient(workerUrl, authToken);
+	// A vault that last synced encrypted seeds no plaintext settings until the downgrade is confirmed.
+	api.refusePlaintext(Boolean(plugin.settings.encryptedVaultId));
 	// Undefined when unknown: the read failed, or was skipped for an encrypted vault.
 	let shared: SharedSettings | null | undefined;
 	try {

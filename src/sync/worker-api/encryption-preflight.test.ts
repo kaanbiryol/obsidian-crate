@@ -28,6 +28,18 @@ it.each(['/sync/upload?path=private.md', '/sync/batch-upload', '/settings', '/re
 	expect(transport.mock.calls.every(([request]) => request.body !== 'New private content')).toBe(true);
 });
 
+it('does not send a private URL to an unencrypted server while this vault last synced encrypted', async () => {
+	const transport = vi.fn<ApiHttpTransport>(async request => request.url.endsWith('/encryption')
+		? { ...response({ encryption: null }), headers: { 'X-Crate-Encryption-State': 'off' } } : response({ title: 'Private page' }));
+	const api = new SyncApiClient('https://crate.test', 'token', transport);
+	api.refusePlaintext(true);
+	await expect(api.fetchPageTitle('https://private.example/secret')).resolves.toBeNull();
+	expect(transport.mock.calls.some(([request]) => request.url.endsWith('/links/title'))).toBe(false);
+	// Confirming the downgrade lets title lookups resume.
+	api.refusePlaintext(false);
+	await expect(api.fetchPageTitle('https://private.example/secret')).resolves.toBe('Private page');
+});
+
 it('does not send a private URL while an encrypted device is waiting for key recovery', async () => {
 	const bundle = await createVaultKeyBundle();
 	const encryption = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
