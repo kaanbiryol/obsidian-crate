@@ -161,3 +161,19 @@ it.each([['an unencrypted', ['e2ee-v1']], ['an encryption-incapable', []]])('ref
 	await http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Private' });
 	expect(transport.mock.calls.some(([request]) => request.body === 'Private')).toBe(true);
 });
+
+it.each([['/sync/metadata', 'POST'], ['/sync/batch-download', 'POST'], ['/sync/versions?path=private.md', 'GET']])('does not send paths in %s to an unencrypted server while this vault last synced encrypted', async (path, method) => {
+	const off = { 'X-Crate-Encryption-State': 'off' };
+	const transport = vi.fn<ApiHttpTransport>(async request => {
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
+		if (request.url.endsWith('/encryption')) return { ...response({ encryption: null }), headers: off };
+		return { ...response({ files: {} }), headers: off };
+	});
+	const http = new WorkerApiHttpClient('https://crate.test', 'token', transport);
+	http.refusePlaintext(true);
+	const body = method === 'POST' ? JSON.stringify({ paths: ['private.md'] }) : undefined;
+	await expect(http.requestJson(path, { method, ...(body ? { body } : {}) })).rejects.toMatchObject({ status: 428, code: 'encryption_downgrade' });
+	expect(transport.mock.calls.map(([request]) => new URL(request.url).pathname)).toEqual(['/.well-known/crate', '/encryption']);
+	// Reads without paths are unchanged.
+	await http.requestJson('/sync/changes?since=0');
+});
