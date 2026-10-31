@@ -325,10 +325,12 @@ it('sends an unupgradable server to deletion instead of suggesting a retry', asy
 	const plugin = createPlugin(true);
 	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new UnupgradableServerError());
 	await startCloudflareDeployment(plugin as never, 'update');
-	expect(progress.fail).toHaveBeenCalledWith('This server can’t be updated',
+	const [title, message, steps, options] = progress.fail.mock.lastCall as [string, string, string[], { action: { label: string; onClick: unknown } }];
+	expect([title, message, steps]).toEqual(['This server can’t be updated',
 		'This server was created by an earlier beta and its database cannot be upgraded.',
-		['Open Crate settings → Advanced server actions and select Delete server and all data, then connect again to create a new server. Your local vault files are kept.'],
-		{ action: { label: 'Open settings', onClick: expect.any(Function) } });
+		['Open Crate settings → Advanced server actions and select Delete server and all data, then connect again to create a new server. Your local vault files are kept.']]);
+	expect(options.action.label).toBe('Open settings');
+	expect(options.action.onClick).toBeTypeOf('function');
 });
 
 it.each(['update', 'delete'] as const)('shows recovery guidance for an uncertain %s', async intent => {
