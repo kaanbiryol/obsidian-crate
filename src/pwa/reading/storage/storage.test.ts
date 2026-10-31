@@ -125,15 +125,15 @@ it('rejects malformed cache envelopes and drafts without overwriting either', as
 
 it('reuses the encrypted Reading index only for the same encryption identity and valid entries', async () => {
 	const item = parseReadingNote(createReadingNote({ id: '00000000-0000-4000-8000-000000000001', url: 'https://example.com/a', title: 'A', savedAt: '2026-10-01T12:00:00Z' }))!;
-	const entry = { file: { path: 'Reading/A.md', hash: 'hash', size: 10, revision: 'r1' }, item: { ...item, path: 'Reading/A.md' } };
+	// The plaintext hash lets a sealed note at a known server path be compared with the held one.
+	const entry = { file: { path: 'Reading/A.md', hash: 'hash', size: 10, revision: 'r1' }, item: { ...item, path: 'Reading/A.md' }, hash: 'a'.repeat(64) };
 	await writeEncryptedReadingIndex(session, 'identity-a', [entry]);
 	await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toEqual([entry]);
 	await expect(readEncryptedReadingIndex(session, 'identity-b', 'Reading')).resolves.toBeUndefined();
-	// The plaintext hash lets a sealed note at a known server path be compared with the held one.
-	await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, hash: 'a'.repeat(64) }]);
-	await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toEqual([{ ...entry, hash: 'a'.repeat(64) }]);
-	await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, hash: 'hash' }]);
-	await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
+	for (const hash of ['hash', undefined]) {
+		await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, hash } as never]);
+		await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
+	}
 	// Entries list server paths, but every note must belong to the plaintext Reading folder.
 	await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, item: { ...entry.item, path: 'Elsewhere/Other.md' } }]);
 	await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();

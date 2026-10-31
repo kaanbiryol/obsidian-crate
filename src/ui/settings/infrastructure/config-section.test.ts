@@ -296,20 +296,6 @@ it('keeps the installed version in the server section without duplicating the up
 });
 
 
-it('lets an older server save its vault name through an explicit update', async () => {
-	const { renderServerSection } = await loadConfigSectionModule();
-	const plugin = { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
-		settings: { workerUrl: 'https://crate.example', cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } },
-		syncRuntime: { getCachedVersionInfo: () => undefined, getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => true },
-	};
-	renderServerSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
-	const setting = getSettingByName('Vault name');
-	expect(setting.buttons[0]?.buttonEl.textContent).toBe('Save vault name');
-	setting.buttons[0]?.click();
-	expect(startCloudflareDeployment).toHaveBeenCalledWith(plugin, 'update');
-});
-
-
 it.each([false, true])('disconnects with optional forgetting (%s)', async forget => {
 	const { renderAccountSection } = await loadConfigSectionModule();
 	const saved = { accountId: 'account', d1DatabaseId: 'database' };

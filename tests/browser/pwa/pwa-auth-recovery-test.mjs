@@ -45,7 +45,7 @@ async function harness(browser) {
     if (!sessions.has(token)) return route.fulfill({ status: 401, body: 'Session expired' });
     if (sessions.get(token) !== folder) return route.fulfill({ status: 403, body: 'Wrong reminders folder' });
     if (request.method() === 'GET' && folder !== 'Reminders') {
-      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ reminders: [], projects: [] }) });
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ reminders: [], projects: [], issues: [] }) });
     }
     const headers = { ...request.headers(), authorization: `Bearer ${previewAuthToken}` };
     if (request.method() !== 'GET') {

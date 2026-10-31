@@ -10,8 +10,9 @@ const embeddedArtifact = {
 	development: undefined as DevelopmentBuild | undefined,
 };
 
-async function loadUpdateNotice() {
+async function loadUpdateNotice(isMobile = false) {
 	vi.doMock('obsidian', () => ({
+		Platform: { isMobile },
 		Notice: class Notice {
 			constructor(message: FakeDocumentFragment) {
 				notices.push(message);
@@ -109,6 +110,12 @@ describe('showCloudflareServerUpdateNotice', () => {
 
 		notices[0]?.links[0]?.click();
 		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(1);
+	});
+
+	it('points the update to the desktop on mobile', async () => {
+		const { showCloudflareServerUpdateNotice } = await loadUpdateNotice(true);
+		showCloudflareServerUpdateNotice(createPlugin() as never);
+		expect(notices).toEqual(['A Crate server update is available. Open Crate settings in Obsidian on your desktop to update it.']);
 	});
 
 	it('stays quiet when the deployed artifact is current', async () => {

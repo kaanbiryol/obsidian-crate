@@ -244,21 +244,6 @@ describe('terminal server deletion', () => {
 		await expect(deleteCrateServer(h.input)).rejects.toThrow('shares'); expect(h.api.deleteWorker).not.toHaveBeenCalled();
 	});
 
-	it('resumes a legacy delete-only retirement checkpoint', async () => {
-		const h = harness();
-		h.metadata.reset = { id: 'e'.repeat(32), phase: 'clearing', deleteOnly: true, databaseId: h.metadata.d1DatabaseId!, bucketCreatedAt: h.remote.bucketCreatedAt, namespaceId: 'b'.repeat(32) };
-		h.worker.annotations = { 'workers/message': `Crate reset ${h.metadata.reset.id}` };
-		h.hold({ kind: 'delete', resetId: h.metadata.reset.id, step: 'deleteR2Objects', stepState: 'started', recoveryProtocol: 1 });
-		await deleteCrateServer(h.input); expect(h.metadata.deletion?.id).toBe(h.metadata.reset.id);
-	});
-
-	it('can terminally delete a settled interrupted reset without rebuilding it', async () => {
-		const h = harness();
-		h.metadata.reset = { id: 'e'.repeat(32), phase: 'clearing', databaseId: h.metadata.d1DatabaseId!, bucketCreatedAt: h.remote.bucketCreatedAt, namespaceId: 'b'.repeat(32) };
-		h.hold({ kind: 'reset', resetId: h.metadata.reset.id, step: 'future-step', stepState: 'confirmed' });
-		await deleteCrateServer(h.input); expect(h.metadata.deletion?.phase).toBe('complete');
-	});
-
 	it('can retry after the database was deleted but progress could not be saved', async () => {
 		const h = harness(); h.input.persist.mockImplementationOnce(async () => {});
 		const persist = h.input.persist.getMockImplementation()!;

@@ -18,7 +18,7 @@ export function isSyncDate(value: unknown): value is string {
 	return month! >= 1 && month! <= 12 && day! >= 1 && day! <= new Date(Date.UTC(year!, month, 0)).getUTCDate();
 }
 
-/** Revisions are opaque object identities. Legacy live objects used their path. */
+/** Revisions are opaque object identities. */
 export function isSyncRevision(value: unknown): value is string {
 	return typeof value === 'string' && value.length > 0 && value.length <= 1024
 		&& !/[\u0000-\u001f\u007f\\]/.test(value) && value.split('/').every(part => part && part !== '.' && part !== '..');

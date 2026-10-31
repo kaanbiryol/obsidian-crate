@@ -4,7 +4,6 @@ import type { SyncHistoryEntry } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, type FileCardType } from './rendering';
 import { historyEntryKey } from './history-point';
 import { historyTime } from './history';
-import { getSyncIssues } from '../../sync/issues';
 import { renderSyncIssues, type SyncIssueRenderOptions } from './sync-issues';
 
 export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[], openFileHistory?: (path: string) => void, issueOptions: SyncIssueRenderOptions = {}): void {
@@ -56,7 +55,7 @@ function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expa
 
 function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry, openFileHistory?: (path: string) => void, issueOptions: SyncIssueRenderOptions = {}): void {
 	const filesEl = container.createDiv({ cls: 'crate-history-files' });
-	const issues = getSyncIssues(entry);
+	const issues = entry.issues ?? [];
 	if (issues.length) renderSyncIssues(filesEl, issues, issueOptions);
 	if (entry.errorCount > (entry.errors?.length ?? 0)) {
 		filesEl.createDiv({ text: entry.errors?.length

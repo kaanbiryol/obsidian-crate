@@ -59,7 +59,7 @@ describe('activity history', () => {
 		});
 
 		it('shows errors even when no files transferred', () => {
-				const container = render({ success: false, uploaded: 0, uploadedPaths: [], errorCount: 1, errors: ['Upload failed: Notes.md'] });
+				const container = render({ success: false, uploaded: 0, uploadedPaths: [], errorCount: 1, errors: ['Upload failed: Notes.md'], issues: [{ message: 'Upload failed: Notes.md' }] });
 				expect(find(container, 'crate-history-details')).toBeDefined();
 				expect(container.collectText()).toContain('Upload failed: Notes.md');
 		});
@@ -119,7 +119,7 @@ it('keeps single-file successes expandable with a summary and file row', () => {
 		expect(find(container, 'crate-history-files')).toBeDefined();
 });
 it('keeps single-file failures expandable', () => {
-		const container = render({ success: false, errorCount: 1, errors: ['Failed to finish'] });
+		const container = render({ success: false, errorCount: 1, errors: ['Failed to finish'], issues: [{ message: 'Failed to finish' }] });
 		expect(find(container, 'crate-history-details')).toBeDefined();
 		expect(container.collectText()).toContain('Failed to finish');
 });

@@ -17,10 +17,10 @@ interface HistoryRestoreContext {
 
 export async function loadRuntimeHistoryComparison(engine: Pick<SyncEngine, 'loadHistoryComparison'>, verify: () => void,
 		entry: SyncHistoryEntry) {
-		const id = entry.sharedCheckpoint ?? entry.historyCheckpoint;
+		const id = entry.sharedCheckpoint;
 		if (!id) throw new Error('This sync has no saved state to preview.');
 		verify();
-		const comparison = await engine.loadHistoryComparison(id, !!entry.sharedCheckpoint);
+		const comparison = await engine.loadHistoryComparison(id);
 		verify();
 		return { ...comparison, preview: async (path: string) => {
 				verify();
@@ -33,9 +33,10 @@ export async function loadRuntimeHistoryComparison(engine: Pick<SyncEngine, 'loa
 /** Preserve pause/persist/apply/sync/verify/resume ordering as one workflow. */
 export async function createRuntimeHistoryRestore({ engine, settings, verify, clearForegroundSyncTimer, persistSettings, runSyncOperation }: HistoryRestoreContext,
 		entry: SyncHistoryEntry) {
-		if (!entry.sharedCheckpoint && (!entry.historyCheckpoint || !settings.syncHistory.some(saved => saved.timestamp === entry.timestamp && saved.type === entry.type && saved.historyCheckpoint === entry.historyCheckpoint))) throw new Error('This history entry has no complete vault checkpoint.');
+		const id = entry.sharedCheckpoint;
+		if (!id) throw new Error('This history entry has no complete vault checkpoint.');
 		let automaticSync = false;
-		const review = await engine.createHistoryRestore(entry.sharedCheckpoint ?? entry.historyCheckpoint!, async () => {
+		const review = await engine.createHistoryRestore(id, async () => {
 				verify();
 				automaticSync = settings.automaticSync;
 				// Persist the pause before changing files, including across a crash.
@@ -44,7 +45,7 @@ export async function createRuntimeHistoryRestore({ engine, settings, verify, cl
 				engine.updateSettings(settings);
 				await persistSettings({ automaticSync: false });
 				verify();
-		}, Boolean(entry.sharedCheckpoint));
+		});
 		verify();
 		return { items: review.items, unchangedCount: review.unchangedCount, preview: async (path: string) => {
 				verify();

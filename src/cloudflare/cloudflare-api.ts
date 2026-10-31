@@ -1,4 +1,4 @@
-import { buildWorkerMultipartBody, buildResetWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './deployment/worker-upload-payload';
+import { buildWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './deployment/worker-upload-payload';
 import { CloudflareApiError } from './cloudflare-api-error';
 import { BACKUPS_PREFIX, UPGRADE_BACKUP_OBJECT } from '../protocol/storage-keys';
 export { CloudflareApiError } from './cloudflare-api-error';
@@ -315,13 +315,6 @@ export class CloudflareApiClient {
 		}
 	}
 
-	async retireCrateWorker(accountId: string, workerName: string, resetId: string, databaseId: string, bucketName: string, alreadyRetired = false, retireCloudSafety = false): Promise<void> {
-		const multipart = buildResetWorkerMultipartBody(resetId, databaseId, bucketName, alreadyRetired, retireCloudSafety);
-		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
-			method: 'PUT', headers: { 'Content-Type': multipart.contentType }, body: multipart.body,
-		}, false);
-	}
-
 	async uploadServerDeletionWorker(accountId: string, workerName: string, deletionId: string, bucketName: string, tokenHash: string, uploadTag: string): Promise<void> {
 		const multipart = buildServerDeletionWorkerMultipartBody(deletionId, bucketName, tokenHash, uploadTag);
 		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
@@ -356,7 +349,6 @@ export class CloudflareApiClient {
 		artifacts: CloudflareDeploymentArtifacts;
 		d1DatabaseId: string;
 		r2BucketName: string;
-		retireCloudSafety?: boolean;
 	}): Promise<void> {
 		const multipart = buildWorkerMultipartBody(input);
 		await this.request(`/accounts/${input.accountId}/workers/scripts/${encodeURIComponent(input.workerName)}`, {

@@ -26,7 +26,6 @@ function findBinding(
 /** `workers/message` annotations identifying what Crate uploaded. Readers compare
  * against these exactly, so the format lives in one place. */
 export const releaseWorkerMessage = (version: string, fingerprint: string): string => `Crate ${version} ${fingerprint}`;
-export const resetWorkerMessage = (resetId: string): string => `Crate reset ${resetId}`;
 export const deletionWorkerMessage = (deletionId: string): string => `Crate deletion ${deletionId}`;
 
 /** The live Worker's storage, when it binds exactly one database as `DB` and one
@@ -53,11 +52,7 @@ export function deployedArtifact(settings: CloudflareWorkerSettings): {
 				: null,
 		};
 	}
-	const tag = settings.annotations?.['workers/tag']?.trim() ?? '';
-	return {
-		version: tag && tag !== 'crate' ? tag : null,
-		fingerprint: null,
-	};
+	return { version: null, fingerprint: null };
 }
 
 function toDeployment(

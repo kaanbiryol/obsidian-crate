@@ -31,8 +31,8 @@ describe('SyncApiClient', () => {
 	it('accepts sequential namespace replacements in history while validating the final manifest', async () => {
 		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-09-08', revision: 'r1' };
 		const changes = [
-			{ seq: 1, path: 'Projects.md', action: 'delete', hash: '', size: 0, created_at: '2026-09-08' },
-			{ seq: 2, path: 'projects.md/child.md', action: 'put', hash: entry.hash, size: 1, created_at: '2026-09-08' },
+			{ seq: 1, path: 'Projects.md', action: 'delete', hash: '', size: 0, created_at: '2026-09-08', revision: 'd1' },
+			{ seq: 2, path: 'projects.md/child.md', action: 'put', hash: entry.hash, size: 1, created_at: '2026-09-08', revision: 'r2' },
 		];
 		const client = new SyncApiClient('https://worker.example', 'token', mockTransport(
 			Response.json({ changes, lastSeq: 2, hasMore: false, cursorExpired: false }),
@@ -170,8 +170,8 @@ describe('SyncApiClient', () => {
 			})),
 			new Response(JSON.stringify({
 				changes: [
-					{ seq: 4, path: 'notes/a.md', action: 'delete', hash: '', size: 0, created_at: '2026-01-04' },
-					{ seq: 5, path: 'notes/c.md', action: 'put', hash: 'c'.repeat(64), size: 3, created_at: '2026-01-05' },
+					{ seq: 4, path: 'notes/a.md', action: 'delete', hash: '', size: 0, created_at: '2026-01-04', revision: 'd4' },
+					{ seq: 5, path: 'notes/c.md', action: 'put', hash: 'c'.repeat(64), size: 3, created_at: '2026-01-05', revision: 'r5' },
 				],
 				lastSeq: 5,
 				hasMore: false, cursorExpired: false,
@@ -183,7 +183,7 @@ describe('SyncApiClient', () => {
 			version: 1,
 			files: {
 				'notes/b.md': { hash: 'b'.repeat(64), size: 2, modified: '2026-01-02', revision: 'r1' },
-				'notes/c.md': { hash: 'c'.repeat(64), size: 3, modified: '2026-01-05' },
+				'notes/c.md': { hash: 'c'.repeat(64), size: 3, modified: '2026-01-05', revision: 'r5' },
 			},
 			lastSeq: 5,
 		});

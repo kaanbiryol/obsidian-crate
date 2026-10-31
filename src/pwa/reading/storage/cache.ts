@@ -45,7 +45,7 @@ function isIndexEntry(folder: string) {
 		const { path, hash, size, revision } = entry.file;
 		return typeof path === 'string' && typeof hash === 'string' && typeof revision === 'string'
 			&& typeof size === 'number' && Number.isSafeInteger(size) && size >= 0
-			&& (entry.hash === undefined || isSha256Hex(entry.hash)) && isReadingItem(entry.item, folder);
+			&& isSha256Hex(entry.hash) && isReadingItem(entry.item, folder);
 	};
 }
 

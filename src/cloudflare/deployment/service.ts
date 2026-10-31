@@ -1,9 +1,7 @@
 import type { BackupChoice } from '../restore/archive';
 import { runRestoreWorkflow } from '../restore/workflow';
-import { normalizeVaultName } from '../vault-name';
 import { resumeInterruptedUpdate, type DeploymentRecoveryResult } from './update-recovery';
 import { deleteCrateServer } from '../server-reset/delete';
-import { resetCrateServer } from '../server-reset/reset';
 import type { CrateSettings } from '../../plugin/settings';
 import type { CloudflareDeploymentMetadata, CloudflareDeploymentResult, DeploymentIntent, DeploymentRequest, SavedDeploymentIntent } from './types';
 import { CloudflareApiClient } from '../cloudflare-api';
@@ -14,6 +12,7 @@ import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type Cloudfla
 import { CloudflareOAuthSession } from './oauth-session';
 import { provisionCloudflareDeployment } from './provisioner';
 import { workersDevOrigin } from './worker-origin';
+import { changesServer, DesktopOnlyServerChangeError } from './server-changes';
 import { stableJson } from '../../platform/stable-json';
 import { createCloudflareDeploymentMetadata, resolveDeploymentTarget, type SelectDeployment } from './target';
 import {
@@ -31,17 +30,13 @@ export type WithCloudflareAuthorization = <T>(operation: (tokens: CloudflareOAut
 
 type DeploymentAccount = Awaited<ReturnType<typeof resolveDeploymentTarget>>['account'];
 
-/** The saved server operation that must finish before `intent` can run. A deletion,
- * including a delete-only reset saved by an earlier release, admits only deletion.
- * A reset admits resuming it, or deleting the server instead. */
-export function blockingServerOperation(saved: CloudflareDeploymentMetadata | null | undefined, intent: DeploymentIntent): 'deletion' | 'reset' | null {
-	if ((saved?.deletion || saved?.reset?.deleteOnly) && intent !== 'delete') return 'deletion';
-	if (saved?.reset && intent !== 'reset' && intent !== 'delete') return 'reset';
-	return null;
+/** The saved server operation that must finish before `intent` can run. A deletion admits only deletion. */
+export function blockingServerOperation(saved: CloudflareDeploymentMetadata | null | undefined, intent: DeploymentIntent): 'deletion' | null {
+	return saved?.deletion && intent !== 'delete' ? 'deletion' : null;
 }
 
-const resumeBeforeStarting = { deletion: 'Resume server deletion before connecting or updating.', reset: 'Resume the server reset before connecting or updating.' };
-const resumeBeforeContinuing = { deletion: 'Resume server deletion before continuing.', reset: 'Resume the server reset or deletion before continuing.' };
+const resumeBeforeStarting = { deletion: 'Resume server deletion before connecting or updating.' };
+const resumeBeforeContinuing = { deletion: 'Resume server deletion before continuing.' };
 
 export interface CloudflareDeploymentServiceOptions {
 	clientId: string;
@@ -53,6 +48,8 @@ export interface CloudflareDeploymentServiceOptions {
 	onAuthorized?: (accountId: string, tokens: CloudflareOAuthTokens) => void;
 	beforeServerReset?: () => Promise<void>;
 	beforeServerSwitch?: () => Promise<void>;
+	/** False on mobile, where devices only connect to existing servers. */
+	serverChangesAllowed?: boolean;
 	now?: () => number;
 }
 
@@ -77,10 +74,11 @@ export class CloudflareDeploymentService {
 
 	async startDeployment(intent: DeploymentIntent = 'connect'): Promise<void> {
 		this.assertIdle();
+		if (changesServer(intent)) this.assertServerChangeAllowed();
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
 		const blocking = blockingServerOperation(existingMetadata, intent);
 		if (blocking) throw new Error(resumeBeforeStarting[blocking]);
-		if ((intent === 'reset' || intent === 'delete') && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) {
+		if (intent === 'delete' && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) {
 			throw new Error('Connect to a Crate server before resetting its remote data.');
 		}
 		if (intent === 'reconnect' && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) throw new Error('Connect a Cloudflare server first.');
@@ -142,6 +140,8 @@ export class CloudflareDeploymentService {
 				request, api, getVaultName: this.options.getVaultName, selectDeployment, onProgress,
 				whileActive: operation => this.whileActive(operation),
 			}));
+			// Connecting creates a server when none was reused.
+			if (changesServer(request.intent) || !reuseExisting) this.assertServerChangeAllowed();
 			checkTarget?.();
 			onProgress?.('Preparing the selected server…');
 			await this.prepareTarget(request, metadata, account);
@@ -158,13 +158,13 @@ export class CloudflareDeploymentService {
 		}
 	}
 
-	/** Refuse a request whose saved server changed or gained a pending reset or deletion during authorization. */
+	/** Refuse a request whose saved server changed or gained a pending deletion during authorization. */
 	private assertRequestCurrent(request: DeploymentRequest): void {
 		const saved = this.options.settingsOwner.settings.cloudflareDeployment;
 		const blocking = blockingServerOperation(saved, request.intent);
 		if (blocking) throw new Error(resumeBeforeStarting[blocking]);
-		if ((request.intent === 'reset' || request.intent === 'delete') && stableJson(request.metadata) !== stableJson(saved)) {
-			throw new Error('Server settings changed during authorization. Confirm the reset again.');
+		if (request.intent === 'delete' && stableJson(request.metadata) !== stableJson(saved)) {
+			throw new Error('Server settings changed during authorization. Confirm the deletion again.');
 		}
 		if ((request.intent === 'switch' || request.intent === 'create') && request.originalMetadata !== stableJson(saved)) throw new Error('Server settings changed during authorization. Start again.');
 		if (request.intent === 'reconnect') this.checkSavedTarget(request.metadata, request.intent);
@@ -177,9 +177,6 @@ export class CloudflareDeploymentService {
 		if (changingServer || request.intent === 'switch' || request.intent === 'create') {
 			if (!this.options.beforeServerSwitch) throw new Error('Switching servers requires sync shutdown.');
 			await this.whileActive(this.options.beforeServerSwitch);
-		}
-		if (!metadata.vaultName && (request.intent === 'update' || request.intent === 'reset')) {
-			metadata.vaultName = normalizeVaultName(this.options.getVaultName?.());
 		}
 		metadata.accountId = account.id;
 		metadata.accountName = account.name;
@@ -197,7 +194,7 @@ export class CloudflareDeploymentService {
 		return { status: 'deleted', accountName: account.name };
 	}
 
-	/** Reset if requested, publish or reuse the Worker, then register this device. */
+	/** Publish or reuse the Worker, then register this device. */
 	private async deployServer(
 		request: DeploymentRequest,
 		api: CloudflareApiClient,
@@ -207,15 +204,6 @@ export class CloudflareDeploymentService {
 		device?: CloudflareAuthorizedDevice,
 		onProgress?: (message: string) => void,
 	): Promise<CloudflareDeploymentResult> {
-		const artifacts = request.intent === 'reset' ? await this.whileActive(this.options.loadArtifacts) : null;
-		if (request.intent === 'reset') {
-			if (!device || !artifacts || !this.options.beforeServerReset) throw new Error('Reset requires a new device credential and sync shutdown.');
-			await this.whileActive(() => resetCrateServer({
-				api, accountId: account.id, metadata, version: artifacts.version,
-				beforeDelete: () => this.whileActive(this.options.beforeServerReset!), onProgress,
-				persist: () => this.persistMetadata(metadata),
-			}));
-		}
 		let workerUrl: string;
 		if (reuseExisting) {
 			// Registering a replica must never replace shared Worker/PWA code.
@@ -225,7 +213,7 @@ export class CloudflareDeploymentService {
 			await this.persistMetadata(metadata);
 			workerUrl = workersDevOrigin(metadata.workerName, subdomain);
 		} else {
-			const deploymentArtifacts = artifacts ?? await this.whileActive(this.options.loadArtifacts);
+			const deploymentArtifacts = await this.whileActive(this.options.loadArtifacts);
 			workerUrl = await this.whileActive(() => provisionCloudflareDeployment({
 				api,
 				accountId: account.id,
@@ -245,10 +233,6 @@ export class CloudflareDeploymentService {
 				databaseId,
 				device,
 			}));
-		}
-		if (metadata.reset) {
-			delete metadata.reset;
-			await this.persistMetadata(metadata);
 		}
 		return { status: 'deployed', workerUrl, accountName: account.name };
 	}
@@ -272,10 +256,11 @@ export class CloudflareDeploymentService {
 		onProgress?: (message: string) => void,
 	): Promise<CloudflareDeploymentResult> {
 		this.assertIdle('A Cloudflare operation is already in progress.');
+		if (changesServer(intent)) this.assertServerChangeAllowed();
 		const metadata = this.options.settingsOwner.settings.cloudflareDeployment;
 		if (!metadata?.accountId) throw new Error('Connect a Cloudflare server first.');
 		this.checkSavedTarget(metadata, intent);
-		if ((intent === 'reset' || intent === 'delete') && !metadata.d1DatabaseId) throw new Error('Connect a Cloudflare server first.');
+		if (intent === 'delete' && !metadata.d1DatabaseId) throw new Error('Connect a Cloudflare server first.');
 		const request: DeploymentRequest = {
 			metadata: structuredClone(metadata), intent, discoverExisting: false,
 			originalMetadata: stableJson(metadata),
@@ -295,8 +280,9 @@ export class CloudflareDeploymentService {
 	private async restoreBackups<T>(withAuthorization: WithCloudflareAuthorization,
 		operation: (api: CloudflareApiClient, source: CloudflareDeploymentMetadata) => Promise<T>): Promise<T> {
 		this.assertIdle();
+		this.assertServerChangeAllowed();
 		const source = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
-		if (!source?.accountId || !source.d1DatabaseId || source.reset || source.deletion) throw new Error('Select the source Cloudflare server and finish any deletion first.');
+		if (!source?.accountId || !source.d1DatabaseId || source.deletion) throw new Error('Select the source Cloudflare server and finish any deletion first.');
 		return this.exclusive(() => withAuthorization(tokens => operation(this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(source, 'update')), source)));
 	}
 
@@ -324,6 +310,7 @@ export class CloudflareDeploymentService {
 
 	async recoverUpdate(withAuthorization: WithCloudflareAuthorization): Promise<DeploymentRecoveryResult> {
 		this.assertIdle();
+		this.assertServerChangeAllowed();
 		const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
 		if (!metadata?.accountId) throw new Error('Connect to your Cloudflare account first.');
 		this.checkSavedTarget(metadata, 'update');
@@ -393,6 +380,10 @@ export class CloudflareDeploymentService {
 	}
 
 	/** Run one saved-authorization operation at a time; it replaces any pending browser authorization. */
+	private assertServerChangeAllowed(): void {
+		if (this.options.serverChangesAllowed === false) throw new DesktopOnlyServerChangeError();
+	}
+
 	private async exclusive<T>(operation: () => Promise<T>): Promise<T> {
 		this.cancelPendingDeployment();
 		this.handlingCallback = true;

@@ -15,18 +15,17 @@ const LOG_VERSION = 1;
 
 export type ManifestLogState = Omit<ManifestCheckpoint, 'manifest' | 'generation' | 'authority'>;
 
-/** Persisted checkpoint key -> owner field, for the non-file recovery state. */
+/** Persisted checkpoint key -> owner field, for the non-file recovery state. Upload
+ * diagnostics are left out: records append only their new rows. */
 const STATE_FIELDS = {
 	initialConfigPull: 'initialConfigPull', initialImportToken: 'initialImportToken', restoreIntents: 'restoreIntents',
-	uploadDiagnostics: 'uploadDiagnostics', settledUploads: 'settledUploads', renameDependencies: 'renames',
+	settledUploads: 'settledUploads', renameDependencies: 'renames',
 } as const satisfies Record<string, keyof ManifestLogState>;
 
-/** Each recovery field as JSON text, with `null` for an absent or empty value. Upload
- * diagnostics are left out: records append only their new rows. */
-export type EncodedLogState = Record<Exclude<keyof typeof STATE_FIELDS, 'uploadDiagnostics'>, string>;
+/** Each recovery field as JSON text, with `null` for an absent or empty value. */
+export type EncodedLogState = Record<keyof typeof STATE_FIELDS, string>;
 
-/** Replay appends a record's new diagnostic rows. Older plugins ignore this key and keep
- * the diagnostics of the checkpoint. */
+/** Replay appends a record's new diagnostic rows. */
 const APPENDED_DIAGNOSTICS = 'appendedUploadDiagnostics';
 
 export function encodeLogState(state: ManifestLogState): EncodedLogState {
@@ -47,7 +46,7 @@ export interface ManifestLogRecord {
 	/**
 	 * Recovery fields that differ from `previous` (the state already on disk), so
 	 * large rename or receipt state is not repeated by every file change. `null`
-	 * clears a field. Records from before this format carry the full `state`.
+	 * clears a field.
 	 */
 	state: EncodedLogState;
 	previous: EncodedLogState | undefined;
@@ -106,7 +105,7 @@ function parseLine(line: string): unknown {
 function parseRecord(value: unknown, checkpoint: ManifestCheckpoint): {
 	generation: number; set: Record<string, FileEntry>; deleted: string[]; state: Partial<ManifestLogState>; appendedDiagnostics: UploadDiagnostic[];
 } {
-	const changes = isRecord(value) ? value.changes ?? value.state : undefined;
+	const changes = isRecord(value) ? value.changes : undefined;
 	if (!isRecord(value) || !isSyncSequence(value.generation) || !Array.isArray(value.deleted)
 		|| !value.deleted.every((path: unknown) => typeof path === 'string' && isSyncPath(path)) || !isRecord(changes)) {
 		throw new Error('Invalid manifest change log. Preserve this vault and its metadata before recovering sync.');
@@ -117,9 +116,9 @@ function parseRecord(value: unknown, checkpoint: ManifestCheckpoint): {
 		...present, version: CHECKPOINT_VERSION, files: {}, generation: value.generation,
 		...(checkpoint.authority === undefined ? {} : { authority: checkpoint.authority }),
 	});
-	// A full `state` record replaces every field; a `changes` record only the ones it names.
-	const state = 'changes' in value ? Object.fromEntries((Object.keys(STATE_FIELDS) as Array<keyof typeof STATE_FIELDS>)
-		.filter(key => key in changes).map(key => [STATE_FIELDS[key], parsed[STATE_FIELDS[key]]])) as Partial<ManifestLogState> : parsed;
+	// A record replaces only the fields it names.
+	const state = Object.fromEntries((Object.keys(STATE_FIELDS) as Array<keyof typeof STATE_FIELDS>)
+		.filter(key => key in changes).map(key => [STATE_FIELDS[key], parsed[STATE_FIELDS[key]]])) as Partial<ManifestLogState>;
 	return { generation: value.generation, set: parseSyncFiles(value.set, true), deleted: value.deleted, state,
 		appendedDiagnostics: normalizeUploadDiagnostics(changes[APPENDED_DIAGNOSTICS]) };
 }

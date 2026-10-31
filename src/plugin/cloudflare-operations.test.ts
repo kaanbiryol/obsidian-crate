@@ -58,7 +58,7 @@ function createPlugin(configured = false) {
 		cloudflareDeploymentService: {
 			startDeployment: vi.fn(),
 			deployWithSavedAuthorization: vi.fn(async (..._args: unknown[]): Promise<CloudflareDeploymentResult> => ({ status: 'deployed', workerUrl: 'https://crate.example.workers.dev', accountName: 'Example account' })),
-			pendingIntent: null as null | 'reconnect' | 'switch' | 'create' | 'reset' | 'delete',
+			pendingIntent: null as null | 'reconnect' | 'switch' | 'create' | 'delete',
 			handleCallback: vi.fn(async (): Promise<CloudflareDeploymentResult> => ({
 				status: 'deployed',
 				accountName: 'Example account',
@@ -111,7 +111,7 @@ it('routes deployment sign-in through a tappable link on mobile', async () => {
 		writeSettings: vi.fn(async () => {}),
 	});
 
-	await createCloudflareDeploymentService(plugin as never).startDeployment('create');
+	await createCloudflareDeploymentService(plugin as never).startDeployment('connect');
 
 	expect(openCloudflareAuthorizationModal).toHaveBeenCalledOnce();
 	for (const [app, url, signal] of openCloudflareAuthorizationModal.mock.calls) {
@@ -184,39 +184,6 @@ describe('handleCloudflareOAuthProtocol', () => {
 			'Your Worker and Crate web app are now up to date.',
 		);
 		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'update', undefined, expect.any(AbortSignal));
-	});
-
-	it('registers and reconnects a fresh device after resetting an already connected server', async () => {
-		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
-		const plugin = createPlugin(true);
-		plugin.cloudflareDeploymentService.pendingIntent = 'reset';
-		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
-		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
-		expect(plugin.cloudflareDeploymentService.handleCallback).toHaveBeenCalledWith(expect.anything(), expect.any(Function), expect.objectContaining({ tokenHash: 'device-token-hash' }), expect.any(Function));
-		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(plugin, 'https://crate.example.workers.dev', 'device-token');
-		const report = (plugin.cloudflareDeploymentService.handleCallback.mock.calls[0] as unknown as [unknown, unknown, unknown, (message: string) => void])[3];
-		report('Checking remote files: 10 checked…');
-		expect(progress.setWorking).toHaveBeenCalledWith('Rebuilding Crate server', 'Checking remote files: 10 checked…');
-		expect(progress.succeed).toHaveBeenCalledWith('Crate server rebuilt', expect.stringContaining('Crate: Sync now'));
-		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
-	});
-
-	it.each([false, true])('offers the saved reset recovery action (resumable: %s)', async (resumable) => {
-		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
-		const plugin = createPlugin(true);
-		Object.assign(plugin.settings, { cloudflareDeployment: { reset: resumable ? {} : undefined } });
-		plugin.cloudflareDeploymentService.pendingIntent = 'reset';
-		plugin.cloudflareDeploymentService.handleCallback.mockRejectedValue(new Error('Namespace listing incomplete'));
-		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
-		expect(progress.fail).toHaveBeenCalledWith(
-			'Server rebuild failed',
-			'Crate couldn’t finish rebuilding your Cloudflare server.',
-			[expect.stringContaining('Complete recovery using that version')],
-			expect.objectContaining({ technicalDetails: 'Namespace listing incomplete' }),
-		);
-		const options = progress.fail.mock.calls[0]![3] as { action: { onClick: () => void } };
-		options.action.onClick();
-		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(2);
 	});
 
 	it('uses update-specific recovery copy when an existing server update fails', async () => {
@@ -300,7 +267,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 
 });
 
-it.each(['connect', 'update', 'reset', 'delete'] as const)('uses saved login for %s and connects devices only when needed', async intent => {
+it.each(['connect', 'update', 'delete'] as const)('uses saved login for %s and connects devices only when needed', async intent => {
 	const { startCloudflareDeployment } = await loadPluginIntegration();
 	const plugin = createPlugin(intent === 'update' || intent === 'delete');
 	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockResolvedValue(intent === 'delete' ? { status: 'deleted', accountName: 'Example account' } : { status: 'deployed', workerUrl: 'https://crate.example.workers.dev', accountName: 'Example account' });
@@ -308,7 +275,7 @@ it.each(['connect', 'update', 'reset', 'delete'] as const)('uses saved login for
 	await startCloudflareDeployment(plugin as never, intent === 'connect' ? undefined : intent);
 	expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mock.calls[0]?.[0]).toBe(intent);
 	expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
-	expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledTimes(intent === 'connect' || intent === 'reset' ? 1 : 0);
+	expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledTimes(intent === 'connect' ? 1 : 0);
 	expect(plugin.cloudflareSavedLogin.forget).toHaveBeenCalledTimes(intent === 'delete' ? 1 : 0);
 	expect(progress.succeed).toHaveBeenCalledOnce();
 });
@@ -322,7 +289,7 @@ it('repairs an unconfigured device with saved authorization and then connects it
 	expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledOnce();
 });
 
-it.each(['reset', 'delete'] as const)('falls back to the same %s intent only for invalid authorization', async intent => {
+it.each(['delete'] as const)('falls back to the same %s intent only for invalid authorization', async intent => {
 	const { startCloudflareDeployment } = await loadPluginIntegration();
 	const { CloudflareReauthorizationRequired } = await import('../cloudflare/oauth/client');
 	const plugin = createPlugin(true);
@@ -364,7 +331,7 @@ it('sends an unupgradable server to deletion instead of suggesting a retry', asy
 		{ action: { label: 'Open settings', onClick: expect.any(Function) } });
 });
 
-it.each(['update', 'reset', 'delete'] as const)('shows recovery guidance for an uncertain %s', async intent => {
+it.each(['update', 'delete'] as const)('shows recovery guidance for an uncertain %s', async intent => {
 	const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
 	const { DeploymentRecoveryRequiredError } = await import('../cloudflare/deployment/fence');
 	const plugin = createPlugin(true);
@@ -388,7 +355,7 @@ it('offers resume only when an interrupted deletion checkpoint is saved', async 
 	const { startCloudflareDeployment } = await loadPluginIntegration();
 	const { DeploymentRecoveryRequiredError } = await import('../cloudflare/deployment/fence');
 	const plugin = createPlugin(true);
-	Object.assign(plugin.settings.cloudflareDeployment, { reset: { deleteOnly: true } });
+	Object.assign(plugin.settings.cloudflareDeployment, { deletion: { id: 'delete-job', phase: 'clearing-bucket' } });
 	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new DeploymentRecoveryRequiredError('Needs review'));
 	await startCloudflareDeployment(plugin as never, 'delete');
 	expect(JSON.stringify(progress.fail.mock.calls)).toContain('select Resume server deletion');
@@ -537,4 +504,24 @@ it('does not report verification for a connection changed during the request', a
 	await startCloudflareDeployment(plugin as never, 'reconnect');
 	expect(progress.succeed).not.toHaveBeenCalled();
 	expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
+});
+
+it.each(['update', 'delete'] as const)('points %s to the desktop on mobile without opening progress', async intent => {
+	platform.isMobile = true;
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const { Notice } = await import('obsidian');
+	const plugin = createPlugin(true);
+	await startCloudflareDeployment(plugin as never, intent);
+	expect(Notice).toHaveBeenCalledWith(expect.stringContaining('Server changes run only in Obsidian on a desktop.'));
+	expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).not.toHaveBeenCalled();
+	expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
+	expect(openCloudflareDeploymentModal).not.toHaveBeenCalled();
+});
+
+it('reconnects on mobile', async () => {
+	platform.isMobile = true;
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const plugin = createPlugin(true);
+	await startCloudflareDeployment(plugin as never, 'reconnect');
+	expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mock.calls[0]?.[0]).toBe('reconnect');
 });

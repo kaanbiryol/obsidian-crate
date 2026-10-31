@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildWorkerMultipartBody, buildResetWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './worker-upload-payload';
+import { buildWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './worker-upload-payload';
 
 const artifacts = {
 	version: '0.1.0',
@@ -11,32 +11,6 @@ const artifacts = {
 };
 
 describe('Worker upload payloads', () => {
-	it('deletes a listed experimental safety namespace while keeping reminder alarms', () => {
-		const upload = (retireCloudSafety?: boolean) => new TextDecoder().decode(buildWorkerMultipartBody({ publicOrigin: 'https://crate.workers.dev', artifacts,
-			d1DatabaseId: 'database', r2BucketName: 'crate-0123456789abcdef', retireCloudSafety }).body);
-		const body = upload(true);
-		expect(body).toContain('"CloudSafety":{"type":"durable-object","state":"deleted"}');
-		expect(body).toContain('"ReminderAlarm":{"type":"durable-object","storage":"sqlite","state":"created"}');
-		expect(body).not.toContain('"class_name":"CloudSafety"');
-		// New servers and servers already updated never had or no longer have the class.
-		expect(upload()).not.toContain('CloudSafety');
-	});
-
-	it('retires ReminderAlarm and the safety namespace and installs the authenticated cleanup Worker', () => {
-		const body = new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket', false, true).body);
-		expect(body).toContain('"ReminderAlarm":{"type":"durable-object","state":"deleted"}');
-		expect(body).toContain('"CloudSafety":{"type":"durable-object","state":"deleted"}');
-		expect(new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket').body)).not.toContain('CloudSafety');
-		expect(body).not.toContain('export class CloudSafety');
-		expect(body).not.toContain('export class ReminderAlarm');
-		expect(body).not.toContain('"force":true');
-		expect(body).toContain('status: 503');
-		expect(body).toContain('Crate reset reset-id');
-		expect(body).toContain('"name":"CRATE_RESET_ID","text":"reset-id"');
-		expect(body).toContain('record.cleanupTokenHash');
-		expect(new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket', true).body)).not.toContain('"ReminderAlarm"');
-	});
-
 	it('builds a module upload with D1, R2, and declarative Durable Object bindings', () => {
 		const multipart = buildWorkerMultipartBody({
 			publicOrigin: 'https://worker.test',

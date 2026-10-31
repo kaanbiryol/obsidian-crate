@@ -19,7 +19,7 @@ Update Crate on every Obsidian device you use. [Installation](/docs/getting-star
 When the plugin includes a newer server or web app, Crate settings shows an update notice.
 
 1. Let sync finish, and let the web app send or save any pending work.
-2. Open **Settings → Crate** and select **Update server**.
+2. On a desktop, open **Settings → Crate** and select **Update server**. Phones and tablets show the update but can't run it.
 3. Follow the prompts and wait for the check to finish.
 4. Sync again and open the web app to make sure everything works.
 

@@ -5,7 +5,7 @@ import type { SettingsSectionContext } from '../section-helpers';
 
 export function renderForgetServerSetting({ containerEl, plugin, rerender }: SettingsSectionContext): void {
 	const saved = plugin.settings.cloudflareDeployment;
-	if (plugin.syncRuntime.isConfigured() || !saved || saved.reset || saved.deletion) return;
+	if (plugin.syncRuntime.isConfigured() || !saved || saved.deletion) return;
 	new Setting(containerEl)
 		.setName('Forget saved connection')
 		.setDesc('Forget this vault’s saved server connection. Your Cloudflare login, local files, and server data are kept.')

@@ -25,7 +25,7 @@ export async function checkCheckboxHoverAfterDismissal(browser, origin) {
 						id: `hover-${index}`, content: `Reminder ${index}`, project: 'Inbox',
 						completed: false, priority: 4, filePath: 'Reminders/Inbox.md', revision: 'hover-1',
 					}));
-					await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'] } }));
+					await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'], issues: [] } }));
 				}
 				await page.goto(`${origin}/notifications?folder=Reminders&${view}`);
 				const checkbox = page.locator('.premium-checkbox').nth(view === 'tab=inbox' ? 16 : 0);

@@ -29,7 +29,7 @@ describe('literal path names in sync API records', () => {
 			Response.json({ version: 1, files: { constructor: entry, toString: entry }, lastSeq: 3, snapshotSeq: 3, hasMore: false, cursorExpired: false }),
 			Response.json({ changes: [
 				{ seq: 4, path: '__proto__', action: 'put', hash: 'e'.repeat(64), size: 2, created_at: '2026-01-02', revision: 'r2' },
-				{ seq: 5, path: 'constructor', action: 'delete', hash: entry.hash, size: 1, created_at: '2026-01-02' },
+				{ seq: 5, path: 'constructor', action: 'delete', hash: entry.hash, size: 1, created_at: '2026-01-02', revision: 'd5' },
 			], lastSeq: 5, hasMore: false, cursorExpired: false }),
 		);
 		const manifest = await client.getManifest();

@@ -8,7 +8,7 @@ const latest = entry('2026-05-01T12:00:00Z');
 
 describe('checkpointDue', () => {
 	it('always checkpoints initial and full syncs', () => {
-		const recent = entry('2026-05-01T11:59:00Z', { historyCheckpoint: 'a'.repeat(64) });
+		const recent = entry('2026-05-01T11:59:00Z', { sharedCheckpoint: 'shared' });
 		for (const type of ['initial', 'force'] as const) {
 			expect(checkpointDue({ type, history: [latest, recent], latest, lastCheckpointAt: now, trackedFiles: 1_000, now })).toBe(true);
 		}

@@ -64,13 +64,6 @@ class DownloadCheckpointTests(unittest.TestCase):
         return json.dumps({'complete': True, 'createdAt': '2026-10-29T10:00:00.000Z', 'bookmark': None, 'objects': self.objects,
                            'source': {'account': 'account', 'database': 'source', 'bucket': 'bucket'}, **fields}).encode()
 
-    def single_file_checkpoint(self):
-        """The layout the first upgrade backup writer used."""
-        for item, data in zip(self.objects, [self.settings, *[self.files[key] for key in sorted(self.files)]]):
-            self.remote.objects[PREFIX + '/objects/' + digest(item['key'].encode())] = data
-        self.remote.objects[PREFIX + '/database.sql'] = self.sql
-        self.remote.objects[PREFIX + '/archive.json'] = self.manifest(format=1, databaseSha256=digest(self.sql))
-
     def parted_checkpoint(self):
         """Database parts end at statement boundaries; file copies are shared and named by checksum."""
         middle = self.sql.index(b'\n', len(self.sql) // 2) + 1
@@ -96,10 +89,6 @@ class DownloadCheckpointTests(unittest.TestCase):
         self.assertEqual({key: data for key, data in target.objects.items() if key in self.files}, self.files)
         self.assertEqual(target.objects['__crate__/settings.json'], self.settings)
         self.assertIsNone(restored.execute("SELECT value FROM maintenance_state WHERE key = 'crate_upgrade_backup'").fetchone())
-
-    def test_downloads_single_file_checkpoints(self):
-        self.single_file_checkpoint()
-        self.assert_restorable()
 
     def test_downloads_parted_checkpoints_with_shared_file_copies(self):
         self.parted_checkpoint()

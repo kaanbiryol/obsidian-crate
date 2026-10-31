@@ -43,7 +43,7 @@ try {
       await page.route('**/reminders/list?*', route => route.fulfill({ json: {
         reminders: [{ id: 'chips', content: 'Check chip scrolling', project: 'Inbox', priority: 4,
           completed: false, filePath: 'Reminders/Inbox.md', revision: 'one' }],
-        projects: ['Inbox', projectName],
+        projects: ['Inbox', projectName], issues: [],
       } }));
       await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
       await page.locator('[data-reminder-id="chips"]').tap();

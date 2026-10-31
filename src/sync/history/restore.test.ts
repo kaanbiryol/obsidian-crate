@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FileEntry, RemoteFileVersion } from '../../protocol/sync-types';
+import type { FileEntry } from '../../protocol/sync-types';
 import { createHistoryRestore } from './restore';
 import { HistoryVersionUnavailableError } from './source';
-import { HistoryCheckpoints } from './checkpoint';
-import { writeLegacyCheckpoint } from './checkpoint-test-harness';
 import { sha256Hex } from '../../platform/sha256';
 
 vi.mock('../local/file-discovery', async importOriginal => ({
@@ -43,28 +41,27 @@ async function harness(initial: Record<string, string>, historical: Record<strin
 		trash: (file: { path: string }) => trash(file.path),
 	};
 	const remote = await metadata(server), target = await metadata(historical);
-	const versions: RemoteFileVersion[] = Object.entries(target).map(([path, file]) => ({ ...file, path, storage_key: `retained/${path}`, created_at: '2026-09-20', expires_at: 9999999999, reason: 'replaced' }));
-	const api = {
-		getManifest: vi.fn(async () => ({ version: 1, files: remote })),
-		listFileVersions: vi.fn(async ({ path }: { path?: string }) => ({ versions: versions.filter(v => v.path === path), hasMore: false })),
-		previewFileVersion: vi.fn(async (version: RemoteFileVersion) => bytes(historical[version.path]!)),
-		downloadFile: vi.fn(async (path: string) => ({ content: bytes(server[path]!), contentType: 'text/plain', ...remote[path]! })),
-	};
-	const context = { vault: vault as never, api, target, baseline: structuredClone(remote), recoveryRoot: '.crate/state-recovery',
+	const api = { getManifest: vi.fn(async () => ({ version: 1, files: remote })) };
+	const expired = new Set<string>();
+	const readTarget = vi.fn(async (path: string, _file: FileEntry) => {
+		if (expired.has(path)) throw new HistoryVersionUnavailableError(path);
+		return bytes(historical[path]!);
+	});
+	const context = { vault: vault as never, api, target, baseline: structuredClone(remote), recoveryRoot: '.crate/state-recovery', readTarget,
 		shouldIgnore: (path: string) => path.startsWith('.crate/') || path.startsWith('.trash/') || path.startsWith('excluded/'),
 		verify: vi.fn(), beforeApply: vi.fn(async () => {}), applied: vi.fn() };
-	return { context, files, adapter, vault, api, versions, remote, target, process, trash };
+	return { context, files, adapter, vault, api, readTarget, expired, remote, target, process, trash };
 }
 
 describe('whole synced vault restore', () => {
 	it('previews exact checkpoint edits, additions and removals without writing or applying', async () => {
 		const h = await harness({ 'edit.md': 'new', 'later.md': 'added' }, { 'edit.md': 'old', 'deleted.md': 'saved' });
 		const review = await createHistoryRestore(h.context);
-		expect(h.api.previewFileVersion).not.toHaveBeenCalled();
+		expect(h.readTarget).not.toHaveBeenCalled();
 		expect(await review.preview('edit.md')).toEqual({ current: 'new', saved: 'old' });
 		expect(await review.preview('deleted.md')).toEqual({ current: '', saved: 'saved' });
 		expect(await review.preview('later.md')).toEqual({ current: 'added', saved: '' });
-		expect(h.api.previewFileVersion).toHaveBeenCalledTimes(2);
+		expect(h.readTarget).toHaveBeenCalledTimes(2);
 		await expect(review.preview('../outside.md')).rejects.toThrow('not part');
 		expect(h.adapter.writeBinary).not.toHaveBeenCalled();
 		expect(h.adapter.write).not.toHaveBeenCalled();
@@ -78,7 +75,7 @@ describe('whole synced vault restore', () => {
 		const h = await harness({ 'edit.md': 'new' }, { 'edit.md': 'old' });
 		const review = await createHistoryRestore(h.context);
 		if (source === 'local') h.files.set('edit.md', bytes('another edit'));
-		else h.api.previewFileVersion.mockResolvedValue(bytes('wrong saved file'));
+		else h.readTarget.mockResolvedValue(bytes('wrong saved file'));
 		await expect(review.preview('edit.md')).rejects.toThrow('changed');
 		expect(h.adapter.writeBinary).not.toHaveBeenCalled();
 	});
@@ -89,7 +86,7 @@ describe('whole synced vault restore', () => {
 		const h = await harness({ [path]: 'new' }, { [path]: content });
 		const review = await createHistoryRestore(h.context);
 		expect(await review.preview(path)).toHaveProperty('unavailable');
-		if (kind !== 'invalid text') expect(h.api.previewFileVersion).not.toHaveBeenCalled();
+		if (kind !== 'invalid text') expect(h.readTarget).not.toHaveBeenCalled();
 		await review.restore();
 		expect(h.files.get(path)).toEqual(bytes(content));
 	});
@@ -150,7 +147,7 @@ describe('whole synced vault restore', () => {
 
 	it('restores the rest and reports a file whose saved version expired, keeping its current contents', async () => {
 		const h = await harness({ 'a.md': 'current', 'later.md': 'new' }, { 'a.md': 'old', 'b.md': 'saved' });
-		h.versions.splice(h.versions.findIndex(version => version.path === 'a.md'), 1);
+		h.expired.add('a.md');
 		const review = await createHistoryRestore(h.context);
 		await expect(review.preview('a.md')).rejects.toThrow('no longer available');
 		expect(await review.restore()).toEqual(['a.md']);
@@ -187,7 +184,7 @@ describe('whole synced vault restore', () => {
 	it('stages every version before deleting or replacing any file', async () => {
 		const h = await harness({ 'a.md': 'current', 'later.md': 'new' }, { 'a.md': 'old', 'b.md': 'deleted' });
 		const review = await createHistoryRestore(h.context);
-		h.api.previewFileVersion.mockRejectedValueOnce(new Error('Offline'));
+		h.readTarget.mockRejectedValueOnce(new Error('Offline'));
 		await expect(review.restore()).rejects.toThrow('Offline');
 		expect(h.trash).not.toHaveBeenCalled();
 		expect(h.process).not.toHaveBeenCalled();
@@ -212,7 +209,7 @@ describe('whole synced vault restore', () => {
 
 	it('refuses corrupt downloaded bytes before applying anything', async () => {
 		const h = await harness({ 'a.md': 'current' }, { 'a.md': 'old' });
-		h.api.previewFileVersion.mockResolvedValue(bytes('wrong'));
+		h.readTarget.mockResolvedValue(bytes('wrong'));
 		await expect((await createHistoryRestore(h.context)).restore()).rejects.toThrow('damaged');
 		expect(h.process).not.toHaveBeenCalled();
 	});
@@ -249,32 +246,11 @@ describe('whole synced vault restore', () => {
 
 	it('uses matching local bytes when the remote target version has expired', async () => {
 		const h = await harness({ 'a.md': 'old' }, { 'a.md': 'old' }, { 'a.md': 'new' });
-		h.versions.length = 0;
+		h.expired.add('a.md');
 		const review = await createHistoryRestore(h.context);
 		expect(review.items).toEqual([{ path: 'a.md', action: 'revert' }]);
 		await review.restore();
-		expect(h.api.previewFileVersion).not.toHaveBeenCalled();
+		expect(h.readTarget).not.toHaveBeenCalled();
 		expect(h.files.get('a.md')).toEqual(bytes('old'));
-	});
-});
-
-describe('history checkpoints', () => {
-	it('round trips a complete inventory, bound to its server and exclusions', async () => {
-		const h = await harness({}, {});
-		const checkpoints = new HistoryCheckpoints(h.adapter as never, '.crate/checkpoints', 'https://one.test');
-		const files = await metadata({ 'a.md': 'one', '__proto__.md': 'two' });
-		const id = await writeLegacyCheckpoint(h.adapter, '.crate/checkpoints', 'https://one.test', files, ['excluded/']);
-		expect((await checkpoints.load(id, ['excluded/'])).files).toEqual(files);
-		await expect(checkpoints.load(id, [])).rejects.toThrow('exclusions');
-		await expect(new HistoryCheckpoints(h.adapter as never, '.crate/checkpoints', 'https://two.test').load(id, ['excluded/'])).rejects.toThrow('different sync');
-		h.files.set(`.crate/checkpoints/${id}.json`, bytes('{}'));
-		await expect(checkpoints.load(id, ['excluded/'])).rejects.toThrow('damaged');
-	});
-
-	it('rejects missing checkpoints and path traversal', async () => {
-		const h = await harness({}, {});
-		const checkpoints = new HistoryCheckpoints(h.adapter as never, '.crate/checkpoints', 'https://one.test');
-		await expect(checkpoints.load('a'.repeat(64), [])).rejects.toThrow('no longer available');
-		await expect(checkpoints.load('../secret', [])).rejects.toThrow('no complete');
 	});
 });

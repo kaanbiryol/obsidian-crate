@@ -37,8 +37,9 @@ it('binds reads, source edits, and enrollment permissions to the original folder
 	expect((await worker.fetch(request('/reminders/create', 'browser', { folderPath: 'Private', content: 'No', project: 'Inbox', operationId: crypto.randomUUID() }), env)).status).toBe(403);
 	expect((await worker.fetch(request('/notifications/reminders-enrollment-token', 'browser', { folderPath: 'Private' }), env)).status).toBe(403);
 	expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env)).status).toBe(200);
+	// Enrollment always binds a folder; a session without one still reaches no reminders.
 	await token('unbound', 'reminders', null);
-	expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'unbound', undefined, 'GET'), env)).status).toBe(401);
+	expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'unbound', undefined, 'GET'), env)).status).toBe(403);
 });
 it('moves web app sessions, their push subscriptions and setup links with the reminders folder', async () => {
 	await token('vault', 'vault', null); await token('browser'); await token('stale', 'reminders', 'Old'); await token('reading', 'reading', 'Reminders');

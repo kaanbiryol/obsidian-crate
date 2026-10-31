@@ -11,6 +11,7 @@ describe('normalizeRemindersSettings', () => {
 	it('normalizes persisted reminders settings defensively', () => {
 		const settings = normalizeRemindersSettings({
 			enabled: true,
+			confirmed: true,
 			taskCreationDefaultDueDate: 'tomorrow',
 			remindersFolderPath: ' /Reminders/Work/ ',
 			upcomingDaysDefault: 14,
@@ -41,22 +42,15 @@ describe('normalizeRemindersSettings', () => {
 			sidebarDefaultTab: 'other' as never,
 		});
 
-		expect(settings).toEqual({
-			...DEFAULT_REMINDERS_SETTINGS,
-			enabled: true,
-			confirmed: true,
-		});
+		expect(settings).toEqual(DEFAULT_REMINDERS_SETTINGS);
 	});
 
 	it('starts a fresh install with reminders off and unconfirmed', () => {
 		expect(DEFAULT_REMINDERS_SETTINGS).toMatchObject({ enabled: false, confirmed: false });
 	});
 
-	it('keeps reminders on and confirmed for settings saved before those preferences existed', () => {
-		const upgraded = { ...DEFAULT_REMINDERS_SETTINGS, enabled: true, confirmed: true };
-		expect(normalizeRemindersSettings({}).enabled).toBe(true);
-		expect(normalizeRemindersSettings(undefined)).toEqual(upgraded);
-		expect(normalizeRemindersSettings(null)).toEqual(upgraded);
+	it.each([undefined, null, {}])('uses the fresh-install defaults when settings are %s', saved => {
+		expect(normalizeRemindersSettings(saved)).toEqual(DEFAULT_REMINDERS_SETTINGS);
 	});
 
 	it('never runs reminders in a vault that has not confirmed them', () => {
@@ -64,14 +58,14 @@ describe('normalizeRemindersSettings', () => {
 	});
 
 	it('drops retired embedded-block preferences from saved settings', () => {
-		const saved = { enabled: false, queryViewPreferences: { abc123: { showCompleted: true } } };
+		const saved = { enabled: false, confirmed: true, queryViewPreferences: { abc123: { showCompleted: true } } };
 		const settings = normalizeRemindersSettings(saved);
 		expect(settings).not.toHaveProperty('queryViewPreferences');
 		expect(settings).toEqual({ ...DEFAULT_REMINDERS_SETTINGS, enabled: false, confirmed: true });
 	});
 
 	it('preserves explicitly disabled Reminders', () => {
-		expect(normalizeRemindersSettings({ enabled: false }).enabled).toBe(false);
+		expect(normalizeRemindersSettings({ enabled: false, confirmed: true }).enabled).toBe(false);
 	});
 
 	it.each(['flat', 'cards'] as const)('preserves the %s list style', listStyle => {

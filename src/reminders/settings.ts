@@ -101,19 +101,18 @@ export function normalizeRemindersFolderPath(rawPath: string | null | undefined)
 	return normalizePath(safeSegments.join('/'));
 }
 
-/** Saved settings without a field predate it, from installs that already ran reminders in this vault.
- * Reminders run only in a vault that confirmed them. */
+/** Reminders run only in a vault that confirmed them. */
 export function normalizeRemindersSettings(
 	value: Partial<RemindersSettings> | null | undefined,
 ): RemindersSettings {
-	const confirmed = typeof value?.confirmed === 'boolean' ? value.confirmed : true;
+	const confirmed = typeof value?.confirmed === 'boolean' ? value.confirmed : DEFAULT_REMINDERS_SETTINGS.confirmed;
 	return {
 		...(isRecord(value?.pendingServerFolder) && typeof value.pendingServerFolder.id === 'string'
 			&& typeof value.pendingServerFolder.workerUrl === 'string' && value.pendingServerFolder.workerUrl
 			&& typeof value.pendingServerFolder.folderPath === 'string'
 			? { pendingServerFolder: { id: value.pendingServerFolder.id, workerUrl: value.pendingServerFolder.workerUrl,
 				folderPath: normalizeRemindersFolderPath(value.pendingServerFolder.folderPath) } } : {}),
-		enabled: confirmed && (typeof value?.enabled === 'boolean' ? value.enabled : true),
+		enabled: confirmed && (typeof value?.enabled === 'boolean' ? value.enabled : DEFAULT_REMINDERS_SETTINGS.enabled),
 		confirmed,
 		listStyle: normalizeListStyle(value?.listStyle),
 

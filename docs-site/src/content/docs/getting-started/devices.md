@@ -13,7 +13,7 @@ There are two ways to use Crate on another device:
 1. Let a sync finish on your first device. Until it does, other devices stop with "Another device is uploading this vault for the first time." If you see this on the device that started the upload, for example after reconnecting it, select **Replace server files** to finish.
 2. On the other device, open a vault and [install Crate](/docs/getting-started/installation/). Use an empty vault for a fresh copy. If the vault already has notes, back them up first, because they'll be combined with the synced ones.
 3. Connect to the **same server**:
-   - **Cloudflare:** select **Connect with Cloudflare** and choose the existing server.
+   - **Cloudflare:** select **Connect with Cloudflare** and choose the existing server. On a phone or tablet, select **Open Cloudflare** in the connection dialog first.
    - **Docker:** select **Connect to your server** and use a new [pairing code](/docs/getting-started/self-hosting/#create-another-pairing-code).
 4. In **Choose what Crate manages in this vault**, keep Reminders and Reading on to use them here, then select **Finish**. Features your server already has on show **On for your other devices** and start on. Crate doesn't start a feature in a new vault until you choose it here or turn it on later under **Settings → Crate**.
 5. If you use encryption, open **Manage encryption** in Crate’s Sync settings and enter your recovery key.

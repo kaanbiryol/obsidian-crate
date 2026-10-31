@@ -7,11 +7,9 @@ import type { CloudflareSavedLogin } from '../cloudflare/saved-login';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment/service';
 import {
 	type RemindersSettings,
-	DEFAULT_REMINDERS_SETTINGS,
 	normalizeRemindersSettings,
 	useRemindersSettingsStore,
 } from '../reminders/settings';
-import { DEFAULT_READING_SETTINGS } from '../reading/settings';
 import { type ReminderBackend } from '../reminders/runtime';
 import { configureLogger as configureRemindersLogger } from '../reminders/logger';
 import { SyncRuntime } from '../sync/runtime/runtime';
@@ -65,10 +63,8 @@ export default class CratePlugin extends Plugin {
 		const signal = getPluginLifecycleSignal(this);
 		const data = await loadPluginData(this) as PluginData | null;
 		if (signal.aborted) return;
-		// Without saved data this is a fresh install: no feature changes notes until it is turned on in this vault.
-		const saved: PluginData = data ?? { reading: DEFAULT_READING_SETTINGS, reminders: DEFAULT_REMINDERS_SETTINGS };
-		this.settings = normalizeCrateSettings(saved, this.app.vault.configDir);
-		const remindersSettings = normalizeRemindersSettings(saved.reminders);
+		this.settings = normalizeCrateSettings(data, this.app.vault.configDir);
+		const remindersSettings = normalizeRemindersSettings(data?.reminders);
 		useRemindersSettingsStore.setState(remindersSettings, true);
 		// Saved in the background, in the shape `persist` writes, so startup does not wait for it.
 		if (data) void keepLastGoodPluginData(this, { ...buildPersistedCrateSettings(this.settings), reminders: remindersSettings });

@@ -10,6 +10,7 @@ import { createSettingsSectionHeading, type SettingsSectionContext } from '../se
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
 import { openExternalBrowserModal } from '../../external-browser-modal';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
+import { addServerChangeButton } from './server-change-button';
 
 export function renderConfigSection(context: SettingsSectionContext, showHeading = true): void {
 	const { containerEl, plugin } = context;
@@ -26,7 +27,9 @@ export function renderConfigSection(context: SettingsSectionContext, showHeading
 			.setName(connectionLabel)
 			.setDesc(rememberedServer
 				? 'Reconnect to your previous server using your saved Cloudflare login. Sign in again only if needed.'
-				: 'Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.')
+				: Platform.isMobile
+					? 'Sign in to connect to your existing Crate server. To create a server, use Obsidian on a desktop.'
+					: 'Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.')
 			.addButton(button => button
 				.setButtonText(connectionLabel)
 				.setCta()
@@ -43,6 +46,11 @@ export function renderServerUpdateNotice(context: SettingsSectionContext): void 
 	const deployment = plugin.settings.cloudflareDeployment;
 	if (!plugin.syncRuntime.isConfigured() || !deployment
 		|| !isCloudflareServerUpdateAvailable(deployment, EMBEDDED_CLOUDFLARE_ARTIFACT)) return;
+	if (Platform.isMobile) {
+		new Setting(containerEl).setName('Cloudflare update available')
+			.setDesc('Update your sync server and reminders web app from Crate settings in Obsidian on a desktop.');
+		return;
+	}
 
 	let needsVerification = false;
 	let canUpdate = false;
@@ -76,17 +84,11 @@ export function renderServerSection(context: SettingsSectionContext): void {
 	const { containerEl, plugin } = context;
 	const deployment = plugin.settings.cloudflareDeployment;
 	renderVersionSettings(containerEl, plugin);
-	if (plugin.syncRuntime.isConfigured() && deployment?.accountId && !deployment.vaultName) {
-		new Setting(containerEl).setName('Vault name')
-			.setDesc('Save this vault’s name so you can recognize its server on other devices. This updates the Cloudflare server.')
-			.addButton(button => button.setButtonText('Save vault name')
-				.onClick(() => { void startCloudflareDeployment(plugin, 'update'); }));
-	}
 	if (plugin.syncRuntime.isConfigured() && deployment?.accountId && deployment.d1DatabaseId) {
-		new Setting(containerEl).setName('Interrupted server update')
-			.setDesc('Check an interrupted update and recover it when Cloudflare has confirmed the operation.')
-			.addButton(button => button.setButtonText('Check and recover update')
-				.onClick(() => { void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); }); }));
+		addServerChangeButton(new Setting(containerEl).setName('Interrupted server update')
+			.setDesc('Check an interrupted update and recover it when Cloudflare has confirmed the operation.'),
+		button => button.setButtonText('Check and recover update')
+			.onClick(() => { void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); }); }));
 	}
 	renderServerBackupSetting(context);
 	const details = containerEl;
@@ -151,7 +153,7 @@ export function renderAccountSection(context: SettingsSectionContext): void {
 							? 'Your local files, server data, and Cloudflare login are kept. Other devices stay connected.'
 							: 'Your access token is revoked when the server is reachable. Local files and server data are kept. Other devices stay connected. Generate a new pairing code on your server to reconnect.',
 							...(plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_KEYS) ? ['Encryption keys saved on this device will be removed. Keep your recovery key outside this vault before disconnecting.'] : [])],
-						checkbox: deployment && !deployment.reset && !deployment.deletion ? {
+						checkbox: deployment && !deployment.deletion ? {
 
 							label: 'Forget saved connection',
 							description: 'You’ll need to select a server to reconnect.',
@@ -179,11 +181,11 @@ export function renderAccountSection(context: SettingsSectionContext): void {
 
 function renderServerBackupSetting({ containerEl, plugin }: SettingsSectionContext): void {
 	const deployment = plugin.settings.cloudflareDeployment;
-	if (deployment?.accountId && deployment.d1DatabaseId && !deployment.reset && !deployment.deletion) {
+	if (deployment?.accountId && deployment.d1DatabaseId && !deployment.deletion) {
 		const restore = plugin.settings.cloudflareRestore;
-		new Setting(containerEl).setName('Server backup recovery')
-			.setDesc(restore ? 'Review or resume your saved restore. The original server and backup are retained.' : 'Restore an upgrade backup into a separate server, keeping your current files and connection.')
-			.addButton(button => button.setButtonText(restore?.phase === 'complete' ? 'View restored server' : restore ? 'Resume restore' : 'Restore backup…')
-				.onClick(() => { void import('../../../plugin/cloudflare-restore').then(({ openServerRestore }) => openServerRestore(plugin)); }));
+		addServerChangeButton(new Setting(containerEl).setName('Server backup recovery')
+			.setDesc(restore ? 'Review or resume your saved restore. The original server and backup are retained.' : 'Restore an upgrade backup into a separate server, keeping your current files and connection.'),
+		button => button.setButtonText(restore?.phase === 'complete' ? 'View restored server' : restore ? 'Resume restore' : 'Restore backup…')
+			.onClick(() => { void import('../../../plugin/cloudflare-restore').then(({ openServerRestore }) => openServerRestore(plugin)); }));
 	}
 }

@@ -26,12 +26,12 @@ async function measureCapacity(browser, count) {
       completed: false, filePath: 'Reminders/Inbox.md', revision: 'capacity-revision-1',
       lineNumber: index + 1,
     }));
-    const payloadBytes = Buffer.byteLength(JSON.stringify({ reminders, projects: ['Inbox'] }));
+    const payloadBytes = Buffer.byteLength(JSON.stringify({ reminders, projects: ['Inbox'], issues: [] }));
     const mutations = [];
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/reminders/list?*', route => route.fulfill({
-      json: { reminders, projects: ['Inbox'] },
+      json: { reminders, projects: ['Inbox'], issues: [] },
     }));
     await page.route('**/reminders/update', route => {
       const body = route.request().postDataJSON();

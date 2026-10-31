@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { Notice, Platform } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment/update';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/deployment/embedded-artifacts';
@@ -21,6 +21,13 @@ export function showCloudflareServerUpdateNotice(plugin: CratePlugin): void {
 		?? (isManagedDeploymentUrl(plugin.settings)
 			? deployment.lastKnownRevision : undefined);
 	const serverIsNewer = revision !== undefined && revision > release.revision;
+	if (Platform.isMobile) {
+		// Server updates run only on desktop.
+		new Notice(serverIsNewer
+			? 'Your Crate server is newer than this plugin’s bundled server. Update Crate on this device.'
+			: 'A Crate server update is available. Open Crate settings in Obsidian on your desktop to update it.', 15000);
+		return;
+	}
 	const fragment = new DocumentFragment();
 	fragment.createSpan({ text: serverIsNewer
 		? 'Your Crate server is newer than this plugin’s bundled server. '

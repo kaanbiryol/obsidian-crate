@@ -17,8 +17,10 @@ Cloudflare handles billing; Crate doesn't collect your payment details. There's 
 
 ## Create your server
 
+Create your server from Obsidian on a desktop. Phones and tablets can connect to an existing server, but can't create, update, or delete one, because they may pause Obsidian in the background partway through.
+
 1. In Obsidian, open **Settings → Crate → Connect with Cloudflare**.
-2. In your browser, choose the Cloudflare account, review the permissions, and authorize Crate. On mobile, select **Open Cloudflare** in the connection dialog first.
+2. In your browser, choose the Cloudflare account, review the permissions, and authorize Crate.
 3. Go back to Obsidian. If it doesn't open on its own, select **Open Obsidian**.
 4. For a new vault, select **Create server**.
 5. Wait for the connection to finish.

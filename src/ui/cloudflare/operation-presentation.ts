@@ -16,14 +16,13 @@ export class CloudflareOperationPresentation {
 
 	start(): void {
 		if (this.context.intent === 'delete') this.progress.setWorking('Deleting Crate server', 'Verifying this server, then removing its remote data and Worker. Keep Obsidian open.');
-		if (this.context.intent === 'reset') this.progress.setWorking('Rebuilding Crate server', 'Verifying this deployment, then erasing its remote data and rebuilding. Keep Obsidian open.');
 	}
 
 	checkingAccess(): void { this.progress.setWorking('Reconnecting', 'Checking this device’s access…'); }
 
 	advance(message: string): void {
 		const { intent, shouldConnectDevice } = this.context;
-		this.progress.setWorking(intent === 'reconnect' ? 'Reconnecting' : intent === 'reset' ? 'Rebuilding Crate server'
+		this.progress.setWorking(intent === 'reconnect' ? 'Reconnecting'
 			: intent === 'delete' ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message);
 	}
 
@@ -31,7 +30,7 @@ export class CloudflareOperationPresentation {
 		this.progress.fail('Could not connect to Cloudflare', message, ['Try again from Crate settings.']);
 	}
 
-	operationFailed(message: string, recovery: { needsReview: boolean; canResumeDeletion: boolean; resetBlocked: boolean; unupgradable?: boolean }): void {
+	operationFailed(message: string, recovery: { needsReview: boolean; canResumeDeletion: boolean; unupgradable?: boolean }): void {
 		const { intent, shouldConnectDevice, openSettings, recoverUpdate } = this.context;
 		const deleteAction = recovery.canResumeDeletion ? 'Resume server deletion' : 'Delete server and all data';
 		const deleting = intent === 'delete' || recovery.canResumeDeletion;
@@ -46,7 +45,7 @@ export class CloudflareOperationPresentation {
 						: 'If the operation was interrupted, its Cloudflare status must be checked and the update lock recovered before trying again.',
 					'Closing this message does not clear the lock.',
 				],
-				{ technicalDetails: message, action: intent === 'reset' || deleting
+				{ technicalDetails: message, action: deleting
 					? { label: 'Open settings', onClick: openSettings }
 					: { label: 'Check and recover update', onClick: recoverUpdate } },
 			);
@@ -67,14 +66,6 @@ export class CloudflareOperationPresentation {
 		if (intent === 'delete') {
 			this.progress.fail('Server deletion failed', 'Crate couldn’t finish deleting your Cloudflare server.',
 				[`Once your connection is stable, open Crate settings → Advanced server actions and select ${deleteAction} to check and continue.`],
-				{ technicalDetails: message, action: { label: 'Open settings', onClick: openSettings } });
-			return;
-		}
-		if (intent === 'reset') {
-			this.progress.fail('Server rebuild failed', 'Crate couldn’t finish rebuilding your Cloudflare server.',
-				[recovery.resetBlocked
-					? 'Review the technical details below. The reported issue must be resolved before rebuilding this server.'
-					: 'This rebuild was started by an earlier Crate version. Complete recovery using that version before changing this connection. Keep this vault’s saved settings.'],
 				{ technicalDetails: message, action: { label: 'Open settings', onClick: openSettings } });
 			return;
 		}
@@ -120,9 +111,8 @@ export class CloudflareOperationPresentation {
 			return;
 		}
 		this.progress.succeed(
-			intent === 'reconnect' ? 'Connection verified' : intent === 'reset' ? 'Crate server rebuilt' : 'Crate is connected',
+			intent === 'reconnect' ? 'Connection verified' : 'Crate is connected',
 			intent === 'reconnect' ? 'Cloudflare and this device are connected. Select Sync now to retry syncing.'
-				: intent === 'reset' ? 'This device is connected. Open the command palette and select Crate: Sync now to sync this vault with the server. Reconnect other devices and set up web push again.'
 				: 'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
 		);
 	}

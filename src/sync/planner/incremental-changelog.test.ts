@@ -47,7 +47,7 @@ it('does not fetch another page after cancellation', async () => {
 
 it('keeps paging past an encrypted page made only of deletes this device never synced', async () => {
 	const created_at = '2026-10-25T12:00:00Z';
-	const deletes = Array.from({ length: 5000 }, (_, index) => ({ seq: 11 + index, path: `gone/${index}.md`, action: 'delete', hash: '', size: 0, created_at }));
+	const deletes = Array.from({ length: 5000 }, (_, index) => ({ seq: 11 + index, path: `gone/${index}.md`, action: 'delete', hash: '', size: 0, created_at, revision: `d${index}` }));
 	let put!: ChangelogEntry;
 	let descriptor: unknown;
 	const requestJson = vi.fn(async (url: string) => {

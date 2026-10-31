@@ -1,6 +1,5 @@
 import { expect, it, vi } from 'vitest';
 import { createEngineHistory } from './history';
-import { writeLegacyCheckpoint } from '../history/checkpoint-test-harness';
 import { sha256Hex } from '../../platform/sha256';
 
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
@@ -34,7 +33,7 @@ async function harness(local: Record<string, string>, saved: Record<string, stri
 		load: vi.fn(async () => ({ files: target })),
 		download: vi.fn(async (_checkpoint: string, path: string) => bytes(saved[path]!)),
 	} };
-	const settings = { workerUrl: 'https://example.com', ignorePatterns: ['excluded/'] };
+	const settings = { ignorePatterns: ['excluded/'] };
 	const context = {
 		vault: vault as never, api: api as never, pluginDir: '.obsidian/plugins/crate',
 		getSettings: () => settings,
@@ -50,7 +49,7 @@ async function harness(local: Record<string, string>, saved: Record<string, stri
 it('compares actual unsynced files and hidden configuration with the selected saved state', async () => {
 	const h = await harness({ 'edit.md': 'unsynced', 'local.md': 'new', 'same.md': 'same', '.obsidian/core-plugins.json': '{"sync":false}' },
 		{ 'edit.md': 'saved', 'deleted.md': 'old', 'same.md': 'same', '.obsidian/core-plugins.json': '{"sync":true}' });
-	const comparison = await h.history.compare('selected', true);
+	const comparison = await h.history.compare('selected');
 	expect(comparison.items).toEqual([
 		{ path: '.obsidian/core-plugins.json', action: 'modified' },
 		{ path: 'deleted.md', action: 'added' }, { path: 'edit.md', action: 'modified' }, { path: 'local.md', action: 'deleted' },
@@ -67,65 +66,46 @@ it('compares actual unsynced files and hidden configuration with the selected sa
 });
 it('shows no differences when the current vault matches the selected state', async () => {
 	const h = await harness({ 'note.md': 'same' }, { 'note.md': 'same' });
-	const comparison = await h.history.compare('selected', true);
+	const comparison = await h.history.compare('selected');
 	expect(comparison.compared).toBe(true);
 	expect(comparison.items).toEqual([]);
 	expect(h.api.sharedHistory.download).not.toHaveBeenCalled();
 });
 it('excludes ignored files from both current and historical inventories', async () => {
 	const h = await harness({ 'excluded/local.md': 'private' }, { 'excluded/saved.md': 'private' });
-	expect((await h.history.compare('selected', true)).items).toEqual([]);
+	expect((await h.history.compare('selected')).items).toEqual([]);
 	expect(h.adapter.readBinary).not.toHaveBeenCalled();
 });
 it('rechecks local bytes on revisiting a file and picks up edits on a fresh comparison', async () => {
 	const h = await harness({ 'note.md': 'unsynced' }, { 'note.md': 'saved' });
-	const comparison = await h.history.compare('selected', true);
+	const comparison = await h.history.compare('selected');
 	expect(await comparison.preview('note.md')).toEqual({ current: 'unsynced', saved: 'saved' });
 	h.files.set('note.md', 'another edit');
 	await expect(comparison.preview('note.md')).rejects.toThrow('changed');
-	expect(await (await h.history.compare('selected', true)).preview('note.md')).toEqual({ current: 'another edit', saved: 'saved' });
+	expect(await (await h.history.compare('selected')).preview('note.md')).toEqual({ current: 'another edit', saved: 'saved' });
 });
 it('fails an incomplete local scan instead of treating missing files as additions', async () => {
 	const h = await harness({ 'note.md': 'local' }, { 'note.md': 'saved' });
 	h.adapter.list.mockRejectedValue(new Error('Cannot list vault'));
-	await expect(h.history.compare('selected', true)).rejects.toThrow('Cannot list vault');
+	await expect(h.history.compare('selected')).rejects.toThrow('Cannot list vault');
 });
 it('rejects a file disappearing during the scan', async () => {
 	const h = await harness({ 'note.md': 'local' }, { 'note.md': 'saved' });
 	h.adapter.readBinary.mockImplementationOnce(async path => { h.files.delete(path); throw new Error('Deleted'); });
-	await expect(h.history.compare('selected', true)).rejects.toThrow('changed while checking');
+	await expect(h.history.compare('selected')).rejects.toThrow('changed while checking');
 });
 it('rejects an expired selected checkpoint before reading local contents', async () => {
 	const h = await harness({ 'note.md': 'local' }, { 'note.md': 'saved' });
 	h.api.sharedHistory.load.mockRejectedValue(new Error('Checkpoint expired'));
-	await expect(h.history.compare('selected', true)).rejects.toThrow('Checkpoint expired');
+	await expect(h.history.compare('selected')).rejects.toThrow('Checkpoint expired');
 	expect(h.adapter.readBinary).not.toHaveBeenCalled();
 });
 it('rejects an exclusion change during comparison or preview', async () => {
 	const h = await harness({ 'note.md': 'local' }, { 'note.md': 'saved' });
-	const comparison = await h.history.compare('selected', true);
+	const comparison = await h.history.compare('selected');
 	h.settings.ignorePatterns.push('note.md');
 	await expect(comparison.preview('note.md')).rejects.toThrow('exclusions changed');
-	const pending = h.history.compare('selected', true);
+	const pending = h.history.compare('selected');
 	h.settings.ignorePatterns.push('other.md');
 	await expect(pending).rejects.toThrow('exclusions changed');
-});
-it('looks up only the previewed file when reading a local checkpoint', async () => {
-	const h = await harness({ 'note.md': 'unsynced' }, { 'note.md': 'saved' });
-	const text = new Map<string, string>();
-	h.adapter.write.mockImplementation(async (path: string, value: string) => { text.set(path, value); });
-	Object.assign(h.adapter, { read: vi.fn(async (path: string) => text.get(path)!) });
-	h.adapter.exists.mockImplementation(async (path: string) => h.files.has(path) || text.has(path));
-	const target = h.context.getManifest().files;
-	const api = Object.assign(h.api, {
-		getManifest: vi.fn(async () => ({ version: 1, files: target })),
-		getFileMetadata: vi.fn(async (paths: string[]) => ({ files: Object.fromEntries(paths.map(path => [path, target[path]])) })),
-		downloadFile: vi.fn(async () => ({ content: bytes('saved') })),
-	});
-	const id = await writeLegacyCheckpoint(h.adapter, '.obsidian/plugins/crate/history-checkpoints', 'https://example.com', target, ['excluded/']);
-
-	const comparison = await h.history.compare(id, false);
-	expect(await comparison.preview('note.md')).toEqual({ current: 'unsynced', saved: 'saved' });
-	expect(api.getFileMetadata).toHaveBeenCalledWith(['note.md']);
-	expect(api.getManifest).not.toHaveBeenCalled();
 });

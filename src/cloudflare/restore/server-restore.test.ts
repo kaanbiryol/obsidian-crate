@@ -96,18 +96,8 @@ async function fixture(extraRows = 0) {
 		choice.manifest = { ...choice.manifest, format: 2, databaseParts: [{ sha256, size: bytes.length }] };
 		await writeManifest();
 	};
-	/** Rewrites the backup in the single-file layout written before database parts and shared file copies. */
-	const toFormat1 = async () => {
-		const bucket = buckets.get(source.bucket)!, sql = new TextEncoder().encode(await readBackupDatabase(client, source, choice));
-		bucket.set(`${choice.prefix}/database.sql`, sql);
-		for (const item of choice.manifest.objects) bucket.set(`${choice.prefix}/objects/${await sha256Hex(item.key)}`, bucket.get(upgradeBackupStoreKey(item.sha256))!);
-		for (const key of [...bucket.keys()]) if (key.startsWith('__crate__/backups/schema-upgrade-ffffffff-')) bucket.delete(key);
-		const { databaseParts: _parts, ...manifest } = choice.manifest as Extract<typeof choice.manifest, { format: 2 }>;
-		choice.manifest = { ...manifest, format: 1, databaseSha256: await sha256Hex(sql) };
-		await writeManifest();
-	};
 	api.queryD1.mockClear(); api.putRecoveryObject.mockClear();
-	return { api, client, state, choice, artifacts, run, snapshots, buckets, original, databases, rewriteSQL, toFormat1, interrupt: (handler: (sql: string) => void) => { afterQuery = handler; } };
+	return { api, client, state, choice, artifacts, run, snapshots, buckets, original, databases, rewriteSQL, interrupt: (handler: (sql: string) => void) => { afterQuery = handler; } };
 }
 
 it('restores launch-baseline checkpoints, keeps history and receipts, and requires fresh enrollment', async () => {
@@ -145,16 +135,6 @@ it('stops listing backups at the shared file copies that sort after them', async
 	f.api.listR2Objects.mockReset().mockResolvedValueOnce({ keys, cursor: 'more-shared-copies' });
 	expect((await listUpgradeBackups(f.client, source)).map(choice => choice.prefix)).toEqual([f.choice.prefix]);
 	expect(f.api.listR2Objects).toHaveBeenCalledOnce();
-});
-
-it('restores a backup in the original single-file layout', async () => {
-	const f = await fixture();
-	await f.toFormat1();
-	expect(f.choice.manifest.format).toBe(1);
-	await expect(f.run()).resolves.toContain('.workers.dev');
-	const restored = f.databases.get(destination)!;
-	expect(restored.prepare('SELECT * FROM files').all()).toEqual(f.original.prepare('SELECT * FROM files').all());
-	expect([...f.buckets.get(f.state.target.r2BucketName)!.keys()].sort()).toEqual(['__crate__/settings.json', 'live-object', 'old-object']);
 });
 
 it('rejects a corrupt database part before creating any destination', async () => {

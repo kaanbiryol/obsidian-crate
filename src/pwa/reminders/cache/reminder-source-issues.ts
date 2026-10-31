@@ -1,8 +1,7 @@
 import type { ReminderSourceIssue } from '../types';
 
-/** An omitted optional API field is empty; cache readers separately reject legacy snapshots without it. */
+/** Missing or damaged metadata never reads as a complete, issue-free list. */
 export function parseReminderSourceIssues(value: unknown): ReminderSourceIssue[] | null {
-	if (value === undefined) return [];
 	if (!Array.isArray(value)) return null;
 	const issues: ReminderSourceIssue[] = [];
 	for (const item of value as unknown[]) {

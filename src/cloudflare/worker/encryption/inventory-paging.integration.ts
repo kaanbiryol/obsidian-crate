@@ -53,16 +53,6 @@ it('pages a folder by reading only each page of rows', async () => {
 	for (const rowsRead of reads) expect(rowsRead).toBeLessThanOrEqual(ENCRYPTED_INVENTORY_PAGE + 10);
 });
 
-it('resumes an original-case path cursor from an older server after its file', async () => {
-	const paths = await seed();
-	const after = paths[1000]!;
-	const result = await page(after);
-	const byKey = (a: string, b: string) => portablePathKey(a) < portablePathKey(b) ? -1 : 1;
-	const expected = paths.filter(path => portablePathKey(path) > portablePathKey(after)).sort(byKey).slice(0, 5);
-	expect(result.files.map(file => file.path).slice(0, 5)).toEqual(expected);
-	expect(result.files.map(file => file.path)).not.toContain(after);
-});
-
 it('reuses the encryption state authentication already read', async () => {
 	await seed();
 	const state = (await createEncryptionFixture('active')).state;

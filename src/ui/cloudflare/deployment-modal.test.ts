@@ -193,3 +193,16 @@ it('closes active progress and clears it when the plugin unloads', async () => {
 	expect(unmount).toHaveBeenCalledOnce();
 	expect(revealCloudflareOperation(app)).toBe(false);
 });
+
+it('does not offer server creation on mobile', async () => {
+	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: true } }));
+	const { openCloudflareDeploymentModal } = await import('./deployment-modal');
+	const modal = openCloudflareDeploymentModal({} as never);
+	const selected = modal.selectVault([]);
+	const host = MockModal.instances[0]!;
+	expect(host.titleEl.textContent).toBe('No Crate server found');
+	expect(host.contentEl.collectText()).toContain('Create one in Obsidian on a desktop, then connect this device.');
+	expect(host.contentEl.collectText()).not.toContain('Create server');
+	modal.close();
+	await expect(selected).resolves.toBeNull();
+});

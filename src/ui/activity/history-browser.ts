@@ -107,7 +107,7 @@ export class HistoryBrowser {
 		this.renderFooter();
 		if (navigate) this.files.querySelector<HTMLElement>('h3')?.focus({ preventScroll: true });
 		try {
-			if (!entry.sharedCheckpoint && !entry.historyCheckpoint) throw new Error('No saved state for this sync. Recorded files may be incomplete.');
+			if (!entry.sharedCheckpoint) throw new Error('No saved state for this sync. Recorded files may be incomplete.');
 			if (!this.deps.load) throw new Error('Saved-state previews are unavailable.');
 			const comparison = await this.deps.load(entry);
 			if (this.disposed || revision !== this.revision) return;
@@ -146,7 +146,7 @@ export class HistoryBrowser {
 		if (notice) {
 			const status = this.files.createDiv({ cls: 'crate-history-state-notice' });
 			status.createEl('p', { text: notice, cls: 'crate-history-description', attr: { role: 'status' } });
-			if (retryable && (this.selected?.sharedCheckpoint || this.selected?.historyCheckpoint)) {
+			if (retryable && this.selected?.sharedCheckpoint) {
 				const retry = status.createEl('button', { text: 'Retry loading', cls: 'crate-activity-action', attr: { type: 'button' } });
 				retry.addEventListener('click', () => { void this.select(this.selected!, false); });
 			}
@@ -210,7 +210,7 @@ export class HistoryBrowser {
 			const file = actions.createEl('button', { text: 'File history', cls: 'crate-activity-action', attr: { type: 'button' } });
 			file.addEventListener('click', () => this.deps.openFile!(path));
 		}
-		if ((entry.sharedCheckpoint || entry.historyCheckpoint) && this.deps.restore) {
+		if (entry.sharedCheckpoint && this.deps.restore) {
 			const restore = actions.createEl('button', { text: 'Restore to this point', cls: 'crate-activity-action', attr: { type: 'button' } });
 			restore.addEventListener('click', () => this.deps.restore!(entry));
 		}

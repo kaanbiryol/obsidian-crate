@@ -38,7 +38,7 @@ async function many(count: number) {
 }
 
 it('sweeps old unreferenced and receipt-only descriptors, preserving data, history and upload leases', async () => {
-	const references = ['live', 'history', 'changelog', 'deletion', 'upload', 'batch-legacy', 'batch-owned'];
+	const references = ['live', 'history', 'changelog', 'deletion', 'upload', 'batch-owned'];
 	for (const revision of [...references, 'receipt', 'orphan']) await descriptor(revision, revision === 'changelog' ? '-3 days' : '-40 days');
 	await descriptor('new', '-1 hour');
 	await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('live.md', 'live.md', 'live')").run();
@@ -48,7 +48,7 @@ it('sweeps old unreferenced and receipt-only descriptors, preserving data, histo
 	// A replayed upload receipt returns its stored response and never needs the descriptor.
 	await env.DB.prepare(`INSERT INTO upload_operations(operation_id, request_hash, response_json) VALUES ('operation', 'hash', '{"revision":"receipt"}')`).run();
 	await env.DB.prepare("INSERT INTO staged_uploads(storage_key, file_path) VALUES ('upload', 'upload.md')").run();
-	await env.DB.prepare(`INSERT INTO staged_upload_batches(id, storage_keys) VALUES ('batch', '["batch-legacy", {"storageKey":"batch-owned"}, {"other":1}]')`).run();
+	await env.DB.prepare(`INSERT INTO staged_upload_batches(id, storage_keys) VALUES ('batch', '[{"storageKey":"batch-owned"}, {"other":1}]')`).run();
 	expect(await pruneEncryptionMetadata(env.DB, true)).toBe(false);
 	expect(await retained()).toEqual([...references, 'new'].sort());
 	expect(await env.DB.prepare('SELECT count(*) AS n FROM files').first()).toEqual({ n: 1 });

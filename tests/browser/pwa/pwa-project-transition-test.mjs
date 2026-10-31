@@ -17,7 +17,7 @@ try {
       const projects = ['Errands', 'Personal', 'Personal/Finance', ...Array.from({ length: 24 }, (_, index) => `Project ${index + 1}`)];
       await page.route('**/reminders/list?*', route => route.fulfill({ json: {
         projects, reminders: projects.map((project, index) => ({ id: `project-${index}`, content: `Reminder ${index}`, project,
-          priority: 4, completed: false, filePath: `Reminders/${project}.md`, lineNumber: 1 })),
+          priority: 4, completed: false, filePath: `Reminders/${project}.md`, lineNumber: 1 })), issues: [],
       } }));
       await page.goto(`${origin}/notifications?folder=Reminders&tab=browse`);
       const target = page.getByRole('button', { name: 'Open Errands', exact: true });

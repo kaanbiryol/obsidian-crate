@@ -20,8 +20,7 @@ export interface EncryptionReset {
 	/** Turning encryption off uploads plaintext; turning it on uploads with this device's keys. */
 	target: 'plain' | 'encrypted';
 	phase: 'remote' | 'local' | 'upload';
-	/** Missing on older checkpoints, whose begin outcome must be treated as uncertain. */
-	beginState?: 'prepared' | 'attempted' | 'rejected';
+	beginState: 'prepared' | 'attempted' | 'rejected';
 }
 
 export function loadEncryptionReset(storage: SecretStorageService): EncryptionReset | null {
@@ -33,7 +32,7 @@ export function loadEncryptionReset(storage: SecretStorageService): EncryptionRe
 		|| !value.workerUrl || typeof value.oldToken !== 'string' || !value.oldToken
 		|| !isSha256Hex(value.replacementToken)
 		|| typeof value.automaticSync !== 'boolean' || !['plain', 'encrypted'].includes(value.target ?? '') || !['remote', 'local', 'upload'].includes(value.phase ?? '')
-		|| (value.beginState !== undefined && !['prepared', 'attempted', 'rejected'].includes(value.beginState))) {
+		|| !['prepared', 'attempted', 'rejected'].includes(value.beginState ?? '')) {
 		throw new Error('The saved encryption reset is invalid. Sync remains paused; preserve this device’s data.');
 	}
 	return value as EncryptionReset;

@@ -16,7 +16,7 @@ export function validRestoreState(value: unknown): value is ServerRestoreState {
 		&& isSha256Hex(state.archiveHash) && isSha256Hex(state.fingerprint)
 		&& Number.isSafeInteger(state.restoredAt) && state.restoredAt > 0
 		&& ['copying', 'publishing', 'complete'].includes(state.phase)
-		&& !!target && target.deploymentId === state.id && !target.reset && target.accountId === source.account && target.workerName === `crate-${state.id}`
+		&& !!target && target.deploymentId === state.id && target.accountId === source.account && target.workerName === `crate-${state.id}`
 		&& target.r2BucketName === target.workerName && target.d1DatabaseName === target.workerName
 		&& target.r2BucketName !== source.bucket && target.d1DatabaseId !== source.database
 		&& (state.phase === 'copying' || typeof target.d1DatabaseId === 'string')

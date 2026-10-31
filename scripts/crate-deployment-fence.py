@@ -37,7 +37,7 @@ def inspect(remote, worker):
 
 def release(remote, worker, owner, confirm_quiescent=False):
     if not confirm_quiescent:
-        raise ValueError('Stop all deployment/reset clients, revoke old credentials, and resolve in-flight requests before releasing the fence')
+        raise ValueError('Stop all deployment clients, revoke old credentials, and resolve in-flight requests before releasing the fence')
     current = inspect(remote, worker)
     if current is None:
         return False
@@ -48,7 +48,7 @@ def release(remote, worker, owner, confirm_quiescent=False):
         raise ValueError('This update must be resumed and verified, not unlocked. Settle resolved requests and use Check and recover update.')
     if record.get('deletionPending') is True:
         raise ValueError('This deletion must finish, not be unlocked. Use Delete server and all data or Resume server deletion.')
-    if record['kind'] not in ('update', 'reset', 'delete'):
+    if record['kind'] not in ('update', 'delete'):
         raise ValueError('An unknown operation must remain locked. Settle resolved requests before deleting the server.')
     removed = query(remote, 'DELETE FROM maintenance_state WHERE key = ? AND value = ? RETURNING key', [KEY, value])
     if removed != [{'key': KEY}]:
@@ -96,7 +96,7 @@ def main():
             parser.error('--owner from the inspection is required')
         if args.action == 'settle':
             settle(remote, args.worker, args.owner, args.confirm_quiescent)
-            print('The operation remains locked. Resume server deletion to permanently remove this server, or use the matching plugin build to recover an update or reset.')
+            print('The operation remains locked. Resume server deletion to permanently remove this server, or use the matching plugin build to recover an update.')
             return
         changed = release(remote, args.worker, args.owner, args.confirm_quiescent)
         print('Released the inspected owner. Resume the original operation in Obsidian.' if changed else 'No fence is held. Review the live deployment before resuming.')

@@ -24,7 +24,7 @@ async function scheduleScrollScenario(browser, reducedMotion) {
       filePath: 'Reminders/Inbox.md', revision: 'scroll-1', lineNumber: index + 1,
       description: index % 3 === 0 ? 'Extra details that wrap across multiple lines on a phone and make this card taller.' : '',
     }));
-    await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'] } }));
+    await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'], issues: [] } }));
     await page.goto(`${origin}/notifications?folder=Reminders&tab=today`);
     for (const tab of ['Today', 'Upcoming']) {
       await page.getByRole('button', { name: tab, exact: true }).tap();
@@ -80,7 +80,7 @@ async function scenario(browser, reducedMotion, count) {
       filePath: 'Reminders/Inbox.md', revision: 'scroll-1', lineNumber: index + 1,
       description: index % 3 === 0 ? 'A longer reminder with extra details to exercise variable row heights.' : '',
     }));
-    await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'] } }));
+    await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'], issues: [] } }));
     await page.route('**/reminders/set-completed', async route => {
       const body = route.request().postDataJSON();
       const reminder = reminders.find(item => item.id === body.id);

@@ -404,17 +404,6 @@ describe('LocalManifest', () => {
 			expect(restored.at(-1)).toMatchObject({ uploadHash: hex(99), phase: 'remote-committed' });
 		});
 
-		it('replays diagnostics written as a full list by older plugins', async () => {
-			const disk = new Map<string, string>();
-			diskAdapter(disk);
-			manifest.setEntry('a.md', entry('a'));
-			await manifest.save();
-			const row = { at: '2026-01-01T00:00:00.000Z', clientSession: crypto.randomUUID(), operationId: createReminderOperationId(20_000), kind: 'local',
-				phase: 'prepared', generation: 2, pathHash: 'a'.repeat(64), uploadHash: 'b'.repeat(64), baseHash: 'c'.repeat(64) };
-			disk.set(log, `{"version":1,"base":1}\n{"generation":2,"set":{},"deleted":[],"changes":{"uploadDiagnostics":${JSON.stringify([row])}}}\n`);
-			expect((await reload()).getUploadDiagnostics()).toEqual([row]);
-		});
-
 		it('keeps an equal entry and writes nothing for it', async () => {
 			const disk = new Map<string, string>();
 			diskAdapter(disk);
@@ -440,17 +429,6 @@ describe('LocalManifest', () => {
 			manifest.removeEntry('a.md');
 			await manifest.save();
 			expect(disk.get(log)!.trim().split('\n').at(-1)).toContain('"changes":{"renameDependencies":null}');
-			expect((await reload()).getRenameDependencies()).toEqual({});
-		});
-
-		it('replays records that carry the full recovery state', async () => {
-			const disk = new Map<string, string>();
-			diskAdapter(disk);
-			manifest.setEntry('a.md', entry('a'));
-			manifest.recordRename('a.md', 'b.md', 'file');
-			await manifest.save();
-			// An omitted field in a full `state` record means empty, clearing the rename.
-			disk.set(log, `{"version":1,"base":1}\n{"generation":2,"set":{},"deleted":[],"state":{}}\n`);
 			expect((await reload()).getRenameDependencies()).toEqual({});
 		});
 

@@ -2,20 +2,17 @@ import type { Vault } from 'obsidian';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { LocalManifestView } from '../manifest/manifest';
 import type { SyncApiClient } from '../worker-api/client';
-import { HistoryCheckpoints } from '../history/checkpoint';
 import { compareHistorySnapshots, type HistoryComparison, type HistorySnapshot } from '../history/comparison';
 import { getAllVaultFiles } from '../local/file-discovery';
 import { readLocalFileEntry } from '../local/local-file-entry';
 import { createHistoryRestore } from '../history/restore';
-import { findHistorySource } from '../history/source';
-import { getCheckpointAuthority } from '../connection/worker-url';
 import type { SyncSettings } from '../settings';
 
 interface EngineHistoryContext {
 	vault: Vault;
 	api: SyncApiClient;
 	pluginDir: string;
-	getSettings(): Pick<SyncSettings, 'workerUrl' | 'checkpointScope' | 'ignorePatterns'>;
+	getSettings(): Pick<SyncSettings, 'ignorePatterns'>;
 	getManifest(): LocalManifestView;
 	shouldIgnore: (path: string) => boolean;
 	throwIfDestroyed(): void;
@@ -27,29 +24,24 @@ interface EngineHistoryContext {
 
 /** Checkpoint and restore policy; the engine retains operation/lifecycle authority. */
 export function createEngineHistory(context: EngineHistoryContext) {
-	const checkpoints = () => new HistoryCheckpoints(context.vault.adapter, `${context.pluginDir}/history-checkpoints`, getCheckpointAuthority(context.getSettings()));
-	const load = (id: string, shared: boolean) => shared
-		? context.api.sharedHistory.load(id) : checkpoints().load(id, context.getSettings().ignorePatterns);
 	return {
-		prune: (retained: string[]) => checkpoints().prune(retained),
 		async saveShared() {
 			if (!context.canCheckpoint() || context.hasPendingMutations()) return undefined;
 			return context.api.sharedHistory.save();
 		},
-		async compare(checkpoint: string, shared: boolean): Promise<HistoryComparison> {
+		async compare(checkpoint: string): Promise<HistoryComparison> {
 			const scope = JSON.stringify(context.getSettings().ignorePatterns);
 			const verify = () => {
 				context.throwIfDestroyed();
 				if (scope !== JSON.stringify(context.getSettings().ignorePatterns)) throw new Error('Sync exclusions changed. Refresh the comparison.');
 			};
 			verify();
-			const snapshot = await load(checkpoint, shared);
+			const snapshot = await context.api.sharedHistory.load(checkpoint);
 			verify();
 			const saved: HistorySnapshot = { files: Object.fromEntries(Object.entries(snapshot.files).filter(([path]) => !context.shouldIgnore(path))), read: async (path, file) => {
 				verify();
 				if (saved.files[path] !== file) throw new Error('This file is not in the selected saved state.');
-				const bytes = shared ? await context.api.sharedHistory.download(checkpoint, path, file)
-					: await (await findHistorySource(context.api, path, file, (await context.api.getFileMetadata([path])).files[path]))();
+				const bytes = await context.api.sharedHistory.download(checkpoint, path, file);
 				verify();
 				return bytes;
 			} };
@@ -73,7 +65,7 @@ export function createEngineHistory(context: EngineHistoryContext) {
 			verify();
 			return compareHistorySnapshots(saved, current, { cachePreviews: false });
 		},
-		prepareRestore(checkpoint: string, beforeApply: () => Promise<void>, shared: boolean) {
+		prepareRestore(checkpoint: string, beforeApply: () => Promise<void>) {
 			return context.runExclusive(async () => {
 				const scope = JSON.stringify(context.getSettings().ignorePatterns);
 				const verify = () => {
@@ -82,10 +74,10 @@ export function createEngineHistory(context: EngineHistoryContext) {
 					if (context.hasPendingMutations()) throw new Error('Finish pending uploads, file restores, and conflict reviews before returning to this state.');
 				};
 				verify();
-				const snapshot = await load(checkpoint, shared);
+				const snapshot = await context.api.sharedHistory.load(checkpoint);
 				const review = await createHistoryRestore({
 					vault: context.vault, api: context.api, target: snapshot.files, baseline: context.getManifest().files,
-					...(shared ? { readTarget: (path, file) => context.api.sharedHistory.download(checkpoint, path, file) } : {}),
+					readTarget: (path, file) => context.api.sharedHistory.download(checkpoint, path, file),
 					recoveryRoot: `${context.pluginDir}/state-recovery`, shouldIgnore: context.shouldIgnore,
 					verify, beforeApply, applied: context.applied,
 				});

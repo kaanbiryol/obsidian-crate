@@ -17,7 +17,7 @@ try {
         revision: 'touch-revision', lineNumber: index + 1,
       }));
       const orders = [];
-      await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'] } }));
+      await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'], issues: [] } }));
       await page.route('**/reminders/reorder', route => {
         const body = route.request().postDataJSON();
         orders.push(body.orderedIds);

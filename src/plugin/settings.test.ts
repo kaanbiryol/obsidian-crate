@@ -23,10 +23,10 @@ describe('normalizeCrateSettings', () => {
 			.toEqual([...ignorePatterns, '.obsidian/workspace*']);
 	});
 
-	it('keeps Reading on and confirmed for settings saved before those preferences existed', () => {
-		expect(normalizeCrateSettings(undefined, '.obsidian').reading).toEqual({ enabled: true, confirmed: true, folderPath: 'Reading' });
+	it('keeps Reading off and unconfirmed when those preferences are missing', () => {
+		expect(normalizeCrateSettings(undefined, '.obsidian').reading).toEqual({ enabled: false, confirmed: false, folderPath: 'Reading' });
 		expect(normalizeCrateSettings({ reading: { folderPath: 'Articles' } as never }, '.obsidian').reading)
-			.toEqual({ enabled: true, confirmed: true, folderPath: 'Articles' });
+			.toEqual({ enabled: false, confirmed: false, folderPath: 'Articles' });
 	});
 
 	it('preserves explicitly disabled Reading', () => {
@@ -171,17 +171,6 @@ describe('normalizeCrateSettings', () => {
 	});
 });
 
-
-it.each([false, true])('preserves the cleanup checkpoint across a settings reload (delete-only: %s)', deleteOnly => {
-	const reset = { ...(deleteOnly ? { deleteOnly: true as const } : {}), id: 'a'.repeat(32), phase: 'clearing' as const, databaseId: '01234567-89ab-cdef-0123-456789abcdef', bucketCreatedAt: '2026-01-01T00:00:00Z', namespaceId: 'c'.repeat(32) };
-	const settings = normalizeCrateSettings({ cloudflareDeployment: {
-		deploymentId: '0123456789abcdef', accountId: 'a'.repeat(32), accountName: 'Personal',
-		workerName: 'crate-0123456789abcdef', d1DatabaseName: 'crate-0123456789abcdef',
-		d1DatabaseId: reset.databaseId, r2BucketName: 'crate-0123456789abcdef',
-		workersSubdomain: 'example', lastDeployedVersion: '0.1.0', lastDeployedFingerprint: null, reset,
-	} }, '.obsidian');
-	expect(settings.cloudflareDeployment?.reset).toEqual(reset);
-});
 
 it('persists usage snapshots across settings reloads and rejects malformed cached numbers', () => {
 	const snapshot = { accountId: 'account-a', updatedAt: 1000, groups: [{ label: 'Workers', metrics: [{ label: 'Requests', used: 79 }] }] };

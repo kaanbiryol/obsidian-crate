@@ -38,7 +38,7 @@ try {
 		const browser = await browserType.launch();
 		try {
 			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
-			const data = { ...createInitialState(), projects: ['Inbox', 'Work', 'Personal'] };
+			const data = { ...createInitialState(), projects: ['Inbox', 'Work', 'Personal'], issues: [] };
 			const reminder = data.reminders.find(reminder => reminder.id === 'preview-inbox-1');
 			reminder.content = content;
 			reminder.dueDatetime = '2027-04-13T10:30:00.000Z';

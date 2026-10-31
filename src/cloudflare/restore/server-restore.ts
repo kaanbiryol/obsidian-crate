@@ -4,10 +4,10 @@ import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
 import { workersDevOrigin } from '../deployment/worker-origin';
-import { backupObjectKey, literal, parseBackupRows, PREFIX, quote, readBackup, readBackupDatabase, type BackupChoice, type BackupRow, type BackupSource } from './archive';
+import { literal, parseBackupRows, PREFIX, quote, readBackup, readBackupDatabase, type BackupChoice, type BackupRow, type BackupSource } from './archive';
 import { validRestoreState, type ServerRestoreState } from './state';
 import { sha256Hex } from '../../platform/sha256';
-import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE } from '../../protocol/storage-keys';
+import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 
 export async function listUpgradeBackups(api: CloudflareApiClient, source: BackupSource): Promise<BackupChoice[]> {
 	const choices: BackupChoice[] = [], cursors = new Set<string>(); let cursor: string | undefined;
@@ -89,7 +89,7 @@ export async function restoreUpgradeBackup(input: {
 		const batches = rowBatches(rows, plan);
 		// Verify every archived object before creating destination resources.
 		for (const [index, item] of backup.manifest.objects.entries()) {
-			const bytes = await api.getRecoveryObject(account, source.bucket, await backupObjectKey(backup, item));
+			const bytes = await api.getRecoveryObject(account, source.bucket, upgradeBackupStoreKey(item.sha256));
 			if (bytes.length !== item.size || await sha256Hex(bytes) !== item.sha256) throw new Error('A backup file failed verification');
 			onProgress(`Verifying backup: ${index + 1} of ${backup.manifest.objects.length} files and versions…`);
 		}
@@ -127,7 +127,7 @@ export async function restoreUpgradeBackup(input: {
 			try { bytes = await api.getRecoveryObject(account, target.r2BucketName, item.key); }
 			catch (error) {
 				if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
-				const original = await api.getRecoveryObject(account, source.bucket, await backupObjectKey(backup, item));
+				const original = await api.getRecoveryObject(account, source.bucket, upgradeBackupStoreKey(item.sha256));
 				if (original.length !== item.size || await sha256Hex(original) !== item.sha256) throw new Error('Backup file changed during restore');
 				await api.putRestoredObject(account, source.bucket, target.r2BucketName, item.key, original);
 				bytes = await api.getRecoveryObject(account, target.r2BucketName, item.key);

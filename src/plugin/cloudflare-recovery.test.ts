@@ -4,8 +4,10 @@ const mocks = vi.hoisted(() => ({
 	start: vi.fn(),
 	reveal: vi.fn(() => false),
 	copy: vi.fn(async (_text: string) => {}),
+	platform: { isMobile: false },
+	notice: vi.fn(),
 }));
-vi.mock('obsidian', () => ({ Notice: class {} }));
+vi.mock('obsidian', () => ({ Notice: mocks.notice, Platform: mocks.platform }));
 vi.mock('../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal, revealCloudflareOperation: mocks.reveal }));
 import { checkAndRecoverUpdate } from './cloudflare-recovery';
 import { DeploymentRecoveryRequiredError } from '../cloudflare/deployment/fence';
@@ -65,5 +67,14 @@ it('reveals a running operation instead of starting recovery concurrently', asyn
 	const instance = plugin('recovered');
 	mocks.reveal.mockReturnValueOnce(true);
 	await checkAndRecoverUpdate(instance as never, mocks.start);
+	expect(instance.cloudflareDeploymentService.recoverUpdate).not.toHaveBeenCalled();
+});
+
+it('points recovery to the desktop on mobile', async () => {
+	mocks.platform.isMobile = true;
+	const instance = plugin('recovered');
+	try { await checkAndRecoverUpdate(instance as never, mocks.start); }
+	finally { mocks.platform.isMobile = false; }
+	expect(mocks.notice).toHaveBeenCalledWith(expect.stringContaining('Server changes run only in Obsidian on a desktop.'));
 	expect(instance.cloudflareDeploymentService.recoverUpdate).not.toHaveBeenCalled();
 });

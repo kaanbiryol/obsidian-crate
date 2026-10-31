@@ -116,7 +116,7 @@ it('handles new file changes after migration without rescanning the vault', asyn
 	expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toEqual({ path: 'Reminders/new.md' });
 });
 
-it('drains deleted legacy source rows after the migration scan has completed', async () => {
+it('drains source rows whose files are gone after the migration scan has completed', async () => {
 	await revalidateReminderSources(env, 2);
 	await env.DB.prepare(`INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified)
     VALUES ('Reminders/deleted-1.md', 'old', 0, 0), ('Reminders/deleted-2.md', 'old', 0, 0), ('Reminders/deleted-3.md', 'old', 0, 0)`).run();

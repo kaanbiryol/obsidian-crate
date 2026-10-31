@@ -22,7 +22,7 @@ describe('authoritative read contracts', () => {
 		expect(parseManifestPage({ ...page, files: {} }).files).toEqual({});
 		expect(() => parseFileMetadata({ files: page.files }, ['different.md'])).toThrow();
 	});
-	it.each([{ seq: 0 }, { action: 'rename' }, { hash: 'broken' }, { path: '../note.md' }, { revision: {} }, { created_at: 'tomorrow' }])('rejects invalid changelog rows %j', patch => {
+	it.each([{ seq: 0 }, { action: 'rename' }, { hash: 'broken' }, { path: '../note.md' }, { revision: {} }, { revision: null }, { revision: undefined }, { created_at: 'tomorrow' }])('rejects invalid changelog rows %j', patch => {
 		expect(() => parseChanges({ changes: [{ ...change, ...patch }], lastSeq: 1, hasMore: false }, 0)).toThrow();
 	});
 	it('rejects non-progressing, repeated, and incomplete change pages', () => {
@@ -33,8 +33,7 @@ describe('authoritative read contracts', () => {
 		]) expect(() => parseChanges(input, 0)).toThrow();
 		expect(() => parseChangesCheck({ lastSeq: 1, hasChanges: false }, 0)).toThrow();
 	});
-	it('preserves known legacy revision-less changes and cursor-expiry semantics', () => {
-		expect(parseChanges({ changes: [{ ...change, revision: null }], lastSeq: 1, hasMore: false }, 0).changes).toHaveLength(1);
+	it('preserves cursor-expiry semantics', () => {
 		expect(parseChanges({ changes: [], lastSeq: 1, hasMore: false, cursorExpired: true }, 50).cursorExpired).toBe(true);
 	});
 	it('requires paginated history support instead of presenting a silently truncated older response', () => {

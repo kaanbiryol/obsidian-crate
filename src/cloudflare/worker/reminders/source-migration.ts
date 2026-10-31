@@ -75,7 +75,7 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 	for (const { path } of sources) {
 		const current = stored.get(path);
 		if (!current) {
-			// Deleted legacy rows must still drain after the one-time scan finishes.
+			// Rows whose file is gone (such as one pruned from an initial import) must still drain.
 			await env.DB.prepare(`DELETE FROM reminder_source_state WHERE file_path = ?
         AND NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`).bind(path, ...filePathArgs(path)).run();
 			continue;

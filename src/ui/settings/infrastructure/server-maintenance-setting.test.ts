@@ -4,8 +4,8 @@ import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks 
 const confirm = vi.fn<(_app: unknown, options: { warning?: boolean; details: string[] }) => Promise<boolean>>();
 const start = vi.fn();
 
-async function render(configured = true, resetting = false, deployed = false) {
-	vi.doMock('obsidian', () => createObsidianUiModule());
+async function render(configured = true, deployed = false, mobile = false) {
+	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: mobile } }));
 	vi.doMock('../../../plugin/cloudflare-operations', () => ({ startCloudflareDeployment: start }));
 	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	const { renderServerRepairSetting } = await import('./server-repair-setting');
@@ -16,7 +16,6 @@ async function render(configured = true, resetting = false, deployed = false) {
 			deploymentId: '0123456789abcdef', accountId: 'a'.repeat(32), accountName: 'Personal',
 			workerName: 'crate-0123456789abcdef', d1DatabaseName: 'crate-0123456789abcdef',
 			d1DatabaseId: '01234567-89ab-cdef-0123-456789abcdef', r2BucketName: 'crate-0123456789abcdef',
-			...(resetting ? { reset: { id: 'r', phase: 'clearing', databaseId: 'd', bucketCreatedAt: 'date', namespaceId: 'n' } } : {}),
 		} },
 		syncRuntime: { isConfigured: () => configured },
 	};
@@ -39,7 +38,7 @@ describe('server maintenance settings', () => {
 	});
 
 	it('hides server actions for a disconnected device with a completed deployment', async () => {
-		await render(false, false, true);
+		await render(false, true);
 		expect(MockSetting.instances).toHaveLength(0);
 	});
 
@@ -51,12 +50,6 @@ describe('server maintenance settings', () => {
 		expect(start).toHaveBeenCalledExactlyOnceWith(plugin, 'update');
 		expect(confirm).not.toHaveBeenCalled();
 	});
-	it('preserves legacy recovery guidance without offering rebuild', async () => {
-		await render(false, true);
-		expect(MockSetting.instances[0]!.nameEl.textContent).toBe('Interrupted server cleanup');
-		expect(MockSetting.instances[0]!.buttons).toHaveLength(0);
-	});
-
 	it('requires confirmation of exact resources for delete-only authorization', async () => {
 		const plugin = await render();
 		const { renderServerDeleteSetting } = await import('./server-delete-setting');
@@ -87,13 +80,21 @@ it.each(['cancel', 'changed target'])('does not delete after %s', async reason =
 	expect(start).not.toHaveBeenCalled();
 });
 
-it('offers terminal deletion during a legacy unfinished rebuild', async () => {
-	const plugin = await render(false, true);
-	const { renderServerDeleteSetting } = await import('./server-delete-setting');
-	renderServerDeleteSetting(new FakeElement('div') as never, plugin as never);
-	confirm.mockResolvedValue(true);
-	const setting = MockSetting.instances.find(item => item.nameEl.textContent === 'Delete server and all data')!;
-	setting.buttons[0]!.click();
-	await vi.waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(plugin, 'delete'));
-	expect(confirm.mock.calls[0]![1].details.join(' ')).toContain('entire selected database and file bucket');
+describe('on mobile', () => {
+	it('points repair to the desktop', async () => {
+		await render(false, false, true);
+		const setting = MockSetting.instances.find(item => item.nameEl.textContent === 'Repair server')!;
+		expect(setting.buttons).toHaveLength(0);
+		expect(setting.descEl.collectText()).toContain('Available in Obsidian on a desktop.');
+	});
+
+	it('points deletion to the desktop', async () => {
+		const plugin = await render(true, false, true);
+		const { renderServerDeleteSetting } = await import('./server-delete-setting');
+		renderServerDeleteSetting(new FakeElement('div') as never, plugin as never);
+		const setting = MockSetting.instances.find(item => item.nameEl.textContent === 'Delete server and all data')!;
+		expect(setting.buttons).toHaveLength(0);
+		expect(setting.descEl.collectText()).toContain('Available in Obsidian on a desktop.');
+	});
+
 });

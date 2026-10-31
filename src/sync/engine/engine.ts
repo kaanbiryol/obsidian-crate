@@ -225,8 +225,6 @@ export class SyncEngine {
 	async initialize(): Promise<void> {
 		this.updateState({ initializing: true });
 		await this.localManifest.load();
-		try { await this.history().prune(this.settings.syncHistory.flatMap(entry => entry.historyCheckpoint ? [entry.historyCheckpoint] : [])); }
-		catch (error) { logger.warn('Could not prune old history checkpoints:', errorMessage(error)); }
 		this.lifecycle.throwIfDestroyed();
 		await this.conflictStore.load();
 		this.lifecycle.throwIfDestroyed();
@@ -318,12 +316,12 @@ export class SyncEngine {
 	trackedFileCount(): number { return this.localManifest.getAllPaths().length; }
 	trackedPaths(): string[] { return this.localManifest.getAllPaths(); }
 
-	async loadHistoryComparison(checkpoint: string, shared = false) {
-		return this.history().compare(checkpoint, shared);
+	async loadHistoryComparison(checkpoint: string) {
+		return this.history().compare(checkpoint);
 	}
 
-	async createHistoryRestore(checkpoint: string, beforeApply: () => Promise<void>, shared = false) {
-		return this.history().prepareRestore(checkpoint, beforeApply, shared);
+	async createHistoryRestore(checkpoint: string, beforeApply: () => Promise<void>) {
+		return this.history().prepareRestore(checkpoint, beforeApply);
 	}
 
 	private async runExclusiveOperation<T>(operation: () => Promise<T>, busyMessage = 'Wait for sync to finish, then try again.'): Promise<T> {

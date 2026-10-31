@@ -60,9 +60,9 @@ export async function authenticateWorkerRequest(
 			return { response: corsResponse({ error: 'Invalid token' }, 401) };
 		}
 
-		if (row.scope === 'reminders' && !row.folder_path) return { response: corsResponse({ error: 'Open a fresh Crate web app link to renew this session' }, 401) };
-		// Refresh only this authenticated web session's display name. Older
-		// clients omit the header, and vault-device names stay user-controlled.
+		// Refresh only this authenticated web session's display name. Requests
+		// without the header (such as feature and pairing checks) keep it, and
+		// vault-device names stay user-controlled.
 		const sessionName = row.scope === 'reminders'
 			? readWebSessionName(request)
 			: null;

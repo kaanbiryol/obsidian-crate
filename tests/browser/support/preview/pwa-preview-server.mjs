@@ -233,6 +233,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [],
 				sendJson(res, 200, {
 					reminders: sortForList(state.reminders, folderPath),
 					projects: projectNames(state.reminders),
+					issues: [],
 				});
 				return;
 			}

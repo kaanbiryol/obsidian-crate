@@ -1,4 +1,4 @@
-export type DeploymentIntent = 'reconnect' | 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete';
+export type DeploymentIntent = 'reconnect' | 'connect' | 'switch' | 'create' | 'update' | 'delete';
 export type SavedDeploymentIntent = Exclude<DeploymentIntent, 'switch' | 'create'>;
 
 export function supportsSavedAuthorization(intent: DeploymentIntent): intent is SavedDeploymentIntent {
@@ -34,14 +34,6 @@ export interface CloudflareDeploymentMetadata {
 		helperName: string;
 		/** Provider receipt for an uncertain helper upload when D1 is already absent. */
 		helperUploadPending?: string;
-	};
-	reset?: {
-		id: string;
-		phase: 'clearing' | 'rebuilding';
-		deleteOnly?: true;
-		databaseId: string;
-		bucketCreatedAt: string;
-		namespaceId: string;
 	};
 }
 

@@ -33,7 +33,7 @@ class FenceTests(unittest.TestCase):
         self.addCleanup(self.remote.db.close)
         self.worker = 'crate-' + 'a' * 16
         self.owner = '11111111-1111-4111-8111-111111111111'
-        self.record = {'worker': self.worker, 'owner': self.owner, 'kind': 'reset', 'version': '0.1.0'}
+        self.record = {'worker': self.worker, 'owner': self.owner, 'kind': 'update', 'version': '0.1.0'}
         self.remote.db.execute('INSERT INTO maintenance_state VALUES (?, ?)', (fence.KEY, json.dumps(self.record)))
 
     def test_requires_quiescence_and_the_exact_inspected_owner(self):
@@ -79,7 +79,7 @@ class FenceTests(unittest.TestCase):
         self.assertEqual(fence.inspect(self.remote, self.worker)[1], record)
 
     def test_operator_can_settle_deletion_without_unlocking_or_requiring_a_release_version(self):
-        for kind in ('update', 'reset', 'delete', 'future-operation'):
+        for kind in ('update', 'delete', 'future-operation'):
             with self.subTest(kind=kind):
                 record = dict(self.record, kind=kind, recoveryProtocol=999, step='unknown-step',
                               stepState='started', deletionPending=kind == 'delete')

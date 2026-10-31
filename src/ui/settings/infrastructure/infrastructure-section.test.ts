@@ -58,15 +58,6 @@ describe('advanced server actions', () => {
 		expect(confirm.mock.calls[0]![1].details).toContain('Database: crate-0123456789abcdef (database)');
 	});
 
-	it('keeps resume available for a legacy delete-only checkpoint', async () => {
-		await render(deployment({ reset: {
-			id: 'legacy-job', phase: 'clearing', deleteOnly: true, databaseId: 'database',
-			bucketCreatedAt: 'date', namespaceId: 'namespace',
-		} }));
-		expect(MockSetting.instances.flatMap(setting => setting.buttons).map(button => button.buttonEl.textContent))
-			.toContain('Resume server deletion');
-	});
-
 	it('offers deletion of a remembered server without an empty heading on a disconnected device', async () => {
 		await render(deployment());
 		expect(MockSetting.instances.flatMap(setting => setting.buttons).map(button => button.buttonEl.textContent))

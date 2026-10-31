@@ -20,6 +20,9 @@ it('persists and verifies the replacement credential before any server mutation'
 	expect(() => saveEncryptionReset({ ...storage, set: () => {} } as never, { ...reset, phase: 'upload' })).toThrow('verify');
 	values.set(SECRET_KEYS.ENCRYPTION_RESET, '{}');
 	expect(() => loadEncryptionReset(storage as never)).toThrow('invalid');
+	const { beginState: _beginState, ...withoutBeginState } = reset;
+	values.set(SECRET_KEYS.ENCRYPTION_RESET, JSON.stringify(withoutBeginState));
+	expect(() => loadEncryptionReset(storage as never)).toThrow('invalid');
 });
 
 it.each(['begin', 'finish'])('resumes after a lost %s response without starting a second destructive reset', async lostAt => {
@@ -67,7 +70,7 @@ it.each([400, 401, 403, 409, 428])('records a definitive first begin rejection (
 			throw new HttpError('Rejected', status);
 		},
 	} as unknown as WorkerApiHttpClient);
-	await expect(resetRemoteEncryption(reset, () => {}, () => {}, create, value => persisted.push(value.beginState!)))
+	await expect(resetRemoteEncryption(reset, () => {}, () => {}, create, value => persisted.push(value.beginState)))
 		.rejects.toBeInstanceOf(EncryptionResetRejectedError);
 	expect(persisted).toEqual(['attempted', 'rejected']);
 	const noNetwork = vi.fn(create);
@@ -75,8 +78,8 @@ it.each([400, 401, 403, 409, 428])('records a definitive first begin rejection (
 	expect(noNetwork).not.toHaveBeenCalled();
 });
 
-it.each(['attempted', undefined] as const)('retains uncertain or older checkpoints when both credentials are rejected (%s)', async beginState => {
-	const reset = { ...await checkpoint(), beginState };
+it('retains an uncertain checkpoint when both credentials are rejected', async () => {
+	const reset = { ...await checkpoint(), beginState: 'attempted' as const };
 	const create = () => ({ getServerInfo: async () => ({ capabilities: ['e2ee-reset-v1'] }), setEncryptionAuthority: vi.fn(),
 		requestJson: async () => { throw new HttpError('Unauthorized', 401); },
 	} as unknown as WorkerApiHttpClient);

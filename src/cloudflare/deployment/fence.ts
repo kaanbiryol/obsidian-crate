@@ -25,12 +25,12 @@ export const REPEATABLE_DELETION_STEPS = ['delete-worker', 'deleteR2Objects', 'd
  * so a new step must join one of them. Migration steps are resumable while the
  * release still registers that migration. */
 export type FenceStep = typeof UPDATE_STEPS[number] | `migrate-${string}`
-	| typeof REPEATABLE_DELETION_STEPS[number] | 'retireCrateWorker';
+	| typeof REPEATABLE_DELETION_STEPS[number];
 
 export interface DeploymentFenceRecord {
 	owner: string;
 	worker: string;
-	kind: 'update' | 'reset' | 'delete';
+	kind: 'update' | 'delete';
 	version: string;
 	fingerprint?: string;
 	startedAt: string;
@@ -218,7 +218,7 @@ export async function withDeploymentFence<T>(input: {
 		throw new DeploymentRecoveryRequiredError('Could not confirm deployment ownership. Inspect the deployment fence with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');
 	}
 	if (acquired.length !== 1 || acquired[0]?.value !== value) {
-		throw new DeploymentRecoveryRequiredError('Another deployment or server reset is active or needs recovery. Wait for it to finish; for an abandoned operation see docs/deployment.md and scripts/crate-deployment-fence.py.');
+		throw new DeploymentRecoveryRequiredError('Another deployment or server deletion is active or needs recovery. Wait for it to finish; for an abandoned operation see docs/deployment.md and scripts/crate-deployment-fence.py.');
 	}
 	const fence = new DeploymentFence(input.api, input.accountId, input.databaseId, value);
 	let outcome: { ok: true; value: T } | { ok: false; error: unknown };

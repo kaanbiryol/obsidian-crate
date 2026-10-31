@@ -46,8 +46,8 @@ async function openApp(userAgent, path, { statusBarInset = 0 } = {}) {
     markdown: 'A long article for document scrolling. '.repeat(600),
   } }));
   await context.route('**/reminders/list?*', route => route.fulfill({ json: statusBarInset
-    ? { reminders: [...reminders, ...errands], projects: ['Inbox', 'Work', 'Errands'] }
-    : { reminders, projects: ['Inbox', 'Work'] } }));
+    ? { reminders: [...reminders, ...errands], projects: ['Inbox', 'Work', 'Errands'], issues: [] }
+    : { reminders, projects: ['Inbox', 'Work'], issues: [] } }));
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));

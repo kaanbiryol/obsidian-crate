@@ -1,7 +1,7 @@
 import { portablePathKey } from '@/protocol/portable-path';
 
 /** A Reading note by its server path (`wire`), plaintext path and authenticated
- * plaintext hash (empty when unknown). */
+ * plaintext hash. */
 export interface KnownReadingNote { wire: string; path: string; hash: string }
 
 /** The server may only create sealed notes. One is accepted at a server path this web

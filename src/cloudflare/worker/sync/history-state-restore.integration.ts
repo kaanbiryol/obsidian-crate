@@ -11,9 +11,6 @@ import { CHECKPOINT_PAGE_SIZE, createSharedCheckpoint, getSharedCheckpoint, prun
 import { parseSharedCheckpointDocument } from '../../../protocol/history-checkpoints';
 import worker from '../index';
 import { sha256Hex } from '../../../platform/sha256';
-import { writeLegacyCheckpoint } from '../../../sync/history/checkpoint-test-harness';
-import { getCheckpointAuthority } from '../../../sync/connection/worker-url';
-import { TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -40,8 +37,7 @@ it('restores a full checkpoint through real sync and converges another device', 
 	first.disk.write('deleted.md', 'before deletion\n');
 	first.disk.write('original.md', 'before rename\n');
 	await sync(first);
-	const checkpoint = await saveLegacyCheckpoint(first);
-	expect(checkpoint).toMatch(/^[a-f0-9]{64}$/);
+	const checkpoint = await saveCheckpoint(first);
 	await sync(second);
 	first.disk.write('edited.md', 'after edit\n');
 	first.disk.remove('deleted.md');
@@ -62,15 +58,15 @@ it('restores a full checkpoint through real sync and converges another device', 
 	expect(Object.keys((await first.api.getManifest()).files).sort()).toEqual(['deleted.md', 'edited.md', 'original.md']);
 });
 
-/** Device-local checkpoints are no longer created, but legacy history entries still restore. */
-function saveLegacyCheckpoint(device: SyncTestDevice): Promise<string> {
-	return writeLegacyCheckpoint(device.disk.vault.adapter, `${TEST_PLUGIN_DIR}/history-checkpoints`,
-		getCheckpointAuthority(device.settings), device.checkpoint().files, [...device.settings.ignorePatterns]);
+async function saveCheckpoint(device: SyncTestDevice): Promise<string> {
+	const checkpoint = await device.api.sharedHistory.save();
+	expect(checkpoint).toBeDefined();
+	return checkpoint!.id;
 }
 
 function historyRuntime(device: SyncTestDevice, checkpoint: string): SyncRuntime {
 	const entry: SyncHistoryEntry = { timestamp: new Date().toISOString(), type: 'sync', success: true,
-		uploaded: 1, downloaded: 0, merged: 0, deleted: 0, conflictCount: 0, errorCount: 0, historyCheckpoint: checkpoint };
+		uploaded: 1, downloaded: 0, merged: 0, deleted: 0, conflictCount: 0, errorCount: 0, sharedCheckpoint: checkpoint };
 	device.settings.syncHistory.push(entry);
 	const runtime = new SyncRuntime({} as never, device.settings, { get: () => null, has: () => false } as never, async update => { Object.assign(device.settings, update); });
 	(runtime as unknown as { syncEngine: SyncEngine }).syncEngine = device.engine;
@@ -82,7 +78,7 @@ it('restores a historical file after that path became a directory', async () => 
 	clients.push(device); await device.authorize(); await device.open();
 	device.disk.write('note.md', 'original file');
 	await sync(device);
-	const checkpoint = await saveLegacyCheckpoint(device);
+	const checkpoint = await saveCheckpoint(device);
 	device.disk.remove('note.md');
 	await sync(device);
 	await device.disk.vault.createFolder('note.md');
@@ -107,10 +103,8 @@ it('discovers a checkpoint on another Mac and rolls back without the originating
 	expect(second.settings.syncHistory).toEqual([]);
 	first.disk.write('edited.md', 'later edit'); first.disk.remove('deleted.md'); first.disk.write('added.md', 'later addition');
 	await sync(first); await sync(second);
-	const runtime = historyRuntime(second, '');
-	const entry = second.settings.syncHistory[0]!;
-	delete entry.historyCheckpoint; entry.sharedCheckpoint = checkpoint!.id;
-	await (await runtime.createHistoryRestore(entry)).restore();
+	const runtime = historyRuntime(second, checkpoint!.id);
+	await (await runtime.createHistoryRestore(second.settings.syncHistory[0]!)).restore();
 	await sync(first);
 	for (const device of clients) {
 		expect(device.disk.paths()).toEqual(['deleted.md', 'edited.md']);
@@ -128,10 +122,8 @@ it('restores the rest of a shared checkpoint and reports a file whose saved vers
 	const checkpoint = (await device.api.sharedHistory.save())!;
 	// Replaced seconds after it was saved, right after another version was kept.
 	device.disk.write('edited.md', 'later edit'); device.disk.remove('deleted.md'); await sync(device);
-	const runtime = historyRuntime(device, '');
-	const entry = device.settings.syncHistory[0]!;
-	delete entry.historyCheckpoint; entry.sharedCheckpoint = checkpoint.id;
-	const review = await runtime.createHistoryRestore(entry);
+	const runtime = historyRuntime(device, checkpoint.id);
+	const review = await runtime.createHistoryRestore(device.settings.syncHistory[0]!);
 	expect(review.items.map(item => item.path)).toEqual(['deleted.md', 'edited.md']);
 	expect(await review.restore()).toEqual(['edited.md']);
 	expect(device.disk.paths()).toEqual(['deleted.md', 'edited.md']);

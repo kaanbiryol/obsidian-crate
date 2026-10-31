@@ -8,7 +8,7 @@ function harness() {
 	let connected = true;
 	const verify = () => { if (!connected) throw new Error('Sync connection changed. Reopen history.'); };
 	const preview = vi.fn(async () => ({ current: 'unsynced local edit', saved: 'selected saved contents' }));
-	const engine = { loadHistoryComparison: vi.fn(async (_id: string, _shared: boolean) => ({ compared: true,
+	const engine = { loadHistoryComparison: vi.fn(async (_id: string) => ({ compared: true,
 		items: [{ path: 'note.md', action: 'modified' as const }], preview })) };
 	return { engine, preview, disconnect: () => { connected = false; },
 		compare: (entry: SyncHistoryEntry) => loadRuntimeHistoryComparison(engine, verify, entry) };
@@ -16,14 +16,9 @@ function harness() {
 it('compares the selected checkpoint with the current vault without needing a preceding checkpoint', async () => {
 	const h = harness();
 	const comparison = await h.compare(point('selected'));
-	expect(h.engine.loadHistoryComparison.mock.calls).toEqual([['selected', true]]);
+	expect(h.engine.loadHistoryComparison.mock.calls).toEqual([['selected']]);
 	expect(comparison.compared).toBe(true);
 	expect(await comparison.preview('note.md')).toEqual({ current: 'unsynced local edit', saved: 'selected saved contents' });
-});
-it('supports a legacy local checkpoint', async () => {
-	const h = harness();
-	await h.compare({ ...point('unused'), sharedCheckpoint: undefined, historyCheckpoint: 'local' });
-	expect(h.engine.loadHistoryComparison.mock.calls).toEqual([['local', false]]);
 });
 it('requires a saved state instead of treating the recorded transfer paths as a snapshot', async () => {
 	const h = harness();

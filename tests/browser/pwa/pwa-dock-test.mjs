@@ -12,7 +12,7 @@ function dockScenario(engine, scenario, run) {
   test(`PWA dock ${name}: ${scenario}`, { timeout: 90000 }, async () => {
     let fixture, browser, page;
     try {
-      const reminderFixture = { projects: ['Inbox'], reminders: Array.from({ length: 32 }, (_, index) => ({
+      const reminderFixture = { projects: ['Inbox'], issues: [], reminders: Array.from({ length: 32 }, (_, index) => ({
         id: `dock-reminder-${index}`, content: `Dock scroll sample ${index + 1}`, project: 'Inbox',
         dueDatetime: new Date().toISOString(), priority: 4, completed: false, filePath: 'Reminders/Inbox.md', lineNumber: index + 1,
       })) };

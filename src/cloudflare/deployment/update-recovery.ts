@@ -29,7 +29,7 @@ const confirmedSteps = new Set<string>(UPDATE_STEPS);
  * it to "started" before dispatching its next mutation. Pending address activation
  * has a separate read-and-verify recovery path; other started steps stay blocked. */
 export async function recoverDeployment(api: RecoveryApi, target: CloudflareDeploymentMetadata, fingerprint?: string): Promise<DeploymentRecoveryResult> {
-	if (!target.accountId || !target.d1DatabaseId || target.reset || target.deletion) throw new Error('Select the original server and finish any pending reset or deletion first.');
+	if (!target.accountId || !target.d1DatabaseId || target.deletion) throw new Error('Select the original server and finish any pending deletion first.');
 	const account = target.accountId;
 	const database = target.d1DatabaseId;
 	const report: Record<string, unknown> = { worker: target.workerName, database, checkedAt: new Date().toISOString(), currentFingerprint: fingerprint };
@@ -124,7 +124,7 @@ export async function completePublishedDeployment(
 ): Promise<void> {
 	const parsed = parseFenceRecord(value);
 	const record = (parsed ?? {}) as Partial<DeploymentFenceRecord>;
-	if (!parsed || !target.accountId || !target.d1DatabaseId || target.reset || record.kind !== 'update'
+	if (!parsed || !target.accountId || !target.d1DatabaseId || record.kind !== 'update'
 		|| record.worker !== target.workerName || record.recoveryProtocol !== 1 || record.verificationPending !== true
 		|| !record.fingerprint || !isSha256Hex(record.fingerprint) || !record.version || !/^\d+\.\d+\.\d+$/.test(record.version)
 		|| !awaitsPublicationVerification(parsed)) throw new Error('This update is not ready for publication verification.');

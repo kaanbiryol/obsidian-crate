@@ -30,7 +30,7 @@ async function withReminders(browser, reminders, run) {
     const serverReminders = structuredClone(reminders);
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/reminders/list?*', route => route.fulfill({
-      json: { reminders: serverReminders, projects: [...new Set(serverReminders.map(item => item.project))] },
+      json: { reminders: serverReminders, projects: [...new Set(serverReminders.map(item => item.project))], issues: [] },
     }));
     const result = await run(page, serverReminders);
     assert.deepEqual(errors, [], 'pagination interactions must not throw browser errors');

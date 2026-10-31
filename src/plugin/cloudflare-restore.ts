@@ -1,3 +1,4 @@
+import { Notice, Platform } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { beginCloudflareOperation } from './cloudflare-operation-guard';
 import { getPluginLifecycleSignal } from './lifecycle-state';
@@ -8,10 +9,15 @@ import { BackupPicker, RestoredServer } from '../ui/cloudflare/restore-ui';
 import type { BackupChoice } from '../cloudflare/restore/archive';
 import { workersDevOrigin } from '../cloudflare/deployment/worker-origin';
 import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
+import { DESKTOP_ONLY_SERVER_CHANGE } from '../cloudflare/deployment/server-changes';
 
 const renewLoginMessage = 'Your Cloudflare login needs renewing. Select Reconnect under Account and devices, then resume the restore.';
 
 export async function openServerRestore(plugin: CratePlugin, chooseAnother = false): Promise<void> {
+	if (Platform.isMobile) {
+		new Notice(DESKTOP_ONLY_SERVER_CHANGE);
+		return;
+	}
 	const signal = beginCloudflareOperation(plugin, 'Wait for the current Cloudflare operation to finish.');
 	if (!signal) return;
 	const saved = plugin.settings.cloudflareRestore;

@@ -10,9 +10,6 @@ import {
 const deleteCrateServer = vi.hoisted(() => vi.fn(async (_input: unknown) => {}));
 vi.mock('../server-reset/delete', () => ({ deleteCrateServer }));
 
-const resetCrateServer = vi.hoisted(() => vi.fn(async (_input: unknown) => {}));
-vi.mock('../server-reset/reset', () => ({ resetCrateServer }));
-
 const apiMocks = vi.hoisted(() => ({
 	accounts: [{ id: '0123456789abcdef0123456789abcdef', name: 'Personal' }],
 	constructedWithTokens: [] as string[],
@@ -60,10 +57,11 @@ vi.mock('./provisioner', () => ({ provisionCloudflareDeployment }));
 
 import { blockingServerOperation, CloudflareDeploymentService, type CloudflareDeploymentServiceOptions } from './service';
 import type { CloudflareDeploymentMetadata, DeploymentIntent } from './types';
+import { DesktopOnlyServerChangeError } from './server-changes';
 
 const CLIENT_ID = '0123456789abcdef0123456789abcdef';
 
-function createHarness(onAuthorized?: CloudflareDeploymentServiceOptions['onAuthorized']) {
+function createHarness(onAuthorized?: CloudflareDeploymentServiceOptions['onAuthorized'], options: Partial<CloudflareDeploymentServiceOptions> = {}) {
 	const settings: CrateSettings = { ...DEFAULT_SETTINGS };
 	const persisted: string[] = [];
 	const settingsOwner = {
@@ -106,6 +104,7 @@ function createHarness(onAuthorized?: CloudflareDeploymentServiceOptions['onAuth
 		beforeServerSwitch,
 		beforeServerReset,
 		now: () => 1_000,
+		...options,
 	});
 	return { service, settings, settingsOwner, persisted, opened, transportCalls, transport, loadArtifacts, beforeServerReset, beforeServerSwitch, selectDeployment };
 }
@@ -124,7 +123,6 @@ beforeEach(() => {
 	apiMocks.queryD1.mockReset();
 	apiMocks.queryD1.mockResolvedValue([{ results: [] }]);
 	provisionCloudflareDeployment.mockClear();
-	resetCrateServer.mockReset();
 	deleteCrateServer.mockReset();
 });
 afterEach(() => vi.restoreAllMocks());
@@ -322,7 +320,7 @@ describe('Cloudflare deployment lifetime', () => {
 		let release!: (value: ArrayBuffer) => void;
 		vi.spyOn(crypto.subtle, 'digest').mockImplementation(() => new Promise(resolve => { release = resolve; }));
 		const h = resetHarness();
-		const pending = h.service.startDeployment('reset');
+		const pending = h.service.startDeployment('delete');
 		await h.service.deployWithSavedAuthorization('reconnect', operation => operation({ accessToken: 'saved' }), h.selectDeployment);
 		release(new ArrayBuffer(32));
 		await pending;
@@ -330,7 +328,7 @@ describe('Cloudflare deployment lifetime', () => {
 		expect(h.service.pendingIntent).toBeNull();
 	});
 
-	it.each(['connect', 'update', 'reset', 'delete'] as const)('revokes a late OAuth token without starting %s after destruction', async intent => {
+	it.each(['connect', 'update', 'delete'] as const)('revokes a late OAuth token without starting %s after destruction', async intent => {
 		const h = intent === 'connect' ? createHarness() : resetHarness();
 		let release!: () => void;
 		h.transport.mockImplementationOnce(async () => {
@@ -346,7 +344,6 @@ describe('Cloudflare deployment lifetime', () => {
 		await rejected;
 		expect(apiMocks.constructedWithTokens).toEqual([]);
 		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
-		expect(resetCrateServer).not.toHaveBeenCalled();
 		expect(deleteCrateServer).not.toHaveBeenCalled();
 		expect(h.settingsOwner.writeSettings).not.toHaveBeenCalled();
 		expect(h.transportCalls).toHaveLength(1);
@@ -354,7 +351,7 @@ describe('Cloudflare deployment lifetime', () => {
 		expect(h.transportCalls[0]?.body).toContain('late-token');
 	});
 
-	it.each(['connect', 'reset'] as const)('does not begin %s after artifacts finish loading on a destroyed service', async intent => {
+	it.each(['connect'] as const)('does not begin %s after artifacts finish loading on a destroyed service', async intent => {
 		const h = intent === 'connect' ? createHarness() : resetHarness();
 		let release!: () => void;
 		const artifacts = await h.loadArtifacts();
@@ -371,7 +368,6 @@ describe('Cloudflare deployment lifetime', () => {
 		release();
 		await rejected;
 		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
-		expect(resetCrateServer).not.toHaveBeenCalled();
 		expect(deleteCrateServer).not.toHaveBeenCalled();
 		expect(h.persisted).toHaveLength(writes);
 		expect(h.transportCalls.at(-1)?.url).toContain('/oauth2/revoke');
@@ -401,60 +397,11 @@ describe('Cloudflare deployment lifetime', () => {
 	});
 });
 
-describe('server reset authorization', () => {
+describe('server deletion authorization', () => {
 	it('requires an existing deployment before opening authorization', async () => {
 		const h = createHarness();
-		await expect(h.service.startDeployment('reset')).rejects.toThrow('Connect to a Crate server');
+		await expect(h.service.startDeployment('delete')).rejects.toThrow('Connect to a Crate server');
 		expect(h.opened).toEqual([]);
-	});
-
-	it('resets, provisions a fresh database, registers the device, and revokes authorization', async () => {
-		const h = resetHarness();
-		await h.service.startDeployment('reset');
-		expect(h.service.pendingIntent).toBe('reset');
-		const params = { code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! };
-		await h.service.handleCallback(params, h.selectDeployment, resetDevice);
-		expect(resetCrateServer).toHaveBeenCalledOnce();
-		expect(resetCrateServer.mock.invocationCallOrder[0]).toBeLessThan(provisionCloudflareDeployment.mock.invocationCallOrder[0]!);
-		expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
-		expect(apiMocks.queryD1).toHaveBeenCalled();
-		expect(h.transportCalls.some(call => call.url.endsWith('/oauth2/revoke'))).toBe(true);
-		expect(h.service.pendingIntent).toBeNull();
-		await expect(h.service.handleCallback(params, h.selectDeployment, resetDevice)).rejects.toThrow('No Cloudflare deployment');
-		expect(resetCrateServer).toHaveBeenCalledOnce();
-	});
-
-	it.each(['missing credential', 'changed settings', 'denied authorization', 'wrong account', 'failed validation'])('does not provision when reset is blocked: %s', async reason => {
-		const h = resetHarness();
-		await h.service.startDeployment('reset');
-		const params: Record<string, string> = { code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! };
-		if (reason === 'changed settings') h.settings.cloudflareDeployment!.d1DatabaseId = 'changed';
-		if (reason === 'denied authorization') params.error = 'access_denied';
-		if (reason === 'wrong account') apiMocks.accounts = [{ id: 'b'.repeat(32), name: 'Other' }];
-		if (reason === 'failed validation') resetCrateServer.mockRejectedValue(new Error('Reset blocked'));
-		await expect(h.service.handleCallback(params, h.selectDeployment, reason === 'missing credential' ? undefined : resetDevice)).rejects.toThrow();
-		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
-		if (reason !== 'failed validation') expect(resetCrateServer).not.toHaveBeenCalled();
-	});
-	it.each(['connect', 'update'] as const)('blocks %s while a server reset is pending', async intent => {
-		const h = resetHarness();
-		h.settings.cloudflareDeployment!.reset = { id: 'a'.repeat(32), phase: 'clearing', databaseId: h.settings.cloudflareDeployment!.d1DatabaseId!, bucketCreatedAt: 'date', namespaceId: 'c'.repeat(32) };
-		await expect(h.service.startDeployment(intent)).rejects.toThrow('Resume the server reset');
-		expect(h.opened).toEqual([]);
-	});
-
-	it('does not allow another authorization or callback while reset is running', async () => {
-		const h = resetHarness();
-		let release!: () => void;
-		resetCrateServer.mockImplementation(() => new Promise<void>(resolve => { release = resolve; }));
-		await h.service.startDeployment('reset');
-		const params = { code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! };
-		const running = h.service.handleCallback(params, h.selectDeployment, resetDevice);
-		await vi.waitFor(() => expect(resetCrateServer).toHaveBeenCalledOnce());
-		await expect(h.service.startDeployment('reset')).rejects.toThrow('Wait for the current');
-		await expect(h.service.handleCallback(params, h.selectDeployment, resetDevice)).rejects.toThrow('already in progress');
-		release();
-		await running;
 	});
 
 	it('deletes without provisioning or registering a device, then clears metadata and revokes access', async () => {
@@ -480,11 +427,6 @@ describe('server reset authorization', () => {
 		expect(h.transportCalls.some(call => call.url.endsWith('/oauth2/revoke'))).toBe(true);
 	});
 
-	it.each(['connect', 'update', 'reset'] as const)('blocks %s while server deletion is pending', async intent => {
-		const h = resetHarness();
-		h.settings.cloudflareDeployment!.reset = { id: 'a'.repeat(32), phase: 'clearing', deleteOnly: true, databaseId: h.settings.cloudflareDeployment!.d1DatabaseId!, bucketCreatedAt: 'date', namespaceId: 'c'.repeat(32) };
-		await expect(h.service.startDeployment(intent)).rejects.toThrow('Resume server deletion');
-	});
 
 });
 
@@ -673,20 +615,7 @@ it('continues a saved update when the selected server is rewritten with reordere
 	expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
 });
 
-it('resets with saved authorization and registers the replacement device', async () => {
-	const h = createHarness();
-	await h.service.startDeployment();
-	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, h.selectDeployment);
-	h.settings.cloudflareDeployment!.d1DatabaseId = 'database';
-	h.transportCalls.length = 0;
-	const device = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Desktop', platform: 'desktop' };
-	await h.service.deployWithSavedAuthorization('reset', operation => operation({ accessToken: 'saved' }), h.selectDeployment, device);
-	expect(resetCrateServer).toHaveBeenCalledOnce();
-	expect(apiMocks.queryD1).toHaveBeenCalled();
-	expect(h.transportCalls).toHaveLength(0);
-});
-
-it.each(['reset', 'delete'] as const)('rejects a changed confirmation target during saved %s authorization', async intent => {
+it.each(['delete'] as const)('rejects a changed confirmation target during saved %s authorization', async intent => {
 	const h = createHarness();
 	await h.service.startDeployment();
 	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, h.selectDeployment);
@@ -695,7 +624,6 @@ it.each(['reset', 'delete'] as const)('rejects a changed confirmation target dur
 		h.settings.cloudflareDeployment!.workerName = 'different-worker';
 		return operation({ accessToken: 'saved' });
 	}, h.selectDeployment)).rejects.toThrow('Server settings changed');
-	expect(resetCrateServer).not.toHaveBeenCalled();
 	expect(deleteCrateServer).not.toHaveBeenCalled();
 });
 
@@ -719,38 +647,77 @@ it('keeps reconnect bound to its saved server across browser authorization', asy
 	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 });
 
-it.each(['connect', 'reconnect', 'switch', 'create', 'update', 'reset'] as const)('blocks %s while terminal deletion is pending', async intent => {
+it.each(['connect', 'reconnect', 'switch', 'create', 'update'] as const)('blocks %s while terminal deletion is pending', async intent => {
 	const h = resetHarness();
 	h.settings.cloudflareDeployment!.deletion = { id: 'a'.repeat(32), phase: 'clearing-bucket', databaseId: h.settings.cloudflareDeployment!.d1DatabaseId!,
 		bucketCreatedAt: 'date', workerCreatedAt: 'date', helperName: `crate-delete-${'a'.repeat(32)}` };
 	await expect(h.service.startDeployment(intent)).rejects.toThrow('Resume server deletion');
 });
 
-it('allows deletion to supersede an interrupted reset without loading artifacts', async () => {
-	const h = resetHarness();
-	h.settings.cloudflareDeployment!.reset = { id: 'a'.repeat(32), phase: 'clearing', databaseId: h.settings.cloudflareDeployment!.d1DatabaseId!, bucketCreatedAt: 'date', namespaceId: 'c'.repeat(32) };
-	h.loadArtifacts.mockRejectedValue(new Error('obsolete server bundle'));
-	await h.service.deployWithSavedAuthorization('delete', operation => operation({ accessToken: 'saved' }), h.selectDeployment);
-	expect(deleteCrateServer).toHaveBeenCalledOnce();
-	expect(resetCrateServer).not.toHaveBeenCalled();
-	expect(h.loadArtifacts).not.toHaveBeenCalled();
-});
-
 describe('pending server operations', () => {
-	const reset = { id: 'a'.repeat(32), phase: 'clearing' as const, databaseId: 'old-db', bucketCreatedAt: 'date', namespaceId: 'c'.repeat(32) };
 	const deletion = { id: 'b'.repeat(32), phase: 'removing-worker' as const, databaseId: 'old-db', bucketCreatedAt: null, workerCreatedAt: null, helperName: `crate-delete-${'b'.repeat(32)}` };
 	const saved = (pending: Partial<CloudflareDeploymentMetadata>): CloudflareDeploymentMetadata => ({ ...savedServer(), ...pending });
-	const intents: DeploymentIntent[] = ['reconnect', 'connect', 'switch', 'create', 'update', 'reset', 'delete'];
-	const cases: Array<[string, CloudflareDeploymentMetadata | null, Partial<Record<DeploymentIntent, 'deletion' | 'reset'>>]> = [
+	const intents: DeploymentIntent[] = ['reconnect', 'connect', 'switch', 'create', 'update', 'delete'];
+	const cases: Array<[string, CloudflareDeploymentMetadata | null, Partial<Record<DeploymentIntent, 'deletion'>>]> = [
 		['no saved server', null, {}],
 		['no pending operation', saved({}), {}],
-		['a reset', saved({ reset }), { reconnect: 'reset', connect: 'reset', switch: 'reset', create: 'reset', update: 'reset' }],
-		['a deletion', saved({ deletion }), { reconnect: 'deletion', connect: 'deletion', switch: 'deletion', create: 'deletion', update: 'deletion', reset: 'deletion' }],
-		['an earlier release’s delete-only reset', saved({ reset: { ...reset, deleteOnly: true } }),
-			{ reconnect: 'deletion', connect: 'deletion', switch: 'deletion', create: 'deletion', update: 'deletion', reset: 'deletion' }],
+		['a deletion', saved({ deletion }), { reconnect: 'deletion', connect: 'deletion', switch: 'deletion', create: 'deletion', update: 'deletion' }],
 	];
-	it.each(cases)('admits only resuming or deleting with %s', (_label, metadata, blocked) => {
+	it.each(cases)('admits only deleting with %s', (_label, metadata, blocked) => {
 		expect(Object.fromEntries(intents.map(intent => [intent, blockingServerOperation(metadata, intent)])))
 			.toEqual(Object.fromEntries(intents.map(intent => [intent, blocked[intent] ?? null])));
+	});
+});
+
+describe('mobile server changes', () => {
+	const mobile = () => createHarness(undefined, { serverChangesAllowed: false });
+	const saved = (h: ReturnType<typeof createHarness>) => {
+		h.settings.cloudflareDeployment = { ...savedServer(), accountId: apiMocks.accounts[0]!.id };
+	};
+	const authorize = (h: ReturnType<typeof createHarness>, device?: Parameters<typeof h.service.handleCallback>[2]) =>
+		h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, h.selectDeployment, device);
+	const existingServer = () => {
+		apiMocks.workers = [{ id: 'crate-fedcba9876543210' }];
+		apiMocks.workerSettings.set('crate-fedcba9876543210', { annotations: { 'workers/message': 'Crate 9.0.0' }, bindings: [
+			{ type: 'd1', name: 'DB', id: 'existing-database-id' },
+			{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-fedcba9876543210' },
+			{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
+		] });
+	};
+
+	it.each(['create', 'update', 'delete'] as const)('refuses %s before opening authorization', async intent => {
+		const h = mobile();
+		saved(h);
+		await expect(h.service.startDeployment(intent)).rejects.toThrow(DesktopOnlyServerChangeError);
+		expect(h.opened).toHaveLength(0);
+	});
+
+	it('refuses saved-login changes without using the login', async () => {
+		const h = mobile();
+		saved(h);
+		const withAuthorization = vi.fn();
+		await expect(h.service.deployWithSavedAuthorization('update', withAuthorization, h.selectDeployment)).rejects.toThrow(DesktopOnlyServerChangeError);
+		await expect(h.service.recoverUpdate(withAuthorization)).rejects.toThrow(DesktopOnlyServerChangeError);
+		await expect(h.service.listRestoreBackups(withAuthorization)).rejects.toThrow(DesktopOnlyServerChangeError);
+		expect(withAuthorization).not.toHaveBeenCalled();
+	});
+
+	it('connects to an existing server', async () => {
+		existingServer();
+		const h = mobile();
+		await h.service.startDeployment();
+		await expect(authorize(h, resetDevice)).resolves.toEqual(expect.objectContaining({ status: 'deployed' }));
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		expect(h.settings.cloudflareDeployment?.d1DatabaseId).toBe('existing-database-id');
+	});
+
+	it('does not create a server when connecting finds none', async () => {
+		const h = mobile();
+		await h.service.startDeployment();
+		await expect(authorize(h, resetDevice)).rejects.toThrow(DesktopOnlyServerChangeError);
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		expect(h.beforeServerSwitch).not.toHaveBeenCalled();
+		expect(h.settings.cloudflareDeployment).toBeNull();
+		expect(h.transportCalls.some(call => call.url.endsWith('/oauth2/revoke'))).toBe(true);
 	});
 });

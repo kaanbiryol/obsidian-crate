@@ -60,32 +60,16 @@ function createApi() {
 }
 
 describe('provisionCloudflareDeployment', () => {
-	it.each(['ordinary update', 'clearing reset', 'deletion', 'missing replacement', 'changed worker', 'old bucket'] as const)(
-		'does not substitute storage for %s', async scenario => {
-			const api = createApi();
-			const metadata = createMetadata();
-			const originalId = metadata.d1DatabaseId!;
-			api.getD1Database.mockResolvedValue(null);
-			if (scenario !== 'ordinary update') {
-				metadata.reset = { id: 'b'.repeat(32), phase: scenario === 'clearing reset' ? 'clearing' : 'rebuilding',
-					databaseId: originalId, bucketCreatedAt: '2026-01-01', namespaceId: 'c'.repeat(32),
-					...(scenario === 'deletion' ? { deleteOnly: true as const } : {}) };
-				api.getWorkerSettings.mockResolvedValue({ annotations: { 'workers/message': `Crate reset ${metadata.reset.id}` },
-					bindings: [{ type: 'd1', name: 'DB', id: originalId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: metadata.r2BucketName }] });
-			}
-			if (scenario === 'missing replacement') metadata.d1DatabaseId = 'fedcba98-7654-3210-fedc-ba9876543210';
-			if (scenario === 'changed worker') {
-				const settings = await api.getWorkerSettings();
-				api.getWorkerSettings.mockResolvedValue({ ...settings, annotations: { 'workers/message': `Crate 0.1.0 ${artifacts.fingerprint}` } });
-			}
-			if (scenario === 'old bucket') api.getR2Bucket.mockResolvedValue({ name: metadata.r2BucketName, creation_date: metadata.reset!.bucketCreatedAt });
-			await expect(provisionCloudflareDeployment({ api: api as never, metadata, accountId: metadata.accountId!, artifacts, onMetadataChanged: vi.fn() })).rejects.toThrow();
-			expect(api.createD1Database).not.toHaveBeenCalled();
-			expect(api.createR2Bucket).not.toHaveBeenCalled();
-			expect(api.queryD1).not.toHaveBeenCalled();
-			expect(api.uploadWorker).not.toHaveBeenCalled();
-		},
-	);
+	it('does not substitute storage when the saved database is missing', async () => {
+		const api = createApi();
+		const metadata = createMetadata();
+		api.getD1Database.mockResolvedValue(null);
+		await expect(provisionCloudflareDeployment({ api: api as never, metadata, accountId: metadata.accountId!, artifacts, onMetadataChanged: vi.fn() })).rejects.toThrow('The saved server database is missing');
+		expect(api.createD1Database).not.toHaveBeenCalled();
+		expect(api.createR2Bucket).not.toHaveBeenCalled();
+		expect(api.queryD1).not.toHaveBeenCalled();
+		expect(api.uploadWorker).not.toHaveBeenCalled();
+	});
 
 	it('preserves the remote vault name when updating from a differently named local copy', async () => {
 		const api = createApi();
@@ -98,23 +82,6 @@ describe('provisionCloudflareDeployment', () => {
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
 		expect(api.uploadWorker).toHaveBeenCalledWith(expect.objectContaining({ vaultName: 'Notes', workerName: metadata.workerName }));
 		expect(metadata.vaultName).toBe('Notes');
-	});
-
-	it('deletes the beta safety namespace only while this Worker still has one', async () => {
-		const api = createApi();
-		const metadata = createMetadata();
-		api.listDurableObjectNamespaces.mockResolvedValueOnce([
-			{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' },
-			{ id: 'd'.repeat(32), script: metadata.workerName, class: 'CloudSafety' },
-			{ id: 'e'.repeat(32), script: 'another-worker', class: 'CloudSafety' },
-		]).mockResolvedValueOnce([
-			{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' },
-			{ id: 'e'.repeat(32), script: 'another-worker', class: 'CloudSafety' },
-		]);
-		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
-		metadata.lastDeployedFingerprint = null;
-		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
-		expect(api.uploadWorker.mock.calls.map(([input]) => input.retireCloudSafety)).toEqual([true, false]);
 	});
 
 	it('skips address activation when Cloudflare already has the exact settings', async () => {

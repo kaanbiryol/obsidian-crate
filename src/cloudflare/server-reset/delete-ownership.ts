@@ -85,9 +85,6 @@ export async function inspectDeletionResources(api: DeleteApi, metadata: Cloudfl
 		}
 		if (bucket && bucket.creation_date !== job.bucketCreatedAt) throw new Error('Deletion paused: the file bucket was recreated during deletion.');
 		if (database && ['removing-helper', 'complete'].includes(job.phase)) throw new Error('Deletion paused: server storage still exists.');
-	} else if (bucket && metadata.reset && (metadata.reset.deleteOnly || metadata.reset.phase === 'clearing')
-		&& bucket.creation_date !== metadata.reset.bucketCreatedAt) {
-		throw new Error('Deletion blocked: the file bucket changed since the interrupted operation.');
 	}
 	const namespaces = await api.listDurableObjectNamespaces(accountId);
 	if (namespaces.some(namespace => !namespace.id || !namespace.script)) throw new Error('Deletion blocked: could not verify Durable Object ownership.');

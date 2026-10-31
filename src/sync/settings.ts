@@ -1,4 +1,4 @@
-import { isRecord, isSha256Hex, normalizeNonNegativeInteger, normalizeNullableString, normalizeStringArray } from '../platform/validation';
+import { isRecord, normalizeNonNegativeInteger, normalizeNullableString, normalizeStringArray } from '../platform/validation';
 import { MAX_TIMER_SECONDS } from '../protocol/shared-settings';
 import { isCheckpointId } from '../protocol/history-checkpoints';
 import { normalizeWorkerUrl } from './connection/worker-url';
@@ -140,8 +140,6 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 		} : {}),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
 		...(isCheckpointId(value.sharedCheckpoint) ? { sharedCheckpoint: value.sharedCheckpoint } : {}),
-		...(isSha256Hex(value.historyCheckpoint)
-			? { historyCheckpoint: value.historyCheckpoint } : {}),
 		...(requestDiagnostics ? { requestDiagnostics } : {}),
 		...(timings ? { timings } : {}),
 		...(typeof value.resolvedRaceCount === 'number' ? {

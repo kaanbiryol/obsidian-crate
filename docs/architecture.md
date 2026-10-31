@@ -81,9 +81,9 @@ enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
 ## Worker Bindings
 
 `cloudflare/deployment/worker-upload-payload.ts` builds multipart metadata and module bytes for
-normal, reset and deletion Workers. `cloudflare/cloudflare-api.ts` owns authenticated
+normal and deletion Workers. `cloudflare/cloudflare-api.ts` owns authenticated
 transport, response handling and pagination. Binding and export policy belongs with
-the payload builders, including preserved Durable Object namespaces during reset.
+the payload builders.
 
 | Binding | Type | Purpose |
 |---|---|---|
@@ -451,7 +451,7 @@ operation reconciliation still handles uncertain remote writes.
 3. The plugin verifies `state` before exchanging the authorization code. The deployment service uses the exchanged tokens for the selected account operation.
 4. The plugin discovers Crate Workers in the selected account. Joining a saved or discovered deployment registers this device without uploading code or changing schema. Creating a deployment initializes the current schema; explicit updates require its schema marker before uploading code; request cold starts never mutate the schema. Updates reject an authoritative remote version newer than the installed artifact.
 5. The plugin generates a permanent device secret locally and writes only its hash and device metadata to the deployment's D1 database using the temporary Cloudflare authorization.
-6. After a successful operation, `CloudflareSavedLogin` retains the access and refresh tokens in Obsidian secret storage, scoped to the Cloudflare account. Explicit usage, reconnect, update, reset, deletion and recovery operations reuse this login and renew it when needed. Failed operations with newly exchanged tokens revoke them; a failed operation using the saved login keeps that shared login. Plugin settings contain only non-secret deployment metadata and the cached usage snapshot. Revocation is available in Cloudflare.
+6. After a successful operation, `CloudflareSavedLogin` retains the access and refresh tokens in Obsidian secret storage, scoped to the Cloudflare account. Explicit usage, reconnect, update, deletion and recovery operations reuse this login and renew it when needed. Failed operations with newly exchanged tokens revoke them; a failed operation using the saved login keeps that shared login. Plugin settings contain only non-secret deployment metadata and the cached usage snapshot. Revocation is available in Cloudflare.
 
 Terminal Cloudflare deletion is implemented separately in `server-reset/delete.ts`, with resource identity checks in `server-reset/delete-ownership.ts` and settled-operation takeover in `server-reset/delete-fence.ts`. It removes the selected Worker and its owned Durable Objects, then its entire R2 bucket and D1 database. A separate temporary cleanup Worker uses a hashed capability and only the selected R2 binding; it does not depend on application protocols, releases, schemas, or reset/rebuild rules. Non-secret deletion progress survives plugin reload.
 
@@ -549,7 +549,7 @@ immutable history. Sync retains cursor/checkpoint ordering and persists at opera
 completion. This preserves newer progress during unrelated settings saves, the
 hydrated device identity and the existing shared settings object.
 
-`cloudflare/deployment/state.ts` validates persisted deployment, reset and deletion
+`cloudflare/deployment/state.ts` validates persisted deployment and deletion
 state; plugin settings compose that domain normalizer. `cloudflare/restore/workflow.ts`
 keeps restore checkpoint selection, destination creation and persist-before-remote
 ordering together. `CloudflareDeploymentService` retains authorization, operation

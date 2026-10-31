@@ -1,10 +1,16 @@
+import { Notice, Platform } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { beginCloudflareOperation } from './cloudflare-operation-guard';
 import { openCloudflareDeploymentModal } from '../ui/cloudflare/deployment-modal';
 import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
 import { DeploymentRecoveryRequiredError } from '../cloudflare/deployment/fence';
+import { DESKTOP_ONLY_SERVER_CHANGE } from '../cloudflare/deployment/server-changes';
 
 export async function checkAndRecoverUpdate(plugin: CratePlugin, onUpdate: () => void): Promise<void> {
+	if (Platform.isMobile) {
+		new Notice(DESKTOP_ONLY_SERVER_CHANGE);
+		return;
+	}
 	const signal = beginCloudflareOperation(plugin, 'A Cloudflare operation is still running. Wait for its result before checking recovery.');
 	if (!signal) return;
 	const progress = openCloudflareDeploymentModal(plugin.app, 'update', plugin.getSettingsDocument(), signal);

@@ -93,7 +93,7 @@ export class CrateSettingTab extends PluginSettingTab {
 					this.renderSection(context => renderServerActions({ ...context, isConfigured }), content);
 				},
 			});
-			if (this.plugin.settings.cloudflareDeployment?.reset || this.plugin.settings.cloudflareRestore && this.plugin.settings.cloudflareRestore.phase !== 'complete') {
+			if (this.plugin.settings.cloudflareRestore && this.plugin.settings.cloudflareRestore.phase !== 'complete') {
 				const attention = new Setting(containerEl).setName('Server recovery needs attention')
 					.setDesc('Review the saved server recovery operation.');
 				attention.addButton(button => button.setButtonText('Review recovery').onClick(() => {

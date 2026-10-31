@@ -23,12 +23,11 @@ export function validateReadingFolder(value: string, remindersFolder?: string, c
 	return folder;
 }
 
-/** Saved settings without a field predate it, from installs that already ran Reading in this vault.
- * Reading runs only in a vault that confirmed it. */
+/** Reading runs only in a vault that confirmed it. */
 export function normalizeReadingSettings(value: unknown): ReadingSettings {
 	const settings = value && typeof value === 'object' ? value as Partial<ReadingSettings> : {};
-	const confirmed = typeof settings.confirmed === 'boolean' ? settings.confirmed : true;
-	const enabled = confirmed && (typeof settings.enabled === 'boolean' ? settings.enabled : true);
+	const confirmed = typeof settings.confirmed === 'boolean' ? settings.confirmed : DEFAULT_READING_SETTINGS.confirmed;
+	const enabled = confirmed && (typeof settings.enabled === 'boolean' ? settings.enabled : DEFAULT_READING_SETTINGS.enabled);
 	try {
 		return { enabled, confirmed, folderPath: validateReadingFolder(typeof settings.folderPath === 'string' ? settings.folderPath : 'Reading') };
 	} catch { return { enabled, confirmed, folderPath: DEFAULT_READING_SETTINGS.folderPath }; }

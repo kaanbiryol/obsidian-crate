@@ -20,7 +20,7 @@ function reminder(id: string, overrides: Partial<ReminderRecord> = {}): Reminder
 		filePath: 'Reminders/Inbox.md', project: 'Inbox', ...overrides };
 }
 function response(reminders: ReminderRecord[], projects = ['Inbox']) {
-	return new Response(JSON.stringify({ reminders, projects }), { headers: { ETag: 'latest-list' } });
+	return new Response(JSON.stringify({ reminders, projects, issues: [] }), { headers: { ETag: 'latest-list' } });
 }
 function harness() {
 	const requests: Array<{ resolve: (value: Response) => void }> = [];
@@ -105,12 +105,12 @@ describe('PWA reminder refresh around local writes', () => {
 
 	it.each([
 		{}, { reminders: [] }, { projects: [] },
-		{ reminders: [null], projects: ['Inbox'] },
-		{ reminders: [reminder('one'), reminder('one')], projects: ['Inbox'] },
-		{ reminders: [reminder('one', { filePath: 'Private/Inbox.md' })], projects: ['Inbox'] },
-		{ reminders: [reminder('one', { dueDate: '2099-02-30' })], projects: ['Inbox'] },
-		{ reminders: [reminder('one')], projects: [null] },
-		{ reminders: [], projects: [], issues: 'invalid' },
+		{ reminders: [null], projects: ['Inbox'], issues: [] },
+		{ reminders: [reminder('one'), reminder('one')], projects: ['Inbox'], issues: [] },
+		{ reminders: [reminder('one', { filePath: 'Private/Inbox.md' })], projects: ['Inbox'], issues: [] },
+		{ reminders: [reminder('one', { dueDate: '2099-02-30' })], projects: ['Inbox'], issues: [] },
+		{ reminders: [reminder('one')], projects: [null], issues: [] },
+		{ reminders: [], projects: [], issues: 'invalid' }, { reminders: [], projects: [] },
 	])('preserves the confirmed snapshot and ETag after an invalid list: %j', async invalid => {
 		const { rendered, original, options, load, settle } = harness();
 		await settle(0, response([original]), load());

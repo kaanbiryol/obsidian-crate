@@ -12,7 +12,7 @@ function harness() {
 	const writeSettings = vi.fn(async (update: Partial<CrateSettings>) => { Object.assign(settings, update); });
 	const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: [] }) }));
 	const service = new CloudflareDeploymentService({ clientId: 'a'.repeat(32), settingsOwner: { settings, writeSettings }, transport, loadArtifacts: async () => ({ version: '0.3.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: '', d1SchemaSha256: '' }), openExternal: vi.fn() });
-	const choice: BackupChoice = { prefix: '__crate__/backups/schema-upgrade-11111111-1111-1111-1111-111111111111', hash: 'b'.repeat(64), manifest: { format: 1, complete: true, createdAt: new Date().toISOString(), source: { account: settings.cloudflareDeployment!.accountId!, database: settings.cloudflareDeployment!.d1DatabaseId!, bucket: settings.cloudflareDeployment!.r2BucketName }, databaseSha256: 'c'.repeat(64), objects: [] } };
+	const choice: BackupChoice = { prefix: '__crate__/backups/schema-upgrade-11111111-1111-1111-1111-111111111111', hash: 'b'.repeat(64), manifest: { format: 2, complete: true, createdAt: new Date().toISOString(), source: { account: settings.cloudflareDeployment!.accountId!, database: settings.cloudflareDeployment!.d1DatabaseId!, bucket: settings.cloudflareDeployment!.r2BucketName }, databaseParts: [{ sha256: 'c'.repeat(64), size: 1 }], objects: [] } };
 	return { settings, writeSettings, transport, service, choice };
 }
 beforeEach(() => vi.resetAllMocks());

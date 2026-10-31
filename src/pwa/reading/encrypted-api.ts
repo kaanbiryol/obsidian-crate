@@ -32,8 +32,8 @@ interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path
 interface Source { file: WireFile; content: string; item: ReadingItem; hash: string; sealed: boolean }
 /** Authenticated metadata for one encrypted note, reusable while its file is unchanged.
  * `file.path` is the server path; `item.path` is the note's plaintext path. `hash` is
- * its plaintext hash, absent from entries saved by earlier versions. */
-export interface EncryptedReadingIndexEntry { file: WireFile; item: ReadingItem; hash?: string }
+ * its plaintext hash. */
+export interface EncryptedReadingIndexEntry { file: WireFile; item: ReadingItem; hash: string }
 /** `rejected` marks an attempt the Worker refused with `version_conflict`; it is rebuilt, never resent. */
 interface Attempt { requestHash: string; body: string; generation: number; rejected?: true }
 interface EncryptedReadingOptions {
@@ -52,7 +52,7 @@ interface EncryptedReadingOptions {
  * even when the vault sequence has not changed. */
 class NoteUnavailableError extends Error {}
 
-const known = (entry: EncryptedReadingIndexEntry) => ({ wire: entry.file.path, path: entry.item.path, hash: entry.hash ?? '' });
+const known = (entry: EncryptedReadingIndexEntry) => ({ wire: entry.file.path, path: entry.item.path, hash: entry.hash });
 
 function sameFile(a: WireFile, b: WireFile): boolean {
 	return a.revision === b.revision && a.hash === b.hash && a.size === b.size;

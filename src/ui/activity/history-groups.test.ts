@@ -35,6 +35,6 @@ describe('history grouping', () => {
 });
 
 it('does not merge no-change entries with different restore checkpoints', () => {
-	const groups = groupHistory([entry(19, 14, { historyCheckpoint: 'a'.repeat(64) }), entry(19, 13, { historyCheckpoint: 'b'.repeat(64) })], now);
+	const groups = groupHistory([entry(19, 14, { sharedCheckpoint: 'first' }), entry(19, 13, { sharedCheckpoint: 'second' })], now);
 	expect(groups[0]?.rows).toHaveLength(2);
 });

@@ -1,5 +1,4 @@
 import { CloudflareOperationPresentation } from '../ui/cloudflare/operation-presentation';
-import { ResetBlockedError } from '../cloudflare/server-reset/reset-errors';
 import { supportsSavedAuthorization, type CloudflareDeploymentResult, type DeploymentIntent, type SavedDeploymentIntent } from '../cloudflare/deployment/types';
 import type { CloudflareAuthorizedDevice } from '../cloudflare/deployment/device-registration';
 import type { ConnectionTestResult } from '../sync/types';
@@ -29,6 +28,7 @@ import {
 } from '../cloudflare/oauth/config';
 import { SECRET_KEYS } from '../platform/secret-keys';
 import { stableJson } from '../platform/stable-json';
+import { changesServer, DESKTOP_ONLY_SERVER_CHANGE } from '../cloudflare/deployment/server-changes';
 
 export function createCloudflareSavedLogin(plugin: CratePlugin): CloudflareSavedLogin {
 	return new CloudflareSavedLogin({
@@ -54,6 +54,7 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 		transport: obsidianHttpTransport,
 		loadArtifacts: loadEmbeddedCloudflareArtifacts,
 		openExternal: url => openCloudflareAuthorization(plugin, url),
+		serverChangesAllowed: !Platform.isMobile,
 		beforeServerSwitch: async () => {
 			plugin.clearSettingsUiState();
 			await plugin.syncRuntime.clearSyncConfiguration(signal);
@@ -91,6 +92,10 @@ export async function startCloudflareDeployment(plugin: CratePlugin, intent?: Ex
 	}
 	try {
 		const selectedIntent = intent ?? (plugin.syncRuntime.isConfigured() ? 'update' : 'connect');
+		if (Platform.isMobile && changesServer(selectedIntent)) {
+			new Notice(DESKTOP_ONLY_SERVER_CHANGE);
+			return;
+		}
 		if (supportsSavedAuthorization(selectedIntent) && plugin.settings.cloudflareDeployment?.accountId) {
 			await runCloudflareOperation(plugin, {}, selectedIntent);
 			return;
@@ -189,7 +194,7 @@ function beginOperation(
 	const intent = savedIntent ?? plugin.cloudflareDeploymentService.pendingIntent;
 	const isReconnect = intent === 'reconnect';
 	const isSwitch = ['switch', 'create'].includes(intent ?? '');
-	const shouldConnectDevice = intent !== 'delete' && (isReconnect || isSwitch || intent === 'reset' || !plugin.syncRuntime.isConfigured());
+	const shouldConnectDevice = intent !== 'delete' && (isReconnect || isSwitch || !plugin.syncRuntime.isConfigured());
 	const originalDeployment = stableJson(plugin.settings.cloudflareDeployment);
 	const originalWorkerUrl = plugin.settings.workerUrl;
 	const originalToken = isReconnect ? plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) : null;
@@ -261,11 +266,10 @@ async function handleDeploymentFailure({ plugin, signal, savedIntent, intent, pr
 		return;
 	}
 	const needsReview = error instanceof DeploymentRecoveryRequiredError;
-	if (needsReview || intent === 'delete' || intent === 'reset') plugin.refreshSettingsTab();
+	if (needsReview || intent === 'delete') plugin.refreshSettingsTab();
 	presentation.operationFailed(deploymentErrorMessage(error), {
 		needsReview,
-		canResumeDeletion: Boolean(plugin.settings.cloudflareDeployment?.deletion || plugin.settings.cloudflareDeployment?.reset?.deleteOnly),
-		resetBlocked: error instanceof ResetBlockedError,
+		canResumeDeletion: Boolean(plugin.settings.cloudflareDeployment?.deletion),
 		unupgradable: error instanceof UnupgradableServerError,
 	});
 }

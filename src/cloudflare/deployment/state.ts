@@ -78,13 +78,5 @@ export function normalizeCloudflareDeployment(value: unknown): CloudflareDeploym
 		...(deletion ? { deletion } : {}),
 		...(typeof value.lastKnownRevision === 'number' && Number.isSafeInteger(value.lastKnownRevision) && value.lastKnownRevision > 0
 			? { lastKnownRevision: value.lastKnownRevision } : {}),
-		...(isRecord(value.reset) && typeof value.reset.id === 'string' && /^[a-f0-9]{32}$/.test(value.reset.id)
-			&& (value.reset.phase === 'clearing' || value.reset.phase === 'rebuilding')
-			&& typeof value.reset.databaseId === 'string' && /^[a-f0-9-]{36}$/i.test(value.reset.databaseId)
-			&& typeof value.reset.bucketCreatedAt === 'string' && value.reset.bucketCreatedAt.length > 0
-			&& typeof value.reset.namespaceId === 'string' && /^[a-f0-9]{32}$/i.test(value.reset.namespaceId)
-			? { reset: { id: value.reset.id, phase: value.reset.phase, databaseId: value.reset.databaseId,
-				bucketCreatedAt: value.reset.bucketCreatedAt, namespaceId: value.reset.namespaceId,
-				...(value.reset.deleteOnly === true ? { deleteOnly: true as const } : {}) } } : {}),
 	};
 }

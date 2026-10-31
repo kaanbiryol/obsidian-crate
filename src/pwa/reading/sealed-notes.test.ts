@@ -20,8 +20,6 @@ describe('acceptsSealedNote', () => {
 		expect(acceptsSealedNote(note, [{ ...note }])).toBe(true);
 		expect(acceptsSealedNote(note, [{ ...note, hash: 'b' }])).toBe(false);
 		expect(acceptsSealedNote(note, [{ ...note, path: 'Reading/Renamed.md' }])).toBe(false);
-		// Entries saved before hashes were recorded never match.
-		expect(acceptsSealedNote(note, [{ ...note, hash: '' }])).toBe(false);
 	});
 	it('rejects the name of a note at another server path, in any letter case', () => {
 		expect(acceptsSealedNote(note, [{ wire: 'R/old.md', path: 'Reading/Article.md', hash: 'a' }])).toBe(false);

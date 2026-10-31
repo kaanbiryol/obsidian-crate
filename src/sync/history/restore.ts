@@ -1,5 +1,5 @@
 import type { Vault } from 'obsidian';
-import { findHistorySource, HistoryVersionUnavailableError } from './source';
+import { HistoryVersionUnavailableError } from './source';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { LocalManifestView } from '../manifest/manifest';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
@@ -25,11 +25,11 @@ export interface HistoryRestoreReview {
 }
 interface Context {
 	vault: Vault;
-	api: Pick<SyncApiClient, 'getManifest' | 'listFileVersions' | 'previewFileVersion' | 'downloadFile'>;
+	api: Pick<SyncApiClient, 'getManifest'>;
 	baseline: LocalManifestView['files'];
 	target: Files;
 	recoveryRoot: string;
-	readTarget?(path: string, file: FileEntry): Promise<ArrayBuffer>;
+	readTarget(path: string, file: FileEntry): Promise<ArrayBuffer>;
 	shouldIgnore(path: string): boolean;
 	verify(): void;
 	beforeApply(): Promise<void>;
@@ -52,22 +52,17 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 	const items: HistoryRestoreItem[] = paths.filter(path => local[path]?.hash !== target[path]?.hash || remote[path]?.hash !== target[path]?.hash).map(path => ({
 		path, action: !target[path] ? 'remove' : local[path] ? 'revert' : 'restore',
 	}));
-	// Resolve the exact bytes while previewing. A file whose saved version is gone
-	// keeps its current contents and is reported; it is never silently skipped.
+	// A file whose saved version is gone keeps its current contents and is
+	// reported; it is never silently skipped.
 	const sources = new Map<string, () => Promise<ArrayBuffer>>();
 	const unavailable = new Set<string>();
 	for (const item of items) {
 		const wanted = target[item.path];
 		if (!wanted) continue;
 		if (wanted.size > MAX_FILE_SIZE_BYTES) throw new Error(`${item.path}: file is too large to restore.`);
-		try {
-			sources.set(item.path, local[item.path]?.hash === wanted.hash
-				? () => vault.adapter.readBinary(item.path)
-				: context.readTarget ? () => context.readTarget!(item.path, wanted) : await findHistorySource(api, item.path, wanted, remote[item.path]));
-		} catch (error) {
-			if (!(error instanceof HistoryVersionUnavailableError)) throw error;
-			unavailable.add(item.path);
-		}
+		sources.set(item.path, local[item.path]?.hash === wanted.hash
+			? () => vault.adapter.readBinary(item.path)
+			: () => context.readTarget(item.path, wanted));
 	}
 	context.verify();
 	/** The target state, with unavailable files kept as they are now. */

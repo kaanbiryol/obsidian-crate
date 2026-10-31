@@ -6,7 +6,6 @@ import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import { applySchema } from './test-support/schema-test-harness';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
-import { resetCrateServer } from '../server-reset/reset';
 import { CloudflareApiError, type CloudflareWorkerSettings } from '../cloudflare-api';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { SERVER_RELEASE } from '../deployment/database-upgrades';
@@ -62,12 +61,10 @@ async function harness(empty = false) {
 		listDurableObjectNamespaces: vi.fn(async () => state.worker?.bindings?.some(binding => binding.type === 'durable_object_namespace') ? [{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' }] : []),
 		listR2Objects: vi.fn(async () => ({ keys: [] })), deleteR2Objects: vi.fn(async () => {}),
 		deleteR2Bucket: vi.fn(async () => { state.bucket = false; }), deleteD1Database: vi.fn(async () => { state.database = false; }),
-		retireCrateWorker: vi.fn(async (_account: string, _name: string, resetId: string) => { state.worker = { annotations: { 'workers/message': `Crate reset ${resetId}` }, bindings: [...bindings.slice(0, 2), { type: 'plain_text', name: 'CRATE_RESET_ID', text: resetId }] }; }),
 	};
 	const deploy = (build = artifact(), client = api, saved = { ...structuredClone(metadata), d1DatabaseId: empty ? null : metadata.d1DatabaseId }) => provisionCloudflareDeployment({ api: client as never,
 		accountId: metadata.accountId!, metadata: saved, artifacts: build, onMetadataChanged: async () => {} });
-	const resetInput = { api, accountId: metadata.accountId!, metadata: structuredClone(metadata), version: '0.1.0', beforeDelete: vi.fn(async () => {}), persist: vi.fn(async () => {}) };
-	return { api, state, metadata, deploy, resetInput };
+	return { api, state, metadata, deploy };
 }
 async function held() { return env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(DEPLOYMENT_FENCE_KEY).first<{ value: string }>(); }
 
@@ -126,61 +123,6 @@ it('preserves definite publication rejections for recovery and does not retry un
 	await expect(next.deploy()).rejects.toThrow('fence remains held');
 	expect(next.api.createWorkersSubdomain).toHaveBeenCalledOnce();
 	expect(await held()).not.toBeNull();
-});
-
-it('prevents reset from starting while an update owns publication', async () => {
-	const h = await harness();
-	const gate = deferred(); const started = deferred();
-	const upload = h.api.uploadWorker.getMockImplementation()!;
-	h.api.uploadWorker.mockImplementationOnce(async input => { started.resolve(); await gate.promise; await upload(input); });
-	const update = h.deploy(); await started.promise;
-	await expect(resetCrateServer(h.resetInput)).rejects.toThrow('Another deployment');
-	expect(h.resetInput.beforeDelete).not.toHaveBeenCalled();
-	expect(h.api.retireCrateWorker).not.toHaveBeenCalled();
-	gate.resolve(); await update;
-	await resetCrateServer(h.resetInput);
-	expect(h.state.database).toBe(false);
-});
-
-it('rechecks the version before retirement when another updater wins reset preflight', async () => {
-	const h = await harness();
-	const gate = deferred(); const started = deferred();
-	const database = h.api.getD1Database.getMockImplementation()!;
-	h.api.getD1Database.mockImplementationOnce(async () => { started.resolve(); await gate.promise; return database(); });
-	const resetting = resetCrateServer(h.resetInput);
-	const rejection = expect(resetting).rejects.toThrow('downgrades are not supported');
-	await started.promise;
-	await h.deploy(artifact('0.2.0'));
-	gate.resolve(); await rejection;
-	expect(h.api.retireCrateWorker).not.toHaveBeenCalled();
-	expect(h.state.database).toBe(true);
-	expect(await held()).toBeNull();
-});
-
-it('prevents update from publishing while reset is in flight and after its database is removed', async () => {
-	const h = await harness();
-	const gate = deferred(); const started = deferred();
-	const retire = h.api.retireCrateWorker.getMockImplementation()!;
-	h.api.retireCrateWorker.mockImplementationOnce(async (...args) => { started.resolve(); await gate.promise; await retire(...args); });
-	const resetting = resetCrateServer(h.resetInput); await started.promise;
-	await expect(h.deploy()).rejects.toThrow('Another deployment');
-	gate.resolve(); await resetting;
-	await expect(h.deploy()).rejects.toThrow('being reset or deleted');
-	expect(h.api.uploadWorker).not.toHaveBeenCalled();
-});
-
-it('preserves reset ownership/checkpoint while an uncertain retirement awaits explicit recovery', async () => {
-	const h = await harness();
-	const retire = h.api.retireCrateWorker.getMockImplementation()!;
-	h.api.retireCrateWorker.mockImplementationOnce(async (...args) => { await retire(...args); throw new Error('lost retirement response'); });
-	await expect(resetCrateServer(h.resetInput)).rejects.toThrow('fence remains held');
-	expect(h.resetInput.metadata.reset?.phase).toBe('clearing');
-	await expect(resetCrateServer(h.resetInput)).rejects.toThrow('Another deployment');
-	const owner = await held();
-	await env.DB.prepare('DELETE FROM maintenance_state WHERE key = ? AND value = ?').bind(DEPLOYMENT_FENCE_KEY, owner!.value).run();
-	await resetCrateServer(h.resetInput);
-	expect(h.api.retireCrateWorker).toHaveBeenCalledOnce();
-	expect(h.resetInput.metadata.reset?.phase).toBe('rebuilding');
 });
 
 it('bootstraps one named database and prevents a second initial provisioner from publishing', async () => {

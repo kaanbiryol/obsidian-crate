@@ -35,9 +35,9 @@ export function parseChanges(value: unknown, since: number): ChangesResponse {
 			|| !isSyncPath(change.path) || !isSyncSequence(change.size) || !isSyncDate(change.created_at)
 			|| !['put', 'delete'].includes(String(change.action))
 			|| !(isSha256Hex(change.hash) || change.action === 'delete' && change.hash === '')
-			|| (change.revision != null && !isSyncRevision(change.revision))) return invalid();
+			|| !isSyncRevision(change.revision)) return invalid();
 		changes.push({ seq: change.seq, path: change.path, action: change.action as 'put' | 'delete', hash: change.hash,
-			size: change.size, created_at: change.created_at, ...(change.revision == null ? {} : { revision: change.revision }) });
+			size: change.size, created_at: change.created_at, revision: change.revision });
 		previous = change.seq;
 	}
 	if (value.hasMore && !changes.length || !value.cursorExpired && !value.hasMore && previous !== value.lastSeq) return invalid();

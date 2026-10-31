@@ -17,7 +17,7 @@ export function checkpointDue(input: {
 	now: number;
 }): boolean {
 	if (input.type !== 'sync') return true;
-	const previous = input.history.find(entry => entry !== input.latest && (entry.sharedCheckpoint || entry.historyCheckpoint) && entry.checkpointFileCount === undefined);
+	const previous = input.history.find(entry => entry !== input.latest && entry.sharedCheckpoint && entry.checkpointFileCount === undefined);
 	const last = Math.max(previous ? Date.parse(previous.timestamp) : 0, input.lastCheckpointAt);
 	return !last || input.now - last >= input.trackedFiles * CHECKPOINT_INTERVAL_PER_FILE_MS;
 }

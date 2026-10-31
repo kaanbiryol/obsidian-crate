@@ -21,7 +21,7 @@ it('does not turn cancellation into a file failure', async () => {
 	expect(syncErrorIssues(error)).toEqual([{ message: 'cancelled' }]);
 });
 
-it('saves explicit file context through merged results and settings reload, without duplicating the legacy log', () => {
+it('saves explicit file context through merged results and settings reload, without duplicating the text log', () => {
 	const result = createEmptySyncResult();
 	const transfer = createEmptySyncResult();
 	recordSyncError(transfer, 'EACCES', 'Notes/café: <draft>.md');
@@ -31,7 +31,7 @@ it('saves explicit file context through merged results and settings reload, with
 	recordSyncHistory(settings, 'sync', result);
 	const reloaded = normalizeCrateSettings(settings, '.obsidian');
 	expect(getSyncIssues(reloaded.syncHistory[0]!)).toEqual([{ path: 'Notes/café: <draft>.md', message: 'EACCES' }]);
-	expect(getSyncIssues({ errors: ['note.md: old error'] })).toEqual([{ message: 'note.md: old error' }]);
+	expect(getSyncIssues({ errors: ['Sync access is no longer valid'] })).toEqual([{ message: 'Sync access is no longer valid' }]);
 });
 
 it('bounds saved and remote issues and removes unsafe file paths without losing their explanation', () => {

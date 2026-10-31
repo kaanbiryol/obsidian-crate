@@ -374,8 +374,7 @@ included in a follow-up checkpoint before that save finishes.
 fields (renames, upload receipts, restore intents) that changed since the
 previous record, with `null` clearing a field. Upload diagnostics are appended:
 a record carries only the rows recorded since the previous one, and loading keeps
-the newest 50. Older plugins ignore those rows, so a downgrade loses only
-diagnostics. A queue flush in a large vault rewrites neither the whole baseline
+the newest 50. A queue flush in a large vault rewrites neither the whole baseline
 nor unchanged recovery state. The
 log's header names the base checkpoint generation; loading applies its consecutive
 records only when that base is the selected main checkpoint, so a log left behind by
@@ -474,9 +473,7 @@ check the live index and exact current/retained D1 path and revision ownership; 
 client verifies size and SHA-256 against the checkpoint before staging. Unlike text
 previews, these reads support the full 25 MiB sync-file limit.
 
-Earlier releases saved device-local inventories; their history entries can still
-be browsed and restored, and inventories that no sync history entry references are
-pruned when the sync engine starts. Shared checkpoints
+Shared checkpoints
 contain the full remote inventory; each restoring device preserves its current
 excluded files and rejects exclusion changes during review.
 

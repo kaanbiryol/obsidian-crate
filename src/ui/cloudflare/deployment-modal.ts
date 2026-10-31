@@ -1,6 +1,6 @@
 import { vaultChoiceLabel } from '../../cloudflare/vault-name';
 import type { DiscoveredCloudflareDeployment } from '../../cloudflare/deployment/discovery';
-import { Modal, type App } from 'obsidian';
+import { Modal, Platform, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ModalLayout } from '../shared/ModalLayout';
@@ -149,24 +149,28 @@ export class CloudflareDeploymentModal extends Modal {
 	private render(): void {
 		if (this.vaultSelection) {
 			const { deployments, missing } = this.vaultSelection;
-			const title = missing ? 'Your previous server is no longer available' : deployments.length ? 'Choose a server' : 'Create a server';
+			// Server creation runs only on desktop.
+			const canCreate = !Platform.isMobile;
+			const title = missing ? 'Your previous server is no longer available' : deployments.length ? 'Choose a server' : canCreate ? 'Create a server' : 'No Crate server found';
 			this.modalEl.removeClass('is-working');
 			this.setTitle(title);
 			this.root?.render(createElement(ThemeIconProvider, { renderer: ObsidianIcon, children: createElement(ModalLayout, {
 				title, onClose: () => this.close(),
 				children: createElement('div', { className: 'crate-vault-selection' },
-					createElement('p', null, deployments.length ? (missing ? 'Your previous server is gone. Choose another server or create a new one.' : 'Each server syncs one vault. To keep this vault separate, create a new server. Select an existing server only to sync another copy of the same vault.') : (missing ? 'Your previous server is gone. Create a new Cloudflare server for this vault.' : 'Create a Cloudflare server for this vault.')),
-					createElement('p', null, deployments.length ? 'Your local files stay unchanged during setup. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.' : 'Your local files stay unchanged during setup. When setup is complete, select Crate: Sync now from the command palette to start syncing.'),
+					createElement('p', null, canCreate
+						? deployments.length ? (missing ? 'Your previous server is gone. Choose another server or create a new one.' : 'Each server syncs one vault. To keep this vault separate, create a new server. Select an existing server only to sync another copy of the same vault.') : (missing ? 'Your previous server is gone. Create a new Cloudflare server for this vault.' : 'Create a Cloudflare server for this vault.')
+						: deployments.length ? `${missing ? 'Your previous server is gone. ' : ''}Select the server that syncs this vault. To create a new server, use Obsidian on a desktop.` : `${missing ? 'Your previous server is gone. ' : 'This Cloudflare account has no Crate server. '}Create one in Obsidian on a desktop, then connect this device.`),
+					(canCreate || deployments.length > 0) && createElement('p', null, deployments.length ? 'Your local files stay unchanged during setup. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.' : 'Your local files stay unchanged during setup. When setup is complete, select Crate: Sync now from the command palette to start syncing.'),
 					...deployments.map(deployment => createElement(Button, {
 						key: deployment.metadata.workerName, variant: 'outline',
 						onClick: () => this.finishSelection(deployment), title: deployment.metadata.workerName,
 						children: vaultChoiceLabel(deployment.metadata, deployments.map(item => item.metadata)),
 					})),
-					createElement('p', null, 'Cloudflare usage charges may apply.'),
+					canCreate && createElement('p', null, 'Cloudflare usage charges may apply.'),
 				),
 				footer: createElement('div', { className: 'crate-modal-actions' },
-					createElement(Button, { variant: 'outline', onClick: () => this.close(), children: 'Cancel' }),
-					createElement(Button, { variant: 'primary', onClick: () => this.finishSelection('create'), children: 'Create server' })),
+					createElement(Button, { variant: 'outline', onClick: () => this.close(), children: canCreate || deployments.length ? 'Cancel' : 'Close' }),
+					canCreate && createElement(Button, { variant: 'primary', onClick: () => this.finishSelection('create'), children: 'Create server' })),
 			}) }));
 			return;
 		}

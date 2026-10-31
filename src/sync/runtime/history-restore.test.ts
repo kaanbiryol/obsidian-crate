@@ -10,7 +10,7 @@ function harness(automaticSync = true) {
 	let current = true;
 	const verify = () => { if (!current) throw new Error('Sync connection changed. Reopen history.'); };
 	const entry: SyncHistoryEntry = { timestamp: '2026-09-20T10:00:00Z', type: 'sync', success: true,
-		uploaded: 1, downloaded: 0, merged: 0, deleted: 0, conflictCount: 0, errorCount: 0, historyCheckpoint: 'a'.repeat(64) };
+		uploaded: 1, downloaded: 0, merged: 0, deleted: 0, conflictCount: 0, errorCount: 0, sharedCheckpoint: 'shared' };
 	h.settings.syncHistory.push(entry);
 	const apply = vi.fn(async () => {
 		expect(h.settings.automaticSync).toBe(false);
@@ -116,9 +116,9 @@ describe('history restore orchestration', () => {
 		expect(h.settings.automaticSync).toBe(false);
 	});
 
-	it('rejects legacy entries without inferring state from their path lists', async () => {
+	it('rejects entries without a saved state instead of inferring state from their path lists', async () => {
 		const h = harness();
-		delete h.entry.historyCheckpoint;
+		delete h.entry.sharedCheckpoint;
 		await expect(h.prepare(h.entry)).rejects.toThrow('no complete vault checkpoint');
 	});
 });

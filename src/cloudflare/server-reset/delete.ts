@@ -18,7 +18,7 @@ export async function deleteCrateServer(input: {
 	onProgress?.('Checking the selected Cloudflare resources…');
 	const initial = await inspectDeletionResources(api, metadata);
 	if (!metadata.deletion) {
-		const id = metadata.reset?.deleteOnly ? metadata.reset.id : createRandomHexToken(16);
+		const id = createRandomHexToken(16);
 		metadata.deletion = { id, phase: 'removing-worker', databaseId: metadata.d1DatabaseId,
 			bucketCreatedAt: initial.bucket?.creation_date ?? null, workerCreatedAt: initial.workerCreatedAt, helperName: `crate-delete-${id}` };
 		await input.persist();
@@ -103,9 +103,9 @@ export async function deleteCrateServer(input: {
 			};
 			// The entire selected bucket is authorized for deletion. Never consult
 			// application tables or interpret object keys as paths or file formats.
-			await clearBucketObjects(api, accountId, metadata.r2BucketName, async () => {}, verify,
+			await clearBucketObjects(api, accountId, metadata.r2BucketName, verify,
 				async keys => mutate('deleteR2Objects', () => api.deleteR2Objects(origin, job.id, cleanupToken, keys), await sha256Hex(JSON.stringify(keys))),
-				0, onProgress);
+				onProgress);
 			await verify();
 			onProgress?.('Removing the empty file bucket…');
 			await mutate('deleteR2Bucket', () => removeIfPresent(() => api.deleteR2Bucket(accountId, metadata.r2BucketName)));

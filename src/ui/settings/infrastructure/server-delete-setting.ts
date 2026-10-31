@@ -2,20 +2,21 @@ import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
 import { startCloudflareDeployment } from '../../../plugin/cloudflare-operations';
 import { openConfirmationModal } from '../../confirmation-modal';
+import { addServerChangeButton } from './server-change-button';
 
 export function renderServerDeleteSetting(containerEl: HTMLElement, plugin: CratePlugin): void {
 	const saved = plugin.settings.cloudflareDeployment;
 	if (!saved?.accountId || !saved.d1DatabaseId) return;
 	const snapshot = JSON.stringify(saved);
 	const deployment = JSON.parse(snapshot) as typeof saved;
-	const resuming = Boolean(deployment.deletion || deployment.reset?.deleteOnly);
+	const resuming = Boolean(deployment.deletion);
 	const label = resuming ? 'Resume server deletion' : 'Delete server and all data';
-	new Setting(containerEl)
+	addServerChangeButton(new Setting(containerEl)
 		.setName('Delete server and all data')
 		.setDesc(resuming
 			? 'Check the interrupted deletion and continue removing this server. Local vault files are kept.'
-			: 'Permanently delete the server and its remote data for all devices. Local vault files are kept.')
-		.addButton(button => button.setButtonText(label).setDestructive().onClick(async () => {
+			: 'Permanently delete the server and its remote data for all devices. Local vault files are kept.'),
+	button => button.setButtonText(label).setDestructive().onClick(async () => {
 			button.setDisabled(true);
 			try {
 				const confirmed = await openConfirmationModal(plugin.app, {

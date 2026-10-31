@@ -15,7 +15,6 @@ import { commitStagedFile } from '../sync/mutations';
 import { FileVersionConflictError } from '../storage';
 import { beginReminderOperation, reminderOperationEffects } from '../reminders/operations';
 import { isSyncRevision } from '../../../protocol/sync-validation';
-import { portablePathKey } from '../../../protocol/portable-path';
 import { FILE_HASH_HEADER, REVISION_HEADER } from '../../../protocol/http-headers';
 import type { Env } from '../types';
 import { isSha256Hex } from '../../../platform/validation';
@@ -53,8 +52,7 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 		// Page in primary-key order from a single lower bound, so each page reads only
 		// its own rows. The cursor is opaque to clients.
 		const [keyStart = '', keyEnd, pathStart, pathEnd] = fileFolderArgs(folder);
-		const afterKey = portablePathKey(after);
-		const [lower, lowerBound] = afterKey >= keyStart ? ['portable_path > ?', afterKey] : ['portable_path >= ?', keyStart];
+		const [lower, lowerBound] = after >= keyStart ? ['portable_path > ?', after] : ['portable_path >= ?', keyStart];
 		const rows = await env.DB.prepare(`SELECT path, portable_path, hash, size, storage_key AS revision FROM files
 			WHERE ${lower} AND portable_path < ? AND path >= ? AND path < ? AND lower(path) LIKE '%.md'
 			ORDER BY portable_path LIMIT ${ENCRYPTED_INVENTORY_PAGE}`)

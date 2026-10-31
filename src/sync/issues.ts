@@ -85,7 +85,7 @@ export function recordSyncIssue(result: Pick<SyncResult, 'errors' | 'issues'>, i
 	(result.issues ??= []).push(issue);
 }
 
-/** Older histories retain their original text; only explicit context enables file actions. */
+/** Failures recorded only as text join the explicit issues; only explicit context enables file actions. */
 export function getSyncIssues(value: { errors?: string[]; issues?: SyncIssue[] }): SyncIssue[] {
 	const issues = [...(value.issues ?? [])];
 	const recorded = new Set(issues.map(formatSyncIssue));

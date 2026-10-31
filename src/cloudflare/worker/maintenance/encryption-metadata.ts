@@ -16,7 +16,7 @@ const descriptorKey = (revision: string) => `'${ENCRYPTION_FILE_PREFIX}' || ${re
  * response, and clients never open the descriptor of a receipt's revision. */
 const held = (revision: string) => `(EXISTS (SELECT 1 FROM file_deletion_receipts WHERE consumed_revision = ${revision})
 	OR EXISTS (SELECT 1 FROM staged_uploads WHERE storage_key = ${revision})
-	OR ${revision} IN (SELECT staged FROM (SELECT CASE WHEN k.type = 'text' THEN k.value ELSE json_extract(k.value, '$.storageKey') END AS staged
+	OR ${revision} IN (SELECT staged FROM (SELECT json_extract(k.value, '$.storageKey') AS staged
 		FROM staged_upload_batches b, json_each(b.storage_keys) k) WHERE staged IS NOT NULL))`;
 /** A revision's changelog entry is written in the same transaction as its descriptor,
  * and pruning keeps the changelog contiguous from its oldest entry. Once that entry is

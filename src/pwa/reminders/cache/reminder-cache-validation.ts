@@ -7,8 +7,6 @@ import type { CachedReminderSnapshot } from '../types';
 export function normalizeSnapshot(value: unknown, folderPath: string, recordsValidated = false): CachedReminderSnapshot | null {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 	const snapshot = value as Partial<CachedReminderSnapshot>;
-	// Snapshots without completeness metadata need a fresh full response.
-	if (snapshot.issues === undefined) return null;
 	const issues = parseReminderSourceIssues(snapshot.issues);
 	const { reminders } = snapshot;
 	if (!Array.isArray(reminders) || !(recordsValidated ? isScopedReminderList(reminders, folderPath) : isReminderList(reminders, folderPath))) return null;

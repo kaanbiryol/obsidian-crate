@@ -1,4 +1,3 @@
-import { ResetBlockedError } from '../server-reset/reset-errors';
 import { createUpgradeCheckpoint, releaseUpgradeGuards } from './upgrade-checkpoint';
 import { readVaultName } from '../vault-name';
 import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentRelease } from './database';
@@ -9,10 +8,9 @@ import { CloudflareApiClient, CloudflareApiError } from '../cloudflare-api';
 import { isDefinitiveRejection } from '../cloudflare-api-error';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { createRandomHexToken } from '../../platform/random-hex';
-import { deployedArtifact, resetWorkerMessage, workerStorageBindings } from './discovery';
+import { deployedArtifact, workerStorageBindings } from './discovery';
 import { assertDeploymentIsNotDowngrade } from './update';
 import { withDeploymentFence, isRejectedWorkerUpload, isSettledStep, parseFenceRecord, type DeploymentFence } from './fence';
-import { assertWorkerTarget } from '../server-reset/reset-ownership';
 
 async function ensureD1Database(
 	api: CloudflareApiClient,
@@ -26,20 +24,7 @@ async function ensureD1Database(
 			if (existingById.name !== metadata.d1DatabaseName || named?.uuid !== existingById.uuid) throw new Error('The deployment database identity is ambiguous or changed. Reconnect to the intended server.');
 			return existingById.uuid;
 		}
-		const reset = metadata.reset;
-		if (reset?.phase !== 'rebuilding' || reset.deleteOnly || metadata.d1DatabaseId !== reset.databaseId) {
-			throw new Error('The saved server database is missing. Restore its data or explicitly create a new server.');
-		}
-		// Only the verified reset stub may replace the database it retired. Keep
-		// the original ID in the checkpoint until the replacement ID is persisted,
-		// so a lost creation response can resume by its stable resource name.
-		const worker = await api.getWorkerSettings(accountId, metadata.workerName);
-		if (worker.annotations?.['workers/message'] !== resetWorkerMessage(reset.id)) {
-			throw new ResetBlockedError('the Worker changed before rebuilding its database.');
-		}
-		assertWorkerTarget(worker, metadata, true);
-		const bucket = await api.getR2Bucket(accountId, metadata.r2BucketName);
-		if (bucket?.creation_date === reset.bucketCreatedAt) throw new ResetBlockedError('the old bucket still exists.');
+		throw new Error('The saved server database is missing. Restore its data or explicitly create a new server.');
 	}
 
 	const existingByName = await api.findD1Database(accountId, metadata.d1DatabaseName);
@@ -86,11 +71,9 @@ async function checkRemoteDeployment(input: { api: CloudflareApiClient; accountI
 	try {
 		const settings = await input.api.getWorkerSettings(input.accountId, input.metadata.workerName);
 		const message = settings.annotations?.['workers/message'];
-		const ownResetStub = input.metadata.reset?.phase === 'rebuilding' && message === resetWorkerMessage(input.metadata.reset.id);
-		if (message?.startsWith('Crate reset ') && !ownResetStub) throw new Error('This server is being reset or deleted. Finish that operation before updating.');
-		if (!ownResetStub) assertDeploymentIsNotDowngrade(deployedArtifact(settings).version, input.artifacts.version);
+		assertDeploymentIsNotDowngrade(deployedArtifact(settings).version, input.artifacts.version);
 		const storage = workerStorageBindings(settings);
-		const expectedDatabase = ownResetStub ? input.metadata.reset!.databaseId : input.metadata.d1DatabaseId;
+		const expectedDatabase = input.metadata.d1DatabaseId;
 		if (!message?.startsWith('Crate ') || !storage || expectedDatabase && storage.databaseId !== expectedDatabase
 			|| storage.bucketName !== input.metadata.r2BucketName) {
 			throw new Error('The live Worker bindings do not match this deployment. Reconnect to the correct server before updating.');
@@ -181,14 +164,10 @@ export async function provisionCloudflareDeployment(input: {
 		});
 		await fence.checkpoint('prepare-database');
 		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
-		// Read before the upload is fenced, so a failed listing never leaves an uncertain step.
-		const retireCloudSafety = (await input.api.listDurableObjectNamespaces(input.accountId))
-			.some(namespace => namespace.script === input.metadata.workerName && namespace.class === 'CloudSafety');
 		input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
 		fence.requireVerification();
 		await fence.uploadWorker(uploadTag => input.api.uploadWorker({
 			uploadTag,
-			retireCloudSafety,
 			publicOrigin: workersDevOrigin(input.metadata.workerName, workersSubdomain),
 			accountId: input.accountId,
 			workerName: input.metadata.workerName,

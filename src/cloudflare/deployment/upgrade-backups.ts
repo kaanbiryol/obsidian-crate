@@ -50,12 +50,12 @@ async function protectedBackups(api: CloudflareApiClient, account: string, datab
 	}));
 }
 
-interface Manifest { format: 1 | 2; createdAt: string; objects: Array<{ sha256: string }> }
+interface Manifest { format: 2; createdAt: string; objects: Array<{ sha256: string }> }
 async function readManifest(api: CloudflareApiClient, account: string, bucket: string, prefix: string): Promise<Manifest | null> {
 	await api.throttle();
 	try {
 		const value = JSON.parse(new TextDecoder().decode(await api.getRecoveryObject(account, bucket, `${prefix}/archive.json`))) as Partial<Manifest> & { complete?: unknown };
-		return (value.format === 1 || value.format === 2) && value.complete === true && typeof value.createdAt === 'string' && Number.isFinite(Date.parse(value.createdAt))
+		return value.format === 2 && value.complete === true && typeof value.createdAt === 'string' && Number.isFinite(Date.parse(value.createdAt))
 			&& Array.isArray(value.objects) && value.objects.every(item => typeof item?.sha256 === 'string') ? value as Manifest : null;
 	} catch (error) {
 		if (error instanceof SyntaxError || error instanceof CloudflareApiError && error.status === 404) return null;
@@ -114,7 +114,7 @@ export async function pruneUpgradeBackups(input: { api: CloudflareApiClient; acc
 	// An unreadable manifest might list shared copies, so keep all of them.
 	if (unreadable) return;
 	const listed = new Set(complete.filter(backup => !removed.has(backup.prefix))
-		.flatMap(backup => backup.manifest.format === 2 ? backup.manifest.objects.map(item => item.sha256) : []));
+		.flatMap(backup => backup.manifest.objects.map(item => item.sha256)));
 	for (const sha256 of (await listBackupObjects(api, accountId, bucketName, `${UPGRADE_BACKUP_STORE}/objects/`)).keys()) {
 		if (listed.has(sha256) || !UPGRADE_BACKUP_OBJECT.test(upgradeBackupStoreKey(sha256))) continue;
 		await api.throttle();

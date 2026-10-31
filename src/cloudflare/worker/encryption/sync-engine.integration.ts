@@ -134,7 +134,7 @@ it('decrypts retained baselines and shared history when comparing unsynced local
 	second.disk.write(path, '{"theme":"new remote setting"}'); await sync(second);
 	first.disk.write(path, local); await first.engine.onRawFileChange(path);
 	expect(await first.engine.loadPendingDiff(path, false)).toMatchObject({ before: original, after: local });
-	const comparison = await first.engine.loadHistoryComparison(checkpoint!.id, true);
+	const comparison = await first.engine.loadHistoryComparison(checkpoint!.id);
 	expect(comparison.items).toContainEqual({ path, action: 'modified' });
 	expect(await comparison.preview(path)).toEqual({ current: local, saved: original });
 	expect(first.disk.text(path)).toBe(local);

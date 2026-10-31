@@ -459,7 +459,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await fixture.seedArticle();
   await modePage.route('**/reminders/list?*', route => route.fulfill({ json: {
     projects: ['Errands'], reminders: [{ id: 'history-reminder', content: 'History reminder', project: 'Errands',
-      priority: 4, completed: false, filePath: 'Reminders/Errands.md', lineNumber: 1 }],
+      priority: 4, completed: false, filePath: 'Reminders/Errands.md', lineNumber: 1 }], issues: [],
   } }));
   const modeEnrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
   await modePage.goto(`${origin}/notifications?browserToken=${modeEnrollment.browserToken}`);

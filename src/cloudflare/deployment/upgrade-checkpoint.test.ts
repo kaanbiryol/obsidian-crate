@@ -260,7 +260,7 @@ it('pages large tables by key so each row is read once', async () => {
 
 it('keeps the newest and still-needed backups and removes older backups and unused shared copies', async () => {
 	const h = await harness();
-	const oldest = await h.seed('a', { format: 1, createdAt: '2026-01-01T00:00:00Z', databaseSha256: 'd'.repeat(64), objects: [] }, [], ['database.sql', `objects/${'e'.repeat(64)}`, 'private.txt']);
+	const oldest = await h.seed('a', { createdAt: '2026-01-01T00:00:00Z' }, [], [`objects/${'e'.repeat(64)}`, 'private.txt']);
 	const upgrading = await h.seed('b', { createdAt: '2026-01-15T00:00:00Z' }, ['needed by an interrupted upgrade']);
 	const restoring = await h.seed('c', { createdAt: '2026-02-01T00:00:00Z' }, ['needed by a pending restore']);
 	const newest = await h.seed('d', { createdAt: '2026-03-01T00:00:00Z' }, ['Existing note.']);
