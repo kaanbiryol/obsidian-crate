@@ -28,6 +28,8 @@ import { presentReadingItems } from './pending-view';
 import { exportReadingData } from './storage/storage';
 import { useDocumentReaderScroll } from './useDocumentReaderScroll';
 import { useReadingArticle } from './useReadingArticle';
+import { pendingReadingHighlights, readingItemSyncStatus } from './reader-feedback';
+import { useReaderSyncFeedback } from './useReaderSyncFeedback';
 
 export default function ReadingApp() {
 	return <ReadingDialogHost.Provider value={PwaReadingDialog}><ReadingAppContent /></ReadingDialogHost.Provider>;
@@ -39,7 +41,7 @@ function ReadingAppContent() {
 	const captureFormId = useId();
 	const featureNavigation = useContext(FeatureNavigationContext);
 	const active = featureNavigation?.active !== false;
-	const { connection, sync, showToast, saving, saveLink, updateItem, retryArticle, deleteItem } = useReadingRuntime();
+	const { connection, sync, showToast, claimFailure, saving, saveLink, updateItem, retryArticle, deleteItem } = useReadingRuntime();
 	const { session, readOnly, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, run, connect,
 		isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture } = connection;
 	const { refreshManually, isOffline } = sync;
@@ -63,6 +65,11 @@ function ReadingAppContent() {
 	const blockedItemIds = useMemo(() => new Set([...visibleItems.filter(item => !item.path).map(item => item.crate_reading_id), ...pending.flatMap(op => op.action === 'capture' ? [op.id]
 		: (op.review || op.action === 'retry') && typeof op.intent.id === 'string' ? [op.intent.id] : [])]), [pending, visibleItems]);
 	const readingDisabled = !session && connectionState !== 'available';
+	const updateFromReader = useReaderSyncFeedback({ itemId: reader?.item.crate_reading_id, pending, showToast, claimFailure,
+		retry: () => void run(refreshManually), review: () => setSettingsOpen(true),
+		update: (item, changes) => updateItem(item, changes, reader ?? undefined),
+		current: id => visibleItems.find(item => item.crate_reading_id === id) ?? (visibleReader?.crate_reading_id === id ? visibleReader : undefined) });
+	const readerHighlights = useMemo(() => reader ? pendingReadingHighlights(cache?.items.find(item => item.crate_reading_id === reader.item.crate_reading_id) ?? reader.item, pending) : [], [reader, cache, pending]);
 
 	if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
 	const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
@@ -85,7 +92,7 @@ function ReadingAppContent() {
 				</EmptyState> : undefined}
 				beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
 				headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
-				reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)} onBack={closeReader} onUpdate={changes => updateItem(visibleReader, changes, reader)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={() => retryArticle(reader.item)} onDelete={reader.item.path ? async () => { await deleteItem(visibleReader); closeReader(); } : undefined} />} />
+				reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)} onBack={closeReader} onUpdate={changes => updateFromReader(visibleReader, changes)} syncStatus={reader.item.path ? readingItemSyncStatus(pending, reader.item.crate_reading_id, isOffline) : undefined} pendingHighlights={readerHighlights} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={() => retryArticle(reader.item)} onDelete={reader.item.path ? async () => { await deleteItem(visibleReader); closeReader(); } : undefined} />} />
 			{adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={closeCapture}>{close => <SaveLinkForm id={captureFormId} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { if (await saveLink(open)) close(); })} />}</ReadingDialog>}
 
 		</>}

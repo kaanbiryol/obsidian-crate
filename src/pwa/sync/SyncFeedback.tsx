@@ -7,10 +7,10 @@ const SyncFeedbackContext = createContext<ShowToast | null>(null);
 
 /** Keep sync and logout feedback visible even when its feature screen is absent. */
 export function SyncFeedbackProvider({ children }: { children: ReactNode }) {
-	const { toast, showToast } = useToast();
+	const { toast, showToast, clearToast } = useToast();
 	return <SyncFeedbackContext.Provider value={showToast}>
 		{children}
-		<div className="crate-reminders-ui"><PwaToast toast={toast} /></div>
+		<div className="crate-reminders-ui"><PwaToast toast={toast} onDismiss={clearToast} /></div>
 	</SyncFeedbackContext.Provider>;
 }
 

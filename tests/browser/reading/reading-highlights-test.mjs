@@ -38,12 +38,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     page = await context.newPage();
     await page.goto(readingUrl);
-    const open = async () => {
+    const open = async (status = 'Available offline') => {
       await page.getByRole('button', { name: /example.invalid Highlight article/ }).click();
       await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');
       await expect(page).toHaveURL(new RegExp(`item=${saved.id}`));
       await expect(page.locator('.crate-reading-reader__body')).toContainText('A useful article excerpt.');
-      await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
+      await expect(page.locator('.crate-reading-reader__availability').getByRole('status')).toHaveText(status);
     };
     await open();
     const code = page.locator('.crate-reading-reader__body pre code').first();
@@ -263,8 +263,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert');
     await page.evaluate(() => window.__finishReadingBack());
     await expect(page.locator('.crate-reading__library')).not.toHaveAttribute('inert');
-    await open();
+    // The unsent highlight is this article's own pending change.
+    await open(/^(Syncing 1 change|Offline: 1 change waiting to sync)$/);
     await expect(marks).toHaveCount(3);
+    await expect(page.locator('.crate-reading-reader__body mark[data-sync="pending"]')).toHaveCount(3);
     if (name === 'chromium') { await page.reload(); await expect(marks).toHaveCount(3); }
     await expect(code.locator('.hljs-keyword')).toHaveText('let');
     assert.equal(await code.textContent(), codeExample, 'Code survives offline reopening and highlight repainting');
@@ -277,6 +279,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       `\n<!-- crate:article:start -->\n${articleMarkdown}\n<!-- crate:article:end -->\n`, 'Highlighting preserves the saved article wrapper and source');
     await page.reload();
     await expect(page.locator('.crate-reading-reader__highlight')).toHaveCount(3);
+    await expect(page.locator('.crate-reading-reader__body mark[data-sync="pending"]')).toHaveCount(0);
     const longArticle = await page.addStyleTag({ content: '.crate-reading-reader__body { padding-top: 1400px; min-height: 12000px; }' });
     await page.evaluate(() => window.scrollTo({ top: 6300, behavior: 'instant' }));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(6300);

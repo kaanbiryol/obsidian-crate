@@ -7,7 +7,7 @@ import { useSyncFailureToast } from './useSyncFailureToast';
 const showToast = vi.fn();
 let visibility: 'visible' | 'hidden';
 let active: boolean;
-let hook: ReturnType<typeof renderHook<void>> | undefined;
+let hook: ReturnType<typeof renderHook<ReturnType<typeof useSyncFailureToast>>> | undefined;
 let options: Parameters<typeof useSyncFailureToast>[0];
 beforeEach(() => {
 	showToast.mockClear(); visibility = 'visible'; active = true; hook = undefined;
@@ -81,4 +81,15 @@ it('removes visibility listeners when the feature hides or unmounts', () => {
 	active = true; visibility = 'hidden'; render(['failure']);
 	hook!.unmount(); visibility = 'visible'; visibilityChanged();
 	expect(showToast).not.toHaveBeenCalled();
+});
+
+it('skips operations a screen already announced with its own feedback', () => {
+	render([]);
+	expect(hook!.current('claimed')).toBe(true);
+	expect(hook!.current('claimed')).toBe(false);
+	render(['claimed']);
+	expect(showToast).not.toHaveBeenCalled();
+	render(['claimed', 'other']);
+	expect(showToast).toHaveBeenCalledTimes(1);
+	expect(hook!.current('other')).toBe(false);
 });

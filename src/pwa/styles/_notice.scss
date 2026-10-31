@@ -10,6 +10,14 @@
 		color: var(--text-normal);
 	}
 
+	// Undo and Retry sit inline after the message, keeping the toast one row.
+	.toast__action {
+		flex-shrink: 0;
+		margin: -4px -6px -4px 2px;
+		color: var(--interactive-accent);
+		font-weight: 600;
+	}
+
 	.pwa-notice {
 		padding: 12px 12px 2px;
 		border: 1px solid var(--background-modifier-border);

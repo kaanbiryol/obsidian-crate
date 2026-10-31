@@ -10,4 +10,8 @@ describe('PWA toast duration', () => {
 		expect(getToastDuration('info')).toBe(3200);
 		expect(getToastDuration('error')).toBe(4200);
 	});
+
+	it('leaves time to reach an inline action', () => {
+		expect(getToastDuration('success', true)).toBe(6000);
+	});
 });

@@ -53,6 +53,14 @@ it('keeps adjacent highlights separate and identifies every formatted fragment',
 	expect(marks.map(mark => [mark.dataset.highlightStart, mark.dataset.highlightEnd])).toEqual([['0', '6'], ['6', '12'], ['6', '12']]);
 	expect(marks.map(mark => mark.getAttribute('tabindex'))).toEqual(['0', '0', '-1']);
 });
+it('marks a merged passage pending while any highlight it covers is unsynced', () => {
+	const { document } = parseHTML('<html><body><p>Hello <em>world</em>! Next sentence.</p></body></html>');
+	const body = document.body;
+	const saved = { start: 0, end: 5, text: 'Hello' }, unsynced = { start: 3, end: 11, text: 'lo world' }, other = { start: 13, end: 17, text: 'Next' };
+	paintHighlights(body, [saved, unsynced, other], [unsynced]);
+	const marks = Array.from(body.querySelectorAll('mark'));
+	expect(marks.map(mark => [mark.textContent, mark.dataset.sync])).toEqual([['Hello ', 'pending'], ['world', 'pending'], ['Next', undefined]]);
+});
 
 it('resizes either endpoint, clamps crossing handles, and keeps emoji intact', () => {
 	const text = 'One 😀 two';

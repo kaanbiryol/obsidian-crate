@@ -46,6 +46,10 @@
 	&__highlight { cursor: pointer; }
 	&__highlight:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 	&__body mark { background: var(--text-highlight-bg, rgba(255, 208, 64, .35)); color: inherit; }
+	// Unsynced passages read as drafts and settle to the solid fill once sent.
+	&__body mark[data-sync="pending"] { background: color-mix(in srgb, var(--text-highlight-bg, rgba(255, 208, 64, .35)) 45%, transparent); text-decoration: underline dashed color-mix(in srgb, #b99a12 70%, transparent); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+	&__body mark { transition: background-color 240ms ease; }
+	@media (prefers-reduced-motion: reduce) { &__body mark { transition: none; } }
 	&__quick-actions { display: flex; justify-content: flex-end; }
 	&__page { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; max-width: 748px; margin: 0 auto; padding: 52px clamp(24px, 5%, 64px) 60px; }
 	&__header { overflow-wrap: anywhere; margin-bottom: 32px; }
@@ -57,6 +61,7 @@
 	&__tools { display: flex; align-items: center; gap: 0; border-top: 1px solid var(--crate-divider); border-bottom: 1px solid var(--crate-divider); margin-top: 26px; min-height: 52px; }
 	&__availability { display: flex; align-items: center; flex: 1; color: var(--text-muted); font-size: 10px; }
 	&__availability span { display: inline-flex; align-items: center; gap: 4px; }
+	&__availability .crate-sync-indicator { width: 12px; height: 12px; flex: 0 0 12px; }
 	&__tags { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 11px; color: var(--text-muted); padding-top: 14px; }
 	&__body { font-family: var(--font-text, var(--font-interface, system-ui, sans-serif)); font-size: var(--reading-font-size, 19px); line-height: 1.85; overflow-wrap: anywhere; color: var(--text-normal); }
 	&[data-serif="true"] .crate-reading-reader__body { font-family: Georgia, 'Times New Roman', serif; }

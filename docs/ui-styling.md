@@ -241,8 +241,16 @@ literals onto roles, run `node scripts/check-style-tokens.mjs --write`.
   Toasts fade in and out over 160ms without moving; reduced motion skips the fade.
   Replacing feedback updates the current toast instead of stacking another one.
   Reading confirms explicit link, tag, and highlight-note saves after local
-  persistence; offline confirmations say they are saved on this device. Favorite,
-  archive, and passage-highlight changes use their immediate visual state.
+  persistence; offline confirmations say they are saved on this device. Favorite
+  and passage-highlight changes use their immediate visual state: an unsent
+  highlight paints lighter with a dashed underline until its change leaves the
+  outbox, and only an offline highlight gets a toast. Archive confirms with
+  **Undo**. A toast action (`Undo`, `Retry`, `Review`) sits inline after the
+  message and extends the toast to six seconds. The open article's header shows
+  its own pending changes with the shared sync dot, and falls back to its
+  availability label once they sync. A failure for the open article replaces the
+  app-wide notice with one naming the change: **Retry** resends it, and **Review**
+  opens settings for a rejected change, which is no longer shown as applied.
   Input validation stays beside the field. Failed local writes also show an error
   toast. Both features announce rejected changes or exhausted automatic retries
   once per operation, when the feature is visible; routine retries and refreshes

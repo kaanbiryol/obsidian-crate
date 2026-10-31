@@ -294,7 +294,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const beforeConflict = requests.length;
     conflict.release();
     await expect(sync).toHaveAttribute('data-sync-state', 'error');
-    await expect(toast).toHaveText('Reading changes need attention. Review them in settings.');
+    // The open article names its first rejected change instead of the app-wide notice.
+    await expect(toast).toContainText('Tags didn’t sync');
+    await expect(toast.getByRole('button', { name: 'Review', exact: true })).toBeVisible();
     await expect(toast).toHaveAttribute('role', 'alert');
     await expect(page.locator('.crate-reading-reader__tags')).toHaveText('#remote');
     await expect(page.locator('.crate-reading__reader-pane').getByRole('button', { name: 'Remove favorite', exact: true })).toHaveAttribute('aria-pressed', 'true');

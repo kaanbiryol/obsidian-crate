@@ -34,7 +34,7 @@ function useReadingController() {
 		if (previousSession.current && !session) setSettingsOpen(false);
 		previousSession.current = session;
 	}, [session, setSettingsOpen]);
-	useSyncFailureToast({
+	const claimFailure = useSyncFailureToast({
 		scope: session ? JSON.stringify([session.id, session.token, session.generation]) : null,
 		ready,
 		operationIds: pending.filter(op => op.sessionId === session?.id && readingNeedsAttention(op)).map(op => op.id),
@@ -86,7 +86,7 @@ function useReadingController() {
 		</>,
 	});
 
-	return { connection, sync: { refresh, refreshManually, syncing, syncedSession, isOffline }, showToast, saving, queueChange, saveLink, updateItem, retryArticle, deleteItem };
+	return { connection, sync: { refresh, refreshManually, syncing, syncedSession, isOffline }, showToast, claimFailure, saving, queueChange, saveLink, updateItem, retryArticle, deleteItem };
 }
 const ReadingRuntimeContext = createContext<ReturnType<typeof useReadingController> | null>(null);
 export function ReadingRuntimeProvider({ children }: { children: ReactNode }) {

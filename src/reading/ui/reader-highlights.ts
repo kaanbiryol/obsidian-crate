@@ -11,15 +11,17 @@ export function selectedHighlight(body: HTMLElement): ReadingHighlight | null {
 	return text.trim() ? { start, end: start + text.length, text } : null;
 }
 
-/** Split only text nodes: links, emphasis and paragraph structure remain intact. */
-export function paintHighlights(body: HTMLElement, highlights: ReadingHighlight[]): void {
+/** Split only text nodes: links, emphasis and paragraph structure remain intact.
+ * A painted passage is pending while any highlight it covers is still unsynced. */
+export function paintHighlights(body: HTMLElement, highlights: ReadingHighlight[], pending: ReadingHighlight[] = []): void {
 	if (!highlights.length) return;
 	const ranges = matchingHighlights(body.textContent ?? '', highlights).sort((a, b) => a.start - b.start);
-	const merged: Array<{ start: number; end: number }> = [];
+	const isPending = (range: ReadingHighlight) => pending.some(entry => entry.start === range.start && entry.end === range.end);
+	const merged: Array<{ start: number; end: number; pending: boolean }> = [];
 	for (const range of ranges) {
 		const last = merged.at(-1);
-		if (last && range.start < last.end) last.end = Math.max(last.end, range.end);
-		else merged.push({ start: range.start, end: range.end });
+		if (last && range.start < last.end) { last.end = Math.max(last.end, range.end); last.pending ||= isPending(range); }
+		else merged.push({ start: range.start, end: range.end, pending: isPending(range) });
 	}
 	const walker = body.ownerDocument.createTreeWalker(body, 4 /* SHOW_TEXT */);
 	const nodes: Text[] = [];
@@ -37,6 +39,7 @@ export function paintHighlights(body: HTMLElement, highlights: ReadingHighlight[
 				const mark = body.ownerDocument.createElement('mark');
 				mark.className = 'crate-reading-reader__highlight'; mark.textContent = text.slice(from, to);
 				mark.dataset.highlightStart = String(span.start); mark.dataset.highlightEnd = String(span.end);
+				if (span.pending) mark.dataset.sync = 'pending';
 				mark.setAttribute('role', 'button'); mark.setAttribute('aria-label', 'Highlight options');
 				mark.tabIndex = span.start >= offset ? 0 : -1;
 				fragment.append(mark); cursor = to;

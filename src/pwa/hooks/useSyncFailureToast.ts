@@ -1,8 +1,10 @@
-import { useContext, useEffect, useRef } from 'react';
+import { useCallback, useContext, useEffect, useRef } from 'react';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import type { ShowToast } from '../types';
 
-/** Announce actionable failures once; persistent sync notices own recovery. */
+/** Announce actionable failures once; persistent sync notices own recovery.
+ * A screen with more specific feedback claims an operation first, so it is
+ * announced once in total. Child effects run before this one in a commit. */
 export function useSyncFailureToast({ scope, ready, operationIds, feature, showToast, isCurrent }: {
 	scope: string | null;
 	ready: boolean;
@@ -27,4 +29,10 @@ export function useSyncFailureToast({ scope, ready, operationIds, feature, showT
 		document.addEventListener('visibilitychange', announce);
 		return () => document.removeEventListener('visibilitychange', announce);
 	}, [scope, ready, active, operationIds, feature, showToast, isCurrent]);
+	return useCallback((id: string) => {
+		if (announced.current.scope !== scope) announced.current = { scope, ids: new Set() };
+		if (announced.current.ids.has(id)) return false;
+		announced.current.ids.add(id);
+		return true;
+	}, [scope]);
 }

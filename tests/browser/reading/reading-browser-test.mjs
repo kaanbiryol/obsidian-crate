@@ -777,7 +777,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await assertNoPendingBanner(page);
   await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
   await expect(page.getByRole('heading',{name:'browser.example.invalid',exact:true})).toBeVisible();
-  await expect(page.getByText('Available offline',{exact:true})).toBeVisible();
+  // The cached reader opens at once; its header reports this article's held change.
+  await expect(page.locator('.crate-reading-reader__availability').getByRole('status')).toHaveText('Syncing 1 change');
   await assertNoPendingBanner(page);
   await page.getByRole('button',{name:'Back to reading',exact:true}).click();
   await page.getByRole('button',{name:'Save a link',exact:true}).click();
