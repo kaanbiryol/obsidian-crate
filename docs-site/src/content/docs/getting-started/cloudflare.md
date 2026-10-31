@@ -22,6 +22,7 @@ Cloudflare handles billing; Crate doesn't collect your payment details. There's 
 3. Go back to Obsidian. If it doesn't open on its own, select **Open Obsidian**.
 4. For a new vault, select **Create server**.
 5. Wait for the connection to finish.
+6. In **Choose what Crate manages in this vault**, turn Reminders and Reading on or off, then select **Finish**. [After you connect](/docs/getting-started/hosting/#after-you-connect) explains the defaults.
 
 Crate creates everything it needs in your account: the server (a Cloudflare Worker), file storage (R2), a database (D1), and what's needed for notifications.
 
@@ -37,7 +38,7 @@ Connecting doesn't move any files yet.
 
 You're set up. If you want this device to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync**; it starts off.
 
-Next, [connect another device or open the web app](/docs/getting-started/devices/). Reading and Reminders start on; notifications and encryption start off. [Choose and manage features](/docs/features/settings/) to keep what you want.
+Next, [connect another device or open the web app](/docs/getting-started/devices/). Notifications and encryption start off. [Choose and manage features](/docs/features/settings/) to keep what you want.
 
 ## Check hosting usage
 

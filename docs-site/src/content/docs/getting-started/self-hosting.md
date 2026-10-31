@@ -23,7 +23,8 @@ The first run builds Crate from the repository, so it takes a little while. Wait
 1. In the logs, find **Server address to paste into Obsidian** and **Pairing code**.
 2. In Obsidian, open **Settings → Crate → Connect to your server**.
 3. Enter the full HTTPS address and the pairing code.
-4. Open the command palette and select **Crate: Sync now**.
+4. In **Choose what Crate manages in this vault**, turn Reminders and Reading on or off, then select **Finish**. [After you connect](/docs/getting-started/hosting/#after-you-connect) explains the defaults.
+5. Open the command palette and select **Crate: Sync now**.
 
 When it finishes, check **Crate: Show sync activity** for errors. If you want this device to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync**; it starts off.
 

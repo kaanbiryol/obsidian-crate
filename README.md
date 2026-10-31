@@ -44,7 +44,7 @@ npm run build
 
 Copy `dist/main.js`, `manifest.json` and `dist/styles.css` into `<Vault>/.obsidian/plugins/crate/`, reload Obsidian, and enable **Crate** in **Settings → Community plugins**. Then open **Settings → Crate** and select **Connect with Cloudflare** (activate R2 first; see [R2 activation and billing](docs/deployment.md#activate-r2-before-connecting)), or connect to a [local server](docs/self-hosting.md).
 
-Automatic sync is off by default on each device. After connecting, run **Crate: Sync now** for your first sync. Reading and Reminders stay off in a vault until you turn them on in **Settings → Crate**, which names the folder each one will change.
+Automatic sync is off by default on each device. After connecting, run **Crate: Sync now** for your first sync. Reading and Reminders stay off in a vault until you turn them on in the last setup step, **Choose what Crate manages in this vault**, or in **Settings → Crate**. Both name the folder each one will change.
 
 ## Accounts, costs and network use
 

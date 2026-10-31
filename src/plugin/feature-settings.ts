@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { Notice, TFile, TFolder, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import type { SyncState } from '../sync/types';
 import { captureServerConnection, serverRequest } from './server-request';
@@ -8,6 +8,7 @@ import { getPluginLifecycleSignal } from './lifecycle-state';
 import { parseFeaturePolicy, type FeaturePolicy, type SharedFeatures } from '../protocol/feature-policy';
 import { sharedSettingsSync } from './shared-settings-sync';
 import { openConfirmationModal } from '../ui/confirmation-modal';
+import { openFeatureChoiceModal, type FeatureChoice } from '../ui/feature-choice-modal';
 
 type Feature = keyof SharedFeatures;
 
@@ -25,14 +26,55 @@ const CONFIRMATIONS: Record<Feature, { title: string; message: (folder: string) 
  * Connected, Reading uses the folder its server names. */
 export async function confirmFeatureFolder(plugin: CratePlugin, feature: Feature): Promise<boolean> {
 	if (featureConfirmed(plugin, feature)) return true;
-	let folder = feature === 'reading' ? plugin.settings.reading.folderPath : plugin.remindersSettings.remindersFolderPath;
-	if (feature === 'reading' && plugin.settings.workerUrl) {
-		const { assertCurrent } = captureServerConnection(plugin);
-		folder = (await readReadingPolicy(plugin))?.folder_path ?? folder;
-		assertCurrent();
-	}
+	const folder = await featureFolder(plugin, feature);
 	const { title, message } = CONFIRMATIONS[feature];
 	return openConfirmationModal(plugin.app, { title, message: message(folder), confirmText: 'Turn on' });
+}
+
+function localFolder(plugin: CratePlugin, feature: Feature): string {
+	return feature === 'reading' ? plugin.settings.reading.folderPath : plugin.remindersSettings.remindersFolderPath;
+}
+async function featureFolder(plugin: CratePlugin, feature: Feature): Promise<string> {
+	const folder = localFolder(plugin, feature);
+	if (feature !== 'reading' || !plugin.settings.workerUrl) return folder;
+	const { assertCurrent } = captureServerConnection(plugin);
+	const policy = await readReadingPolicy(plugin);
+	assertCurrent();
+	return policy?.folder_path ?? folder;
+}
+
+/** Markdown notes under a folder, from the vault's file index without reading them. */
+function countNotes(plugin: CratePlugin, folder: string): number {
+	const root = plugin.app.vault.getAbstractFileByPath(folder);
+	if (!(root instanceof TFolder)) return 0;
+	let count = 0;
+	const pending: TAbstractFile[] = [...root.children];
+	for (let file = pending.pop(); file; file = pending.pop()) {
+		if (file instanceof TFolder) pending.push(...file.children);
+		else if (file instanceof TFile && file.extension === 'md') count++;
+	}
+	return count;
+}
+
+/** After connecting, offers each feature this vault has not confirmed. Finish turns the
+ * selected ones on as the settings toggle does; closing changes nothing. */
+export async function offerFeatureChoice(plugin: CratePlugin): Promise<void> {
+	const features = (['reminders', 'reading'] as const).filter(feature => !featureConfirmed(plugin, feature));
+	if (!features.length) return;
+	// Offline, the step still opens with this device's folders.
+	const policy = await requestFeatures(plugin).catch(() => null);
+	const choices: FeatureChoice[] = [];
+	for (const feature of features) {
+		const folder = await featureFolder(plugin, feature).catch(() => localFolder(plugin, feature));
+		choices.push({ feature, folder, notes: countNotes(plugin, folder), serverOn: policy?.[feature] ?? false });
+	}
+	const selected = await openFeatureChoiceModal(plugin.app, choices);
+	if (!selected) return;
+	for (const feature of selected) {
+		try { await setSharedFeature(plugin, feature, true); }
+		catch (error) { new Notice(`Could not turn on ${feature}: ${error instanceof Error ? error.message : 'Unknown error'}`); }
+	}
+	if (selected.length) plugin.refreshSettingsTab();
 }
 
 const WAITING_NOTICES: Record<Feature, string> = {

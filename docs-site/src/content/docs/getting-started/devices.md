@@ -15,10 +15,10 @@ There are two ways to use Crate on another device:
 3. Connect to the **same server**:
    - **Cloudflare:** select **Connect with Cloudflare** and choose the existing server.
    - **Docker:** select **Connect to your server** and use a new [pairing code](/docs/getting-started/self-hosting/#create-another-pairing-code).
-4. If you use encryption, open **Manage encryption** in Crate’s Sync settings and enter your recovery key.
-5. Run **Crate: Sync now** and wait for it to finish.
-6. Open a note on both devices to check that it matches. If both devices changed the same content, [review the conflicts](/docs/troubleshooting/conflicts/).
-7. To use Reading or Reminders here, turn them on under **Settings → Crate**. Crate doesn't start them in a new vault on its own, even when your server has them on.
+4. In **Choose what Crate manages in this vault**, keep Reminders and Reading on to use them here, then select **Finish**. Features your server already has on show **On for your other devices** and start on. Crate doesn't start a feature in a new vault until you choose it here or turn it on later under **Settings → Crate**.
+5. If you use encryption, open **Manage encryption** in Crate’s Sync settings and enter your recovery key.
+6. Run **Crate: Sync now** and wait for it to finish.
+7. Open a note on both devices to check that it matches. If both devices changed the same content, [review the conflicts](/docs/troubleshooting/conflicts/).
 8. If you want this device to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync**. It starts off on every new device.
 
 :::caution[One vault per server]

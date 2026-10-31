@@ -17,6 +17,7 @@ import { loadEmbeddedCloudflareArtifacts } from '../cloudflare/deployment/embedd
 import { obsidianHttpTransport } from '../cloudflare/http';
 import { configureCloudflareAuthorizedDevice } from './cloudflare-connection';
 import { isSelfHostedConnectionPending } from './self-hosted-connection';
+import { offerFeatureChoice } from './feature-settings';
 import { generateSecureToken, hashToken } from '../cloudflare/device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from './deviceInfo';
 import { openCloudflareDeploymentModal, revealCloudflareOperation, type CloudflareDeploymentModal } from '../ui/cloudflare/deployment-modal';
@@ -303,6 +304,7 @@ async function connectDevice(operation: CloudflareOperation, workerUrl: string, 
 
 	plugin.refreshSettingsTab();
 	presentation.connected(connection);
+	if (connection.success && !isReconnect) void offerFeatureChoice(plugin);
 }
 
 function deploymentErrorMessage(error: unknown): string {

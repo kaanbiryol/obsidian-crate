@@ -14,6 +14,7 @@ const { outputFiles } = await build({
     import { SharedModal } from './src/ui/plugin/shared-modal';
     import { createSettingsDisclosure } from './src/ui/plugin/settings-disclosure';
     import { openConfirmationModal } from './src/ui/confirmation-modal';
+    import { openFeatureChoiceModal } from './src/ui/feature-choice-modal';
     import { PendingDiscardModal } from './src/ui/activity/pending-discard-modal';
     import { SyncDiagnosticsModal } from './src/ui/sync-diagnostics-modal';
     import { QRModal } from './src/ui/qr-modal';
@@ -60,6 +61,7 @@ const { outputFiles } = await build({
       } else if (scene==='rows') new RowDialog({}).open();
       else if(scene==='management') new Management({}).open();
       else if(scene==='confirmation') void openConfirmationModal({}, {title:'Disconnect this device',message:'Stop syncing this device?',details:['Other devices stay connected.'],confirmText:'Disconnect',warning:true,checkbox:{label:'Also forget the saved server connection',onChange:()=>{}}});
+      else if(scene==='features') void openFeatureChoiceModal({}, [{feature:'reminders',folder:'Reminders',notes:12,serverOn:true},{feature:'reading',folder:'Reading',notes:0,serverOn:false}]);
       else if(scene==='discard') new PendingDiscardModal({},async()=>({items:[{path:'Notes/Review.md',action:'restore'}],unchangedCount:0,discard:async()=>{window.discarded=true;}}),()=>{}).open();
       else if(scene==='diagnostics') new SyncDiagnosticsModal({},'Fixture sync report\\n'.repeat(30)).open();
       else if(scene==='qr') new QRModal({},url).open();
@@ -81,7 +83,7 @@ const obsidianCss = process.env.CRATE_OBSIDIAN_CSS_PATH ? await readFile(process
 const output = '.generated/plugin-dialog-review';
 const hostName = obsidianCss ? 'obsidian-' : '';
 await mkdir(output,{recursive:true});
-const scenes=['confirmation','diagnostics','qr','external','authorization','deployment','pairing','reset','management','discard','delete'];
+const scenes=['confirmation','features','diagnostics','qr','external','authorization','deployment','pairing','reset','management','discard','delete'];
 for (const browserType of [chromium,webkit]) {
   const browser = await browserType.launch();
   try {

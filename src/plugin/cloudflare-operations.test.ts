@@ -13,6 +13,7 @@ const dismissCloudflareAuthorizationModal = vi.fn();
 const platform = { isMobile: false };
 
 const revealCloudflareOperation = vi.fn(() => false);
+const offerFeatureChoice = vi.fn(async () => {});
 
 const progress = {
 	dismiss: vi.fn(),
@@ -27,6 +28,7 @@ async function loadPluginIntegration() {
 	vi.doMock('../cloudflare/oauth/config', async () => ({ ...await vi.importActual<object>('../cloudflare/oauth/config'), isCloudflareOAuthConfigured: () => true }));
 	vi.doMock('obsidian', () => ({ Notice: vi.fn(), Platform: platform }));
 	vi.doMock('./cloudflare-connection', () => ({ configureCloudflareAuthorizedDevice }));
+	vi.doMock('./feature-settings', () => ({ offerFeatureChoice }));
 	vi.doMock('../cloudflare/device-token', () => ({ generateSecureToken, hashToken }));
 	vi.doMock('./deviceInfo', () => ({
 		getCurrentDeviceName: vi.fn(() => 'Test device'),
@@ -96,6 +98,7 @@ afterEach(() => {
 	vi.doUnmock('../ui/cloudflare/authorization-modal');
 	vi.doUnmock('../cloudflare/deployment/embedded-artifacts');
 	vi.doUnmock('../cloudflare/http');
+	vi.doUnmock('./feature-settings');
 });
 
 it('routes deployment sign-in through a tappable link on mobile', async () => {
@@ -150,6 +153,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 			'Crate is connected',
 			'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
 		);
+		expect(offerFeatureChoice).toHaveBeenCalledExactlyOnceWith(plugin);
 	});
 
 	it('passes the settings document to the OAuth dialog without waiting for animation frames', async () => {
@@ -419,6 +423,7 @@ it('keeps connection-test retry guidance for a temporary network failure', async
 	await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
 	expect(progress.fail).toHaveBeenCalledWith('Crate is connected with a warning', expect.stringContaining('Network unavailable'),
 		['Your device credentials were saved. You can retry the connection test from Crate settings.']);
+	expect(offerFeatureChoice).not.toHaveBeenCalled();
 });
 
 it('does not open another update dialog when the service is busy', async () => {
@@ -484,6 +489,8 @@ describe('unified reconnect', () => {
 		await handleCloudflareOAuthProtocol(plugin as never, { state: 'oauth-state', code: 'code' });
 		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalled();
 		expect(progress.succeed).toHaveBeenCalledWith('Connection verified', expect.any(String));
+		// Reconnecting verifies an existing setup, so it does not offer features again.
+		expect(offerFeatureChoice).not.toHaveBeenCalled();
 	});
 
 	it('does not report success when the repaired credential is still rejected', async () => {

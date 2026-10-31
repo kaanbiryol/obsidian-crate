@@ -1,5 +1,6 @@
 import { Notice, Setting, type TextComponent } from 'obsidian';
 import { connectSelfHostedServer, updateSelfHostedServerAddress } from '../../../plugin/self-hosted-connection';
+import { offerFeatureChoice } from '../../../plugin/feature-settings';
 import type { SettingsSectionContext } from '../section-helpers';
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { selfHostedConnectionMessage } from './self-hosted-errors';
@@ -68,6 +69,7 @@ export function renderSelfHostedSetting({ containerEl, plugin, rerender }: Setti
 				tokenInput.setValue('');
 				new Notice('Connected to your server. You can now sync this vault.');
 				rerender();
+				if (!reconnect) void offerFeatureChoice(plugin);
 			} catch (error) {
 				errorEl.setText(selfHostedConnectionMessage(error, address));
 				errorEl.hidden = false;

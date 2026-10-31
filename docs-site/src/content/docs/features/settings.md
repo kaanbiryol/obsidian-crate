@@ -38,7 +38,7 @@ Turn off **Enable reading** or **Enable reminders** in its section. Turn it back
 :::note[These switches affect every device]
 They apply to **all devices connected to this server**, so changing them needs a connection. Other devices pick up the change when they next check the server. An offline device keeps its last known setting until it reconnects.
 
-A vault that has never used a feature doesn't start it from the server's setting. Crate shows a notice instead, and you turn the feature on in that vault's settings after checking its folder.
+A vault that has never used a feature doesn't start it from the server's setting. When you connect, the last setup step, **Choose what Crate manages in this vault**, lists each feature with its folder; select **Finish** to turn on the ones you keep on. If you close that step, Crate shows a notice instead, and you turn the feature on in that vault's settings after checking its folder.
 :::
 
 ## Pause sync on one device

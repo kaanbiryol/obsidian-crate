@@ -32,6 +32,16 @@ Your machine needs to stay awake, online, and running Docker for sync and schedu
 
 [Set up with Docker →](/docs/getting-started/self-hosting/)
 
+## After you connect
+
+Crate ends setup with **Choose what Crate manages in this vault**. It lists Reminders and Reading with the folder each one uses:
+
+- **An empty or new folder** starts on, and Crate says what it will store there.
+- **A folder that already has notes** starts off. Crate shows how many notes it has and what turning the feature on changes: Reminders adds a small ID comment to each task and turns dates like "tomorrow" into fixed dates, and Reading adds Crate frontmatter to each note.
+- **A feature your other devices use** starts on and says **On for your other devices**.
+
+Select **Finish** to turn on what you chose. Features you leave off don't change any notes, and closing the step without **Finish** changes nothing. You can change these later in **Settings → Crate**.
+
 ## One server for each vault
 
 Connect copies of the **same vault** to the same server, and give each unrelated vault its own server. Vault names don't keep data apart: connecting two different vaults to one server merges their files when they sync.
