@@ -1,0 +1,95 @@
+{
+	"stored": "{\"version\":1,\"files\":{\"Notes/hello.md\":{\"hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":21,\"modified\":\"2026-10-31 16:57:20\",\"revision\":\"__crate__/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/fixture-a\"},\"__proto__\":{\"hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"size\":4,\"modified\":\"2026-10-30T08:00:00.000Z\",\"revision\":\"fixture-b\"},\"Notes/renamed.md\":{\"hash\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"size\":9,\"modified\":\"unverified\"},\"aaaaaaaaaaaaaaaaaaaaaaaaaa.md\":{\"hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"size\":300,\"modified\":\"2026-10-29\",\"revision\":\"fixture-e\",\"wire\":\"bbbbbbbbbbbbbbbbbbbbbbbbbb.md\"}},\"lastSeq\":42,\"initialConfigPull\":{\"configDir\":\".obsidian\",\"files\":{\".obsidian/app.json\":\"5555555555555555555555555555555555555555555555555555555555555555\"}},\"initialImportToken\":\"55555555-5555-4555-8555-555555555555\",\"restoreIntents\":[{\"version\":{\"path\":\"Notes/hello.md\",\"storage_key\":\"retained/fixture-version\",\"hash\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"size\":12,\"expires_at\":1793000000000,\"created_at\":\"2026-10-01T00:00:00Z\",\"reason\":\"replaced\"},\"phase\":\"pending\",\"request\":{\"operationId\":\"e1_00020757_44444444-1111-4111-8111-111111111111\",\"path\":\"Notes/hello.md\",\"storageKey\":\"retained/fixture-version\",\"expectedHash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"expectedRevision\":\"__crate__/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/fixture-a\"}}],\"uploadDiagnostics\":[{\"at\":\"2026-10-31T16:57:20.000Z\",\"clientSession\":\"33333333-3333-4333-8333-333333333333\",\"operationId\":\"e1_00020757_11111111-1111-4111-8111-111111111111\",\"kind\":\"merge\",\"phase\":\"checkpointed\",\"generation\":7,\"pathHash\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"uploadHash\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"baseHash\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"appliedHash\":\"4444444444444444444444444444444444444444444444444444444444444444\"}],\"settledUploads\":[\"e1_00020757_22222222-1111-4111-8111-111111111111\",\"e1_00020757_11111111-1111-4111-8111-111111111111\"],\"renameDependencies\":{\"Notes/old.md\":\"Notes/renamed.md\"},\"generation\":7,\"authority\":\"https://crate.example.test\"}",
+	"decoded": {
+		"manifest": {
+			"version": 1,
+			"files": {
+				"Notes/hello.md": {
+					"hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					"size": 21,
+					"modified": "2026-10-31 16:57:20",
+					"revision": "__crate__/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/fixture-a"
+				},
+				"__proto__": {
+					"hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+					"size": 4,
+					"modified": "2026-10-30T08:00:00.000Z",
+					"revision": "fixture-b"
+				},
+				"Notes/renamed.md": {
+					"hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+					"size": 9,
+					"modified": "unverified"
+				},
+				"aaaaaaaaaaaaaaaaaaaaaaaaaa.md": {
+					"hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+					"size": 300,
+					"modified": "2026-10-29",
+					"revision": "fixture-e",
+					"wire": "bbbbbbbbbbbbbbbbbbbbbbbbbb.md"
+				}
+			},
+			"lastSeq": 42
+		},
+		"generation": 7,
+		"authority": "https://crate.example.test",
+		"settledUploads": [
+			"e1_00020757_22222222-1111-4111-8111-111111111111",
+			"e1_00020757_11111111-1111-4111-8111-111111111111"
+		],
+		"renames": [
+			[
+				"Notes/old.md",
+				"Notes/renamed.md"
+			]
+		],
+		"uploadDiagnostics": [
+			{
+				"at": "2026-10-31T16:57:20.000Z",
+				"clientSession": "33333333-3333-4333-8333-333333333333",
+				"operationId": "e1_00020757_11111111-1111-4111-8111-111111111111",
+				"kind": "merge",
+				"phase": "checkpointed",
+				"generation": 7,
+				"pathHash": "1111111111111111111111111111111111111111111111111111111111111111",
+				"uploadHash": "2222222222222222222222222222222222222222222222222222222222222222",
+				"baseHash": "3333333333333333333333333333333333333333333333333333333333333333",
+				"appliedHash": "4444444444444444444444444444444444444444444444444444444444444444"
+			}
+		],
+		"restoreIntents": [
+			{
+				"version": {
+					"path": "Notes/hello.md",
+					"storage_key": "retained/fixture-version",
+					"hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+					"size": 12,
+					"expires_at": 1793000000000,
+					"created_at": "2026-10-01T00:00:00Z",
+					"reason": "replaced"
+				},
+				"phase": "pending",
+				"request": {
+					"operationId": "e1_00020757_44444444-1111-4111-8111-111111111111",
+					"path": "Notes/hello.md",
+					"storageKey": "retained/fixture-version",
+					"expectedHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					"expectedRevision": "__crate__/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/fixture-a"
+				}
+			}
+		],
+		"initialConfigPull": {
+			"configDir": ".obsidian",
+			"files": {
+				".obsidian/app.json": "5555555555555555555555555555555555555555555555555555555555555555"
+			}
+		},
+		"initialImportToken": "55555555-5555-4555-8555-555555555555",
+		"paths": [
+			"Notes/hello.md",
+			"__proto__",
+			"Notes/renamed.md",
+			"aaaaaaaaaaaaaaaaaaaaaaaaaa.md"
+		]
+	}
+}

@@ -1,0 +1,24 @@
+{
+	"stored": [
+		"e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2",
+		"e1_00020000_saved-operation-id-123456",
+		"operation_123456789"
+	],
+	"decoded": [
+		{
+			"id": "e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2",
+			"valid": true,
+			"day": 20757
+		},
+		{
+			"id": "e1_00020000_saved-operation-id-123456",
+			"valid": true,
+			"day": 20000
+		},
+		{
+			"id": "operation_123456789",
+			"valid": true,
+			"day": null
+		}
+	]
+}

@@ -1,0 +1,31 @@
+{
+	"stored": {
+		"requested": [
+			"b.md",
+			"missing.md"
+		],
+		"response": {
+			"files": {
+				"b.md": {
+					"hash": "320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88",
+					"size": 5,
+					"modified": "2026-10-31 16:57:20",
+					"revision": "__crate__/files/320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88/b6ff103f-e739-4ff8-bbd4-e93fd2fbc11f"
+				}
+			}
+		}
+	},
+	"decoded": {
+		"files": {
+			"b.md": {
+				"hash": "320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88",
+				"size": 5,
+				"modified": "2026-10-31 16:57:20",
+				"revision": "__crate__/files/320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88/b6ff103f-e739-4ff8-bbd4-e93fd2fbc11f"
+			}
+		},
+		"paths": [
+			"b.md"
+		]
+	}
+}

@@ -1,0 +1,17 @@
+{
+	"stored": {
+		"since": 5,
+		"response": {
+			"changes": [],
+			"lastSeq": 120,
+			"hasMore": false,
+			"cursorExpired": true
+		}
+	},
+	"decoded": {
+		"changes": [],
+		"lastSeq": 120,
+		"hasMore": false,
+		"cursorExpired": true
+	}
+}

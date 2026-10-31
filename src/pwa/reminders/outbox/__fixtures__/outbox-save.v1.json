@@ -1,0 +1,36 @@
+{
+	"stored": {
+		"authToken": "synthetic-web-session-credential",
+		"folderPath": "Reminders",
+		"entries": {
+			"crate-reminder-outbox:v1:c385d43196a3c9be0eabea4ec6d6198b3c0de920d3aff1948f817d33b5a248b1:Reminders:e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2": "{\"version\":1,\"createdAt\":1793465840000,\"change\":{\"operationId\":\"e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2\",\"recordId\":\"e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2\",\"kind\":\"save\",\"path\":\"/reminders/create\",\"method\":\"POST\",\"body\":\"{\\\"folderPath\\\":\\\"Reminders\\\",\\\"content\\\":\\\"Water the plants\\\",\\\"description\\\":\\\"Synthetic note\\\",\\\"project\\\":\\\"Inbox\\\",\\\"priority\\\":4,\\\"dueDate\\\":null,\\\"dueDatetime\\\":\\\"2099-01-02T08:30:00.000Z\\\",\\\"id\\\":\\\"e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2\\\",\\\"operationId\\\":\\\"e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2\\\"}\",\"status\":\"pending\",\"attempts\":0,\"retryAt\":0,\"optimistic\":{\"id\":\"e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2\",\"content\":\"Water the plants\",\"description\":\"Synthetic note\",\"project\":\"Inbox\",\"priority\":4,\"completed\":false,\"dueDate\":\"2099-01-02\",\"dueDatetime\":\"2099-01-02T08:30:00.000Z\",\"filePath\":\"Reminders/Inbox.md\"}}}"
+		}
+	},
+	"decoded": {
+		"changes": [
+			{
+				"operationId": "e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2",
+				"recordId": "e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2",
+				"kind": "save",
+				"path": "/reminders/create",
+				"method": "POST",
+				"body": "{\"folderPath\":\"Reminders\",\"content\":\"Water the plants\",\"description\":\"Synthetic note\",\"project\":\"Inbox\",\"priority\":4,\"dueDate\":null,\"dueDatetime\":\"2099-01-02T08:30:00.000Z\",\"id\":\"e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2\",\"operationId\":\"e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2\"}",
+				"status": "pending",
+				"attempts": 0,
+				"retryAt": 0,
+				"optimistic": {
+					"id": "e1_00020757_0a14f966-767d-4908-8cc9-b1f0f10d1cc2",
+					"content": "Water the plants",
+					"description": "Synthetic note",
+					"project": "Inbox",
+					"priority": 4,
+					"completed": false,
+					"dueDate": "2099-01-02",
+					"dueDatetime": "2099-01-02T08:30:00.000Z",
+					"filePath": "Reminders/Inbox.md"
+				}
+			}
+		],
+		"quarantined": []
+	}
+}

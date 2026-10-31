@@ -1,0 +1,81 @@
+{
+	"stored": {
+		"service": "crate",
+		"serverVersion": "0.9.0",
+		"pwaAssetVersion": "fixture-pwa-1",
+		"protocol": {
+			"current": 1,
+			"oldestCompatible": 1
+		},
+		"capabilities": [
+			"web-pairing-v1",
+			"e2ee-v1",
+			"e2ee-reset-v1",
+			"shared-history-checkpoints-v1",
+			"resumable-initial-import-v1",
+			"bulk-new-file-uploads-v1",
+			"sync-v1",
+			"file-revision-deletes",
+			"upload-operation-receipts",
+			"restore-operation-receipts",
+			"reminder-operation-receipts",
+			"conditional-file-mutations",
+			"settings-v1",
+			"devices-v1",
+			"reminders-v1",
+			"reading-v1",
+			"reading-fetching-consent-v1",
+			"shared-features-v1",
+			"reading-shortcut-pairing-v1",
+			"reading-shortcut-transport-v1",
+			"notifications-v1"
+		],
+		"shortcut": {
+			"version": 1,
+			"revision": 1,
+			"minimumRevision": 1
+		},
+		"serverRevision": 2,
+		"schemaVersion": 1,
+		"deploymentFingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+		"reminderOperationDay": 20757
+	},
+	"decoded": {
+		"info": {
+			"service": "crate",
+			"serverVersion": "0.9.0",
+			"protocol": {
+				"current": 1,
+				"oldestCompatible": 1
+			},
+			"capabilities": [
+				"web-pairing-v1",
+				"e2ee-v1",
+				"e2ee-reset-v1",
+				"shared-history-checkpoints-v1",
+				"resumable-initial-import-v1",
+				"bulk-new-file-uploads-v1",
+				"sync-v1",
+				"file-revision-deletes",
+				"upload-operation-receipts",
+				"restore-operation-receipts",
+				"reminder-operation-receipts",
+				"conditional-file-mutations",
+				"settings-v1",
+				"devices-v1",
+				"reminders-v1",
+				"reading-v1",
+				"reading-fetching-consent-v1",
+				"shared-features-v1",
+				"reading-shortcut-pairing-v1",
+				"reading-shortcut-transport-v1",
+				"notifications-v1"
+			],
+			"pwaAssetVersion": "fixture-pwa-1",
+			"serverRevision": 2,
+			"deploymentFingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+			"reminderOperationDay": 20757
+		},
+		"compatible": true
+	}
+}

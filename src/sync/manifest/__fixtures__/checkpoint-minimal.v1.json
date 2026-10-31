@@ -1,0 +1,16 @@
+{
+	"stored": "{\"version\":1,\"files\":{},\"generation\":1,\"authority\":\"https://crate.example.test\"}",
+	"decoded": {
+		"manifest": {
+			"version": 1,
+			"files": {}
+		},
+		"generation": 1,
+		"authority": "https://crate.example.test",
+		"settledUploads": [],
+		"renames": [],
+		"uploadDiagnostics": [],
+		"restoreIntents": [],
+		"paths": []
+	}
+}

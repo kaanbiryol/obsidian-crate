@@ -1,0 +1,26 @@
+{
+	"stored": {
+		"authToken": "synthetic-web-session-credential",
+		"folderPath": "Reminders",
+		"entries": {
+			"crate-reminder-outbox:v1:c385d43196a3c9be0eabea4ec6d6198b3c0de920d3aff1948f817d33b5a248b1:Reminders:e1_00020757_1b25fa77-878e-4a19-9dd0-c2f1f21e2dd3": "{\"version\":1,\"createdAt\":1793465840000,\"change\":{\"operationId\":\"e1_00020757_1b25fa77-878e-4a19-9dd0-c2f1f21e2dd3\",\"recordId\":\"r-existing\",\"kind\":\"complete\",\"path\":\"/reminders/set-completed\",\"method\":\"POST\",\"status\":\"uncertain\",\"attempts\":2,\"retryAt\":1793000000000,\"ambiguous\":true,\"body\":\"{\\\"operationId\\\":\\\"e1_00020757_1b25fa77-878e-4a19-9dd0-c2f1f21e2dd3\\\",\\\"folderPath\\\":\\\"Reminders\\\",\\\"id\\\":\\\"r-existing\\\",\\\"completed\\\":true,\\\"filePath\\\":\\\"Reminders/Inbox.md\\\",\\\"expectedRevision\\\":\\\"e0dbd2afdcc4108bf3710031c9235a78f742f564fcaec72bdbc842c8b80657f2\\\"}\"}}"
+		}
+	},
+	"decoded": {
+		"changes": [
+			{
+				"operationId": "e1_00020757_1b25fa77-878e-4a19-9dd0-c2f1f21e2dd3",
+				"recordId": "r-existing",
+				"kind": "complete",
+				"path": "/reminders/set-completed",
+				"method": "POST",
+				"status": "uncertain",
+				"attempts": 2,
+				"retryAt": 1793000000000,
+				"ambiguous": true,
+				"body": "{\"operationId\":\"e1_00020757_1b25fa77-878e-4a19-9dd0-c2f1f21e2dd3\",\"folderPath\":\"Reminders\",\"id\":\"r-existing\",\"completed\":true,\"filePath\":\"Reminders/Inbox.md\",\"expectedRevision\":\"e0dbd2afdcc4108bf3710031c9235a78f742f564fcaec72bdbc842c8b80657f2\"}"
+			}
+		],
+		"quarantined": []
+	}
+}

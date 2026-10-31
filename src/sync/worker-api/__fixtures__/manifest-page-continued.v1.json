@@ -1,0 +1,48 @@
+{
+	"stored": {
+		"version": 1,
+		"files": {
+			"Notes/hello.md": {
+				"hash": "19db98e2e4daf5be76805c1e5d07db93971336101597c94b4ebe096437f0a0ff",
+				"size": 21,
+				"modified": "2026-10-31 16:57:20",
+				"revision": "__crate__/files/19db98e2e4daf5be76805c1e5d07db93971336101597c94b4ebe096437f0a0ff/1c2b32ec-2d0c-4fab-b3e5-f6a9668c7de7"
+			},
+			"__proto__": {
+				"hash": "320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88",
+				"size": 5,
+				"modified": "2026-10-31 16:57:20",
+				"revision": "__crate__/files/320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88/b6ff103f-e739-4ff8-bbd4-e93fd2fbc11f"
+			}
+		},
+		"lastSeq": 9,
+		"snapshotSeq": 7,
+		"hasMore": true,
+		"nextCursor": "__proto__"
+	},
+	"decoded": {
+		"version": 1,
+		"files": {
+			"Notes/hello.md": {
+				"hash": "19db98e2e4daf5be76805c1e5d07db93971336101597c94b4ebe096437f0a0ff",
+				"size": 21,
+				"modified": "2026-10-31 16:57:20",
+				"revision": "__crate__/files/19db98e2e4daf5be76805c1e5d07db93971336101597c94b4ebe096437f0a0ff/1c2b32ec-2d0c-4fab-b3e5-f6a9668c7de7"
+			},
+			"__proto__": {
+				"hash": "320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88",
+				"size": 5,
+				"modified": "2026-10-31 16:57:20",
+				"revision": "__crate__/files/320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88/b6ff103f-e739-4ff8-bbd4-e93fd2fbc11f"
+			}
+		},
+		"lastSeq": 9,
+		"snapshotSeq": 7,
+		"hasMore": true,
+		"nextCursor": "__proto__",
+		"paths": [
+			"Notes/hello.md",
+			"__proto__"
+		]
+	}
+}

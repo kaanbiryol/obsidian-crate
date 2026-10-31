@@ -1,0 +1,20 @@
+{
+	"stored": {
+		"ignorePatterns": [
+			".git/",
+			" .git/ ",
+			"",
+			"Private/**"
+		],
+		"syncInterval": 300,
+		"pushEnabled": true
+	},
+	"decoded": {
+		"ignorePatterns": [
+			".git/",
+			"Private/**"
+		],
+		"syncInterval": 300,
+		"pushEnabled": true
+	}
+}

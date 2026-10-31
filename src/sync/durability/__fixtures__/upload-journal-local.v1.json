@@ -1,0 +1,32 @@
+{
+	"stored": "{\"version\":1,\"authority\":\"https://crate.example.test\",\"sequence\":1,\"file\":{\"operationId\":\"e1_00020757_11111111-1111-4111-8111-111111111111\",\"path\":\"Notes/hello.md\",\"content\":\"SGVsbG8gZnJvbSBwcm90b2NvbCAx\",\"hash\":\"19db98e2e4daf5be76805c1e5d07db93971336101597c94b4ebe096437f0a0ff\",\"size\":21,\"contentType\":\"text/markdown\",\"expectedHash\":null,\"intent\":{\"kind\":\"local\"},\"origin\":{\"clientSession\":\"33333333-3333-4333-8333-333333333333\",\"at\":\"2026-10-31T17:00:32.895Z\"}}}",
+	"decoded": [
+		{
+			"entry": {
+				"operationId": "e1_00020757_11111111-1111-4111-8111-111111111111",
+				"path": "Notes/hello.md",
+				"content": "SGVsbG8gZnJvbSBwcm90b2NvbCAx",
+				"hash": "19db98e2e4daf5be76805c1e5d07db93971336101597c94b4ebe096437f0a0ff",
+				"size": 21,
+				"contentType": "text/markdown",
+				"expectedHash": null,
+				"intent": {
+					"kind": "local"
+				},
+				"origin": {
+					"clientSession": "33333333-3333-4333-8333-333333333333",
+					"at": "2026-10-31T17:00:32.895Z"
+				}
+			},
+			"wire": {
+				"operationId": "e1_00020757_11111111-1111-4111-8111-111111111111",
+				"path": "Notes/hello.md",
+				"content": "SGVsbG8gZnJvbSBwcm90b2NvbCAx",
+				"hash": "19db98e2e4daf5be76805c1e5d07db93971336101597c94b4ebe096437f0a0ff",
+				"size": 21,
+				"contentType": "text/markdown",
+				"expectedHash": null
+			}
+		}
+	]
+}

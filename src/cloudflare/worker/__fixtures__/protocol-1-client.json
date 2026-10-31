@@ -1,0 +1,54 @@
+{
+	"description": "Requests a released protocol 1 client (plugin 0.9.0 and its PWA) sends for the core sync and reminder flows. {{operationDay}} is replaced with the 8-digit reminderOperationDay from the handshake, as the client does, because operation IDs expire after 180 UTC dates.",
+	"protocolHeader": "1",
+	"clientProtocol": { "current": 1, "oldestCompatible": 1 },
+	"requiredCapabilities": [
+		"sync-v1",
+		"file-revision-deletes",
+		"upload-operation-receipts",
+		"restore-operation-receipts",
+		"reminder-operation-receipts",
+		"conditional-file-mutations",
+		"settings-v1",
+		"devices-v1",
+		"reminders-v1",
+		"notifications-v1",
+		"shared-history-checkpoints-v1",
+		"e2ee-v1",
+		"e2ee-reset-v1",
+		"web-pairing-v1"
+	],
+	"requests": {
+		"serverInfo": { "method": "GET", "path": "/.well-known/crate", "headers": {} },
+		"upload": {
+			"method": "PUT",
+			"path": "/sync/upload?path=Notes%2Fhello.md",
+			"headers": {
+				"X-Crate-Upload-Operation": "e1_{{operationDay}}_11111111-1111-4111-8111-111111111111",
+				"Content-Type": "text/markdown",
+				"X-File-Hash": "19db98e2e4daf5be76805c1e5d07db93971336101597c94b4ebe096437f0a0ff",
+				"X-File-Size": "21",
+				"X-Crate-Expected-Hash": "absent"
+			},
+			"body": "Hello from protocol 1"
+		},
+		"batchUpload": {
+			"method": "POST",
+			"path": "/sync/batch-upload",
+			"headers": { "X-Crate-Upload-Operations": "e1_{{operationDay}}_22222222-1111-4111-8111-111111111111" },
+			"body": "{\"files\":[{\"operationId\":\"e1_{{operationDay}}_22222222-1111-4111-8111-111111111111\",\"path\":\"b.md\",\"content\":\"QmF0Y2g=\",\"hash\":\"320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88\",\"size\":5,\"contentType\":\"text/markdown\",\"expectedHash\":null}]}"
+		},
+		"manifest": { "method": "GET", "path": "/sync/manifest?limit=2000", "headers": {} },
+		"changes": { "method": "GET", "path": "/sync/changes?since=0", "headers": {} },
+		"check": { "method": "GET", "path": "/sync/check?since=0", "headers": {} },
+		"metadata": { "method": "POST", "path": "/sync/metadata", "headers": {}, "body": "{\"paths\":[\"b.md\",\"missing.md\"]}" },
+		"download": { "method": "GET", "path": "/sync/download?path=Notes%2Fhello.md", "headers": {} },
+		"reminderCreate": {
+			"method": "POST",
+			"path": "/reminders/create",
+			"headers": { "Content-Type": "application/json" },
+			"body": "{\"folderPath\":\"Reminders\",\"content\":\"Water the plants\",\"description\":\"Synthetic note\",\"project\":\"Inbox\",\"priority\":4,\"dueDate\":null,\"dueDatetime\":\"2099-01-02T08:30:00.000Z\",\"id\":\"e1_{{operationDay}}_0a14f966-767d-4908-8cc9-b1f0f10d1cc2\",\"operationId\":\"e1_{{operationDay}}_0a14f966-767d-4908-8cc9-b1f0f10d1cc2\"}"
+		},
+		"reminderList": { "method": "GET", "path": "/reminders/list?folderPath=Reminders", "headers": {} }
+	}
+}

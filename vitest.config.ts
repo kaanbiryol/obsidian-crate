@@ -20,5 +20,19 @@ export default defineConfig({
 	test: {
 		setupFiles: ['./src/test/setup-byte-equality.ts'],
 		include: ['src/**/*.test.ts'],
+		// Floors for the folders where a silently dropped test risks user data. They
+		// sit just under current coverage: raise them as coverage grows, never lower them
+		// to make a change pass. The Worker is covered by `test:worker-runtime` instead.
+		coverage: {
+			provider: 'v8',
+			include: ['src/**/*.{ts,tsx}'],
+			exclude: ['src/**/*.test.ts', 'src/test/**', 'src/**/*.d.ts'],
+			thresholds: {
+				'src/sync/**': { statements: 86, branches: 80, functions: 85, lines: 89 },
+				'src/encryption/**': { statements: 76, branches: 76, functions: 86, lines: 81 },
+				'src/protocol/**': { statements: 94, branches: 89, functions: 97, lines: 97 },
+				'src/reminders/core/**': { statements: 93, branches: 88, functions: 95, lines: 95 },
+			},
+		},
 	},
 });

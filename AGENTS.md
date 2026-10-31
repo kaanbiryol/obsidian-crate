@@ -56,6 +56,15 @@ Use npm with the Node version in `.nvmrc` and `package.json` `engines`. `package
 
 Match verification to the change. Add regression tests for meaningful behavior and failure modes, reproducing the failure through the real boundary (D1/R2 tests for publication guarantees). Documentation-only edits need a link and diff review, not the test suites. After checks pass, rerun only for new edits, failures or open risks. Never replace visual baselines just to make a comparison pass.
 
+## Guardrail tests
+
+These tests protect stored user data and released clients. When one fails, the change is wrong; do not edit the test, fixture or floor to make it pass. Ask first if a format really must change.
+
+- Frozen formats: `*.fixtures.test.ts` files decode append-only samples in the `__fixtures__/` folder beside them: encrypted formats (`src/encryption/format-fixtures.test.ts`), protocol bodies, the local checkpoint manifest, upload journal, Worker read responses and the PWA reminder outbox (all through `src/test/frozen-fixtures.ts`). A new format version adds a fixture; it never rewrites an old one. Each test file says how to freeze a new one.
+- Old clients: `src/cloudflare/worker/old-client-replay.integration.ts` (in `npm run test:worker-runtime`) replays recorded protocol 1 client requests against the real Worker, including retries after a lost response. When a new protocol ships, add a recording next to the old ones; never replace them.
+- Invariants: `*.property.test.ts` files (fast-check) cover sync reconciliation (deletion needs verified absence, plans converge), the changelog cursor, reminder recurrence, identity and sort, and outbox settlement and retries (identical resends, at most one commit).
+- Coverage floors: `npm run test:coverage` enforces per-folder minimums in `vitest.config.ts` for `src/sync`, `src/encryption`, `src/protocol` and `src/reminders/core`. Raise a floor when coverage grows; never lower it. Do not delete or skip tests to make a change pass.
+
 ## Generated files
 
 - After changing release manifest, wire or shortcut protocols, or transfer limits, run `node scripts/check-contract-docs.mjs --write` to refresh `docs/current-contract.md`.

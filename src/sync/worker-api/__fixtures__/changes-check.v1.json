@@ -1,0 +1,13 @@
+{
+	"stored": {
+		"since": 0,
+		"response": {
+			"lastSeq": 2,
+			"hasChanges": true
+		}
+	},
+	"decoded": {
+		"lastSeq": 2,
+		"hasChanges": true
+	}
+}

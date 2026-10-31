@@ -1,0 +1,37 @@
+{
+	"stored": "{\"version\":1,\"authority\":\"https://crate.example.test\",\"sequence\":1,\"file\":{\"operationId\":\"e1_00020757_22222222-1111-4111-8111-111111111111\",\"path\":\"Notes/hello.md\",\"content\":\"TWVyZ2VkIGxpbmUgb25lCk1lcmdlZCBsaW5lIHR3bwo=\",\"hash\":\"eb779259b8438326905ea21e75684ef02400db45c2afc590450078b5ae55b341\",\"size\":32,\"contentType\":\"text/markdown\",\"expectedHash\":\"6d7828af069dc754bb8173b4da6833a32d2fa5d4165930e9668789f2c2f7410f\",\"intent\":{\"kind\":\"merge\",\"preimage\":{\"content\":\"TWVyZ2VkIGxpbmUgb25lCg==\",\"hash\":\"6d7828af069dc754bb8173b4da6833a32d2fa5d4165930e9668789f2c2f7410f\",\"size\":16}},\"origin\":{\"clientSession\":\"33333333-3333-4333-8333-333333333333\",\"at\":\"2026-10-31T17:00:32.900Z\"}}}",
+	"decoded": [
+		{
+			"entry": {
+				"operationId": "e1_00020757_22222222-1111-4111-8111-111111111111",
+				"path": "Notes/hello.md",
+				"content": "TWVyZ2VkIGxpbmUgb25lCk1lcmdlZCBsaW5lIHR3bwo=",
+				"hash": "eb779259b8438326905ea21e75684ef02400db45c2afc590450078b5ae55b341",
+				"size": 32,
+				"contentType": "text/markdown",
+				"expectedHash": "6d7828af069dc754bb8173b4da6833a32d2fa5d4165930e9668789f2c2f7410f",
+				"intent": {
+					"kind": "merge",
+					"preimage": {
+						"content": "TWVyZ2VkIGxpbmUgb25lCg==",
+						"hash": "6d7828af069dc754bb8173b4da6833a32d2fa5d4165930e9668789f2c2f7410f",
+						"size": 16
+					}
+				},
+				"origin": {
+					"clientSession": "33333333-3333-4333-8333-333333333333",
+					"at": "2026-10-31T17:00:32.900Z"
+				}
+			},
+			"wire": {
+				"operationId": "e1_00020757_22222222-1111-4111-8111-111111111111",
+				"path": "Notes/hello.md",
+				"content": "TWVyZ2VkIGxpbmUgb25lCk1lcmdlZCBsaW5lIHR3bwo=",
+				"hash": "eb779259b8438326905ea21e75684ef02400db45c2afc590450078b5ae55b341",
+				"size": 32,
+				"contentType": "text/markdown",
+				"expectedHash": "6d7828af069dc754bb8173b4da6833a32d2fa5d4165930e9668789f2c2f7410f"
+			}
+		}
+	]
+}

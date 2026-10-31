@@ -1,0 +1,67 @@
+{
+	"stored": {
+		"version": 1,
+		"checkpoint": {
+			"id": "0f0f0f0f-1111-4222-8333-444444444444",
+			"sequence": 12,
+			"timestamp": "2026-09-20T10:00:00.000Z",
+			"expiresAt": 1792490400000,
+			"fileCount": 3
+		},
+		"files": {
+			"Notes/hello.md": {
+				"hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				"size": 21,
+				"modified": "2026-09-20 09:59:00",
+				"revision": "__crate__/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/fixture-revision-a"
+			},
+			"__proto__": {
+				"hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+				"size": 4,
+				"modified": "2026-09-19T08:00:00Z",
+				"revision": "__crate__/files/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/fixture-revision-b"
+			},
+			"Attachments/Ünïcødé image.png": {
+				"hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+				"size": 2048,
+				"modified": "2026-09-18",
+				"revision": "__crate__/files/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/fixture-revision-c"
+			}
+		}
+	},
+	"decoded": {
+		"version": 1,
+		"checkpoint": {
+			"id": "0f0f0f0f-1111-4222-8333-444444444444",
+			"sequence": 12,
+			"timestamp": "2026-09-20T10:00:00.000Z",
+			"expiresAt": 1792490400000,
+			"fileCount": 3
+		},
+		"files": {
+			"Notes/hello.md": {
+				"hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				"size": 21,
+				"modified": "2026-09-20 09:59:00",
+				"revision": "__crate__/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/fixture-revision-a"
+			},
+			"__proto__": {
+				"hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+				"size": 4,
+				"modified": "2026-09-19T08:00:00Z",
+				"revision": "__crate__/files/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/fixture-revision-b"
+			},
+			"Attachments/Ünïcødé image.png": {
+				"hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+				"size": 2048,
+				"modified": "2026-09-18",
+				"revision": "__crate__/files/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/fixture-revision-c"
+			}
+		},
+		"paths": [
+			"Notes/hello.md",
+			"__proto__",
+			"Attachments/Ünïcødé image.png"
+		]
+	}
+}

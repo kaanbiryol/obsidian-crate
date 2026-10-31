@@ -9,6 +9,10 @@ Scripts in `package.json` are the source of truth. [Framework and Config](#frame
 | Suite | Command | Notes |
 | --- | --- | --- |
 | Unit tests | `npm test` | Vitest over `src/**/*.test.ts`. One file: `npx vitest run <file>`. |
+| Unit coverage floors | `npm run test:coverage` | The unit suite with V8 coverage. Fails when `src/sync`, `src/encryption`, `src/protocol` or `src/reminders/core` drop under the floors in `vitest.config.ts`. `check:source` and CI run this instead of `npm test`. |
+| Frozen formats | `npx vitest run src/**/*.fixtures.test.ts src/encryption/format-fixtures.test.ts` | Part of the unit suite. Decode append-only samples in `__fixtures__/` folders. Encrypted formats: `CRATE_WRITE_ENCRYPTION_FIXTURES=1` writes only missing entries. Others: `CRATE_WRITE_FIXTURES=<file name>` writes only that missing file (see `src/test/frozen-fixtures.ts`). |
+| Old-client replay | `npm run test:worker-runtime` | `src/cloudflare/worker/old-client-replay.integration.ts` replays recorded protocol 1 client requests against local D1, R2 and Durable Objects. |
+| Property tests | `npx vitest run src/**/*.property.test.ts` | Part of the unit suite. fast-check invariants for sync reconciliation, reminders and the PWA outbox. |
 | Worker runtime | `npm run test:worker-runtime` | Builds the Worker, then runs the `*.integration.ts` suites against local D1, R2 and Durable Objects. |
 | Local server | `npm run test:local-server` | Builds the Worker, then runs every `packages/server/test/*.test.mjs`. |
 | Server package | `npm run test:server-package` | Packs the server and installs it through npx in an isolated cache. |
@@ -18,7 +22,7 @@ Scripts in `package.json` are the source of truth. [Framework and Config](#frame
 | Recovery tooling | `npm run test:recovery` | Python `unittest`. |
 | Contract docs | `npm run check:contracts` | Rejects stale values in `current-contract.md`; `node scripts/check-contract-docs.mjs --write` refreshes them. |
 | Static checks | `npm run lint`, `typecheck`, `typecheck:worker`, `typecheck:service-worker`, `typecheck:visual`, `deadcode`, `notices:check` | Run each as `npm run <name>`. The type-checks keep incremental state in the ignored `.generated/tsc/`. |
-| Source checks | `npm run check:source` | Builds the Worker, then runs lint, the plugin, Worker and service-worker type-checks, `deadcode`, `notices:check`, `check:contracts`, `test:ci`, `test:server-revision`, `test:recovery` and `npm test`. |
+| Source checks | `npm run check:source` | Builds the Worker, then runs lint, the plugin, Worker and service-worker type-checks, `deadcode`, `notices:check`, `check:contracts`, `test:ci`, `test:server-revision`, `test:recovery` and `test:coverage`. |
 | Everything except browsers | `npm run check` | `check:source`, then `test:worker-runtime` and `test:local-server`. |
 | PWA preview smoke test | `npm run test:pwa-preview` | Smoke test of the built PWA preview and its asset budgets. |
 | PWA browser | `npm run test:pwa-browser` | Chromium and WebKit, registered in `scripts/browser-tests.mjs`. `-- --platform=linux --shard=1/4 --list` selects and lists a CI group. One script: `node tests/browser/pwa/<name>-test.mjs`. |

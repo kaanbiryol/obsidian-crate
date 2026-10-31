@@ -1,0 +1,37 @@
+{
+	"stored": {
+		"version": 1,
+		"checkpoints": [
+			{
+				"id": "0f0f0f0f-1111-4222-8333-444444444444",
+				"sequence": 12,
+				"timestamp": "2026-09-20T10:00:00.000Z",
+				"expiresAt": 1792490400000,
+				"fileCount": 3
+			},
+			{
+				"id": "0f0f0f0f-1111-4222-8333-555555555555",
+				"sequence": 9,
+				"timestamp": "2026-09-20T10:00:00.000Z",
+				"expiresAt": 1792490400000,
+				"fileCount": 0
+			}
+		]
+	},
+	"decoded": [
+		{
+			"id": "0f0f0f0f-1111-4222-8333-444444444444",
+			"sequence": 12,
+			"timestamp": "2026-09-20T10:00:00.000Z",
+			"expiresAt": 1792490400000,
+			"fileCount": 3
+		},
+		{
+			"id": "0f0f0f0f-1111-4222-8333-555555555555",
+			"sequence": 9,
+			"timestamp": "2026-09-20T10:00:00.000Z",
+			"expiresAt": 1792490400000,
+			"fileCount": 0
+		}
+	]
+}
