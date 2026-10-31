@@ -15,7 +15,7 @@
 		flex-shrink: 0;
 		margin: -4px -6px -4px 2px;
 		color: var(--interactive-accent);
-		font-weight: 600;
+		font-weight: var(--crate-font-weight-semibold);
 	}
 
 	.pwa-notice {
