@@ -239,7 +239,9 @@ async function deliverAndCleanup(context: ReminderScheduleContext, reminder: Rem
 		const delivery = await sendToAllSubscriptions(db, {
 			title: scheduled.content,
 			body: scheduled.project || '',
-			tag: reminder.reminderId,
+			// A notification replaces one with the same tag without alerting. Retries of this
+			// occurrence replace it; the next occurrence of a recurring reminder alerts again.
+			tag: `${reminder.reminderId}:${reminder.dueDatetime}`,
 			project: scheduled.project ?? undefined,
 			reminderId: reminder.reminderId,
 		}, { origin: env.CRATE_PUBLIC_ORIGIN ?? '', subscriptionIds: pendingSubscriptionIds, subscriptions });

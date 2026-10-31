@@ -155,6 +155,17 @@ describe('reminder alarm delivery', () => {
 		expect(harness.storedValues.has('reminder')).toBe(false);
 	});
 
+	it('tags each occurrence so the next one of a recurring reminder alerts again', async () => {
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
+		vi.mocked(sendToAllSubscriptions).mockResolvedValue({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] });
+		const harness = createHarness();
+
+		await harness.alarm.alarm();
+
+		// Before: the tag was the reminder ID, so a new occurrence silently replaced the last one.
+		expect(sendToAllSubscriptions).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tag: 'reminder-1:2099-01-01T00:00:00.000Z', reminderId: 'reminder-1' }), expect.anything());
+	});
+
 	it('keeps alarm state when every push delivery fails', async () => {
 		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
 		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
