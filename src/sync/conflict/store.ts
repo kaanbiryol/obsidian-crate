@@ -75,7 +75,8 @@ export class ConflictStore {
 		const adapter = this.app.vault.adapter;
 		let loaded = false;
 		let recoveredFromTmp = false;
-		for (const path of [this.storePath, this.tmpPath]) {
+		// A save writes the temporary file first, so a complete one is never older than the main file.
+		for (const path of [this.tmpPath, this.storePath]) {
 			if (loaded || !await adapter.exists(path)) continue;
 			try {
 				const parsed = normalizeStore(JSON.parse(await adapter.read(path)));

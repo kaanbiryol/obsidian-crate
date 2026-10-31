@@ -151,6 +151,41 @@ describe('ConflictStore', () => {
 		expect(harness.files.has('.obsidian/plugins/crate/conflicts.json.tmp')).toBe(false);
 	});
 
+	it('keeps the newer temporary store when a save stopped before replacing the main file', async () => {
+		const conflictPath = `image (conflict remote ${'a'.repeat(64)}).png`;
+		const newer = JSON.stringify({ version: 1, conflicts: [{
+			originalPath: 'image.png', conflictPath, createdAt: '2026-10-30T00:00:00.000Z', cause: 'incoming-review',
+			copySide: 'remote', localHash: 'local', remoteHash: 'a'.repeat(64), status: 'active',
+		}] });
+		const harness = createHarness({
+			'.obsidian/plugins/crate/conflicts.json': JSON.stringify({ version: 1, conflicts: [] }),
+			'.obsidian/plugins/crate/conflicts.json.tmp': newer,
+		});
+
+		await harness.store.load();
+
+		expect(harness.store.getIncomingReviews()).toMatchObject([{ conflictPath, status: 'active' }]);
+		expect(JSON.parse(harness.files.get('.obsidian/plugins/crate/conflicts.json')!)).toEqual(JSON.parse(newer));
+		expect(harness.files.has('.obsidian/plugins/crate/conflicts.json.tmp')).toBe(false);
+	});
+
+	it('keeps the main store when the temporary store is torn', async () => {
+		const main = JSON.stringify({ version: 1, conflicts: [{
+			originalPath: 'notes/shared.md', conflictPath: 'notes/shared (conflict 2026-01-02 03-04-05 ab12).md',
+			createdAt: '2026-01-02T03:04:05.000Z', cause: 'concurrent-edit', status: 'active',
+		}] });
+		const harness = createHarness({
+			'.obsidian/plugins/crate/conflicts.json': main,
+			'.obsidian/plugins/crate/conflicts.json.tmp': '{"version":1,"confl',
+		});
+
+		await harness.store.load();
+
+		expect(harness.store.getActiveConflicts()).toHaveLength(1);
+		expect(harness.files.get('.obsidian/plugins/crate/conflicts.json')).toBe(main);
+		expect(harness.files.has('.obsidian/plugins/crate/conflicts.json.tmp')).toBe(false);
+	});
+
 	it('records the same discovered incoming copy from live events and vault recovery', async () => {
 		const conflictPath = `notes/shared (conflict remote ${'a'.repeat(64)}).md`;
 		const live = createHarness();
