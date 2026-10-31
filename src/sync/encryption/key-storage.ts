@@ -10,6 +10,14 @@ export function loadEncryptionKeys(storage: SecretStorageService): VaultKeyBundl
 	return bundle;
 }
 
+/** Keys received from another device by pairing, which never transfers the recovery key. */
+export function savePairedEncryptionKeys(storage: SecretStorageService, bundle: VaultKeyBundle): void {
+	validateVaultKeyBundle(bundle);
+	storage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
+	storage.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(bundle));
+	if (JSON.stringify(loadEncryptionKeys(storage)) !== JSON.stringify(bundle)) throw new Error('Could not verify saved encryption keys.');
+}
+
 export function saveEncryptionKeys(storage: SecretStorageService, bundle: VaultKeyBundle, recovery: string): void {
 	validateVaultKeyBundle(bundle);
 	storage.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);

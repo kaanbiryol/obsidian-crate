@@ -768,3 +768,11 @@ current app session, and `web-app-unlock.ts` validates and persists the bundle w
 preserving existing draft encryption secrets. Pairing polls exist only for open
 screens, stop on close, and pause while hidden. They do not belong in startup or
 normal sync loops.
+
+Device pairing shares its format in `protocol/device-pairing.ts`.
+`cloudflare/deployment/device-pairing.ts` writes the hashed one-use code through the
+saved Cloudflare login, `ui/settings/add-device-modal.ts` shows the QR code and waits
+for the new token, and `worker/auth/device-pairing.ts` redeems the code. On the new
+device, `plugin/device-pairing.ts` handles `obsidian://crate-pair` and the pasted
+link, and `ui/settings/device-key-pairing-modal.ts` requests the vault keys through
+the same approval relay.

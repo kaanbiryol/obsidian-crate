@@ -7,6 +7,8 @@ import {
 	ICON_SVG,
 	OPEN_OBSIDIAN_HTML,
 	OPEN_OBSIDIAN_JS,
+	PAIR_DEVICE_HTML,
+	PAIR_DEVICE_JS,
 	PWA_APP_JS,
 	PWA_CLIENT_ASSETS,
 	PWA_THEME_BOOTSTRAP_JS,
@@ -140,6 +142,19 @@ export function handleOpenObsidian(): Response {
 
 export function handleOpenObsidianScript(request: Request): Response {
 	return javascriptAssetResponse(request, OPEN_OBSIDIAN_JS);
+}
+
+export function handlePairDevice(): Response {
+	return new Response(PAIR_DEVICE_HTML, {
+		headers: {
+			'Content-Type': 'text/html; charset=utf-8',
+			...htmlSecurityHeaders(),
+		},
+	});
+}
+
+export function handlePairDeviceScript(request: Request): Response {
+	return javascriptAssetResponse(request, PAIR_DEVICE_JS);
 }
 
 export function handleIcon(request: Request): Response {

@@ -36,6 +36,14 @@ export function renderConfigSection(context: SettingsSectionContext, showHeading
 				.onClick(() => {
 					void startCloudflareDeployment(plugin);
 				}));
+		let pairingLink = '';
+		new Setting(containerEl)
+			.setName('Pairing link')
+			.setDesc('Paste the pairing link from your desktop.')
+			.addText(text => text.setPlaceholder('Pairing link').onChange(value => { pairingLink = value; }))
+			.addButton(button => button.setButtonText('Connect').onClick(() => {
+				void import('../../../plugin/device-pairing').then(({ handleDevicePairingLink }) => handleDevicePairingLink(plugin, pairingLink));
+			}));
 		renderSelfHostedSetting(context);
 		renderServerBackupSetting(context);
 	}

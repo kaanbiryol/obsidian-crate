@@ -7,6 +7,7 @@ import { createLogger } from '../../sync/logger';
 import { errorMessage } from '../../platform/logger';
 import type { SettingsSectionContext } from './section-helpers';
 import { formatTimeAgo } from '../shared/format';
+import { AddDeviceModal } from './add-device-modal';
 
 const log = createLogger('DeviceSettings');
 
@@ -24,6 +25,13 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 	let refreshButton: ButtonComponent;
 
 	const devicesEl = containerEl;
+	const deployment = plugin.settings.cloudflareDeployment;
+	if (deployment?.accountId && deployment.d1DatabaseId && !deployment.deletion) {
+		new Setting(devicesEl)
+			.setName('Add a device')
+			.setDesc('Connect another Obsidian vault to this server by scanning a code. No Cloudflare sign-in is needed on that device.')
+			.addButton(button => button.setButtonText('Add a device').onClick(() => { new AddDeviceModal(plugin).open(); }));
+	}
 	new Setting(devicesEl)
 		.setName('Connected devices and sessions')
 		.setDesc('Browsers and home screen apps appear separately, even on the same device.')

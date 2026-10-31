@@ -119,6 +119,7 @@ describe('renderConfigSection integration', () => {
 
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
 			'Connect with Cloudflare',
+			'Pairing link',
 			'Server address', 'Pairing code or access token', 'Connect to your server',
 		]);
 		expect(getSettingByName('Connect with Cloudflare').descEl.textContent).toBe(
@@ -135,7 +136,7 @@ describe('renderConfigSection integration', () => {
 			syncRuntime: { getCachedVersionInfo: () => undefined, getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => false },
 		};
 		renderConfigSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
-		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual(['Reconnect', 'Server backup recovery']);
+		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual(['Reconnect', 'Pairing link', 'Server backup recovery']);
 		const reconnect = getSettingByName('Reconnect');
 		expect(reconnect.descEl.textContent).toContain('using your saved Cloudflare login');
 		reconnect.buttons[0]!.click();

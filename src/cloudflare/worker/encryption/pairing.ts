@@ -15,7 +15,7 @@ const visible = (r: Stored): PairingRecord => ({ context: r.context, commitment:
 	...(r.responderKey ? { responderKey: r.responderKey } : {}), ...(r.requesterKey ? { requesterKey: r.requesterKey } : {}),
 	...(r.payload ? { payload: r.payload } : {}), ...(r.closed ? { closed: true } : {}) });
 const ownerValid = `EXISTS (SELECT 1 FROM auth_tokens a WHERE a.id = json_extract(maintenance_state.value, '$.owner')
-  AND a.scope IN ('reminders','reading') AND (a.expires_at IS NULL OR a.expires_at > ?)
+  AND a.scope IN ('reminders','reading','vault') AND (a.expires_at IS NULL OR a.expires_at > ?)
   AND (a.scope != 'reading' OR a.reading_generation = (SELECT generation FROM reading_policy WHERE id=1)))`;
 const stateValid = `(json_extract(${ENCRYPTION_STATE_SQL},'$.mode')='active' AND json_extract(${ENCRYPTION_STATE_SQL},'$.vaultId')=?
   AND json_extract(${ENCRYPTION_STATE_SQL},'$.generation')=?)`;
@@ -37,8 +37,9 @@ export async function handleEncryptionPairing(request: Request, db: D1Database, 
       AND json_extract(value,'$.expiresAt') > ? AND json_extract(value,'$.context.vaultId')=? AND json_extract(value,'$.context.generation')=?
       AND ${ownerValid} AND (? IS NULL OR key=?) AND (? OR json_extract(value,'$.owner')=?) ORDER BY key LIMIT 32`)
 			.bind(PREFIX, END, Date.now(), state.vaultId, state.generation, Date.now(), id, id ? PREFIX + id : '', vault ? 1 : 0, principal.tokenId).all<{ value: string }>();
+		// A device never lists its own request for approval.
 		const records = rows.results.map(row => JSON.parse(row.value) as Stored)
-			.filter(row => id || !row.closed && !row.payload && (!row.approver || row.approver === principal.tokenId));
+			.filter(row => id || row.owner !== principal.tokenId && !row.closed && !row.payload && (!row.approver || row.approver === principal.tokenId));
 		return response({ requests: records.map(visible) });
 	}
 	const parsed = await parseJsonObject(request, 24576);
@@ -46,7 +47,6 @@ export async function handleEncryptionPairing(request: Request, db: D1Database, 
 	const body = parsed.value;
 	try {
 		if (body.action === 'start') {
-			if (vault) return failure('Start pairing in the web app.', 403);
 			validatePairingContext(body.context);
 			const c = body.context;
 			if (c.vaultId !== state.vaultId || c.generation !== state.generation) return failure('This app connection changed. Start again.');
@@ -75,14 +75,14 @@ export async function handleEncryptionPairing(request: Request, db: D1Database, 
 		const previous = JSON.parse(stored.value) as Stored;
 		if (previous.expiresAt <= Date.now() || previous.context.vaultId !== state.vaultId || previous.context.generation !== state.generation) return failure('This pairing expired or changed.', 410);
 		const owner = previous.owner === principal.tokenId;
-		if (!owner && !vault || vault && previous.approver && previous.approver !== principal.tokenId) return failure('This request belongs to another device.', 403);
+		if (!owner && (!vault || previous.approver && previous.approver !== principal.tokenId)) return failure('This request belongs to another device.', 403);
 		const next = { ...previous };
 		if (body.action === 'cancel' || body.action === 'finish') {
 			if (body.action === 'finish' && (!owner || !previous.payload)) return failure('This transfer is not complete.');
 			next.closed = true; delete next.payload;
 		} else {
 			if (previous.closed) return failure('This pairing ended.', 410);
-			if (body.action === 'accept' && vault) {
+			if (body.action === 'accept' && vault && !owner) {
 				validatePairingKey(body.key);
 				if (previous.responderKey && previous.responderKey !== body.key) return failure('Another device accepted this request.');
 				next.approver = principal.tokenId; next.responderKey = body.key;

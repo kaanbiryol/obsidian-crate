@@ -10,7 +10,7 @@ export {
 	CRATE_MARK_256_PNG,
 } from './install-assets';
 export { createManifestJson } from './manifest';
-export { OPEN_OBSIDIAN_HTML, OPEN_OBSIDIAN_JS } from './open-obsidian';
+export { OPEN_OBSIDIAN_HTML, OPEN_OBSIDIAN_JS, PAIR_DEVICE_HTML, PAIR_DEVICE_JS } from './open-obsidian';
 export { SERVICE_WORKER_JS } from './service-worker';
 export { PWA_THEME_BOOTSTRAP_JS } from './theme-bootstrap';
 

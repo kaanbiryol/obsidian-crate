@@ -34,7 +34,7 @@ describe('worker route tables', () => {
 			'POST /reading/shortcut/v1/prepare': 30, 'POST /reading/capture': 30, 'POST /reading/encrypted-extract': 30,
 			'POST /reading/update': 60, 'POST /reading/retry': 10, 'POST /reading/delete': 30,
 			'POST /reading/policy': 10, 'POST /features': 10,
-			'POST /notifications/reminders-exchange': 10, 'POST /notifications/reminders-enrollment-token': 10,
+			'POST /notifications/reminders-exchange': 10, 'POST /auth/device-pairing': 10, 'POST /notifications/reminders-enrollment-token': 10,
 			'POST /notifications/subscribe': 30, 'DELETE /notifications/subscribe': 30,
 			'POST /notifications/test': 3,
 		});

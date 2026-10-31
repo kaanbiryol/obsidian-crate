@@ -12,14 +12,16 @@ export class WebAppPairingModal extends SharedModal {
 	private attempt?: Awaited<ReturnType<typeof answerAppPairing>>;
 	private approved = false;
 	private approving = false;
-	constructor(private readonly plugin: CratePlugin) { super(plugin.app); }
+	/** `device` approves a newly paired Obsidian device instead of a web app. */
+	constructor(private readonly plugin: CratePlugin, private readonly kind: 'app' | 'device' = 'app') { super(plugin.app); }
 	onOpen(): void {
-		this.openLayout('Connect web app');
+		const device = this.kind === 'device';
+		this.openLayout(device ? 'Approve new device' : 'Connect web app');
 		this.modalEl.addClass('crate-encryption-modal', 'crate-web-pairing-modal');
 		const status = this.bodyEl.createDiv({ attr: { role: 'status', 'aria-live': 'polite' } });
-		const heading = status.createEl('h3', { cls: 'crate-encryption-operation__title', text: 'Waiting for your app…' });
-		const instructions = status.createEl('p', { cls: 'crate-encryption-intro', text: 'Open Crate on your phone and select ' });
-		instructions.createEl('strong', { text: 'Connect with Obsidian' }); instructions.appendText('.');
+		const heading = status.createEl('h3', { cls: 'crate-encryption-operation__title', text: device ? 'Waiting for the new device…' : 'Waiting for your app…' });
+		const instructions = status.createEl('p', { cls: 'crate-encryption-intro', text: device ? 'The new device asks for this vault’s keys after it connects.' : 'Open Crate on your phone and select ' });
+		if (!device) { instructions.createEl('strong', { text: 'Connect with Obsidian' }); instructions.appendText('.'); }
 		const codePanel = this.bodyEl.createDiv({ cls: 'crate-web-pairing-verification' });
 		codePanel.createSpan({ text: 'Verification code' });
 		const code = codePanel.createEl('output', { cls: 'crate-web-pairing-code', attr: { 'aria-label': 'Verification code' } });

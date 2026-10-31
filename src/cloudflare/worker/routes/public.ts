@@ -16,6 +16,8 @@ import {
 	handleNotificationsPage,
 	handleOpenObsidian,
 	handleOpenObsidianScript,
+	handlePairDevice,
+	handlePairDeviceScript,
 	handlePwaApp,
 	handlePwaClientAsset,
 	handlePwaThemeBootstrap,
@@ -23,6 +25,8 @@ import {
 	handleServiceWorker,
 } from '../pwa/asset-handlers';
 import { handleServerInfo } from '../server-info';
+import { exchangeDevicePairing } from '../auth/device-pairing';
+import { DEVICE_PAIRING_PAGE, DEVICE_PAIRING_PATH } from '../../../protocol/device-pairing';
 import type { Env } from '../types';
 
 export async function handlePublicRoute(
@@ -56,6 +60,9 @@ export async function handlePublicRoute(
 	if (path === '/notifications/apple-touch-icon-180.png' && method === 'GET') return handleAppleTouchIcon(request);
 	if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
 	if (path === '/notifications/open-obsidian.js' && method === 'GET') return handleOpenObsidianScript(request);
+	if (path === DEVICE_PAIRING_PAGE && method === 'GET') return handlePairDevice();
+	if (path === `${DEVICE_PAIRING_PAGE}.js` && method === 'GET') return handlePairDeviceScript(request);
+	if (path === DEVICE_PAIRING_PATH && method === 'POST') return await exchangeDevicePairing(request, db);
 	if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
 	if (path === '/notifications/reminders-exchange' && method === 'POST') {
 		return await handleExchangeRemindersEnrollmentToken(request, db);

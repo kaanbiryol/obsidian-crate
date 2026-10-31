@@ -20,21 +20,7 @@ export class QRModal extends SharedModal {
 			cls: 'crate-qr-desc',
 		});
 
-		const qr = qrcode(0, 'L');
-		qr.addData(this.data);
-		qr.make();
-
-		const wrapper = contentEl.createDiv({ cls: 'crate-qr-wrapper' });
-		const parsedSvg = new DOMParser().parseFromString(
-			qr.createSvgTag({ scalable: true }),
-			'image/svg+xml',
-		).documentElement;
-
-		if (parsedSvg.tagName.toLowerCase() !== 'svg') {
-			wrapper.setText('Unable to render setup code.');
-		} else {
-			wrapper.appendChild(document.importNode(parsedSvg, true));
-		}
+		renderQrCode(contentEl.createDiv({ cls: 'crate-qr-wrapper' }), this.data);
 
 		const fallback = contentEl.createDiv({ cls: 'crate-qr-link-fallback' });
 		fallback.hide();
@@ -54,5 +40,21 @@ export class QRModal extends SharedModal {
 					});
 				}
 			}));
+	}
+}
+
+export function renderQrCode(wrapper: HTMLElement, data: string): void {
+	const qr = qrcode(0, 'L');
+	qr.addData(data);
+	qr.make();
+	const parsedSvg = new DOMParser().parseFromString(
+		qr.createSvgTag({ scalable: true }),
+		'image/svg+xml',
+	).documentElement;
+
+	if (parsedSvg.tagName.toLowerCase() !== 'svg') {
+		wrapper.setText('Unable to render setup code.');
+	} else {
+		wrapper.appendChild(document.importNode(parsedSvg, true));
 	}
 }

@@ -138,11 +138,13 @@ Server updates use the saved Cloudflare login and renew it when needed. **Update
 
 Creating, updating, recovering, restoring, and deleting a server run only in Obsidian on a desktop, because phones can suspend Obsidian in the background partway through these operations. On mobile, **Connect with Cloudflare** and **Reconnect** join existing servers only; the server selection dialog offers no **Create server**, and other server actions say they are available on a desktop. The deployment service enforces this with `serverChangesAllowed`, rejecting before authorization and again once the target is resolved, so a connection that finds no server never provisions one.
 
-Cloudflare account access is the source of truth for vault devices. The plugin never exposes a Worker claim page or a vault-device setup link. A device credential can be created or rotated only using valid Cloudflare authorization, either saved or newly obtained.
+Cloudflare account access is the source of truth for vault devices. A device credential can be created or rotated only using valid Cloudflare authorization, either saved or newly obtained. A device pairing link carries only a one-use code that a connected device wrote with that authorization; it expires after ten minutes and never contains a credential.
 
 ## Connecting another device
 
-Install Crate on the other device, open **Settings → Crate → Configuration**, and select **Connect with Cloudflare**. Authorize the account that owns the vault's Crate server. When that account has multiple Crate servers, choose the matching Worker in Obsidian. A phone or tablet connects only to a server that already exists, so create the server on a desktop first.
+From a connected device, open **Settings → Crate → Account and devices** and select **Add a device**. Crate writes a one-use code through the saved Cloudflare login and shows a QR code and link. On the new device, create an empty vault, turn on community plugins, install Crate, then scan the code or paste the link into **Pairing link**. After **Connect**, the new device saves this server's identity and a vault token of its own; it holds no Cloudflare login, so server updates stay on the desktop. In an encrypted vault, **Add a device** then switches to **Approve new device**: compare the code on both screens, select **Approve** on the desktop and **Confirm and unlock** on the new device. See the [Worker API](worker-api.md#post-authdevice-pairing-public) for the redemption guarantees.
+
+Without a connected device, install Crate on the other device, open **Settings → Crate → Configuration**, and select **Connect with Cloudflare**. Authorize the account that owns the vault's Crate server. When that account has multiple Crate servers, choose the matching Worker in Obsidian. A phone or tablet connects only to a server that already exists, so create the server on a desktop first.
 
 ## Supported protocol and schema
 

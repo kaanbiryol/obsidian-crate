@@ -721,3 +721,25 @@ describe('mobile server changes', () => {
 		expect(h.transportCalls.some(call => call.url.endsWith('/oauth2/revoke'))).toBe(true);
 	});
 });
+
+describe('device pairing codes', () => {
+	it('records only the code hash through the saved login and returns the code once', async () => {
+		const h = createHarness();
+		h.settings.cloudflareDeployment = { ...savedServer(), accountId: apiMocks.accounts[0]!.id };
+		const issued = await h.service.issueDevicePairing(operation => operation({ accessToken: 'saved', scope: CLOUDFLARE_OAUTH_SCOPES.join(' ') }));
+		expect(issued.code).toMatch(/^[a-f0-9]{64}$/);
+		const calls = apiMocks.queryD1.mock.calls.map(call => JSON.stringify(call));
+		expect(calls).toHaveLength(2);
+		expect(calls.join()).not.toContain(issued.code);
+		expect(calls[1]).toContain(issued.tokenId);
+		expect(h.opened).toEqual([]);
+	});
+
+	it.each(['no saved server', 'a pending deletion'])('refuses %s before using the login', async reason => {
+		const h = createHarness();
+		if (reason === 'a pending deletion') h.settings.cloudflareDeployment = { ...savedServer(), deletion: { id: 'b'.repeat(32), phase: 'removing-worker', databaseId: 'old-db', bucketCreatedAt: null, workerCreatedAt: null, helperName: 'helper' } };
+		const withAuthorization = vi.fn();
+		await expect(h.service.issueDevicePairing(withAuthorization)).rejects.toThrow('Connect this vault');
+		expect(withAuthorization).not.toHaveBeenCalled();
+	});
+});

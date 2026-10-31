@@ -60,10 +60,24 @@ it.each(['reminders', 'reading'])('transfers only encrypted browser keys after a
 	expect((await mac.read()).requests).toEqual([]);
 });
 
-it('admits only enrolled browser sessions and binds attempts to the current vault keys', async () => {
+it('transfers keys to a newly paired vault device that cannot approve its own request', async () => {
+	const f = await configure(); const phone = transport('other-vault'), desktop = transport('vault');
+	const device = await requestAppPairing(f.context(), phone, current);
+	// A device never sees its own request and cannot answer it.
+	expect((await phone.read()).requests).toEqual([]);
+	expect((await send('other-vault', { action: 'accept', id: device.id, key: (await createPairingResponder((await phone.read(device.id)).requests[0]!)).publicKey })).status).toBe(403);
+	const approval = await answerAppPairing((await desktop.read()).requests[0]!, desktop, current);
+	const code = (await device.poll()).code;
+	expect(await approval.poll()).toBe(code);
+	await approval.approve({ bundle: f.bundle });
+	expect((await device.poll()).payload).toEqual({ bundle: f.bundle });
+	await device.close(true);
+	expect((await desktop.read()).requests).toEqual([]);
+});
+
+it('admits only enrolled sessions and devices and binds attempts to the current vault keys', async () => {
 	const f = await configure(); const request = (await createPairingRequester(f.context())).request;
 	expect((await send('capture', { action: 'start', ...request })).status).toBe(403);
-	expect((await send('vault', { action: 'start', ...request })).status).toBe(403);
 	for (const changed of [{ generation: f.state.generation + 1 }, { vaultId: crypto.randomUUID() }]) {
 		expect((await send('app', { action: 'start', ...(await createPairingRequester({ ...f.context(), ...changed })).request })).status).toBe(409);
 	}

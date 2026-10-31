@@ -112,7 +112,7 @@ describe('renderDevicesSection', () => {
 			containerEl: containerEl as never,
 			plugin: {
 				app: {},
-				settingsUiState: { devices: null },
+				settings: {}, settingsUiState: { devices: null },
 				syncRuntime: {
 					getApiClient: () => ({
 						listTokens: vi.fn(async () => {
@@ -139,7 +139,7 @@ describe('renderDevicesSection', () => {
 		openConfirmationModal.mockResolvedValue(true);
 		renderDevicesSection({
 			containerEl: new FakeElement('div') as never,
-			plugin: { app: {}, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } } as never,
+			plugin: { app: {}, settings: {}, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } } as never,
 		});
 		await flushMicrotasks();
 		expect(getSettingByName('Connected devices and sessions').descEl.textContent).toContain('appear separately');
@@ -203,7 +203,7 @@ describe('device list caching', () => {
 		let resolve!: (value: { tokens: typeof device[] }) => void;
 		listTokens.mockReturnValueOnce(new Promise(done => { resolve = done; }));
 		const client = { listTokens };
-		const plugin = { settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } };
+		const plugin = { settings: {}, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } };
 		const first = new FakeElement('div');
 		const cleanup = renderDevicesSection({ containerEl: first as never, plugin: plugin as never });
 		expect(first.collectText()).toContain('Loading devices…');
@@ -229,7 +229,7 @@ describe('device list caching', () => {
 		const { renderDevicesSection } = await loadDevicesSectionModule();
 		const listTokens = vi.fn().mockResolvedValueOnce({ tokens: [device] }).mockRejectedValueOnce(new Error('offline'));
 		const client = { listTokens };
-		const plugin = { settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } };
+		const plugin = { settings: {}, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } };
 		const container = new FakeElement('div');
 		renderDevicesSection({ containerEl: container as never, plugin: plugin as never });
 		await flushMicrotasks();
@@ -244,7 +244,7 @@ describe('device list caching', () => {
 		const { renderDevicesSection } = await loadDevicesSectionModule();
 		const client = { listTokens: vi.fn(() => new Promise(() => {})) };
 		const plugin = {
-			settingsUiState: { devices: { client: {}, tokens: [device], pending: null } },
+			settings: {}, settingsUiState: { devices: { client: {}, tokens: [device], pending: null } },
 			syncRuntime: { getApiClient: () => client },
 		};
 		const container = new FakeElement('div');
@@ -252,4 +252,16 @@ describe('device list caching', () => {
 		expect(container.collectText()).not.toContain('My Mac');
 		expect(container.collectText()).toContain('Loading devices…');
 	});
+});
+
+it('offers Add a device only for a vault connected to a Cloudflare server', async () => {
+	const { renderDevicesSection } = await loadDevicesSectionModule();
+	const names = (settings: Record<string, unknown>) => {
+		resetObsidianUiMocks();
+		renderDevicesSection({ containerEl: new FakeElement('div') as never,
+			plugin: { app: {}, settings, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => ({ listTokens: vi.fn(async () => ({ tokens: [] })) }) } } as never });
+		return MockSetting.instances.map(setting => setting.nameEl.textContent);
+	};
+	expect(names({ cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } })).toContain('Add a device');
+	expect(names({})).not.toContain('Add a device');
 });

@@ -1,4 +1,5 @@
 import { DEVELOPMENT_BUILD } from '../../protocol/server-build';
+import { DEVICE_PAIRING_CAPABILITY } from '../../protocol/device-pairing';
 import { SHARED_CHECKPOINT_CAPABILITY } from '../../protocol/history-checkpoints';
 import { PWA_ASSET_VERSION } from '../../pwa/shell/version';
 import release from '../server-release.json';
@@ -29,6 +30,7 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 	protocol: CRATE_PLUGIN_PROTOCOL,
 	capabilities: Object.freeze([
 		'web-pairing-v1',
+		DEVICE_PAIRING_CAPABILITY,
 		ENCRYPTION_CAPABILITY,
 		'e2ee-reset-v1',
 				SHARED_CHECKPOINT_CAPABILITY,

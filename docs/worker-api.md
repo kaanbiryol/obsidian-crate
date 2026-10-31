@@ -8,7 +8,7 @@ App mutations require `X-Crate-Protocol: 1`; check `/.well-known/crate` before w
 
 All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have `vault`, `reminders`, `reading`, or `reading_capture` scope, and may have an expiry. Reading grants are also bound to the active Reading policy generation. The Worker hashes the bearer token with SHA-256 and looks up the hash in the `auth_tokens` D1 table, joined with the single `server_state` row that holds the encryption state, feature policy and reset generation. Authentication fails closed with `503` when D1 is unavailable, or with the `d1_daily_limit` 429 below once the daily allowance is used. A failed last-seen update does not block the request.
 
-Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. Once a Reading folder is configured, the same token can use Reading library, save, update, and shortcut-pairing routes. It cannot change the Reading folder, and it cannot call sync, settings, device-management or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
+Vault device tokens are registered only through Cloudflare account authorization: directly through a temporary Cloudflare OAuth authorization, or by redeeming a one-use [device pairing code](#post-authdevice-pairing-public) that a connected device wrote through the Cloudflare D1 API. No device token can issue a vault credential. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. Once a Reading folder is configured, the same token can use Reading library, save, update, and shortcut-pairing routes. It cannot change the Reading folder, and it cannot call sync, settings, device-management or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
 Self-hosted installations additionally have a Node gateway, outside the Worker:
 `GET /__crate/ready` returns a per-process readiness identifier, and
@@ -72,8 +72,10 @@ tokens and scoped PWA enrollment keep their current behavior.
 | `GET` | `/notifications/version.json` | Returns the current PWA asset version |
 | `GET` | `/notifications/icon.svg` | Serves the PWA icon |
 | `GET` | `/notifications/open-obsidian` | Serves the browser handoff page for opening Obsidian |
+| `GET` | `/notifications/pair` | Serves the device pairing page, which hands the code in its fragment to Obsidian |
 | `GET` | `/notifications/vapid-public-key` | Returns the Web Push VAPID public key |
 | `POST` | `/notifications/reminders-exchange` | Exchanges a one-time web enrollment token for a PWA auth token |
+| `POST` | `/auth/device-pairing` | Redeems a one-use device pairing code for a vault device token |
 
 ## Request/Response Details
 
@@ -382,6 +384,16 @@ Returns the VAPID public key, lazily generated and stored in D1.
 
 Response: `{ publicKey: "base64url-encoded-key" }`
 
+### POST /auth/device-pairing (public)
+
+Servers advertising `device-pairing-v1` accept codes from **Add a device**. The issuing device generates a 256-bit code and writes its SHA-256 hash with the Cloudflare D1 API as a `crate_device_pairing:<hash>` row in `maintenance_state`, replacing any earlier unredeemed code. The row holds a token ID, a ten-minute expiry, the current `server_state.reset_generation`, and the deployment metadata without deletion progress. The QR code encodes `/notifications/pair#<code>`; the page reads the fragment, which browsers never send, removes it from the address bar and opens `obsidian://crate-pair?server=<origin>&code=<code>`.
+
+Request: `{ code, tokenHash, deviceId, deviceName, platform }`. The new device generates its token locally and sends only its hash.
+
+One D1 batch creates a `vault` token with the row's token ID only while the exact unredeemed row exists and its reset generation is current, so concurrent redemptions create one token and an encryption reset voids earlier codes. The same batch removes a previous vault token with the same `deviceId`, with its push subscriptions and the Shortcut credentials it paired, and marks the row redeemed with the token hash. Retrying with the same `tokenHash` until expiry returns the same result, so a lost response is safe; any other request returns 410. The route has a per-minute action limit and returns `Cache-Control: no-store`.
+
+Response: `{ tokenId, deployment }`.
+
 ### POST /notifications/reminders-exchange (public)
 
 Consumes a one-time web enrollment token and creates a per-device PWA auth token in `auth_tokens` in one transaction. A failed transaction preserves the enrollment token. Concurrent exchanges can create only one session. A successful transaction whose response is lost still consumes the token; recovery requires a new enrollment link.
@@ -614,12 +626,13 @@ Servers advertising `web-pairing-v1` expose non-cacheable `GET` and `POST`
 ciphertext to an already authenticated app; it never issues login credentials.
 
 - `GET ?id=<request-id>` returns `{ requests }` for the requesting app or a vault
-  device. A vault device may omit the ID to list pending requests. Other app
-  credentials cannot inspect or cancel that request.
+  device. A vault device may omit the ID to list pending requests other than its
+  own. Other app credentials cannot inspect or cancel that request.
 - `POST { action: "start", context, commitment }` creates an app request. Context
   contains `version: 1`, unique `id`, canonical `origin`, `vaultId`, `generation`
-  and `generation`. Reading capture credentials and vault devices cannot start
-  app requests. Approval transfers `{ bundle }`, the full vault key bundle.
+  and `generation`. A vault device without keys, such as a newly paired one, may
+  start a request too; Reading capture credentials cannot. No device can accept
+  its own request. Approval transfers `{ bundle }`, the full vault key bundle.
 - `accept` supplies `{ id, key }` from one vault device; `reveal` supplies the
   committed requester public key from the owning app. Public keys are raw P-256
   points encoded as base64url. `approve` supplies `{ id, payload }` from that

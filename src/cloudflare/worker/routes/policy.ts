@@ -88,6 +88,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'PUT /sync/upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncUpload } },
 	'PUT /sync/import/upload': { scopes: VAULT },
 	'POST /notifications/reminders-exchange': { ...PUBLIC, rateLimit: 10 },
+	'POST /auth/device-pairing': { ...PUBLIC, rateLimit: 10 },
 	'POST /notifications/reminders-enrollment-token': { scopes: VAULT, execution: COORDINATOR_READ, rateLimit: 10 },
 	'POST /notifications/subscribe': { scopes: REMINDERS, execution: COORDINATOR_READ, rateLimit: 30 },
 	'POST /notifications/test': { scopes: VAULT, rateLimit: 3 },

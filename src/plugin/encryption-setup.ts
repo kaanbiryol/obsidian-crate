@@ -1,5 +1,5 @@
 import type CratePlugin from './CratePlugin';
-import { loadEncryptionKeys, saveEncryptionKeys } from '../sync/encryption/key-storage';
+import { loadEncryptionKeys, savePairedEncryptionKeys, saveEncryptionKeys } from '../sync/encryption/key-storage';
 import { createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRecoveryBundle, type VaultKeyBundle } from '../encryption/key-bundle';
 import { verifyRecoveryCode } from '../encryption/recovery-verification';
 import { assertEncryptionKeys, type EncryptionServerState } from '../encryption/server-state';
@@ -70,6 +70,15 @@ export async function encryptVault(plugin: CratePlugin, bundle: VaultKeyBundle, 
 	await plugin.syncRuntime.turnOnEncryption(bundle, recovery, progress,
 		{ workerUrl, authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) ?? '' }, getPluginLifecycleSignal(plugin));
 	preparedKeys.get(plugin)?.delete(workerUrl);
+}
+
+/** Unlocks with keys another device approved; the caller has already confirmed the comparison code. */
+export async function unlockVaultWithPairedKeys(plugin: CratePlugin, state: EncryptionServerState, bundle: VaultKeyBundle, assertCurrent: () => void): Promise<void> {
+	assertEncryptionKeys(state, bundle);
+	await plugin.syncRuntime.runEncryptionSetup(async () => {
+		assertCurrent();
+		savePairedEncryptionKeys(plugin.secretStorage, bundle);
+	});
 }
 
 export async function unlockVault(plugin: CratePlugin, state: EncryptionServerState, recoveryCode: string, assertCurrent: () => void): Promise<void> {

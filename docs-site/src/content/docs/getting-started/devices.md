@@ -13,10 +13,10 @@ There are two ways to use Crate on another device:
 1. Let a sync finish on your first device. Until it does, other devices stop with "Another device is uploading this vault for the first time." If you see this on the device that started the upload, for example after reconnecting it, select **Replace server files** to finish.
 2. On the other device, open a vault and [install Crate](/docs/getting-started/installation/). Use an empty vault for a fresh copy. If the vault already has notes, back them up first, because they'll be combined with the synced ones.
 3. Connect to the **same server**:
-   - **Cloudflare:** select **Connect with Cloudflare** and choose the existing server. On a phone or tablet, select **Open Cloudflare** in the connection dialog first.
+   - **Cloudflare:** on your first device, open **Settings → Crate → Account and devices** and select **Add a device**. Scan the code on the new device, or copy the link and paste it into **Pairing link** in Crate settings there, then select **Connect**. The code works once and expires after 10 minutes. You can also select **Connect with Cloudflare** on the new device and choose the existing server; on a phone or tablet, select **Open Cloudflare** in the connection dialog first.
    - **Docker:** select **Connect to your server** and use a new [pairing code](/docs/getting-started/self-hosting/#create-another-pairing-code).
 4. In **Choose what Crate manages in this vault**, keep Reminders and Reading on to use them here, then select **Finish**. Features your server already has on show **On for your other devices** and start on. Crate doesn't start a feature in a new vault until you choose it here or turn it on later under **Settings → Crate**.
-5. If you use encryption, open **Manage encryption** in Crate’s Sync settings and enter your recovery key.
+5. If you use encryption and added the device with a code, keep **Add a device** open on your first device. Check that both screens show the same code, select **Approve** there, then **Confirm and unlock** on the new device. Otherwise, open **Manage encryption** in Crate’s Sync settings and enter your recovery key.
 6. Run **Crate: Sync now** and wait for it to finish.
 7. Open a note on both devices to check that it matches. If both devices changed the same content, [review the conflicts](/docs/troubleshooting/conflicts/).
 8. If you want this device to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync**. It starts off on every new device.

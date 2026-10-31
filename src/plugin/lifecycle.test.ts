@@ -174,7 +174,7 @@ describe('bootstrapPlugin', () => {
 		});
 		expect(createCloudflareDeploymentService).toHaveBeenCalledWith(plugin);
 		expect(showCloudflareServerUpdateNotice).toHaveBeenCalledWith(plugin);
-		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(2);
+		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(3);
 
 		const remindersHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
 			([name]) => name === 'crate-reminders',
@@ -419,7 +419,7 @@ it.each(['connection restore', 'reminders', 'sync'])('stops startup after shutdo
 	await starting;
 	// Sync initialization runs after onload, once the workspace layout is ready.
 	expect(registerSyncCommands).toHaveBeenCalledTimes(stage === 'sync' ? 1 : 0);
-	expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(stage === 'sync' ? 2 : 0);
+	expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(stage === 'sync' ? 3 : 0);
 	expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
 	expect(initialize).toHaveBeenCalledTimes(stage === 'sync' ? 1 : 0);
 	expect(destroy).toHaveBeenCalledTimes(stage === 'connection restore' ? 0 : 1);

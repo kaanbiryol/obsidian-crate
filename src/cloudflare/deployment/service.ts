@@ -15,6 +15,7 @@ import { workersDevOrigin } from './worker-origin';
 import { changesServer, DesktopOnlyServerChangeError } from './server-changes';
 import { stableJson } from '../../platform/stable-json';
 import { createCloudflareDeploymentMetadata, resolveDeploymentTarget, type SelectDeployment } from './target';
+import { issueDevicePairingCode, type IssuedDevicePairing } from './device-pairing';
 import {
 	registerCloudflareAuthorizedDevice,
 	type CloudflareAuthorizedDevice,
@@ -306,6 +307,20 @@ export class CloudflareDeploymentService {
 				}),
 			});
 		});
+	}
+
+	/** Issues a one-use code for adding a device. Reading the saved login is not a server
+	 * change, so any device with that login may issue one. */
+	async issueDevicePairing(withAuthorization: WithCloudflareAuthorization): Promise<IssuedDevicePairing> {
+		this.assertIdle();
+		const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
+		if (!metadata?.accountId || !metadata.d1DatabaseId || metadata.deletion) throw new Error('Connect this vault to its Cloudflare server first.');
+		const { accountId, d1DatabaseId } = metadata;
+		this.checkSavedTarget(metadata, 'reconnect');
+		return this.exclusive(() => withAuthorization(tokens => issueDevicePairingCode({
+			api: this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(metadata, 'reconnect')),
+			accountId, databaseId: d1DatabaseId, metadata, now: this.now(),
+		})));
 	}
 
 	async recoverUpdate(withAuthorization: WithCloudflareAuthorization): Promise<DeploymentRecoveryResult> {

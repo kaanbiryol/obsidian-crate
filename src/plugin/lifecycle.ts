@@ -152,6 +152,9 @@ function registerPluginProtocols(plugin: CratePlugin): void {
 	plugin.registerObsidianProtocolHandler("crate-cloudflare-oauth", (params) => {
 		void handleCloudflareOAuthProtocol(plugin, params);
 	});
+	plugin.registerObsidianProtocolHandler("crate-pair", (params) => {
+		void import('./device-pairing').then(({ handleDevicePairingProtocol }) => handleDevicePairingProtocol(plugin, params));
+	});
 	plugin.registerObsidianProtocolHandler("crate-reminders", (params) => {
 		if (!plugin.remindersSettings.enabled) {
 			new Notice("Reminders are unavailable. Check your folder in Crate settings.");
