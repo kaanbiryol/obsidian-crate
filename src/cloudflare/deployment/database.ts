@@ -6,6 +6,14 @@ import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { type DeploymentFence } from './fence';
 import { migrationTransaction, planDatabaseUpgrade, validateMigrationHistory, SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 
+/** The saved server can only be replaced: retrying the update cannot succeed. */
+export class UnupgradableServerError extends Error {
+	constructor() {
+		super('This server was created by an earlier beta and its database cannot be upgraded.');
+		this.name = 'UnupgradableServerError';
+	}
+}
+
 export interface DeploymentDatabase {
 	api: Pick<CloudflareApiClient, 'queryD1'>;
 	accountId: string;
@@ -39,7 +47,7 @@ export async function inspectDeploymentDatabase(input: DeploymentDatabase): Prom
 	if (deployed && deployed.schema_version === SERVER_RELEASE.schemaVersion && deployed.schema_hash !== input.artifacts.d1SchemaSha256) {
 		// Released schemas only change with a version increase, so this database comes
 		// from a pre-release beta that has no upgrade path.
-		throw new Error('This server was created by an earlier beta and its database cannot be upgraded. Select Delete server and all data, then connect again to create a new server. Local vault files are kept.');
+		throw new UnupgradableServerError();
 	}
 	const receipts = await query('SELECT id, checksum FROM crate_migrations;');
 	validateMigrationHistory(version, createdVersion, receipts);

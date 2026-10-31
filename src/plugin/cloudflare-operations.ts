@@ -7,6 +7,7 @@ import { SyncApiClient, HttpError } from '../sync/worker-api/client';
 import { checkAndRecoverUpdate } from './cloudflare-recovery';
 import { beginCloudflareOperation } from './cloudflare-operation-guard';
 import { DeploymentRecoveryRequiredError } from '../cloudflare/deployment/fence';
+import { UnupgradableServerError } from '../cloudflare/deployment/database';
 import { Notice, Platform } from 'obsidian';
 import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
 import { CloudflareSavedLogin } from '../cloudflare/saved-login';
@@ -265,6 +266,7 @@ async function handleDeploymentFailure({ plugin, signal, savedIntent, intent, pr
 		needsReview,
 		canResumeDeletion: Boolean(plugin.settings.cloudflareDeployment?.deletion || plugin.settings.cloudflareDeployment?.reset?.deleteOnly),
 		resetBlocked: error instanceof ResetBlockedError,
+		unupgradable: error instanceof UnupgradableServerError,
 	});
 }
 

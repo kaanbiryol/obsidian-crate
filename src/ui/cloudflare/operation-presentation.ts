@@ -31,7 +31,7 @@ export class CloudflareOperationPresentation {
 		this.progress.fail('Could not connect to Cloudflare', message, ['Try again from Crate settings.']);
 	}
 
-	operationFailed(message: string, recovery: { needsReview: boolean; canResumeDeletion: boolean; resetBlocked: boolean }): void {
+	operationFailed(message: string, recovery: { needsReview: boolean; canResumeDeletion: boolean; resetBlocked: boolean; unupgradable?: boolean }): void {
 		const { intent, shouldConnectDevice, openSettings, recoverUpdate } = this.context;
 		const deleteAction = recovery.canResumeDeletion ? 'Resume server deletion' : 'Delete server and all data';
 		const deleting = intent === 'delete' || recovery.canResumeDeletion;
@@ -56,6 +56,12 @@ export class CloudflareOperationPresentation {
 			this.progress.fail('Server deletion is incomplete', 'Finish deleting the saved server before connecting or updating.',
 				['Open Crate settings → Advanced server actions and select Resume server deletion. Your local vault files are kept.'],
 				{ technicalDetails: message, action: { label: 'Open settings', onClick: openSettings } });
+			return;
+		}
+		if (recovery.unupgradable && intent !== 'delete') {
+			this.progress.fail('This server can’t be updated', message,
+				['Open Crate settings → Advanced server actions and select Delete server and all data, then connect again to create a new server. Your local vault files are kept.'],
+				{ action: { label: 'Open settings', onClick: openSettings } });
 			return;
 		}
 		if (intent === 'delete') {

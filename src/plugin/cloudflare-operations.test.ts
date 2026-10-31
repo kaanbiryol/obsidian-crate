@@ -352,6 +352,18 @@ it('shows a rejected D1 quota error directly without sending the user to lock re
 	expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
 });
 
+it('sends an unupgradable server to deletion instead of suggesting a retry', async () => {
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const { UnupgradableServerError } = await import('../cloudflare/deployment/database');
+	const plugin = createPlugin(true);
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new UnupgradableServerError());
+	await startCloudflareDeployment(plugin as never, 'update');
+	expect(progress.fail).toHaveBeenCalledWith('This server can’t be updated',
+		'This server was created by an earlier beta and its database cannot be upgraded.',
+		['Open Crate settings → Advanced server actions and select Delete server and all data, then connect again to create a new server. Your local vault files are kept.'],
+		{ action: { label: 'Open settings', onClick: expect.any(Function) } });
+});
+
 it.each(['update', 'reset', 'delete'] as const)('shows recovery guidance for an uncertain %s', async intent => {
 	const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
 	const { DeploymentRecoveryRequiredError } = await import('../cloudflare/deployment/fence');
