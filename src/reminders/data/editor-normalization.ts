@@ -29,12 +29,14 @@ export function createReminderEditorWriter(workspace: Pick<Workspace, 'getLeaves
 		write(filePath, content, normalized) {
 			const open = views(filePath);
 			if (!open.length) return null;
-			const editor = open[0]!.editor;
+			const editor = open[0]!.editor, value = editor.getValue();
+			// The editor may show the note without its byte-order mark and CRLF line endings.
+			const shown = (text: string) => value === content ? text : text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
 			// Unsaved typing is newer than the scanned file; its save starts another scan.
-			if (editor.getValue() !== content) return { content, complete: false };
+			if (value !== shown(content)) return { content, complete: false };
 			const typing = new Set(open.filter(view => view.editor.hasFocus())
 				.flatMap(view => view.editor.listSelections().map(selection => selection.head.line)));
-			const before = content.split('\n'), lines = normalized.split('\n'), changes: EditorChange[] = [];
+			const before = value.split('\n'), lines = shown(normalized).split('\n'), changes: EditorChange[] = [];
 			let complete = true;
 			for (const [line, text] of lines.entries()) {
 				const previous = before[line]!;

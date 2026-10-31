@@ -46,6 +46,15 @@ describe('reminder editor writer', () => {
 		expect(second.editor.transaction).not.toHaveBeenCalled();
 	});
 
+	it('writes a CRLF note with a byte-order mark through an editor that shows it with LF endings', () => {
+		const content = '\uFEFFNotes\r\n- [ ] Task\r\n', normalized = '\uFEFFNotes\r\n- [ ] Task <!-- crate-id:new -->\r\n';
+		const { state, editor } = fakeEditor('Notes\n- [ ] Task\n');
+		const writer = createReminderEditorWriter(workspaceWith([leaf(inbox, editor)]), vi.fn());
+		// Before: the scanned bytes never matched the editor, so the reminder never got an ID.
+		expect(writer.write(inbox, content, normalized)).toEqual({ content: 'Notes\n- [ ] Task <!-- crate-id:new -->\n', complete: true });
+		expect(state.text).toBe('Notes\n- [ ] Task <!-- crate-id:new -->\n');
+	});
+
 	it('leaves notes without a loaded source editor to the vault', () => {
 		const { editor } = fakeEditor('- [ ] Task');
 		for (const leaves of [[], [{ view: {} }], [leaf('Reminders/Other.md', editor)], [leaf(inbox, editor, 'preview')]]) {
