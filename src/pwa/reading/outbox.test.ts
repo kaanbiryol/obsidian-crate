@@ -249,3 +249,24 @@ it('re-reads only the edited item when the edit chains from the cached library',
 	expect(cache).toMatchObject({ revision: '"r2"', items: [{ crate_reading_id: item.crate_reading_id, favorite: true }] });
 	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/list');
 });
+
+it('drops a deleted item from the cached library without reloading it', async () => {
+	const item = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-000000000002', title: 'Article', path: 'Reading/article.md',
+		source_url: 'https://example.com/article', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' };
+	storage.values.set('cache', { items: [item], issues: [], savedAt: 1, revision: '"r1"' });
+	network.mockImplementation(async path => {
+		if (path === '/reading/session') return response({ day: 20_000, generation: session.generation });
+		if (path === '/reading/delete') return response({ deleted: true, id: item.crate_reading_id, library: { before: '"r1"', after: '"r2"' } });
+		return response({ items: [], issues: [], cursor: null });
+	});
+	const before = { reading_status: 'inbox' as const, favorite: false, tags: [] };
+	await queueReading(session, { action: 'delete', intent: { id: item.crate_reading_id, before } });
+	// A deleted item accepts no further edits.
+	await expect(queueReading(session, { action: 'update', intent: { id: item.crate_reading_id, before: { favorite: false }, changes: { favorite: true } } })).rejects.toThrow();
+	const cache = await drainReading(session);
+	expect(cache).toMatchObject({ revision: '"r2"', items: [] });
+	expect(JSON.parse(network.mock.calls.find(([path]) => path === '/reading/delete')![1]!.body as string)).toMatchObject({ id: item.crate_reading_id, before });
+	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/list');
+	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/item');
+	expect(await pendingReading(session)).toEqual([]);
+});

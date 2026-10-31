@@ -214,7 +214,7 @@ export class EncryptedReadingApi {
 			if (!item) throw this.options.error('Article is unavailable or has an identity conflict.', 409, 'reading_conflict');
 			return { item, markdown: readReadingFrontmatter((await this.source(this.files.get(this.wires.get(item.path)!)!)).content)!.body };
 		}
-		if (!rawBody || !['capture', 'update', 'retry'].includes(action)) throw new Error('Unsupported encrypted Reading request.');
+		if (!rawBody || !['capture', 'update', 'retry', 'delete'].includes(action)) throw new Error('Unsupported encrypted Reading request.');
 		const body = JSON.parse(rawBody) as Record<string, unknown>, id = body.operationId;
 		if (typeof id !== 'string') throw new Error('A saved Reading operation ID is required.');
 		const requestHash = await sha256Hex(JSON.stringify({ action, body }));
@@ -281,6 +281,16 @@ export class EncryptedReadingApi {
 			if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
 			wire = this.wires.get(item.path)!;
 			const source = await this.source(this.files.get(wire)!); path = item.path; previous = source.file; itemId = item.crate_reading_id; before = item;
+			if (action === 'delete') {
+				if (!body.before || typeof body.before !== 'object' || !Object.keys(body.before).length) throw new Error('Choose a Reading change.');
+				if (readingUpdateIssue(item, body.before, body.before)) throw this.options.error('This article changed on another device. Refresh before deleting.', 409, 'reading_conflict');
+				const response = { deleted: true, id: itemId };
+				const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
+				const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id,
+					files: [], remove: [{ path: previous.path, expectedHash: previous.hash, expectedRevision: previous.revision }], acknowledgment }) };
+				await this.options.writeAttempt(id, attempt);
+				return { attempt };
+			}
 			if (action === 'retry') {
 				if (!isEmptyReadingCapture(source.content, item)) throw this.options.error('Only empty saved links can be downloaded.', 409);
 				content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });

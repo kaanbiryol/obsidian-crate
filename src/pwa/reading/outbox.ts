@@ -12,7 +12,8 @@ export interface ReadingUpdateIntent { id: string; changes: ReadingChanges; befo
 export type ReadingCommand =
 	| { action: 'capture'; intent: { url: string; title?: string; fetchArticle?: boolean } }
 	| { action: 'update'; intent: ReadingUpdateIntent }
-	| { action: 'retry'; intent: { id: string } };
+	| { action: 'retry'; intent: { id: string } }
+	| { action: 'delete'; intent: { id: string; before: ReadingChanges } };
 export type PendingReading = ReadingCommand & {
 	id: string; sessionId: string; queuedAt?: string; body?: string; error?: string;
 	review?: boolean; attempts?: number; retryAt?: number;
@@ -108,7 +109,7 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
 				const response = await readingRequest<{ library?: unknown } | null>(`/reading/${op.action}`, session, op.body);
 				confirmed.add(op.id);
 				if (op.action === 'capture') onlyEdits = false;
-				else writes.push({ itemId: op.intent.id, library: response?.library });
+				else writes.push({ itemId: op.intent.id, library: response?.library, ...op.action === 'delete' ? { deleted: true } : {} });
 			} catch (error) {
 				const review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
 				await readingLock(async () => {

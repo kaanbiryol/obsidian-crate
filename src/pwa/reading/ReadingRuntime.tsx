@@ -27,7 +27,7 @@ function useReadingController() {
 		adding, connect, resetSession } = connection;
 	useConnectionReset(resetSession);
 	const { refresh, refreshManually, syncing, syncedSession, isOffline } = useReadingSync(connection, enabled);
-	const { saving, preparingChange, canApplyUpdate, queueChange, saveLink, updateItem, retryArticle } = useReadingMutations(connection, { refresh, showToast });
+	const { saving, preparingChange, canApplyUpdate, queueChange, saveLink, updateItem, retryArticle, deleteItem } = useReadingMutations(connection, { refresh, showToast });
 	const [, setSettingsOpen] = useSettingsOpen();
 	const previousSession = useRef(session);
 	useEffect(() => {
@@ -86,7 +86,7 @@ function useReadingController() {
 		</>,
 	});
 
-	return { connection, sync: { refresh, refreshManually, syncing, syncedSession, isOffline }, showToast, saving, queueChange, saveLink, updateItem, retryArticle };
+	return { connection, sync: { refresh, refreshManually, syncing, syncedSession, isOffline }, showToast, saving, queueChange, saveLink, updateItem, retryArticle, deleteItem };
 }
 const ReadingRuntimeContext = createContext<ReturnType<typeof useReadingController> | null>(null);
 export function ReadingRuntimeProvider({ children }: { children: ReactNode }) {

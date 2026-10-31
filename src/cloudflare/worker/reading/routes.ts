@@ -35,13 +35,13 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 			}
 			return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
 		}
-		if (encryption && (shortcut?.kind === 'prepare' || ['/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
+		if (encryption && (shortcut?.kind === 'prepare' || ['/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/delete', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
 		if (path === '/reading/encryption' && request.method === 'GET' && principal) {
 			const current = await authority(env.DB, principal, featurePolicyValue); // Reading access only.
 			// The web app recovers the plaintext folder name from this label with the vault key.
 			return readingResponse({ encryption, ...(encryption ? { folderLabel: await readFolderLabel(env.DB, current.folder_path) } : {}) });
 		}
-		const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' ? 262_144 : 24_576);
+		const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' || path === '/reading/delete' ? 262_144 : 24_576);
 		if (!parsed.ok) return parsed.response;
 		const body = parsed.value;
 		if (shortcut) validateShortcutBody(body, shortcut.kind);
@@ -67,6 +67,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 		if (path === '/reading/session' && request.method === 'GET') return readingResponse({ id: principal.tokenId, folderPath: current.folder_path, generation: current.generation, expiresAt: principal.expiresAt ?? null, day: Math.floor(Date.now() / 86400_000) });
 		if (path === '/reading/update' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'update');
 		if (path === '/reading/retry' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'retry');
+		if (path === '/reading/delete' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'delete');
 		if (request.method === 'GET' && (path === '/reading/item' || path === '/reading/list')) {
 			const index = await ensureReadingIndex(env, current, file => readStoredNote(env, file));
 			// Reads wake notification processing only to continue a rebuild or extract what it queued.

@@ -13,13 +13,14 @@ export function fileFolderArgs(folder: string): string[] {
 	return [`${key}/`, `${key}0`, `${folder}/`, `${folder}0`];
 }
 
-/** The file still has this exact revision. Evaluate inside the dependent write. */
-export function fileRevisionGuard(path: string, storageKey: string): SqlGuard {
+/** The file still has this exact revision, or is absent for `null`. Evaluate inside the dependent write. */
+export function fileRevisionGuard(path: string, storageKey: string | null): SqlGuard {
+	if (storageKey === null) return { sql: `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`, args: filePathArgs(path) };
 	return { sql: `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`, args: [...filePathArgs(path), storageKey] };
 }
 
 /** Every listed file still has its exact revision. */
-export function fileRevisionsGuard(files: ReadonlyArray<{ path: string; storageKey: string }>): SqlGuard {
+export function fileRevisionsGuard(files: ReadonlyArray<{ path: string; storageKey: string | null }>): SqlGuard {
 	const guards = files.map(file => fileRevisionGuard(file.path, file.storageKey));
 	return { sql: guards.map(guard => guard.sql).join(' AND '), args: guards.flatMap(guard => guard.args) };
 }

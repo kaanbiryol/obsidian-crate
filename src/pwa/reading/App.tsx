@@ -39,7 +39,7 @@ function ReadingAppContent() {
 	const captureFormId = useId();
 	const featureNavigation = useContext(FeatureNavigationContext);
 	const active = featureNavigation?.active !== false;
-	const { connection, sync, showToast, saving, saveLink, updateItem, retryArticle } = useReadingRuntime();
+	const { connection, sync, showToast, saving, saveLink, updateItem, retryArticle, deleteItem } = useReadingRuntime();
 	const { session, readOnly, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, run, connect,
 		isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture } = connection;
 	const { refreshManually, isOffline } = sync;
@@ -56,7 +56,8 @@ function ReadingAppContent() {
 		// Mount and focus within the tap so iOS can open its software keyboard.
 		flushSync(openCaptureForm);
 	};
-	const visibleReader = useMemo(() => reader && presentReadingItems([reader.item], pending)[0], [reader, pending]);
+	// A pending delete hides the item, but the reader keeps it while it closes.
+	const visibleReader = useMemo(() => reader && (presentReadingItems([reader.item], pending)[0] ?? reader.item), [reader, pending]);
 	// Ordinary edits remain usable while sending. New links need their server ID,
 	// and rejected changes or text extraction require settlement before further edits.
 	const blockedItemIds = useMemo(() => new Set([...visibleItems.filter(item => !item.path).map(item => item.crate_reading_id), ...pending.flatMap(op => op.action === 'capture' ? [op.id]
@@ -84,7 +85,7 @@ function ReadingAppContent() {
 				</EmptyState> : undefined}
 				beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
 				headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
-				reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)} onBack={closeReader} onUpdate={changes => updateItem(visibleReader, changes, reader)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={() => retryArticle(reader.item)} />} />
+				reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)} onBack={closeReader} onUpdate={changes => updateItem(visibleReader, changes, reader)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={() => retryArticle(reader.item)} onDelete={reader.item.path ? async () => { await deleteItem(visibleReader); closeReader(); } : undefined} />} />
 			{adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={closeCapture}>{close => <SaveLinkForm id={captureFormId} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { if (await saveLink(open)) close(); })} />}</ReadingDialog>}
 
 		</>}

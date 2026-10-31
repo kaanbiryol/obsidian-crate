@@ -109,6 +109,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /reading/capture': { scopes: ALL_SCOPES, execution: COORDINATOR, rateLimit: 30 },
 	'POST /reading/update': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 60 },
 	'POST /reading/retry': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 10 },
+	'POST /reading/delete': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 30 },
 	'POST /reading/policy': { scopes: VAULT, execution: COORDINATOR, rateLimit: 10 },
 	'GET /reading/policy': { scopes: VAULT },
 	'GET /reading/session': { scopes: LIBRARY, keylessEncryptedRead: true },

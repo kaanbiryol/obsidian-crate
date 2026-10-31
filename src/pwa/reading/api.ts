@@ -8,6 +8,7 @@ import { capturePwaSession } from '../connection/session-generation';
 import { commitReadingCache, readReadingCache, type ReadingCache } from './storage/storage';
 import { READING_CHANGED_EVENT, READING_SESSION_KEY, assertReadingSession, readingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
+import type { ReadingItem } from '@/reading/core/model';
 import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
 export { ReadingApiError } from './session/api-error';
@@ -151,7 +152,7 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
 }
 
 /** A confirmed edit and the library revisions the server reported around it. */
-export interface ReadingWrite { itemId: string; library?: unknown }
+export interface ReadingWrite { itemId: string; library?: unknown; deleted?: true }
 
 /** Edits that chain from the cached library revision only need their items again; any
  * other write, a lost response or a missing revision reloads the whole library. */
@@ -165,12 +166,13 @@ export async function reloadReadingAfterWrites(session: ReadingSession, writes: 
 		revision = after;
 	}
 	if (!previous || !writes.length) return loadReading(session, previous);
-	const items = new Map(previous.items.map(item => [item.crate_reading_id, item]));
+	const items = new Map<string, ReadingItem | null>(previous.items.map(item => [item.crate_reading_id, item]));
+	const deleted = new Set(writes.flatMap(write => write.deleted ? [write.itemId] : []));
 	for (const id of new Set(writes.map(write => write.itemId))) {
 		if (!items.has(id)) return loadReading(session, previous);
-		items.set(id, (await loadReadingArticle(session, id)).item);
+		items.set(id, deleted.has(id) ? null : (await loadReadingArticle(session, id)).item);
 	}
-	return commitReadingCache(session, { ...previous, items: previous.items.map(item => items.get(item.crate_reading_id)!), savedAt: Date.now(), revision });
+	return commitReadingCache(session, { ...previous, items: previous.items.flatMap(item => items.get(item.crate_reading_id) ?? []), savedAt: Date.now(), revision });
 }
 
 export async function loadReadingArticle(session: ReadingSession, id: string): Promise<ReadingArticle> {

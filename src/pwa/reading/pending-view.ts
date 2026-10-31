@@ -8,6 +8,7 @@ export function presentReadingItems(items: ReadingItem[], pending: PendingReadin
 	const visible = [...items];
 	const urls = new Set(items.filter(item => item.source_url).map(item => readingUrlIdentity(item.source_url)));
 	const changesById = new Map<string, ReadingChanges & Pick<Partial<ReadingItem>, 'extraction_status' | 'highlight_format'>>();
+	const deleted = new Set<string>();
 	for (const op of pending) {
 		if (op.review) continue;
 		if (op.action === 'capture') {
@@ -22,6 +23,10 @@ export function presentReadingItems(items: ReadingItem[], pending: PendingReadin
 			} catch { /* Invalid recovery data must not become a library item. */ }
 			continue;
 		}
+		if (op.action === 'delete') {
+			deleted.add(op.intent.id);
+			continue;
+		}
 		if (op.action === 'retry') {
 			changesById.set(op.intent.id, { ...changesById.get(op.intent.id), extraction_status: 'pending' });
 			continue;
@@ -33,8 +38,9 @@ export function presentReadingItems(items: ReadingItem[], pending: PendingReadin
 		}
 		if (Object.keys(changes).length) changesById.set(op.intent.id, { ...changesById.get(op.intent.id), ...changes });
 	}
-	if (!changesById.size) return visible;
-	return visible.map(item => {
+	const present = deleted.size ? visible.filter(item => !deleted.has(item.crate_reading_id)) : visible;
+	if (!changesById.size) return present;
+	return present.map(item => {
 		const changes = changesById.get(item.crate_reading_id);
 		return changes ? { ...item, ...changes } : item;
 	});

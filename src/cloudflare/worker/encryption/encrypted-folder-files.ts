@@ -11,7 +11,7 @@ import { getStoredFileRow, storedObjectMatchesMetadata } from '../sync/storage';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
 import { writeCommittedMarkdownMove } from '../sync/atomic-markdown-move';
-import { commitStagedFile } from '../sync/mutations';
+import { commitFileDelete, commitStagedFile } from '../sync/mutations';
 import { FileVersionConflictError } from '../storage';
 import { beginReminderOperation, reminderOperationEffects } from '../reminders/operations';
 import { isSyncRevision } from '../../../protocol/sync-validation';
@@ -80,7 +80,7 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 	const body = parsed.value;
 	if (Object.keys(body).some(key => !['folderPath', 'operationId', 'files', 'remove', 'acknowledgment', 'createdId'].includes(key))) return corsResponse({ error: 'Unexpected encrypted mutation field' }, 400);
 	if ((expectedFolder && body.folderPath !== expectedFolder) || !isFolder(body.folderPath)
-		|| !Array.isArray(body.files) || body.files.length < 1 || body.files.length > 2
+		|| !Array.isArray(body.files) || body.files.length > 2 || (body.files.length < 1 && body.remove === undefined)
 		|| !isReceiptEnvelope(body.acknowledgment)) return corsResponse({ error: 'Invalid encrypted mutation' }, 400);
 	const operation = await beginReminderOperation(env.DB, body, 'encrypted-files');
 	if (operation instanceof Response) return operation;
@@ -98,7 +98,8 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 		files.push({ path: filePath, content: file.content, expectedHash: file.expectedHash!, expectedRevision: file.expectedRevision });
 	}
 	if (new Set(files.map(file => file.path)).size !== files.length) return corsResponse({ error: 'Duplicate file path' }, 400);
-	// A rename creates one new note and deletes its source in the same transaction.
+	// A rename creates one new note and deletes its source in the same transaction;
+	// a delete names only the source.
 	let removed: { path: string; expectedHash: string; expectedRevision: string } | undefined;
 	if (body.remove !== undefined) {
 		const [raw] = Array.isArray(body.remove) && body.remove.length === 1 ? body.remove as unknown[] : [];
@@ -106,13 +107,16 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 		const sourcePath = scopedPath(source?.path, body.folderPath);
 		if (!source || !sourcePath || Object.keys(source).some(key => !['path', 'expectedHash', 'expectedRevision'].includes(key))
 			|| typeof source.expectedHash !== 'string' || !isSha256Hex(source.expectedHash) || !isSyncRevision(source.expectedRevision)
-			|| files.length !== 1 || files[0]!.expectedHash !== null || sourcePath === files[0]!.path) return corsResponse({ error: 'Invalid encrypted rename' }, 400);
+			|| files.length > 1 || files.length === 1 && (files[0]!.expectedHash !== null || sourcePath === files[0]!.path)) return corsResponse({ error: 'Invalid encrypted rename' }, 400);
 		removed = { path: sourcePath, expectedHash: source.expectedHash, expectedRevision: source.expectedRevision };
 	}
 	const response = { encrypted: body.acknowledgment };
 	const effects = reminderOperationEffects(env.DB, operation, response, typeof body.createdId === 'string' ? body.createdId : undefined);
 	try {
-		if (removed) {
+		if (removed && !files.length) {
+			const result = await commitFileDelete(env.DB, { ...removed, previousFile: await getStoredFileRow(env.DB, removed.path), effects });
+			if (!result.committed) throw new FileVersionConflictError(removed.path, result.currentHash);
+		} else if (removed) {
 			await writeCommittedMarkdownMove(env.BUCKET, env.DB, { source: removed, destination: files[0]!, effects });
 		} else if (files.length === 2) {
 			const [source, destination] = files;

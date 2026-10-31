@@ -185,3 +185,11 @@ it('finds the newest staged share for a page that lost its share parameter', asy
 	await removeReadingShare(session, 'newest');
 	await expect(newestReadingShare()).resolves.toEqual({ id: 'middle', url: 'https://example.com/middle' });
 });
+
+it('accepts delete commands only with the library fields they were based on', () => {
+	const pending = (intent: unknown) => ({ id: 'operation', sessionId: session.id, action: 'delete', intent });
+	expect(isPendingReading(pending({ id: 'article', before: { reading_status: 'inbox', favorite: false, tags: [] } }), session.id)).toBe(true);
+	expect(isPendingReading(pending({ id: 'article', before: {} }), session.id)).toBe(false);
+	expect(isPendingReading(pending({ id: 'article', before: { title: 'Other' } }), session.id)).toBe(false);
+	expect(isPendingReading(pending({ id: 'article' }), session.id)).toBe(false);
+});

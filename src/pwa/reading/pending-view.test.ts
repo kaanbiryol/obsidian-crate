@@ -44,6 +44,11 @@ describe('pending Reading presentation', () => {
 		expect(presentReadingItems([article], pending)[0]).toMatchObject({ favorite: false, tags: ['essays'], reading_status: 'archived' });
 		expect(presentReadingItems([article], pending.map(op => ({ ...op, review: true })))).toEqual([article]);
 	});
+	it('hides a pending delete and restores the item if the delete is rejected', () => {
+		const pending: PendingReading = { id: 'delete', sessionId: 'session', action: 'delete', intent: { id: article.crate_reading_id, before: { favorite: false } } };
+		expect(presentReadingItems([article], [pending])).toEqual([]);
+		expect(presentReadingItems([article], [{ ...pending, review: true }])).toEqual([article]);
+	});
 	it('shows extraction retry immediately and rolls it back if rejected', () => {
 		const pending: PendingReading = { id: 'retry', sessionId: 'session', action: 'retry', intent: { id: article.crate_reading_id } };
 		expect(presentReadingItems([article], [pending])[0]?.extraction_status).toBe('pending');

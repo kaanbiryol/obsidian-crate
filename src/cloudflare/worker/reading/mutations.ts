@@ -5,7 +5,7 @@ import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
 import { isEmptyReadingCapture, readingUpdateIssue } from '@/reading/core/mutation-policy';
 import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
-import { commitStagedFile } from '../sync/mutations';
+import { commitFileDelete, commitStagedFile } from '../sync/mutations';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { beginOperation, operationEffects, operationStatement } from './operations';
@@ -72,6 +72,24 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 		return readingResponse(response);
 	}
 	const source = await sourceById(env, body.id);
+	// Reading writes run under the coordinator lock, so the library revision cannot move
+	// between the index check above and this commit. A client whose cached library has the
+	// `before` revision then needs only this item again, not the whole library.
+	const revision = crypto.randomUUID().replaceAll('-', '');
+	const library = async () => ({ before: await readingListEtag(current, index.revision), after: await readingListEtag(current, revision) });
+	if (action === 'delete') {
+		// The library fields the client saw must still match, so a stale delete never removes newer edits.
+		const before = body.before;
+		if (!before || typeof before !== 'object' || Array.isArray(before) || !Object.keys(before).length) throw new ReadingError('Choose a Reading change.');
+		const issue = readingUpdateIssue(source.item, before, before);
+		if (issue === 'unsupported') throw new ReadingError('Unsupported Reading change.');
+		if (issue === 'conflict') throw new ReadingError('This item changed on another device. Refresh before deleting it.', 409, 'reading_conflict');
+		const response = { deleted: true, id: source.item.crate_reading_id };
+		const result = await commitFileDelete(env.DB, { path: source.path, expectedHash: source.file.hash, expectedRevision: source.file.storageKey, previousFile: source.file,
+			readingPolicy: current, readingRevision: revision, effects: operationEffects(env.DB, op, response) });
+		if (!result.committed) throw new ReadingError('This note changed. Refresh before deleting it.', 409);
+		return readingResponse({ ...response, library: await library() });
+	}
 	let content: string;
 	if (action === 'retry') {
 		if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before retrying.', 403);
@@ -87,12 +105,8 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 		catch (error) { throw new ReadingError(error instanceof Error ? error.message : 'Invalid Reading change.'); }
 	}
 	const response = { saved: true, id: source.item.crate_reading_id };
-	// Reading writes run under the coordinator lock, so the library revision cannot move
-	// between the index check above and this commit. A client whose cached library has the
-	// `before` revision then needs only this item again, not the whole library.
-	const revision = crypto.randomUUID().replaceAll('-', '');
 	const staged = await stageMarkdownFile(env.BUCKET, env.DB, source.path, content, source.file.hash);
 	const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, readingRevision: revision, reminderFolder: op.reminderFolder, encryptionState: null, effects: operationEffects(env.DB, op, response) });
 	if (!result.committed) throw new ReadingError('This note changed. Refresh before editing it.', 409);
-	return readingResponse({ ...response, library: { before: await readingListEtag(current, index.revision), after: await readingListEtag(current, revision) } });
+	return readingResponse({ ...response, library: await library() });
 }

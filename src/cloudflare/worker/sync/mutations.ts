@@ -216,6 +216,10 @@ export async function commitFileDelete(
 		expectedRevision?: string;
 		previousFile: FileStorageRow | null;
 		audit?: MutationAuditContext;
+		/** Statements that commit only with this deletion. */
+		effects?: CommitEffects;
+		readingPolicy?: ReadingIndexPolicy;
+		readingRevision?: string;
 	},
 ): Promise<CommitResult> {
 	// The caller's verified absent snapshot is a valid linearization point for
@@ -244,7 +248,8 @@ export async function commitFileDelete(
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
 		...await enqueueFileProjection(db, params.path, null, null),
-		...await readingIndexStatements(db, [{ path: params.path, storageKey: null }]),
+		...await readingIndexStatements(db, [{ path: params.path, storageKey: null }], { policy: params.readingPolicy, revision: params.readingRevision }),
+		...(params.effects?.([{ path: params.path, storageKey: null }]) ?? []),
 	]);
 
 	if (changedRows(results[2]) !== 1) {

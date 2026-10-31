@@ -30,9 +30,11 @@ import { ReadingSourceIcon } from './ReadingSourceIcon';
 import { LoadingIndicator } from '../../ui/shared/LoadingIndicator';
 import { EmptyState } from '../../ui/shared/EmptyState';
 
-export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.', mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange }: {
+export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onDelete, onSaveComplete, onCopyComplete, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.', mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange }: {
 	appearance?: ReadingAppearance; onAppearanceChange?: (appearance: ReadingAppearance) => void;
 	item: ReadingMetadata; markdown: string | null; onBack: () => void; onEdit?: () => void; onUpdate?: (changes: ReadingChanges) => Promise<void>;
+	/** Deletes the note; the caller closes the reader. */
+	onDelete?: () => Promise<void>;
 	/** Keep article parsing and layout out of the host's opening slide. */
 	deferContentUntilEntered?: boolean;
 	/** Reveal article metadata with its text; retain source access if loading fails. */
@@ -47,9 +49,9 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	status?: string; onRetry?: () => Promise<void>; notice?: React.ReactNode; mutationPending?: boolean; highlightsPending?: boolean;
 }) {
 	const body = useRef<HTMLDivElement>(null);
-	const tagsFormId = useId(), noteFormId = useId(), deleteFormId = useId();
+	const tagsFormId = useId(), noteFormId = useId(), deleteFormId = useId(), deleteItemFormId = useId();
 	const { error, setError, busy, sharing, copied, run, shareLink } = useReadingReaderActions(item.crate_reading_id);
-	const [dialog, setDialog] = useState<'appearance' | 'tags' | null>(null);
+	const [dialog, setDialog] = useState<'appearance' | 'tags' | 'delete' | null>(null);
 	const [localAppearance, setLocalAppearance] = useState(DEFAULT_READING_APPEARANCE);
 	const { fontSize, serif } = appearance ?? localAppearance;
 	const updateAppearance = (changes: Partial<ReadingAppearance>) => {
@@ -112,7 +114,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 			{notice}
 			{showHeader && <header className="crate-reading-reader__header">{item.source_url ? <a className="crate-reading-reader__source" href={item.source_url} target="_blank" rel="noopener noreferrer"><ReadingSourceIcon item={item} />{readingSource(item.source_url)}<ThemeIcon id="arrow-up-right" size="xs" aria-hidden="true" /></a> : <span className="crate-reading-reader__source"><ReadingSourceIcon item={item} />Vault note</span>}<h1 ref={heading} tabIndex={-1}>{readingTitle(item)}</h1>
 				<div className="crate-reading-reader__byline">{item.author && <span>{item.author}</span>}<time dateTime={item.saved_at}>{new Date(item.saved_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>{videoId && <span>Video</span>}{videoId && segments.length > 0 && item.transcript_language && <span>Transcript: {item.transcript_language}</span>}{!videoId && markdown !== null && item.extraction_status === 'ready' && <span>{minutes} min read</span>}</div>
-				<div className="crate-reading-reader__tools"><div className="crate-reading-reader__availability">{status && <span role="status"><ThemeIcon id="check" size="xs" aria-hidden="true" />{status}</span>}</div>{(!videoId || hasVideoNotes) && <IconButton size="large" icon="type" label="Reading appearance" onClick={() => setDialog('appearance')} />}{onUpdate && <IconButton size="large" icon="hash" label={`Edit ${kind} tags`} disabled={mutationPending} onClick={() => setDialog('tags')} />}{onEdit && <IconButton size="large" icon="file-text" label="Open note" onClick={onEdit} />}{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : `Share ${kind}`} aria-disabled={sharing} onClick={() => void shareLink(article.current?.ownerDocument.defaultView, readingTitle(item), item.source_url)} />}</div>
+				<div className="crate-reading-reader__tools"><div className="crate-reading-reader__availability">{status && <span role="status"><ThemeIcon id="check" size="xs" aria-hidden="true" />{status}</span>}</div>{(!videoId || hasVideoNotes) && <IconButton size="large" icon="type" label="Reading appearance" onClick={() => setDialog('appearance')} />}{onUpdate && <IconButton size="large" icon="hash" label={`Edit ${kind} tags`} disabled={mutationPending} onClick={() => setDialog('tags')} />}{onEdit && <IconButton size="large" icon="file-text" label="Open note" onClick={onEdit} />}{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : `Share ${kind}`} aria-disabled={sharing} onClick={() => void shareLink(article.current?.ownerDocument.defaultView, readingTitle(item), item.source_url)} />}{onDelete && <IconButton size="large" icon="trash-2" tone="danger" label={`Delete ${kind}`} disabled={mutationPending} onClick={() => setDialog('delete')} />}</div>
 				{item.tags.length > 0 && <div className="crate-reading-reader__tags">{item.tags.map(tag => <span key={tag}>#{tag}</span>)}</div>}
 			</header>}
 			{error && <p role="alert" className="crate-reading__notice">{error}</p>}
@@ -135,5 +137,12 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		{!(floatingHighlights && highlightsOpen && noteOverHighlights) && noteDialog}
 		{dialog === 'appearance' && <ReadingDialog title="Reading appearance" onClose={() => setDialog(null)}><div className="crate-reading-reader__preferences"><span>Typeface</span><div className="crate-reading-reader__font-choice"><ToggleButton variant="outline" pressed={!serif} onPressedChange={() => updateAppearance({ serif: false })}>Modern<span>Sans serif</span></ToggleButton><ToggleButton variant="outline" pressed={serif} onPressedChange={() => updateAppearance({ serif: true })}>Literary<span>Serif</span></ToggleButton></div><div className="crate-reading-reader__font-size"><span>Text size</span><IconButton icon="minus" iconSize="s" label="Decrease text size" disabled={fontSize <= 16} onClick={() => updateAppearance({ fontSize: Math.max(16, fontSize - 1) })} /><output aria-label="Text size" aria-live="polite">{fontSize}</output><IconButton icon="plus" iconSize="s" label="Increase text size" disabled={fontSize >= 26} onClick={() => updateAppearance({ fontSize: Math.min(26, fontSize + 1) })} /></div><div className="crate-reading-reader__sample-frame"><p className="crate-reading-reader__sample" style={{ fontSize, fontFamily: serif ? 'Georgia, serif' : 'var(--font-interface)' }}>A little room to read.<br />A little space to think.</p></div></div></ReadingDialog>}
 		{dialog === 'tags' && onUpdate && <ReadingDialog title={videoId ? "Video tags" : "Article tags"} action={{ label: 'Save', ariaLabel: 'Save tags', type: 'submit', form: tagsFormId, disabled: busy, busy }} busy={busy} onClose={() => setDialog(null)}>{close => <ReadingTagsForm id={tagsFormId} initialTags={item.tags} busy={busy} error={error} onSave={tags => { void run(async isCurrent => { await onUpdate({ tags }); if (!isCurrent()) return; onSaveComplete?.('tags'); if (isCurrent()) close(); }); }} />}</ReadingDialog>}
+		{dialog === 'delete' && onDelete && <ReadingDialog title={videoId ? 'Delete video' : 'Delete article'} role="alertdialog" action={{ label: 'Delete', ariaLabel: `Confirm delete ${kind}`, type: 'submit', form: deleteItemFormId, tone: 'danger', disabled: busy || mutationPending, busy }} busy={busy} onClose={() => setDialog(null)}>{close => <form id={deleteItemFormId} className="crate-reading-note" onSubmit={event => {
+			event.preventDefault();
+			void run(async isCurrent => { await onDelete(); if (isCurrent()) close(); });
+		}}>
+			<p className="crate-reading-note__message">This removes the note and its highlights. Obsidian moves it to its trash when it syncs.</p>
+			{error && <span className="crate-field__error" role="alert">{error}</span>}
+		</form>}</ReadingDialog>}
 	</article>;
 }

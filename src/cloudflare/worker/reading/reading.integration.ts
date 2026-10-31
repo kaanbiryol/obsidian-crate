@@ -292,6 +292,45 @@ it('replays a lost receipt even after deletion and rejects expired operation ide
 	expect((await command('capture', { url: body.url, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000) - 180) })).status).toBe(410);
 });
 
+it('deletes an unchanged note once, replays its receipt and refuses a stale delete', async () => {
+	const path = 'Reading/Delete.md', content = await adoptReadingClip('Kept until deleted.', path, '2026-09-26T00:00:00Z');
+	const item = parseReadingNote(content)!;
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+	await buildIndex();
+	const before = { reading_status: item.reading_status, favorite: item.favorite, tags: item.tags };
+	// A delete based on stale metadata leaves the note untouched.
+	expect((await command('delete', { id: item.crate_reading_id, before: { ...before, favorite: !item.favorite }, operationId: id() })).status).toBe(409);
+	expect((await command('delete', { id: item.crate_reading_id, before: {}, operationId: id() })).status).toBe(400);
+	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.content).toBe(content);
+
+	const body = { id: item.crate_reading_id, before, operationId: id() };
+	const first = await command('delete', body);
+	expect(first.status).toBe(200);
+	const payload = await first.json() as { deleted: boolean; library: { before: string; after: string } };
+	expect(payload).toMatchObject({ deleted: true, id: item.crate_reading_id });
+	expect(payload.library.before).not.toBe(payload.library.after);
+	expect(await getStoredFileRow(env.DB, path)).toBeNull();
+	expect(await env.DB.prepare('SELECT 1 FROM reading_items WHERE item_id = ?').bind(item.crate_reading_id).first()).toBeNull();
+	// The deleted revision stays recoverable, and sync observes an ordinary delete.
+	expect(await env.DB.prepare("SELECT 1 FROM file_versions WHERE path = ? AND reason = 'deleted'").bind(path).first()).not.toBeNull();
+	expect(await env.DB.prepare("SELECT 1 FROM changelog WHERE path = ? AND action = 'delete'").bind(path).first()).not.toBeNull();
+	// A lost response replays the receipt, without library revisions; a new operation finds nothing to delete.
+	expect(await (await command('delete', body)).json()).toEqual({ deleted: true, id: item.crate_reading_id });
+	expect((await command('delete', { ...body, operationId: id() })).status).toBe(409);
+});
+
+it('refuses to delete a note edited after the client saw it', async () => {
+	const path = 'Reading/Edited.md', content = await adoptReadingClip('Original.', path, '2026-09-26T00:00:00Z');
+	const item = parseReadingNote(content)!;
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+	await buildIndex();
+	const edited = updateReadingNote(content, item.crate_reading_id, { tags: ['kept'] });
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, edited, (await getStoredFileRow(env.DB, path))!.hash);
+	const response = await command('delete', { id: item.crate_reading_id, before: { reading_status: item.reading_status, favorite: item.favorite, tags: item.tags }, operationId: id() });
+	expect(response.status).toBe(409);
+	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.content).toBe(edited);
+});
+
 it('persists highlights with replay receipts and rejects concurrent highlight replacement', async () => {
 	const content = await adoptReadingClip('Hello **world**!', 'Reading/Highlights.md', '2026-09-26T00:00:00Z');
 	const item = parseReadingNote(content)!;

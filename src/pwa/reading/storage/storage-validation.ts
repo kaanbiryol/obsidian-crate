@@ -51,7 +51,7 @@ function isChangeField(key: string, value: unknown, before: boolean): boolean {
 }
 
 export function isReadingCommand(command: unknown): command is ReadingCommand {
-	if (!isRecord(command) || (command.action !== 'capture' && command.action !== 'update' && command.action !== 'retry')) return false;
+	if (!isRecord(command) || !['capture', 'update', 'retry', 'delete'].includes(command.action as string)) return false;
 	const { action, intent: value } = command;
 	if (!isRecord(value) || 'operationId' in value) return false;
 	if (action === 'capture') {
@@ -61,8 +61,10 @@ export function isReadingCommand(command: unknown): command is ReadingCommand {
 	}
 	if (!nonEmptyString(value.id)) return false;
 	if (action === 'retry') return true;
-	if (!isRecord(value.changes) || !isRecord(value.before)) return false;
+	if (!isRecord(value.before)) return false;
 	const before = value.before;
+	if (action === 'delete') return Object.keys(before).length > 0 && Object.entries(before).every(([key, field]) => isChangeField(key, field, true));
+	if (!isRecord(value.changes)) return false;
 	return Object.keys(value.changes).length > 0 && Object.entries(value.changes).every(([key, field]) =>
 		isChangeField(key, field, false) && isChangeField(key, before[key], true));
 }

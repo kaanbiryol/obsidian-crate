@@ -71,6 +71,20 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
 	expect((await env.DB.prepare('SELECT * FROM reading_items').all()).results).toHaveLength(0);
 	expect((await env.DB.prepare('SELECT * FROM reading_jobs').all()).results).toHaveLength(0);
 });
+it('deletes an encrypted note once across a lost response and refuses a stale delete', async () => {
+	const h = await setup(), api = h.api();
+	const saved = await api.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/delete', fetchArticle: false })) as { id: string };
+	const { items: [item] } = await api.request('/reading/list') as { items: ReadingItem[] };
+	const before = { reading_status: item!.reading_status, favorite: item!.favorite, tags: item!.tags };
+	await expect(api.request('/reading/delete', JSON.stringify({ operationId: operation(), id: saved.id, before: { ...before, favorite: true } }))).rejects.toThrow('changed on another device');
+	expect(await env.DB.prepare('SELECT 1 FROM files').first()).not.toBeNull();
+	const body = JSON.stringify({ operationId: operation(), id: saved.id, before });
+	h.loseNextReply(); await expect(api.request('/reading/delete', body)).rejects.toThrow('Lost reply');
+	expect(await api.request('/reading/delete', body)).toEqual({ deleted: true, id: saved.id });
+	expect(h.requests.at(-1)).toBe(h.requests.at(-2));
+	expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
+	expect((await h.api().request('/reading/list') as { items: ReadingItem[] }).items).toEqual([]);
+});
 async function concurrentEdit() {
 	const h = await setup();
 	const saved = await h.api().request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/concurrent' })) as { id: string };

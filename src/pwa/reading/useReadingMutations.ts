@@ -93,5 +93,15 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
 		void run(() => refresh(session));
 	};
 
-	return { saving, preparingChange: preparationCount > 0, canApplyUpdate, queueChange, saveLink, updateItem, retryArticle };
+	const deleteItem = async (item: ReadingItem) => {
+		if (!session) return;
+		// The server deletes only while these fields still match, so edits made elsewhere survive.
+		const { reading_status, favorite, tags, highlights } = item;
+		await queueChange({ action: 'delete', intent: { id: item.crate_reading_id, before: { reading_status, favorite, tags, highlights } } });
+		if (!isCurrentSession(session)) return;
+		showToast('success', navigator.onLine ? 'Deleted' : 'Deleted on this device');
+		void run(() => refresh(session));
+	};
+
+	return { saving, preparingChange: preparationCount > 0, canApplyUpdate, queueChange, saveLink, updateItem, retryArticle, deleteItem };
 }
