@@ -8,6 +8,7 @@ import { deletePathLocallyIfUnchanged } from '../local/local-delete';
 import { applyRemoteContentIfUnchanged } from '../local/local-apply';
 import { isUtf8Text } from '../history/preview-format';
 import { replaceLocalFileWithRecovery } from '../local/local-recovery-write';
+import { localPathExists } from '../local/stored-name';
 import { sha256Hex } from '../../platform/sha256';
 
 interface DiscardItem {
@@ -54,7 +55,8 @@ export async function createPendingDiscard(context: DiscardContext, keys: string
 			used = true;
 			// Validate the entire selection before the first destructive operation.
 			await verifySnapshots(context, snapshots);
-			for (const snapshot of snapshots) {
+			// Trash new names first, so a case-only rename restores its old name.
+			for (const snapshot of [...snapshots].sort((a, b) => Number(b.action === 'trash') - Number(a.action === 'trash'))) {
 				await discardOne(context, snapshot);
 			}
 		},
@@ -62,6 +64,8 @@ export async function createPendingDiscard(context: DiscardContext, keys: string
 }
 
 async function readHash(vault: Vault, path: string): Promise<string | null> {
+	// A stored case or Unicode variant of the name, as after `todo.md` -> `TODO.md`, is another file.
+	if (!await localPathExists(vault, path)) return null;
 	const stat = await vault.adapter.stat(path);
 	if (!stat) return null;
 	if (stat.type !== 'file') throw new Error(`${path}: a folder now occupies this path.`);

@@ -1,9 +1,10 @@
-import type { DataAdapter } from 'obsidian';
+import type { Vault } from 'obsidian';
 import type { FileEntry } from '../../protocol/sync-types';
 import { assertLocalSyncPath } from '../local/local-path-safety';
 import { decodePreviewText, isBinaryPreviewPath } from '../history/preview-format';
 import { MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
+import { localPathExists } from '../local/stored-name';
 
 export interface PendingDiff {
 	before?: string;
@@ -18,14 +19,16 @@ export interface PendingDiff {
 
 /** Read a snapshot for display only; never advance the manifest or sync queue. */
 export async function loadPendingDiff(
-	adapter: Pick<DataAdapter, 'stat' | 'readBinary'>,
+	vault: Vault,
 	baseline: Readonly<FileEntry> | undefined,
 	readBase: (path: string, hash: string) => Promise<ArrayBuffer | null>,
 	path: string,
 	deleted: boolean,
 ): Promise<PendingDiff> {
 	assertLocalSyncPath(path);
-	const local = await adapter.stat(path);
+	const stat = await vault.adapter.stat(path);
+	// After `todo.md` -> `TODO.md` on a case-insensitive file system, stat also finds the deleted old name.
+	const local = deleted && stat && !await localPathExists(vault, path) ? null : stat;
 	if (deleted ? local !== null : local?.type !== 'file') {
 		throw new Error('This file changed. Refresh sync activity to see its latest state.');
 	}
@@ -40,7 +43,7 @@ export async function loadPendingDiff(
 	if (Math.max(result.beforeSize, result.afterSize) > MAX_PREVIEW_BYTES) {
 		return { ...result, unavailable: 'This file is too large to preview (limit: 256 KB).' };
 	}
-	const afterBytes = deleted ? new ArrayBuffer(0) : await adapter.readBinary(path);
+	const afterBytes = deleted ? new ArrayBuffer(0) : await vault.adapter.readBinary(path);
 	if (afterBytes.byteLength > MAX_PREVIEW_BYTES) {
 		return { ...result, afterSize: afterBytes.byteLength, unavailable: 'This file is too large to preview (limit: 256 KB).' };
 	}

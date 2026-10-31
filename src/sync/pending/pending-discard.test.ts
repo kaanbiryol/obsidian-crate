@@ -163,4 +163,43 @@ describe('pending discard', () => {
 		expect(h.files.get('new.md')).toEqual(bytes('new'));
 		expect(h.trash).not.toHaveBeenCalled();
 	});
+
+	it('restores the old name of a case-only rename on a case-insensitive file system', async () => {
+		// macOS, iOS and Windows resolve `todo.md` to the stored `TODO.md`; the index keeps exact names.
+		const saved = bytes('note');
+		const files = new Map([['TODO.md', saved]]);
+		const stored = (path: string) => [...files.keys()].find(name => name.toLowerCase() === path.toLowerCase());
+		const trash = vi.fn(async (path: string) => { const name = stored(path)!; files.set(`.trash/${name}`, files.get(name)!); files.delete(name); });
+		const adapter = {
+			stat: vi.fn(async (path: string) => stored(path) ? { type: 'file', size: files.get(stored(path)!)!.byteLength, mtime: 1, ctime: 1 } : null),
+			exists: vi.fn(async (path: string) => stored(path) !== undefined),
+			list: vi.fn(async () => ({ files: [...files.keys()].filter(path => !path.includes('/')), folders: [] })),
+			readBinary: vi.fn(async (path: string) => { if (!stored(path)) throw new Error('Missing file'); return files.get(stored(path)!)!; }),
+			writeBinary: vi.fn(async (path: string, content: ArrayBuffer) => { files.set(stored(path) ?? path, content); }),
+			write: vi.fn(async (path: string, text: string) => { files.set(stored(path) ?? path, bytes(text)); }),
+			mkdir: vi.fn(async () => {}),
+			trashLocal: trash,
+		};
+		const identities = new Map<string, { path: string; extension: string }>();
+		const vault = {
+			adapter,
+			getAbstractFileByPath: (path: string) => files.has(path) ? identities.get(path) ?? identities.set(path, { path, extension: 'md' }).get(path)! : null,
+			createBinary: vi.fn(async (path: string, content: ArrayBuffer) => { if (stored(path)) throw new Error('File exists'); files.set(path, content); }),
+			trash: (file: { path: string }) => trash(file.path),
+		};
+		const baseline = { hash: await sha256Hex(saved), size: saved.byteLength, modified: '2026-09-16', revision: 'v1' };
+		const applied = vi.fn(async () => {});
+		const review = await createPendingDiscard({
+			vault: vault as never, getBaseline: path => path === 'todo.md' ? baseline : undefined, readBase: async () => saved,
+			backupRoot: '.obsidian/plugins/crate/discard-recovery', verify: vi.fn(), beforeBinaryReplace: vi.fn(async () => {}), applied,
+		}, [pendingChangeKey('delete', 'todo.md'), 'TODO.md']);
+		expect(review.items).toEqual([{ path: 'todo.md', action: 'restore' }, { path: 'TODO.md', action: 'trash' }]);
+
+		await review.discard();
+
+		expect(files.get('todo.md')).toEqual(saved);
+		expect(files.has('TODO.md')).toBe(false);
+		expect(files.get('.trash/TODO.md')).toEqual(saved);
+		expect(applied).toHaveBeenCalledWith('todo.md', baseline, saved);
+	});
 });

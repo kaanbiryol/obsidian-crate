@@ -37,7 +37,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 					throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');
 				}
 			};
-			const preview = await loadPendingDiff(context.vault.adapter, baseline,
+			const preview = await loadPendingDiff(context.vault, baseline,
 				async (filePath, hash) => {
 					const cached = await context.cache.readBase(filePath, hash);
 					verifyBaseline();

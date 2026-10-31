@@ -11,10 +11,12 @@ function setup(local: string | null = 'new', remote: string | null = 'old', fixt
 	const adapter = {
 		stat: vi.fn(async () => local === null ? null : { type: 'file' as const, size: encode(local).byteLength, ctime: 0, mtime: 0 }),
 		readBinary: vi.fn(async () => encode(local ?? '')),
+		exists: vi.fn(async () => local !== null),
 	};
+	const vault = { adapter, getAbstractFileByPath: (path: string) => local === null ? null : { path } };
 	const baseline: FileEntry | undefined = remote === null ? undefined : { size: encode(remote).byteLength, hash: 'hash', modified: '' };
 	const readBase = vi.fn(async (): Promise<ArrayBuffer | null> => encode(remote ?? ''));
-	return { adapter, baseline, readBase, load: (deleted = false, path = fixturePath) => loadPendingDiff(adapter, baseline, readBase, path, deleted) };
+	return { adapter, baseline, readBase, load: (deleted = false, path = fixturePath) => loadPendingDiff(vault as never, baseline, readBase, path, deleted) };
 }
 
 describe('pending file previews', () => {
@@ -108,6 +110,15 @@ describe('pending file previews', () => {
 			expect(await h.load()).toMatchObject({ before: 'old', after: 'new', kind: 'modified' });
 		},
 	);
+	it('previews a deleted old name while a case variant of it is stored', async () => {
+		// After `todo.md` -> `TODO.md` on a case-insensitive file system, stat resolves the old name.
+		const h = setup('new', 'old');
+		const preview = loadPendingDiff({
+			adapter: { ...h.adapter, list: vi.fn(async () => ({ files: ['TODO.md'], folders: [] })), exists: vi.fn(async () => true) },
+			getAbstractFileByPath: () => null,
+		} as never, h.baseline, h.readBase, 'todo.md', true);
+		expect(await preview).toMatchObject({ before: 'old', after: '', kind: 'deleted' });
+	});
 	it('rejects paths outside the vault before accessing storage', async () => {
 		const h = setup();
 		await expect(h.load(false, '../outside')).rejects.toThrow('Invalid sync path');
