@@ -382,6 +382,8 @@ export class SyncWorkerApi {
 		const encryption = this.encryption;
 		if (!encryption) return response;
 		const files = new Array<DownloadedBatchFile>(response.files.length);
+		// Each sealed note is checked against the Reading folder's synced files; read them once.
+		const synced = encryption.syncedSnapshot();
 		let next = 0;
 		const worker = async () => {
 			while (next < response.files.length) {
@@ -389,7 +391,7 @@ export class SyncWorkerApi {
 				const { content, ...file } = response.files[index]!;
 				const path = plainByWire.get(file.path) ?? file.path;
 				if (file.error) { files[index] = { ...file, path, content }; continue; }
-				const opened = await encryption.download(file.path, base64ToArrayBuffer(content), file, path);
+				const opened = await encryption.download(file.path, base64ToArrayBuffer(content), file, path, true, synced);
 				files[index] = { ...file, ...opened.metadata, path, verifiedContent: opened.content };
 			}
 		};

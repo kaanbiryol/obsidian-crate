@@ -99,6 +99,12 @@ export class EncryptedFiles {
 		}
 	}
 
+	/** One read of the files synced in a folder, shared by the files of one listing or batch. */
+	syncedSnapshot(): (folder: string) => Promise<SyncedFile[]> {
+		let synced: Promise<SyncedFile[]> | undefined;
+		return folder => synced ??= this.paths.syncedIn(folder);
+	}
+
 	/** Open the metadata of files listed by server path, returning their plaintext paths. */
 	async metadata<T extends WireMetadata>(entries: Array<{ path: string; entry: T }>, live = true): Promise<Array<PlainEntry<T>>> {
 		// Bound both unverified descriptors and retained metadata during large
@@ -106,8 +112,7 @@ export class EncryptedFiles {
 		const chunks: Array<Array<{ path: string; entry: T }>> = [];
 		for (let offset = 0; offset < entries.length; offset += ENCRYPTION_METADATA_BATCH) chunks.push(entries.slice(offset, offset + ENCRYPTION_METADATA_BATCH));
 		const results: Array<Array<PlainEntry<T>>> = [];
-		let synced: Promise<SyncedFile[]> | undefined;
-		const syncedOnce = (folder: string) => synced ??= this.paths.syncedIn(folder);
+		const syncedOnce = this.syncedSnapshot();
 		for (let start = 0; start < chunks.length; start += METADATA_CONCURRENCY) {
 			const group = await Promise.all(chunks.slice(start, start + METADATA_CONCURRENCY).map(chunk => this.metadataChunk(chunk, live, syncedOnce)));
 			results.push(...group);
@@ -242,10 +247,11 @@ export class EncryptedFiles {
 	}
 
 	/** Open a file downloaded from server path `wire`. With `expected`, it must be the
-	 * file this device knows by that plaintext path. */
-	async download(wire: string, bytes: ArrayBuffer, check?: Pick<WireMetadata, 'hash' | 'size'>, expected?: string, live = true): Promise<{ content: ArrayBuffer; metadata: PrivateFileMetadata }> {
+	 * file this device knows by that plaintext path. A batch passes one `syncedSnapshot`. */
+	async download(wire: string, bytes: ArrayBuffer, check?: Pick<WireMetadata, 'hash' | 'size'>, expected?: string, live = true,
+		synced?: (folder: string) => Promise<SyncedFile[]>): Promise<{ content: ArrayBuffer; metadata: PrivateFileMetadata }> {
 		if (check && (bytes.byteLength !== check.size || await sha256Hex(bytes) !== check.hash)) throw new Error('Encrypted transfer failed integrity validation');
-		const opened = await openFile(new Uint8Array(bytes), this.binding(wire, live), this.keys.forPath(wire));
+		const opened = await openFile(new Uint8Array(bytes), this.binding(wire, live, synced), this.keys.forPath(wire));
 		if (expected !== undefined && opened.metadata.path !== expected && await this.paths.plainFor(wire) !== expected) {
 			throw new Error('Encrypted file metadata does not match the requested file');
 		}
