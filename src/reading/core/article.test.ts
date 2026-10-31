@@ -120,7 +120,7 @@ describe('Reading article assembly', () => {
 		expect(managedArticle(content)!.text).toBe(`\n\n${[
 			'Templater \\<\u200B%\\* await app.vault.delete(file) %\\> and `<\u200B% tp.date.now() %>`',
 			'',
-			'Inline `$\u200B= dv.current()` and <code>$\u200B=dv.pages()</code>',
+			'Inline `$\u200B= dv.current()` and <code>\u200B$\u200B=dv.pages()</code>',
 			'',
 			'```',
 			'dv.paragraph("<\u200B% tp.file.title %>")',
@@ -139,55 +139,48 @@ describe('Reading article assembly', () => {
 		if (title !== undefined) expect(title).toBe('<\u200B%* tR += app.vault.getName() %>');
 	});
 
-	it('keeps ordinary code blocks and fence examples unchanged', () => {
+	it('keeps ordinary code blocks unchanged and drops executable names from fence examples', () => {
 		const source = note(), metadata = parseReadingNote(source)!;
-		const markdown = [
+		const kept = [
 			'```ts',
 			'const total = items.reduce((sum, item) => sum + item.price, 0);',
 			'```',
-			'',
-			'````markdown',
-			'```dataviewjs',
-			'dv.paragraph("example")',
-			'```',
-			'````',
 			'',
 			'```` ```dataviewjs ```` starts a Dataview block, and `dv.view()` loads a script.',
 			'',
 			'~~~python',
 			'print("tilde")',
 			'~~~',
-		].join('\n');
-		const content = applyLocalArticle(source, { ...metadata, path: 'Reading/Article.md' }, { markdown });
-		expect(managedArticle(content)!.text).toBe(`\n\n${markdown}\n\n`);
+		];
+		const example = ['````markdown', '```dataviewjs', 'dv.paragraph("example")', '```', '````'];
+		const content = applyLocalArticle(source, { ...metadata, path: 'Reading/Article.md' }, { markdown: [...kept, '', ...example].join('\n') });
+		// Raw HTML can make an example's inner fence real, so its name goes too.
+		expect(managedArticle(content)!.text).toBe(`\n\n${[...kept, '', '````markdown', '```', 'dv.paragraph("example")', '```', '````'].join('\n')}\n\n`);
 	});
 
-	it('breaks Dataview inline JavaScript only at the start of code', () => {
+	it('breaks every Dataview inline JavaScript prefix', () => {
 		const source = note(), metadata = parseReadingNote(source)!;
-		const kept = [
-			'Prices: a $= b, `x $= y` and \\`$= escaped\\`.',
+		const markdown = [
+			'Prices: a $= b and `x $= y`.',
 			'',
 			'```js',
-			'a $= b',
-			'$= later lines stay',
+			'$= dv.pages()',
 			'```',
 			'',
-		];
-		const markdown = [...kept,
-			'Run `$= dv.pages()`, `` $=dv.current() `` or <code>$= dv.view()</code>.',
+			'Run `$= dv.pages()`, `` $=dv.current() `` or <code class="x>y">$= dv.view()</code>.',
 			'',
-			'> ```',
-			'> $= dv.pages()',
-			'> ```',
+			'-     $= dv.pages()',
 		].join('\n');
 		const content = applyLocalArticle(source, { ...metadata, path: 'Reading/Article.md' }, { markdown });
-		expect(managedArticle(content)!.text).toBe(`\n\n${[...kept,
-			'Run `$\u200B= dv.pages()`, `` $\u200B=dv.current() `` or <code>$\u200B= dv.view()</code>.',
-			'',
-			'> ```',
-			'> $\u200B= dv.pages()',
-			'> ```',
-		].join('\n')}\n\n`);
+		expect(managedArticle(content)!.text).toBe(`\n\n${markdown.split('$=').join('$\u200B=').replace('<code class="x>y">', '<code class="x>y">\u200B')}\n\n`);
+	});
+
+	it('breaks raw HTML code whose prefix is split across elements', () => {
+		const source = note(), metadata = parseReadingNote(source)!;
+		const markdown = 'A note<sup><code><b>$</b>=dv.el("p", "x")</code></sup> and <CODE\ntitle="a"><i>$</i>=dv.el("p", "y")</CODE>.';
+		const text = managedArticle(applyLocalArticle(source, { ...metadata, path: 'Reading/Article.md' }, { markdown }))!.text;
+		expect(text).toContain('<code>\u200B<b>$</b>=');
+		expect(text).toContain('<CODE\ntitle="a">\u200B<i>$</i>=');
 	});
 
 	it('breaks plugin code in Markdown converted by Defuddle', async () => {
@@ -207,6 +200,26 @@ describe('Reading article assembly', () => {
 			expect(text).toContain('```\ndv.paragraph("x")\n```');
 			expect(text).toContain('```\nreturn 1\n```');
 			expect(text).toContain('```ts\nconst value = 1;\n```');
+		} finally { vi.unstubAllGlobals(); }
+	});
+
+	it('breaks plugin code that Defuddle keeps as raw HTML', async () => {
+		vi.stubGlobal('window', { DOMParser });
+		try {
+			const { articleMarkdown } = await import('../extraction/markdown');
+			// Defuddle keeps `sup` and complex tables as raw HTML, which Markdown does not parse,
+			// so a fence line inside one must not change how later lines are treated.
+			const html = `<p>A note<sup><code><b>$</b>=dv.el("p", "inline")</code></sup>.</p>
+				<table><tr><th colspan="2">Shell</th></tr><tr><td><pre>example\n\`\`\`\nfence</pre></td><td>b</td></tr></table>
+				<p>Between.</p>
+				<pre><code data-lang="dataviewjs">dv.el("p", "fenced")</code></pre>
+				<pre><code data-lang="datacorejsx">return 1</code></pre>`;
+			const markdown = articleMarkdown(parseHTML(`<html><body>${html}</body></html>`).document.body, 'https://example.com/article');
+			const source = note();
+			const text = managedArticle(applyLocalArticle(source, { ...parseReadingNote(source)!, path: 'Reading/Article.md' }, { markdown }))!.text;
+			expect(text).not.toMatch(/^[\t >]*`{3,}\s*(?:dataviewjs|datacorejsx)/im);
+			expect(text).toContain('<code>​<b>$</b>=');
+			expect(text).toContain('```\ndv.el("p", "fenced")\n```');
 		} finally { vi.unstubAllGlobals(); }
 	});
 

@@ -19,8 +19,9 @@ function replaceArticle(content: string, block: NonNullable<ReturnType<typeof ma
 	return `${content.slice(0, block.start)}\n\n${article.markdown}\n\n${content.slice(block.end)}`;
 }
 
-// Dataview JS, JS Engine and Tasks custom filter/group/sort functions run these code blocks when the note renders.
-const EXECUTABLE_FENCES = new Set(['dataviewjs', 'js-engine', 'tasks']);
+// Dataview JS, Datacore, JS Engine, Meta Bind JS views and Tasks custom filter/group/sort
+// functions run these code blocks when the note renders.
+const EXECUTABLE_FENCES = new Set(['dataviewjs', 'datacorejs', 'datacorejsx', 'datacorets', 'datacoretsx', 'js-engine', 'meta-bind-js-view', 'tasks']);
 // A zero-width space keeps the text readable while breaking a plugin's trigger.
 const BREAK = '\u200B';
 
@@ -29,48 +30,20 @@ function inertTemplater(text: string): string {
 	return text.split('<%').join(`<${BREAK}%`);
 }
 
-/** Dataview runs inline code, including raw HTML `<code>`, whose text starts with `$=`. */
-function inertInlineCode(line: string): string {
-	const text = line.replace(/(<code\b[^>]*>\s*)\$=/gi, (_match, open: string) => `${open}$${BREAK}=`);
-	const outside = /\\[\s\S]|`+/g, inside = /`+/g;
-	let output = '', copied = 0;
-	for (let open = outside.exec(text); open; open = outside.exec(text)) {
-		if (open[0][0] === '\\') continue;
-		inside.lastIndex = outside.lastIndex;
-		let close = inside.exec(text);
-		while (close && close[0].length !== open[0].length) close = inside.exec(text);
-		// An unmatched backtick run is literal text.
-		if (!close) continue;
-		const prefix = /^\s*\$=/.exec(text.slice(outside.lastIndex, close.index));
-		if (prefix) {
-			const equals = outside.lastIndex + prefix[0].length - 1;
-			output += text.slice(copied, equals) + BREAK;
-			copied = equals;
-		}
-		outside.lastIndex = inside.lastIndex;
-	}
-	return output + text.slice(copied);
-}
-
-/** Saved web pages must not bring plugin code into the vault. Executable code blocks
- * stay readable as plain code; Defuddle fences are longer than any backtick run inside them. */
+/** Saved web pages must not bring plugin code into the vault. Raw HTML blocks are not
+ * parsed as Markdown, so they can hide a fence or code span from line-based tracking.
+ * Every rule therefore applies everywhere, including inside code blocks, where the
+ * breaks are invisible; executable code blocks stay readable as plain code. */
 function inertArticle(article: CapturedArticle): CapturedArticle {
-	let fence = '', firstLine = false;
 	const markdown = article.markdown.split('\n').map(line => {
-		const match = /^((?:[ \t]*>)*[ \t]*)(`{3,}|~{3,})(.*)$/.exec(line);
-		const marker = match && !(match[2]![0] === '`' && match[3]!.includes('`')) ? match : null;
-		if (fence) {
-			if (marker && marker[2]!.startsWith(fence) && !marker[3]!.trim()) fence = '';
-			// Dataview's inline queries in code blocks also run a block whose text starts with `$=`.
-			else if (firstLine) line = line.replace(/^((?:[ \t]*>)*\s*)\$=/, (_match, prefix: string) => `${prefix}$${BREAK}=`);
-			firstLine = false;
-			return line;
-		}
-		if (!marker) return inertInlineCode(line);
-		fence = marker[2]!;
-		firstLine = true;
-		return EXECUTABLE_FENCES.has(marker[3]!.trim().split(/\s/)[0]!.toLowerCase()) ? marker[1]! + fence : line;
-	}).join('\n');
+		const fence = /^((?:[ \t]*>)*[ \t]*)(`{3,}|~{3,})(.*)$/.exec(line);
+		return fence && EXECUTABLE_FENCES.has(fence[3]!.trim().split(/\s/)[0]!.toLowerCase()) ? fence[1]! + fence[2]! : line;
+	}).join('\n')
+		// Dataview runs inline code and code blocks whose text starts with `$=`. Raw HTML
+		// `<code>` can split the prefix across child elements, so its text also starts with
+		// the break, which `trim()` keeps.
+		.split('$=').join(`$${BREAK}=`)
+		.replace(/<code\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, tag => tag + BREAK);
 	return { ...article, markdown: inertTemplater(markdown),
 		...(article.title === undefined ? {} : { title: inertTemplater(article.title) }),
 		...(article.author === undefined ? {} : { author: inertTemplater(article.author) }) };
