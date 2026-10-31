@@ -16,6 +16,7 @@ import { trimContentCache } from '@/pwa/storage/content-cache';
 import { responseError } from '@/pwa/connection/response-error';
 import type { PathTags } from '@/encryption/path-tags';
 import { resolveEncryptedPath } from '@/encryption/path-binding';
+import { acceptsSealedNote } from './sealed-notes';
 
 // The documented device budget: each refresh seals the whole list and index.
 export const MAX_READING_FILES = 10_000;
@@ -23,13 +24,16 @@ const MAX_READING_METADATA_BYTES = 12 * 1024 * 1024;
 // Changed notes download in parallel, a few at a time, in page order.
 const SOURCE_CONCURRENCY = 6;
 const DUPLICATE_ID_ISSUE = 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.';
+const SEALED_ISSUE = 'The server created a note that would replace or take the name of another note. It was not opened.';
 /** `revision` fingerprints the Reading files and issues, so edits elsewhere in the vault keep it. */
 interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: null; revision: string }
 
-interface Source { file: WireFile; content: string; item: ReadingItem }
+/** `hash` is the authenticated plaintext hash; `sealed` marks a note the server sealed. */
+interface Source { file: WireFile; content: string; item: ReadingItem; hash: string; sealed: boolean }
 /** Authenticated metadata for one encrypted note, reusable while its file is unchanged.
- * `file.path` is the server path; `item.path` is the note's plaintext path. */
-export interface EncryptedReadingIndexEntry { file: WireFile; item: ReadingItem }
+ * `file.path` is the server path; `item.path` is the note's plaintext path. `hash` is
+ * its plaintext hash, absent from entries saved by earlier versions. */
+export interface EncryptedReadingIndexEntry { file: WireFile; item: ReadingItem; hash?: string }
 /** `rejected` marks an attempt the Worker refused with `version_conflict`; it is rebuilt, never resent. */
 interface Attempt { requestHash: string; body: string; generation: number; rejected?: true }
 interface EncryptedReadingOptions {
@@ -47,6 +51,8 @@ interface EncryptedReadingOptions {
 /** A note download that failed in transit. Unlike a rejected note, it is retried
  * even when the vault sequence has not changed. */
 class NoteUnavailableError extends Error {}
+
+const known = (entry: EncryptedReadingIndexEntry) => ({ wire: entry.file.path, path: entry.item.path, hash: entry.hash ?? '' });
 
 function sameFile(a: WireFile, b: WireFile): boolean {
 	return a.revision === b.revision && a.hash === b.hash && a.size === b.size;
@@ -96,13 +102,14 @@ export class EncryptedReadingApi {
 			const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`).catch(() => undefined);
 			if (!response?.ok) throw new NoteUnavailableError('Article changed or is unavailable. Refresh to retry.');
 			const reading = { plain: this.options.folderPath, wire: this.options.wireFolder };
+			let sealed = false;
 			const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, this.options.authority,
-				'Encrypted article failed integrity verification.', (metadataPath, sealed) => resolveEncryptedPath(this.options.paths, file.path, metadataPath, sealed, reading));
+				'Encrypted article failed integrity verification.', (metadataPath, isSealed) => { sealed = isSealed; return resolveEncryptedPath(this.options.paths, file.path, metadataPath, sealed, reading); });
 			if (opened.content.byteLength > MAX_READING_BYTES) throw new Error('Reading notes must be smaller than 1 MB.');
 			const content = new TextDecoder('utf-8', { fatal: true }).decode(opened.content);
 			const metadata = parseReadingNote(content);
 			if (!metadata) throw new Error('Open Obsidian to import this note into Reading.');
-			source = { file, content, item: { ...metadata, path: opened.metadata.path } };
+			source = { file, content, item: { ...metadata, path: opened.metadata.path }, hash: opened.metadata.hash, sealed };
 		}
 
 		sources.set(file.path, source);
@@ -122,6 +129,8 @@ export class EncryptedReadingApi {
 		const candidates: ReadingItem[] = [], unreadable: Array<string | undefined> = [];
 		const next = new Map<string, WireFile>(), issues: Array<{ path: string; message: string }> = [];
 		const nextIndex = new Map<string, EncryptedReadingIndexEntry>();
+		// Sealed notes first seen at a server path in this inventory; checked for taken names once all are listed.
+		const newSealed: WireFile[] = [];
 		let downloaded = false, unavailable = false;
 		const nextSources = new Map(this.sources);
 		let metadataBytes = 0;
@@ -131,8 +140,8 @@ export class EncryptedReadingApi {
 		})) {
 			const loaded = await mapBounded(page.files, SOURCE_CONCURRENCY, async file => {
 				const cached = this.indexed.get(file.path);
-				if (cached && sameFile(cached.file, file)) return { item: cached.item };
-				try { const { item } = await this.source(file, nextSources); downloaded = true; return { item }; }
+				if (cached && sameFile(cached.file, file)) return { entry: cached };
+				try { const { item, hash, sealed } = await this.source(file, nextSources); downloaded = true; return { entry: { file, item, hash }, sealed }; }
 				catch (error) { return { error }; }
 			});
 			for (const [index, file] of page.files.entries()) {
@@ -140,11 +149,20 @@ export class EncryptedReadingApi {
 					next.set(file.path, file);
 					const result = loaded[index]!;
 					if ('error' in result) throw result.error;
-					const item = result.item;
+					const { entry } = result, { item } = entry;
+					if (result.sealed) {
+						// The server may only create notes, so a sealed one may not replace a note known here.
+						const held = this.indexed.get(file.path);
+						if (held && !acceptsSealedNote(known(entry), [known(held)])) {
+							nextSources.delete(file.path);
+							throw new Error(SEALED_ISSUE);
+						}
+						if (!held) newSealed.push(file);
+					}
 					metadataBytes += metadataSize(item);
 					if (metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
 					candidates.push(item);
-					nextIndex.set(file.path, { file, item });
+					nextIndex.set(file.path, entry);
 				} catch (error) {
 					if (error instanceof NoteUnavailableError) unavailable = true;
 					// Name a note this device has read before by its plaintext path, so the
@@ -158,6 +176,15 @@ export class EncryptedReadingApi {
 			}
 			// An oversized library fails after its last page, before the sequence is confirmed.
 			if (!page.nextCursor && metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
+		}
+		// Nor may it take the name of another note, listed now or kept from a failed download.
+		for (const file of newSealed) {
+			const entry = nextIndex.get(file.path);
+			if (!entry || acceptsSealedNote(known(entry), [...nextIndex.values()].filter(other => other !== entry).map(known))) continue;
+			nextIndex.delete(file.path); nextSources.delete(file.path);
+			candidates.splice(candidates.indexOf(entry.item), 1);
+			unreadable.push(undefined);
+			issues.push({ path: file.path, message: SEALED_ISSUE });
 		}
 		const { sequence } = first;
 		const removed = [...this.indexed.keys()].some(path => !nextIndex.has(path));

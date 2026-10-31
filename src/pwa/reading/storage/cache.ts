@@ -1,6 +1,6 @@
 import type { ReadingItem } from '@/reading/core/model';
 import { MAX_READING_FILES, type EncryptedReadingIndexEntry } from '@/pwa/reading/encrypted-api';
-import { isRecord } from '@/platform/validation';
+import { isRecord, isSha256Hex } from '@/platform/validation';
 import { decodeReadingValue, encodeReadingValue } from './private-storage';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
 import { abortTransaction } from '../../storage/abort-transaction';
@@ -45,7 +45,7 @@ function isIndexEntry(folder: string) {
 		const { path, hash, size, revision } = entry.file;
 		return typeof path === 'string' && typeof hash === 'string' && typeof revision === 'string'
 			&& typeof size === 'number' && Number.isSafeInteger(size) && size >= 0
-			&& isReadingItem(entry.item, folder);
+			&& (entry.hash === undefined || isSha256Hex(entry.hash)) && isReadingItem(entry.item, folder);
 	};
 }
 
