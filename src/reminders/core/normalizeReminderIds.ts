@@ -1,4 +1,4 @@
-import { createReminderId, setReminderIdMarker } from './reminderIdentity';
+import { createReminderId, extractReminderId, setReminderIdMarker, stripReminderIdMarker } from './reminderIdentity';
 import { parseCheckboxLine, type ParsedCheckbox } from './grammar/checkboxParser';
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
 import { normalizeReminderScheduleLine } from './normalizeReminderSchedule';
@@ -30,8 +30,21 @@ export function normalizeReminderIds(
 	const lines = content.split("\n");
 	const usedIds = new Set(reservedIds);
 	let remindersUpdated = 0;
+	const tasks = new Set(markdownTaskContexts(lines).keys());
 
-	for (const index of markdownTaskContexts(lines).keys()) {
+	// Enter just before the marker leaves `- [ ] <!-- crate-id -->` under its
+	// reminder; give the ID back so the reminder keeps its identity.
+	for (const index of tasks) {
+		const line = lines[index], below = lines[index + 1];
+		if (line === undefined || below === undefined || !tasks.has(index + 1) || extractReminderId(line)) continue;
+		const reminder = parseCheckboxLine(line), split = parseCheckboxLine(below);
+		if (!reminder?.parsed.cleanContent.trim() || !split?.reminderId || split.parsed.cleanContent.trim()) continue;
+		lines[index] = setReminderIdMarker(line, split.reminderId);
+		lines[index + 1] = `${stripReminderIdMarker(below)}${below.endsWith('\r') ? '\r' : ''}`;
+		remindersUpdated++;
+	}
+
+	for (const index of tasks) {
 		const line = lines[index];
 		if (line === undefined) continue;
 		// Saved lines resolve in persisted mode; only unresolved drafts need the

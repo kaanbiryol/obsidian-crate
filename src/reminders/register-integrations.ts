@@ -1,5 +1,6 @@
 import { setReminderRibbon } from './visibility';
-import { addIcon } from 'obsidian';
+import { addIcon, editorInfoField } from 'obsidian';
+import type { EditorState } from '@codemirror/state';
 import type CratePlugin from '../plugin/CratePlugin';
 import { registerReminderCommands } from './commands';
 import { renderRemindersBlock } from './query/injector';
@@ -7,6 +8,7 @@ import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/plugin/reminders-view';
 import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { CRATE_ICON_ID, CRATE_ICON_SVG } from '../ui/crate-icon';
+import { createReminderIdMarkerHiding, createReminderLineLeaveExtension } from './data/editor-line-leave';
 
 const remindersLogger = createLogger('Reminders');
 const registeredReminderUi = new WeakSet<CratePlugin>();
@@ -33,6 +35,17 @@ export async function registerReminderIntegrations(plugin: CratePlugin, openView
 	});
 
 	setReminderRibbon(plugin, ribbon);
+	const editorPath = (state: EditorState) => state.field(editorInfoField, false)?.file?.path;
+	plugin.registerEditorExtension([
+		createReminderLineLeaveExtension(state => {
+			const path = editorPath(state);
+			return Boolean(path && plugin.reminders?.canAssignEditorIds(path));
+		}),
+		createReminderIdMarkerHiding(state => {
+			const path = editorPath(state);
+			return Boolean(path && plugin.reminders?.index.isReminderFile(path));
+		}),
+	]);
 	registerReminderCommands(plugin);
 
 	plugin.addCommand({

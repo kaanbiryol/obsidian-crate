@@ -1,4 +1,16 @@
-const REMINDER_ID_MARKER_REGEX = /<!--\s*crate-id:([A-Za-z0-9_-]+)\s*-->\s*$/;
+// The marker belongs at the line end, but edits can push text after it or join
+// another line on; it still names the reminder and the next write moves it back.
+// Leading whitespace is trimmed in code: a pattern starting with \s* backtracks
+// quadratically over long whitespace runs.
+const REMINDER_ID_MARKERS_REGEX = /<!--\s*crate-id:([A-Za-z0-9_-]+)\s*-->/g;
+
+function reminderIdMarkers(value: string) {
+	return [...value.matchAll(REMINDER_ID_MARKERS_REGEX)].map(match => {
+		let from = match.index;
+		while (from > 0 && /\s/.test(value[from - 1]!)) from--;
+		return { from, to: match.index + match[0].length, id: match[1] ?? '' };
+	});
+}
 
 function normalizeReminderId(id: string): string | null {
 	const trimmed = id.trim();
@@ -14,16 +26,27 @@ export function createReminderId(): string {
 }
 
 export function extractReminderId(value: string): string | null {
-	const match = value.match(REMINDER_ID_MARKER_REGEX);
-	if (!match) {
+	const [marker] = reminderIdMarkers(value);
+	if (!marker) {
 		return null;
 	}
 
-	return normalizeReminderId(match[1] ?? '') ?? null;
+	return normalizeReminderId(marker.id) ?? null;
+}
+
+/** The first marker's span, including the whitespace before it. */
+export function findReminderIdMarker(value: string): { from: number; to: number } | null {
+	const [marker] = reminderIdMarkers(value);
+	return marker ? { from: marker.from, to: marker.to } : null;
 }
 
 export function stripReminderIdMarker(value: string): string {
-	return value.replace(REMINDER_ID_MARKER_REGEX, '').trimEnd();
+	let stripped = '', end = 0;
+	for (const { from, to } of reminderIdMarkers(value)) {
+		stripped += value.slice(end, Math.max(from, end));
+		end = to;
+	}
+	return (stripped + value.slice(end)).trimEnd();
 }
 
 export function setReminderIdMarker(value: string, reminderId: string): string {

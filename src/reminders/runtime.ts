@@ -19,6 +19,8 @@ export interface ReminderBackend {
 	index: ReminderIndex;
 	repository: ReminderRepository;
 	watcher: VaultWatcher;
+	/** Whether an editor may add reminder IDs to the file now, as a scan would. */
+	canAssignEditorIds(filePath: string): boolean;
 }
 
 const remindersLogger = createLogger('Reminders');
@@ -144,6 +146,7 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 		index,
 		repository: createReminderRepository(index, createMarkdownWriter(plugin.app, index, journal)),
 		watcher: new VaultWatcher(plugin.app.vault, index),
+		canAssignEditorIds: filePath => index.isReminderFile(filePath) && !gate.shouldDeferScan(filePath),
 	};
 	plugin.reminders = backend;
 	backend.watcher.register();

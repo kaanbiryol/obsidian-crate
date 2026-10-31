@@ -18,6 +18,21 @@ describe('reminder ID normalization', () => {
 		}
 	});
 
+	it('moves a marker that edits pushed off the line end back to it', () => {
+		expect(normalizeReminderIds('- [ ] Buy milk <!-- crate-id:r1 --> and eggs')).toEqual({
+			content: '- [ ] Buy milk and eggs <!-- crate-id:r1 -->', remindersUpdated: 1,
+		});
+	});
+
+	it('gives an ID that Enter split onto an empty task back to its reminder', () => {
+		expect(normalizeReminderIds('- [ ] Buy milk\r\n- [ ]  <!-- crate-id:r1 -->\r\n- [ ] Next <!-- crate-id:r2 -->')).toEqual({
+			content: '- [ ] Buy milk <!-- crate-id:r1 -->\r\n- [ ]\r\n- [ ] Next <!-- crate-id:r2 -->', remindersUpdated: 1,
+		});
+		// An empty task under a reminder that has its own ID keeps the stray marker for the scan.
+		const kept = '- [ ] Buy milk <!-- crate-id:r1 -->\n- [ ] <!-- crate-id:r2 -->';
+		expect(normalizeReminderIds(kept)).toEqual({ content: kept, remindersUpdated: 0 });
+	});
+
 	it('preserves existing IDs and ignores empty checkboxes', () => {
 		const content = '- [ ] Existing <!-- crate-id:r1 -->\n- [ ] \nBody';
 		expect(normalizeReminderIds(content)).toEqual({ content, remindersUpdated: 0 });
