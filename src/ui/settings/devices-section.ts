@@ -26,7 +26,8 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 
 	const devicesEl = containerEl;
 	const deployment = plugin.settings.cloudflareDeployment;
-	if (deployment?.accountId && deployment.d1DatabaseId && !deployment.deletion) {
+	// Codes are written with the saved Cloudflare login, which a device added with a code does not have.
+	if (deployment?.accountId && deployment.d1DatabaseId && !deployment.deletion && plugin.cloudflareSavedLogin.connected) {
 		new Setting(devicesEl)
 			.setName('Add a device')
 			.setDesc('Connect another Obsidian vault to this server by scanning a code. No Cloudflare sign-in is needed on that device.')

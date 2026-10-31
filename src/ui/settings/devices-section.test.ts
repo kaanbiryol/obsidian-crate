@@ -254,14 +254,17 @@ describe('device list caching', () => {
 	});
 });
 
-it('offers Add a device only for a vault connected to a Cloudflare server', async () => {
+it('offers Add a device only for a vault connected to a Cloudflare server with its saved Cloudflare login', async () => {
 	const { renderDevicesSection } = await loadDevicesSectionModule();
-	const names = (settings: Record<string, unknown>) => {
+	const names = (settings: Record<string, unknown>, connected = true) => {
 		resetObsidianUiMocks();
 		renderDevicesSection({ containerEl: new FakeElement('div') as never,
-			plugin: { app: {}, settings, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => ({ listTokens: vi.fn(async () => ({ tokens: [] })) }) } } as never });
+			plugin: { app: {}, settings, cloudflareSavedLogin: { connected }, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => ({ listTokens: vi.fn(async () => ({ tokens: [] })) }) } } as never });
 		return MockSetting.instances.map(setting => setting.nameEl.textContent);
 	};
-	expect(names({ cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } })).toContain('Add a device');
+	const cloudflare = { cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } };
+	expect(names(cloudflare)).toContain('Add a device');
 	expect(names({})).not.toContain('Add a device');
+	// A device added with a code holds no Cloudflare login, so it cannot issue codes.
+	expect(names(cloudflare, false)).not.toContain('Add a device');
 });
