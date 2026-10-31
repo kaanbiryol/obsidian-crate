@@ -73,9 +73,9 @@ export async function downloadAndSaveFile(
 }
 
 /** A version already saved for review is not downloaded again only to save the same copy. */
-async function awaitingReview(context: TransferContext, request: DownloadRequest): Promise<string | null> {
-	if (request.expectedLocalHash === null) return null;
-	const review = context.conflictStore.findIncomingReview(request.path, request.expectedRemoteHash, request.expectedLocalHash);
+export async function awaitingReview(context: TransferContext, path: string, remoteHash: string, localHash: string | null): Promise<string | null> {
+	if (localHash === null) return null;
+	const review = context.conflictStore.findIncomingReview(path, remoteHash, localHash);
 	return review && await context.vault.adapter.exists(review.conflictPath) ? incomingReviewMessage(review.conflictPath) : null;
 }
 
@@ -105,7 +105,7 @@ export async function parallelDownloadAndSaveFiles(
 			onProcessed?.();
 			continue;
 		}
-		const review = await awaitingReview(context, request);
+		const review = await awaitingReview(context, request.path, request.expectedRemoteHash, request.expectedLocalHash);
 		if (review) {
 			recordDeferredChange(result, { reason: review, review: true }, request.path);
 			onProcessed?.();

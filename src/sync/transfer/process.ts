@@ -5,7 +5,7 @@ import { isMarkdownPath } from "../../protocol/note-paths";
 import { mergeMarkdownContent } from "../merge/markdown-merge";
 import { deletePathLocallyIfUnchanged, isVaultTFileLike } from "../local/local-delete";
 import { hasUnresolvedConflict, recordResolvedRace, recordUnresolvedConflict } from "../sync-result";
-import { downloadAndSaveFile, validateDownloadedContent } from "./download";
+import { awaitingReview, downloadAndSaveFile, validateDownloadedContent } from "./download";
 import { prepareUploadFromPath } from "./prepare";
 import type { DiffApplyOutcome, TransferContext } from "./types";
 import type { ConflictDiff, FileDiff, SyncResult } from '../types';
@@ -92,6 +92,9 @@ export async function processDiff(
 		}
 
 		case "conflict": {
+			// Both sides changed again only if the review copy is gone or either hash moved.
+			const review = await awaitingReview(context, diff.path, diff.remoteHash, diff.localHash);
+			if (review) return { status: "deferred", reason: review, review: true };
 			const response = await context.files.downloadFile(diff.path);
 			const remoteContent = response.content;
 			if (remoteContent.byteLength > MAX_FILE_SIZE_BYTES) {

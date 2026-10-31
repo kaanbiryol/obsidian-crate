@@ -168,6 +168,23 @@ it('keeps the baseline of a binary edited on both sides while its incoming versi
 	expect(harness.localManifest.getEntry('image.bin')).toEqual(harness.baseline);
 });
 
+it('downloads a binary edited on both sides once while its incoming version awaits review', async () => {
+	const harness = await awaitingReview();
+	const edited = new Uint8Array([255, 4]).buffer;
+	harness.disk.write('image.bin', edited);
+
+	const results = [await harness.engine.sync(), await harness.engine.sync(), await harness.engine.sync()];
+
+	for (const result of results) {
+		expect(result).toMatchObject({ success: true, errors: [] });
+		expect(result.issues).toContainEqual(reviewIssue);
+	}
+	expect(harness.requests.downloads.filter(path => path === 'image.bin')).toHaveLength(1);
+	expect(harness.disk.read('image.bin')).toEqual(edited);
+	expect(harness.disk.read(getIncomingConflictFileName('image.bin', await sha256Hex(harness.incoming)))).toEqual(harness.incoming);
+	expect(harness.localManifest.getEntry('image.bin')).toEqual(harness.baseline);
+});
+
 it('restores the incoming version after a review replacement stops between trash and create', async () => {
 	const harness = await awaitingReview();
 	await harness.engine.sync();
