@@ -36,7 +36,7 @@
 	&__item[data-openable] > :not(.crate-reading-highlights__open) { pointer-events: none; }
 	&__excerpt {
 		position: relative; margin: 0; padding: 0 0 0 var(--crate-space-12);
-		border: 0; font-size: 15px; line-height: 1.55; white-space: pre-wrap; color: color-mix(in srgb, var(--text-normal) 86%, transparent);
+		border: 0; font-size: var(--crate-font-sm); line-height: 1.55; white-space: pre-wrap; color: color-mix(in srgb, var(--text-normal) 86%, transparent);
 		&::before { content: ''; position: absolute; top: calc(.775em - 3px); left: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--crate-highlight-accent); }
 	}
 	// Long passages stay short in the list; the article shows the whole excerpt.
@@ -47,7 +47,7 @@
 	&__note {
 		position: relative; margin: 2px 0 0 var(--crate-space-12); padding-left: var(--crate-space-12);
 		border-left: 2px solid var(--crate-divider); border-radius: 0;
-		font-size: 14px; line-height: 1.5; white-space: pre-wrap; color: var(--text-muted);
+		font-size: var(--crate-font-xs); line-height: 1.5; white-space: pre-wrap; color: var(--text-muted);
 	}
 	&__meta {
 		position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--crate-space-8);
@@ -84,7 +84,7 @@
 		display: inline-flex; align-items: center; gap: var(--crate-space-4); height: 28px; margin: 0 var(--crate-space-4) 0 0; padding: 0 12px;
 		border: 0; border-radius: tokens.$radius-pill; box-shadow: none;
 		background: color-mix(in srgb, var(--text-normal) 8%, transparent); color: var(--text-normal);
-		font: inherit; font-size: 12px; font-weight: 500; cursor: pointer;
+		font: inherit; font-size: 12px; font-weight: var(--crate-font-weight-medium); cursor: pointer;
 		@media (hover: hover) and (pointer: fine) { &:hover { background: color-mix(in srgb, var(--text-normal) 12%, transparent); } }
 		&[data-press-active] { background: color-mix(in srgb, var(--text-normal) 16%, transparent); }
 		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 0; }
@@ -103,12 +103,12 @@
 	display: grid; gap: var(--crate-space-16);
 	&__excerpt {
 		position: relative; margin: 0; padding: 0 0 0 var(--crate-space-12); border: 0;
-		font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-muted);
+		font-size: var(--crate-font-sm); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-muted);
 		// Long passages stay in the article; four lines identify the excerpt.
 		display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden;
 		&::before { content: ''; position: absolute; top: .25em; bottom: .25em; left: 0; width: 3px; border-radius: 2px; background: var(--text-highlight-bg, #c7a73d); }
 	}
-	&__message { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text-normal); }
+	&__message { margin: 0; font-size: var(--crate-font-sm); line-height: 1.5; color: var(--text-normal); }
 	&__input.crate-text-input {
 		display: block; min-height: 132px; max-height: min(320px, 40dvh);
 		padding: var(--crate-space-16) 0 0; line-height: 1.5;
@@ -135,7 +135,7 @@
 		}
 		&__copy { display: grid; gap: var(--crate-list-copy-gap); flex: 1; min-width: 0; }
 		&__copy strong { @include list-item.title; overflow-wrap: anywhere; }
-		&__copy > span { color: var(--text-muted); font-size: 13px; font-weight: 400; }
+		&__copy > span { color: var(--text-muted); font-size: var(--crate-font-xxs); font-weight: var(--crate-font-weight-normal); }
 		&__body { padding: var(--crate-space-8) 0 0 var(--crate-list-indent); }
 	}
 	.crate-reading[data-list-style="flat"] .crate-highlight-group:not([data-open]) { margin-bottom: var(--crate-list-flat-row-gap); }
@@ -151,7 +151,7 @@
 		--crate-action-border: var(--crate-divider);
 		padding: 8px 8px; border-radius: 12px; gap: 4px;
 		background: var(--crate-control-bg); box-shadow: none;
-		font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--text-normal);
+		font-size: var(--crate-font-xxs); font-weight: var(--crate-font-weight-medium); line-height: 1.4; color: var(--text-normal);
 		&[data-filtered] { --crate-action-border: var(--crate-accent); background: var(--crate-selection-bg); color: var(--crate-accent-text); }
 		@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: var(--crate-control-hover-bg); } }
 		&[data-press-active]:not(:disabled) { background: var(--crate-control-active-bg); }

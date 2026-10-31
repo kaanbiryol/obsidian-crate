@@ -55,7 +55,7 @@ const RULES = [
 		name: 'radius',
 		property: /^border(-[a-z]+)*-radius$/,
 		literal: value => [...value.matchAll(PIXELS)].some(([, amount]) => Number(amount) !== 0),
-		hint: 'Use the --crate-radius-* roles or tokens.$radius-pill instead of literal radii.',
+		hint: 'Use the --crate-radius-* roles, tokens.$radius-pill or, in the PWA shell, --radius-s/-m/-l instead of literal radii.',
 	},
 	{
 		name: 'spacing',

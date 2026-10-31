@@ -79,7 +79,10 @@ module.
   Obsidian's animation settings. `tokens.$easing-settle` is the settle curve
   shared by the sync indicator and list height changes.
 - Radii: the `--crate-radius-*` roles follow the host theme;
-  `tokens.$radius-pill` rounds capsules and pills.
+  `tokens.$radius-pill` rounds capsules and pills. The PWA shell in
+  `src/pwa/styles/host/` uses the host's `--radius-s`, `--radius-m` and
+  `--radius-l` directly, because many shell elements sit outside the token
+  mixin's scope.
 
 ## Style token check
 
