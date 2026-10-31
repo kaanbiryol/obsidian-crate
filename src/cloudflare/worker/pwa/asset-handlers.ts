@@ -33,7 +33,7 @@ function htmlSecurityHeaders(nonce?: string): Record<string, string> {
 			"script-src-attr 'none'",
 			"worker-src 'self'",
 			"frame-src https://www.youtube-nocookie.com",
-			"connect-src 'self' https:",
+			"connect-src 'self'",
 			"img-src 'self' data: https:",
 			"manifest-src 'self'",
 			"base-uri 'none'",

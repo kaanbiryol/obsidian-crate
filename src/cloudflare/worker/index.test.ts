@@ -316,6 +316,8 @@ describe('worker entrypoint', () => {
 		expect(nonce).toBeTruthy();
 		expect(pageResponse.headers.get('Content-Security-Policy')).toContain(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic';`);
 		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("img-src 'self' data: https:");
+		// The app only talks to this Worker; articles are downloaded by the server.
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("connect-src 'self';");
 		expect(pageResponse.headers.get('Content-Security-Policy')).not.toContain("script-src 'self' 'unsafe-inline'");
 		expect(handoffResponse.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
 		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("script-src-attr 'none'");
