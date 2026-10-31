@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
-import { requireCompatibleProtocol, requireCompatibleServer } from './server-compatibility';
+import { forgetCompatibleProtocol, requireCompatibleProtocol, requireCompatibleServer } from './server-compatibility';
+import { makeApiFetch } from './api-fetch';
+
+vi.mock('../reminders/encryption-session', () => ({ prepareReminderEncryption: async () => null, reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }) }));
 
 const info = { service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: 20_000 };
 const fetchMock = vi.fn(async () => Response.json(info));
@@ -10,6 +13,7 @@ let now = performance.now();
 beforeEach(() => {
 	vi.spyOn(performance, 'now').mockImplementation(() => now);
 	now += 60_000;
+	forgetCompatibleProtocol();
 	vi.stubGlobal('fetch', fetchMock);
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); fetchMock.mockClear(); });
@@ -30,4 +34,29 @@ it('retries at once after a failed read', async () => {
 	await expect(requireCompatibleServer()).rejects.toThrow('Update the Crate server');
 	await requireCompatibleServer();
 	expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+it('negotiates the change protocol once per page until the server refuses it', async () => {
+	vi.stubGlobal('localStorage', { getItem: () => 'session' });
+	vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
+	vi.stubGlobal('navigator', { userAgent: 'Test Browser', maxTouchPoints: 0 });
+	let refuse = false;
+	const network = vi.fn(async (path: string) => path === '/.well-known/crate' ? Response.json(info)
+		: refuse ? Response.json({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible' }, { status: 428 })
+			: Response.json({ success: true }));
+	vi.stubGlobal('fetch', network);
+	const api = makeApiFetch('session', vi.fn());
+	const change = () => api('/reminders/delete', { method: 'DELETE', body: '{}' });
+	const serverInfoReads = () => network.mock.calls.filter(([path]) => path === '/.well-known/crate').length;
+	await change();
+	now += 6_000;
+	await change();
+	// Before: a change more than 5 s after the previous one read server info first.
+	expect(serverInfoReads()).toBe(1);
+	refuse = true;
+	expect((await change()).status).toBe(428);
+	refuse = false;
+	await change();
+	// The refusal makes the next change negotiate again.
+	expect(serverInfoReads()).toBe(2);
 });

@@ -9,7 +9,8 @@ import { prepareReminderEncryption } from '../reminders/encryption-session';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { checkEncryptionSignals, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
-import { requireCompatibleProtocol } from './server-compatibility';
+import { forgetCompatibleProtocol, requireCompatibleProtocol } from './server-compatibility';
+import { responseError } from './response-error';
 import { EncryptedReminderApi } from '../reminders/encrypted-reminder-api';
 
 // The token and session whose latest authenticated response said the vault is not
@@ -69,6 +70,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 			onUnauthorized();
 			throw new ConnectionError('reconnect', 'Session expired. Open a fresh link from Crate.');
 		}
+		if (response.status === 428 && (await responseError(response.clone(), '')).code === 'protocol_incompatible') forgetCompatibleProtocol();
 		// Without keys, a 428 from a newly encrypted vault retries after a fresh probe.
 		checkEncryptionSignals(response, path, { probePath: '/encryption', message: 'The vault encryption changed.', encrypted: Boolean(keys) || encryptionState === 'on' });
 		if (response.status === 403 && path.startsWith('/reminders/')) await followFolderChange(response);

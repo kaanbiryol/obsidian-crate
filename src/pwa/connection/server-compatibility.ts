@@ -22,8 +22,22 @@ async function fetchCompatibleServer(): Promise<CrateServerInfo> {
 	return info;
 }
 
-/** Fetched per mutation: operation ids take the server's current day from this response. */
-export async function requireCompatibleProtocol(): Promise<number> {
-	const info = await requireCompatibleServer();
-	return Math.min(CRATE_PLUGIN_PROTOCOL.current, info.protocol.current);
+// The page and the Worker that served it ship together, so the negotiated
+// protocol holds for the page. The Worker refuses an out-of-range protocol
+// with 428 protocol_incompatible, which clears it for the next change.
+let negotiated: Promise<number> | undefined;
+
+/** The protocol header for changes, negotiated once per page. */
+export function requireCompatibleProtocol(): Promise<number> {
+	if (negotiated) return negotiated;
+	const protocol = requireCompatibleServer().then(info => Math.min(CRATE_PLUGIN_PROTOCOL.current, info.protocol.current));
+	negotiated = protocol;
+	protocol.catch(() => { if (negotiated === protocol) negotiated = undefined; });
+	return protocol;
+}
+
+/** The server refused this page's protocol; the next change reads server info again. */
+export function forgetCompatibleProtocol(): void {
+	negotiated = undefined;
+	recent = undefined;
 }
