@@ -271,3 +271,23 @@ it('drops a deleted item from the cached library without reloading it', async ()
 	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/item');
 	expect(await pendingReading(session)).toEqual([]);
 });
+
+it('queues a delete after this article\'s pending edits and sends them in order', async () => {
+	const markdownHash = 'a'.repeat(64);
+	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { reading_status: 'archived' }, before: { reading_status: 'inbox' } } });
+	// The delete is based on the archived value its edit will commit.
+	await queueReading(session, { action: 'delete', intent: { id: 'article', before: { reading_status: 'archived', favorite: false, tags: [] }, markdownHash } });
+	await expect(queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } }))
+		.rejects.toThrow('This article is being deleted.');
+	await drainReading(session);
+	expect(network.mock.calls.map(([path]) => path).filter(path => path === '/reading/update' || path === '/reading/delete')).toEqual(['/reading/update', '/reading/delete']);
+	expect(await pendingReading(session)).toEqual([]);
+});
+
+it('asks to wait for pending highlights before deleting, since they change the article', async () => {
+	const highlights = [{ start: 0, end: 4, text: 'Text' }];
+	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { highlights }, before: { highlights: [] } } });
+	await expect(queueReading(session, { action: 'delete', intent: { id: 'article', before: { highlights }, markdownHash: 'a'.repeat(64) } }))
+		.rejects.toThrow('Wait for your highlights to sync before deleting this article.');
+	expect(await pendingReading(session)).toHaveLength(1);
+});

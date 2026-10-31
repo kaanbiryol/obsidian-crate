@@ -45,7 +45,13 @@ export async function queueReading(session: ReadingSession, input: ReadingComman
 		assertReadingSession(session); const queue = await pendingReading(session);
 		const previous = command.action === 'capture' ? [] : queue.filter(op => op.action !== 'capture' && op.intent.id === command.intent.id);
 		if (previous.some(op => op.review)) throw new Error('Review this article’s unsynced changes in settings before editing again.');
-		if (previous.length && (command.action !== 'update' || previous.some(op => op.action !== 'update'))) throw new Error('Article text is being updated. Try again after it syncs.');
+		if (previous.some(op => op.action === 'delete')) throw new Error('This article is being deleted.');
+		const edits = previous.length > 0 && previous.every(op => op.action === 'update');
+		// A delete follows queued edits, based on the values they commit. A highlight
+		// edit also changes the article body the delete was shown, so it must settle first.
+		if (command.action === 'delete' && edits) {
+			if (previous.some(op => op.action === 'update' && op.intent.changes.highlights !== undefined)) throw new Error('Wait for your highlights to sync before deleting this article.');
+		} else if (previous.length && (command.action !== 'update' || !edits)) throw new Error('Article text is being updated. Try again after it syncs.');
 		if (command.action === 'update') assertReadingUpdateBase(previous, command.intent);
 		const existing = previous.at(-1);
 		if (command.action === 'update' && existing && coalesceReadingUpdate(existing, command.intent)) {
