@@ -75,7 +75,9 @@ const { outputFiles } = await build({
   bundle: true, write: false, format: 'iife', platform: 'browser', loader: { '.scss': 'empty' },
   plugins: [{ name: 'obsidian-host', setup(builder) {
     builder.onResolve({ filter: /(^obsidian$|plugin\/web-app-pairing$)/ }, args => ({ path: args.path, namespace: 'host' }));
-    builder.onLoad({ filter: /.*/, namespace: 'host' }, args => ({ contents: args.path==='obsidian' ? obsidianDialogModule : 'export function openWebAppPairing(){return new Promise(()=>{});}' }));
+    builder.onLoad({ filter: /.*/, namespace: 'host' }, args => ({ contents: args.path==='obsidian' ? `${obsidianDialogModule}
+      // Dialogs render as on desktop, where server changes are offered.
+      export const Platform = { isMobile: false };` : 'export function openWebAppPairing(){return new Promise(()=>{});}' }));
   } }],
 });
 const css = await readFile(process.env.CRATE_PLUGIN_CSS_PATH ?? 'dist/styles.css','utf8');
