@@ -315,6 +315,17 @@ export class SyncEngine {
 	async saveSharedHistoryCheckpoint() { return this.trackWork(() => this.history().saveShared()); }
 	trackedFileCount(): number { return this.localManifest.getAllPaths().length; }
 	trackedPaths(): string[] { return this.localManifest.getAllPaths(); }
+	/** Server files outside this device's exclusions that it does not hold at their server
+	 * version, such as one awaiting review, over the size limit or with a name it cannot store. */
+	async untrackedServerPaths(): Promise<string[]> {
+		const remote = await this.api.getManifest();
+		return Object.entries(remote.files).flatMap(([path, entry]) => {
+			if (this.shouldIgnore(path)) return [];
+			const local = this.localManifest.getEntry(path);
+			const held = local && !entry.rejected && (entry.revision && local.revision ? local.revision === entry.revision : local.hash === entry.hash);
+			return held ? [] : [path];
+		});
+	}
 
 	async loadHistoryComparison(checkpoint: string) {
 		return this.history().compare(checkpoint);

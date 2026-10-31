@@ -19,6 +19,7 @@ beforeEach(() => {
 	vi.spyOn(WorkerApiHttpClient.prototype, 'getServerInfo').mockResolvedValue({ service: 'crate', serverVersion: 'test', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['e2ee-reset-v1'] });
 	vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 	vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(createEmptySyncResult());
+	vi.spyOn(SyncEngine.prototype, 'untrackedServerPaths').mockResolvedValue([]);
 	vi.spyOn(SyncEngine.prototype, 'forceFullSync').mockRejectedValue(new Error('Reset must never force overwrite'));
 	vi.spyOn(SyncApiClient.prototype, 'putSharedSettings').mockResolvedValue({ success: true, settingsVersion: 'new' });
 });

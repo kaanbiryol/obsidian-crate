@@ -265,6 +265,23 @@ describe('turning encryption on', () => {
 		expect((await env.DB.prepare('SELECT path FROM files ORDER BY path').all<{ path: string }>()).results.map(row => row.path)).toEqual([deep, 'note.md']);
 	});
 
+	it('refuses before the wipe while a server version awaits review on this device', async () => {
+		const other = await secondDevice();
+		disk.write('image.bin', new Uint8Array([255, 1]).buffer);
+		expect((await runtime.sync()).success).toBe(true);
+		expect((await other.engine.sync()).success).toBe(true);
+		disk.write('image.bin', new Uint8Array([255, 2]).buffer);
+		other.disk.write('image.bin', new Uint8Array([255, 3]).buffer);
+		expect((await other.engine.sync()).success).toBe(true);
+		expect((await runtime.sync()).issues).toContainEqual(expect.objectContaining({ path: 'image.bin', code: 'incoming-review' }));
+		await expect(turnOn()).rejects.toThrow('1 server file isn’t synced to this device, and replacing the server copy would delete it. Review incoming files, or start from a device that has it. First: image.bin');
+		expect(loadEncryptionReset(storage)).toBeNull();
+		expect(loadEncryptionKeys(storage)).toBeNull();
+		expect(await readEncryptionState(env.DB)).toBeNull();
+		const row = await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'image.bin'").first<{ storage_key: string }>();
+		expect(new Uint8Array(await (await env.BUCKET.get(row!.storage_key))!.arrayBuffer())).toEqual(new Uint8Array([255, 3]));
+	});
+
 	it('releases a setup the server refuses to start and leaves the plaintext server untouched', async () => {
 		await env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')").run();
 		await env.DB.prepare("INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES ('capture','reading-generation','private url','private note',0)").run();

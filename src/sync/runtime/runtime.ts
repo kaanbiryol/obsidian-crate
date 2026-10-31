@@ -464,6 +464,11 @@ export class SyncRuntime {
 				if (result.outcome === 'cancelled' || !result.success || result.conflicts.length) {
 					throw new Error('Sync this device without errors or conflicts first, so no server-only changes are lost.');
 				}
+				// A successful sync can still leave server files it reported but did not take.
+				const missing = await engine.untrackedServerPaths();
+				if (missing.length) {
+					throw new Error(`${missing.length === 1 ? '1 server file isn’t' : `${missing.length} server files aren’t`} synced to this device, and replacing the server copy would delete ${missing.length === 1 ? 'it' : 'them'}. Review incoming files, or start from a device that has ${missing.length === 1 ? 'it' : 'them'}. First: ${missing[0]}`);
+				}
 				return engine.trackedPaths();
 			},
 			resumeEvents: () => { this.vaultEvents.open(); },
