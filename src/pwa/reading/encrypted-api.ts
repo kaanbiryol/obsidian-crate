@@ -52,6 +52,9 @@ interface EncryptedReadingOptions {
  * even when the vault sequence has not changed. */
 class NoteUnavailableError extends Error {}
 
+/** Reading routes this client answers; an encrypted session never sends them in plaintext. */
+export const ENCRYPTED_READING_ACTIONS: readonly string[] = ['list', 'item', 'capture', 'update', 'retry', 'delete'];
+
 const known = (entry: EncryptedReadingIndexEntry) => ({ wire: entry.file.path, path: entry.item.path, hash: entry.hash });
 
 function sameFile(a: WireFile, b: WireFile): boolean {
@@ -214,7 +217,7 @@ export class EncryptedReadingApi {
 			if (!item) throw this.options.error('Article is unavailable or has an identity conflict.', 409, 'reading_conflict');
 			return { item, markdown: readReadingFrontmatter((await this.source(this.files.get(this.wires.get(item.path)!)!)).content)!.body };
 		}
-		if (!rawBody || !['capture', 'update', 'retry', 'delete'].includes(action)) throw new Error('Unsupported encrypted Reading request.');
+		if (!rawBody || !ENCRYPTED_READING_ACTIONS.includes(action)) throw new Error('Unsupported encrypted Reading request.');
 		const body = JSON.parse(rawBody) as Record<string, unknown>, id = body.operationId;
 		if (typeof id !== 'string') throw new Error('A saved Reading operation ID is required.');
 		const requestHash = await sha256Hex(JSON.stringify({ action, body }));

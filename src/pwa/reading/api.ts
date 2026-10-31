@@ -9,7 +9,7 @@ import { commitReadingCache, readReadingCache, type ReadingCache } from './stora
 import { READING_CHANGED_EVENT, READING_SESSION_KEY, assertReadingSession, readingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
 import type { ReadingItem } from '@/reading/core/model';
-import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
+import { ENCRYPTED_READING_ACTIONS, EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
 export { ReadingApiError } from './session/api-error';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './storage/record-validation';
@@ -51,6 +51,7 @@ export async function connectReadingFromReminders(): Promise<{ session: ReadingS
 	window.dispatchEvent(new Event(READING_CHANGED_EVENT));
 	return { session: next, day };
 }
+const ENCRYPTED_READING_PATH = new RegExp(`^/reading/(?:${ENCRYPTED_READING_ACTIONS.join('|')})(?:\\?|$)`);
 let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;
 onReadingEncryptionReset(() => { encryptedClient = undefined; });
 async function rawReadingRequest(path: string, session: ReadingSession | null, body?: string, extraHeaders: Record<string, string> = {}): Promise<Response> {
@@ -71,7 +72,7 @@ export function readingRequest<T>(path: string, session: ReadingSession | null, 
 async function preparedReadingRequest<T>(path: string, session: ReadingSession | null, body?: string, refresh = false): Promise<T> {
 	if (session) {
 		const keys = await prepareReadingEncryption(session, refresh, body !== undefined);
-		if (keys && /^\/reading\/(list|item|capture|update|retry)(?:\?|$)/.test(path)) {
+		if (keys && ENCRYPTED_READING_PATH.test(path)) {
 			const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.generation]);
 			const indexIdentity = JSON.stringify([keys.vaultId, keys.generation, keys.folderPath]);
 			if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
