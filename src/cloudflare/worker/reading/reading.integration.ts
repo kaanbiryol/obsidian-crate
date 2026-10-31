@@ -20,6 +20,7 @@ import { readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { readingDocument } from '@/reading/core/markdown';
 import { writeMarkdownHighlights } from '@/reading/core/markdown-highlights';
 import type { ReadingItem } from '@/reading/core/model';
+import { sha256Hex } from '@/platform/sha256';
 
 const principal = { tokenId: 'vault', scope: 'vault' as const };
 const command = (path: string, body: Record<string, unknown>) => handleReadingRoute(new Request(`https://test/reading/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, principal);
@@ -298,12 +299,14 @@ it('deletes an unchanged note once, replays its receipt and refuses a stale dele
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	await buildIndex();
 	const before = { reading_status: item.reading_status, favorite: item.favorite, tags: item.tags };
+	const markdownHash = await sha256Hex(readReadingFrontmatter(content)!.body);
 	// A delete based on stale metadata leaves the note untouched.
-	expect((await command('delete', { id: item.crate_reading_id, before: { ...before, favorite: !item.favorite }, operationId: id() })).status).toBe(409);
-	expect((await command('delete', { id: item.crate_reading_id, before: {}, operationId: id() })).status).toBe(400);
+	expect((await command('delete', { id: item.crate_reading_id, before: { ...before, favorite: !item.favorite }, markdownHash, operationId: id() })).status).toBe(409);
+	expect((await command('delete', { id: item.crate_reading_id, before: {}, markdownHash, operationId: id() })).status).toBe(400);
+	expect((await command('delete', { id: item.crate_reading_id, before, operationId: id() })).status).toBe(400);
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.content).toBe(content);
 
-	const body = { id: item.crate_reading_id, before, operationId: id() };
+	const body = { id: item.crate_reading_id, before, markdownHash, operationId: id() };
 	const first = await command('delete', body);
 	expect(first.status).toBe(200);
 	const payload = await first.json() as { deleted: boolean; library: { before: string; after: string } };
@@ -326,8 +329,25 @@ it('refuses to delete a note edited after the client saw it', async () => {
 	await buildIndex();
 	const edited = updateReadingNote(content, item.crate_reading_id, { tags: ['kept'] });
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, edited, (await getStoredFileRow(env.DB, path))!.hash);
-	const response = await command('delete', { id: item.crate_reading_id, before: { reading_status: item.reading_status, favorite: item.favorite, tags: item.tags }, operationId: id() });
+	const response = await command('delete', { id: item.crate_reading_id, before: { reading_status: item.reading_status, favorite: item.favorite, tags: item.tags },
+		markdownHash: await sha256Hex(readReadingFrontmatter(content)!.body), operationId: id() });
 	expect(response.status).toBe(409);
+	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.content).toBe(edited);
+});
+
+it('refuses to delete a note whose article changed after the client showed it', async () => {
+	const path = 'Reading/Body.md', content = await adoptReadingClip('Original.', path, '2026-09-26T00:00:00Z');
+	const item = parseReadingNote(content)!;
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+	await buildIndex();
+	const shown = (await (await handleReadingRoute(new Request(`https://test/reading/item?id=${item.crate_reading_id}`), env, principal)).json() as { markdown: string }).markdown;
+	// Notes added in Obsidian change no library field, only the body.
+	const edited = `${content}\nMy notes, written after the web app showed the article.\n`;
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, edited, (await getStoredFileRow(env.DB, path))!.hash);
+	const response = await command('delete', { id: item.crate_reading_id, before: { reading_status: item.reading_status, favorite: item.favorite, tags: item.tags },
+		markdownHash: await sha256Hex(shown), operationId: id() });
+	expect(response.status).toBe(409);
+	expect(await response.json()).toMatchObject({ code: 'reading_conflict' });
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.content).toBe(edited);
 });
 

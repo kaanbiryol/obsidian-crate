@@ -260,12 +260,13 @@ it('drops a deleted item from the cached library without reloading it', async ()
 		return response({ items: [], issues: [], cursor: null });
 	});
 	const before = { reading_status: 'inbox' as const, favorite: false, tags: [] };
-	await queueReading(session, { action: 'delete', intent: { id: item.crate_reading_id, before } });
+	const markdownHash = 'a'.repeat(64);
+	await queueReading(session, { action: 'delete', intent: { id: item.crate_reading_id, before, markdownHash } });
 	// A deleted item accepts no further edits.
 	await expect(queueReading(session, { action: 'update', intent: { id: item.crate_reading_id, before: { favorite: false }, changes: { favorite: true } } })).rejects.toThrow();
 	const cache = await drainReading(session);
 	expect(cache).toMatchObject({ revision: '"r2"', items: [] });
-	expect(JSON.parse(network.mock.calls.find(([path]) => path === '/reading/delete')![1]!.body as string)).toMatchObject({ id: item.crate_reading_id, before });
+	expect(JSON.parse(network.mock.calls.find(([path]) => path === '/reading/delete')![1]!.body as string)).toMatchObject({ id: item.crate_reading_id, before, markdownHash });
 	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/list');
 	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/item');
 	expect(await pendingReading(session)).toEqual([]);

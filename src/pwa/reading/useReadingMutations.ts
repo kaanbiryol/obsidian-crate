@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { findSavedReadingLink } from '@/reading/core/inventory';
 import { readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingItem } from '@/reading/core/model';
 import { youtubeVideoId } from '@/reading/core/youtube';
+import { sha256Hex } from '@/platform/sha256';
 import { queueReading, type ReadingCommand } from './outbox';
 import { presentReadingItems } from './pending-view';
 import { assertReadingSession, type ReadingSession } from './session/session';
@@ -93,11 +94,13 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
 		void run(() => refresh(session));
 	};
 
-	const deleteItem = async (item: ReadingItem) => {
+	/** `markdown` is the article body the reader shows. */
+	const deleteItem = async (item: ReadingItem, markdown: string) => {
 		if (!session) return;
-		// The server deletes only while these fields still match, so edits made elsewhere survive.
+		// The server deletes only while these fields and that body still match, so edits made elsewhere survive.
 		const { reading_status, favorite, tags, highlights } = item;
-		await queueChange({ action: 'delete', intent: { id: item.crate_reading_id, before: { reading_status, favorite, tags, highlights } } });
+		const markdownHash = await sha256Hex(markdown);
+		await queueChange({ action: 'delete', intent: { id: item.crate_reading_id, before: { reading_status, favorite, tags, highlights }, markdownHash } });
 		if (!isCurrentSession(session)) return;
 		showToast('success', navigator.onLine ? 'Deleted' : 'Deleted on this device');
 		void run(() => refresh(session));

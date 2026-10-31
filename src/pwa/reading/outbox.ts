@@ -13,7 +13,8 @@ export type ReadingCommand =
 	| { action: 'capture'; intent: { url: string; title?: string; fetchArticle?: boolean } }
 	| { action: 'update'; intent: ReadingUpdateIntent }
 	| { action: 'retry'; intent: { id: string } }
-	| { action: 'delete'; intent: { id: string; before: ReadingChanges } };
+	/** `markdownHash` is the SHA-256 of the article body the reader showed. */
+	| { action: 'delete'; intent: { id: string; before: ReadingChanges; markdownHash: string } };
 export type PendingReading = ReadingCommand & {
 	id: string; sessionId: string; queuedAt?: string; body?: string; error?: string;
 	review?: boolean; attempts?: number; retryAt?: number;

@@ -1,5 +1,5 @@
 import type { PendingReading, ReadingCommand } from '../outbox';
-import { isRecord } from '@/platform/validation';
+import { isRecord, isSha256Hex } from '@/platform/validation';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { readingHighlights } from '@/reading/core/highlights';
 import { readingTimestamp, readingUrl } from '@/reading/core/model';
@@ -63,7 +63,7 @@ export function isReadingCommand(command: unknown): command is ReadingCommand {
 	if (action === 'retry') return true;
 	if (!isRecord(value.before)) return false;
 	const before = value.before;
-	if (action === 'delete') return Object.keys(before).length > 0 && Object.entries(before).every(([key, field]) => isChangeField(key, field, true));
+	if (action === 'delete') return isSha256Hex(value.markdownHash) && Object.keys(before).length > 0 && Object.entries(before).every(([key, field]) => isChangeField(key, field, true));
 	if (!isRecord(value.changes)) return false;
 	return Object.keys(value.changes).length > 0 && Object.entries(value.changes).every(([key, field]) =>
 		isChangeField(key, field, false) && isChangeField(key, before[key], true));

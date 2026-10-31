@@ -105,9 +105,12 @@ writes run under the coordinator lock, so a client whose cached library carries
 `before` re-reads only the edited item (or drops a deleted one) and adopts `after`; any other client, a
 replayed receipt (which omits `library`) or a capture reloads the list.
 
-`POST /reading/delete` accepts `{ id, before, operationId }` from a library credential.
+`POST /reading/delete` accepts `{ id, before, markdownHash, operationId }` from a library credential.
 `before` holds the `reading_status`, `favorite`, `tags` and `highlights` values the client
-last saw; any mismatch returns 409 `reading_conflict` and leaves the note untouched. The
+last saw, and `markdownHash` is the lowercase SHA-256 of the article body (the `markdown` of
+`GET /reading/item`) its reader showed. Any mismatch, including notes added in Obsidian since,
+returns 409 `reading_conflict` and leaves the note untouched. The web app offers delete only
+once the article has loaded. The encrypted web app checks the same values before it commits. The
 note is deleted as an ordinary sync deletion of that exact revision, keeping a `deleted`
 file version, and the receipt commits in the same batch. Synced Obsidian devices move the
 note to their trash. A note still in the capture queue has no file and returns 409.

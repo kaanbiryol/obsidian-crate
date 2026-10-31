@@ -1,5 +1,5 @@
 import { applyLocalArticle } from '../../reading/core/article';
-import { isEmptyReadingCapture, readingUpdateIssue } from '../../reading/core/mutation-policy';
+import { isEmptyReadingCapture, readingDeleteIssue, readingUpdateIssue } from '../../reading/core/mutation-policy';
 import type { CapturedArticle } from '../../reading/extraction/types';
 import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
 import { decryptJson, encryptJson } from '@/encryption/envelope';
@@ -285,8 +285,9 @@ export class EncryptedReadingApi {
 			wire = this.wires.get(item.path)!;
 			const source = await this.source(this.files.get(wire)!); path = item.path; previous = source.file; itemId = item.crate_reading_id; before = item;
 			if (action === 'delete') {
-				if (!body.before || typeof body.before !== 'object' || !Object.keys(body.before).length) throw new Error('Choose a Reading change.');
-				if (readingUpdateIssue(item, body.before, body.before)) throw this.options.error('This article changed on another device. Refresh before deleting.', 409, 'reading_conflict');
+				const issue = await readingDeleteIssue(item, source.content, body.before, body.markdownHash);
+				if (issue === 'invalid') throw new Error('Choose a Reading change.');
+				if (issue) throw this.options.error('This article changed on another device. Refresh before deleting.', 409, 'reading_conflict');
 				const response = { deleted: true, id: itemId };
 				const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
 				const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id,

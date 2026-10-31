@@ -45,7 +45,7 @@ describe('pending Reading presentation', () => {
 		expect(presentReadingItems([article], pending.map(op => ({ ...op, review: true })))).toEqual([article]);
 	});
 	it('hides a pending delete and restores the item if the delete is rejected', () => {
-		const pending: PendingReading = { id: 'delete', sessionId: 'session', action: 'delete', intent: { id: article.crate_reading_id, before: { favorite: false } } };
+		const pending: PendingReading = { id: 'delete', sessionId: 'session', action: 'delete', intent: { id: article.crate_reading_id, before: { favorite: false }, markdownHash: 'a'.repeat(64) } };
 		expect(presentReadingItems([article], [pending])).toEqual([]);
 		expect(presentReadingItems([article], [{ ...pending, review: true }])).toEqual([article]);
 	});

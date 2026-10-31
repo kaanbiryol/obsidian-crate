@@ -2,7 +2,7 @@ import { capturePath } from './captures';
 import { updatePolicy } from './access';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
 import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
-import { isEmptyReadingCapture, readingUpdateIssue } from '@/reading/core/mutation-policy';
+import { isEmptyReadingCapture, readingDeleteIssue, readingUpdateIssue } from '@/reading/core/mutation-policy';
 import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
 import { commitFileDelete, commitStagedFile } from '../sync/mutations';
@@ -78,10 +78,9 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	const revision = crypto.randomUUID().replaceAll('-', '');
 	const library = async () => ({ before: await readingListEtag(current, index.revision), after: await readingListEtag(current, revision) });
 	if (action === 'delete') {
-		// The library fields the client saw must still match, so a stale delete never removes newer edits.
-		const before = body.before;
-		if (!before || typeof before !== 'object' || Array.isArray(before) || !Object.keys(before).length) throw new ReadingError('Choose a Reading change.');
-		const issue = readingUpdateIssue(source.item, before, before);
+		// The note must still be what the client showed, so a stale delete never removes newer edits.
+		const issue = await readingDeleteIssue(source.item, source.content, body.before, body.markdownHash);
+		if (issue === 'invalid') throw new ReadingError('Choose a Reading change.');
 		if (issue === 'unsupported') throw new ReadingError('Unsupported Reading change.');
 		if (issue === 'conflict') throw new ReadingError('This item changed on another device. Refresh before deleting it.', 409, 'reading_conflict');
 		const response = { deleted: true, id: source.item.crate_reading_id };
