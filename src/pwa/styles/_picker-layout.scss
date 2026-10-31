@@ -44,11 +44,6 @@
     --crate-radius-control: 8px;
 
     .reminder-picker {
-      // Match the reminder cards' PWA type scale instead of plugin density.
-      --crate-font-base: 16px;
-      --crate-font-sm: 15px;
-      --crate-font-xs: 14px;
-      --crate-font-xxs: 13px;
       --crate-picker-row-height: 44px;
       --crate-picker-input-height: 40px;
       display: flex;

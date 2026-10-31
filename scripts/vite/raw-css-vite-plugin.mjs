@@ -34,8 +34,9 @@ export function rawCssPlugin() {
 			}
 			const filePath = id.slice(prefix.length, id.endsWith(moduleSuffix) ? -moduleSuffix.length : undefined);
 
+			// Compressed output keeps the inlined PWA shell and Worker pages small.
 			const contents = filePath.endsWith('.scss')
-				? compile(filePath).css
+				? compile(filePath, { style: 'compressed' }).css
 				: readFileSync(filePath, 'utf-8');
 
 			return `export default ${JSON.stringify(contents)};`;

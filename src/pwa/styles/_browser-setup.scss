@@ -26,7 +26,7 @@
 	.crate-encryption-unlock__options {
 		margin-top: 8px;
 		border-top: 1px solid var(--crate-divider);
-		summary { padding: 14px 0; min-height: 44px; cursor: pointer; color: var(--text-muted); font-size: 13px; }
+		summary { padding: 12px 0; min-height: 44px; cursor: pointer; color: var(--text-muted); font-size: 13px; }
 		.auth-card__actions { padding: 4px 0 12px; }
 	}
 
@@ -44,7 +44,7 @@
 		gap: 12px;
 		width: 100%;
 		min-height: 76px;
-		padding: 14px 12px;
+		padding: 12px 12px;
 		text-align: left;
 		color: var(--text-muted);
 		> span { display: grid; gap: 4px; font-size: 13px; line-height: 1.4; }

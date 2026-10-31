@@ -2,7 +2,7 @@ export const PWA_UPDATE_TRANSITION_KEY = 'crate-pwa-update-transition';
 export const PWA_UPDATE_TRANSITION_POSITION_KEY = 'crate-pwa-update-position';
 export const PWA_UPDATE_TRANSITION_MAX_AGE_MS = 60_000;
 export const PWA_UPDATE_OPENING_PROGRESS = 0.9;
-/** Matches the progress bar's CSS transition in theme.css. */
+/** Matches the progress bar's CSS transition in host/theme.scss. */
 export const PWA_UPDATE_PROGRESS_SETTLE_MS = 450;
 // Recover if the browser suspends or cancels transition completion.
 const UPDATE_REVEAL_FALLBACK_MS = 1000;

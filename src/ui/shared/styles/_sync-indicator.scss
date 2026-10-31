@@ -1,3 +1,5 @@
+@use "tokens";
+
 @mixin styles($selector) {
 	#{$selector} {
 		display: block;
@@ -22,7 +24,7 @@
 	#{$selector}__dot {
 		r: 4px;
 		fill: var(--sync-indicator-color);
-		transition: fill var(--sync-indicator-color-duration) ease-in-out, r 600ms cubic-bezier(.22, 1, .36, 1);
+		transition: fill var(--sync-indicator-color-duration) ease-in-out, r 600ms tokens.$easing-settle;
 	}
 
 	#{$selector}__glow {
@@ -53,9 +55,9 @@
 	}
 
 	#{$selector}[data-visual-state="settling"] {
-		#{$selector}__dot { animation: pwa-sync-settle 600ms cubic-bezier(.22, 1, .36, 1); }
-		#{$selector}__glow { animation: pwa-sync-glow 600ms cubic-bezier(.22, 1, .36, 1); }
-		#{$selector}__ripple { animation: pwa-sync-ripple 1400ms cubic-bezier(.22, 1, .36, 1) both; }
+		#{$selector}__dot { animation: pwa-sync-settle 600ms tokens.$easing-settle; }
+		#{$selector}__glow { animation: pwa-sync-glow 600ms tokens.$easing-settle; }
+		#{$selector}__ripple { animation: pwa-sync-ripple 1400ms tokens.$easing-settle both; }
 	}
 
 	@keyframes pwa-sync-settle {

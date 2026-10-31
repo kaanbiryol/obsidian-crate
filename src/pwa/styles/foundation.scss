@@ -19,6 +19,11 @@
 // Shared PWA theme and controls. Feature styles only own their content/layout.
 .crate-reminders-ui {
 	@include tokens.styles;
+	// Keep the app type scale from host/theme.scss instead of the Obsidian-shaped defaults.
+	--crate-font-base: inherit;
+	--crate-font-sm: inherit;
+	--crate-font-xs: inherit;
+	--crate-font-xxs: inherit;
 	@include app-density.typography;
 	@include view-header.screen-spacing-tokens;
 	// Standalone safe-area and launch-shell styles consume these host aliases.

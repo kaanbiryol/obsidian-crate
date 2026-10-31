@@ -1,10 +1,12 @@
+@use "../../../ui/shared/styles/tokens";
+
 /* Base UI supplies behavior; the PWA owns geometry and transition timing. */
 /* Keep keyboard geometry local to the stage rather than invalidating inherited
    styles throughout the editor on each viewport update. */
 @property --pwa-keyboard-inset{syntax:"<length>";inherits:false;initial-value:0px}
 /* Retarget from the painted position; never animate direct finger tracking. */
-.pwa-sheet-portal{position:fixed;inset:0;z-index:1000;pointer-events:none}
-.pwa-modal-sheet{position:fixed;inset:0;z-index:1000;pointer-events:none}
+.pwa-sheet-portal{position:fixed;inset:0;z-index:tokens.$layer-sheet;pointer-events:none}
+.pwa-modal-sheet{position:fixed;inset:0;z-index:tokens.$layer-sheet;pointer-events:none}
 .pwa-modal-sheet__backdrop{position:absolute;inset:0;opacity:calc(1 - var(--pwa-sheet-position,1))}
 .pwa-modal-sheet__container{position:absolute;bottom:0;left:0;display:flex;flex-direction:column;outline:none;pointer-events:auto;transform:none;transition:transform var(--pwa-motion-surface-duration) var(--pwa-motion-surface-ease)}
 /* Keyboard geometry commits once; useSheetKeyboardMotion animates only translate. */
@@ -34,7 +36,7 @@
 /* Anchor the grabber to the visible surface that keyboard motion moves.
    Let touches reach the header and Base UI's existing swipe handling. */
 .crate-reminders-ui .pwa-modal-sheet--settings .pwa-sheet-surface::after,
-.crate-reminders-ui .pwa-reminder-sheet-stage::after{content:"";position:absolute;top:5px;left:50%;z-index:2;width:36px;height:5px;border-radius:999px;background:var(--text-faint);opacity:.4;transform:translateX(-50%);pointer-events:none}
+.crate-reminders-ui .pwa-reminder-sheet-stage::after{content:"";position:absolute;top:5px;left:50%;z-index:2;width:36px;height:5px;border-radius:tokens.$radius-pill;background:var(--text-faint);opacity:.4;transform:translateX(-50%);pointer-events:none}
 /* Match Flutter's Cupertino grabber geometry: 5px above, 5px handle, 5px
    below before content. Include this inset in the measured editor header. */
 .pwa-modal-sheet{--pwa-sheet-header-top-padding:15px}

@@ -1,3 +1,17 @@
+// Fixed values that no host or theme changes compile to literals, so they work
+// outside the mixin's scope too. Layers order surfaces that compete across
+// components; stacking inside one component (-9 to 9) stays inline.
+$layer-raised: 10;
+$layer-menu: 20;
+$layer-tab-bar: 40;
+$layer-floating: 50;
+$layer-overlay: 60;
+$layer-popover: 100;
+$layer-sheet: 1000;
+$layer-dialog: 10000;
+$easing-settle: cubic-bezier(.22, 1, .36, 1);
+$radius-pill: 999px;
+
 // Shared semantic roles. Hosts supply the palette and component variables.
 // Obsidian provides them natively; the PWA defines its own light/dark values.
 @mixin styles {

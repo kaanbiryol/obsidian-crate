@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
+import { compile } from 'sass';
 import { chromium, webkit, expect } from '@playwright/test';
 
 const { outputFiles } = await build({
@@ -43,7 +43,7 @@ const { outputFiles } = await build({
 	bundle: true, format: 'iife', globalName: 'uiTest', write: false,
 	define: { 'process.env.NODE_ENV': '"production"' },
 });
-const css = await readFile('src/cloudflare/worker/pwa/styles/reminders-view.css', 'utf8');
+const css = compile('src/pwa/styles/host/reminders-view.scss').css;
 
 for (const browserType of [chromium, webkit]) {
 	const browser = await browserType.launch();

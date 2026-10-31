@@ -42,13 +42,13 @@
   text-decoration: none;
   svg { flex-shrink: 0; }
 
-  &[data-size="touch"] { min-height: 44px; min-width: 44px; padding: 10px 12px; }
+  &[data-size="touch"] { min-height: 44px; min-width: 44px; padding: 12px 12px; }
   // A narrow desktop pane still uses compact controls. Size for input capability,
   // not viewport width, so the gallery and Obsidian sidebars match Sync vault.
   @media (pointer: coarse) {
     min-height: 44px;
     min-width: 44px;
-    padding: 10px 12px;
+    padding: 12px 12px;
   }
   &[data-variant="ghost"] { border-color: transparent !important; }
   &:is([data-tone="danger"], .mod-destructive) { color: var(--crate-danger); }
@@ -74,7 +74,7 @@
 
   @media (pointer: coarse) {
     min-height: 44px;
-    padding: 10px 12px;
+    padding: 12px 12px;
   }
 }
 

@@ -9,7 +9,7 @@
 	&__library { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--crate-divider); }
 	&__header.view-header { @include view-header.primary-screen; }
 	&__mobile-nav, button.crate-reading__mobile-add { display: none; }
-	&__search { margin: 14px 18px 12px; }
+	&__search { margin: 12px 18px 12px; }
 	&__tag-picker { position: relative; display: none; align-items: center; gap: 12px; margin: 0 18px 12px; color: var(--text-muted); font-size: 13px; }
 	&__tag-picker select { appearance: none; -webkit-appearance: none; flex: 1; min-width: 0; min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid var(--crate-divider); border-radius: 8px; background: var(--crate-panel-bg); color: var(--text-normal); font: inherit; font-size: 16px; }
 	&__tag-picker > svg { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; }
@@ -36,7 +36,7 @@
 	&__empty { @include empty-state.primary; }
 	&__reader-pane { min-width: 0; min-height: 0; overflow: hidden; }
 	&__more { display: flex; margin: 16px auto; }
-	&__tag-filter { margin: 0 12px 14px; }
+	&__tag-filter { margin: 0 12px 12px; }
 }
 @mixin compact-layout {
 	&__layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
@@ -55,7 +55,7 @@
 	&__list-scroll { padding-bottom: 96px; }
 	&__reader-pane { display: none; grid-column: 1; }
 	&__search { margin: 16px 18px 20px; }
-	&__list-scroll { padding-left: 14px; padding-right: 14px; }
+	&__list-scroll { padding-left: 12px; padding-right: 12px; }
 	&__group h3 { font-size: 13px; }
 	&__source-icon { width: 28px; height: 28px; flex-basis: 28px; }
 	&-workspace[data-reader-open="true"] { .crate-reading__sidebar, .crate-reading__library { display: none; } .crate-reading__reader-pane { display: block; } }

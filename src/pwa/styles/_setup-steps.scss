@@ -1,4 +1,5 @@
 @use "../../ui/shared/styles/list-item";
+@use "../../ui/shared/styles/tokens";
 
 // Flat numbered rows on Settings spacing, with soft filled pills for actions.
 @mixin styles {
@@ -29,7 +30,7 @@
 	.setup-step__title { @include list-item.title; margin: 0; color: var(--text-normal); }
 	.setup-step__instruction, .setup-step__detail { margin: 0; overflow-wrap: anywhere; }
 	.setup-step__instruction { color: var(--text-normal); font-size: var(--crate-font-base); line-height: 1.5; }
-	.setup-step__detail { color: var(--text-muted); font-size: var(--pwa-font-detail); line-height: 1.5; }
+	.setup-step__detail { color: var(--text-muted); font-size: var(--crate-font-xs); line-height: 1.5; }
 	.setup-step__detail strong, .setup-steps-note strong { color: var(--text-normal); font-weight: 500; }
 	.setup-step__instruction strong { font-weight: 600; }
 	.setup-step__extra { display: flex; flex-wrap: wrap; align-items: center; gap: var(--crate-space-8); margin-top: var(--crate-space-8); }
@@ -37,20 +38,20 @@
 	.setup-step .crate-action-button.setup-step__action {
 		gap: 6px;
 		border: 0 !important;
-		border-radius: 999px;
+		border-radius: tokens.$radius-pill;
 		background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 		min-height: 36px;
-		padding: 0 14px;
+		padding: 0 12px;
 		color: var(--text-normal);
-		font-size: var(--pwa-font-detail);
+		font-size: var(--crate-font-xs);
 		font-weight: 500;
 		white-space: nowrap;
 		svg { color: var(--text-muted); }
 		&[data-press-active]:not(:disabled) { background: color-mix(in srgb, var(--text-normal) 14%, transparent); }
 		@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: color-mix(in srgb, var(--text-normal) 12%, transparent); } }
 	}
-	.setup-step__status { margin: 0; font-size: var(--pwa-font-detail); line-height: 1.45; color: var(--text-muted); }
+	.setup-step__status { margin: 0; font-size: var(--crate-font-xs); line-height: 1.45; color: var(--text-muted); }
 	.setup-step__status[role="alert"] { color: var(--crate-danger); }
 	// Notes below a steps card, like Settings help text.
-	.setup-steps-note { margin: 0; padding: var(--crate-space-8) var(--crate-space-16) 0; color: var(--text-muted); font-size: var(--pwa-font-caption); line-height: 1.5; }
+	.setup-steps-note { margin: 0; padding: var(--crate-space-8) var(--crate-space-16) 0; color: var(--text-muted); font-size: var(--crate-font-xxs); line-height: 1.5; }
 }

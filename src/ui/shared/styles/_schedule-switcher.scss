@@ -1,3 +1,5 @@
+@use "tokens";
+
 @mixin styles {
   .pwa-schedule-switcher {
     flex-shrink: 0;
@@ -26,7 +28,7 @@
       content: '';
       position: absolute;
       z-index: -1;
-      border-radius: 999px;
+      border-radius: tokens.$radius-pill;
       pointer-events: none;
     }
 
@@ -62,9 +64,9 @@
     justify-content: center;
     min-width: 0;
     min-height: 44px;
-    padding: 8px 14px;
+    padding: 8px 12px;
     border: 0;
-    border-radius: 999px;
+    border-radius: tokens.$radius-pill;
     background: transparent;
     box-shadow: none;
     color: var(--text-muted);

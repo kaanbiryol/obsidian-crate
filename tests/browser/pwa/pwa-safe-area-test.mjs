@@ -59,7 +59,7 @@ async function checkIos27(browser, colorScheme, belowStatusBar = false) {
 	await page.route('**/notifications?*', async route => {
 		const response = await route.fetch();
 		const body = (await response.text()).replace(/<style\b[^>]*>[\s\S]*?<\/style>/g, style => style
-			.replaceAll('(display-mode:standalone)', '(min-width:0px)')
+			.replace(/\(display-mode: ?standalone\)/g, '(min-width:0px)')
 			.replaceAll(belowStatusBar ? '100vh' : '100dvh', belowStatusBar ? 'calc(100dvh + 62px)' : 'calc(100vh - 62px)')
 			.replaceAll('env(safe-area-inset-top)', belowStatusBar ? '0px' : '62px')
 			.replaceAll('env(safe-area-max-inset-top,0px)', '62px')
@@ -122,12 +122,12 @@ try {
 					await page.route('**/notifications?*', async route => {
 						const response = await route.fetch();
 						const body = (await response.text()).replace(/<style\b[^>]*>[\s\S]*?<\/style>/g, style => style
-							.replaceAll('(display-mode:standalone)', '(min-width:0px)')
+							.replace(/\(display-mode: ?standalone\)/g, '(min-width:0px)')
 							.replaceAll('100dvh', 'calc(100vh - 62px)')
 							// Replace browser-owned env values, not the app's token:
 							// overriding that token would hide a hard-coded inset floor.
 							.replaceAll('env(safe-area-inset-bottom)', `${bottomInset}px`)
-							.replaceAll('env(safe-area-max-inset-bottom,0px)', `${maxBottomInset}px`));
+							.replace(/env\(safe-area-max-inset-bottom, ?0px\)/g, `${maxBottomInset}px`));
 						await route.fulfill({ response, body });
 					});
 				}

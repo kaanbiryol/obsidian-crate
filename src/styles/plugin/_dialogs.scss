@@ -14,7 +14,7 @@
 	all: unset;
 	position: fixed;
 	inset: 0;
-	z-index: 9999;
+	z-index: tokens.$layer-dialog - 1;
 	display: flex;
 }
 
@@ -55,7 +55,7 @@
 .crate-reminders-compact-modal__content {
 	all: unset;
 	position: relative;
-	z-index: 10000;
+	z-index: tokens.$layer-dialog;
 	display: block;
 	pointer-events: auto;
 }

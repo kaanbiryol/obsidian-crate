@@ -114,7 +114,7 @@ for (const browserType of [chromium,webkit]) {
         await expect(header).toBeVisible();
         if(width<700) assert.ok((await header.getByRole('button').first().boundingBox()).height>=44,'Header close has a touch target');
         const label=`${browserType.name()} ${width}x${height} ${theme} ${scene}`;
-        await expect(header).toHaveCSS('padding',width<=640?'4px 12px':'4px 10px');
+        await expect(header).toHaveCSS('padding','4px 12px');
         await expect(modal.locator('.crate-modal-body')).toHaveCSS('padding','16px');
         const bounds=await modal.boundingBox();
         assert.ok(bounds.x>=0 && bounds.y>=0 && bounds.x+bounds.width<=width+1 && bounds.y+bounds.height<=height+1,`${label}: modal fits the viewport`);

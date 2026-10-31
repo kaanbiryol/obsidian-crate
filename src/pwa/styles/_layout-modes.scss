@@ -1,3 +1,5 @@
+@use "../../ui/shared/styles/tokens";
+
 // PWA-owned layout baseline. Later PWA CSS applies browser and safe-area overrides.
 // ============================================
 // Floating Action Button
@@ -21,7 +23,7 @@
     align-items: center;
     justify-content: center;
     box-shadow: 0 4px 12px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
-    z-index: 50;
+    z-index: tokens.$layer-floating;
     transition: box-shadow 0.2s ease;
 
     @media (hover: hover) and (pointer: fine) {

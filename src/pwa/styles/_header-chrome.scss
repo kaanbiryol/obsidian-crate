@@ -1,4 +1,5 @@
 @use "glass";
+@use "../../ui/shared/styles/tokens";
 
 // Shared screen chrome follows the reader's rounded control surfaces.
 // Loaded by foundation so the cached launch shell has identical geometry.
@@ -8,13 +9,13 @@
     --crate-view-title-size: 24px;
     --crate-view-title-spacing: -.025em;
   }
-  .view-header { align-items: flex-start; gap: 10px; border-bottom: 0; }
+  .view-header { align-items: flex-start; gap: 8px; border-bottom: 0; }
   .project-detail-title { font-size: var(--crate-view-title-size); letter-spacing: var(--crate-view-title-spacing); }
 
   :is(.view-header, .project-detail-header, .project-detail-navigation) .crate-view-header-actions,
   .crate-detail-navigation .crate-icon-button.crate-back-button[data-variant] {
     @include glass.surface;
-    border-radius: 999px;
+    border-radius: tokens.$radius-pill;
   }
   :is(.view-header, .project-detail-header, .project-detail-navigation) .crate-view-header-actions { padding: 0; gap: 0; }
   .crate-back-button { justify-self: start; }

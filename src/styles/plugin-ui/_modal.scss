@@ -8,7 +8,7 @@
 .crate-status-content {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
   font-size: var(--font-ui-small);
   line-height: 1.5;
 
@@ -38,7 +38,7 @@
 }
 
 .crate-status-guidance {
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   line-height: 1.5;
@@ -199,7 +199,7 @@ body.reduce-motion & .crate-status-icon.is-working svg { animation: none; }
     display: flex;
     flex-direction: column;
     gap: 3px;
-    padding: 10px 8px;
+    padding: 8px 8px;
     border-top: 1px solid var(--background-modifier-border);
     box-sizing: border-box;
     height: 58px;

@@ -27,7 +27,7 @@
 /* Settings tab - setup and diagnostics */
 .crate-action-progress {
 	margin: 6px 0 12px;
-	padding: 8px 10px;
+	padding: 8px 8px;
 	border-left: 3px solid var(--interactive-accent);
 	background: var(--background-secondary);
 	border-radius: var(--radius-s);
@@ -65,7 +65,7 @@ body.reduce-motion .crate-action-progress {
 
 .crate-diagnostics {
 	margin: 8px 0 16px;
-	padding: 8px 10px;
+	padding: 8px 8px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-s);
 }
@@ -141,7 +141,7 @@ body.reduce-motion .crate-action-progress {
 	font-variant-numeric: tabular-nums;
 
 	.crate-usage-group {
-		padding: 14px 0;
+		padding: 12px 0;
 		& + .crate-usage-group { border-top: 1px solid var(--background-modifier-border); }
 	}
 
@@ -173,7 +173,7 @@ body.reduce-motion .crate-action-progress {
 	.crate-usage-period,
 	.crate-usage-metric-footer { color: var(--text-faint); }
 	.crate-usage-period { overflow-wrap: anywhere; }
-	.crate-usage-metric + .crate-usage-metric { margin-top: 14px; }
+	.crate-usage-metric + .crate-usage-metric { margin-top: 12px; }
 	.crate-usage-metric-header { font-size: var(--font-ui-small); }
 	.crate-usage-label { color: var(--text-muted); }
 	.crate-usage-value { margin-left: auto; overflow-wrap: anywhere; }

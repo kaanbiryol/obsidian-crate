@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
-import { compileString } from 'sass';
+import { compile, compileString } from 'sass';
 import { chromium, webkit, expect } from '@playwright/test';
 
 const { outputFiles } = await build({
@@ -45,8 +44,7 @@ const css = compileString(`
 	}
 `, { loadPaths: [process.cwd()] }).css;
 
-const palettes = await Promise.all(['palette', 'theme-light'].map(name =>
-	readFile(`src/cloudflare/worker/pwa/styles/${name}.css`, 'utf8')));
+const palettes = ['palette', 'theme-light'].map(name => compile(`src/pwa/styles/host/${name}.scss`).css);
 const luminance = rgb => rgb.match(/[\d.]+/g).slice(0, 3)
 	.map(value => Number(value) / 255)
 	.map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)

@@ -32,7 +32,7 @@
     @include screen-spacing-tokens;
     @include screen-spacing;
     padding: var(--crate-view-header-padding);
-    gap: 10px;
+    gap: 8px;
 
     .view-header-title {
         font-size: var(--crate-view-title-size);

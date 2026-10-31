@@ -8,7 +8,7 @@
   align-items: center;
   column-gap: 6px;
   min-height: 44px;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--crate-divider) 65%, transparent);
 }
 
@@ -127,10 +127,6 @@
 .reminder-modal-header-action[data-tone="danger"].is-enabled {
   color: var(--crate-danger);
 }
-@media (max-width: 640px) {
-  .reminder-modal-header { padding-inline: 12px; }
-}
-
 @media (pointer: coarse) {
   .reminder-modal-header { --reminder-modal-header-control-size: 44px; }
 }

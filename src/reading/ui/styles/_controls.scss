@@ -1,3 +1,5 @@
+@use "../../../ui/shared/styles/tokens";
+
 .crate-reading-view { height: 100%; overflow: hidden; padding: 0 !important; }
 .crate-reading-mount { height: 100%; overflow: hidden; }
 .crate-reminders-ui .crate-reading {
@@ -7,7 +9,7 @@
 	:where(button) { font: inherit; cursor: pointer; touch-action: manipulation; }
 	:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 2px; }
 	.crate-reading__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-	.crate-reading__notice { padding: 12px 14px; margin: 12px 0; background: var(--crate-panel-bg); border: 1px solid var(--crate-divider); border-radius: 10px; overflow-wrap: anywhere; font-size: 13px; color: var(--text-muted); }
+	.crate-reading__notice { padding: 12px 12px; margin: 12px 0; background: var(--crate-panel-bg); border: 1px solid var(--crate-divider); border-radius: 10px; overflow-wrap: anywhere; font-size: 13px; color: var(--text-muted); }
 	.crate-reading__notice button { margin: 4px; }
 	.crate-reading__notice ul { max-height: 150px; overflow-y: auto; padding-left: 20px; }
 	.crate-reading__notice summary { cursor: pointer; min-height: 32px; align-content: center; }
@@ -38,7 +40,7 @@
 .crate-reminders-ui .crate-reading-pane-overlay {
 	position: absolute;
 	inset: 0;
-	z-index: 60;
+	z-index: tokens.$layer-overlay;
 	pointer-events: none;
 	.base-modal-container { position: absolute; }
 	.crate-reading-dialog { width: 100%; max-width: 100%; }

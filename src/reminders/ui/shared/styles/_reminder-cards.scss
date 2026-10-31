@@ -1,4 +1,5 @@
 @use "../../../../ui/shared/styles/list-item";
+@use "../../../../ui/shared/styles/tokens";
 
 // ============================================
 // Shared reminder card presentation
@@ -67,11 +68,11 @@
         }
 
         &.is-long-press-armed {
-            z-index: 45;
+            z-index: tokens.$layer-floating - 5;
         }
 
         &.is-reordering {
-            z-index: 50;
+            z-index: tokens.$layer-floating;
             cursor: grabbing;
         }
 

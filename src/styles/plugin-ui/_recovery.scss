@@ -12,7 +12,7 @@
     font-size: var(--font-ui-small);
     .crate-history-activity-back { @include sync-review.action; align-self: flex-start; }
     .crate-history-description { margin: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
-    .crate-history-group { margin: 0 0 10px; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: 500; padding: 0 12px; border: 0; overflow-wrap: anywhere; }
+    .crate-history-group { margin: 0 0 12px; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: 500; padding: 0 12px; border: 0; overflow-wrap: anywhere; }
     .crate-history-state-icon svg { width: 16px; height: 16px; }
     .crate-history-version-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
     .crate-history-event-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); margin-top: 2px; }

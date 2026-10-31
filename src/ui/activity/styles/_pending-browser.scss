@@ -27,7 +27,7 @@
 .crate-pending-browser .crate-browser-file {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
     height: auto;
     @include sync-review.row;
@@ -49,7 +49,7 @@
     flex-shrink: 0;
     gap: 12px;
     min-height: 54px;
-    padding: 10px sync-review.$panel-inset;
+    padding: 12px sync-review.$panel-inset;
     border-bottom: 0;
     &[hidden] { display: none; }
 }
@@ -86,7 +86,7 @@
     justify-content: center;
     align-items: center;
     padding: 32px;
-    gap: 10px;
+    gap: 8px;
     text-align: center;
     color: var(--text-muted);
     line-height: 1.5;
@@ -102,7 +102,7 @@
         .crate-browser-detail { display: flex; }
     }
     .crate-pending-browser .crate-browser-back { display: flex; min-height: 36px; }
-    .crate-browser-toolbar { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+    .crate-browser-toolbar { padding: 12px 12px; gap: 8px; flex-wrap: wrap; }
 }
 
 .crate-sync-now-btn[hidden] { display: none; }
@@ -202,7 +202,7 @@
         width: auto;
         height: 36px;
         min-height: 36px;
-        padding: 0 10px;
+        padding: 0 12px;
         border: 1px solid transparent;
         border-radius: 4px;
         box-shadow: none;
@@ -215,7 +215,7 @@
     .crate-browser-sync {
         order: 2;
         width: 100%;
-        padding-inline: 14px;
+        padding-inline: 12px;
         border: 0;
         border-radius: var(--input-radius, var(--radius-s, 4px));
         background: color-mix(in srgb, var(--text-normal) 6%, var(--background-primary));

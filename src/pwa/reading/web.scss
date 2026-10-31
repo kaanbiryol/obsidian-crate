@@ -1,12 +1,13 @@
 @use '../../ui/shared/styles/reading-navigation';
 @use '../styles/glass';
+@use '../../ui/shared/styles/tokens';
 // The reader supplies selection actions; keep saved passages selectable for resizing.
 #app .crate-reading-reader__body, #app .crate-reading-reader__highlight { user-select: text; -webkit-user-select: text; -webkit-touch-callout: none; }
 .crate-reminders-ui.pwa-reading-root { --pwa-tabbar-content-height: 64px; --pwa-tabbar-safe-area: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)); --reminders-tabbar-height: calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area)); }
 .crate-reminders-ui .crate-reading-web { height: 100%; min-height: 0; overflow: hidden; background: var(--crate-app-bg); color: var(--text-normal); padding: var(--pwa-safe-area-top, env(safe-area-inset-top)) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .crate-reminders-ui .pwa-reading-opening__search { flex-shrink: 0; height: 48px; margin: 16px 18px 20px; border-radius: var(--crate-radius-field-rounded); }
-.crate-reminders-ui .pwa-reading-opening .pwa-mode-opening__content { padding: 0 14px; }
-.crate-reminders-ui .pwa-reading-article-opening__body { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--text-muted); text-align: center; }
+.crate-reminders-ui .pwa-reading-opening .pwa-mode-opening__content { padding: 0 12px; }
+.crate-reminders-ui .pwa-reading-article-opening__body { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--text-muted); text-align: center; }
 .crate-reminders-ui .pwa-reading-article-opening__body p { max-width: 32ch; margin: 0; font-size: 14px; line-height: 1.5; }
 
 .crate-reminders-ui.pwa-reading-root { @include reading-navigation.styles; }
@@ -20,17 +21,17 @@
   padding-bottom: 16px;
   // Flatten the code block into the step's action row: field, then Copy beside New code.
   &__code, &__code .crate-copyable-text { display: contents; }
-  &__code label { order: 1; flex-basis: 100%; color: var(--text-muted); font-size: var(--pwa-font-detail); }
+  &__code label { order: 1; flex-basis: 100%; color: var(--text-muted); font-size: var(--crate-font-xs); }
   &__code textarea.crate-text-input {
     order: 2; flex-basis: 100%; box-sizing: border-box; width: 100%; height: 44px; min-height: 0; margin-bottom: var(--crate-space-4);
-    padding: 0 14px; overflow: hidden; resize: none; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+    padding: 0 12px; overflow: hidden; resize: none; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--text-normal) 6%, transparent);
     white-space: pre; color: var(--text-muted); font: 16px/42px var(--font-monospace, ui-monospace, monospace);
   }
   &__code .crate-copyable-text > button { order: 3; }
   .setup-step__extra > button { order: 4; }
   &__code .crate-copyable-text > span, &__code > p, .setup-step__extra > p { order: 5; flex-basis: 100%; }
   &__code .crate-field__description:empty { display: none; }
-  &__code .crate-field__description, &__code .crate-field__error { font-size: var(--pwa-font-detail); }
+  &__code .crate-field__description, &__code .crate-field__error { font-size: var(--crate-font-xs); }
 }
 
 .crate-reminders-ui .pwa-reading-sheet > .settings-panel { background: transparent; }
@@ -125,7 +126,7 @@ html.pwa-document-reader {
 
   &__quick-actions, & .crate-reading-reader__tools > button[data-variant], & .crate-reading-reader__highlights-button[data-variant] {
     @include glass.surface;
-    border-radius: 999px;
+    border-radius: tokens.$radius-pill;
   }
   // Outline buttons force their action border; keep the shared material's border.
   & .crate-reading-reader__highlights-button[data-variant] {
@@ -143,8 +144,8 @@ html.pwa-document-reader {
   &__tools { gap: 6px; margin-top: 20px; border: 0; min-height: 44px; flex-wrap: wrap; }
   &__availability { min-width: 100px; }
   &__tools > button { min-height: 44px; flex-shrink: 0; }
-  &__tabs { padding: 3px; gap: 3px; border: 1px solid var(--reader-control-border); border-radius: 999px; background: var(--background-primary-alt); }
-  &__tabs button { min-width: 0; min-height: 44px; border: 1px solid transparent; border-radius: 999px; font-size: 14px; }
+  &__tabs { padding: 3px; gap: 3px; border: 1px solid var(--reader-control-border); border-radius: tokens.$radius-pill; background: var(--background-primary-alt); }
+  &__tabs button { min-width: 0; min-height: 44px; border: 1px solid transparent; border-radius: tokens.$radius-pill; font-size: 14px; }
   &__tabs button[aria-pressed="true"] {
     color: var(--text-normal);
     background: color-mix(in srgb, var(--background-primary-alt) 88%, var(--text-normal));

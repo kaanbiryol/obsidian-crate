@@ -1,3 +1,5 @@
+@use "tokens";
+
 @mixin styles {
   @media (hover: none), (pointer: coarse) {
     // History captures the list as soon as a project opens. A release fade
@@ -32,7 +34,7 @@
   .pwa-project-layer {
     position: absolute;
     inset: 0;
-    z-index: 60;
+    z-index: tokens.$layer-overlay;
     isolation: isolate;
     overflow: hidden;
     pointer-events: none;

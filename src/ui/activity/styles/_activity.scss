@@ -133,9 +133,9 @@
 	align-items: flex-start;
 	max-height: min(45vh, 420px);
 	overflow-y: auto;
-	gap: 10px;
+	gap: 8px;
 	margin: 8px var(--crate-activity-space-inline) 16px;
-	padding: 12px 14px;
+	padding: 12px 12px;
 	border: 1px solid color-mix(in srgb, var(--text-error) 18%, var(--background-modifier-border));
 	border-radius: var(--radius-m, 8px);
 	background: color-mix(in srgb, var(--text-error) 3%, var(--background-primary));
@@ -192,7 +192,7 @@
 .crate-sync-issue-path { display: block; color: var(--text-normal); margin-bottom: 3px; font-weight: var(--font-semibold, 600); }
 .crate-sync-issue-summary { color: var(--text-normal); }
 .crate-sync-issue-recovery { color: var(--text-muted); margin-top: 3px; }
-.crate-sync-issue-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.crate-sync-issue-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .crate-reminders-ui .crate-activity-modal .crate-sync-issue-actions button {
     @include action.control;
     height: auto;
@@ -214,14 +214,14 @@
     &[aria-expanded="true"]::after { transform: rotate(225deg); margin-top: 3px; }
 }
 .crate-sync-issue-details {
-    margin-top: 10px;
-    padding-top: 10px;
+    margin-top: 12px;
+    padding-top: 12px;
     border-top: 1px solid var(--background-modifier-border);
     color: var(--text-muted);
     &[hidden] { display: none; }
     pre {
         margin: 4px 0 0;
-        padding: 8px 10px;
+        padding: 8px 8px;
         border-radius: var(--radius-s, 4px);
         background: var(--background-secondary);
         font-family: var(--font-monospace, monospace);
@@ -233,7 +233,7 @@
     }
 }
 .crate-sync-issue-detail-label { color: var(--text-normal); font-weight: var(--font-medium, 500); }
-.crate-sync-issue-repair { margin: 4px 0 10px; max-width: 80ch; }
+.crate-sync-issue-repair { margin: 4px 0 12px; max-width: 80ch; }
 .crate-sync-issues-more {
     margin-top: 8px;
     color: var(--text-muted);
@@ -393,7 +393,7 @@
 .crate-activity-file-card {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     @include sync-review.row;
     border: 0;
     background: transparent;
@@ -466,7 +466,7 @@
 	align-items: center;
 	justify-content: center;
 	flex: 1 0 auto;
-	gap: 14px;
+	gap: 12px;
 	padding: 32px 20px;
 	box-sizing: border-box;
 }
@@ -523,7 +523,7 @@
 }
 
 .crate-history-day-label {
-    margin: sync-review.$section-heading-gap 10px 6px;
+    margin: sync-review.$section-heading-gap 12px 6px;
     line-height: 1.4;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -542,7 +542,7 @@
 .crate-history-card {
     margin: 0;
     min-height: 44px;
-    padding: 9px 10px;
+    padding: 9px 12px;
     border: 0;
     border-radius: var(--crate-activity-radius-control);
     background: transparent;
@@ -554,7 +554,7 @@
     grid-template-columns: 12px minmax(0, 1fr) auto;
     align-items: center;
     min-height: 26px;
-    gap: 4px 10px;
+    gap: 4px 8px;
 }
 
 .crate-history-meta {
@@ -670,7 +670,7 @@
 }
 
 .crate-history-files {
-    margin: 8px 10px 0 32px;
+    margin: 8px 8px 0 32px;
     padding: 0 0 12px;
     border-top: 0;
     display: flex;
@@ -679,7 +679,7 @@
 
     .crate-activity-file-card {
         @include sync-review.row;
-        gap: 10px;
+        gap: 8px;
     }
 }
 
@@ -904,7 +904,7 @@ body.reduce-motion .crate-activity-modal {
         padding: 0;
         font-size: var(--font-ui-smaller);
         color: var(--text-muted);
-        margin-bottom: 10px;
+        margin-bottom: 12px;
     }
     label {
         position: relative;

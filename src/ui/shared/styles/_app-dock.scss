@@ -1,3 +1,5 @@
+@use "tokens";
+
 .crate-reminders-ui {
   --pwa-dock-bottom-inset: max(10px, var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)));
   --pwa-dock-height: calc(70px + var(--pwa-dock-bottom-inset));
@@ -21,7 +23,8 @@
     display: flex;
     align-items: center;
     flex: 0 0 auto;
-    gap: 10px;
+    gap: 8px;
+    // With the 56px controls this 10px inset makes --pwa-dock-height's 66px.
     padding: 10px 16px var(--dock-bottom-inset);
     color: var(--text-normal);
     z-index: 5;
@@ -79,8 +82,8 @@
   // An absolute portal keeps the menu out of the dock's flex layout.
   .pwa-dock__portal { position: absolute; inset: 0; pointer-events: none; }
   .pwa-dock__portal > * { pointer-events: auto; }
-  .pwa-dock__backdrop { position: fixed; inset: 0; z-index: 19; background: transparent; }
-  .pwa-dock__menu { position: absolute; z-index: 20; left: 16px; right: 86px; bottom: var(--dock-bottom-inset); max-height: calc(100dvh - var(--pwa-safe-area-top, 0px) - var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)) - 32px); overflow: auto; overscroll-behavior: contain; padding: 12px; border: 1px solid transparent; border-radius: 28px; background: transparent;
+  .pwa-dock__backdrop { position: fixed; inset: 0; z-index: tokens.$layer-menu - 1; background: transparent; }
+  .pwa-dock__menu { position: absolute; z-index: tokens.$layer-menu; left: 16px; right: 86px; bottom: var(--dock-bottom-inset); max-height: calc(100dvh - var(--pwa-safe-area-top, 0px) - var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)) - 32px); overflow: auto; overscroll-behavior: contain; padding: 12px; border: 1px solid transparent; border-radius: 28px; background: transparent;
     // Reveal along the same edge as the surface, without translating the menu
     // or delaying input. The short exit fade lets Base UI finish its lifecycle.
     clip-path: inset(var(--dock-menu-inset, 0px) 0 0 round 28px);
@@ -91,7 +94,7 @@
   .pwa-dock__menu[data-ending-style] { pointer-events: none; }
   .pwa-dock__choices { opacity: var(--dock-menu-opacity, 0); }
   .pwa-dock__menu[data-dragging="true"] { user-select: none; -webkit-user-select: none; }
-  .pwa-dock__destination { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 22px; background: transparent; color: var(--text-normal); box-shadow: none; text-align: left; font-size: 15px; touch-action: manipulation; }
+  .pwa-dock__destination { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 12px 12px; border: 0; border-radius: 22px; background: transparent; color: var(--text-normal); box-shadow: none; text-align: left; font-size: 15px; touch-action: manipulation; }
   .pwa-dock__destination > span { flex: 1; }
   .pwa-dock__destination[aria-current="page"] { background: color-mix(in srgb, var(--text-normal) 9%, transparent); }
   .pwa-dock__menu[data-dragging="true"] .pwa-dock__destination { background: transparent; }
