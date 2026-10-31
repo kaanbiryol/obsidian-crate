@@ -219,3 +219,11 @@ test('CI mirrors check:source step by step and the local release gate runs the p
 	assert.ok(verify.jobs.worker.steps.some(step => step.run === 'npm run test:server-package'));
 	assert.ok(scripts['release:check'].split(' && ').includes('npm run test:server-package'));
 });
+
+test('artifact checks still report after an earlier failure, but release staging needs every step', async () => {
+	const verify = parse(await readFile(new URL('../.github/workflows/verify.yml', import.meta.url), 'utf8'));
+	const step = name => verify.jobs.checks.steps.find(item => item.name === name);
+	for (const name of ['Build plugin', 'Smoke test built PWA']) assert.equal(step(name)?.if, "${{ !cancelled() && inputs.reuse-run-id == '' }}", name);
+	assert.equal(step('Verify release artifacts')?.if, '${{ !cancelled() }}');
+	for (const name of ['Record candidate', 'Prepare release assets']) assert.equal(step(name)?.if, "inputs.reuse-run-id == ''", name);
+});

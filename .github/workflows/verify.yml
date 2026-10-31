@@ -128,15 +128,18 @@ jobs:
       - name: Check visual and editor types
         if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm run typecheck:visual
+      # Artifact checks report even when an earlier check failed; the release
+      # steps after them still require every step to pass.
       - name: Build plugin
-        if: inputs.reuse-run-id == ''
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm run build:plugin
       - name: Smoke test built PWA
-        if: inputs.reuse-run-id == ''
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         env:
           CRATE_WORKER_PREBUILT: '1'
         run: npm run test:pwa-preview
       - name: Verify release artifacts
+        if: ${{ !cancelled() }}
         run: npm run check:css-scope && npm run size-check && npm run verify:release-artifacts
       - name: Record candidate
         if: inputs.reuse-run-id == ''
