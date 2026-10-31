@@ -245,8 +245,9 @@ export class SyncQueueController {
 
 		const existingTimer = this.debounceTimer;
 
-		// Track when the first debounce call arrived (before any timer existed)
-		if (!existingTimer && this.maxWaitStart === null) {
+		// Track when the first debounce call arrived. A timer for a held large upload
+		// does not start the maximum wait, so the first event after it does.
+		if (this.maxWaitStart === null) {
 			this.maxWaitStart = Date.now();
 		}
 

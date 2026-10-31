@@ -273,7 +273,7 @@ describe('clearSyncedPendingPaths', () => {
 });
 
 describe('large upload pacing', () => {
-	function createPacedController() {
+	function createPacedController(debounceDelayMs = 25) {
 		const prepared: string[] = [];
 		const controller = new SyncQueueController({
 			finishInitialSetup: async () => {},
@@ -294,7 +294,7 @@ describe('large upload pacing', () => {
 			currentStatus: () => 'idle',
 			verifyPendingPaths: async () => [],
 			prepareUploadFromPath: async (path: string) => { prepared.push(path); return null; },
-			getDebounceDelayMs: () => 25,
+			getDebounceDelayMs: () => debounceDelayMs,
 			maxDebounceWaitMs: 30_000,
 			reconcile: async () => createEmptySyncResult(),
 			onFlushResult: vi.fn(),
@@ -319,6 +319,29 @@ describe('large upload pacing', () => {
 		for (let elapsed = 0; elapsed < 5 * 60_000; elapsed += 30_000) {
 			h.controller.onFileChange({ path: 'drawing.excalidraw' });
 			await vi.advanceTimersByTimeAsync(30_000);
+		}
+		expect(h.prepared).toEqual(['drawing.excalidraw']);
+	});
+
+	// Saves closer together than the debounce delay must still flush at the maximum wait.
+	it('flushes a note saved every two seconds within the maximum wait while a large file is held', async () => {
+		const h = createPacedController(5_000);
+		h.controller.onFileChange({ path: 'drawing.excalidraw' });
+		h.controller.onFileChange({ path: 'note.md' });
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(h.prepared).toEqual(['note.md']);
+		for (let elapsed = 0; elapsed < 32_000; elapsed += 2_000) {
+			h.controller.onFileChange({ path: 'note.md' });
+			await vi.advanceTimersByTimeAsync(2_000);
+		}
+		expect(h.prepared).toEqual(['note.md', 'note.md']);
+	});
+
+	it('uploads a large file saved every few seconds once its five minutes pass', async () => {
+		const h = createPacedController(5_000);
+		for (let elapsed = 0; elapsed < 5 * 60_000 + 30_000; elapsed += 3_000) {
+			h.controller.onFileChange({ path: 'drawing.excalidraw' });
+			await vi.advanceTimersByTimeAsync(3_000);
 		}
 		expect(h.prepared).toEqual(['drawing.excalidraw']);
 	});
