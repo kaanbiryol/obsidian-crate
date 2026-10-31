@@ -40,7 +40,7 @@ export function registerViewHeaderTests() {
       // Include a community theme's larger heading size, not only fixture defaults.
       for (const fontSize of [null, '32px']) {
         if (fontSize) await page.locator('.crate-reminders-ui').evaluate((root, size) => {
-          (root as HTMLElement).style.setProperty('--reminder-font-title', size);
+          (root as HTMLElement).style.setProperty('--crate-font-title', size);
         }, fontSize);
         await active.getByRole('button', { name: 'Inbox', exact: true }).click();
         await expect(header.locator('h1')).toHaveText('Inbox');

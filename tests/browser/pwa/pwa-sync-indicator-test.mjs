@@ -40,7 +40,7 @@ const css = compileString(`
 	@use 'src/reminders/ui/shared/styles/project-detail';
 	@use 'src/ui/shared/styles/view-header';
 	body { margin:0; font-family:Arial,sans-serif; }
-	#root { --reminder-font-title:32px; --text-normal:#eee; --text-muted:#999; background:#202020;
+	#root { --crate-font-title:32px; --text-normal:#eee; --text-muted:#999; background:#202020;
 		@include shell.styles; @include view-header.styles; @include project-detail.styles; @include indicator.styles;
 	}
 `, { loadPaths: [process.cwd()] }).css;
