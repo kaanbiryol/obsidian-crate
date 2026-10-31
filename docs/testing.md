@@ -487,8 +487,9 @@ single-file and atomic-move changelog/history publication against real D1, inclu
 rejected revisions that must leave derived state unchanged. Worker
 `sync/version-coalescing.integration.ts` checks which replaced copies single, batch,
 Worker-side Markdown and atomic two-file writes keep, the 60-minute window for large
-files, R2 removal of copies that are not kept, file history restore and the checkpoint
-download code for a revision that is no longer kept. Retain the move,
+files, R2 removal of copies that are not kept, file history restore, keeping a checkpoint's
+copy replaced within the window, and the checkpoint download code for a revision that is
+no longer kept. Retain the move,
 upload-publication, topology and protocol integration tests when changing these
 boundaries.
 

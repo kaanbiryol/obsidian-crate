@@ -406,7 +406,7 @@ Implementation: `manifest.ts:LocalManifest`
 - **Revoked access:** a 401 shows the reconnect message in the status bar and Activity on every sync path. Full, incremental and forced syncs, queue flushes and queue reconciliation treat a 401 reported for one downloaded, uploaded or deleted file the same way. Its notice appears once until a sync succeeds or the connection changes, so background flushes that keep failing do not repeat it
 - **Queue retry:** retryable flush failures are re-added to `pendingKeys`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts
 - **Large files:** local files > 25 MB are reported as skipped issues, not failures. They never become pending changes or local deletes, settle in the queue without failing their batch, and do not hold back the changelog cursor or an initial import. If a file grows past the limit while initial import or force full sync reads it, that run stops with an error. A remote change to such a path still fails until the local file is reduced. A remote file over 25 MB is likewise reported as a skipped issue: it is not downloaded, the path keeps its existing baseline, and the changelog cursor still advances past it
-- **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap. Deleted copies are always kept. Replaced copies are coalesced so that frequent saves do not keep a full copy each: a replaced copy is kept if it was the live version for at least 10 minutes, or if its path has no version kept in the last 10 minutes (60 minutes for files of 1 MiB or more). This always keeps the state from before an editing session and about one version per window while editing; a drawing saved every 30 seconds keeps about 6 copies an hour instead of 120. A version restored from file history always keeps the copy it replaces. Copies that are not kept go to the reference-aware cleanup queue in the same D1 transaction. Intermediate saves within a window are therefore not recoverable, and an uncached merge base or pending-change preview for such a save is unavailable
+- **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap. Deleted copies are always kept. Replaced copies are coalesced so that frequent saves do not keep a full copy each: a replaced copy is kept if it was the live version for at least 10 minutes, if it was live when the latest shared checkpoint was created, or if its path has no version kept in the last 10 minutes (60 minutes for files of 1 MiB or more). This always keeps the state from before an editing session and about one version per window while editing; a drawing saved every 30 seconds keeps about 6 copies an hour instead of 120. A version restored from file history always keeps the copy it replaces. Copies that are not kept go to the reference-aware cleanup queue in the same D1 transaction. Intermediate saves within a window are therefore not recoverable, and an uncached merge base or pending-change preview for such a save is unavailable
 - **Ignored remote cleanup:** changing ignore patterns never deletes data implicitly; settings provide an explicit preview-and-confirm purge action
 
 ## Pending change previews
@@ -466,9 +466,9 @@ remaining unreferenced inventories after a one-day grace period, 1,000 objects p
 and requests further passes while a page finds some and more remain.
 
 Expiry uses server time. Kept replaced/deleted versions retain at least 30 days from the
-D1 commit time, so a checkpoint expires no later than those retained bytes. A checkpoint
-saved during an editing session can still reference a replaced copy that coalescing did
-not keep; its download returns 410 with `code: "version_unavailable"`.
+D1 commit time, so a checkpoint expires no later than those retained bytes. Coalescing
+keeps every copy that was live at the latest checkpoint. A checkpoint file download for a
+revision that is no longer kept returns 410 with `code: "version_unavailable"`.
 The server rejects expired or evicted checkpoint reads. Checkpoint file downloads
 check the live index and exact current/retained D1 path and revision ownership; the
 client verifies size and SHA-256 against the checkpoint before staging. Unlike text
@@ -503,7 +503,7 @@ an exact saved-state preview. File previews retain the 256 KB text limit.
 number of current files that will change, including local unsynced edits. Excluded files remain untouched. The current server
 inventory must match the device's baseline before reviewing. Required versions come from
 the server's current files or retained history. A file whose exact saved version is no
-longer kept, for example an intermediate save that was coalesced, keeps its current contents;
+longer kept keeps its current contents;
 the rest of the vault is restored, and the completion notice lists those files by name.
 Verification then expects their current contents instead of the saved state.
 Confirmation stages and verifies all required bytes and originals under

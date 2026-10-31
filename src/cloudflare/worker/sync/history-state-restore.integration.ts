@@ -113,15 +113,16 @@ it('discovers a checkpoint on another Mac and rolls back without the originating
 	}
 });
 
-it('restores the rest of a shared checkpoint and reports a file whose saved version was coalesced away', async () => {
+it('restores the rest of a shared checkpoint and reports a file whose saved version is no longer kept', async () => {
 	const device = new SyncTestDevice('shared-coalesced', env); clients.push(device);
 	await device.authorize(); await device.open();
 	device.disk.write('edited.md', 'first'); device.disk.write('deleted.md', 'bring back');
 	await sync(device);
 	device.disk.write('edited.md', 'checkpointed'); await sync(device);
 	const checkpoint = (await device.api.sharedHistory.save())!;
-	// Replaced seconds after it was saved, right after another version was kept.
 	device.disk.write('edited.md', 'later edit'); device.disk.remove('deleted.md'); await sync(device);
+	// The saved version is no longer kept.
+	await env.DB.prepare("UPDATE file_versions SET expires_at = 0 WHERE path = 'edited.md'").run();
 	const runtime = historyRuntime(device, checkpoint.id);
 	const review = await runtime.createHistoryRestore(device.settings.syncHistory[0]!);
 	expect(review.items.map(item => item.path)).toEqual(['deleted.md', 'edited.md']);

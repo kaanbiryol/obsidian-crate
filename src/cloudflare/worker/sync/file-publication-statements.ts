@@ -18,15 +18,22 @@ export function publishedChangelogStatement(
 }
 
 const LARGE_VERSION_BYTES = 1024 * 1024;
+/** `maintenance_state` key: when the latest shared checkpoint started, in the
+ * `files.modified` format. */
+export const SHARED_CHECKPOINT_AT_KEY = 'shared_checkpoint_at';
 
 /** Whether to keep a replaced copy, given the `previous` row's `path`, `size` and
  * `modified`. Saves are coalesced: a copy is kept if it was live for a whole window,
  * which keeps the state before each editing session, or if its path has no version
  * retained within the window, which keeps one version per window while editing.
- * Files of 1 MiB or more use a 60-minute window instead of 10 minutes. */
+ * Files of 1 MiB or more use a 60-minute window instead of 10 minutes. A copy that
+ * was live when the latest shared checkpoint started is also kept, so every
+ * checkpoint revision stays downloadable. */
 export function keepReplacedVersionSql(previous: string): string {
 	const since = `datetime('now', CASE WHEN ${previous}.size >= ${LARGE_VERSION_BYTES} THEN '-60 minutes' ELSE '-10 minutes' END)`;
-	return `(${previous}.modified <= ${since} OR NOT EXISTS (SELECT 1 FROM file_versions retained
+	return `(${previous}.modified <= ${since}
+		OR ${previous}.modified <= (SELECT value FROM maintenance_state WHERE key = '${SHARED_CHECKPOINT_AT_KEY}')
+		OR NOT EXISTS (SELECT 1 FROM file_versions retained
 		WHERE retained.path = ${previous}.path AND retained.created_at > ${since}))`;
 }
 

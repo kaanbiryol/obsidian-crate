@@ -10,6 +10,7 @@ import { isSyncRevision } from '../../../protocol/sync-validation';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
 import { putMaintenanceValue } from '../db';
 import { FILE_HASH_HEADER } from '../../../protocol/http-headers';
+import { SHARED_CHECKPOINT_AT_KEY } from './file-publication-statements';
 
 const PREFIX = HISTORY_CHECKPOINT_PREFIX;
 // Ten pages cover the largest checkpoint within the Free plan's query budget.
@@ -40,6 +41,10 @@ export async function createSharedCheckpoint(bucket: R2Bucket, db: D1Database): 
 	if (start.state !== 'complete') return response({ error: 'Finish the initial sync before creating a checkpoint.' }, 409);
 	const existing = (await readIndex(bucket)).checkpoints.find(entry => entry.sequence === start.sequence && entry.expiresAt > start.now);
 	if (existing) return response({ checkpoint: existing });
+	// Every copy live now is kept when replaced (`keepReplacedVersionSql`); a write
+	// since `start` changes the sequence, so this inventory is rejected below.
+	await db.prepare(`INSERT INTO maintenance_state (key, value) VALUES (?, datetime('now'))
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(SHARED_CHECKPOINT_AT_KEY).run();
 	// Encode rows as they are read: the inventory is never held as both objects
 	// and a serialized document, keeping a 100k-file checkpoint within memory.
 	const encoder = new TextEncoder();

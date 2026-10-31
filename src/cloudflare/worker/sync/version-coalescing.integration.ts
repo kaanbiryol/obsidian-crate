@@ -12,6 +12,7 @@ import { drainObjectCleanupQueue } from '../maintenance/object-cleanup';
 import { writeCommittedMarkdownFile } from '../storage';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
 import { createSharedCheckpoint } from './history-checkpoints';
+import { SHARED_CHECKPOINT_AT_KEY } from './file-publication-statements';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -128,14 +129,37 @@ it('coalesces Worker-side Markdown commits and atomic two-file writes', async ()
 	expect(await keys('object_cleanup_queue')).toEqual([a2.storage_key, b2.storage_key, a3.storage_key].sort());
 });
 
-it('answers a checkpoint read of a coalesced version with a distinct code', async () => {
+const checkpointFile = (id: string, path: string, revision: string) =>
+	worker.fetch(new Request(`https://worker.test/sync/checkpoint-file?id=${id}&path=${encodeURIComponent(path)}&revision=${encodeURIComponent(revision)}`, { headers: headers() }), env);
+const createCheckpoint = async () => (await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: { id: string } }).checkpoint;
+
+it('keeps the copy a shared checkpoint recorded when a bulk change replaces it within the window', async () => {
+	// 12:00 an edit keeps the older copy, 12:04 a checkpoint records the edit, 12:06 a bulk change replaces it.
+	const before = await save('single', 'notes.txt', 'before the session');
+	await liveFor('notes.txt', 24 * 60);
+	const checkpointed = await save('single', 'notes.txt', 'checkpointed');
+	const checkpoint = await createCheckpoint();
+	await liveFor('notes.txt', 6); await retainedAgo(6);
+	await env.DB.prepare("UPDATE maintenance_state SET value = datetime('now', '-2 minutes') WHERE key = ?").bind(SHARED_CHECKPOINT_AT_KEY).run();
+	const bulk = await save('single', 'notes.txt', 'bulk change');
+	// A copy that became live after the checkpoint is still coalesced.
+	await save('single', 'notes.txt', 'next change');
+	await drainObjectCleanupQueue(env.BUCKET, env.DB);
+	const response = await checkpointFile(checkpoint.id, 'notes.txt', checkpointed);
+	expect(response.status, await response.clone().text()).toBe(200);
+	expect(await response.text()).toBe('checkpointed');
+	expect(await keys('file_versions')).toEqual([before, checkpointed].sort());
+	expect(await env.BUCKET.get(bulk)).toBeNull();
+});
+
+it('answers a checkpoint read of a version that is no longer retained with a distinct code', async () => {
 	await save('single', 'notes.txt', 'first');
-	await save('single', 'notes.txt', 'second');
-	const checkpointed = (await live('notes.txt'))!.storage_key;
-	const { checkpoint } = await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: { id: string } };
+	const checkpointed = await save('single', 'notes.txt', 'second');
+	const checkpoint = await createCheckpoint();
 	await save('single', 'notes.txt', 'third');
-	expect(await keys('object_cleanup_queue')).toEqual([checkpointed]);
-	const response = await worker.fetch(new Request(`https://worker.test/sync/checkpoint-file?id=${checkpoint.id}&path=notes.txt&revision=${encodeURIComponent(checkpointed)}`, { headers: headers() }), env);
+	// The saved version is no longer kept.
+	await env.DB.prepare('UPDATE file_versions SET expires_at = 0 WHERE storage_key = ?').bind(checkpointed).run();
+	const response = await checkpointFile(checkpoint.id, 'notes.txt', checkpointed);
 	expect(response.status).toBe(410);
 	expect(await response.json()).toMatchObject({ code: 'version_unavailable' });
 });
