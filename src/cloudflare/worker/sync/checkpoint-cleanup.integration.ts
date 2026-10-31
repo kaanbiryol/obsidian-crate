@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { createSharedCheckpoint } from './history-checkpoints';
+import { createSharedCheckpoint, getSharedCheckpoint } from './history-checkpoints';
 import { runMaintenanceEpisode } from '../maintenance/lifecycle';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
 import { MAX_SHARED_CHECKPOINTS, type SharedCheckpoint } from '../../../protocol/history-checkpoints';
@@ -68,6 +68,14 @@ it('deletes only what its own index write dropped when another writer publishes 
 	expect(current).toHaveLength(MAX_SHARED_CHECKPOINTS);
 	expect(current.map(entry => entry.id)).toContain(checkpoint.id);
 	expect(await inventories()).toEqual(keysOf(current));
+});
+
+it('answers 410 when an inventory is deleted after its reader found it in the index', async () => {
+	await create();
+	const [entry] = await index();
+	await env.BUCKET.delete(`${HISTORY_CHECKPOINT_PREFIX}${entry!.id}.json`);
+	const response = await getSharedCheckpoint(new Request(`https://worker.test/sync/checkpoint?id=${entry!.id}`), env.BUCKET);
+	expect(response.status).toBe(410);
 });
 
 it('continues the maintenance sweep while trimmed inventories remain', async () => {

@@ -98,18 +98,22 @@ export async function listSharedCheckpoints(bucket: R2Bucket): Promise<Response>
 	return response({ version: 1, checkpoints: index.checkpoints.filter(entry => entry.expiresAt > Date.now()) });
 }
 
+const replaced = () => response({ error: 'This shared checkpoint expired or was replaced by a newer checkpoint.' }, 410);
+
 /** Streams the stored document after matching its metadata to the live index entry. */
 export async function getSharedCheckpoint(request: Request, bucket: R2Bucket): Promise<Response> {
 	const id = new URL(request.url).searchParams.get('id');
 	if (!isCheckpointId(id)) return response({ error: 'Invalid checkpoint ID' }, 400);
 	const entry = (await readIndex(bucket)).checkpoints.find(entry => entry.id === id && entry.expiresAt > Date.now());
-	if (!entry) return response({ error: 'This shared checkpoint expired or was replaced by a newer checkpoint.' }, 410);
+	if (!entry) return replaced();
 	return streamCheckpointObject(bucket, keyFor(id), JSON.stringify(entry));
 }
 
 async function streamCheckpointObject(bucket: R2Bucket, key: string, expected?: string): Promise<Response> {
 	const object = await bucket.get(key);
-	if (!object || object.size > MAX_STORED_CHECKPOINT_BYTES) throw new Error('Shared checkpoint is unavailable');
+	// An index write deletes the inventories it drops, possibly after this read of the index.
+	if (!object) return replaced();
+	if (object.size > MAX_STORED_CHECKPOINT_BYTES) throw new Error('Shared checkpoint is unavailable');
 	const metadata = object.customMetadata?.checkpoint;
 	if (!metadata || (expected !== undefined && metadata !== expected)) {
 		await object.body?.cancel();
