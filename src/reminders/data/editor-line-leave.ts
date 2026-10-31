@@ -49,8 +49,9 @@ export function createReminderLineLeaveExtension(canAssign: (state: EditorState)
 		const changes = reminderIdChangesForLeftLines({ ...update, wasFocused, isFocused });
 		if (!changes.length) return;
 		// A view cannot dispatch during its own update; skip if the text moved on meanwhile.
+		// Undo would remove the hidden ID unseen, and leaving the line again would mint another.
 		queueMicrotask(() => {
-			if (update.view.state.doc === update.state.doc) update.view.dispatch({ changes });
+			if (update.view.state.doc === update.state.doc) update.view.dispatch({ changes, annotations: Transaction.addToHistory.of(false) });
 		});
 	});
 }

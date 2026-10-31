@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EditorSelection, EditorState, type TransactionSpec } from '@codemirror/state';
-import { hiddenReminderIdRanges, protectReminderIdMarker, reminderIdChangesForLeftLines } from './editor-line-leave';
+import { EditorSelection, EditorState, Transaction, type TransactionSpec } from '@codemirror/state';
+import { EditorView, type ViewUpdate } from '@codemirror/view';
+import { createReminderLineLeaveExtension, hiddenReminderIdRanges, protectReminderIdMarker, reminderIdChangesForLeftLines } from './editor-line-leave';
 import { normalizeReminderIds } from '../core/normalizeReminderIds';
 
 vi.mock('../core/normalizeReminderIds', async importOriginal => {
@@ -54,6 +55,21 @@ describe('reminder IDs on line leave', () => {
 			expect(leave(text, from, { selection: { anchor: 0 } })).toEqual(text.split('\n'));
 		}
 		expect(normalizeReminderIds).not.toHaveBeenCalled();
+	});
+
+	it('adds the ID outside undo history, so undo never removes it unseen', async () => {
+		const text = '- [ ] Call Sam\nNotes';
+		const startState = EditorState.create({ doc: text, selection: EditorSelection.cursor(5), extensions: createReminderLineLeaveExtension(() => true) });
+		const transaction = startState.update({ selection: { anchor: text.length } });
+		const dispatch = vi.fn<(spec: TransactionSpec) => void>();
+		const view = { hasFocus: true, state: transaction.state, dispatch };
+		const update = { view, state: transaction.state, startState, changes: transaction.changes, selectionSet: true, focusChanged: false } as unknown as ViewUpdate;
+		for (const listener of startState.facet(EditorView.updateListener)) listener(update);
+		await Promise.resolve();
+		expect(dispatch).toHaveBeenCalledOnce();
+		const written = transaction.state.update(dispatch.mock.calls[0]![0]);
+		expect(written.state.doc.line(1).text).toMatch(ID);
+		expect(written.annotation(Transaction.addToHistory)).toBe(false);
 	});
 
 	it('does nothing for an editor that was not focused', () => {
