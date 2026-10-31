@@ -22,9 +22,11 @@ export interface SyncQueueControllerContext extends Pick<QueueFlushContext,
 }
 
 const MAX_RETRY_DELAY_MS = 5 * 60_000;
-/** Every upload keeps a copy in file history, so an automatic flush holds back an
- * edited synced file of this size until it has been quiet for a minute, for at
- * most five minutes. Manual and full syncs still upload it at once. */
+/** Each upload sends the whole file again, so to save bandwidth an automatic flush
+ * holds back an edited synced file of this size until it has been quiet for a
+ * minute, for at most five minutes. The server already coalesces the history copies
+ * these uploads replace. Sync now, periodic, foreground and full syncs still upload
+ * it at once. */
 const LARGE_UPLOAD_BYTES = 1024 * 1024;
 const LARGE_UPLOAD_QUIET_MS = 60_000;
 const LARGE_UPLOAD_MAX_WAIT_MS = 5 * 60_000;
