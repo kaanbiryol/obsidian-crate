@@ -12,6 +12,7 @@ let body: FakeElement;
 let titles: string[];
 let closeModal: () => void;
 let values: Map<string, string>;
+let capabilities: string[];
 const read = vi.fn(async (): Promise<EncryptionServerState | null> => state);
 // The real workflow saves the keys, wipes the server and uploads this device's vault.
 const convert = vi.fn(async (keys: VaultKeyBundle, recovery: string, _progress: EncryptionProgress) => {
@@ -26,7 +27,7 @@ const setting = (name: string) => [...MockSetting.instances].reverse().find(item
 beforeEach(() => {
 	resetObsidianUiMocks(); convert.mockClear(); sync.mockClear(); turnOff.mockClear(); confirmTurnOn.mockClear();
 	read.mockReset().mockImplementation(async () => state);
-	state = null; titles = []; values = new Map([[SECRET_KEYS.AUTH_TOKEN, 'token']]);
+	state = null; titles = []; values = new Map([[SECRET_KEYS.AUTH_TOKEN, 'token']]); capabilities = ['e2ee-reading-v1'];
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../../plugin/shared-modal', async () => ({ ...await vi.importActual<typeof import('../../plugin/shared-modal')>('../../plugin/shared-modal'), SharedModal: class {
 		modalEl = new FakeElement('div');
@@ -44,7 +45,7 @@ beforeEach(() => {
 		constructor(private readonly url: string) {}
 		setAbortSignal() {}
 		getWorkerUrl() { return this.url; }
-		getServerInfo() { return Promise.resolve({ capabilities: ['e2ee-reading-v1'] }); }
+		getServerInfo() { return Promise.resolve({ capabilities }); }
 	} }));
 	vi.doMock('../../../sync/encryption/server-encryption', async () => ({
 		...await vi.importActual('../../../sync/encryption/server-encryption'),
@@ -53,7 +54,7 @@ beforeEach(() => {
 });
 afterEach(() => {
 	vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.resetModules();
-	for (const name of ['obsidian', '../../plugin/shared-modal', '../../confirmation-modal', '../../sync/worker-api/http', '../../sync/encryption/server-encryption']) vi.doUnmock(name);
+	for (const name of ['obsidian', '../../plugin/shared-modal', '../../confirmation-modal', '../../sync/worker-api/http', '../../sync/encryption/server-encryption', '../device-key-pairing-modal']) vi.doUnmock(name);
 });
 
 const apiClient = {};
@@ -292,6 +293,19 @@ it('reports active keys and offers recovery when this device has damaged keys', 
 	await vi.waitFor(() => expect(setting('This device').descEl.textContent).toContain('Locked'));
 	expect(setting('Notification keys').descEl.textContent).toContain('Unavailable');
 	expect(body.collectText()).toContain('Unlock vault');
+});
+
+it.each([true, false])('lets a locked device request keys from an unlocked one when the server supports it (%s)', async supported => {
+	const keysModal = vi.fn();
+	vi.doMock('../device-key-pairing-modal', () => ({ DeviceKeyPairingModal: class { open = keysModal; } }));
+	if (supported) capabilities = ['device-pairing-v1'];
+	await configure('active'); values.delete(SECRET_KEYS.ENCRYPTION_KEYS);
+	await open();
+	await vi.waitFor(() => expect(body.collectText()).toContain('Unlock vault'));
+	const request = MockSetting.instances.flatMap(item => item.buttons).find(button => button.buttonEl.textContent === 'Request keys');
+	expect(Boolean(request)).toBe(supported);
+	request?.click();
+	expect(keysModal).toHaveBeenCalledTimes(supported ? 1 : 0);
 });
 
 

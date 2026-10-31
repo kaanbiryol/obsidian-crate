@@ -54,7 +54,10 @@ A newly paired Obsidian device uses the same protocol as the requester. After
 and shows **Unlock this vault**; the desktop answers in **Approve new device**.
 Both confirmations stay required. The device stores the vault key bundle without
 a recovery key, because pairing never transfers it, so **Copy recovery key** is
-unavailable there. A device cannot list or accept its own request.
+unavailable there. A device cannot list or accept its own request. A locked
+Obsidian device can start a request again from **Manage encryption → Request
+keys** on servers that advertise `device-pairing-v1`; an unlocked device approves
+it in **Manage encryption → Connect web app**.
 
 The commitment and decimal comparison follow the design principles described
 in [Matrix SAS verification](https://spec.matrix.org/v1.17/client-server-api/#short-authentication-string-sas-verification).

@@ -16,6 +16,8 @@ import { renderRecoveryVerification } from './recovery-key-setting';
 import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-setup-ui';
 import { renderEncryptionManagement } from './encryption-manage-ui';
 import { WebAppPairingModal } from '../web-app-pairing-modal';
+import { DeviceKeyPairingModal } from '../device-key-pairing-modal';
+import { DEVICE_PAIRING_CAPABILITY } from '../../../protocol/device-pairing';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 
 const log = createLogger('EncryptionSettings');
@@ -138,7 +140,12 @@ class EncryptionModal extends SharedModal {
 		this.setLayoutTitle(encryptionModalTitle(state));
 		const keys = loadDeviceEncryptionKeys(this.plugin, state);
 		if (state?.mode === 'resetting') { this.clearContent(); this.bodyEl.createEl('p', { text: 'An encryption reset is in progress. Resume it on the Obsidian device that started it.' }); return; }
-		if (state && !keys) { this.clearContent(); this.status(); this.recover(state); return; }
+		if (state && !keys) {
+			// Servers that pair devices also accept key requests from a device without keys.
+			const pairing = state.mode === 'active' && (await this.http.getServerInfo()).capabilities.includes(DEVICE_PAIRING_CAPABILITY);
+			this.assertCurrentConnection();
+			this.clearContent(); this.status(); this.recover(state, pairing); return;
+		}
 		if (state?.mode === 'active' && keys) { this.clearContent(); this.ready(keys, state); return; }
 		if (!state && !keys && this.plugin.settings.encryptedVaultId) { this.clearContent(); this.downgraded(); return; }
 		// Only an unencrypted server reaches setup: an encrypted one is unlocked or managed above.
@@ -215,7 +222,7 @@ class EncryptionModal extends SharedModal {
 		new Setting(devices).setName('This device').setDesc('Locked · enter your saved recovery key below.');
 		new Setting(devices).setName('Notification keys').setDesc('Unavailable until this device is unlocked.');
 	}
-	private recover(state: EncryptionServerState): void {
+	private recover(state: EncryptionServerState, pairing: boolean): void {
 		this.bodyEl.createEl('p', { text: 'This server is encrypted. Enter the recovery key saved when encryption was enabled to unlock this Obsidian device.' });
 		let code = '';
 		new Setting(this.bodyEl).setName('Recovery key').addText(text => { text.inputEl.type = 'password'; text.setPlaceholder('Paste your recovery key').onChange(value => { code = value.trim(); }); });
@@ -228,6 +235,11 @@ class EncryptionModal extends SharedModal {
 				await this.load();
 			} catch (error) { status.setText(errorMessage(error)); }
 			finally { button.setDisabled(false); }
+		}));
+		if (!pairing) return;
+		this.bodyEl.createEl('p', { text: 'Or ask an Obsidian device that is already unlocked to send this vault’s keys.' });
+		createModalActions(this.bodyEl).addButton(button => button.setButtonText('Request keys').onClick(() => {
+			this.assertCurrentConnection(); this.close(); new DeviceKeyPairingModal(this.plugin).open();
 		}));
 	}
 	private ready(keys: VaultKeyBundle, state: EncryptionServerState): void {

@@ -23,8 +23,10 @@ export class DeviceKeyPairingModal extends SharedModal {
 		this.modalEl.addClass('crate-encryption-modal', 'crate-web-pairing-modal');
 		const status = this.bodyEl.createDiv({ attr: { role: 'status', 'aria-live': 'polite' } });
 		const heading = status.createEl('h3', { cls: 'crate-encryption-operation__title', text: 'Waiting for your desktop…' });
-		const instructions = status.createEl('p', { cls: 'crate-encryption-intro', text: 'This vault is encrypted. Keep ' });
-		instructions.createEl('strong', { text: 'Add a device' }); instructions.appendText(' open on your desktop to approve this device.');
+		const instructions = status.createEl('p', { cls: 'crate-encryption-intro', text: 'This vault is encrypted. On an unlocked device, keep ' });
+		instructions.createEl('strong', { text: 'Add a device' }); instructions.appendText(' open or select ');
+		instructions.createEl('strong', { text: 'Manage encryption' }); instructions.appendText(' → ');
+		instructions.createEl('strong', { text: 'Connect web app' }); instructions.appendText(' to approve this device.');
 		const codePanel = this.bodyEl.createDiv({ cls: 'crate-web-pairing-verification' });
 		codePanel.createSpan({ text: 'Verification code' });
 		const code = codePanel.createEl('output', { cls: 'crate-web-pairing-code', attr: { 'aria-label': 'Verification code' } });
