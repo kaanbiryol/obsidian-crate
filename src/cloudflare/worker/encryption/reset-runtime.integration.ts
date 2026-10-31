@@ -180,6 +180,8 @@ describe('turning encryption on', () => {
 	beforeEach(async () => {
 		await env.DB.prepare('UPDATE server_state SET encryption = NULL WHERE id = 1').run();
 		storage.delete(SECRET_KEYS.ENCRYPTION_KEYS); storage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
+		// Start from a vault that has never synced encrypted, so plaintext sync is allowed.
+		settings.encryptedVaultId = null;
 		setup = await createEncryptionFixture('active');
 		messages.length = 0;
 		await runtime.initialize();
