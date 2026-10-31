@@ -53,8 +53,8 @@ function fixture(folders: TFolder[] = []) {
 }
 
 /** Answers `/features` with the server policy, and records each change this vault requests. */
-function serverPolicy(initial: { reading: boolean; reminders: boolean }) {
-	const policy = { ...initial, revision: 'one' };
+function serverPolicy(initial: { reading: boolean; reminders: boolean }, revision: string | null = 'one') {
+	const policy = { ...initial, revision };
 	serverRequest.mockImplementation(async (_plugin: unknown, path: string, body?: { feature: 'reading' | 'reminders'; enabled: boolean }) => {
 		if (path !== '/features') throw new Error(`Unexpected ${path}`);
 		if (body) policy[body.feature] = body.enabled;
@@ -109,6 +109,18 @@ it('starts a feature the server already has on and still names the change', asyn
 	expect(row('Reminders').descEl.textContent).toBe('Reminders/ · On for your other devices. 1 note. Turning this on adds a small ID comment to each task and turns dates like "tomorrow" into fixed dates.');
 	expect(row('Reading').toggles[0]?.value).toBe(true);
 	expect(row('Reading').descEl.textContent).toContain('On for your other devices.');
+	modal.close();
+	await done;
+});
+
+it('treats a fresh server policy, which no device has saved, as unused by other devices', async () => {
+	serverPolicy({ reading: true, reminders: true }, null);
+	const plugin = fixture([folder('Reminders', ['Inbox.md'])]);
+	const { done, modal, row } = await openStep(plugin);
+	expect(row('Reminders').toggles[0]?.value).toBe(false);
+	expect(row('Reminders').descEl.textContent).toBe('Reminders/ · 1 note. Turning this on adds a small ID comment to each task and turns dates like "tomorrow" into fixed dates.');
+	expect(row('Reading').toggles[0]?.value).toBe(true);
+	expect(row('Reading').descEl.textContent).not.toContain('other devices');
 	modal.close();
 	await done;
 });

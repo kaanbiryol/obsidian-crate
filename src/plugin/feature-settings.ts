@@ -66,7 +66,8 @@ export async function offerFeatureChoice(plugin: CratePlugin): Promise<void> {
 	const choices: FeatureChoice[] = [];
 	for (const feature of features) {
 		const folder = await featureFolder(plugin, feature).catch(() => localFolder(plugin, feature));
-		choices.push({ feature, folder, notes: countNotes(plugin, folder), serverOn: policy?.[feature] ?? false });
+		// A policy no device has saved has no revision; its defaults say nothing about other devices.
+		choices.push({ feature, folder, notes: countNotes(plugin, folder), serverOn: policy?.revision != null && policy[feature] });
 	}
 	const selected = await openFeatureChoiceModal(plugin.app, choices);
 	if (!selected) return;
