@@ -2,7 +2,9 @@ import { createDeleteCandidates, type DeleteRemoteFiles } from '../transfer/dele
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
 import { skippedUploadIssue } from '../local/local-file-changes';
-import { rejectedSealedNoteIssue } from '../issues';
+import { unsupportedLocalPathIssue } from '../local/local-path-safety';
+import { oversizedRemoteFileIssue, rejectedSealedNoteIssue } from '../issues';
+import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
@@ -78,12 +80,19 @@ export async function runForceFullSyncWorkflow(
 		const files = localFiles.filter(file => !skippedPaths.has(file.path));
 		if (skipped.length) (result.issues ??= []).push(...skipped);
 
-		// A rejected sealed note has no local name to delete it by, so it stays reported.
-		const rejected = [...remotePaths].filter(path => !localPaths.has(path) && getPathEntry(remoteManifest.files, path)?.rejected);
-		if (rejected.length) (result.issues ??= []).push(...rejected.map(rejectedSealedNoteIssue));
-		const remoteOnlyPaths = [...remotePaths].filter(
-			path => !localPaths.has(path) && !context.shouldIgnore(path) && !getPathEntry(remoteManifest.files, path)?.rejected,
-		);
+		// A remote file this device cannot hold is absent here because it was skipped, not
+		// deleted: a rejected sealed note, one over the size limit, or a name this device
+		// cannot store. It stays on the server and stays reported.
+		const remoteOnlyPaths: string[] = [];
+		for (const path of remotePaths) {
+			if (localPaths.has(path) || context.shouldIgnore(path)) continue;
+			const entry = getPathEntry(remoteManifest.files, path);
+			const kept = entry?.rejected ? rejectedSealedNoteIssue(path)
+				: entry && entry.size > MAX_FILE_SIZE_BYTES ? oversizedRemoteFileIssue(path)
+					: unsupportedLocalPathIssue(path);
+			if (kept) (result.issues ??= []).push(kept);
+			else remoteOnlyPaths.push(path);
+		}
 
 		let uploadsProcessed = 0;
 		const total = files.length + remoteOnlyPaths.length;

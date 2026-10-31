@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { Platform } from 'obsidian';
 import { createPersistentEngineHarness } from './engine-persistence-test-harness';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { INITIAL_IMPORT_CAPABILITY, type ImportInventoryEntry } from '../../protocol/initial-import';
@@ -79,6 +80,27 @@ it('force full sync replaces the server copy around a file over 25 MB', async ()
 	expect(result).toMatchObject({ uploaded: 2, deleted: 1, errors: [], issues: [oversizedIssue] });
 	expect(Object.keys(server.remote).sort()).toEqual([BIG, 'notes/a.md', 'notes/b.md']);
 	expect(server.remote[BIG]?.revision).toBe('rev-b');
+});
+
+it('force full sync keeps remote files this device cannot download or name', async () => {
+	const server = createServer([]);
+	const huge: FileEntry = { hash: 'c'.repeat(64), size: 26 * 1024 * 1024, revision: 'rev-c', modified: new Date(1).toISOString() };
+	const colon: FileEntry = { hash: 'd'.repeat(64), size: 1, revision: 'rev-d', modified: new Date(1).toISOString() };
+	Object.assign(server.remote, { 'media/huge.bin': huge, 'notes/10:30 meeting.md': colon });
+	const harness = await createVault(server.transport, 10);
+	(Platform as { isAndroidApp: boolean }).isAndroidApp = true;
+	try {
+		const result = await harness.engine.forceFullSync();
+
+		expect(result.success, result.errors.join('\n')).toBe(true);
+		expect(result.deleted).toBe(1);
+		expect(result.issues?.map(issue => [issue.path, issue.code])).toEqual(expect.arrayContaining([
+			['media/huge.bin', 'file-too-large'], ['notes/10:30 meeting.md', 'unsupported-device-path'],
+		]));
+		expect(server.remote['remote-only.md']).toBeUndefined();
+		expect(server.remote['media/huge.bin']).toEqual(huge);
+		expect(server.remote['notes/10:30 meeting.md']).toEqual(colon);
+	} finally { (Platform as { isAndroidApp: boolean }).isAndroidApp = false; }
 });
 
 it('fails a force full sync when a file grows past 25 MB after discovery', async () => {
