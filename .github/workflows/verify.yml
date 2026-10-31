@@ -84,6 +84,9 @@ jobs:
       - name: Check contract documentation
         if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm run check:contracts
+      - name: Check style tokens
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run check:style-tokens
       - name: Run tooling and release tests
         if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm run test:ci

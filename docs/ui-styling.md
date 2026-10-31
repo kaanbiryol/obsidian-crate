@@ -39,6 +39,34 @@ fields and header actions, 20px Reading source icons, and a 56px dock. Rows use
 uses its viewport. Each host retains its own colors and safe-area ownership.
 Dock morphs use the shared collapsed height.
 
+## Shared typography
+
+`_tokens.scss` maps the `--crate-font-*` roles onto Obsidian's font variables,
+so community themes and the PWA host defaults control them. List screens and
+Reading override the sizes through `_app-density.scss`; Obsidian mobile
+multiplies them by `--preferred-text-scale`.
+
+| Role | Source | List screens |
+| --- | --- | --- |
+| `--crate-font-base` | `--font-ui-medium` | 16px |
+| `--crate-font-sm` | `--font-ui-small` | 15px |
+| `--crate-font-xs` | `--font-ui-smaller` | 14px |
+| `--crate-font-xxs` | `--font-smallest` | 13px |
+| `--crate-font-title` | `--font-ui-large` | 24px in the PWA mobile layout |
+| `--crate-font-editor-title` | Clamped between base and title | Same |
+
+Weights use `--crate-font-weight-normal`, `-medium`, `-semibold` and `-bold`;
+families use `--crate-font-ui` and `--crate-font-text`; line heights use
+`--crate-line-height-tight`, `-normal` and `-relaxed`. PWA settings and notices
+also use the `--pwa-font-*` roles in `src/cloudflare/worker/pwa/styles/theme.css`.
+
+`npm run check:style-tokens` rejects new absolute font sizes (`px`, `pt`,
+`rem`) and numeric weights in `src/**/*.{scss,css}`, including the `font`
+shorthand. Roles, `var()` fallbacks, keywords and `em` sizes for article
+content pass. Existing literals are counted per file in
+`scripts/style-token-baseline.json`, and a count can only go down: after moving
+literals onto roles, run `node scripts/check-style-tokens.mjs --write`.
+
 ## Ownership
 
 - `src/ui/shared/styles/_tokens.scss` defines the semantic Crate tokens for
@@ -552,7 +580,8 @@ physical iPhone check.
 ## Validation and caching
 
 Run `npm run build`, `npm run lint`, `npm run check:css-scope`,
-`npm run size-check`, and `npm run test:pwa-preview`. Use `npm run preview:pwa`
+`npm run check:style-tokens`, `npm run size-check`, and
+`npm run test:pwa-preview`. Use `npm run preview:pwa`
 for a local preview with disposable reminder fixtures. Test saving, completion,
 project navigation, and light/dark switching when changing shared styles.
 
