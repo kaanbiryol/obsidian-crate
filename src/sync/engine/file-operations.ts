@@ -27,7 +27,7 @@ export function createEngineFileOperations(
 		recordMergeApplication: (path: string, hash: string, phase: UploadApplyPhase) => uploads.recordMergeApplication(path, hash, phase),
 		uploadFile: (path: string, content: ArrayBuffer, hash: string, size: number, contentType: string,
 			expectedHash: string | null, operationId?: string, mergePreimage?: ArrayBuffer) =>
-			largeTransfers(size, () => uploads.single({ path, content: arrayBufferToBase64(content), hash, size, contentType, expectedHash, operationId }, mergePreimage)),
+			largeTransfers(size, () => uploads.single({ path, content: arrayBufferToBase64(content), hash, size, contentType, expectedHash, operationId }, mergePreimage, content)),
 		batchUpload: (files: BatchUploadFile[]) => uploads.batch(files),
 		async batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>) {
 			for (const path of paths) await assertRenamePreserved(manifest, vault, path);

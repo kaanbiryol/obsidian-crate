@@ -160,3 +160,21 @@ it('uses a batch-resolved precondition once instead of asking the server per fil
 	// Consumed: a second preparation must check the server again.
 	await expect(encryption.prepare(journal, batch)).rejects.toThrow('Unexpected precondition request');
 });
+
+it('sends sealed bytes, never the caller\'s plaintext buffer, for an encrypted single upload', async () => {
+	const { create, file, encryption } = await fixture();
+	const plaintext = new TextEncoder().encode('Private content').buffer;
+	let sent: ArrayBuffer | undefined;
+	const transport = {
+		getServerInfo: async () => ({ reminderOperationDay: 20000 }), prepareUploadWire: (file: JournalUpload) => encryption.prepare(file),
+		assertPreparedUpload: (file: JournalUpload) => encryption.verifyPrepared(file),
+		batchUpload: vi.fn(),
+		uploadFile: async (path: string, body: ArrayBuffer, hash: string) => { sent = body; return { success: true, path, hash, revision: 'immutable-revision' }; },
+	};
+	const manifest = create();
+	await new DurableUploads(manifest, transport, { putBase: vi.fn(async () => {}) } as never, crypto.randomUUID()).single(file, undefined, plaintext);
+	expect(sent).toBeDefined();
+	expect(sent).not.toBe(plaintext);
+	expect(new TextDecoder().decode(sent)).not.toContain('Private content');
+	await manifest.close();
+});

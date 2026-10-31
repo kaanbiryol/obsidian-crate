@@ -71,10 +71,12 @@ export class DurableUploads {
 		} finally { for (const file of durable) this.active.delete(file.operationId); }
 	}
 
-	async single(file: BatchUploadFile, mergePreimage?: ArrayBuffer): Promise<UploadResult> {
+	/** `bytes` holds `file.content` decoded; an unencrypted upload sends it instead of
+	 * decoding the journal's copy into another full-size buffer. */
+	async single(file: BatchUploadFile, mergePreimage?: ArrayBuffer, bytes?: ArrayBuffer): Promise<UploadResult> {
 		const intent = mergePreimage ? await mergeUploadIntent(mergePreimage) : { kind: 'local' as const };
 		const [durable] = await this.prepare([{ ...file, intent }]);
-		return this.sendSingle(durable!);
+		return this.sendSingle(durable!, bytes);
 	}
 
 	/** Replay original bytes before reading state for a new reconciliation plan. */
@@ -131,14 +133,16 @@ export class DurableUploads {
 		return prepared;
 	}
 
-	private async sendSingle(file: JournalUpload): Promise<UploadResult> {
+	/** Recovery and encrypted uploads send the journal's wire bytes. */
+	private async sendSingle(file: JournalUpload, bytes?: ArrayBuffer): Promise<UploadResult> {
 		this.active.add(file.operationId);
 		try {
 			let result: UploadResult;
 			try {
 				await this.transport.assertPreparedUpload(file);
 				const wire = uploadWire(file);
-				result = await this.transport.uploadFile(wire.path, base64ToArrayBuffer(wire.content), wire.hash, wire.size, wire.contentType, wire.expectedHash, wire.operationId);
+				const body = bytes && !file.encryptedWire ? bytes : base64ToArrayBuffer(wire.content);
+				result = await this.transport.uploadFile(wire.path, body, wire.hash, wire.size, wire.contentType, wire.expectedHash, wire.operationId);
 			} catch (error) {
 				result = refusedUploadResult(file.path, error);
 			}

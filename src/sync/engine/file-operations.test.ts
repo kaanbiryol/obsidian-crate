@@ -52,3 +52,18 @@ it('protects remote copies from deletion while an upload is unresolved', async (
 	expect(h.transport).not.toHaveBeenCalled();
 	await h.manifest.close();
 });
+
+// A large single upload must not hold a second decoded copy of the bytes it already has.
+it('sends a live upload from the caller\'s bytes and a replay from the journal', async () => {
+	const h = await fixture();
+	const sentBodies = () => h.transport.mock.calls.flatMap(([request]) => request.url.includes('/sync/upload') ? [request.body] : []);
+	await expect(h.files.uploadFile('memo.bin', h.content, h.hash, h.content.byteLength, 'application/octet-stream', null)).rejects.toThrow('Lost response');
+	expect(sentBodies()).toHaveLength(1);
+	expect(sentBodies()[0]).toBe(h.content);
+
+	await expect(h.files.recoverUploads()).rejects.toThrow('Lost response');
+	const [, replayed] = sentBodies();
+	expect(replayed).not.toBe(h.content);
+	expect(new Uint8Array(replayed as ArrayBuffer)).toEqual(new Uint8Array(h.content));
+	await h.manifest.close();
+});
