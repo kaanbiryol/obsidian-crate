@@ -34,6 +34,19 @@ and no editor tab has the note open. Their IDs derive from the note's content, s
 devices that record the same note write identical bytes. They have no creation
 date because the true one is unknown.
 
+The optional Web Clipper template appends Clipper's `{{highlights}}` export as one
+`<!-- crate:clipper-highlights [...] -->` line in the body, since Clipper escapes
+only double quotes in text properties. Adopting the clip removes that line and
+stores each excerpt with its Clipper timestamp as `createdAt` and its notes as the
+personal note. A selection Clipper joined across blocks becomes one entry per
+block, with the note on the first. An excerpt inside exactly one existing
+`==` marker claims that marker without moving delimiters. Otherwise a single
+unmarked match gets new markers. Repeated, missing and overlapping excerpts go to
+`highlight_recovery`. A malformed export leaves the note body unchanged. Imported
+IDs derive from the note ID, offset, text and date, so devices adopting the
+same clip write identical bytes. Markers the export doesn't claim are recorded
+by the regular scan.
+
 `highlight_format: markdown-v1` marks notes that use this format. Unmatched
 excerpts and annotations whose passage was removed or
 changed are retained in `highlight_recovery`, shown under **Highlights** in the

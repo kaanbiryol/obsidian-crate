@@ -56,6 +56,8 @@ Already use Web Clipper? Point it at your Reading folder in the right vault. No 
 
 Every Markdown note in that folder and its subfolders shows up in Reading. Crate keeps the clip's text and file name, picks up its tags, and doesn't download the article again. Notes without a source link show up as vault notes.
 
+Highlights you made in Web Clipper show up in Reading when they're saved in the note as `==text==`. To also keep each highlight's date and notes, use the optional [Reading Clipper template](https://github.com/kaanbiryol/obsidian-crate/blob/master/templates/crate-reading-clipper.json). If a highlighted passage appears more than once or can't be found, it goes to the article's **Highlights** list for you to review.
+
 <details>
 <summary>Duplicates and empty bookmarks</summary>
 

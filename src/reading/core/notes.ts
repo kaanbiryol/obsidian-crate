@@ -1,6 +1,8 @@
 import { ARTICLE_END, ARTICLE_START, readingTimestamp, readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingMetadata } from './model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from './frontmatter';
 import { readMarkdownHighlights, writeMarkdownHighlights } from './markdown-highlights';
+import { importClipperHighlights } from './clipper-highlights';
+import type { ReadingHighlight } from './highlights';
 import { youtubeVideoId } from './youtube';
 import { transcriptSegments } from './transcript';
 
@@ -85,7 +87,8 @@ export async function adoptReadingClip(markdown: string, path: string, savedAt: 
 	const parsed = readReadingFrontmatter(markdown);
 	const value = parsed?.value ?? {};
 	if (Object.prototype.hasOwnProperty.call(value, 'crate_reading_version')) { parseReadingNote(markdown); return markdown; }
-	const body = parsed?.body ?? markdown;
+	const original = parsed?.body ?? markdown;
+	const clipped = importClipperHighlights(original), body = clipped?.body ?? original;
 	// Default Clipper templates use source and may save authors as a list.
 	const source = value.source_url ?? value.source ?? value.url;
 	const transcript = typeof source === 'string' && youtubeVideoId(source) && transcriptSegments(body).length > 0;
@@ -99,5 +102,12 @@ export async function adoptReadingClip(markdown: string, path: string, savedAt: 
 		author: author ?? (Object.prototype.hasOwnProperty.call(value, 'author') ? '' : undefined), extraction_status: body.trim() ? 'ready' : 'unavailable', capture_method: 'web-clipper',
 		...(transcript ? { transcript_source: 'web-clipper', ...(typeof value.language === 'string' && value.language.length <= 64 && /^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$/.test(value.language) ? { transcript_language: value.language } : {}) } : {}),
 	});
-	return patchReadingFrontmatter(markdown, { ...metadata });
+	if (!clipped) return patchReadingFrontmatter(markdown, { ...metadata });
+	// Like recorded markers, IDs derive from content so every device writes identical bytes.
+	const id = (highlight: ReadingHighlight) => contentUuid(JSON.stringify(['crate:reading:clipper-highlight:v1', metadata.crate_reading_id, highlight.start, highlight.text, highlight.createdAt ?? '']));
+	const highlights = await Promise.all(clipped.highlights.map(async highlight => ({ ...highlight, id: await id(highlight) })));
+	const recovery = await Promise.all(clipped.recovery.map(async highlight => ({ ...highlight, id: await id(highlight) })));
+	return patchReadingFrontmatter(markdown.slice(0, markdown.length - original.length) + body, { ...metadata,
+		...(highlights.length || recovery.length ? { highlights, highlight_format: 'markdown-v1' } : {}),
+		...(recovery.length ? { highlight_recovery: recovery } : {}) });
 }

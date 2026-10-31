@@ -130,6 +130,9 @@ reader.
 1. Import [Crate Reading](../templates/crate-reading-clipper.json) into Web Clipper
    and set its note location to your configured Reading folder. Clip a normal
    article and a YouTube video whose preview includes timestamped transcript text.
+   Highlight two passages in Web Clipper first, one with a note. Both should
+   appear in the article's **Highlights** view with their dates and the note,
+   and the `crate:clipper-highlights` comment should be gone from the note.
 2. Save the clipped video's shortened URL in the sidebar and PWA. The existing
    note should open, retaining tags, favorites, archive status and highlights.
    Repeat with a watch URL, Shorts URL, and a different timestamp.

@@ -2,7 +2,7 @@
   "schemaVersion": "0.1.0",
   "name": "Crate Reading",
   "behavior": "create",
-  "noteContentFormat": "{{content}}",
+  "noteContentFormat": "{{content}}\n\n<!-- crate:clipper-highlights {{highlights}} -->",
   "properties": [
     { "name": "title", "value": "{{title}}", "type": "text" },
     { "name": "source", "value": "{{url}}", "type": "text" },
