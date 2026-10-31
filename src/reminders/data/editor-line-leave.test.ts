@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EditorSelection, EditorState, type TransactionSpec } from '@codemirror/state';
 import { hiddenReminderIdRanges, protectReminderIdMarker, reminderIdChangesForLeftLines } from './editor-line-leave';
+import { normalizeReminderIds } from '../core/normalizeReminderIds';
+
+vi.mock('../core/normalizeReminderIds', async importOriginal => {
+	const actual = await importOriginal<typeof import('../core/normalizeReminderIds')>();
+	return { ...actual, normalizeReminderIds: vi.fn(actual.normalizeReminderIds) };
+});
 
 const ID = /^- \[ \] (.+) <!-- crate-id:[0-9a-f-]{36} -->$/;
 
@@ -37,6 +43,17 @@ describe('reminder IDs on line leave', () => {
 		expect(leave(`${kept}\nx`, 0, { selection: { anchor: kept.length + 1 } })[0]).toBe(kept);
 		expect(leave('Plain text\nx', 0, { selection: { anchor: 11 } })[0]).toBe('Plain text');
 		expect(leave('```\n- [ ] Code\n```', 5, { selection: { anchor: 0 } })[1]).toBe('- [ ] Code');
+	});
+
+	it('reads the note only when the line left is a task without an ID', () => {
+		const reminders = Array.from({ length: 5000 }, (_, index) => `- [ ] Task ${index} <!-- crate-id:r${index} -->\n`).join('');
+		const text = `${reminders}\nPlain text\n- [ ]\n`;
+		vi.mocked(normalizeReminderIds).mockClear();
+		for (const line of ['', 'Plain text', '- [ ]']) {
+			const from = text.lastIndexOf(`\n${line}\n`) + 1;
+			expect(leave(text, from, { selection: { anchor: 0 } })).toEqual(text.split('\n'));
+		}
+		expect(normalizeReminderIds).not.toHaveBeenCalled();
 	});
 
 	it('does nothing for an editor that was not focused', () => {

@@ -12,6 +12,9 @@ interface LineLeave {
 	isFocused: boolean;
 }
 
+/** A task with text. Only these can gain an ID, so leaving any other line skips reading the whole note. */
+const TASK_WITH_TEXT = /^\s*-\s*\[[ xX]\]\s*\S/;
+
 /**
  * Identifies reminder lines the cursor just left, so a new reminder gets its ID
  * when the user moves on instead of after the next save and scan. The scan still
@@ -24,7 +27,10 @@ export function reminderIdChangesForLeftLines({ startState, state, changes, wasF
 	// Map back so Enter at a line's end keeps the old cursor on the line it left.
 	const previous = new Set(startState.selection.ranges.map(range => doc.lineAt(changes.mapPos(range.head, -1)).number));
 	const current = new Set(isFocused ? state.selection.ranges.map(range => doc.lineAt(range.head).number) : []);
-	const left = [...previous].filter(line => !current.has(line) && !extractReminderId(doc.line(line).text));
+	const left = [...previous].filter(line => {
+		const { text } = doc.line(line);
+		return !current.has(line) && TASK_WITH_TEXT.test(text) && !extractReminderId(text);
+	});
 	if (!left.length) return [];
 	const normalized = normalizeReminderIds(doc.toString()).content.split('\n');
 	return left.flatMap(number => {
