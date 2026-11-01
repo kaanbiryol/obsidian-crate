@@ -1,7 +1,7 @@
 import { readStoredMarkdownFiles, type StoredMarkdownFileMetadata } from '../../storage';
 import type { Env } from '../../types';
 import { parseReminderSource } from '../source-parse';
-import { MAX_REMINDER_NOTE_BYTES } from '@/reminders/core/constants';
+import { MAX_REMINDER_NOTE_BYTES, REMINDER_NOTE_SIZE_ISSUE } from '@/reminders/core/constants';
 import {
 	REMINDER_INDEX_WARM_MAX_BYTES,
 	REMINDER_INDEX_WARM_MAX_FILES,
@@ -29,7 +29,7 @@ export async function parseReminderCacheEntries(
 	metadata: StoredMarkdownFileMetadata[],
 ): Promise<ReminderFileCacheEntry[]> {
 	const readable = metadata.filter(file => file.size <= MAX_REMINDER_NOTE_BYTES);
-	const skipped: ReminderFileCacheEntry[] = metadata.filter(file => file.size > MAX_REMINDER_NOTE_BYTES).map(file => ({ filePath: file.path, fileHash: file.hash, reminders: [], issue: 'Split this note into files of 1 MiB or smaller to use its reminders in the web app. The vault file remains synced.' }));
+	const skipped: ReminderFileCacheEntry[] = metadata.filter(file => file.size > MAX_REMINDER_NOTE_BYTES).map(file => ({ filePath: file.path, fileHash: file.hash, reminders: [], issue: REMINDER_NOTE_SIZE_ISSUE }));
 	const freshFiles = await readStoredMarkdownFiles(env.BUCKET, readable);
 	if (freshFiles.length !== readable.length) {
 		throw new Error('One or more reminder files could not be read from storage');

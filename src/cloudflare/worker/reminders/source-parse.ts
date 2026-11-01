@@ -3,7 +3,7 @@ import { decodeMarkdownBytes, MarkdownEncodingError } from '@/reminders/core/mar
 import { reminderDescriptionErrorFromMessage } from '@/reminders/core/reminderDescription';
 import type { SyncIssueCode } from '@/protocol/sync-issues';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
-import { MAX_REMINDER_NOTE_BYTES } from '@/reminders/core/constants';
+import { MAX_REMINDER_NOTE_BYTES, REMINDER_NOTE_SIZE_ISSUE } from '@/reminders/core/constants';
 import type { RemoteReminderRecord } from './types';
 import { MAX_ENCRYPTED_PUBLIC_DATA_BYTES, parseEncryptedFile } from '../../../encryption/file-format';
 import { validateEncryptedSchedules, ENCRYPTED_NOTIFICATION_PREFIX, ENCRYPTED_SCHEDULING_CAPACITY_ISSUE } from '../../../encryption/notification-format';
@@ -17,7 +17,7 @@ type ParsedReminderSource =
 	| { reminders: RemoteReminderRecord[]; issue?: undefined }
 	| { reminders: []; issue: string };
 
-export const REMINDER_SOURCE_SIZE_ISSUE = 'Split this note into files of 1 MiB or smaller to use its reminders. The vault file remains synced.';
+export const REMINDER_SOURCE_SIZE_ISSUE = REMINDER_NOTE_SIZE_ISSUE;
 export const REMINDER_PROJECTION_SIZE_ISSUE = 'Split this reminder note into smaller files to schedule notifications';
 export const DUPLICATE_COMMITTED_REMINDER_ISSUE = 'Duplicate reminder identity in committed file';
 const MARKDOWN_ENCODING_ISSUE = new MarkdownEncodingError().message;

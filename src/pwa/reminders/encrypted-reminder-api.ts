@@ -8,7 +8,7 @@ import { applyReminderFileCommand, reminderCommandPayload, ReminderCommandError 
 import { MarkdownEncodingError } from '../../reminders/core/markdownEncoding';
 import { ReminderInputError } from '../../reminders/core/reminderMutationInput';
 import { ReminderMarkdownContextError } from '../../reminders/core/markdownTaskContext';
-import { MAX_REMINDER_NOTE_BYTES } from '../../reminders/core/constants';
+import { MAX_REMINDER_NOTE_BYTES, REMINDER_NOTE_SIZE_ISSUE } from '../../reminders/core/constants';
 import { validateEncryptedSchedules, ENCRYPTED_SCHEDULING_CAPACITY_ISSUE } from '../../encryption/notification-format';
 import { capturePwaSession } from '../connection/session-generation';
 import { loadEncryptedReminderAttempt, loadEncryptedReminderIndex, saveEncryptedReminderAttempt, saveEncryptedReminderIndex, pruneEncryptedReminderAttempts, MAX_ENCRYPTED_REMINDER_FILES, type EncryptedReminderAttempt as Attempt } from './encrypted-reminder-attempts';
@@ -116,14 +116,14 @@ export class EncryptedReminderApi {
 		const cached = cache.get(file.revision);
 		if (cached && cached.file.path === file.path && cached.file.hash === file.hash && cached.file.size === file.size) return cached;
 		// Coarse ciphertext bound before download; the 1 MiB plaintext limit is checked after opening.
-		if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
+		if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
 		const query = new URLSearchParams({ folderPath: this.keys.wireFolder, path: file.path, revision: file.revision });
 		const response = await this.fetch(`/reminders/encrypted-file?${query}`);
 		if (!response.ok) await json(response);
 		const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, this.authority(file.path),
 			'Encrypted reminder transfer failed integrity validation', (metadataPath, sealed) => resolveEncryptedPath(this.keys.paths, file.path, metadataPath, sealed, null));
 		this.names.set(file.path, opened.metadata.path);
-		if (opened.content.byteLength > MAX_REMINDER_NOTE_BYTES) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
+		if (opened.content.byteLength > MAX_REMINDER_NOTE_BYTES) throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
 		const content = decodeMarkdownBytes(opened.content);
 		validateEncryptedSchedules(opened.publicData);
 		const issue = opened.publicData.issue === 'scheduling-capacity' ? ENCRYPTED_SCHEDULING_CAPACITY_ISSUE : undefined;
