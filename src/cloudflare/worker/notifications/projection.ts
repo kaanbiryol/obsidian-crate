@@ -7,11 +7,12 @@ import { READY_PROJECTION_JOBS_SQL } from './queue';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { queryRows } from '../db';
 import { assertUniqueReminderSources } from '../reminders/source-identity';
-import { getStoredFileRow } from '../sync/storage';
+import { loadStoredFileRows } from '../sync/storage';
 import { readStoredMarkdownFiles } from '../storage';
 import { getNotificationPolicy } from './policy';
 import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, REMINDER_PROJECTION_SIZE_ISSUE, DUPLICATE_COMMITTED_REMINDER_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from '../reminders/source-parse';
-import { hasVerifiedReminderSource } from '../reminders/source-state';
+import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
+import type { VerifiedSourceBytes } from '../reminders/source-migration';
 import type { Env } from '../types';
 import type { RemoteReminderRecord } from '../reminders/types';
 import type { NotificationPolicy } from '../../../protocol/notification-policy';
@@ -46,33 +47,48 @@ function operationChunks(operations: Awaited<ReturnType<typeof planNotificationO
 /** Bounded projection of committed files. Client reminder snapshots never schedule or cancel. */
 export async function drainNotificationProjections(env: Env, limit = 4, loaded?: {
 	features: FeaturePolicy; policy: NotificationPolicy | null; encryption: EncryptionServerState | null;
+	/** Bytes source verification already read in this pass. */
+	verified?: Map<string, VerifiedSourceBytes>;
 }): Promise<void> {
 	if (!(loaded ? loaded.features.reminders : await featureEnabled(env.DB, 'reminders'))) return;
 	const policy = loaded ? loaded.policy : await getNotificationPolicy(env.DB);
 	if (!policy) return;
 	const jobs = await queryRows<{ path: string; job_token: string }>(env.DB.prepare(
 		READY_PROJECTION_JOBS_SQL).bind(limit, limit, limit));
-	const encrypted = jobs.length > 0 && (loaded ? loaded.encryption : await readEncryptionState(env.DB))?.mode === 'active';
+	if (!jobs.length) return;
+	const encrypted = (loaded ? loaded.encryption : await readEncryptionState(env.DB))?.mode === 'active';
+	// Read every job's file, verification and source rows once. Projection commits
+	// write none of these rows, and a change to any of them replaces the job token
+	// that each commit below checks.
+	const paths = JSON.stringify(jobs.map(job => job.path));
+	const [files, verified, sourceRows] = await Promise.all([
+		loadStoredFileRows(env.DB, jobs.map(job => job.path)),
+		queryRows<{ file_path: string; file_revision: string }>(env.DB.prepare(`SELECT file_path, file_revision FROM reminder_source_state
+      WHERE file_path IN (SELECT value FROM json_each(?)) AND parser_version = ? AND verified = 1`).bind(paths, REMINDER_CACHE_PARSER_VERSION)),
+		queryRows<{ file_path: string; reminder_id: string; due_key: string; first_seen_at: number | null }>(env.DB.prepare(
+			`SELECT s.file_path, s.reminder_id, s.due_key, o.first_seen_at FROM reminder_sources s
+        LEFT JOIN reminder_occurrences o ON o.reminder_id = s.reminder_id AND o.due_key = s.due_key
+        WHERE s.file_path IN (SELECT value FROM json_each(?))`).bind(paths)),
+	]);
+	const verifiedRevisions = new Map(verified.map(row => [row.file_path, row.file_revision]));
 	for (const job of jobs) {
 		try {
-			const file = await getStoredFileRow(env.DB, job.path);
+			const file = files.get(job.path) ?? null;
 			let reminders: RemoteReminderRecord[] = [];
 			if (file && isReminderPath(job.path, policy.folderPath)) {
 				if (file.size > reminderSourceByteLimit(encrypted)) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
-				const [text] = await readStoredMarkdownFiles(env.BUCKET, [{ path: job.path, ...file }]);
+				const reused = loaded?.verified?.get(job.path);
+				const [text] = reused?.storageKey === file.storageKey ? [reused] : await readStoredMarkdownFiles(env.BUCKET, [{ path: job.path, ...file }]);
 				if (!text) throw new Error('Committed reminder content could not be verified');
 				// Policy changes can revisit sources outside the current folder. Their
 				// uncertain content still cannot authorize removal of prior reminders.
 				const parsed = parseReminderSource(job.path, text.content, policy.folderPath, encrypted);
 				if (parsed.issue) throw new PermanentReminderSourceError(parsed.issue);
-				if (!await hasVerifiedReminderSource(env.DB, job.path, file.storageKey)) throw new Error('Reminder source is awaiting verification with the current parser. Processing will retry within its retry budget. The vault file remains synced.');
+				if (verifiedRevisions.get(job.path) !== file.storageKey) throw new Error('Reminder source is awaiting verification with the current parser. Processing will retry within its retry budget. The vault file remains synced.');
 				if (job.path.startsWith(`${policy.folderPath}/`)) reminders = parsed.reminders;
 			}
 			await assertUniqueReminderSources(env.DB, policy.folderPath, reminders.map(reminder => reminder.id));
-			const sources = await queryRows<{ reminder_id: string; due_key: string; first_seen_at: number | null }>(env.DB.prepare(
-				`SELECT s.reminder_id, s.due_key, o.first_seen_at FROM reminder_sources s
-        LEFT JOIN reminder_occurrences o ON o.reminder_id = s.reminder_id AND o.due_key = s.due_key WHERE s.file_path = ?`).bind(job.path));
-			const observed = new Map(sources.map(row => [row.reminder_id, row]));
+			const observed = new Map(sourceRows.filter(row => row.file_path === job.path).map(row => [row.reminder_id, row]));
 			const ids = new Set<string>();
 			const operations = reminders.map<NotificationOperation>(reminder => {
 				if (ids.has(reminder.id)) throw new PermanentReminderSourceError(DUPLICATE_COMMITTED_REMINDER_ISSUE);

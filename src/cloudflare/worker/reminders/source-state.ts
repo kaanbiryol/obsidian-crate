@@ -14,12 +14,6 @@ export function recordReminderSourceState(db: D1Database, path: string, storageK
 		.bind(path, storageKey, REMINDER_CACHE_PARSER_VERSION, verified ? 1 : 0, ...revision.args);
 }
 
-export async function hasVerifiedReminderSource(db: D1Database, path: string, storageKey: string): Promise<boolean> {
-	return Boolean(await db.prepare(`SELECT 1 FROM reminder_source_state WHERE file_path = ?
-    AND file_revision = ? AND parser_version = ? AND verified = 1`)
-		.bind(path, storageKey, REMINDER_CACHE_PARSER_VERSION).first());
-}
-
 /** Queued commands and existing alarms both need current source and projection authority.
  * Every commit that records a verified source revision also queues that file's projection
  * job, and a projection removes the job only with its own writes. So a verified current

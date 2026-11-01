@@ -46,7 +46,7 @@ it('reads encryption, feature and notification settings once per coordinator run
 	expect(dispatchNotificationJobs).not.toHaveBeenCalled();
 });
 
-it('verifies and projects three files per pass within the query budget', async () => {
+it('verifies and projects four files per pass, reading each once, within the query budget', async () => {
 	for (let file = 0; file < 5; file++) {
 		const content = Array.from({ length: 3 }, () => `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`).join('\n');
 		await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Reminders/${file}.md`, content, null);
@@ -60,13 +60,15 @@ it('verifies and projects three files per pass within the query budget', async (
 		env.DB.prepare('DELETE FROM reading_index'),
 	]);
 	const state = { storage: { setAlarm: vi.fn(async () => {}) } } as unknown as DurableObjectState;
+	const get = vi.spyOn(env.BUCKET, 'get');
 	const { total } = await countQueries(() => runNotificationCoordinator(state, env));
-	// About eight queries per file; a fourth file would leave almost no headroom.
-	expect(total).toBe(41);
+	expect(total).toBe(36);
+	// Projection reuses the bytes verification read: one read per reminder and Reading note.
+	expect(get).toHaveBeenCalledTimes(4 + 3);
 	expect(total).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_source_state WHERE verified = 1 AND parser_version = ?')
-		.bind(REMINDER_CACHE_PARSER_VERSION).first()).toEqual({ n: 3 });
-	expect(await env.DB.prepare('SELECT COUNT(DISTINCT file_path) AS n FROM reminder_projections').first()).toEqual({ n: 3 });
+		.bind(REMINDER_CACHE_PARSER_VERSION).first()).toEqual({ n: 4 });
+	expect(await env.DB.prepare('SELECT COUNT(DISTINCT file_path) AS n FROM reminder_projections').first()).toEqual({ n: 4 });
 });
 
 it('skips the dispatcher when no alarm update is due', async () => {

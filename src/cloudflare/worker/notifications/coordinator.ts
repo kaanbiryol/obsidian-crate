@@ -4,17 +4,17 @@ import { NEXT_NOTIFICATION_WORK_SQL, NEXT_SOURCE_RETRY_SQL } from './queue';
 import { NOTIFICATION_POLICY_COLUMNS, notificationPolicyFromRow, type NotificationPolicyRow } from './policy';
 import type { Env } from '../types';
 import { drainNotificationProjections } from './projection';
-import { revalidateReminderSources } from '../reminders/source-migration';
+import { revalidateReminderSources, type VerifiedSourceBytes } from '../reminders/source-migration';
 import { ENCRYPTION_STATE_SQL, parseEncryptionState } from '../encryption/state';
 import { serverStateValue } from '../server-state';
 
 type NotificationWork = { ready: number; projectionRetry: number | null; dispatchAt: number | null };
 
-// Files each pass verifies and then projects, about eight D1 queries each. The worst
-// case, 41 queries with a Reading index page, stays within D1_QUERIES_PER_INVOCATION
-// (coordinator-budget.integration.ts); per-pass source byte budgets bound memory and
-// CPU for large and encrypted notes.
-const FILES_PER_PASS = 3;
+// Files each pass verifies and then projects, at most the four that source verification
+// takes per pass. The worst case, 36 queries with a Reading index page, stays within
+// D1_QUERIES_PER_INVOCATION (coordinator-budget.integration.ts); per-pass source byte
+// budgets bound memory and CPU for large and encrypted notes.
+const FILES_PER_PASS = 4;
 
 function nextNotificationWork(db: D1Database): Promise<NotificationWork | null> {
 	return db.prepare(NEXT_NOTIFICATION_WORK_SQL).first<NotificationWork>();
@@ -45,9 +45,10 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
 		// invocation so a reminder backlog does not compete with source scans.
 		const policy = notificationPolicyFromRow(loaded);
 		hasPolicy = Boolean(policy);
-		sourceWork = await revalidateReminderSources(env, FILES_PER_PASS, { folder: policy?.folderPath ?? null, encryption });
+		const verified = new Map<string, VerifiedSourceBytes>();
+		sourceWork = await revalidateReminderSources(env, FILES_PER_PASS, { folder: policy?.folderPath ?? null, encryption }, verified);
 		if (hasPolicy) {
-			await drainNotificationProjections(env, FILES_PER_PASS, { features, policy, encryption });
+			await drainNotificationProjections(env, FILES_PER_PASS, { features, policy, encryption, verified });
 			// Skip the dispatcher hop when no alarm update is due yet.
 			pending = await nextNotificationWork(env.DB);
 			dispatch = pending?.dispatchAt != null && pending.dispatchAt <= Date.now();

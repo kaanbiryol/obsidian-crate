@@ -15,6 +15,8 @@ import { readEncryptionState } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 
 const SCAN_KEY = `reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}`;
+/** Hash-verified bytes of one committed revision; a storage key names exactly one revision. */
+export interface VerifiedSourceBytes { storageKey: string; content: ArrayBuffer }
 /** The `maintenance_state` key whose empty value marks a folder's completed source scan. */
 export const reminderSourceScanKey = (folder: string) => `${SCAN_KEY}:${folder}`;
 const SCAN_BATCH_SIZE = 100;
@@ -45,7 +47,8 @@ async function seedSourceStates(db: D1Database, folder: string): Promise<boolean
 
 /** At most limit files and 2 MiB plaintext / 4 MiB encrypted transport per pass.
  * The byte budget always admits one valid file, so a large source cannot stall it. */
-export async function revalidateReminderSources(env: Env, limit: number, scope?: { folder: string | null; encryption?: EncryptionServerState | null }): Promise<boolean> {
+/** `verified` receives each verified file's bytes, keyed by path, for a projection in the same pass. */
+export async function revalidateReminderSources(env: Env, limit: number, scope?: { folder: string | null; encryption?: EncryptionServerState | null }, verified?: Map<string, VerifiedSourceBytes>): Promise<boolean> {
 	if (!scope && await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return false;
 	const folder = scope ? scope.folder : await getReminderFolder(env.DB);
 	const cleaning = await retireOutOfScopeSources(env.DB, folder);
@@ -81,9 +84,10 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 			continue;
 		}
 		const file = { path, ...current };
-		if (upgraded.has(file.path)) await env.DB.prepare(`DELETE FROM notification_file_retries WHERE path = ?
+		// Runs first in either outcome's batch, before the state row reaches this parser.
+		const resetRetries = upgraded.has(file.path) ? [env.DB.prepare(`DELETE FROM notification_file_retries WHERE path = ?
       AND EXISTS (SELECT 1 FROM reminder_source_state WHERE file_path = ? AND parser_version < ?)`)
-			.bind(file.path, file.path, REMINDER_CACHE_PARSER_VERSION).run();
+			.bind(file.path, file.path, REMINDER_CACHE_PARSER_VERSION)] : [];
 		const readableBytes = file.size <= sourceLimit ? file.size : 0;
 		if (bytes + readableBytes > reparseBudget) break;
 		bytes += readableBytes;
@@ -92,15 +96,18 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 			const [text] = await readStoredMarkdownFiles(env.BUCKET, [file]);
 			if (!text) throw new Error('Committed reminder content could not be verified');
 			await env.DB.batch([
+				...resetRetries,
 				...await enqueueFileProjection(env.DB, file.path, file.storageKey, text.content, true, encrypted, folder),
 				env.DB.prepare(`UPDATE notification_file_retries SET available_at = NULL WHERE path = ?
           AND EXISTS (SELECT 1 FROM reminder_source_state WHERE file_path = ? AND file_revision = ? AND verified = 1)`)
 					.bind(file.path, file.path, file.storageKey),
 			]);
+			verified?.set(file.path, { storageKey: file.storageKey, content: text.content });
 		} catch (error) {
 			const issue = error instanceof Error ? error.message.slice(0, 512) : 'Committed reminder content could not be verified';
 			const revision = fileRevisionGuard(file.path, file.storageKey);
 			await env.DB.batch([
+				...resetRetries,
 				recordReminderSourceState(env.DB, file.path, file.storageKey, false),
 				recordFileFailure(env.DB, file.path, issue, revision.sql, revision.args, isPermanentSourceError(error)),
 				env.DB.prepare(`INSERT INTO notification_projection_jobs (path, job_token, last_error)
