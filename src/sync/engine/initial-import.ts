@@ -7,6 +7,8 @@ import type { TransferContext } from '../transfer/types';
 import { getAllVaultFiles } from '../local/file-discovery';
 import { skippedUploadIssue } from '../local/local-file-changes';
 import { pipelineUploadChunks } from '../transfer/budget';
+
+const IMPORT_UPLOAD_CONCURRENCY = 3;
 import { prepareUploadFromVaultFile } from '../transfer/prepare';
 import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
 import { createPathRecord } from '@/protocol/path-record';
@@ -77,6 +79,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	let completed = 0;
 	try {
 		// Prepare the next chunk while the current one uploads, within the byte budget.
+		// One chunk fills every import request slot.
 		const chunks = pipelineUploadChunks(files, async file => {
 			context.throwIfDestroyed();
 			const upload = await prepareUploadFromVaultFile(transfer, file, { force: true, expectedHash: remote.files[file.path]?.hash ?? null });
@@ -90,7 +93,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 				return null;
 			}
 			return upload;
-		});
+		}, undefined, IMPORT_UPLOAD_CONCURRENCY * INITIAL_IMPORT_MAX_FILES);
 		for await (const prepared of chunks) {
 			const small = prepared.filter(file => file.size < BATCH_FILE_SIZE_LIMIT);
 			const batches: PreparedUpload[][] = [];
@@ -122,7 +125,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 					result.uploadedPaths.push(upload.path);
 					completed++;
 				}
-			})), 3);
+			})), IMPORT_UPLOAD_CONCURRENCY);
 			if (result.errors.length) return result;
 			await context.save();
 			progress?.(completed, files.length);

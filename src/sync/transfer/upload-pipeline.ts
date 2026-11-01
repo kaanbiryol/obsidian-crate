@@ -1,5 +1,7 @@
 import type { PreparedUpload, SyncResult } from '../types';
 import { pipelineUploadChunks } from './budget';
+import { BATCH_UPLOAD_CONCURRENCY } from './constants';
+import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import type { UploadPreparedFilesOptions } from './upload';
 
 interface UploadPipelineContext {
@@ -27,7 +29,8 @@ export async function uploadPipelined<T>(
 	result: SyncResult,
 	options: UploadPipelineOptions<T>,
 ): Promise<void> {
-	for await (const chunk of pipelineUploadChunks(items, item => options.prepare(item))) {
+	// One chunk fills every batch request slot; the byte budget still bounds memory.
+	for await (const chunk of pipelineUploadChunks(items, item => options.prepare(item), undefined, BATCH_UPLOAD_CONCURRENCY * BATCH_UPLOAD_MAX_FILES)) {
 		options.beforeChunk?.(chunk);
 		let reported = 0;
 		await context.uploadPreparedFiles(chunk, result, {

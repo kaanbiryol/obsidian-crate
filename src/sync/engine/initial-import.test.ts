@@ -78,7 +78,8 @@ it('stops before pruning or uploading an import another device started', async (
 it.each([['holds its token', 't', undefined], ['uploaded every server file', undefined, 'r1']] as const)('resumes an import when this device %s', async (_case, token, revision) => {
 	const { context, calls } = importContext(token, revision);
 	expect((await runInitialImport(context, createEmptySyncResult()))?.uploaded).toBe(200);
-	expect(calls.slice(0, 3)).toEqual(token ? ['prune', 'upload', 'upload'] : ['token t', 'save', 'prune']);
+	// One prepared chunk fills all three import request slots before its checkpoint.
+	expect(calls.slice(0, 5)).toEqual(token ? ['prune', 'upload', 'upload', 'upload', 'save'] : ['token t', 'save', 'prune', 'upload', 'upload']);
 	// Finishing releases the token.
 	expect(calls.indexOf('token undefined')).toBeGreaterThan(calls.lastIndexOf('upload'));
 });

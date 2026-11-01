@@ -3,6 +3,8 @@ import { createEmptySyncResult } from '../sync-result';
 import type { PreparedUpload } from '../types';
 import type { UploadPreparedFilesOptions } from './upload';
 import { uploadPipelined } from './upload-pipeline';
+import { BATCH_UPLOAD_CONCURRENCY } from './constants';
+import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 
 const prepared = (path: string): PreparedUpload => ({ path, content: new ArrayBuffer(1), size: 1, hash: 'hash' });
 
@@ -23,6 +25,14 @@ describe('upload pipeline', () => {
 		});
 		expect(events).toEqual(['before:3', 'processed:1', 'upload:3', 'after:2']);
 		expect(uploadPreparedFiles).toHaveBeenCalledWith(expect.any(Array), expect.any(Object), expect.objectContaining({ retry: true }));
+	});
+
+	it('prepares enough small files per chunk to fill every batch request slot', async () => {
+		const perChunk = BATCH_UPLOAD_CONCURRENCY * BATCH_UPLOAD_MAX_FILES;
+		const uploadPreparedFiles = vi.fn(async (_files: PreparedUpload[], _result: unknown, _options: UploadPreparedFilesOptions) => {});
+		const paths = Array.from({ length: perChunk + 1 }, (_, index) => `${index}.md`);
+		await uploadPipelined({ uploadPreparedFiles }, paths, createEmptySyncResult(), { prepare: async path => prepared(path), retry: false });
+		expect(uploadPreparedFiles.mock.calls.map(([files]) => files.length)).toEqual([perChunk, 1]);
 	});
 
 	it('passes only the policies a mode supplies to the shared executor', async () => {
