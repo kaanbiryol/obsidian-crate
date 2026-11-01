@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { applyReminderListEffect, reorderProjectReminders, toSharedReminder } from './reminder-list-state';
 import type { ReminderRecord } from '../types';
+import { timezone } from '@/reminders/core/dates/time';
 
 it('reuses card data for an unchanged reminder record', () => {
 	const record = { id: 'one', content: 'One', completed: false, priority: 4, revision: 'r1', filePath: 'Reminders/Inbox.md', project: '' } as ReminderRecord;
@@ -8,6 +9,11 @@ it('reuses card data for an unchanged reminder record', () => {
 	expect(shared).toMatchObject({ id: 'one', project: 'Inbox' });
 	expect(toSharedReminder(record)).toBe(shared);
 	expect(toSharedReminder({ ...record, content: 'Changed' })).not.toBe(shared);
+});
+
+it('gives a recurrence without a time zone the local one, like the plugin', () => {
+	const record = { id: 'one', content: 'One', completed: false, priority: 4, filePath: 'Reminders/Inbox.md', project: 'Inbox', recurrence: { frequency: 'daily' } } as ReminderRecord;
+	expect(toSharedReminder(record).recurrence).toEqual({ frequency: 'daily', timezone: timezone() });
 });
 
 it('keeps unmoved records when reordering a project', () => {

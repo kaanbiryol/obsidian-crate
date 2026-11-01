@@ -4,7 +4,7 @@ import { createMockAppWithVault } from '@/test/factories/obsidian';
 import { createReminderIndex } from './reminder-index';
 import { createMarkdownWriter } from './markdown-writer';
 import { createReminderRepository } from './reminder-repository';
-import { toReminder } from './toReminder';
+import { toReminder } from '../core/toReminder';
 import { buildCreatedReminderBlock, appendCreatedReminderBlock } from '../core/markdownReminderMutation';
 import type { UpdateReminderParams } from '../types/reminder';
 import { ReminderInputError } from '../core/reminderMutationInput';

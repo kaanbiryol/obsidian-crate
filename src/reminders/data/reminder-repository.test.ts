@@ -1,5 +1,5 @@
 import { reminderRevision } from '../core/reminderRevision';
-import { toReminder } from './toReminder';
+import { toReminder } from '../core/toReminder';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReminderIndex, IndexedReminder } from './reminder-index';
 import type { MarkdownWriter } from './markdown-writer';

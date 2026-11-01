@@ -6,7 +6,7 @@ import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/rem
 import { getReminderProjectFilePath } from "@/reminders/core/reminderProjectPath";
 import type { MarkdownWriter } from "./markdown-writer";
 import type { IndexedReminder, ReminderIndex } from "./reminder-index";
-import { toReminder } from "./toReminder";
+import { toReminder } from "../core/toReminder";
 
 export interface ReminderRepository {
 	getAll(): Reminder[];

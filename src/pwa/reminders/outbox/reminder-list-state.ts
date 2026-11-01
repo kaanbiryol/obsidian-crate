@@ -2,30 +2,15 @@ import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
 import type { ReminderRecord } from '../types';
 import { DEFAULT_PROJECT } from '@/reminders/core/constants';
 import { compareProjects } from '@/reminders/core/reminder-list';
-import { reminderProject } from '@/reminders/core/reminderProjectPath';
+import { toReminder } from '@/reminders/core/toReminder';
 
 // Unchanged records keep the same card data, so memoized cards skip re-rendering.
 const sharedReminders = new WeakMap<ReminderRecord, SharedReminder>();
 
 export function toSharedReminder(reminder: ReminderRecord): SharedReminder {
 	let shared = sharedReminders.get(reminder);
-	if (!shared) sharedReminders.set(reminder, shared = convertReminder(reminder));
+	if (!shared) sharedReminders.set(reminder, shared = toReminder(reminder));
 	return shared;
-}
-
-function convertReminder(reminder: ReminderRecord): SharedReminder {
-	return {
-		id: reminder.id,
-		content: reminder.content,
-		description: reminder.description,
-		dueDate: reminder.dueDate,
-		dueDatetime: reminder.dueDatetime,
-		priority: reminder.priority,
-		completed: reminder.completed,
-		project: reminderProject(reminder),
-		recurrence: reminder.recurrence,
-		lineNumber: reminder.lineNumber,
-	};
 }
 
 export function reorderProjectReminders(reminders: ReminderRecord[], project: string, orderedIds: string[]): ReminderRecord[] {
