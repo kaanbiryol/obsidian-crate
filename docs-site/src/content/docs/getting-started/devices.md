@@ -11,7 +11,7 @@ There are two ways to use Crate on another device:
 ## Another Obsidian device
 
 1. Let a sync finish on your first device. Until it does, other devices stop with "Another device is uploading this vault for the first time." If you see this on the device that started the upload, for example after reconnecting it, select **Replace server files** to finish.
-2. On the other device, open a vault and [install Crate](/docs/getting-started/installation/). Use an empty vault for a fresh copy. If the vault already has notes, back them up first, because they'll be combined with the synced ones.
+2. On the other device, open a vault and [install Crate](/docs/getting-started/installation/). Use an empty vault for a fresh copy. If the vault already has files and the server does too, Crate asks before replacing them: everything in the vault moves to Obsidian's `.trash` folder and the server's contents download.
 3. Connect to the **same server**:
    - **Cloudflare:** on your first device, open **Settings → Crate → Account and devices** and select **Add a device**. Scan the code on the new device, or copy the link and paste it into **Pairing link** in Crate settings there, then select **Connect**. The code works once and expires after 10 minutes. You can also select **Connect with Cloudflare** on the new device and choose the existing server; on a phone or tablet, select **Open Cloudflare** in the connection dialog first.
    - **Docker:** select **Connect to your server** and use a new [pairing code](/docs/getting-started/self-hosting/#create-another-pairing-code).
@@ -22,7 +22,7 @@ There are two ways to use Crate on another device:
 8. If you want this device to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync**. It starts off on every new device.
 
 :::caution[One vault per server]
-Connecting two different vaults to the same server merges their files. Give each unrelated vault its own server.
+Connecting another vault to a server that already has files replaces that vault's contents with the server's. Give each unrelated vault its own server.
 :::
 
 ## Open the web app

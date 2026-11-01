@@ -153,6 +153,10 @@ export class SyncApiClient {
 		return this.syncApi.getManifest();
 	}
 
+	async hasFiles(): Promise<boolean> {
+		return this.syncApi.hasFiles();
+	}
+
 	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
 		return this.syncApi.getFileMetadata(paths);
 	}

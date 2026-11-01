@@ -32,6 +32,8 @@ const logger = createLogger('SyncEngine');
 export interface SyncWorkflowContext extends FullSyncUploadContext {
 	deleteRemoteFiles: DeleteRemoteFiles;
 	finishInitialSetup(): Promise<void>;
+	/** Moves the vault to trash when the user chose to replace it with the joined server's contents. */
+	replaceLocalVault?(): Promise<void>;
 	tryInitialImport?(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
 	apiConfigured(): boolean;
 	recoverUploads(): Promise<void>;
@@ -75,6 +77,7 @@ export async function runSyncWorkflow(
 	let recovering = false;
 
 	try {
+		await context.replaceLocalVault?.();
 		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
 		const imported = await context.tryInitialImport?.(result, progressCallback);

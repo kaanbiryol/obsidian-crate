@@ -13,6 +13,7 @@ import { DEVICE_PAIRING_CAPABILITY, DEVICE_PAIRING_PATH, parseDevicePairingLink,
 import { openConfirmationModal } from '../ui/confirmation-modal';
 import { DeviceKeyPairingModal } from '../ui/settings/device-key-pairing-modal';
 import { errorMessage } from '../platform/logger';
+import { ConnectionSetupError } from '../sync/connection/connection-errors';
 
 const pairing = new WeakSet<CratePlugin>();
 
@@ -51,7 +52,7 @@ export async function startDevicePairing(plugin: CratePlugin, target: { origin: 
 		if (!await openConfirmationModal(plugin.app, {
 			title: 'Connect this vault',
 			message: `Connect this vault to ${new URL(target.origin).hostname}?`,
-			details: ['This vault will sync with that Crate server. Use an empty vault for a fresh copy; notes already here are combined with the synced ones.'],
+			details: ['This vault will sync with that Crate server.'],
 			confirmText: 'Connect',
 		})) return;
 		new Notice('Connecting to your Crate server…');
@@ -61,7 +62,8 @@ export async function startDevicePairing(plugin: CratePlugin, target: { origin: 
 		new Notice(result.synced ? 'Connected. Open the command palette and select Crate: Sync now.' : 'Connected, but the connection test failed. Check Crate settings.');
 		if (result.synced) void offerFeatureChoice(plugin);
 	} catch (error) {
-		if (!getPluginLifecycleSignal(plugin).aborted) new Notice(`Could not connect: ${errorMessage(error)}`);
+		if (error instanceof ConnectionSetupError && error.code === 'replace-cancelled') new Notice(error.message);
+		else if (!getPluginLifecycleSignal(plugin).aborted) new Notice(`Could not connect: ${errorMessage(error)}`);
 	} finally { pairing.delete(plugin); }
 }
 

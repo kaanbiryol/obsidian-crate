@@ -164,6 +164,12 @@ export class SyncWorkerApi {
 		return this.http.requestJson<BackendDiagnostics>('/diagnostics');
 	}
 
+	/** One raw manifest entry is enough to tell whether the server stores any file. */
+	async hasFiles(): Promise<boolean> {
+		const page = parseManifestPage(await this.http.requestJson<unknown>('/sync/manifest?limit=1'));
+		return Object.keys(page.files).length > 0;
+	}
+
 	async getManifest(): Promise<FileManifest> {
 		const files = createPathRecord<FileEntry>();
 		let after: string | undefined;

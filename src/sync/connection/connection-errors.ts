@@ -13,6 +13,7 @@ export const CONNECTION_SETUP_MESSAGES = {
 	'pairing-expired': 'Pairing code expired or already used. Generate a new code on your server.',
 	'pairing-invalid': 'Could not redeem this pairing code. Generate a new code and try again.',
 	'invalid-pairing-response': 'The server did not return a valid device token. Generate a new pairing code and try again.',
+	'replace-cancelled': 'Connection cancelled. This vault was not changed.',
 } as const;
 
 export class ConnectionSetupError extends Error {

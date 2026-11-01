@@ -41,7 +41,11 @@ export async function changeServerConnection(
 	transition.verify();
 	applyInfrastructureConfigState(settings, secretStorage, { ...config, workerUrl });
 	if (config.encryption) saveEncryptionKeys(secretStorage, config.encryption.bundle, config.encryption.recovery);
-	if (changingServer) resetStoredSyncState(settings);
+	if (changingServer) {
+		resetStoredSyncState(settings);
+		// Saved with the connection, so no sync can reach the new server without it.
+		if (config.replaceVault) settings.replaceVault = true;
+	}
 	await persistSettings();
 	await transition.initialize();
 }

@@ -97,6 +97,26 @@ and an edit before retry receives normal conflict handling. A populated local
 vault and subsequent syncs always use normal reconciliation. The setup intent is
 removed after successful reconciliation.
 
+#### Joining a server that has files
+
+Connecting a vault to a server that already stores files replaces the vault.
+Before saving the connection, pairing, **Connect with Cloudflare** and
+**Connect to your server** read one manifest entry. If the server has files, or
+the read fails, they ask the user to confirm the replacement. **Cancel** leaves
+the vault disconnected and unchanged. A new or empty server and a reconnect to
+the same server ask nothing.
+
+The confirmation is saved with the connection (`replaceVault` in plugin data).
+The next **Sync now** first moves everything in the vault to Obsidian's local
+`.trash` folder, including hidden files, the configuration folder and ignored
+paths. Only `.trash` and Crate's own plugin folder stay. The vault then
+qualifies as empty, so the first sync adopts the server's settings and downloads
+its notes without conflict copies. Until this step runs, queue flushes, selected
+syncs and **Replace server files** stop before any upload. An interrupted move
+continues on the next sync with what is left. Once the vault has a file
+baseline or a changelog cursor, the step is skipped, so a retry never moves
+files the server already synced.
+
 ### 5. Initial Import
 
 There is no separate initial-sync command. Each sync first asks the server for an unfinished initial import; while one is open, the vault is uploaded through it before any incremental or full reconciliation. Server files missing locally are pruned from the import, files are prepared in byte-budgeted chunks so binary contents cannot accumulate without bound in memory, and small files are committed in batches of up to 32. Three requests stay in flight: each takes the next prepared batch as soon as its previous one finishes, and the local manifest is saved every 256 confirmed files or 5 seconds, and when the import finishes or fails. The committed server inventory remains the resume point. Files over 25 MB are reported as skipped and keep any server copy they already have. Only the device that started the import prunes or uploads for it; another device stops until it finishes (see [upload recovery](upload-recovery.md)). Finishing the import sets the changelog cursor.

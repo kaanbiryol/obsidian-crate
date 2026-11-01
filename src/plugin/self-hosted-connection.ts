@@ -8,6 +8,7 @@ import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { isSha256Hex } from '../platform/validation';
 import { SECRET_KEYS } from '../platform/secret-keys';
 import { writeSyncSettings } from './sync-connection';
+import { confirmVaultReplacement } from './vault-replacement';
 
 const connecting = new WeakSet<CratePlugin>();
 
@@ -83,9 +84,11 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 		const encryption = await api.getEncryptionState();
 		const shared = encryption ? { settings: null } : await api.getSharedSettings();
 		signal.throwIfAborted();
+		const replaceVault = !reconnect && await confirmVaultReplacement(plugin.app, api);
+		signal.throwIfAborted();
 		assertAvailable();
 		plugin.clearSettingsUiState();
-		await plugin.syncRuntime.applyInfrastructureConfig({ workerUrl, authToken }, signal, ...(reconnect ? [expected] : []));
+		await plugin.syncRuntime.applyInfrastructureConfig({ workerUrl, authToken, ...(replaceVault ? { replaceVault } : {}) }, signal, ...(reconnect ? [expected] : []));
 		signal.throwIfAborted();
 		if (shared.settings) {
 			// Normalizing adds this device's own workspace exclusion to the server's patterns.

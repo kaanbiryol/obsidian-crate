@@ -56,6 +56,7 @@ export function recordSyncHistory(
 
 export function resetStoredSyncState(settings: SyncSettings): void {
 	delete settings.checkpointScope;
+	settings.replaceVault = false;
 	updateSyncProgress(settings, { lastSeq: 0, lastSync: null, syncHistory: [] });
 }
 

@@ -7,7 +7,7 @@ import { ConnectionSetupError } from '../sync/connection/connection-errors';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
 const api = vi.hoisted(() => ({
-	setAbortSignal: vi.fn(), testConnection: vi.fn(), listTokens: vi.fn(), getSharedSettings: vi.fn(), getEncryptionState: vi.fn(),
+	setAbortSignal: vi.fn(), testConnection: vi.fn(), listTokens: vi.fn(), getSharedSettings: vi.fn(), getEncryptionState: vi.fn(), hasFiles: vi.fn(),
 }));
 const exchange = vi.hoisted(() => vi.fn());
 vi.mock('../sync/connection/self-hosted-pairing', () => ({ exchangeSelfHostedPairingCode: exchange }));
@@ -29,6 +29,7 @@ beforeEach(() => {
 	api.listTokens.mockResolvedValue({ tokens: [] });
 	api.getSharedSettings.mockResolvedValue({ settings: null });
 	api.getEncryptionState.mockResolvedValue(null);
+	api.hasFiles.mockResolvedValue(false);
 });
 
 describe('self-hosted server connection', () => {

@@ -28,6 +28,7 @@ async function loadPluginIntegration() {
 	vi.doMock('../cloudflare/oauth/config', async () => ({ ...await vi.importActual<object>('../cloudflare/oauth/config'), isCloudflareOAuthConfigured: () => true }));
 	vi.doMock('obsidian', () => ({ Notice: vi.fn(), Platform: platform }));
 	vi.doMock('./cloudflare-connection', () => ({ configureCloudflareAuthorizedDevice }));
+	vi.doMock('./vault-replacement', () => ({ confirmVaultReplacement: async () => false }));
 	vi.doMock('./feature-settings', () => ({ offerFeatureChoice }));
 	vi.doMock('../cloudflare/device-token', () => ({ generateSecureToken, hashToken }));
 	vi.doMock('./deviceInfo', () => ({
@@ -92,6 +93,7 @@ afterEach(() => {
 	vi.doUnmock('../sync/worker-api/client');
 	vi.doUnmock('../cloudflare/oauth/config');
 	vi.doUnmock('./sync-integration');
+	vi.doUnmock('./vault-replacement');
 	vi.doUnmock('../sync/device-token');
 	vi.doUnmock('./deviceInfo');
 	vi.doUnmock('../ui/cloudflare/deployment-modal');

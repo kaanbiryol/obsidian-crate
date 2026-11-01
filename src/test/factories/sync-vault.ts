@@ -116,6 +116,12 @@ export class PersistentTestVault {
 
 	private moveToTrash(path: string): void {
 		const stored = this.resolve(path) ?? path;
+		if (this.folders.has(stored)) {
+			// Like the host, a folder moves with everything inside it.
+			for (const file of [...this.files.keys()].filter(file => file.startsWith(`${stored}/`))) this.moveToTrash(file);
+			for (const folder of [...this.folders].filter(folder => folder === stored || folder.startsWith(`${stored}/`))) this.folders.delete(folder);
+			return;
+		}
 		this.trash.set(stored, this.read(stored));
 		this.remove(stored);
 	}

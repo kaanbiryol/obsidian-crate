@@ -35,10 +35,14 @@ import type { ForceSyncWorkflowContext } from './force-sync-workflow';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './full-sync-upload';
 import { createPathRecord } from '../../protocol/path-record';
+import { moveVaultToTrash } from '../local/vault-replacement';
+
+const VAULT_REPLACEMENT_UNFINISHED = 'Select Sync now to finish replacing this vault with your Crate server’s contents.';
 
 interface SyncEngineContextDependencies {
 	prepareReminderScope?: () => Promise<void>;
 	vault: Vault;
+	pluginDir: string;
 	fileManager: FileManager;
 	api: SyncApiClient;
 	files: EngineFileOperations;
@@ -112,6 +116,7 @@ export class SyncEngineContexts {
 		};
 		this.syncWorkflow = {
 			...base,
+			replaceLocalVault: this.replaceLocalVault,
 			tryInitialImport: (result, progress) => runInitialImport({ transfer: this.transfer, api: d.api,
 				prepareReminderScope: d.prepareReminderScope,
 				shouldIgnore: d.shouldIgnore, throwIfDestroyed: d.throwIfDestroyed,
@@ -224,9 +229,29 @@ export class SyncEngineContexts {
 
 	readonly setLastSync = (value: string): void => updateSyncProgress(this.dependencies.getSettings(), { lastSync: value });
 
-	/** Replays interrupted uploads before any path is planned, reporting recovery progress. */
-	readonly recoverUploads = (): Promise<void> =>
-		this.dependencies.files.recoverUploads((current, total) => this.dependencies.updateState({ work: { phase: 'recovering', current, total } }));
+	/** Replays interrupted uploads before any path is planned, reporting recovery progress.
+	 * Every upload path recovers first, so none runs before a confirmed replacement. */
+	readonly recoverUploads = (): Promise<void> => {
+		this.assertNoVaultReplacement();
+		return this.dependencies.files.recoverUploads((current, total) => this.dependencies.updateState({ work: { phase: 'recovering', current, total } }));
+	};
+
+	assertNoVaultReplacement(): void {
+		if (this.dependencies.getSettings().replaceVault) throw new Error(VAULT_REPLACEMENT_UNFINISHED);
+	}
+
+	/** Runs before anything else in a standard sync. The runtime saves the cleared flag with the sync's progress. */
+	readonly replaceLocalVault = async (): Promise<void> => {
+		const d = this.dependencies;
+		const settings = d.getSettings();
+		if (!settings.replaceVault) return;
+		// Once a file has synced, moving the vault again would trash the server's copies.
+		if (settings.lastSeq === 0 && !Object.keys(d.localManifest.getManifest().files).length) {
+			d.updateState({ work: { phase: 'applying' } });
+			await moveVaultToTrash(d.vault, d.pluginDir, d.throwIfDestroyed);
+		}
+		settings.replaceVault = false;
+	};
 
 	readonly finishInitialSetup = (): Promise<void> => {
 		const d = this.dependencies;

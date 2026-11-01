@@ -311,6 +311,17 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(initialize).toHaveBeenCalledWith({ skipStartupSync: true, resumeEncryptionReset: false });
 	});
 
+	it('saves a confirmed vault replacement with the new connection and drops it on disconnect', async () => {
+		const { runtime, settings } = createRuntimeHarness({});
+		vi.spyOn(runtime, 'initialize').mockResolvedValue(undefined);
+
+		await runtime.applyInfrastructureConfig({ workerUrl: 'https://new-worker.example', authToken: 'token', replaceVault: true });
+		expect(settings.replaceVault).toBe(true);
+
+		await runtime.clearSyncConfiguration();
+		expect(settings.replaceVault).toBe(false);
+	});
+
 	it('clears sync state when clearing configuration', async () => {
 		const { runtime, settings } = createRuntimeHarness({
 			cloudflareDeployment: {

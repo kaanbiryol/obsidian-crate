@@ -17,6 +17,9 @@ vi.mock('obsidian', async importOriginal => ({
 	},
 }));
 
+const confirm = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
+
 const remote ={ ignorePatterns: ['remote-pattern'], syncInterval: 60, pushEnabled: true };
 
 function plugin() {
@@ -37,6 +40,7 @@ function spyOnServer() {
 		encryption: vi.spyOn(SyncApiClient.prototype, 'getEncryptionState').mockResolvedValue(null),
 		sharedSettings: vi.spyOn(SyncApiClient.prototype, 'getSharedSettings').mockResolvedValue({ settings: remote, settingsVersion: 'version' }),
 		createSettings: vi.spyOn(SyncApiClient.prototype, 'createSharedSettings').mockResolvedValue({ success: true, settingsVersion: 'seeded' }),
+		hasFiles: vi.spyOn(SyncApiClient.prototype, 'hasFiles').mockResolvedValue(false),
 	};
 }
 let server: ReturnType<typeof spyOnServer>;
@@ -147,4 +151,31 @@ it('does not read shared settings from an encrypted server before its keys are a
 	expect(owner.syncRuntime.applyInfrastructureConfig).toHaveBeenCalledOnce();
 	expect(owner.settings.ignorePatterns).toEqual(DEFAULT_SETTINGS.ignorePatterns);
 	expect(owner.writeSettings).not.toHaveBeenCalled();
+});
+
+it('asks before joining a server with files and saves the replacement with the connection', async () => {
+	const owner = plugin();
+	server.hasFiles.mockResolvedValue(true);
+	await configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token');
+	expect(confirm).toHaveBeenCalledOnce();
+	expect(owner.syncRuntime.applyInfrastructureConfig).toHaveBeenCalledWith(
+		{ workerUrl: 'https://crate.example.workers.dev', authToken: 'token', replaceVault: true }, expect.any(AbortSignal));
+});
+
+it('does not connect when the replacement is cancelled', async () => {
+	const owner = plugin();
+	server.hasFiles.mockResolvedValue(true);
+	confirm.mockResolvedValueOnce(false);
+	await expect(configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token'))
+		.rejects.toMatchObject({ code: 'replace-cancelled' });
+	expect(owner.syncRuntime.applyInfrastructureConfig).not.toHaveBeenCalled();
+});
+
+it('connects to an empty server, or reconnects, without asking', async () => {
+	const owner = plugin();
+	await configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token');
+	server.hasFiles.mockResolvedValue(true);
+	await configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token', { workerUrl: 'https://crate.example.workers.dev', authToken: 'old' });
+	expect(confirm).not.toHaveBeenCalled();
+	for (const [config] of owner.syncRuntime.applyInfrastructureConfig.mock.calls as unknown as Array<[object]>) expect(config).not.toHaveProperty('replaceVault');
 });

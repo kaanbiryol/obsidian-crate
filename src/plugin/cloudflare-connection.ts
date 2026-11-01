@@ -7,6 +7,7 @@ import type { SharedSettings } from '../protocol/shared-settings';
 import { createLogger } from '../sync/logger';
 import { errorMessage } from '../platform/logger';
 import { writeSyncSettings } from './sync-connection';
+import { confirmVaultReplacement } from './vault-replacement';
 
 const logger = createLogger('CloudflareConnection');
 
@@ -35,10 +36,14 @@ export async function configureCloudflareAuthorizedDevice(
 		// Shared settings are optional during first connection.
 	}
 	signal.throwIfAborted();
+	// A reconnect keeps this vault's sync history with the same server.
+	const replaceVault = !expected && await confirmVaultReplacement(plugin.app, api);
+	signal.throwIfAborted();
 
 	await plugin.syncRuntime.applyInfrastructureConfig({
 		workerUrl,
 		authToken,
+		...(replaceVault ? { replaceVault } : {}),
 	}, signal, ...(expected ? [expected] : []));
 	signal.throwIfAborted();
 	if (shared) {

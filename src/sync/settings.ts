@@ -24,6 +24,9 @@ export interface PersistedSyncSettings {
 	/** The encrypted vault this Obsidian vault last synced with. Kept when keys are
 	 * removed, so a server reporting no encryption cannot silently receive plaintext. */
 	encryptedVaultId: string | null;
+	/** Set when this vault joined a server with files and the user chose to replace
+	 * its contents. The first sync moves the vault to trash before anything else. */
+	replaceVault: boolean;
 }
 
 export interface SyncSettings extends PersistedSyncSettings {
@@ -54,6 +57,7 @@ export const DEFAULT_SYNC_SETTINGS: PersistedSyncSettings = {
 	pushEnabled: false,
 	debounceDelay: 5,
 	encryptedVaultId: null,
+	replaceVault: false,
 };
 
 /** Every device also excludes its own workspace files, whatever its shared patterns say. */
@@ -88,6 +92,7 @@ export function normalizePersistedSyncSettings(
 		pushEnabled: normalizeBoolean(value?.pushEnabled, defaults.pushEnabled),
 		debounceDelay: Math.min(normalizeNonNegativeInteger(value?.debounceDelay, defaults.debounceDelay), MAX_TIMER_SECONDS),
 		encryptedVaultId: normalizeNullableString(value?.encryptedVaultId),
+		replaceVault: normalizeBoolean(value?.replaceVault, defaults.replaceVault),
 	};
 }
 

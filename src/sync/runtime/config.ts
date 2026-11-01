@@ -11,6 +11,8 @@ interface ApplyInfrastructureConfigInput {
 	workerUrl: string;
 	authToken: string;
 	encryption?: { bundle: VaultKeyBundle; recovery: string };
+	/** The user confirmed replacing this vault with the new server's contents. */
+	replaceVault?: boolean;
 }
 
 /** Caller must stop the old engine and await its checkpoint I/O first. */

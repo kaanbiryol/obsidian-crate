@@ -151,6 +151,7 @@ export class SyncEngine {
 		this.contexts = new SyncEngineContexts({
 			prepareReminderScope: async () => { await this.prepareReminderScope?.(); },
 			vault: this.vault,
+			pluginDir: this.plugin.manifest.dir!.replace(/\/+$/, ''),
 			fileManager: this.plugin.app.fileManager,
 			api: this.api,
 			files: this.files,
@@ -710,6 +711,7 @@ export class SyncEngine {
 	}
 
 	private async reconcilePaths(queueKeys: string[], recover = true, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> {
+		this.contexts.assertNoVaultReplacement();
 		await assertNoOpenInitialImport(this.api);
 		if (recover) await this.contexts.recoverUploads();
 		this.lifecycle.throwIfDestroyed();
