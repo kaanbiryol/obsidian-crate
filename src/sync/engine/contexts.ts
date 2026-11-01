@@ -86,7 +86,7 @@ export class SyncEngineContexts {
 			runConcurrent: d.runConcurrent,
 			retryWithBackoff: d.retryWithBackoff,
 			getModifiedIso: d.getModifiedIso,
-			encrypted: () => d.api.isEncrypted(),
+			encrypted: this.encrypted,
 		};
 		this.localDiffPlanner = {
 			throwIfDestroyed: d.throwIfDestroyed,
@@ -96,13 +96,13 @@ export class SyncEngineContexts {
 			shouldIgnore: d.shouldIgnore,
 			verifyContent: d.verifyContent,
 			runConcurrent: d.runConcurrent,
-			encrypted: () => d.api.isEncrypted(),
+			encrypted: this.encrypted,
 		};
 		// Members shared by the standard, initial and forced sync workflows.
 		const base = {
 			finishInitialSetup: this.finishInitialSetup,
 			apiConfigured: () => d.api.isConfigured(),
-			reportWork: (work: SyncWork) => d.updateState({ work }),
+			reportWork: this.reportWork,
 			recoverUploads: this.recoverUploads,
 			getStatus: d.getStatus,
 			updateState: d.updateState,
@@ -121,8 +121,8 @@ export class SyncEngineContexts {
 				prepareReminderScope: d.prepareReminderScope,
 				shouldIgnore: d.shouldIgnore, throwIfDestroyed: d.throwIfDestroyed,
 				save: () => d.localManifest.save(),
-				setLastSeq: lastSeq => updateSyncProgress(d.getSettings(), { lastSeq }),
-				report: work => d.updateState({ work }),
+				setLastSeq: this.setLastSeq,
+				report: this.reportWork,
 				getImportToken: () => d.localManifest.getInitialImportToken(),
 				setImportToken: token => d.localManifest.setInitialImportToken(token),
 			}, result, progress),
@@ -130,6 +130,7 @@ export class SyncEngineContexts {
 			incrementalSync: (progressCallback, onFailure) => this.incrementalSync(progressCallback, onFailure),
 			hasSyncCursor: () => d.getSettings().lastSeq > 0,
 			createFullSyncPlan: (remoteFiles, concurrency, options) => createFullSyncPlan({
+				...this.localDiffPlanner,
 				initialConfigPull: {
 					firstSync: d.getSettings().lastSync === null && d.getSettings().lastSeq === 0,
 					get: () => d.localManifest.getInitialConfigPull(),
@@ -138,13 +139,6 @@ export class SyncEngineContexts {
 						await d.localManifest.save();
 					},
 				},
-				throwIfDestroyed: d.throwIfDestroyed,
-				vault: d.vault,
-				plannedContent: this.plannedContent,
-				localManifest: d.localManifest,
-				shouldIgnore: d.shouldIgnore,
-				runConcurrent: d.runConcurrent,
-				encrypted: () => d.api.isEncrypted(),
 			}, remoteFiles, concurrency, options),
 			processDiff: this.processDiff,
 			prepareFullSyncUpload: diff => prepareTransferUploadFromPath(this.transfer, diff.path, { force: true, expectedHash: diff.remoteHash ?? null }),
@@ -154,9 +148,7 @@ export class SyncEngineContexts {
 			setLocalManifestEntry: (path, entry) => {
 				d.localManifest.setEntry(path, entry);
 			},
-			setLastSeq: value => {
-				updateSyncProgress(d.getSettings(), { lastSeq: value });
-			},
+			setLastSeq: this.setLastSeq,
 		};
 		this.forceSyncWorkflow = {
 			...base,
@@ -167,7 +159,7 @@ export class SyncEngineContexts {
 			prepareUploadsFromVaultFiles: (files, onPrepared) =>
 				transferPrepareUploadsFromVaultFiles(this.transfer, files, PREPARE_CONCURRENCY, onPrepared, { force: true }),
 			createVaultFileChunks: createByteBudgetedVaultFileChunks,
-			encrypted: () => d.api.isEncrypted(),
+			encrypted: this.encrypted,
 		};
 	}
 
@@ -189,14 +181,14 @@ export class SyncEngineContexts {
 		files: this.dependencies.files,
 		vault: this.dependencies.vault,
 		localManifest: this.dependencies.localManifest,
-		reportWork: work => this.dependencies.updateState({ work }),
+		reportWork: this.reportWork,
 	}, files, result, options);
 
 	/** Reconciles queued paths with the server. Version conflicts return their paths for another pass. */
 	readonly reconcileQueuePaths = (queueKeys: string[], onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> => {
 		const d = this.dependencies;
 		return reconcileQueuePaths({
-			reportWork: work => d.updateState({ work }),
+			reportWork: this.reportWork,
 			vault: d.vault,
 			localManifest: d.localManifest,
 			getRemoteEntries: async (paths) => (await d.api.getFileMetadata(paths)).files,
@@ -205,7 +197,7 @@ export class SyncEngineContexts {
 			uploadDiffs: async (diffs, result) => {
 				const retryPaths: string[] = [];
 				const failures = await uploadFullSyncPlan({
-					reportWork: work => d.updateState({ work }),
+					reportWork: this.reportWork,
 					prepareFullSyncUpload: diff => this.syncWorkflow.prepareFullSyncUpload(diff),
 					uploadPreparedFiles: this.uploadPreparedFiles,
 					// Conflicted paths return to the queue pass for a fresh reconciliation.
@@ -228,6 +220,12 @@ export class SyncEngineContexts {
 		transferParallelDownloadAndSaveFiles(this.transfer, requests, result, DOWNLOAD_CONCURRENCY, onProcessed, onFailure);
 
 	readonly setLastSync = (value: string): void => updateSyncProgress(this.dependencies.getSettings(), { lastSync: value });
+
+	private readonly setLastSeq = (value: number): void => updateSyncProgress(this.dependencies.getSettings(), { lastSeq: value });
+
+	private readonly reportWork = (work: SyncWork): void => this.dependencies.updateState({ work });
+
+	private readonly encrypted = (): boolean => this.dependencies.api.isEncrypted();
 
 	/** Replays interrupted uploads before any path is planned, reporting recovery progress.
 	 * Every upload path recovers first, so none runs before a confirmed replacement. */
@@ -258,7 +256,7 @@ export class SyncEngineContexts {
 		return finishInitialSetup({
 			manifest: d.localManifest, lastSeq: d.getSettings().lastSeq,
 			initialImport: d.api.initialImport, prepareReminderScope: d.prepareReminderScope,
-			reportWork: work => d.updateState({ work }), throwIfDestroyed: d.throwIfDestroyed,
+			reportWork: this.reportWork, throwIfDestroyed: d.throwIfDestroyed,
 		});
 	};
 
@@ -267,8 +265,8 @@ export class SyncEngineContexts {
 		const d = this.dependencies;
 		return runIncrementalSync({
 			settings: d.getSettings(),
-			setLastSeq: (lastSeq: number) => updateSyncProgress(d.getSettings(), { lastSeq }),
-			reportWork: work => d.updateState({ work }),
+			setLastSeq: this.setLastSeq,
+			reportWork: this.reportWork,
 			throwIfDestroyed: d.throwIfDestroyed,
 			vault: d.vault,
 			fileManager: d.fileManager,
