@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createUpgradeCheckpoint, releaseUpgradeGuards, removeUpgradeGuards, upgradeGuards } from './upgrade-checkpoint';
+import { createUpgradeCheckpoint } from './upgrade-checkpoint';
+import { releaseUpgradeGuards, removeUpgradeGuards, upgradeGuards } from './database';
 import { migrationTransaction, SERVER_RELEASE } from './database-upgrades';
 import { CloudflareApiClient, CloudflareApiError } from '../cloudflare-api';
 import type { HttpTransport } from '../http';

@@ -1,10 +1,35 @@
 import { canReplaceServerBuild, parseDevelopmentBuild } from '../../protocol/server-build';
-import { upgradeGuards, removeUpgradeGuards } from './upgrade-checkpoint';
 import type { CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { type DeploymentFence } from './fence';
 import { migrationTransaction, planDatabaseUpgrade, validateMigrationHistory, SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
+import { quoteName } from '../restore/archive';
+
+/** Saved in D1 so an interrupted upgrade backup resumes on any device instead of restarting. */
+export const UPGRADE_PROGRESS_KEY = 'crate_upgrade_backup';
+/** Lists the write-guard triggers an upgrade has created. */
+export const UPGRADE_GUARD_TRIGGERS = "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'crate_upgrade_%';";
+const CONTROL = new Set(['maintenance_state', 'crate_schema', 'crate_migrations', 'crate_release']);
+const GUARDED_ACTIONS = ['INSERT', 'UPDATE', 'DELETE'];
+const guardName = (table: string, action: string) => `crate_upgrade_${table}_${action}`;
+/** Tables an upgrade pauses. Control tables stay writable for deployment steps. */
+export const guardedTables = (tables: string[]) => tables.filter(table => !CONTROL.has(table));
+export const writesPaused = (tables: string[], triggers: Set<string>) => tables.every(table => GUARDED_ACTIONS.every(action => triggers.has(guardName(table, action))));
+export function upgradeGuards(table: string): string {
+	if (CONTROL.has(table)) return '';
+	return GUARDED_ACTIONS.map(action => `CREATE TRIGGER IF NOT EXISTS ${quoteName(guardName(table, action))} BEFORE ${action} ON ${quoteName(table)} BEGIN SELECT RAISE(ABORT, 'Crate server upgrade in progress'); END;`).join('\n');
+}
+export function removeUpgradeGuards(table: string): string {
+	return GUARDED_ACTIONS.map(action => `DROP TRIGGER IF EXISTS ${quoteName(guardName(table, action))};`).join('\n');
+}
+
+/** Resumes writers after the upgraded server is verified. Its backup is then complete history. */
+export async function releaseUpgradeGuards(api: Pick<CloudflareApiClient, 'queryD1'>, account: string, database: string, fence: DeploymentFence) {
+	const rows = (await api.queryD1(account, database, UPGRADE_GUARD_TRIGGERS)).flatMap(result => result.results ?? []);
+	if (rows.length) await fence.mutate(() => api.queryD1(account, database, [...rows.map(row => `DROP TRIGGER ${quoteName(String(row.name))};`),
+		`DELETE FROM maintenance_state WHERE key = '${UPGRADE_PROGRESS_KEY}';`].join('\n')), 'resume-upgraded-server');
+}
 
 /** The saved server can only be replaced: retrying the update cannot succeed. */
 export class UnupgradableServerError extends Error {

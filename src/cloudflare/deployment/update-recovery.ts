@@ -3,7 +3,7 @@ import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { isSha256Hex } from '../../platform/validation';
 import { CloudflareApiError, type CloudflareApiClient, type CloudflareWorkerSettings } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
-import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild } from './database';
+import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild, releaseUpgradeGuards } from './database';
 import { SERVER_RELEASE } from './database-upgrades';
 import {
 	awaitsPublicationVerification, type DeploymentFenceRecord, DeploymentRecoveryRequiredError, isPendingAddressActivation,
@@ -11,7 +11,6 @@ import {
 } from './fence';
 import { provisionCloudflareDeployment } from './provisioner';
 import type { CloudflareDeploymentMetadata } from './types';
-import { releaseUpgradeGuards } from './upgrade-checkpoint';
 import { workersDevOrigin } from './worker-origin';
 import { releaseWorkerMessage, workerStorageBindings } from './discovery';
 

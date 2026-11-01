@@ -5,13 +5,8 @@ import { sha256Hex } from '../../platform/sha256';
 import { isSha256Hex } from '../../platform/validation';
 import { listBackupObjects, pruneUpgradeBackups } from '../restore/upgrade-backups';
 import { BACKUP_PREFIX, literal, manifestKey, quoteName, type BackupPart } from '../restore/archive';
+import { guardedTables, UPGRADE_GUARD_TRIGGERS, UPGRADE_PROGRESS_KEY, upgradeGuards, writesPaused } from './database';
 
-const CONTROL = new Set(['maintenance_state', 'crate_schema', 'crate_migrations', 'crate_release']);
-const GUARDED_ACTIONS = ['INSERT', 'UPDATE', 'DELETE'];
-export function upgradeGuards(table: string): string {
-	if (CONTROL.has(table)) return '';
-	return GUARDED_ACTIONS.map(action => `CREATE TRIGGER IF NOT EXISTS ${quoteName(`crate_upgrade_${table}_${action}`)} BEFORE ${action} ON ${quoteName(table)} BEGIN SELECT RAISE(ABORT, 'Crate server upgrade in progress'); END;`).join('\n');
-}
 const PAGE_ROWS = 500;
 const ROWID = 'crate_upgrade_rowid';
 type Query = (sql: string, params?: string[]) => Promise<Array<Record<string, unknown>>>;
@@ -47,12 +42,6 @@ async function* tablePages(rows: Query, table: string, definition: string, start
 	}
 }
 
-export function removeUpgradeGuards(table: string): string {
-	return GUARDED_ACTIONS.map(action => `DROP TRIGGER IF EXISTS ${quoteName(`crate_upgrade_${table}_${action}`)};`).join('\n');
-}
-
-/** Saved in D1 so an interrupted backup resumes on any device instead of restarting. */
-const PROGRESS_KEY = 'crate_upgrade_backup';
 // Database parts end at statement boundaries, so each part stays a few megabytes.
 const PART_CHARACTERS = 4 * 1024 * 1024;
 interface FileReference { key: string; sha256: string; size: number }
@@ -76,7 +65,7 @@ function parseProgress(value: unknown): BackupProgress | null {
 	return parsed as unknown as BackupProgress;
 }
 async function readProgress(query: Query): Promise<SavedProgress> {
-	const rows = await query(`SELECT value FROM maintenance_state WHERE key = '${PROGRESS_KEY}';`);
+	const rows = await query(`SELECT value FROM maintenance_state WHERE key = '${UPGRADE_PROGRESS_KEY}';`);
 	if (!rows.length) return { raw: null, progress: null };
 	const progress = parseProgress(rows[0]?.value);
 	if (rows.length !== 1 || !progress) throw new Error('The saved upgrade backup progress is invalid. The update stopped before changing the database schema.');
@@ -87,8 +76,8 @@ const progressChanged = () => new Error('The upgrade backup changed during this 
 async function saveProgress(query: Query, expected: string | null, next: BackupProgress): Promise<string> {
 	const value = JSON.stringify(next);
 	const saved = expected === null
-		? await query(`INSERT INTO maintenance_state(key, value) VALUES ('${PROGRESS_KEY}', ?) ON CONFLICT(key) DO NOTHING RETURNING value;`, [value])
-		: await query(`UPDATE maintenance_state SET value = ? WHERE key = '${PROGRESS_KEY}' AND value = ? RETURNING value;`, [value, expected]);
+		? await query(`INSERT INTO maintenance_state(key, value) VALUES ('${UPGRADE_PROGRESS_KEY}', ?) ON CONFLICT(key) DO NOTHING RETURNING value;`, [value])
+		: await query(`UPDATE maintenance_state SET value = ? WHERE key = '${UPGRADE_PROGRESS_KEY}' AND value = ? RETURNING value;`, [value, expected]);
 	if (saved.length !== 1 || saved[0]?.value !== value) throw progressChanged();
 	return value;
 }
@@ -206,9 +195,9 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
 	const tables = definitions.filter(row => row.type === 'table').map(row => String(row.name));
 	if (!tables.includes('files') || !tables.includes('crate_schema')) throw new Error('Cannot back up an unrecognized server database');
 	const context: BackupContext = { api, accountId, bucketName, query, definitions };
-	const guarded = tables.filter(table => !CONTROL.has(table));
-	const triggers = new Set((await query("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'crate_upgrade_%';")).map(row => String(row.name)));
-	const paused = guarded.every(table => GUARDED_ACTIONS.every(action => triggers.has(`crate_upgrade_${table}_${action}`)));
+	const guarded = guardedTables(tables);
+	const triggers = new Set((await query(UPGRADE_GUARD_TRIGGERS)).map(row => String(row.name)));
+	const paused = writesPaused(guarded, triggers);
 	// Keep the fence while any write guard remains, even if the backup fails.
 	if (triggers.size) fence.requireVerification();
 	let { raw, progress } = await readProgress(query);
@@ -232,13 +221,19 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
 		fence.requireVerification();
 		// Pausing writers and starting the export commit together.
 		await fence.mutate(() => api.queryD1(accountId, databaseId, `${guarded.map(upgradeGuards).join('\n')}
-UPDATE maintenance_state SET value = ${literal(next)} WHERE key = '${PROGRESS_KEY}' AND value = ${literal(raw)};`), 'freeze-upgrade-data');
+UPDATE maintenance_state SET value = ${literal(next)} WHERE key = '${UPGRADE_PROGRESS_KEY}' AND value = ${literal(raw)};`), 'freeze-upgrade-data');
 		if ((await readProgress(query)).raw !== next) throw progressChanged();
 		raw = next; progress = dumping;
 	} else input.onProgress?.('Resuming the server database backup…');
 	if (progress.phase === 'dumping') ({ raw, progress } = await dumpDatabase(context, { raw: raw!, progress }));
 	if (progress.phase !== 'finishing') throw progressChanged();
+	await finishArchive(context, { databaseId, fence, onProgress: input.onProgress }, { raw: raw!, progress });
+}
 
+/** Copies the frozen database's files that are not stored yet, writes and verifies
+ * the manifest, then marks the backup complete. Runs while every write guard exists. */
+async function finishArchive(context: BackupContext, input: { databaseId: string; fence: DeploymentFence; onProgress?: (message: string) => void }, saved: { raw: string; progress: ExportedProgress }): Promise<void> {
+	const { api, accountId, bucketName, query } = context, { databaseId, fence } = input, { raw, progress } = saved;
 	input.onProgress?.('Finishing and verifying the backup archive…');
 	const stored = await listBackupObjects(api, accountId, bucketName, `${UPGRADE_BACKUP_STORE}/objects/`);
 	const files = new Map<string, FileReference>();
@@ -270,14 +265,7 @@ UPDATE maintenance_state SET value = ${literal(next)} WHERE key = '${PROGRESS_KE
 	await api.throttle();
 	if (await sha256Hex(await api.getRecoveryObject(accountId, bucketName, manifestKey(progress.prefix))) !== await sha256Hex(manifest)) throw new Error('Checkpoint manifest verification failed');
 	const complete = JSON.stringify({ ...progress, phase: 'complete' });
-	await fence.mutate(() => api.queryD1(accountId, databaseId, `UPDATE maintenance_state SET value = ${literal(complete)} WHERE key = '${PROGRESS_KEY}' AND value = ${literal(raw)};
+	await fence.mutate(() => api.queryD1(accountId, databaseId, `UPDATE maintenance_state SET value = ${literal(complete)} WHERE key = '${UPGRADE_PROGRESS_KEY}' AND value = ${literal(raw)};
 INSERT OR REPLACE INTO maintenance_state(key, value) VALUES ('crate_upgrade_checkpoint', ${literal(progress.prefix)});`), 'verify-upgrade-checkpoint');
 	if ((await readProgress(query)).raw !== complete) throw progressChanged();
-}
-
-/** Resumes writers after the upgraded server is verified. Its backup is then complete history. */
-export async function releaseUpgradeGuards(api: Pick<CloudflareApiClient, 'queryD1'>, account: string, database: string, fence: DeploymentFence) {
-	const rows = (await api.queryD1(account, database, "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'crate_upgrade_%';")).flatMap(result => result.results ?? []);
-	if (rows.length) await fence.mutate(() => api.queryD1(account, database, [...rows.map(row => `DROP TRIGGER ${quoteName(String(row.name))};`),
-		`DELETE FROM maintenance_state WHERE key = '${PROGRESS_KEY}';`].join('\n')), 'resume-upgraded-server');
 }
