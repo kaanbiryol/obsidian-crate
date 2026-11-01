@@ -39,7 +39,7 @@ export function renderConfigSection(context: SettingsSectionContext, showHeading
 		let pairingLink = '';
 		new Setting(containerEl)
 			.setName('Pairing link')
-			.setDesc('Paste the pairing link from your desktop.')
+			.setDesc('Paste the pairing link from your other device.')
 			.addText(text => text.setPlaceholder('Pairing link').onChange(value => { pairingLink = value; }))
 			.addButton(button => button.setButtonText('Connect').onClick(() => {
 				void import('../../../plugin/device-pairing').then(({ handleDevicePairingLink }) => handleDevicePairingLink(plugin, pairingLink));

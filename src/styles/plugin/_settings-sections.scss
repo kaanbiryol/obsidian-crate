@@ -63,6 +63,11 @@ body.reduce-motion .crate-action-progress {
 	border-radius: var(--image-radius, var(--radius-s));
 }
 
+.crate-qr-caption {
+	margin: 8px 0 0;
+	text-align: center;
+}
+
 .crate-diagnostics {
 	margin: 8px 0 16px;
 	padding: 8px 8px;
