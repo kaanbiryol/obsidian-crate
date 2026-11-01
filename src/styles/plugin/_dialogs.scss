@@ -60,6 +60,16 @@
 	pointer-events: auto;
 }
 
+/*
+ * Obsidian mobile styles `.modal-content` as a scroller. iOS WebKit clips fixed
+ * descendants of a scroller to its box, and this content box is empty, so the
+ * sheet would paint only inside a 32px corner while still receiving taps.
+ */
+.modal.crate-reminder-editor-modal > .modal-content,
+.modal.crate-reminders-compact-modal > .modal-content {
+	overflow: visible !important;
+}
+
 .modal.crate-shared-modal {
   @include tokens.styles;
   @include native-settings.styles;
