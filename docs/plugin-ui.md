@@ -2,6 +2,15 @@
 
 Obsidian-only presentation: dialogs and the settings tab. Shared tokens, components and visual rules are in [UI styling](ui-styling.md).
 
+## Sync status on mobile
+
+Obsidian mobile hides plugin status bar items, so `ui/header-status.ts` adds the
+shared sync indicator to each main-area view header instead; selecting it opens
+sync activity. On mobile a failed sync also shows one notice until a sync
+succeeds again, except offline and revoked access, which have their own notices.
+On every platform, a sync that rewrites files in the configuration folder asks
+once per session for a restart, because Obsidian reads most settings at launch.
+
 ## Plugin dialogs
 
 Native dialogs use `SharedModal`; React content in an Obsidian shell uses

@@ -52,6 +52,7 @@ export class SyncRuntime {
 	private stateChangeListeners = new Set<(state: SyncState) => void>();
 	private activityProgress: SyncActivityProgress | null = null;
 	private progressListeners = new Set<(current: number, total: number) => void>();
+	private syncResultListeners = new Set<(result: SyncResult) => void>();
 	private readonly vaultEvents = new VaultEventGate(() => this.syncEngine, () => this.plugin.app.workspace.layoutReady !== false);
 	private initializing: boolean;
 	private initializationError: string | null = null;
@@ -251,6 +252,15 @@ export class SyncRuntime {
 
 	removeProgressListener(listener: (current: number, total: number) => void): void {
 		this.progressListeners.delete(listener);
+	}
+
+	/** Called once for each recorded sync, whether a person or a schedule started it. */
+	addSyncResultListener(listener: (result: SyncResult) => void): void {
+		this.syncResultListeners.add(listener);
+	}
+
+	removeSyncResultListener(listener: (result: SyncResult) => void): void {
+		this.syncResultListeners.delete(listener);
 	}
 
 	isConfigured(): boolean {
@@ -605,6 +615,9 @@ export class SyncRuntime {
 			timings: engine.getTimings(),
 			...(api ? { requestDiagnostics: engine.getRequestDiagnostics() } : {}),
 		});
+		for (const listener of this.syncResultListeners) {
+			try { listener(result); } catch (error) { logger.warn('Sync result listener failed:', errorMessage(error)); }
+		}
 		if (result.success && !result.conflicts.length && checkpointDue({
 			type, history: this.settings.syncHistory, latest, lastCheckpointAt: this.lastCheckpointAt,
 			trackedFiles: engine.trackedFileCount(), now: Date.now(),

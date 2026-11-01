@@ -32,6 +32,24 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(runtime.getActivityProgress()).toBeNull();
 	});
 
+	it('announces each recorded manual and automatic result, but not cancellations', async () => {
+		const { runtime } = createRuntimeHarness();
+		const result = { ...createEmptySyncResult(), downloadedPaths: ['.obsidian/app.json'] };
+		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
+		await initializeRuntime(runtime, { sync: vi.fn(async () => result), saveSharedHistoryCheckpoint: vi.fn(async () => undefined) });
+		const automatic = callback.mock.calls.at(-1)![0];
+		callback.mockRestore();
+		const listener = vi.fn();
+		runtime.addSyncResultListener(listener);
+		await runtime.sync();
+		await automatic(result);
+		await automatic(cancelSyncResult(result));
+		expect(listener.mock.calls).toEqual([[result], [result]]);
+		runtime.removeSyncResultListener(listener);
+		await runtime.sync();
+		expect(listener).toHaveBeenCalledTimes(2);
+	});
+
 	it('spaces ordinary sync checkpoints by vault size but always saves one for full syncs', async () => {
 		vi.useFakeTimers({ now: Date.parse('2026-10-17T10:00:00Z') });
 		try {

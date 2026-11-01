@@ -1,13 +1,15 @@
-import type { Plugin } from 'obsidian';
+import { Platform, type Plugin } from 'obsidian';
 import type { SyncRuntime } from '../sync/runtime/runtime';
 import { StatusBarManager } from '../ui/status';
+import { HeaderSyncIndicator } from '../ui/header-status';
 
 type StatusRuntime = Pick<SyncRuntime, 'isInitialized' | 'getState' | 'getActivityProgress'
 	| 'addStateChangeListener' | 'removeStateChangeListener' | 'addProgressListener' | 'removeProgressListener'>;
 
 /** Plugin UI owns its lifetime; runtime events contain no status-bar dependencies. */
 export function registerSyncStatus(plugin: Plugin, runtime: StatusRuntime, onClick: () => void): void {
-	const status = new StatusBarManager(plugin, onClick);
+	// Obsidian mobile does not show status bar items.
+	const status = Platform.isMobile ? new HeaderSyncIndicator(plugin, onClick) : new StatusBarManager(plugin, onClick);
 	const render = () => {
 		const state = runtime.getState();
 		// Initialization failures must remain visible even when there is no engine.

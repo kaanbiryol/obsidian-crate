@@ -1,7 +1,8 @@
 import { registerSyncStatus } from './sync-status';
+import { registerSyncResultNotices } from './sync-result-notices';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
-import { Notice, TFile, type Events, type TAbstractFile } from 'obsidian';
+import { Notice, Platform, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import { notifyConflicts } from '../sync/conflict/conflict';
@@ -25,6 +26,12 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 	registerSyncStatus(plugin, plugin.syncRuntime, () => {
 		new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
 	});
+	registerSyncResultNotices({
+		configDir: plugin.app.vault.configDir,
+		isMobile: Platform.isMobile,
+		register: cleanup => plugin.register(cleanup),
+		showSyncError: message => showSyncErrorNotice(plugin, message),
+	}, plugin.syncRuntime);
 	let serverUnavailable = false;
 	plugin.syncRuntime.addStateChangeListener(state => {
 		if (state.status !== 'offline') { serverUnavailable = false; return; }

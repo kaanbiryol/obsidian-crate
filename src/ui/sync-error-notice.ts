@@ -2,7 +2,12 @@ import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { ActivityModal } from './activity/activity-modal';
 
+let lastShownAt = 0;
+
+/** A background-failure notice and a Sync now notice for the same run show once. */
 export function showSyncErrorNotice(plugin: CratePlugin, message: string): void {
+	if (Date.now() - lastShownAt < 2000) return;
+	lastShownAt = Date.now();
 	const content = createFragment();
 	content.append(`${message} `);
 	const link = createEl('a', { text: 'View errors', href: '#', cls: 'crate-sync-error-link' });
