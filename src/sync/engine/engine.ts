@@ -74,6 +74,8 @@ export class SyncEngine {
 	private prepareReminderScope?: () => Promise<void>;
 	private readonly rawConfigEvents: (path: string) => Promise<void>;
 	private ignore: IgnoreMatcherContext;
+	/** The patterns the pending list was last built with; settings objects are updated in place. */
+	private pendingScanPatterns: readonly string[];
 	private syncActivityRevision = 0;
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Per engine, so new credentials (a new engine) can show the notice again. */
@@ -115,6 +117,7 @@ export class SyncEngine {
 			this.updateState({ conflictCount });
 		});
 		this.ignore = this.createIgnoreContext(settings);
+		this.pendingScanPatterns = [...settings.ignorePatterns];
 		this.lifecycle = new SyncEngineLifecycle({
 			apiConfigured: () => this.api.isConfigured(),
 			getStatus: () => this.state.status,
@@ -231,7 +234,7 @@ export class SyncEngine {
 		logger.info('Engine initialized');
 		this.plugin.app.workspace.onLayoutReady(() => {
 			this.scheduleConflictRecovery();
-			if (!this.settings.automaticSync) this.restoreStartupPendingChanges();
+			if (!this.settings.automaticSync) this.restoreLocalPendingChanges();
 			else this.updateState({ initializing: false });
 		});
 		this.seedMarkdownBaseCacheInBackground();
@@ -251,8 +254,12 @@ export class SyncEngine {
 	updateSettings(settings: SyncSettings): void {
 		this.settings = settings;
 		this.ignore = this.createIgnoreContext(settings);
+		const removedPattern = this.pendingScanPatterns.some(pattern => !settings.ignorePatterns.includes(pattern));
+		this.pendingScanPatterns = [...settings.ignorePatterns];
 		this.lifecycle.settingsChanged();
 		this.queueController.settingsChanged();
+		// Files a removed exclusion now includes fire no vault events; list them like the startup scan does.
+		if (removedPattern && this.state.initializing === false && !settings.automaticSync) this.restoreLocalPendingChanges();
 	}
 
 	setReminderScopePreparation(prepare?: () => Promise<void>): void {
@@ -502,7 +509,7 @@ export class SyncEngine {
 		return () => revision === this.syncActivityRevision;
 	}
 
-	private restoreStartupPendingChanges(): void {
+	private restoreLocalPendingChanges(): void {
 		if (this.lifecycle.isDestroyed) return;
 		if (this.state.status === 'syncing') {
 			this.updateState({ initializing: false });

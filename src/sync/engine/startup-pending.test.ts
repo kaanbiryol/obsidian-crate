@@ -8,8 +8,8 @@ import { VERIFICATION_FILE_BUDGET } from './content-verifier';
 import { LOCAL_CONTENT_CHECK_INTERVAL_MS } from './lifecycle';
 import { sha256Hex } from '../../platform/sha256';
 
-async function setup() {
-	const h = createHarness({ automaticSync: false, lastSync: '2026-09-19T10:00:00Z' });
+async function setup(ignorePatterns?: string[]) {
+	const h = createHarness({ automaticSync: false, lastSync: '2026-09-19T10:00:00Z', ...(ignorePatterns ? { ignorePatterns } : {}) });
 	const original = toArrayBuffer('original');
 	const hash = await sha256Hex(original);
 	for (const path of ['edited.md', 'unchanged.md', 'deleted.md', 'old-name.md']) {
@@ -141,6 +141,28 @@ describe('pending changes after restart with automatic sync off', () => {
 			await restore(h);
 			expect(h.engine.getState().status).toBe('error');
 			expect(h.engine.getState().lastError).toContain('disk unavailable');
+		} finally { h.engine.destroy(); }
+	});
+
+	it('lists files a removed exclusion now includes, without syncing', async () => {
+		const h = await setup(['.hidden.md']);
+		try {
+			await restore(h);
+			expect(h.engine.getPendingKeys()).not.toContain('.hidden.md');
+			const listings = h.vault.adapter.list.mock.calls.length;
+			// Settings pages replace the list on the shared settings object before notifying the engine.
+			h.settings.ignorePatterns = ['.hidden.md', 'never-matches.md'];
+			h.engine.updateSettings(h.settings);
+			await h.engine.waitForIdle();
+			expect(h.vault.adapter.list).toHaveBeenCalledTimes(listings);
+			h.settings.ignorePatterns = ['never-matches.md'];
+			h.engine.updateSettings(h.settings);
+			await h.engine.waitForIdle();
+			expect(h.engine.getPendingKeys()).toContain('.hidden.md');
+			expect(h.engine.getState()).toMatchObject({ status: 'idle', pendingChanges: 6 });
+			for (const call of [h.api.getChanges, h.api.getManifest, h.api.uploadFile, h.api.batchUpload, h.api.batchDelete]) {
+				expect(call).not.toHaveBeenCalled();
+			}
 		} finally { h.engine.destroy(); }
 	});
 

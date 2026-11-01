@@ -30,6 +30,11 @@ saved last-sync timestamp does not show green before those checks finish. Sync
 activity shows **Checking local files…** during local startup checks; errors and
 server availability warnings remain visible.
 
+With automatic sync off, removing or editing an exclusion pattern runs the same
+local scan, so files the old pattern hid appear as pending changes. Unchanged
+files fire no vault events, so without this scan they would only surface at the
+next full sync. With automatic sync on, the next periodic check finds them.
+
 ## Sync Modes
 
 ### 1. Periodic Check
