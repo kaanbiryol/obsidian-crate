@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import { useReminderCardInteractions } from '@/reminders/ui/shared/useReminderCardInteractions';
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
@@ -22,38 +22,10 @@ export const WebReminderCard = memo(function WebReminderCard({
 	onEdit: (id: string) => void;
 	onToggleComplete: (id: string, completed: boolean) => void | Promise<void>;
 }) {
-	const mountedRef = useRef(true);
-	const isCompletingRef = useRef(false);
-	const [completionPreview, setCompletionPreview] = useState(false);
-
-	useEffect(() => {
-		mountedRef.current = true;
-		return () => {
-			mountedRef.current = false;
-		};
-	}, []);
-
-	useEffect(() => {
-		if (!reminder.completed) return;
-		setCompletionPreview(false);
-	}, [reminder.completed]);
-
-	const toggleComplete = useCallback(() => {
-		if (isCompletingRef.current) return;
-		isCompletingRef.current = true;
-		if (!reminder.completed) setCompletionPreview(true);
-		void Promise.resolve()
-			.then(() => onToggleComplete(reminder.id, reminder.completed))
-			.finally(() => {
-				isCompletingRef.current = false;
-				if (mountedRef.current) setCompletionPreview(false);
-			});
-	}, [onToggleComplete, reminder.completed, reminder.id]);
-
-	const wrapperRef = useReminderCardInteractions({
+	const { wrapperRef, completionPreview } = useReminderCardInteractions({
+		completed: reminder.completed,
 		onEdit: () => onEdit(reminder.id),
-		onToggleComplete: toggleComplete,
-		isDisabled: () => isCompletingRef.current,
+		onToggleComplete: () => onToggleComplete(reminder.id, reminder.completed),
 	});
 
 	return (

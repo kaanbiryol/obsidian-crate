@@ -6,7 +6,7 @@
  * - Integrates with the reminder repository and modal system
  */
 import { Notice } from 'obsidian';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import { useReminderCardInteractions } from '@/reminders/ui/shared/useReminderCardInteractions';
 import { createLogger } from '@/reminders/logger';
@@ -43,20 +43,12 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
 }: ReminderCardWrapperProps) {
 	const plugin = PluginContext.use();
 	const listStyle = useRemindersSettingsStore(state => state.listStyle);
-	const isTogglingRef = useRef(false);
-	const [completionPreview, setCompletionPreview] = useState<{ source: Reminder; completed: boolean }>();
 
 	/**
 	 * Handle reminder completion toggle
 	 * Optimistic updates are handled by ReminderIndex
 	 */
 	const handleToggle = useCallback(async () => {
-		if (isTogglingRef.current) return;
-		isTogglingRef.current = true;
-		// The exiting row keeps its old props. Give it immediate checkbox feedback,
-		// and let the next repository snapshot take over without a timer or delay.
-		setCompletionPreview({ source: reminder, completed: !reminder.completed });
-
 		try {
 			if (reminder.completed) {
 				await requireReminderBackend(plugin).repository.uncomplete(reminder.id);
@@ -64,11 +56,8 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
 				await requireReminderBackend(plugin).repository.complete(reminder.id);
 			}
 		} catch (error) {
-			setCompletionPreview(undefined);
 			log.error('Failed to toggle reminder', error);
 			new Notice(errorMessage(error));
-		} finally {
-			isTogglingRef.current = false;
 		}
 	}, [plugin, reminder]);
 
@@ -79,10 +68,10 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
 		openReminderEditModal(plugin, reminder, onUpdate ?? (() => undefined));
 	}, [onUpdate, plugin, reminder]);
 
-	const wrapperRef = useReminderCardInteractions({
+	const { wrapperRef, completionPreview } = useReminderCardInteractions({
+		completed: reminder.completed,
 		onEdit: handleEdit,
 		onToggleComplete: handleToggle,
-		isDisabled: () => isTogglingRef.current,
 	});
 
 	return (
@@ -95,17 +84,8 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
 		>
 			<SharedReminderCard
 				listStyle={listStyle}
-				reminder={{
-					id: reminder.id,
-					content: reminder.content,
-					description: reminder.description,
-					completed: completionPreview?.source === reminder ? completionPreview.completed : reminder.completed,
-					dueDatetime: reminder.dueDatetime,
-					dueDate: reminder.dueDate,
-					priority: reminder.priority,
-					project: reminder.project,
-					recurrence: reminder.recurrence,
-				}}
+				reminder={reminder}
+				completionPreview={completionPreview}
 				animationConfig={{ enabled: false }}
 				index={index}
 				hideProject={hideProject}
