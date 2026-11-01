@@ -4,7 +4,7 @@ import { isStoredReminderDate, isStoredReminderDatetime } from '@/reminders/core
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 import type { ModalDraft, ModalPickerId, ReminderRecord } from '../types';
 import { isSyncPath } from '@/protocol/sync-validation';
-import { isMarkdownPath } from '../../../protocol/note-paths';
+import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-paths';
 
 const prioritySchema = v.picklist([1, 4]);
 // Validate existing metadata without normalizing or replacing the stored value.
@@ -58,7 +58,7 @@ export function isReminderRecord(value: unknown): value is ReminderRecord {
 }
 
 export function isStoredReminderRecord(value: unknown, folderPath: string): value is ReminderRecord {
-	return isReminderRecord(value) && value.filePath.startsWith(`${folderPath}/`);
+	return isReminderRecord(value) && isMarkdownNoteInFolder(value.filePath, folderPath);
 }
 
 export function isReminderList(value: unknown, folderPath: string): value is ReminderRecord[] {
@@ -69,7 +69,7 @@ export function isReminderList(value: unknown, folderPath: string): value is Rem
 /** For records that each passed reminder validation on entry: recheck only the
  * folder scope and identity uniqueness of their combination. */
 export function isScopedReminderList(records: ReminderRecord[], folderPath: string): boolean {
-	return records.every(record => record.filePath.startsWith(`${folderPath}/`))
+	return records.every(record => isMarkdownNoteInFolder(record.filePath, folderPath))
 		&& new Set(records.map(record => record.id)).size === records.length;
 }
 

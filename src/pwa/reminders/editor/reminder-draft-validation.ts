@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import { isStoredReminderDraft, storedObject, storedStringChoice } from '../cache/reminder-storage-validation';
 import type { ModalState } from '../types';
 import { isSyncPath } from '../../../protocol/sync-validation';
-import { isMarkdownPath } from '../../../protocol/note-paths';
+import { isMarkdownNoteInFolder } from '../../../protocol/note-paths';
 
 const optionalString = v.optional(v.string());
 const modalSchema = storedObject({
@@ -17,8 +17,7 @@ const modalSchema = storedObject({
 });
 
 function filePath(value: string | undefined, folderPath: string): boolean {
-	return value === undefined || value.startsWith(`${folderPath}/`)
-		&& isMarkdownPath(value) && isSyncPath(value);
+	return value === undefined || isMarkdownNoteInFolder(value, folderPath) && isSyncPath(value);
 }
 
 /** Validate drafts without rewriting saved data. */

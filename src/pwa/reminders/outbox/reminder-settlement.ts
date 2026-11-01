@@ -4,6 +4,7 @@ import type { PendingReminderChange, ReminderChangeResult } from './reminder-out
 import type { ReminderRecord } from '../types';
 import { sealPrivateValue, openPrivateValue, REMINDER_OUTBOX_PREFIX } from '../private-storage';
 import { isReminderOperationId } from '../../../protocol/reminder-operation';
+import { isMarkdownNoteInFolder } from '../../../protocol/note-paths';
 import { sha256Hex } from '../../../platform/sha256';
 
 interface ReminderSettlement {
@@ -49,7 +50,7 @@ export async function createReminderSettlementChannel(authToken: string, folderP
 				if (typeof value.recordId !== 'string' || !value.recordId) return null;
 				if (value.kind === 'delete') return value as ReminderSettlement;
 				if ((value.kind !== 'save' && value.kind !== 'complete') || !isConfirmedReminder(value.reminder, value.recordId)
-					|| !value.reminder.filePath.startsWith(`${folderPath}/`)) return null;
+					|| !isMarkdownNoteInFolder(value.reminder.filePath, folderPath)) return null;
 				return value as ReminderSettlement;
 			} catch { return null; }
 		},

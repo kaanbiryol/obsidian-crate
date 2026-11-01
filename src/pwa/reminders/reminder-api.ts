@@ -3,6 +3,7 @@ import type { ReminderRecord, ReminderSourceIssue } from './types';
 import { isReminderList, isScopedReminderList } from './cache/reminder-storage-validation';
 import { parseReminderSourceIssues } from './cache/reminder-source-issues';
 import { compareCodePoints } from '@/protocol/portable-path';
+import { isPathInFolder } from '@/protocol/note-paths';
 
 export interface ReminderIndexingProgress {
 	indexedFiles: number;
@@ -29,7 +30,7 @@ function parseReminderDeltaResponse(value: unknown, folderPath: string): {
 	if (!value || typeof value !== 'object' || Array.isArray(value) || (value as { delta?: unknown }).delta !== true) return null;
 	const result = value as Record<string, unknown>;
 	const changedPaths = result.changedPaths;
-	if (!Array.isArray(changedPaths) || !changedPaths.every(path => typeof path === 'string' && path.startsWith(`${folderPath}/`))
+	if (!Array.isArray(changedPaths) || !changedPaths.every(path => typeof path === 'string' && isPathInFolder(path, folderPath))
 		|| !isReminderList(result.reminders, folderPath) || !Array.isArray(result.projects) || !result.projects.every(project => typeof project === 'string')
 		|| !Array.isArray(result.issues) || result.issues.length) return null;
 	const changed = new Set(changedPaths as string[]);
