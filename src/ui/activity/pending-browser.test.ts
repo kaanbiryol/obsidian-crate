@@ -116,3 +116,13 @@ it('shows a Crate update bundle as an update listing its files, without diffing 
 	expect(load).not.toHaveBeenCalled();
 	state.dispose?.();
 });
+
+it('renders the rows in view plus overscan, clamped to the list', async () => {
+	const { pendingRowWindow } = await import('./pending-browser');
+	expect(pendingRowWindow(0, 480, 48, 1000)).toEqual({ start: 0, end: 20 });
+	expect(pendingRowWindow(4800, 480, 48, 1000)).toEqual({ start: 90, end: 120 });
+	expect(pendingRowWindow(4810, 500, 48, 1000)).toEqual({ start: 90, end: 121 });
+	expect(pendingRowWindow(47_500, 480, 48, 1000)).toEqual({ start: 979, end: 1000 });
+	expect(pendingRowWindow(0, 0, 48, 1000)).toEqual({ start: 0, end: 50 });
+	expect(pendingRowWindow(0, 480, 48, 3)).toEqual({ start: 0, end: 3 });
+});

@@ -3,7 +3,7 @@ import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { isBinaryPreviewPath } from '../../sync/history/preview-format';
 import { decodePendingChange } from '../../sync/pending/pending-change';
 import { countDiff } from './diff-model';
-import { renderDiffPreview } from './pending-diff';
+import { createPendingDetail, crateUpdateTitle } from './pending-detail';
 import { PendingComparisons } from './pending-comparisons';
 import { createPendingActions, type PendingActions } from './pending-actions';
 import { createPendingRowSelection, type PendingRowSelectionState } from './pending-row-selection';
@@ -34,6 +34,16 @@ const OVERSCAN_ROWS = 10;
 /** Rows to render while the list has no size yet, such as on a hidden tab. */
 const UNSIZED_ROWS = 40;
 
+/** Rows to render, `start` inclusive and `end` exclusive: those in view plus overscan on
+ * each side. A list with no size yet renders a fixed number of rows. */
+export function pendingRowWindow(scrollTop: number, viewport: number, rowPx: number, count: number): { start: number; end: number } {
+	const first = Math.floor(scrollTop / rowPx);
+	return {
+		start: Math.max(0, first - OVERSCAN_ROWS),
+		end: Math.min(count, first + (viewport > 0 ? Math.ceil(viewport / rowPx) : UNSIZED_ROWS) + OVERSCAN_ROWS),
+	};
+}
+
 /** Check file statuses on opening, or on selection in long lists; keep one selected comparison in view. */
 export function renderPendingBrowser(container: HTMLElement, paths: string[], load: PendingDiffLoader, state: PendingBrowserState = {}, actions?: PendingActions): void {
 	const changes = paths.map(decodePendingChange);
@@ -49,25 +59,13 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	const rowSelection = createPendingRowSelection(sidebar, paths, state);
 	const selection = actions ? createPendingActions(sidebar, heading, paths, state.excludedKeys ??= new Set(), actions, rowSelection) : undefined;
 
-	const detail = browser.createDiv({ cls: 'crate-browser-detail', attr: { role: 'region', 'aria-label': 'File comparison' } });
-	detail.id = `crate-pending-detail-${nextBrowserId}`;
-	const toolbar = detail.createDiv({ cls: 'crate-browser-toolbar' });
-	const back = toolbar.createEl('button', { cls: 'crate-browser-back', attr: { type: 'button', 'aria-label': 'Back to files' } });
-	setIcon(back.createSpan({ attr: { 'aria-hidden': 'true' } }), 'arrow-left');
-	back.createSpan({ text: 'Files' });
-	const fileInfo = toolbar.createDiv({ cls: 'crate-browser-file-heading' });
-	const fileName = fileInfo.createDiv({ cls: 'crate-browser-file-title' });
-	const filePath = fileInfo.createDiv({ cls: 'crate-browser-file-folder' });
-	const comparisonHeader = toolbar.createDiv({ cls: 'crate-diff-header' });
-	toolbar.hidden = true;
-	const preview = detail.createDiv({ cls: 'crate-file-diff' });
-	const empty = preview.createDiv({ cls: 'crate-browser-empty' });
-	setIcon(empty.createSpan({ cls: 'crate-browser-empty-icon', attr: { 'aria-hidden': 'true' } }), 'file-diff');
-	empty.createDiv({ text: 'Select a file', cls: 'crate-browser-empty-title' });
-	empty.createDiv({ text: 'Compare this device’s changes with its last-synced copy.' });
-
-	let requestRevision = 0;
 	let selectedIndex = -1;
+	const detail = createPendingDetail(browser, `crate-pending-detail-${nextBrowserId}`, () => {
+		state.showDetail = false;
+		browser.classList.remove('is-reviewing');
+		focusRow(selectedIndex);
+	});
+
 	// Binary files have no text diff; load their metadata only when selected.
 	const updateVersions = changes.map(({ path }) => state.configDir === undefined ? null : crateUpdateVersion(path, state.configDir));
 	const canPreview = (index: number) => !updateVersions[index] && !isBinaryPreviewPath(changes[index]!.path);
@@ -100,20 +98,6 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		const row = rows.get(index);
 		if (browser.isConnected && row) row.status.textContent = 'Unavailable';
 	}, index => autoCheck && needsCheck(index));
-	const showFiles = () => {
-		state.showDetail = false;
-		browser.classList.remove('is-reviewing');
-		focusRow(selectedIndex);
-	};
-	back.addEventListener('click', showFiles);
-	detail.addEventListener('keydown', event => {
-		if (event.key === 'Escape' && back.getClientRects().length > 0) {
-			event.preventDefault();
-			event.stopPropagation();
-			showFiles();
-		}
-	});
-
 	const select = async (index: number, moveFocus = true) => {
 		const key = paths[index];
 		if (!key) return;
@@ -121,46 +105,18 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		state.selectedKey = key;
 		if (moveFocus) state.showDetail = true;
 		browser.classList.toggle('is-reviewing', !!state.showDetail);
-		const { kind, path } = changes[index]!;
-		const parts = path.split('/');
-		const updateVersion = updateVersions[index];
-		fileName.textContent = updateVersion ? crateUpdateTitle(updateVersion) : parts.pop() ?? path;
-		filePath.textContent = updateVersion ? 'Plugin update' : parts.join('/') || 'Vault root';
-		filePath.title = path;
-		toolbar.hidden = false;
 		setFocusIndex(index);
-		comparisonHeader.empty();
-		preview.empty();
-		if (updateVersion) {
-			++requestRevision;
-			renderCrateUpdate(preview, updateVersion, kind === 'delete');
-			if (moveFocus && back.getClientRects().length > 0) back.focus({ preventScroll: true });
-			return;
-		}
-		preview.createDiv({ cls: 'crate-diff-message', text: 'Loading changes…', attr: { role: 'status' } });
-		preview.setAttribute('aria-busy', 'true');
-		if (moveFocus && back.getClientRects().length > 0) back.focus({ preventScroll: true });
-		const revision = ++requestRevision;
-		try {
-			const snapshot = await comparisons.read(index);
-			if (!browser.isConnected || revision !== requestRevision) return;
-			preview.empty();
-			renderDiffPreview(preview, snapshot, path, comparisonHeader);
-		} catch (error) {
-			if (!browser.isConnected || revision !== requestRevision) return;
-			preview.empty();
-			unavailable.add(index);
-			const row = rows.get(index);
-			if (row) row.status.textContent = 'Unavailable';
-			const message = preview.createDiv({ cls: 'crate-diff-message', attr: { role: 'status' } });
-			message.createSpan({ text: error instanceof Error ? error.message : 'Could not load changes.' });
-			const retry = message.createEl('button', { text: 'Try again', cls: 'crate-activity-action', attr: { type: 'button' } });
-			retry.addEventListener('click', () => { void select(index, false); });
-		} finally {
-			if (browser.isConnected && revision === requestRevision) {
-				preview.removeAttribute('aria-busy');
-			}
-		}
+		const { kind, path } = changes[index]!;
+		await detail.show({
+			path, deleted: kind === 'delete', updateVersion: updateVersions[index] ?? null, moveFocus,
+			read: () => comparisons.read(index),
+			failed: () => {
+				unavailable.add(index);
+				const row = rows.get(index);
+				if (row) row.status.textContent = 'Unavailable';
+			},
+			retry: () => { void select(index, false); },
+		});
 	};
 
 	const before = list.createDiv({ attr: { 'aria-hidden': 'true' } });
@@ -224,10 +180,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		row.element.remove();
 	};
 	const renderWindow = () => {
-		const viewport = list.clientHeight;
-		const first = Math.floor(list.scrollTop / rowPx);
-		const start = Math.max(0, first - OVERSCAN_ROWS);
-		const end = Math.min(paths.length, first + (viewport > 0 ? Math.ceil(viewport / rowPx) : UNSIZED_ROWS) + OVERSCAN_ROWS);
+		const { start, end } = pendingRowWindow(list.scrollTop, list.clientHeight, rowPx, paths.length);
 		for (const index of [...rows.keys()]) if (index < start || index >= end) unmountRow(index);
 		let next: Element = after;
 		for (let index = end - 1; index >= start; index--) {
@@ -311,20 +264,6 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	queueMicrotask(() => {
 		if (browser.isConnected && browser.getClientRects().length > 0) comparisons.start();
 	});
-}
-
-const crateUpdateTitle = (version: string) => `Crate ${version} update`;
-
-/** A bundle holds a whole release, so it is described rather than diffed. */
-function renderCrateUpdate(preview: HTMLElement, version: string, deleted: boolean): void {
-	const message = preview.createDiv({ cls: 'crate-diff-message', attr: { role: 'status' } });
-	if (deleted) {
-		message.createDiv({ text: `Removes the Crate ${version} update. A newer version replaced it, so no device installs it.` });
-		return;
-	}
-	message.createDiv({ text: `Your other devices install Crate ${version} on their next sync. Crate's settings and sync state stay on each device.` });
-	const files = message.createEl('ul');
-	for (const name of CRATE_UPDATE_FILES) files.createEl('li', { text: name });
 }
 
 function describeSnapshot(snapshot: PendingDiff): string {
