@@ -195,18 +195,17 @@
 	color: var(--text-muted);
 }
 
-.crate-settings .crate-get-started-progress {
-	height: 4px;
-	margin: 10px 0 6px;
-	border-radius: 2px;
-	background: var(--background-modifier-border);
-	overflow: hidden;
+.crate-settings .crate-get-started-steps {
+	margin-top: 6px;
 }
 
-.crate-settings .crate-get-started-progress-fill {
-	width: var(--crate-get-started-progress, 0%);
-	height: 100%;
-	background: var(--interactive-accent);
+.crate-settings .crate-get-started-subtitle {
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	color: var(--text-muted);
 }
 
 .crate-settings .crate-get-started-step {
@@ -256,5 +255,14 @@
 
 	.crate-get-started-name {
 		color: var(--text-muted);
+	}
+}
+
+.crate-settings .crate-get-started-step.is-upcoming {
+	min-height: 0;
+	padding: 3px 0;
+
+	.crate-get-started-name {
+		color: var(--text-faint);
 	}
 }

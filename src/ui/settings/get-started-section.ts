@@ -6,6 +6,8 @@ import { QRModal } from '../qr-modal';
 import { AddDeviceModal } from './add-device-modal';
 import { canAddDeviceWithCode, loadConnectedDevices } from './devices-section';
 import { buildEnrollmentUrl } from './reminders-web-app';
+import { showSyncErrorNotice } from '../sync-error-notice';
+import { notifyConflicts } from '../../sync/conflict/conflict';
 import type { SettingsSectionContext } from './section-helpers';
 
 interface GetStartedStep {
@@ -25,7 +27,7 @@ export function connectedDeviceKinds(devices: RegisteredDevice[] | null): { othe
 	};
 }
 
-/** First steps, each checked off from this device's real state. Hidden once dismissed. */
+/** Sync setup steps, each checked off from this device's real state, plus optional suggestions. Hidden once dismissed. */
 export function renderGetStartedSection(context: SettingsSectionContext): () => void {
 	const { containerEl, plugin, rerender } = context;
 	if (plugin.settings.getStartedDismissed) return () => {};
@@ -34,13 +36,21 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 	let devices: RegisteredDevice[] | null = plugin.settingsUiState.devices?.tokens ?? null;
 	let disposed = false;
 
+	const addAction = (row: HTMLElement, action: NonNullable<GetStartedStep['action']>, cta: boolean) => {
+		const button = new ButtonComponent(row).setButtonText(action.label).onClick(async () => {
+			button.setDisabled(true);
+			try { await action.run(); } finally { if (!disposed) button.setDisabled(false); }
+		});
+		if (cta) button.setCta();
+	};
+
 	const render = () => {
 		card.empty();
 		const steps = buildSteps(context, devices);
 		const done = steps.filter(step => step.done).length;
 		const header = card.createDiv({ cls: 'crate-get-started-header' });
 		header.createDiv({ cls: 'crate-get-started-title', text: 'Get started' });
-		header.createSpan({ cls: 'crate-get-started-count', text: done === steps.length ? 'All set' : `${done} of ${steps.length}` });
+		header.createSpan({ cls: 'crate-get-started-count', text: done === steps.length ? 'Sync is set up' : `${done} of ${steps.length}` });
 		new ButtonComponent(header).setButtonText(done === steps.length ? 'Done' : 'Hide').onClick(async () => {
 			try {
 				await plugin.writeSettings({ getStartedDismissed: true });
@@ -49,29 +59,39 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 				new Notice(`Could not save settings: ${errorMessage(error)}`);
 			}
 		});
-		const progress = card.createDiv({ cls: 'crate-get-started-progress' });
-		progress.setCssProps({ '--crate-get-started-progress': `${Math.round(done / steps.length * 100)}%` });
-		progress.createDiv({ cls: 'crate-get-started-progress-fill' });
 
+		// Only the next step is expanded, so the list reads as what to do now rather than a to-do list.
+		const next = steps.find(step => !step.done);
 		const list = card.createDiv({ cls: 'crate-get-started-steps' });
 		for (const step of steps) {
 			const row = list.createDiv({ cls: 'crate-get-started-step' });
 			if (step.done) row.addClass('is-done');
+			else if (step !== next) row.addClass('is-upcoming');
 			setIcon(row.createSpan({ cls: 'crate-get-started-icon' }), step.done ? 'circle-check' : 'circle');
 			const body = row.createDiv({ cls: 'crate-get-started-body' });
 			body.createDiv({ cls: 'crate-get-started-name', text: step.name });
-			if (step.done) continue;
+			if (step !== next) continue;
 			body.createDiv({ cls: 'crate-get-started-desc', text: step.desc });
-			const { action } = step;
-			if (!action) continue;
-			const button = new ButtonComponent(row).setButtonText(action.label).onClick(async () => {
-				button.setDisabled(true);
-				try { await action.run(); } finally { if (!disposed) button.setDisabled(false); }
-			});
+			if (step.action) addAction(row, step.action, true);
+		}
+
+		const suggestions = buildSuggestions(context, devices);
+		if (suggestions.length === 0) return;
+		card.createDiv({ cls: 'crate-get-started-subtitle', text: 'Also try' });
+		const extras = card.createDiv({ cls: 'crate-get-started-steps' });
+		for (const suggestion of suggestions) {
+			const row = extras.createDiv({ cls: 'crate-get-started-step is-suggestion' });
+			const body = row.createDiv({ cls: 'crate-get-started-body' });
+			body.createDiv({ cls: 'crate-get-started-name', text: suggestion.name });
+			body.createDiv({ cls: 'crate-get-started-desc', text: suggestion.desc });
+			if (suggestion.action) addAction(row, suggestion.action, false);
 		}
 	};
 
 	render();
+	// A first sync from the status row or the command palette checks its step off here too.
+	const onStateChange = () => { if (!disposed) render(); };
+	plugin.syncRuntime.addStateChangeListener(onStateChange);
 	if (plugin.syncRuntime.isConfigured() && devices === null) {
 		void loadConnectedDevices(plugin).then(tokens => {
 			if (disposed) return;
@@ -79,61 +99,84 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 			render();
 		}).catch(() => { /* The device steps stay unchecked when the list cannot load. */ });
 	}
-	return () => { disposed = true; };
+	return () => {
+		disposed = true;
+		plugin.syncRuntime.removeStateChangeListener(onStateChange);
+	};
 }
 
-function buildSteps({ containerEl, plugin, rerender }: SettingsSectionContext, devices: RegisteredDevice[] | null): GetStartedStep[] {
+function buildSteps({ containerEl, plugin }: SettingsSectionContext, devices: RegisteredDevice[] | null): GetStartedStep[] {
 	const connected = plugin.syncRuntime.isConfigured();
-	const { otherDevice, webApp } = connectedDeviceKinds(devices);
-	const featuresOn = plugin.remindersSettings.enabled || plugin.settings.reading.enabled;
-	const later = (step: string) => connected ? step : 'Connect a server first.';
 	return [
 		{
 			name: 'Connect a server',
-			desc: connected ? 'This vault syncs with your server.' : 'Sign in with Cloudflare, paste a pairing link, or use your own server below.',
+			desc: 'Sign in with Cloudflare, paste a pairing link, or use your own server below.',
 			done: connected,
 		},
 		{
-			name: 'Turn on automatic sync',
-			desc: later('Sync after edits, on startup, and at an interval.'),
-			done: connected && plugin.settings.automaticSync,
-			action: connected ? { label: 'Turn on', run: async () => {
+			name: 'Run your first sync',
+			desc: 'Sync this vault with your server. Until automatic sync is on, Crate syncs only when you select Sync now.',
+			done: connected && Boolean(plugin.settings.lastSync),
+			action: { label: 'Sync now', run: async () => {
+				try {
+					const result = await plugin.syncRuntime.sync();
+					if (result.outcome === 'cancelled') return;
+					if (!result.success) showSyncErrorNotice(plugin, 'Sync completed with errors.');
+					notifyConflicts(result.conflicts);
+				} catch (error) {
+					new Notice(`Sync failed: ${errorMessage(error)}`);
+				}
+			} },
+		},
+		{
+			name: 'Add another device',
+			desc: 'Sync this vault to Obsidian on your phone or another computer.',
+			done: connectedDeviceKinds(devices).otherDevice,
+			action: { label: 'Add a device', run: () => {
+				if (canAddDeviceWithCode(plugin)) new AddDeviceModal(plugin).open();
+				else openSettingsSection(containerEl, 'Account and devices');
+			} },
+		},
+	];
+}
+
+/** Optional extras. They never count toward setup and each disappears once it is on. */
+function buildSuggestions({ containerEl, plugin, rerender }: SettingsSectionContext, devices: RegisteredDevice[] | null): GetStartedStep[] {
+	const connected = plugin.syncRuntime.isConfigured();
+	const remindersOn = plugin.remindersSettings.enabled;
+	const readingOn = plugin.settings.reading.enabled;
+	const showFeatures = { label: 'Show', run: () => { openSettingsSection(containerEl, 'Features'); } };
+	const suggestions: GetStartedStep[] = [
+		{
+			name: 'Automatic sync',
+			desc: 'Sync after edits, on startup, and at an interval.',
+			done: !connected || plugin.settings.automaticSync,
+			action: { label: 'Turn on', run: async () => {
 				try {
 					await writeSyncSettings(plugin, { automaticSync: true });
 					rerender();
 				} catch (error) {
 					new Notice(`Failed to save sync settings: ${errorMessage(error)}`);
 				}
-			} } : undefined,
+			} },
 		},
+		{ name: 'Reminders', desc: 'Keep reminders in your notes and get notified on your phone.', done: remindersOn, action: showFeatures },
+		{ name: 'Reading', desc: 'Save articles to read and highlight later.', done: readingOn, action: showFeatures },
 		{
-			name: 'Add another device',
-			desc: later('Sync this vault to Obsidian on your phone or another computer.'),
-			done: otherDevice,
-			action: connected ? { label: 'Add a device', run: () => {
-				if (canAddDeviceWithCode(plugin)) new AddDeviceModal(plugin).open();
-				else openSettingsSection(containerEl, 'Account and devices');
-			} } : undefined,
-		},
-		{
-			name: 'Open the web app on your phone',
-			desc: later('Reminder notifications and Reading, from your home screen.'),
-			done: webApp,
-			action: connected ? { label: 'Show code', run: async () => {
+			name: 'Install the web app',
+			desc: 'Reminder notifications and Reading, from your home screen.',
+			// The web app only serves reminders and Reading, so it is suggested once one of them is on.
+			done: !connected || !(remindersOn || readingOn) || connectedDeviceKinds(devices).webApp,
+			action: { label: 'Show code', run: async () => {
 				try {
 					new QRModal(plugin.app, await buildEnrollmentUrl(plugin)).open();
 				} catch (error) {
 					new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
 				}
-			} } : undefined,
-		},
-		{
-			name: 'Turn on reminders or Reading',
-			desc: 'Optional. Choose them under Features below.',
-			done: featuresOn,
-			action: { label: 'Show features', run: () => { openSettingsSection(containerEl, 'Features'); } },
+			} },
 		},
 	];
+	return suggestions.filter(suggestion => !suggestion.done);
 }
 
 /** Opens a settings disclosure or scrolls to a section heading by its title. */
