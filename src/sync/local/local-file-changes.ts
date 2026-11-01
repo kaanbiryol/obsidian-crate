@@ -17,6 +17,18 @@ export function skippedUploadIssue(file: Pick<VaultFile, 'path' | 'size'>, encry
 	return encrypted && !fitsEncryptedPathLimit(file.path) ? deepEncryptedFileIssue(file.path) : null;
 }
 
+/** Splits discovered files into those sync may upload and the issues for those it leaves out. */
+export function partitionSkippedUploads<T extends Pick<VaultFile, 'path' | 'size'>>(files: T[], encrypted: boolean): { eligible: T[]; skipped: SyncIssue[] } {
+	const eligible: T[] = [];
+	const skipped: SyncIssue[] = [];
+	for (const file of files) {
+		const issue = skippedUploadIssue(file, encrypted);
+		if (issue) skipped.push(issue);
+		else eligible.push(file);
+	}
+	return { eligible, skipped };
+}
+
 /** Untracked, resized or retimed files need their bytes checked; an unreadable baseline time counts as changed. */
 export function hasLocalMetadataChange(file: Pick<VaultFile, 'size' | 'mtime'>, entry: Pick<FileEntry, 'size' | 'modified'> | undefined): boolean {
 	return !entry || entry.size !== file.size || Date.parse(entry.modified) !== file.mtime;

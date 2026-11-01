@@ -5,7 +5,7 @@ import type { SyncApiClient } from '../worker-api/client';
 import type { PreparedUpload, SyncResult, SyncWork } from '../types';
 import type { TransferContext } from '../transfer/types';
 import { getAllVaultFiles } from '../local/file-discovery';
-import { skippedUploadIssue } from '../local/local-file-changes';
+import { partitionSkippedUploads } from '../local/local-file-changes';
 import { getTransferBudgetBytes, prepareUploadChunks } from '../transfer/budget';
 
 const IMPORT_UPLOAD_CONCURRENCY = 3;
@@ -87,9 +87,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	for (const path of obsolete) transfer.localManifest.removeEntry(path);
 	const inventory = createPathRecord<FileEntry>();
 	// Skipped files are reported, not uploaded; a server row they already have stays as it is.
-	const skipped = local.flatMap(file => skippedUploadIssue(file, transfer.encrypted()) ?? []);
-	const skippedPaths = new Set(skipped.map(issue => issue.path));
-	const files = local.filter(file => !skippedPaths.has(file.path));
+	const { eligible: files, skipped } = partitionSkippedUploads(local, transfer.encrypted());
 	for (const issue of skipped) {
 		(result.issues ??= []).push(issue);
 		const existing = remote.files[issue.path!];

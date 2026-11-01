@@ -1,5 +1,5 @@
 import { oversizedRemoteFileIssue, rejectedSealedNoteIssue, withSyncFileContext } from '../issues';
-import { skippedUploadIssue } from '../local/local-file-changes';
+import { partitionSkippedUploads } from '../local/local-file-changes';
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "../local/file-discovery";
 import { createAbortError } from "../abort";
@@ -39,9 +39,8 @@ export async function createFullSyncPlan(
 	};
 	const localFiles = createPathRecord<FileEntry>();
 	const files = await scan(getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), throwIfStopped));
-	const skipped = files.flatMap(file => skippedUploadIssue(file, context.encrypted()) ?? []);
+	const { eligible, skipped } = partitionSkippedUploads(files, context.encrypted());
 	const skippedLocalPaths = new Set(skipped.map(issue => issue.path));
-	const eligible = files.filter((file) => !skippedLocalPaths.has(file.path));
 
 	const hashTasks = eligible
 		.map((file) => () => withSyncFileContext(file.path, async () => {

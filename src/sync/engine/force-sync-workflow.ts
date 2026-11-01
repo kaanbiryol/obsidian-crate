@@ -1,7 +1,7 @@
 import { createDeleteCandidates, type DeleteRemoteFiles } from '../transfer/delete';
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
-import { skippedUploadIssue } from '../local/local-file-changes';
+import { partitionSkippedUploads } from '../local/local-file-changes';
 import { unsupportedLocalPathIssue } from '../local/local-path-safety';
 import { oversizedRemoteFileIssue, rejectedSealedNoteIssue } from '../issues';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
@@ -75,9 +75,7 @@ export async function runForceFullSyncWorkflow(
 		const localFiles = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
 		// Skipped files stay local paths, so their server copy is neither replaced nor deleted.
 		const localPaths = new Set(localFiles.map(file => file.path));
-		const skipped = localFiles.flatMap(file => skippedUploadIssue(file, context.encrypted()) ?? []);
-		const skippedPaths = new Set(skipped.map(issue => issue.path));
-		const files = localFiles.filter(file => !skippedPaths.has(file.path));
+		const { eligible: files, skipped } = partitionSkippedUploads(localFiles, context.encrypted());
 		if (skipped.length) (result.issues ??= []).push(...skipped);
 
 		// A remote file this device cannot hold is absent here because it was skipped, not

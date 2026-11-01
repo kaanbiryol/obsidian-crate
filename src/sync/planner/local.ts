@@ -3,7 +3,7 @@ import { withSyncFileContext } from '../issues';
 import { getAllVaultFiles } from "../local/file-discovery";
 import type { LocalChangeScan, LocalDiffPlannerContext } from "./types";
 import { sha256Hex } from '../../platform/sha256';
-import { skippedUploadIssue, hasLocalMetadataChange } from '../local/local-file-changes';
+import { partitionSkippedUploads, hasLocalMetadataChange } from '../local/local-file-changes';
 import { localPathExists } from '../local/stored-name';
 
 export async function getLocalDeletes(
@@ -41,12 +41,10 @@ export async function getLocalChanges(
 
 	// Skipped files stay discovered (never local deletes) but are not changes:
 	// each would fail every sync and hold back the changelog cursor.
-	const skipped = allFiles.flatMap(file => skippedUploadIssue(file, context.encrypted()) ?? []);
-	const skippedPaths = new Set(skipped.map(issue => issue.path));
+	const { eligible, skipped } = partitionSkippedUploads(allFiles, context.encrypted());
 
-	const candidates = allFiles.filter(file => !skippedPaths.has(file.path)
-		&& (context.pendingKeys?.has(pendingChangeKey('upload', file.path))
-			|| hasLocalMetadataChange(file, context.localManifest.getEntry(file.path))));
+	const candidates = eligible.filter(file => context.pendingKeys?.has(pendingChangeKey('upload', file.path))
+		|| hasLocalMetadataChange(file, context.localManifest.getEntry(file.path)));
 
 	const tasks = candidates.map((file) => async () => {
 		context.throwIfDestroyed();
