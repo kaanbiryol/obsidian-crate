@@ -10,8 +10,6 @@ export interface FeatureChoice {
 	folder: string;
 	/** Markdown notes already in that folder. */
 	notes: number;
-	/** Another device already uses the feature on this server. */
-	serverOn: boolean;
 }
 
 const NAMES: Record<Feature, string> = { reminders: 'Reminders', reading: 'Reading' };
@@ -24,15 +22,15 @@ const CHANGES: Record<Feature, string> = {
 	reading: 'Turning this on adds Crate frontmatter to each note.',
 };
 
-/** A new or empty folder, or one another device already uses, starts on. */
-function defaultFeatureChoice({ notes, serverOn }: FeatureChoice): boolean {
-	return serverOn || notes === 0;
+/** A new or empty folder starts on. */
+function defaultFeatureChoice({ notes }: FeatureChoice): boolean {
+	return notes === 0;
 }
 
 function describeFeatureChoice(choice: FeatureChoice): string {
-	const { feature, folder, notes, serverOn } = choice;
+	const { feature, folder, notes } = choice;
 	const change = notes === 0 ? STORED[feature] : `${notes} ${notes === 1 ? 'note' : 'notes'}. ${CHANGES[feature]}`;
-	return `${folder}/ · ${serverOn ? `On for your other devices. ${change}` : change}`;
+	return `${folder}/ · ${change}`;
 }
 
 class FeatureChoiceModal extends SharedModal {

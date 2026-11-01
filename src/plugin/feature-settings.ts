@@ -56,26 +56,50 @@ function countNotes(plugin: CratePlugin, folder: string): number {
 	return count;
 }
 
-/** After connecting, offers each feature this vault has not confirmed. Finish turns the
- * selected ones on as the settings toggle does; closing changes nothing. */
+/** After connecting, offers each feature this vault has not confirmed. The first device to
+ * finish saves the choice to the server policy for every device; once saved, later devices
+ * take it without asking. Finish turns the selected ones on as the settings toggle does;
+ * closing changes nothing. */
 export async function offerFeatureChoice(plugin: CratePlugin): Promise<void> {
 	const features = (['reminders', 'reading'] as const).filter(feature => !featureConfirmed(plugin, feature));
 	if (!features.length) return;
 	// Offline, the step still opens with this device's folders.
 	const policy = await requestFeatures(plugin).catch(() => null);
+	// A policy no device has saved has no revision; its defaults say nothing about other devices.
+	if (policy?.revision != null) {
+		await adoptSharedChoice(plugin, policy, features);
+		return;
+	}
 	const choices: FeatureChoice[] = [];
 	for (const feature of features) {
 		const folder = await featureFolder(plugin, feature).catch(() => localFolder(plugin, feature));
-		// A policy no device has saved has no revision; its defaults say nothing about other devices.
-		choices.push({ feature, folder, notes: countNotes(plugin, folder), serverOn: policy?.revision != null && policy[feature] });
+		choices.push({ feature, folder, notes: countNotes(plugin, folder) });
 	}
 	const selected = await openFeatureChoiceModal(plugin.app, choices);
 	if (!selected) return;
-	for (const feature of selected) {
-		try { await setSharedFeature(plugin, feature, true); }
-		catch (error) { new Notice(`Could not turn on ${feature}: ${error instanceof Error ? error.message : 'Unknown error'}`); }
+	for (const feature of features) {
+		const enabled = selected.includes(feature);
+		// Saving a feature left off too records the choice, so other devices do not ask again.
+		if (!enabled && !policy?.[feature]) continue;
+		try { await setSharedFeature(plugin, feature, enabled); }
+		catch (error) { new Notice(`Could not turn ${enabled ? 'on' : 'off'} ${feature}: ${error instanceof Error ? error.message : 'Unknown error'}`); }
 	}
 	if (selected.length) plugin.refreshSettingsTab();
+}
+
+/** Confirms here the features another device already turned on for this vault. */
+async function adoptSharedChoice(plugin: CratePlugin, policy: FeaturePolicy, features: readonly Feature[]): Promise<void> {
+	const adopted = features.filter(feature => policy[feature]);
+	if (!adopted.length) return;
+	try {
+		await serialize(plugin, async assertCurrent => {
+			for (const feature of adopted) await confirmFeature(plugin, feature, assertCurrent);
+			await apply(plugin, policy, true, assertCurrent);
+		});
+		plugin.refreshSettingsTab();
+	} catch (error) {
+		new Notice(`Could not turn on Crate features: ${error instanceof Error ? error.message : 'Unknown error'}`);
+	}
 }
 
 const WAITING_NOTICES: Record<Feature, string> = {
@@ -142,14 +166,16 @@ export function refreshSharedFeatures(plugin: CratePlugin, activate = true): Pro
 		if (changed) plugin.refreshSettingsTab();
 	});
 }
+async function confirmFeature(plugin: CratePlugin, feature: Feature, assertCurrent: () => void): Promise<void> {
+	if (featureConfirmed(plugin, feature)) return;
+	if (feature === 'reading') await plugin.writeSettings({ reading: { ...plugin.settings.reading, confirmed: true } }, assertCurrent);
+	else await plugin.writeRemindersSettings({ confirmed: true }, assertCurrent);
+	assertCurrent();
+}
 /** Turning a feature on here confirms it for this vault; ask first with `confirmFeatureFolder`. */
 export function setSharedFeature(plugin: CratePlugin, feature: Feature, enabled: boolean): Promise<void> {
 	return serialize(plugin, async assertCurrent => {
-		if (enabled && !featureConfirmed(plugin, feature)) {
-			if (feature === 'reading') await plugin.writeSettings({ reading: { ...plugin.settings.reading, confirmed: true } }, assertCurrent);
-			else await plugin.writeRemindersSettings({ confirmed: true }, assertCurrent);
-			assertCurrent();
-		}
+		if (enabled) await confirmFeature(plugin, feature, assertCurrent);
 		if (!plugin.settings.workerUrl) {
 			await apply(plugin, { reading: plugin.settings.reading.enabled, reminders: plugin.remindersSettings.enabled, revision: null, [feature]: enabled }, true, assertCurrent);
 			return;

@@ -53,11 +53,14 @@ function fixture(folders: TFolder[] = []) {
 }
 
 /** Answers `/features` with the server policy, and records each change this vault requests. */
-function serverPolicy(initial: { reading: boolean; reminders: boolean }, revision: string | null = 'one') {
+function serverPolicy(initial: { reading: boolean; reminders: boolean }, revision: string | null = null) {
 	const policy = { ...initial, revision };
 	serverRequest.mockImplementation(async (_plugin: unknown, path: string, body?: { feature: 'reading' | 'reminders'; enabled: boolean }) => {
 		if (path !== '/features') throw new Error(`Unexpected ${path}`);
-		if (body) policy[body.feature] = body.enabled;
+		if (body) {
+			policy[body.feature] = body.enabled;
+			policy.revision = `${policy.revision ?? ''}+`;
+		}
 		return { ...policy };
 	});
 }
@@ -101,26 +104,38 @@ it('starts folders with notes off and counts what will change, using the server 
 	await done;
 });
 
-it('starts a feature the server already has on and still names the change', async () => {
-	serverPolicy({ reading: true, reminders: true });
+it('takes the choice another device saved for this vault without asking', async () => {
+	serverPolicy({ reading: false, reminders: true }, 'one');
 	const plugin = fixture([folder('Reminders', ['Inbox.md'])]);
-	const { done, modal, row } = await openStep(plugin);
-	expect(row('Reminders').toggles[0]?.value).toBe(true);
-	expect(row('Reminders').descEl.textContent).toBe('Reminders/ · On for your other devices. 1 note. Turning this on adds a small ID comment to each task and turns dates like "tomorrow" into fixed dates.');
-	expect(row('Reading').toggles[0]?.value).toBe(true);
-	expect(row('Reading').descEl.textContent).toContain('On for your other devices.');
-	modal.close();
-	await done;
+	const { offerFeatureChoice } = await import('./feature-settings');
+	await offerFeatureChoice(plugin as unknown as CratePlugin);
+	expect(MockModal.instances).toHaveLength(0);
+	expect(plugin.remindersSettings).toMatchObject({ enabled: true, confirmed: true });
+	expect(setRemindersEnabled).toHaveBeenCalledWith(plugin, true, expect.any(Function));
+	expect(plugin.settings.reading).toMatchObject({ enabled: false, confirmed: false });
+	expect(serverRequest).toHaveBeenCalledOnce();
+	expect(plugin.refreshSettingsTab).toHaveBeenCalledOnce();
+	expect(noticeMessages).toEqual([]);
+});
+
+it('takes a saved choice with everything off without asking or changing this vault', async () => {
+	serverPolicy({ reading: false, reminders: false }, 'one');
+	const plugin = fixture();
+	const { offerFeatureChoice } = await import('./feature-settings');
+	await offerFeatureChoice(plugin as unknown as CratePlugin);
+	expect(MockModal.instances).toHaveLength(0);
+	expect(plugin.writeSettings).not.toHaveBeenCalled();
+	expect(plugin.writeRemindersSettings).not.toHaveBeenCalled();
+	expect(plugin.refreshSettingsTab).not.toHaveBeenCalled();
 });
 
 it('treats a fresh server policy, which no device has saved, as unused by other devices', async () => {
-	serverPolicy({ reading: true, reminders: true }, null);
+	serverPolicy({ reading: true, reminders: true });
 	const plugin = fixture([folder('Reminders', ['Inbox.md'])]);
 	const { done, modal, row } = await openStep(plugin);
 	expect(row('Reminders').toggles[0]?.value).toBe(false);
 	expect(row('Reminders').descEl.textContent).toBe('Reminders/ · 1 note. Turning this on adds a small ID comment to each task and turns dates like "tomorrow" into fixed dates.');
 	expect(row('Reading').toggles[0]?.value).toBe(true);
-	expect(row('Reading').descEl.textContent).not.toContain('other devices');
 	modal.close();
 	await done;
 });
@@ -136,14 +151,14 @@ it('finish turns on and confirms only the selected features, without a second co
 	expect(MockModal.instances).toHaveLength(1);
 	expect(plugin.remindersSettings).toMatchObject({ enabled: true, confirmed: true });
 	expect(setRemindersEnabled).toHaveBeenCalledWith(plugin, true, expect.any(Function));
-	expect(serverRequest).toHaveBeenCalledWith(plugin, '/features', { feature: 'reminders', enabled: true, revision: 'one' }, expect.anything());
+	expect(serverRequest).toHaveBeenCalledWith(plugin, '/features', { feature: 'reminders', enabled: true, revision: null }, expect.anything());
 	expect(plugin.settings.reading).toMatchObject({ enabled: false, confirmed: false });
 	expect(serverRequest).not.toHaveBeenCalledWith(plugin, '/features', expect.objectContaining({ feature: 'reading' }), expect.anything());
 	expect(plugin.refreshSettingsTab).toHaveBeenCalledOnce();
 	expect(noticeMessages).toEqual([]);
 });
 
-it('keeps a feature the server has on unconfirmed here when it is turned off', async () => {
+it('saves features left off so other devices do not ask again, without confirming them here', async () => {
 	serverPolicy({ reading: true, reminders: false });
 	const plugin = fixture();
 	const { done, row, finish } = await openStep(plugin);
@@ -151,9 +166,11 @@ it('keeps a feature the server has on unconfirmed here when it is turned off', a
 	row('Reminders').toggles[0]?.change(false);
 	finish().click();
 	await done;
-	expect(plugin.writeSettings).not.toHaveBeenCalled();
+	expect(serverRequest).toHaveBeenCalledWith(plugin, '/features', { feature: 'reading', enabled: false, revision: null }, expect.anything());
+	expect(serverRequest).not.toHaveBeenCalledWith(plugin, '/features', expect.objectContaining({ feature: 'reminders' }), expect.anything());
+	expect(plugin.settings.reading).toMatchObject({ enabled: false, confirmed: false });
 	expect(plugin.writeRemindersSettings).not.toHaveBeenCalled();
-	expect(serverRequest).toHaveBeenCalledOnce();
+	expect(plugin.refreshSettingsTab).not.toHaveBeenCalled();
 });
 
 it('closing without finish changes nothing', async () => {
