@@ -39,16 +39,16 @@ export function DateQuickButtons({
 
 	return (
 		<div className="date-quick-options">
-			{REMINDER_DATE_PRESETS.map(({ id, label }) => {
+			{REMINDER_DATE_PRESETS.map(({ id, label, hasTime: presetHasTime }) => {
 				const optionDate = getReminderDateForPreset(id, now);
 				const isActive = Boolean(
 					currentDate
 					&& isSameDay(currentDate, optionDate)
-					&& (id === 'evening'
-						? hasTime && currentDate.getHours() === 18 && currentDate.getMinutes() === 0
+					&& (presetHasTime
+						? hasTime && currentDate.getHours() === optionDate.getHours() && currentDate.getMinutes() === optionDate.getMinutes()
 						: !hasTime),
 				);
-				const detail = id === 'evening'
+				const detail = presetHasTime
 					? `${weekdayFormatter.format(optionDate)}, ${timeFormatter.format(optionDate)}`
 					: dateFormatter.format(optionDate);
 				return (

@@ -8,8 +8,13 @@ import type { AnimationConfig } from '../../../../ui/shared/component-adapter';
 import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
 import { getPickerModalProps } from '../glassStyles';
 import { parseLocalDateKey, parseReminderDateValue } from '../../../core/dates/reminderDate';
-import { buildDatePickerDateSelection, buildDatePickerTimeSelection } from './datePickerSelection';
-import { getReminderDateForPreset, type ReminderDatePreset } from '../../reminder-editor/datePresets';
+import {
+	buildDatePickerDateSelection,
+	buildDatePickerTimeSelection,
+	getReminderDateForPreset,
+	reminderDatePresetHasTime,
+	type ReminderDatePreset,
+} from '../../reminder-editor/datePresets';
 import { REMINDER_PICKER_COPY } from '../../reminder-editor/pickerCopy';
 
 interface DatePickerModalProps {
@@ -41,11 +46,10 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
 
 	const handleQuickDate = useCallback((preset: ReminderDatePreset) => {
 		const date = getReminderDateForPreset(preset);
-		const presetHasTime = preset === 'evening';
 		const selection = buildDatePickerDateSelection(
 			date,
 			date,
-			presetHasTime,
+			reminderDatePresetHasTime(preset),
 		);
 		onDateTimeChange(selection.value, selection.hasTime);
 	}, [onDateTimeChange]);

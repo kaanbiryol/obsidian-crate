@@ -10,6 +10,7 @@ import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/core/dat
 import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '@/reminders/core/recurrence/recurrenceRule';
 import {
 	getReminderDateForPreset,
+	reminderDatePresetHasTime,
 	type ReminderDatePreset,
 } from '@/reminders/ui/reminder-editor/datePresets';
 import type { ModalDraft } from '../types';
@@ -154,10 +155,11 @@ export function applyDatePresetToDraft(
 	}
 
 	const next = getReminderDateForPreset(preset);
+	const hasTime = reminderDatePresetHasTime(preset);
 
 	return applyReminderTextUpdate(draft, projectOptions, {
-		dueDateValue: preset === 'evening' ? next.toISOString() : formatLocalDateKey(next),
-		hasTime: preset === 'evening',
+		dueDateValue: hasTime ? next.toISOString() : formatLocalDateKey(next),
+		hasTime,
 		recurrence: null,
 	});
 }

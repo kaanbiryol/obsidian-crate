@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	buildDatePickerDateSelection,
 	buildDatePickerTimeSelection,
-} from './datePickerSelection';
+} from '../../reminder-editor/datePresets';
 import { parseReminderDateValue } from '../../../core/dates/reminderDate';
 
 describe('DatePickerModal selection helpers', () => {
