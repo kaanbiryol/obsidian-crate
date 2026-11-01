@@ -4,10 +4,10 @@ Crate is an Obsidian community plugin (`id: crate`, mobile supported) that syncs
 
 ## Working approach
 
-- Finish the task end to end: implement, verify, and fix failures your change caused. Make reasonable calls on routine, reversible choices; ask only when missing information changes scope or correctness.
-- Read the code and the relevant doc before editing. Load only the docs and skills the task needs.
-- Keep changes surgical and preserve unrelated working-tree changes. Match surrounding style.
-- Report what changed, which checks ran, and what remains. Separate automated checks from manual or physical-device verification.
+- Make reasonable calls on routine, reversible choices; ask only when missing information changes scope or correctness.
+- Read the relevant doc below before editing that area; load only what the task needs.
+- The working tree is often dirty with unrelated in-progress work. Never revert, stage or reformat files you did not touch.
+- Report which checks ran, separating automated checks from manual or physical-device verification.
 
 ## Layout
 
@@ -53,6 +53,7 @@ Use npm with the Node version in `.nvmrc` and `package.json` `engines`. `package
 - `npm run test:worker-runtime` for Worker behavior against local D1/R2/Durable Objects
 - `npm run test:pwa-browser`, `npm run test:visual`, `npm run test:reading` for browser coverage
 - `npm run check` for broad validation; `npm run release:check` is the full release gate
+- `npm run preview:pwa`, `npm run preview:reading` and `npm run preview:ui` serve the PWA, Reading app and component gallery for browser checks
 
 Match verification to the change. Add regression tests for meaningful behavior and failure modes, reproducing the failure through the real boundary (D1/R2 tests for publication guarantees). Documentation-only edits need a link and diff review, not the test suites. After checks pass, rerun only for new edits, failures or open risks. Never replace visual baselines just to make a comparison pass.
 
@@ -80,7 +81,6 @@ These tests protect stored user data and released clients. When one fails, the c
 - Keep startup light. Defer expensive work, batch vault access, debounce filesystem reactions, and avoid large in-memory structures.
 - Preserve data-safety invariants: a successful request keeps byte, revision and operation-identity guarantees under response loss and retries; deletion requires verified absence; recovery retains local-only intent.
 - Use sentence case and short UI copy. In instructions, **bold** literal UI labels, say "select" for interactions, and use arrows for navigation.
-- Do not use em dashes in docs or comments.
 
 ## Privacy and security
 
@@ -94,7 +94,6 @@ These tests protect stored user data and released clients. When one fails, the c
 
 - Use the `gh` CLI for GitHub operations.
 - Commits are lowercase Conventional Commits: `<type>(<scope>): <description>`. Types: `fix`, `feat`, `chore`, `refactor`, `perf`, `build`, `ci`. Scope is optional; use `ios` or `android` only for platform-specific changes.
-- No `Co-Authored-By` trailers or generated-by attribution in commits or PR descriptions.
 - Keep PRs focused; describe behavior and recovery implications and what was actually tested.
 - Never commit `node_modules/`, `dist/`, `.generated/`, `test-vault/`, `main.js`, signed `.shortcut` files, or other build output.
 - Keep the plugin `id` stable and `minAppVersion` accurate for the APIs used.
