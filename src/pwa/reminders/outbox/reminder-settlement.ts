@@ -5,6 +5,7 @@ import type { ReminderRecord } from '../types';
 import { sealPrivateValue, openPrivateValue, REMINDER_OUTBOX_PREFIX } from '../private-storage';
 import { isReminderOperationId } from '../../../protocol/reminder-operation';
 import { isMarkdownNoteInFolder } from '../../../protocol/note-paths';
+import { projectReminderOrder } from '../../../reminders/core/reminder-list';
 import { sha256Hex } from '../../../platform/sha256';
 
 interface ReminderSettlement {
@@ -60,7 +61,7 @@ export async function createReminderSettlementChannel(authToken: string, folderP
 /** A delayed packet cannot replace a base revision already advanced by a newer read. */
 export function applyReminderSettlement(reminders: ReminderRecord[], projects: string[], settled: ReminderSettlement) {
 	if (settled.kind === 'reorder') {
-		const currentOrder = reminders.filter(item => item.project === settled.project).map(item => item.id);
+		const currentOrder = projectReminderOrder(reminders, settled.project!);
 		if (JSON.stringify(currentOrder) !== JSON.stringify(settled.expectedOrder)) return null;
 		return applyReminderListEffect({ reminders, projects }, { kind: 'reorder', project: settled.project!, orderedIds: settled.orderedIds! });
 	}

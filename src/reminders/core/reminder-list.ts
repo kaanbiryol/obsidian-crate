@@ -14,6 +14,12 @@ interface ReminderListSource<R> {
 	issue?: string;
 }
 
+/** A project's reminder IDs in list order. Lists keep each note's reminders in
+ * file order, so this matches the order a reorder command checks against. */
+export function projectReminderOrder(reminders: readonly { id: string; project: string }[], project: string): string[] {
+	return reminders.filter(reminder => reminder.project === project).map(reminder => reminder.id);
+}
+
 export function compareProjects(left: string, right: string): number {
 	return left.localeCompare(right);
 }

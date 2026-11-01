@@ -7,6 +7,7 @@ import { useReminderOutbox } from './useReminderOutbox';
 import type { ApiFetch, ShowToast, StoredConfig } from '../types';
 import type { ModalState, ReminderRecord, ReminderSyncHost } from './types';
 import { createSaveReminderChange } from './outbox/save-reminder-command';
+import { projectReminderOrder } from '../../reminders/core/reminder-list';
 
 export function useReminderMutations(options: {
 	enabled?: boolean;
@@ -115,7 +116,7 @@ export function useReminderMutations(options: {
 			enqueue({
 				operationId, kind: 'reorder', project, orderedIds: [...orderedIds], path: '/reminders/reorder', method: 'POST',
 				body: JSON.stringify({ folderPath: config.folderPath, project, orderedIds,
-					expectedOrder: getSnapshot().reminders.filter(item => item.project === project).map(item => item.id), operationId }),
+					expectedOrder: projectReminderOrder(getSnapshot().reminders, project), operationId }),
 				status: 'pending', attempts: 0, retryAt: 0,
 			});
 		} catch (error) { if (current()) { refreshPresentation(); report(error); } }

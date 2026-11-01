@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReminderList, compareProjects, REMINDER_IDENTITY_CONFLICT_ISSUE } from './reminder-list';
+import { buildReminderList, compareProjects, projectReminderOrder, REMINDER_IDENTITY_CONFLICT_ISSUE } from './reminder-list';
 
 const reminder = (id: string, filePath: string) => ({ id, filePath });
 const source = (path: string, ids: string[], issue?: string) => ({
@@ -61,4 +61,10 @@ describe('compareProjects', () => {
 	it('orders by locale rather than code unit', () => {
 		expect(['b', 'B', 'a', 'Ä', 'Z'].sort(compareProjects)).toEqual(['a', 'Ä', 'b', 'B', 'Z']);
 	});
+});
+
+it('reads one project order in list order', () => {
+	const reminders = [{ id: 'a', project: 'Home' }, { id: 'b', project: 'Work' }, { id: 'c', project: 'Home' }];
+	expect(projectReminderOrder(reminders, 'Home')).toEqual(['a', 'c']);
+	expect(projectReminderOrder(reminders, 'Errands')).toEqual([]);
 });
