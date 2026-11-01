@@ -29,7 +29,7 @@ import { runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
 import type { InitialConfigPull } from '../manifest/initial-config-pull';
 import { updateSyncProgress, type SyncSettings } from '../settings';
-import type { ReconnectNotice } from '../sync-outcome';
+import type { ReconnectNotice, WorkflowCompletionContext } from '../sync-outcome';
 import type { SyncWorkflowContext } from './standard-sync-workflow';
 import type { ForceSyncWorkflowContext } from './force-sync-workflow';
 import { reconcileQueuePaths } from './reconcile-paths';
@@ -70,6 +70,8 @@ export class SyncEngineContexts {
 	private readonly plannedContent = new PlannedContent();
 	private readonly transfer: TransferContext;
 	private readonly localDiffPlanner: LocalDiffPlannerContext;
+	/** Publishes a finished sync's outcome. */
+	readonly completion: WorkflowCompletionContext;
 	readonly syncWorkflow: SyncWorkflowContext;
 	readonly forceSyncWorkflow: ForceSyncWorkflowContext;
 
@@ -98,6 +100,7 @@ export class SyncEngineContexts {
 			runConcurrent: d.runConcurrent,
 			encrypted: this.encrypted,
 		};
+		this.completion = { updateState: d.updateState, setLastSync: this.setLastSync, reconnectNotice: d.reconnectNotice };
 		// Members shared by the standard, initial and forced sync workflows.
 		const base = {
 			finishInitialSetup: this.finishInitialSetup,
@@ -105,11 +108,9 @@ export class SyncEngineContexts {
 			reportWork: this.reportWork,
 			recoverUploads: this.recoverUploads,
 			getStatus: d.getStatus,
-			updateState: d.updateState,
+			...this.completion,
 			throwIfDestroyed: d.throwIfDestroyed,
-			saveLocalManifest: () => d.localManifest.save(),
-			setLastSync: this.setLastSync,
-			reconnectNotice: d.reconnectNotice,
+			localManifest: d.localManifest,
 			deleteRemoteFiles: this.deleteRemoteFiles,
 			getManifest: () => d.api.getManifest(),
 			uploadPreparedFiles: this.uploadPreparedFiles,
@@ -144,18 +145,12 @@ export class SyncEngineContexts {
 			prepareFullSyncUpload: diff => prepareTransferUploadFromPath(this.transfer, diff.path, { force: true, expectedHash: diff.remoteHash ?? null }),
 			reconcileVersionConflicts: d.reconcileVersionConflicts,
 			parallelDownloadAndSaveFiles: this.parallelDownloadAndSaveFiles,
-			getLocalManifestEntry: path => d.localManifest.getEntry(path),
-			setLocalManifestEntry: (path, entry) => {
-				d.localManifest.setEntry(path, entry);
-			},
 			setLastSeq: this.setLastSeq,
 		};
 		this.forceSyncWorkflow = {
 			...base,
 			vault: d.vault,
 			shouldIgnore: d.shouldIgnore,
-			getLocalManifestPaths: () => d.localManifest.getAllPaths(),
-			removeLocalManifestEntry: path => d.localManifest.removeEntry(path),
 			prepareUploadsFromVaultFiles: (files, onPrepared) =>
 				transferPrepareUploadsFromVaultFiles(this.transfer, files, PREPARE_CONCURRENCY, onPrepared, { force: true }),
 			createVaultFileChunks: createByteBudgetedVaultFileChunks,
@@ -202,7 +197,7 @@ export class SyncEngineContexts {
 					uploadPreparedFiles: this.uploadPreparedFiles,
 					// Conflicted paths return to the queue pass for a fresh reconciliation.
 					reconcileVersionConflicts: async paths => { retryPaths.push(...paths); },
-					getLocalManifestEntry: path => d.localManifest.getEntry(path),
+					localManifest: d.localManifest,
 					throwIfDestroyed: d.throwIfDestroyed,
 				}, diffs, createPathRecord<FileEntry>(), result, () => {});
 				for (const failure of failures) onFailure?.(failure);

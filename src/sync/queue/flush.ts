@@ -14,7 +14,7 @@ import type { DeleteRemoteFiles } from '../transfer/delete';
 import type { ConditionalDeleteCandidate } from '../transfer/delete-batches';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { PreparedUpload, SyncIssue, SyncResult, SyncState } from '../types';
-import type { ReconnectNotice } from '../sync-outcome';
+import type { WorkflowCompletionContext } from '../sync-outcome';
 
 interface QueueApi {
 	isConfigured(): boolean;
@@ -43,7 +43,7 @@ export interface QueueFlushBatch {
 	release(): void;
 }
 
-export interface QueueFlushContext {
+export interface QueueFlushContext extends WorkflowCompletionContext {
 	finishInitialSetup(): Promise<void>;
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
 	deleteRemoteFiles: DeleteRemoteFiles;
@@ -52,10 +52,6 @@ export interface QueueFlushContext {
 	beginBatch(): QueueFlushBatch;
 	api: QueueApi;
 	localManifest: QueueManifest;
-	updateState(updates: Partial<SyncState>): void;
-	/** Persists the time of a successful flush, as every other sync path does. */
-	setLastSync(value: string): void;
-	reconnectNotice: ReconnectNotice;
 	isDestroyed(): boolean;
 	currentStatus(): SyncState['status'];
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;

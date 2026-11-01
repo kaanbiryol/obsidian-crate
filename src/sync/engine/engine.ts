@@ -187,9 +187,7 @@ export class SyncEngine {
 			},
 			localManifest: this.localManifest,
 			shouldIgnore: this.shouldIgnore.bind(this),
-			updateState: this.updateState.bind(this),
-			setLastSync: this.contexts.setLastSync,
-			reconnectNotice: this.reconnectNotice,
+			...this.contexts.completion,
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			currentStatus: () => this.state.status,
 			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
@@ -680,7 +678,7 @@ export class SyncEngine {
 				updateState: updates => this.updateState(updates),
 			});
 			if (startFailure) return startFailure;
-			const outcome = { updateState: this.updateState.bind(this), setLastSync: this.contexts.setLastSync, reconnectNotice: this.reconnectNotice };
+			const outcome = this.contexts.completion;
 			let result = createEmptySyncResult();
 			const failures: MutationFailure[] = [];
 			try {

@@ -10,26 +10,27 @@ import {
 import { PREPARE_CONCURRENCY } from '../transfer/constants';
 import { uploadFullSyncPlan, type FullSyncUploadContext } from './full-sync-upload';
 import { createLogger } from '../logger';
-import type { FileDiff, RemoteManifest, SyncResult, SyncState } from '../types';
+import type { FileDiff, RemoteManifest, SyncResult } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { getPathEntry } from '../../protocol/path-record';
 import { namespaceConflictLookup } from '../namespace-conflicts';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { FullSyncPlan } from '../planner/types';
+import type { LocalManifest } from '../manifest/manifest';
 import {
 	beginSyncAttempt,
 	completeTransferResult,
 	completeWorkflowResult,
 	handleWorkflowError,
-	type ReconnectNotice,
 	type SyncStatus,
+	type WorkflowCompletionContext,
 } from '../sync-outcome';
 import { applyDiffs } from '../transfer/process';
 
 const logger = createLogger('SyncEngine');
 
-export interface SyncWorkflowContext extends FullSyncUploadContext {
+export interface SyncWorkflowContext extends FullSyncUploadContext, WorkflowCompletionContext {
 	deleteRemoteFiles: DeleteRemoteFiles;
 	finishInitialSetup(): Promise<void>;
 	/** Moves the vault to trash when the user chose to replace it with the joined server's contents. */
@@ -38,7 +39,6 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 	apiConfigured(): boolean;
 	recoverUploads(): Promise<void>;
 	getStatus(): SyncStatus;
-	updateState(updates: Partial<SyncState>): void;
 	getManifest(): Promise<RemoteManifest>;
 	incrementalSync(
 		progressCallback?: (current: number, total: number) => void,
@@ -58,12 +58,8 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 		result: SyncResult
 	): Promise<DiffApplyOutcome>;
 	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void>;
-	getLocalManifestEntry(path: string): Readonly<FileEntry> | undefined;
-	setLocalManifestEntry(path: string, entry: FileEntry): void;
-	saveLocalManifest(): Promise<void>;
-	setLastSync(value: string): void;
+	localManifest: Pick<LocalManifest, 'getEntry' | 'setEntry' | 'save'>;
 	setLastSeq(value: number): void;
-	reconnectNotice: ReconnectNotice;
 }
 
 export async function runSyncWorkflow(
@@ -232,7 +228,7 @@ async function runFullSync(
 					recordResolvedRace(result, diff.path, 'kept-remote-edit');
 				}
 				if (downloaded.has(diff.path)) {
-					const manifestEntry = context.getLocalManifestEntry(diff.path);
+					const manifestEntry = context.localManifest.getEntry(diff.path);
 					if (manifestEntry) localFiles[diff.path] = manifestEntry;
 				}
 			}
@@ -255,11 +251,11 @@ async function runFullSync(
 
 		if (result.errors.length === 0) {
 			for (const [path, entry] of Object.entries(localFiles)) {
-				context.setLocalManifestEntry(path, entry);
+				context.localManifest.setEntry(path, entry);
 			}
 		}
 		context.updateState({ work: { phase: 'saving' } });
-		await context.saveLocalManifest();
+		await context.localManifest.save();
 
 		if (
 			result.errors.length === 0

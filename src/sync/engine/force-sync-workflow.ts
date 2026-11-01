@@ -12,29 +12,28 @@ import {
 import { createLogger } from '../logger';
 import { getPathEntry } from '../../protocol/path-record';
 import { namespaceConflictLookup } from '../namespace-conflicts';
-import type { PreparedUpload, RemoteManifest, SyncResult, SyncState } from '../types';
+import type { PreparedUpload, RemoteManifest, SyncResult } from '../types';
+import type { LocalManifest } from '../manifest/manifest';
 import type { MutationFailure } from '../../protocol/sync-types';
 import {
 	beginSyncAttempt,
 	completeTransferResult,
 	handleWorkflowError,
-	type ReconnectNotice,
 	type SyncStatus,
+	type WorkflowCompletionContext,
 } from '../sync-outcome';
 
 const logger = createLogger('SyncEngine');
 
-export interface ForceSyncWorkflowContext {
+export interface ForceSyncWorkflowContext extends WorkflowCompletionContext {
 	finishInitialSetup(): Promise<void>;
 	vault: Vault;
 	apiConfigured(): boolean;
 	recoverUploads(): Promise<void>;
 	getStatus(): SyncStatus;
-	updateState(updates: Partial<SyncState>): void;
 	shouldIgnore(path: string): boolean;
 	getManifest(): Promise<RemoteManifest>;
-	getLocalManifestPaths(): string[];
-	removeLocalManifestEntry(path: string): void;
+	localManifest: Pick<LocalManifest, 'getAllPaths' | 'removeEntry' | 'save'>;
 	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
 	encrypted(): boolean;
@@ -49,9 +48,6 @@ export interface ForceSyncWorkflowContext {
 	): Promise<void>;
 	throwIfDestroyed(): void;
 	deleteRemoteFiles: DeleteRemoteFiles;
-	saveLocalManifest(): Promise<void>;
-	setLastSync(value: string): void;
-	reconnectNotice: ReconnectNotice;
 }
 
 export async function runForceFullSyncWorkflow(
@@ -138,12 +134,12 @@ export async function runForceFullSyncWorkflow(
 		await deleteRemoteOnly(remoteOnlyPaths.filter(path => localConflict(path) === undefined));
 
 		if (!result.errors.length) {
-			for (const path of context.getLocalManifestPaths()) {
-				if (!localPaths.has(path)) context.removeLocalManifestEntry(path);
+			for (const path of context.localManifest.getAllPaths()) {
+				if (!localPaths.has(path)) context.localManifest.removeEntry(path);
 			}
 		}
 		context.updateState({ work: { phase: 'saving' } });
-		await context.saveLocalManifest();
+		await context.localManifest.save();
 
 		logger.info(
 			`Force full sync completed: ${result.uploaded} uploaded, ${result.deleted} remote-only deleted`,

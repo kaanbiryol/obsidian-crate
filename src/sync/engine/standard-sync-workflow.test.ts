@@ -66,9 +66,11 @@ function createContext(options: {
 		parallelDownloadAndSaveFiles: spies.parallelDownloadAndSaveFiles,
 		prepareFullSyncUpload: spies.prepareFullSyncUpload,
 		uploadPreparedFiles: spies.uploadPreparedFiles,
-		getLocalManifestEntry: spies.getLocalManifestEntry,
-		setLocalManifestEntry: spies.setLocalManifestEntry,
-		saveLocalManifest: spies.saveLocalManifest,
+		localManifest: {
+			getEntry: spies.getLocalManifestEntry,
+			setEntry: spies.setLocalManifestEntry,
+			save: spies.saveLocalManifest,
+		},
 		setLastSync: spies.setLastSync,
 		setLastSeq: spies.setLastSeq,
 		tryInitialImport: async () => null,
@@ -197,7 +199,7 @@ describe('runSyncWorkflow', () => {
 			result.downloaded++;
 			result.downloadedPaths.push(path);
 		});
-		context.getLocalManifestEntry = vi.fn(() => ({
+		context.localManifest.getEntry = vi.fn(() => ({
 			hash: 'remote-hash',
 			size: remoteContent.byteLength,
 			modified: 'now',

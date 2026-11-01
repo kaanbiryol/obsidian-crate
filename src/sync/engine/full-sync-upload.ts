@@ -6,13 +6,14 @@ import { uploadPipelined } from '../transfer/upload-pipeline';
 import type { UploadDiff, PreparedUpload, SyncResult, SyncWork } from '../types';
 import { recordResolvedRace } from '../sync-result';
 import { isAbortError } from '../abort';
+import type { LocalManifest } from '../manifest/manifest';
 
 export interface FullSyncUploadContext {
 	reportWork?(work: SyncWork): void;
 	prepareFullSyncUpload(diff: UploadDiff): Promise<PreparedUpload | null>;
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
 	reconcileVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
-	getLocalManifestEntry(path: string): Readonly<FileEntry> | undefined;
+	localManifest: Pick<LocalManifest, 'getEntry'>;
 	throwIfDestroyed(): void;
 }
 
@@ -42,7 +43,7 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 			await context.reconcileVersionConflicts!(paths, syncResult);
 			// Full sync saves this snapshot later; retain the reconciled baseline.
 			for (const path of paths) {
-				const entry = context.getLocalManifestEntry(path);
+				const entry = context.localManifest.getEntry(path);
 				if (entry) localFiles[path] = entry;
 				else delete localFiles[path];
 			}
@@ -64,7 +65,7 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 	const uploaded = new Set(result.uploadedPaths);
 	for (const diff of diffs) {
 		if (!uploaded.has(diff.path)) continue;
-		const entry = context.getLocalManifestEntry(diff.path);
+		const entry = context.localManifest.getEntry(diff.path);
 		if (entry) localFiles[diff.path] = entry;
 		if (diff.cause === 'remote-deleted') recordResolvedRace(result, diff.path, 'kept-local-edit');
 	}
