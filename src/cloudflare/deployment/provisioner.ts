@@ -4,7 +4,7 @@ import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentR
 import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import type { CloudflareDeploymentMetadata } from './types';
 import { workersDevOrigin } from './worker-origin';
-import { CloudflareApiClient, CloudflareApiError } from '../cloudflare-api';
+import { CloudflareApiClient, CloudflareApiError, queryD1Rows } from '../cloudflare-api';
 import { isDefinitiveRejection } from '../cloudflare-api-error';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { createRandomHexToken } from '../../platform/random-hex';
@@ -199,7 +199,7 @@ export async function provisionCloudflareDeployment(input: {
 		const settings = await input.api.getWorkerSettings(input.accountId, input.metadata.workerName);
 		if (deployedArtifact(settings).fingerprint !== input.artifacts.fingerprint) throw new Error('The expected Worker is not live yet. Check and recover this update.');
 		await checkRemoteDeployment(input);
-		const versions = (await input.api.queryD1(input.accountId, databaseId, 'SELECT version FROM crate_schema WHERE id = 1;')).flatMap(result => result.results ?? []);
+		const versions = await queryD1Rows(input.api, input.accountId, databaseId, 'SELECT version FROM crate_schema WHERE id = 1;');
 		if (versions.length !== 1 || versions[0]?.version !== SERVER_RELEASE.schemaVersion) throw new Error('The updated database could not be verified.');
 		await input.api.queryD1(input.accountId, databaseId, 'SELECT path, storage_key FROM files LIMIT 1; SELECT id FROM auth_tokens LIMIT 1;');
 		await input.api.verifyWorkerDeployment(workersDevOrigin(input.metadata.workerName, workersSubdomain), input.artifacts.fingerprint);

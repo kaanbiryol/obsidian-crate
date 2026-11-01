@@ -1,4 +1,4 @@
-import type { CloudflareApiClient } from '../cloudflare-api';
+import { queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import { isDefinitiveRejection } from '../cloudflare-api-error';
 import { CloudflareReauthorizationRequired } from '../oauth/client';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
@@ -56,8 +56,8 @@ export async function createFenceTable(api: FenceApi, accountId: string, databas
 export type StoredFence = { state: 'none' } | { state: 'invalid' } | { state: 'held'; value: string };
 
 export async function readStoredFence(api: FenceApi, accountId: string, databaseId: string): Promise<StoredFence> {
-	const rows = (await api.queryD1(accountId, databaseId,
-		'SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY])).flatMap(result => result.results ?? []);
+	const rows = await queryD1Rows(api, accountId, databaseId,
+		'SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY]);
 	if (!rows.length) return { state: 'none' };
 	return rows.length === 1 && typeof rows[0]?.value === 'string' ? { state: 'held', value: rows[0].value } : { state: 'invalid' };
 }
@@ -146,9 +146,9 @@ export class DeploymentFence {
 		const record = JSON.parse(this.value) as DeploymentFenceRecord;
 		const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(uploadTag ? { uploadTag } : {}), ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
 		try {
-			const rows = (await this.api.queryD1(this.account, this.database,
+			const rows = await queryD1Rows(this.api, this.account, this.database,
 				`UPDATE maintenance_state SET value = ?${record.kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
-				[next, DEPLOYMENT_FENCE_KEY, this.value])).flatMap(result => result.results ?? []);
+				[next, DEPLOYMENT_FENCE_KEY, this.value]);
 			if (rows.length !== 1 || rows[0]?.value !== next) throw new Error('Deployment ownership changed');
 			this.value = next;
 		} catch (error) {
@@ -204,12 +204,11 @@ export async function withDeploymentFence<T>(input: {
 	await createFenceTable(input.api, input.accountId, input.databaseId);
 	let acquired: Array<Record<string, unknown>>;
 	try {
-		acquired = (await input.api.queryD1(input.accountId, input.databaseId,
+		acquired = await queryD1Rows(input.api, input.accountId, input.databaseId,
 			recoveredValue === undefined
 				? 'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;'
 				: `UPDATE maintenance_state SET value = ?${input.record.kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
-			recoveredValue === undefined ? [DEPLOYMENT_FENCE_KEY, value] : [value, DEPLOYMENT_FENCE_KEY, recoveredValue]))
-			.flatMap(result => result.results ?? []);
+			recoveredValue === undefined ? [DEPLOYMENT_FENCE_KEY, value] : [value, DEPLOYMENT_FENCE_KEY, recoveredValue]);
 	} catch (error) {
 		// A definite rejection (quota, permissions, or invalid SQL) did not
 		// acquire ownership. Preserve the provider's actionable error instead

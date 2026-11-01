@@ -1,4 +1,4 @@
-import type { CloudflareApiClient } from '../cloudflare-api';
+import { queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import { createRandomHexToken } from '../../platform/random-hex';
 
 export interface CloudflareAuthorizedDevice {
@@ -20,14 +20,14 @@ export async function registerCloudflareAuthorizedDevice(input: {
 		`DELETE FROM auth_tokens
 			WHERE device_id IS NULL AND device_name = 'setup-link' AND last_seen_at IS NULL;`,
 	);
-	const existing = await input.api.queryD1(
+	const existing = await queryD1Rows(
+		input.api,
 		input.accountId,
 		input.databaseId,
 		'SELECT id FROM auth_tokens WHERE device_id = ? LIMIT 1;',
 		[input.device.deviceId],
 	);
 	const existingId = existing
-		.flatMap(result => result.results ?? [])
 		.map(row => row.id)
 		.find((id): id is string => typeof id === 'string' && id.length > 0);
 

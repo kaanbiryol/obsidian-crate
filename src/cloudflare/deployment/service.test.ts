@@ -51,6 +51,8 @@ vi.mock('../cloudflare-api', () => ({
 			return apiMocks.queryD1(...args);
 		}
 	},
+	queryD1Rows: async (api: { queryD1(...args: unknown[]): Promise<Array<{ results?: unknown[] }>> }, ...args: unknown[]) =>
+		(await api.queryD1(...args)).flatMap(result => result.results ?? []),
 }));
 
 vi.mock('./provisioner', () => ({ provisionCloudflareDeployment }));

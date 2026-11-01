@@ -1,4 +1,4 @@
-import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
+import { CloudflareApiError, queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 import { BACKUP_OBJECT, completeManifest, listBackupKeys, manifestKey, type UpgradeBackup } from './archive';
 
@@ -43,8 +43,7 @@ export async function releaseUpgradeBackupHold(api: BackupQueryApi, source: Sour
 
 /** Backups that an interrupted upgrade or a pending restore still needs. */
 async function protectedBackups(api: CloudflareApiClient, account: string, database: string): Promise<Set<string>> {
-	const rows = (await api.queryD1(account, database, `SELECT key, value FROM maintenance_state WHERE key IN ('crate_upgrade_checkpoint', 'crate_upgrade_backup') OR (key >= '${RESTORE_HOLD_PREFIX}' AND key < 'crate_restore_hold;');`))
-		.flatMap(result => result.results ?? []);
+	const rows = await queryD1Rows(api, account, database, `SELECT key, value FROM maintenance_state WHERE key IN ('crate_upgrade_checkpoint', 'crate_upgrade_backup') OR (key >= '${RESTORE_HOLD_PREFIX}' AND key < 'crate_restore_hold;');`);
 	return new Set(rows.map(row => {
 		if (row.key !== 'crate_upgrade_backup') return String(row.value);
 		try { return String((JSON.parse(String(row.value)) as { prefix?: unknown }).prefix); } catch { throw new Error('The saved upgrade backup progress is invalid. The update stopped before changing the database schema.'); }

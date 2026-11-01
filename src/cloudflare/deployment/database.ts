@@ -1,5 +1,5 @@
 import { canReplaceServerBuild, parseDevelopmentBuild } from '../../protocol/server-build';
-import type { CloudflareApiClient } from '../cloudflare-api';
+import { queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { type DeploymentFence } from './fence';
@@ -26,7 +26,7 @@ export function removeUpgradeGuards(table: string): string {
 
 /** Resumes writers after the upgraded server is verified. Its backup is then complete history. */
 export async function releaseUpgradeGuards(api: Pick<CloudflareApiClient, 'queryD1'>, account: string, database: string, fence: DeploymentFence) {
-	const rows = (await api.queryD1(account, database, UPGRADE_GUARD_TRIGGERS)).flatMap(result => result.results ?? []);
+	const rows = await queryD1Rows(api, account, database, UPGRADE_GUARD_TRIGGERS);
 	if (rows.length) await fence.mutate(() => api.queryD1(account, database, [...rows.map(row => `DROP TRIGGER ${quoteName(String(row.name))};`),
 		`DELETE FROM maintenance_state WHERE key = '${UPGRADE_PROGRESS_KEY}';`].join('\n')), 'resume-upgraded-server');
 }
@@ -47,7 +47,7 @@ export interface DeploymentDatabase {
 }
 
 export async function inspectDeploymentDatabase(input: DeploymentDatabase): Promise<number | null> {
-	const query = async (sql: string) => (await input.api.queryD1(input.accountId, input.databaseId, sql)).flatMap(result => result.results ?? []);
+	const query = (sql: string) => queryD1Rows(input.api, input.accountId, input.databaseId, sql);
 	const tables = (await query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';")).map(row => row.name);
 	if (!tables.length) return null;
 	if (tables.length === 1 && tables[0] === 'maintenance_state'
@@ -110,8 +110,8 @@ INSERT INTO maintenance_state(key, value) VALUES ('crate_development_build', ${i
 
 /** The sidecar is bound to the verified release fingerprint, never inferred from local settings. */
 export async function readDeploymentBuild(input: DeploymentDatabase, fingerprint: string) {
-	const rows = (await input.api.queryD1(input.accountId, input.databaseId,
-		"SELECT value FROM maintenance_state WHERE key = 'crate_development_build';")).flatMap(row => row.results ?? []);
+	const rows = await queryD1Rows(input.api, input.accountId, input.databaseId,
+		"SELECT value FROM maintenance_state WHERE key = 'crate_development_build';");
 	if (!rows.length) return undefined;
 	if (rows.length !== 1 || typeof rows[0]?.value !== 'string') throw new Error('Invalid saved development build');
 	const value = JSON.parse(rows[0].value) as Record<string, unknown>;

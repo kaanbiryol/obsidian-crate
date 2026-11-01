@@ -79,6 +79,11 @@ interface D1QueryResult {
 	success?: boolean;
 }
 
+/** Runs D1 SQL and returns the rows of every statement, in order. */
+export async function queryD1Rows(api: Pick<CloudflareApiClient, 'queryD1'>, ...query: Parameters<CloudflareApiClient['queryD1']>): Promise<Array<Record<string, unknown>>> {
+	return (await api.queryD1(...query)).flatMap(result => result.results ?? []);
+}
+
 function parseJson(text: string): unknown {
 	try {
 		return JSON.parse(text);

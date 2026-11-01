@@ -1,4 +1,4 @@
-import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
+import { CloudflareApiError, queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import type { DeploymentFence } from './fence';
 import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, SHARED_SETTINGS_KEY, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 import { sha256Hex } from '../../platform/sha256';
@@ -190,7 +190,7 @@ async function dumpDatabase(context: BackupContext, saved: { raw: string; progre
  */
 export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient; accountId: string; databaseId: string; bucketName: string; fence: DeploymentFence; onProgress?: (message: string) => void }): Promise<void> {
 	const { api, accountId, databaseId, bucketName, fence } = input;
-	const query: Query = async (sql, params) => (await api.queryD1(accountId, databaseId, sql, params)).flatMap(result => result.results ?? []);
+	const query: Query = (sql, params) => queryD1Rows(api, accountId, databaseId, sql, params);
 	const definitions = await query("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table','index') AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY type DESC, name;");
 	const tables = definitions.filter(row => row.type === 'table').map(row => String(row.name));
 	if (!tables.includes('files') || !tables.includes('crate_schema')) throw new Error('Cannot back up an unrecognized server database');

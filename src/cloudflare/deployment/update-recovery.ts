@@ -1,7 +1,7 @@
 import { canReplaceServerBuild } from '../../protocol/server-build';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { isSha256Hex } from '../../platform/validation';
-import { CloudflareApiError, type CloudflareApiClient, type CloudflareWorkerSettings } from '../cloudflare-api';
+import { CloudflareApiError, queryD1Rows, type CloudflareApiClient, type CloudflareWorkerSettings } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild, releaseUpgradeGuards } from './database';
 import { SERVER_RELEASE } from './database-upgrades';
@@ -49,8 +49,8 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 	if (settings && !build) return result('blocked', 'The live server could not be identified as a supported Crate deployment.');
 	report.liveVersion = build?.[1];
 	report.liveFingerprint = build?.[2];
-	const tables = (await api.queryD1(account, database,
-		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'maintenance_state';")).flatMap(row => row.results ?? []);
+	const tables = await queryD1Rows(api, account, database,
+		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'maintenance_state';");
 	if (!tables.length) return result('ready', 'No interrupted update is blocking this server.');
 	const stored = await readStoredFence(api, account, database);
 	if (stored.state === 'none') return result('ready', 'No interrupted update is blocking this server.');
@@ -77,9 +77,9 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 		&& build?.[1] === record.version && build?.[2] === record.fingerprint
 		&& fingerprint === record.fingerprint) {
 		const confirmed = JSON.stringify({ ...record, stepState: 'confirmed' });
-		const changed = (await api.queryD1(account, database,
+		const changed = await queryD1Rows(api, account, database,
 			'UPDATE maintenance_state SET value = ? WHERE key = ? AND value = ? RETURNING value;',
-			[confirmed, DEPLOYMENT_FENCE_KEY, value])).flatMap(row => row.results ?? []);
+			[confirmed, DEPLOYMENT_FENCE_KEY, value]);
 		if (changed.length !== 1 || changed[0]?.value !== confirmed) {
 			return result('blocked', 'The operation changed during the check. Check again to read its latest status.');
 		}
@@ -106,8 +106,8 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 		if (!fingerprint || fingerprint !== record.fingerprint) return result('blocked', 'Resume this update with the exact plugin build that started it. No lock was cleared.');
 		return { ...result('resume', 'The confirmed update can resume under new ownership.'), resumeValue: value };
 	}
-	const removed = (await api.queryD1(account, database,
-		'DELETE FROM maintenance_state WHERE key = ? AND value = ? RETURNING key;', [DEPLOYMENT_FENCE_KEY, value])).flatMap(row => row.results ?? []);
+	const removed = await queryD1Rows(api, account, database,
+		'DELETE FROM maintenance_state WHERE key = ? AND value = ? RETURNING key;', [DEPLOYMENT_FENCE_KEY, value]);
 	if (removed.length !== 1 || removed[0]?.key !== DEPLOYMENT_FENCE_KEY) {
 		return result('blocked', 'The operation changed during the check. Let it finish, then check again.');
 	}
@@ -165,7 +165,7 @@ export async function completePublishedDeployment(
 			throw new Error('The published database needs a different schema. Use its matching recovery build.');
 		}
 		await api.queryD1(accountId, databaseId, 'SELECT path, storage_key FROM files LIMIT 1; SELECT id FROM auth_tokens LIMIT 1;');
-		const releases = (await api.queryD1(accountId, databaseId, 'SELECT revision, fingerprint FROM crate_release WHERE id = 1;')).flatMap(row => row.results ?? []);
+		const releases = await queryD1Rows(api, accountId, databaseId, 'SELECT revision, fingerprint FROM crate_release WHERE id = 1;');
 		if (live.schemaVersion !== SERVER_RELEASE.schemaVersion || !Number.isSafeInteger(live.revision) || live.revision < 1 || live.revision > SERVER_RELEASE.revision
 			|| (await Promise.all(releases.map(async saved => !canReplaceServerBuild({ revision: Number(saved.revision), fingerprint: String(saved.fingerprint),
 				development: await readDeploymentBuild(schema, String(saved.fingerprint)) },

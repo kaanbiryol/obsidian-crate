@@ -1,5 +1,5 @@
 import { prepareRows } from './prepare-rows';
-import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
+import { CloudflareApiError, queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
@@ -46,7 +46,7 @@ async function verifyRows(api: CloudflareApiClient, account: string, database: s
 	const generated = new Set(['crate_schema', 'maintenance_state', 'notification_projection_jobs']);
 	for (const table of [...schema.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)].map(match => match[1]!)) {
 		if (!groups.has(table) && !generated.has(table)) {
-			const unexpected = (await api.queryD1(account, database, `SELECT 1 FROM ${quote(table)} LIMIT 1;`)).flatMap(item => item.results ?? []);
+			const unexpected = await queryD1Rows(api, account, database, `SELECT 1 FROM ${quote(table)} LIMIT 1;`);
 			if (unexpected.length) throw new Error(`Unexpected data in restored ${table}`);
 		}
 	}
@@ -56,7 +56,7 @@ async function verifyRows(api: CloudflareApiClient, account: string, database: s
 		if (expected.some(row => JSON.stringify(row.columns) !== JSON.stringify(columns))) throw new Error('Inconsistent backup columns');
 		const actual: string[] = [];
 		for (let offset = 0; ; offset += 500) {
-			const result = (await api.queryD1(account, database, `SELECT ${columns.map(quote).join(',')} FROM ${quote(table)}${table === 'maintenance_state' ? ` WHERE key != '${MARKER}'` : ''} LIMIT 500 OFFSET ${offset};`)).flatMap(item => item.results ?? []);
+			const result = await queryD1Rows(api, account, database, `SELECT ${columns.map(quote).join(',')} FROM ${quote(table)}${table === 'maintenance_state' ? ` WHERE key != '${MARKER}'` : ''} LIMIT 500 OFFSET ${offset};`);
 			actual.push(...result.map(row => JSON.stringify(columns.map(column => row[column]))));
 			if (result.length < 500) break;
 		}
@@ -99,7 +99,7 @@ export async function restoreUpgradeBackup(input: {
 		try { await api.getWorkerSettings(account, target.workerName); throw new Error('Restore target already has a Worker'); }
 		catch (error) { if (!(error instanceof CloudflareApiError && error.status === 404)) throw error; }
 		if (!await api.getR2Bucket(account, target.r2BucketName)) await api.createR2Bucket(account, target.r2BucketName);
-		const query = async (sql: string) => (await api.queryD1(account, database, sql)).flatMap(item => item.results ?? []);
+		const query = (sql: string) => queryD1Rows(api, account, database, sql);
 		const tables = await query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';");
 		if (!tables.length) await query(`${artifacts.d1Schema}\nINSERT INTO maintenance_state(key,value) VALUES ('${MARKER}',${literal(`${plan}:0`)});`);
 		const marker = (await query(`SELECT value FROM maintenance_state WHERE key='${MARKER}';`))[0]?.value;
