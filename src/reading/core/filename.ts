@@ -55,3 +55,12 @@ export function isGeneratedCapturePath(path: string, folder: string, source: Rea
 	for (let length = 8; length <= 32; length += 4) if (path.slice(slash + 1) === readingCaptureName(source, hex.slice(0, length))) return true;
 	return false;
 }
+
+/** A note still named after `before` takes the name generated from `after` once its title
+ * changes. Resolves to the new path, or undefined when the name stays; a user rename is kept. */
+export async function retitledCapturePath(path: string, folder: string, before: ReadingNameSource, after: ReadingNameSource, id: string,
+	occupied: (path: string) => boolean | Promise<boolean>): Promise<string | undefined> {
+	if (after.title === before.title || !isGeneratedCapturePath(path, folder, before, id)) return undefined;
+	const renamed = await readingCapturePath(folder, after, id, occupied);
+	return renamed === path ? undefined : renamed;
+}

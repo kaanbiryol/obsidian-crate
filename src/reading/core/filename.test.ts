@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { isGeneratedCapturePath, readingCapturePath } from './filename';
+import { isGeneratedCapturePath, readingCapturePath, retitledCapturePath } from './filename';
 import { getPortablePathIssue } from '@/protocol/portable-path';
 const id = 'a1b2c3d4-5678-4abc-9def-123456789abc';
 const url = 'https://www.kaanbiryol.com/the-hidden-cost/';
@@ -35,4 +35,14 @@ it('recognizes only names Crate generated for the note', async () => {
 	expect(isGeneratedCapturePath('Reading/My notes.md', 'Reading', source, id)).toBe(false);
 	expect(isGeneratedCapturePath('Reading/Archive/kaanbiryol.com - a1b2c3d4.md', 'Reading', source, id)).toBe(false);
 	expect(isGeneratedCapturePath('Reading/kaanbiryol.com - ffffffff.md', 'Reading', source, id)).toBe(false);
+});
+it('renames a note still named after its link once the title is known, keeping user names', async () => {
+	const link = { title: 'www.kaanbiryol.com', url }, titled = { title: 'The Hidden Cost', url };
+	const generated = 'Reading/kaanbiryol.com - a1b2c3d4.md';
+	expect(await retitledCapturePath(generated, 'Reading', link, titled, id, () => false)).toBe('Reading/The Hidden Cost - kaanbiryol.com - a1b2c3d4.md');
+	expect(await retitledCapturePath(generated, 'Reading', link, titled, id, path => path.endsWith('a1b2c3d4.md'))).toBe('Reading/The Hidden Cost - kaanbiryol.com - a1b2c3d45678.md');
+	expect(await retitledCapturePath(generated, 'Reading', link, link, id, () => false)).toBeUndefined();
+	expect(await retitledCapturePath('Reading/My notes.md', 'Reading', link, titled, id, () => false)).toBeUndefined();
+	// A new title that generates the same name keeps the note where it is.
+	expect(await retitledCapturePath(generated, 'Reading', link, { title: 'kaanbiryol.com', url }, id, () => false)).toBeUndefined();
 });

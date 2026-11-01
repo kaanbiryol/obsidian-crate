@@ -6,7 +6,7 @@ import { decryptJson, encryptJson } from '@/encryption/envelope';
 import { createReadingNote, parseReadingNote, updateReadingNote, readingImportId } from '../../reading/core/notes';
 import { readReadingFrontmatter, patchReadingFrontmatter } from '../../reading/core/frontmatter';
 import { MAX_READING_BYTES, readingUrl, type ReadingItem } from '../../reading/core/model';
-import { isGeneratedCapturePath, readingCapturePath } from '../../reading/core/filename';
+import { readingCapturePath, retitledCapturePath } from '../../reading/core/filename';
 import { filterUniqueReadingIds, findSavedReadingLink } from '../../reading/core/inventory';
 import { portablePathKey } from '@/protocol/portable-path';
 import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile, sameInventoryFile } from '@/encryption/file-inventory';
@@ -334,10 +334,9 @@ export class EncryptedReadingApi {
 		if (action === 'capture') {
 			path = await readingCapturePath(this.options.folderPath, source, itemId, occupied);
 			wire = await this.options.paths.wire(path);
-		} else if (action === 'retry' && before && saved.title !== before.title
-			&& isGeneratedCapturePath(path, this.options.folderPath, { title: before.title, url: before.source_url }, itemId)) {
-			const renamed = await readingCapturePath(this.options.folderPath, source, itemId, occupied);
-			if (renamed !== path) { removed = previous; previous = undefined; path = renamed; wire = await this.options.paths.wire(renamed); }
+		} else if (action === 'retry' && before) {
+			const renamed = await retitledCapturePath(path, this.options.folderPath, { title: before.title, url: before.source_url }, source, itemId, occupied);
+			if (renamed) { removed = previous; previous = undefined; path = renamed; wire = await this.options.paths.wire(renamed); }
 		}
 		const sealed = await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: null }, this.options.authority);
 		const response = { saved: true, id: itemId };

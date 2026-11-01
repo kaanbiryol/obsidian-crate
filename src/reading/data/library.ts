@@ -4,7 +4,7 @@ import { filterUniqueReadingIds, findSavedReadingLink } from '../core/inventory'
 import { applyLocalArticle } from '../core/article';
 import { isEmptyReadingCapture, readingUpdateIssue } from '../core/mutation-policy';
 import type { CapturedArticle } from '../extraction/types';
-import { isGeneratedCapturePath, readingCapturePath } from '../core/filename';
+import { readingCapturePath, retitledCapturePath } from '../core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { adoptReadingClip, createReadingNote, parseReadingNote, recordMarkdownHighlights, updateReadingNote } from '../core/notes';
 import { MAX_READING_BYTES, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
@@ -238,13 +238,14 @@ export class ReadingLibrary {
 				let path = item.path;
 				// A note still named after its link takes the downloaded title; a user rename is kept.
 				const previous = written.before;
-				if (this.vault.rename && previous && saved.title !== previous.title
-					&& isGeneratedCapturePath(item.path, this.folder, { title: previous.title, url: previous.source_url }, item.crate_reading_id)) {
-					path = await readingCapturePath(this.folder, { title: saved.title, url: saved.source_url }, item.crate_reading_id,
-						candidate => portablePathKey(candidate) !== portablePathKey(item.path) && this.occupied(candidate));
+				const renamed = this.vault.rename && previous ? await retitledCapturePath(item.path, this.folder, { title: previous.title, url: previous.source_url },
+					{ title: saved.title, url: saved.source_url }, item.crate_reading_id,
+					candidate => portablePathKey(candidate) !== portablePathKey(item.path) && this.occupied(candidate)) : undefined;
+				if (renamed && this.vault.rename) {
 					this.assertActive();
 					// The article is saved either way; a failed rename only keeps the old name.
-					if (path !== item.path) await this.vault.rename(file, path).catch(() => { path = item.path; });
+					path = renamed;
+					await this.vault.rename(file, renamed).catch(() => { path = item.path; });
 				}
 				await this.scan();
 				return { ...saved, path };
