@@ -328,6 +328,8 @@ it('dispatches a full batch of jobs in bounded parallel groups within the reques
 	finally { release(); await draining; }
 	expect(peak).toBe(5);
 	expect(fetch).toHaveBeenCalledTimes(OUTBOX_BATCH_SIZE);
+	// The feature check and the job read, then one acknowledgement batch per group of five.
+	expect(count.queries).toBe(2 + OUTBOX_BATCH_SIZE / 5);
 	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
 	expect(await env.DB.prepare('SELECT 1 FROM notification_jobs').first()).toBeNull();
 });

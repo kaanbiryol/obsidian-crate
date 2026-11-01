@@ -19,8 +19,9 @@ interface NotificationJobRow {
 	attempts: number;
 }
 
-// One read plus one acknowledgement per job stays within D1_QUERIES_PER_INVOCATION.
-export const OUTBOX_BATCH_SIZE = 40;
+// One read plus one acknowledgement batch per group of five jobs stays within
+// D1_QUERIES_PER_INVOCATION.
+export const OUTBOX_BATCH_SIZE = 200;
 const OUTBOX_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 
 /** The existing class supplies a separate request budget; no extra persistent state. */
@@ -55,26 +56,23 @@ async function runJob(env: Env, job: NotificationJobRow): Promise<void> {
 	if (!response.ok) throw new Error('Failed to schedule alarm');
 }
 
-async function processNotificationJob(env: Env, job: NotificationJobRow): Promise<string | undefined> {
+/** Runs one job and returns the statement that acknowledges its outcome. */
+async function runNotificationJob(env: Env, job: NotificationJobRow): Promise<D1PreparedStatement> {
 	// Each reminder object rejects a superseded job token, and every write below
 	// is token-guarded, so the batch row needs no second read.
 	try {
 		await runJob(env, job);
-		await env.DB.prepare('DELETE FROM notification_jobs WHERE reminder_id = ? AND job_token = ?')
-			.bind(job.reminder_id, job.job_token)
-			.run();
-		return undefined;
+		return env.DB.prepare('DELETE FROM notification_jobs WHERE reminder_id = ? AND job_token = ?')
+			.bind(job.reminder_id, job.job_token);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		await env.DB.prepare(`UPDATE notification_jobs SET
+		return env.DB.prepare(`UPDATE notification_jobs SET
 			attempts = attempts + 1,
 			available_at = ?,
 			last_error = ?,
 			updated_at = datetime('now')
 			WHERE reminder_id = ? AND job_token = ?`)
-			.bind(job.attempts + 1 >= 8 ? -1 : Date.now() + retryDelayMs(job.attempts), message.slice(0, 1024), job.reminder_id, job.job_token)
-			.run();
-		return message;
+			.bind(job.attempts + 1 >= 8 ? -1 : Date.now() + retryDelayMs(job.attempts), message.slice(0, 1024), job.reminder_id, job.job_token);
 	}
 }
 
@@ -86,11 +84,10 @@ export async function drainNotificationJobs(env: Env, limit = OUTBOX_BATCH_SIZE,
 			.bind(Date.now(), limit),
 	);
 	// Distinct reminder IDs have independent Durable Object locks. Five at a time
-	// bounds outgoing requests while avoiding serial network round trips.
+	// bounds outgoing requests while avoiding serial network round trips, and one
+	// batch acknowledges each group. A lost acknowledgement only reruns its jobs,
+	// which their reminder objects accept or reject by token.
 	for (let offset = 0; offset < jobs.length; offset += 5) {
-		const results = await Promise.allSettled(jobs.slice(offset, offset + 5).map(job =>
-			processNotificationJob(env, job)));
-		const failed = results.find(result => result.status === 'rejected');
-		if (failed?.status === 'rejected') throw failed.reason;
+		await env.DB.batch(await Promise.all(jobs.slice(offset, offset + 5).map(job => runNotificationJob(env, job))));
 	}
 }
