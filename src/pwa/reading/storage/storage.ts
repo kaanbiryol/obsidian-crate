@@ -3,6 +3,7 @@ import type { PendingReading } from '../outbox';
 import { isPendingReading, isReadingDraft } from './storage-validation';
 import { downloadJson } from '../../storage/download';
 import { abortTransaction } from '../../storage/abort-transaction';
+import { clearSessionStore } from '../../storage/clear-session-store';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
 import { assertReadingSession, READING_CHANGED_EVENT, READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { readingKeys, isPendingReadingKey } from './storage-keys';
@@ -159,12 +160,8 @@ export async function clearReadingData(isCurrent: () => boolean = () => true): P
 	window.dispatchEvent(new Event(READING_CHANGED_EVENT));
 	// Serialize with in-flight cache writes. Credential checks stop later completions.
 	const db = await readingDatabase();
-	if (!isCurrent() || localStorage.getItem(READING_SESSION_KEY) !== null) return;
-	const tx = db.transaction('values', 'readwrite');
-	await tx.store.clear();
-	if (!isCurrent() || localStorage.getItem(READING_SESSION_KEY) !== null) { await abortTransaction(tx); return; }
-	await tx.done;
-	window.dispatchEvent(new Event(READING_CHANGED_EVENT));
+	const signedOut = () => isCurrent() && localStorage.getItem(READING_SESSION_KEY) === null;
+	if (await clearSessionStore(db, 'values', signedOut)) window.dispatchEvent(new Event(READING_CHANGED_EVENT));
 }
 export async function exportReadingData(): Promise<void> {
 	const db = await readingDatabase();

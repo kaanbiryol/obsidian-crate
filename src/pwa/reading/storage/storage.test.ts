@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { drainReading } from '../outbox';
-import { adoptEarlierReadingCaptures, earlierReadingChanges, exportReadingData, newestReadingShare, pendingReading, removeEarlierReadingChanges, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, readEncryptedReadingIndex, writeEncryptedReadingIndex } from './storage';
+import { adoptEarlierReadingCaptures, clearReadingData, earlierReadingChanges, exportReadingData, newestReadingShare, pendingReading, removeEarlierReadingChanges, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, readEncryptedReadingIndex, writeEncryptedReadingIndex } from './storage';
 import { assertReadingSession, readingSession, READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
 const download = vi.hoisted(() => vi.fn());
+const abort = vi.hoisted(() => vi.fn());
 vi.mock('../../storage/download', () => ({ downloadJson: download }));
 vi.mock('../../encryption/encryption-keys', () => ({ exportWrappedLocalKeys: async () => [] }));
 vi.mock('../../storage/single-store-database', () => ({ openSingleStoreDatabase: async () => ({
@@ -16,14 +17,15 @@ vi.mock('../../storage/single-store-database', () => ({ openSingleStoreDatabase:
 	delete: async (_store: string, key: string) => { values.delete(key); },
 	getAllKeys: async () => [...values.keys()],
 	transaction: () => ({ store: { getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key), delete: async (key: string) => { values.delete(key); },
-		put: async (value: unknown, key: string) => { values.set(key, value); } }, done: Promise.resolve() }),
+		put: async (value: unknown, key: string) => { values.set(key, value); }, count: async () => values.size, clear: async () => { values.clear(); } },
+		abort, done: Promise.resolve() }),
 }) }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const intent = { id: 'article', changes: { highlights: [] }, before: { highlights: undefined } };
 const command = () => ({ id: 'queued', sessionId: session.id, action: 'update', intent: structuredClone(intent),
 	body: JSON.stringify({ ...intent, operationId: createReminderOperationId(20_000) }, null, 2), queuedAt: '2026-09-20T10:00:00Z' });
 beforeEach(() => {
-	values.clear(); download.mockClear();
+	values.clear(); download.mockClear(); abort.mockClear();
 	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(session) : null });
 	vi.stubGlobal('navigator', { onLine: true, locks: { request: async (_name: string, action: () => Promise<unknown>) => action() } });
 	vi.stubGlobal('location', { origin: 'https://crate.example' });
@@ -174,6 +176,17 @@ it('moves unsent captures of an earlier sign-in to the same folder into the curr
 	expect(values.get(`pending:${earlier}`)).toEqual([sent, edit]);
 	expect(values.has('pending:reminders:older-token:generation')).toBe(false);
 	expect(values.get('pending:reminders:old-token:other-generation')).toHaveLength(1);
+});
+
+it('rolls back a Reading data clear when the sign-in check throws after clearing', async () => {
+	vi.stubGlobal('localStorage', { getItem: () => null, removeItem: vi.fn() });
+	const dispatch = vi.fn();
+	vi.stubGlobal('window', { dispatchEvent: dispatch });
+	values.set('draft:session', { url: 'https://example.com' });
+	let checks = 0;
+	await expect(clearReadingData(() => { if (++checks > 2) throw new Error('Storage unavailable'); return true; })).rejects.toThrow('Storage unavailable');
+	expect(abort).toHaveBeenCalledOnce();
+	expect(dispatch).toHaveBeenCalledOnce();
 });
 
 it('finds the newest staged share for a page that lost its share parameter', async () => {
