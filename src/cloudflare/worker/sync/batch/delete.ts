@@ -1,5 +1,5 @@
 import { corsResponse } from '../../cors';
-import { commitFileDelete } from '../mutations';
+import { COMMIT_CONTEXT_COLUMNS, commitFileDelete, parseCommitContext, type CommitContextRow } from '../mutations';
 import { parseJsonObject, parseOptionalString, sanitizePath } from '../../request-validation';
 import {
 	formatMetadataCommitFailure,
@@ -62,9 +62,13 @@ export async function handleBatchDelete(
 	}
 
 	let previousFiles = new Map<string, FileStorageRow>();
+	let context: ReturnType<typeof parseCommitContext> = {};
 	if (validFiles.length > 0) {
 		try {
 			previousFiles = await loadStoredFileRows(db, validFiles.map((file) => file.path));
+			// Read once for every member instead of once per file; the coordinator lock
+			// serializes the writers of these rows.
+			if (previousFiles.size) context = parseCommitContext(await db.prepare(`SELECT ${COMMIT_CONTEXT_COLUMNS}`).first<CommitContextRow>());
 		} catch (error: unknown) {
 			return corsResponse({
 				success: false,
@@ -88,6 +92,8 @@ export async function handleBatchDelete(
 				expectedRevision: file.expectedRevision,
 				previousFile: previousFiles.get(file.path) ?? null,
 				audit,
+				reminderFolder: context.reminderFolder,
+				readingPolicy: context.readingPolicy,
 			});
 			if (!commit.committed) {
 				errors.push({

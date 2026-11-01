@@ -34,7 +34,7 @@ tokens and scoped PWA enrollment keep their current behavior.
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 32 files, 10 MiB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
-| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 12 files) |
+| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 32 files) |
 | `GET` | `/sync/checkpoints` | List up to 20 unexpired shared checkpoints |
 | `POST` | `/sync/checkpoints` | Capture the authoritative server inventory; unchanged generations reuse their checkpoint |
 | `GET` | `/sync/checkpoint?id=<id>` | Read the complete inventory of a live shared checkpoint |

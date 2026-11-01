@@ -218,6 +218,8 @@ export async function commitFileDelete(
 		audit?: MutationAuditContext;
 		/** Statements that commit only with this deletion. */
 		effects?: CommitEffects;
+		/** The current reminder folder when the caller already read it under the coordinator lock. */
+		reminderFolder?: string | null;
 		readingPolicy?: ReadingIndexPolicy;
 		readingRevision?: string;
 	},
@@ -247,7 +249,7 @@ export async function commitFileDelete(
 			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...predicateArgs),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
-		...await enqueueFileProjection(db, params.path, null, null),
+		...await enqueueFileProjection(db, params.path, null, null, false, undefined, params.reminderFolder),
 		...await readingIndexStatements(db, [{ path: params.path, storageKey: null }], { policy: params.readingPolicy, revision: params.readingRevision }),
 		...(params.effects?.([{ path: params.path, storageKey: null }]) ?? []),
 	]);

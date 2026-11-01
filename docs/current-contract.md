@@ -16,7 +16,7 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 | Oldest compatible shortcut revision | 1 |
 | Registered migrations | None |
 | Upload batch | 32 files |
-| Delete batch | 12 files |
+| Delete batch | 32 files |
 | Download batch | 50 files |
 | Upload batch bytes | 10485760 |
 | Download batch bytes | 8388608 |
