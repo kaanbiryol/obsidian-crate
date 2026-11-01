@@ -63,7 +63,7 @@ it('adopts server settings when the new vault holds only the note Obsidian creat
 });
 
 it('treats a large or nested welcome note as user data', async () => {
-	for (const [path, text] of [['Welcome.md', 'x'.repeat(4097)], ['Notes/Welcome.md', 'hi']]) {
+	for (const [path, text] of [['Welcome.md', 'x'.repeat(4097)], ['Notes/Welcome.md', 'hi']] as const) {
 		const h = await fixture();
 		if (path.includes('/')) await h.disk.vault.adapter.mkdir('Notes');
 		h.disk.write(path, text);
