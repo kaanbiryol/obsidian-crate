@@ -4,6 +4,10 @@ import { openFile, type FileEncryptionAuthority, type PathBinding } from './file
 import { isSyncPath } from '@/protocol/sync-validation';
 
 export interface EncryptedInventoryFile { path: string; hash: string; size: number; revision: string }
+/** Whether two listings name the same immutable file, so a copy opened from one serves the other. */
+export function sameInventoryFile(a: EncryptedInventoryFile, b: EncryptedInventoryFile): boolean {
+	return a.path === b.path && a.revision === b.revision && a.hash === b.hash && a.size === b.size;
+}
 export interface EncryptedInventoryPage {
 	files: EncryptedInventoryFile[];
 	sequence: number;

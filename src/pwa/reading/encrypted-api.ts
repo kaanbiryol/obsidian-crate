@@ -9,7 +9,7 @@ import { MAX_READING_BYTES, readingUrl, type ReadingItem } from '../../reading/c
 import { isGeneratedCapturePath, readingCapturePath } from '../../reading/core/filename';
 import { filterUniqueReadingIds, findSavedReadingLink } from '../../reading/core/inventory';
 import { portablePathKey } from '@/protocol/portable-path';
-import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '@/encryption/file-inventory';
+import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile, sameInventoryFile } from '@/encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
@@ -59,10 +59,6 @@ export const ENCRYPTED_READING_ACTIONS: readonly string[] = ['list', 'item', 'ca
 
 const known = (entry: EncryptedReadingIndexEntry) => ({ wire: entry.file.path, path: entry.item.path, hash: entry.hash });
 
-function sameFile(a: WireFile, b: WireFile): boolean {
-	return a.revision === b.revision && a.hash === b.hash && a.size === b.size;
-}
-
 // Unchanged notes keep their item object across inventories, so measure each once.
 const metadataSizes = new WeakMap<ReadingItem, number>();
 function metadataSize(item: ReadingItem): number {
@@ -104,7 +100,7 @@ export class EncryptedReadingApi {
 	private async source(file: WireFile, sources = this.sources): Promise<Source> {
 		const folder = encodeURIComponent(this.options.wireFolder);
 		let source = sources.get(file.path);
-		if (!source || !sameFile(source.file, file)) {
+		if (!source || !sameInventoryFile(source.file, file)) {
 			if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new Error('This Reading note is too large.');
 			const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`).catch(() => undefined);
 			if (!response?.ok) throw new NoteUnavailableError('Article changed or is unavailable. Refresh to retry.');
@@ -147,7 +143,7 @@ export class EncryptedReadingApi {
 		})) {
 			const loaded = await mapBounded(page.files, SOURCE_CONCURRENCY, async file => {
 				const cached = this.indexed.get(file.path);
-				if (cached && sameFile(cached.file, file)) return { entry: cached };
+				if (cached && sameInventoryFile(cached.file, file)) return { entry: cached };
 				try { const { item, hash, sealed } = await this.source(file, nextSources); downloaded = true; return { entry: { file, item, hash }, sealed }; }
 				catch (error) { return { error }; }
 			});
@@ -247,7 +243,7 @@ export class EncryptedReadingApi {
 			if (!response.ok || typeof result.encrypted !== 'string') throw this.options.error(result.error ?? 'Reading request failed.', response.status, result.code);
 			const receipt = await decryptJson(result.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
 			if (receipt.requestHash !== requestHash) throw new Error('The encrypted Reading acknowledgment does not match this change.');
-			// Other decrypted notes stay valid; `sameFile` rejects any that changed elsewhere.
+			// Other decrypted notes stay valid; `sameInventoryFile` rejects any that changed elsewhere.
 			const committed = JSON.parse(attempt.body) as { files: Array<{ path: string }>; remove?: Array<{ path: string }> };
 			for (const file of [...committed.files, ...committed.remove ?? []]) this.sources.delete(file.path);
 			this.confirmedAt = undefined;

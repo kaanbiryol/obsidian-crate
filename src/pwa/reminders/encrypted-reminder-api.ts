@@ -14,9 +14,10 @@ import { capturePwaSession } from '../connection/session-generation';
 import { loadEncryptedReminderAttempt, loadEncryptedReminderIndex, saveEncryptedReminderAttempt, saveEncryptedReminderIndex, pruneEncryptedReminderAttempts, MAX_ENCRYPTED_REMINDER_FILES, type EncryptedReminderAttempt as Attempt } from './encrypted-reminder-attempts';
 import { PWA_ASSET_VERSION } from '../shell/version';
 import { requireCompatibleServer } from '../connection/server-compatibility';
+import { responseError } from '../connection/response-error';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import type { ApiFetch } from '../types';
-import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile } from '../../encryption/file-inventory';
+import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile, sameInventoryFile } from '../../encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { isReminderOperationId } from '@/protocol/reminder-operation';
 import { isSyncPath } from '@/protocol/sync-validation';
@@ -33,8 +34,8 @@ interface ScannedNote { file: RemoteFile; path: string; reminders: ReminderPaylo
 
 async function json<T>(response: Response): Promise<T> {
 	if (!response.ok) {
-		const value = await response.json().catch(() => ({})) as { error?: string; code?: string };
-		throw new ReminderCommandError(value.error ?? 'Could not read encrypted reminders', response.status, value.code ?? 'storage');
+		const failure = await responseError(response, 'Could not read encrypted reminders');
+		throw new ReminderCommandError(failure.message, response.status, failure.code ?? 'storage');
 	}
 	return response.json() as Promise<T>;
 }
@@ -114,7 +115,7 @@ export class EncryptedReminderApi {
 
 	private async readNote(file: RemoteFile, cache: typeof this.cached): Promise<{ path: string; content: string; issue?: string }> {
 		const cached = cache.get(file.revision);
-		if (cached && cached.file.path === file.path && cached.file.hash === file.hash && cached.file.size === file.size) return cached;
+		if (cached && sameInventoryFile(cached.file, file)) return cached;
 		// Coarse ciphertext bound before download; the 1 MiB plaintext limit is checked after opening.
 		if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
 		const query = new URLSearchParams({ folderPath: this.keys.wireFolder, path: file.path, revision: file.revision });
@@ -150,7 +151,7 @@ export class EncryptedReminderApi {
 				const loaded = await mapBounded(inventory.files, NOTE_CONCURRENCY, async (file): Promise<ScannedNote | { file: RemoteFile; error: unknown }> => {
 					try {
 						const known = this.scanned.get(file.revision);
-						if (known && known.file.path === file.path && known.file.hash === file.hash && known.file.size === file.size) return known;
+						if (known && sameInventoryFile(known.file, file)) return known;
 						const note = await this.readNote(file, nextCache);
 						const scanned = scanReminderMarkdownContent(note.path, note.content, this.localFolder).reminders;
 						return { file, path: note.path, reminders: await Promise.all(scanned.map(reminder => reminderCommandPayload(reminder))), issue: note.issue };

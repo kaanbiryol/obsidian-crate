@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { createEncryptedInventoryProgress, encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryPage, ENCRYPTED_INVENTORY_PAGE } from './file-inventory';
+import { createEncryptedInventoryProgress, encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryPage, ENCRYPTED_INVENTORY_PAGE, sameInventoryFile } from './file-inventory';
 
 const file = (path = 'Reading/Article.md') => ({ path, hash: 'a'.repeat(64), size: 12, revision: 'revision' });
 const page = (patch: Partial<EncryptedInventoryPage> = {}): EncryptedInventoryPage => ({ files: [], sequence: 1, generation: 1, nextCursor: null, ...patch });
@@ -90,4 +90,11 @@ it.each([[1, null], [2, 'changed while loading']])('confirms sequence %i after t
 	if (error) await expect(result).rejects.toThrow(error);
 	else await expect(result).resolves.toEqual(['A', null]);
 	expect(events).toEqual(['handled A', 'fetch A', 'handled last', 'fetch first']);
+});
+
+it('treats a listed file as the same only when its path, revision, hash and size all match', () => {
+	expect(sameInventoryFile(file(), file())).toBe(true);
+	for (const patch of [{ path: 'Reading/Other.md' }, { revision: 'other' }, { hash: 'b'.repeat(64) }, { size: 13 }]) {
+		expect(sameInventoryFile(file(), { ...file(), ...patch })).toBe(false);
+	}
 });
