@@ -3,6 +3,7 @@ import type { Reminder } from '../types';
 import {
 	applyReminderDraftContentUpdate,
 	buildInitialReminderContent,
+	hasReminderDraftTitle,
 	deriveReminderDraftContentMetadata,
 	rebuildReminderContent,
 	reconcileReminderDraftMetadata,
@@ -224,4 +225,13 @@ it.each(['Inbox', 'Work'])('keeps earlier project mentions when reopening in the
 	expect(deriveReminderDraftContentMetadata(content, ['Inbox', 'Home', 'Work'], project)).toMatchObject({
 		cleanContent: 'Compare #Home with', project,
 	});
+});
+
+it('requires a human-readable title instead of metadata-only content', () => {
+	const projects = ['Inbox', 'Work'];
+
+	expect(hasReminderDraftTitle('', projects)).toBe(false);
+	expect(hasReminderDraftTitle('!', projects)).toBe(false);
+	expect(hasReminderDraftTitle('#Work !', projects)).toBe(false);
+	expect(hasReminderDraftTitle('Finish report #Work !', projects)).toBe(true);
 });

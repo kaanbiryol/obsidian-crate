@@ -5,7 +5,6 @@ import { buildInboxViewModel } from '@/reminders/ui/views/viewModels';
 import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
-	hasReminderDraftTitle,
 } from './editor-draft';
 import { reorderProjectReminders, toSharedReminder } from '../outbox/reminder-list-state';
 import type { ModalDraft, ReminderRecord } from '../types';
@@ -53,15 +52,6 @@ describe('PWA reminder state', () => {
 		const patch = applyReminderTextUpdate(draft, ['Inbox'], { recurrence: null });
 		expect(patch.content?.trim()).toBe('Task');
 		expect(patch.recurrence).toBeUndefined();
-	});
-
-	it('requires a human-readable title instead of metadata-only content', () => {
-		const projects = ['Inbox', 'Work'];
-
-		expect(hasReminderDraftTitle('', projects, 'Inbox')).toBe(false);
-		expect(hasReminderDraftTitle('!', projects, 'Inbox')).toBe(false);
-		expect(hasReminderDraftTitle('#Work !', projects, 'Inbox')).toBe(false);
-		expect(hasReminderDraftTitle('Finish report #Work !', projects, 'Inbox')).toBe(true);
 	});
 
 	it('keeps the dropped order when the Inbox view re-sorts optimistic reminders', () => {

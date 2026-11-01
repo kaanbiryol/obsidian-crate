@@ -14,8 +14,8 @@ import { AnimationConfig } from '../../../../ui/shared/component-adapter';
 import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
 import { Reminder } from '../../../types';
 import { DEFAULT_PROJECT } from '../../../core/constants';
-import { parseReminderContent } from '../../../core/grammar/reminderParser';
-import { getReminderTitleCaret } from '../../reminder-editor/reminderEditorEdits';
+import { hasReminderDraftTitle } from '../../../core/reminderDraft';
+import { clampCaretToReminderTitle } from '../../reminder-editor/reminderEditorEdits';
 import { saveCursorPosition } from '../../../../ui/shared/cursorPosition';
 
 interface AddReminderModalProps {
@@ -69,7 +69,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
 	});
 	const { content, description, project, priority, dueDate, hasTime, recurrence, togglePriority } = draft;
 	const hasTitle = useMemo(
-		() => Boolean(parseReminderContent(content, projects).cleanContent.trim()),
+		() => hasReminderDraftTitle(content, projects),
 		[content, projects],
 	);
 	const {
@@ -127,8 +127,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
 	const handlePriorityToggle = useCallback(() => {
 		const caret = saveCursorPosition(richTextInputRef.current?.getElement() ?? null);
 		const nextContent = togglePriority();
-		const wordsEnd = getReminderTitleCaret(nextContent, projects);
-		richTextInputRef.current?.setCursorPosition(Math.min(caret ?? wordsEnd, wordsEnd), {
+		richTextInputRef.current?.setCursorPosition(clampCaretToReminderTitle(nextContent, caret, projects), {
 			scrollTop: textareaRef.current?.scrollTop ?? 0,
 		});
 	}, [projects, togglePriority]);

@@ -26,6 +26,12 @@ export function getReminderTitleCaret(text: string, knownProjects?: string[]): n
 	return toReminderCursorOffset(text, text.startsWith(words) ? words.length : text.length);
 }
 
+/** Keeps a saved caret within the user's own words after a chip edit rebuilds the text. */
+export function clampCaretToReminderTitle(text: string, caret: number | null, knownProjects?: string[]): number {
+	const wordsEnd = getReminderTitleCaret(text, knownProjects);
+	return Math.min(caret ?? wordsEnd, wordsEnd);
+}
+
 /** Replace the current project token, including its suffix beyond the caret. */
 export function replaceReminderProject(text: string, start: number, length: number, project: string, knownProjects?: string[]) {
 	const current = findProjectMatches(text, knownProjects).find(match => match.index === start);

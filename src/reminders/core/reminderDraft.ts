@@ -74,6 +74,11 @@ export function getDefaultProject(defaultProject: string): string {
 	return defaultProject || DEFAULT_PROJECT;
 }
 
+/** A draft can be saved once words remain beyond its date, project and priority syntax. */
+export function hasReminderDraftTitle(content: string, projects: string[]): boolean {
+	return Boolean(parseReminderContent(content, projects).cleanContent.trim());
+}
+
 export function deriveReminderDraftContentMetadata(
 	content: string,
 	projects: string[],

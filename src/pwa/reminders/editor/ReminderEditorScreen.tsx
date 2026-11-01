@@ -6,7 +6,7 @@ import React, {
 	useRef,
 	useMemo,
 } from 'react';
-import { deriveReminderDraftContentMetadata } from '@/reminders/core/reminderDraft';
+import { deriveReminderDraftContentMetadata, hasReminderDraftTitle } from '@/reminders/core/reminderDraft';
 import { getProjectColor } from '@/reminders/ui/format/projectColors';
 import { IconButton } from '@/ui/shared/IconButton';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
@@ -25,7 +25,7 @@ import {
 } from './editor-draft';
 import type { ModalDraft, ModalPickerId, ModalState } from '../types';
 import { DEFAULT_PROJECT } from '@/reminders/core/constants';
-import { getReminderTitleCaret } from '@/reminders/ui/reminder-editor/reminderEditorEdits';
+import { clampCaretToReminderTitle, getReminderTitleCaret } from '@/reminders/ui/reminder-editor/reminderEditorEdits';
 import { saveCursorPosition } from '@/ui/shared/cursorPosition';
 
 export interface ReminderEditorScreenHandle {
@@ -87,10 +87,11 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	const isEditing = modal.mode === 'edit';
 	const title = isEditing ? 'Edit reminder' : 'New reminder';
 	const editorInteractive = isActive || isReturningToEditor;
+	const hasTitle = useMemo(() => hasReminderDraftTitle(draft.content, projectOptions), [draft.content, projectOptions]);
 	const canSubmit = !draft.deleteConfirm
 		&& !saving
 		&& !isClosing
-		&& Boolean(contentMetadata.cleanContent.trim());
+		&& hasTitle;
 	const submissionStarted = useRef(false);
 	const performSave = useCallback(() => {
 		// Keyboard dismissal can leave a callback holding earlier props. Keep
@@ -156,9 +157,8 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 			priority: draft.priority === 1 ? 4 : 1,
 		});
 		if (typeof patch.content === 'string') {
-			const wordsEnd = getReminderTitleCaret(patch.content, projectOptions);
 			const caret = saveCursorPosition(richTextInputRef.current?.getElement() ?? null);
-			richTextInputRef.current?.setCursorPosition(Math.min(caret ?? wordsEnd, wordsEnd), {
+			richTextInputRef.current?.setCursorPosition(clampCaretToReminderTitle(patch.content, caret, projectOptions), {
 				scrollTop: richTextInputRef.current.getElement()?.scrollTop ?? 0,
 			});
 		}

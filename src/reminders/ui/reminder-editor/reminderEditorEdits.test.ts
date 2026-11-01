@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getReminderTitleCaret, replaceReminderProject, toReminderCursorOffset, toReminderTextOffset } from './reminderEditorEdits';
+import { clampCaretToReminderTitle, getReminderTitleCaret, replaceReminderProject, toReminderCursorOffset, toReminderTextOffset } from './reminderEditorEdits';
 
 describe('reminder editor token edits', () => {
 	it.each([
@@ -47,4 +47,10 @@ it.each([
 	['Buy tomorrow milk', 17],
 ])('places the caret after the user words in %s', (text, caret) => {
 	expect(getReminderTitleCaret(text, ['Work'])).toBe(caret);
+});
+
+it('keeps a saved caret within the title after a chip edit', () => {
+	expect(clampCaretToReminderTitle('Call Ada !', 2)).toBe(2);
+	expect(clampCaretToReminderTitle('Call Ada !', 10)).toBe(8);
+	expect(clampCaretToReminderTitle('Call Ada !', null)).toBe(8);
 });
