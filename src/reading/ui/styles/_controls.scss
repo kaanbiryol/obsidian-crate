@@ -23,6 +23,8 @@
 	width: min(460px, calc(100% - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain;
 	background: var(--crate-modal-bg); border-radius: var(--crate-radius-sheet, 16px);
 	> .crate-reading, > .base-modal-content > .crate-reading { padding: var(--crate-dialog-padding); background: transparent; }
+	// The body already pads its contents; the shared centered surface padding would double the bottom edge.
+	&.is-centered { padding-bottom: 0; }
 	&.crate-reading-dialog--full.is-bottom-sheet {
 		width: 100%;
 		height: 90dvh;
