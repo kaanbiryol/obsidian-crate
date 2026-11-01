@@ -69,16 +69,25 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 			}
 		} finally { connectingRef.current = false; if (alive.current) setConnecting(false); }
 	}, [startupReady, enabled, hydrate]);
+	const connectRef = useRef(connect);
+	connectRef.current = connect;
 	useEffect(() => {
 		if (!startupReady) return;
 		alive.current = true;
 		let cancelled = false;
 		const lifetime = generation;
 		void run(async () => {
+			let current: ReadingSession | null = null;
 			try {
-				const current = readingSession();
+				current = readingSession();
 				if (current) await hydrate(current);
-			} finally { if (!cancelled) setReady(true); }
+			} finally {
+				if (!cancelled) {
+					setReady(true);
+					// Start connecting in the same render, so the library never shows before Reading connects.
+					if (!current) void connectRef.current();
+				}
+			}
 		});
 		return () => { cancelled = true; alive.current = false; lifetime.current++; };
 	}, [startupReady, authority, run, hydrate]);
