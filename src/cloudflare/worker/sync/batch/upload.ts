@@ -3,7 +3,7 @@ import type { EncryptionServerState } from '../../../../encryption/server-state'
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../../encryption/file-format';
 import { trackStagedUploads } from '../staging/staged-uploads';
 import { trackStagedBatch } from '../staging/staged-upload-batches';
-import { beginUploadOperation } from '../upload-operations';
+import { beginUploadOperations } from '../upload-operations';
 import { corsResponse } from '../../cors';
 import { FileNamespaceConflictError } from '../file-namespace';
 import { EncryptionStateError, validateUploadEncryption } from '../../encryption/state';
@@ -26,23 +26,24 @@ export async function handleBatchUpload(
 	if (prepared instanceof Response) return prepared;
 	const { bulkNew, candidates, results } = prepared;
 
-	// Receipt checks are independent; do not pay their latency once per file.
-	const checked = await Promise.all(candidates.map(async file => {
-		try {
-			const operation = await beginUploadOperation(db, file.operationId, {
-				path: file.safePath, hash: file.hash, size: file.size,
-				contentType: file.contentType, expectedHash: file.expectedHash,
-			});
-			if (operation instanceof Response) {
-				const receipt = await operation.json() as BatchUploadResponse['results'][number];
-				results.push({ ...receipt, path: file.safePath, ...(!receipt.success ? { status: operation.status } : {}) });
-				return null;
-			}
-			return { ...file, operation };
-		} catch (error) {
-			results.push(validationFailure(file.safePath, formatMutationError(error)));
+	// One query reads every member's receipt.
+	let operations: Awaited<ReturnType<typeof beginUploadOperations>>;
+	try {
+		operations = await beginUploadOperations(db, candidates.map(file => ({ id: file.operationId, payload: {
+			path: file.safePath, hash: file.hash, size: file.size,
+			contentType: file.contentType, expectedHash: file.expectedHash,
+		} })));
+	} catch (error) {
+		return corsResponse({ success: false, results: results.concat(candidates.map(file => validationFailure(file.safePath, formatMutationError(error)))) });
+	}
+	const checked = await Promise.all(candidates.map(async (file, index) => {
+		const operation = operations[index]!;
+		if (operation instanceof Response) {
+			const receipt = await operation.json() as BatchUploadResponse['results'][number];
+			results.push({ ...receipt, path: file.safePath, ...(!receipt.success ? { status: operation.status } : {}) });
 			return null;
 		}
+		return { ...file, operation };
 	}));
 	const uploads = checked.filter((file): file is NonNullable<typeof file> => file !== null);
 

@@ -54,6 +54,8 @@ it('uses one lease write and commit-returned receipts for a full asset batch', a
 	expect(prepare.mock.calls.filter(([sql]) => sql.startsWith('SELECT request_hash, response_json') && !sql.includes('UNION ALL'))).toHaveLength(0);
 	expect(put).toHaveBeenCalledTimes(payload.length);
 	expectWithinQueryBudget();
+	// One receipt read and one lease write, whatever the batch size.
+	expect(invocations.staging).toBe(2);
 	const repeated = await (await send(payload)).json() as BatchUploadResponse;
 	expect(repeated.results.sort((a, b) => a.path.localeCompare(b.path))).toEqual(receipts.results.sort((a, b) => a.path.localeCompare(b.path)));
 	expect(put).toHaveBeenCalledTimes(payload.length);

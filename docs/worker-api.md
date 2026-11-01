@@ -204,7 +204,7 @@ completed file uploads. See [initial import readiness](protocol.md#initial-impor
 }
 ```
 
-Worker validates: max 32 files, total decoded content <= 10 MiB. Each file requires its own stable `operationId` with the same receipt and expiry rules as a single upload. Staging costs one D1 query per file and each file commits in its own coordinator invocation, so a full batch stays within Workers Free D1 query limits even on stale-write cleanup paths.
+Worker validates: max 32 files, total decoded content <= 10 MiB. Each file requires its own stable `operationId` with the same receipt and expiry rules as a single upload. Staging reads every receipt in one D1 query and each file commits in its own coordinator invocation, so a full batch stays within Workers Free D1 query limits even on stale-write cleanup paths.
 
 Response: `{ success, results: [{ path, success, hash?, revision?, error?, code?, status?, currentHash? }] }`. A stale per-file write uses `code: "version_conflict"`, `status: 409`, and the current remote hash; storage failures use `code: "storage"` and `status: 503`.
 

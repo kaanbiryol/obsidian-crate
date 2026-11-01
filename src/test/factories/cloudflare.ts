@@ -212,6 +212,10 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					return null;
 				}) as MockD1Statement['first'],
 				all: vi.fn(async <T = Record<string, unknown>>() => {
+					if (sql.includes('LEFT JOIN upload_operations o')) {
+						const ids = JSON.parse(String(statement._args[0])) as Array<[string, number]>;
+						return { results: ids.map(([id]) => ({ id, ...(receipts.get(id) ?? { request_hash: null, response_json: null }), valid: 1 })) as T[] };
+					}
 					if (sql.includes('INSERT INTO staged_uploads')) return { results: (JSON.parse(String(statement._args[1])) as unknown[]).map(() => ({ encryption_state: null })) as T[] };
 					if (sql.includes('FROM files WHERE portable_path IN')) {
 						const results = statement._args.flatMap((value) => {

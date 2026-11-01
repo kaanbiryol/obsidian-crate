@@ -286,7 +286,7 @@ Manual, selected-file, incremental, forced and edit-triggered automatic
 sync use `transfer/upload.ts:uploadPreparedFiles()` for ordinary uploads. Files
 are prepared in byte-bounded chunks and split at `BATCH_FILE_SIZE_LIMIT` (1 MB):
 
-- **< 1 MB:** batched into JSON payloads with base64-encoded content. Batches contain up to 32 files. New files are batched apart from edits, so an all-new batch can use one bulk commit when the server supports it. Each request respects `BATCH_MAX_BYTES` (10 MB). Sent via `POST /sync/batch-upload`, with up to 4 requests in flight on desktop or 2 on mobile. Per-path failures retain their code and status for targeted reconciliation or terminal failure handling. Staging costs one D1 query per file and each file then commits in its own coordinator invocation, so a batch stays within Workers Free D1 query limits.
+- **< 1 MB:** batched into JSON payloads with base64-encoded content. Batches contain up to 32 files. New files are batched apart from edits, so an all-new batch can use one bulk commit when the server supports it. Each request respects `BATCH_MAX_BYTES` (10 MB). Sent via `POST /sync/batch-upload`, with up to 4 requests in flight on desktop or 2 on mobile. Per-path failures retain their code and status for targeted reconciliation or terminal failure handling. Staging reads every receipt in one D1 query and each file then commits in its own coordinator invocation, so a batch stays within Workers Free D1 query limits.
 - **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload`, with up to 2 requests in flight. Each mode retains its retry policy.
 
 `protocol/sync-limits.ts:maxUploadBatchFiles()` defines the per-request file limit.

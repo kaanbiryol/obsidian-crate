@@ -3,7 +3,7 @@
  *
  * Mutation batches keep each request's measured worst case within D1's 50 queries
  * per invocation (D1_QUERIES_PER_INVOCATION in the Worker's platform limits) after
- * authentication. Staging an upload costs one query per file, and each file then
+ * authentication. Staging an upload batch costs two queries, and each file then
  * commits in its own invocation; a delete batch costs one query per file.
  */
 export const BATCH_UPLOAD_MAX_FILES = 32;
