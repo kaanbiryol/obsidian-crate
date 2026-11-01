@@ -132,6 +132,8 @@ try {
 			await switchFeature(page, 'Reading');
 			const readingLibrary = page.locator('.crate-reading-workspace');
 			await expect(readingLibrary).toHaveAttribute('data-list-style', 'flat');
+			// The library mounts once before Reading auto-connects; type only into the connected one.
+			await expect(page.locator('.crate-feature-panel[data-active="true"]').getByRole('button', { name: 'Save your first link', exact: true })).toBeVisible();
 			await page.getByRole('searchbox', { name: 'Search reading' }).fill('retained query');
 			await checkCompoundFocus(page, page.getByRole('searchbox', { name: 'Search reading' }), page.locator('.crate-feature-panel[data-active="true"] .crate-field--search .crate-field__control'));
 			await expect(page.getByRole('searchbox', { name: 'Search reading' })).toHaveValue('retained query');

@@ -1,10 +1,23 @@
 import { expect } from '@playwright/test';
 
+// Reordered rows spring into place; measure only once a box stops moving.
+async function settledBox(locator) {
+	let previous = null;
+	await expect.poll(async () => {
+		const box = await locator.boundingBox();
+		const settled = previous !== null && box.x === previous.x && box.y === previous.y;
+		previous = box;
+		return settled;
+	}, { intervals: [50] }).toBe(true);
+	return previous;
+}
+
 export async function checkTabSettings(page, name) {
 	const gear = page.getByRole('button', { name: 'Open settings', exact: true });
 	const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
 	await expect(sheet.getByRole('button', { name: 'Reset tabs', exact: true })).toHaveCount(0);
-	const listTop = () => sheet.locator('.settings-tab-list').evaluate(el => el.getBoundingClientRect().top);
+	// Layout offset, not viewport position: selecting a tab can scroll the sheet.
+	const listTop = () => sheet.locator('.settings-tab-list').evaluate(el => el.offsetTop);
 	const topWithoutReset = await listTop();
 	// Every destination can occupy a slot; exactly four tabs are always present.
 	for (const [index, tab] of ['highlights', 'favorites', 'archive', 'today'].entries()) {
@@ -22,8 +35,8 @@ export async function checkTabSettings(page, name) {
 	// Drag only the handle, leaving the row and its picker scrollable.
 	const handle = sheet.getByRole('button', { name: 'Reorder Archive', exact: true });
 	await handle.scrollIntoViewIfNeeded();
-	const from = await handle.boundingBox();
-	const to = await sheet.getByRole('button', { name: 'Reorder Favorites', exact: true }).boundingBox();
+	const from = await settledBox(handle);
+	const to = await settledBox(sheet.getByRole('button', { name: 'Reorder Favorites', exact: true }));
 	await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
 	await page.mouse.down();
 	// A hold lifts the row before it follows the pointer.
@@ -32,8 +45,15 @@ export async function checkTabSettings(page, name) {
 		await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 + (to.y - from.y - 8) * step / 12);
 		await page.evaluate(() => new Promise(requestAnimationFrame));
 	}
+	// Reorder moves one slot per upward pointer move against measured layouts, so keep
+	// nudging upward until the second swap lands instead of racing its layout pass.
+	const firstRow = sheet.locator('.settings-tab-row').first();
+	for (let nudge = 1; nudge <= 20 && await firstRow.getAttribute('data-settings-tab') !== 'archive'; nudge++) {
+		await page.mouse.move(from.x + from.width / 2, to.y - 8 - nudge * 2);
+		await page.evaluate(() => new Promise(requestAnimationFrame));
+	}
 	// The order previews during the drag and saves only on drop.
-	await expect(sheet.locator('.settings-tab-row').first()).toHaveAttribute('data-settings-tab', 'archive');
+	await expect(firstRow).toHaveAttribute('data-settings-tab', 'archive');
 	expect(await savedTabs()).toEqual(['favorites', 'highlights', 'archive', 'today']);
 	await page.mouse.up();
 	await expect.poll(savedTabs).toEqual(['archive', 'favorites', 'highlights', 'today']);
@@ -42,8 +62,8 @@ export async function checkTabSettings(page, name) {
 		try {
 			await page.mouse.move(0, 0);
 			await expect(sheet.getByRole('button', { name: 'Reorder Reminders', exact: true })).toHaveCSS('touch-action', 'none');
-			const start = await sheet.getByRole('button', { name: 'Reorder Reminders', exact: true }).boundingBox();
-			const end = await sheet.getByRole('button', { name: 'Reorder Archive', exact: true }).boundingBox();
+			const start = await settledBox(sheet.getByRole('button', { name: 'Reorder Reminders', exact: true }));
+			const end = await settledBox(sheet.getByRole('button', { name: 'Reorder Archive', exact: true }));
 			const point = { x: start.x + start.width / 2, y: start.y + start.height / 2 };
 			// Moving before the hold activates leaves the order alone.
 			await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });

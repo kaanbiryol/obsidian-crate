@@ -22,7 +22,8 @@ interface Receipt { consumed_revision: string; revision: string; changelog_seq: 
 
 beforeEach(async () => {
 	await applySchema(env.DB);
-	for (const device of ['first', 'second']) await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES (?, ?, 'vault')")
+	// reset() can leave the previous test's rows under CI load, so seed idempotently.
+	for (const device of ['first', 'second']) await env.DB.prepare("INSERT OR REPLACE INTO auth_tokens (id, token_hash, scope) VALUES (?, ?, 'vault')")
 		.bind(`device-${device}`, await sha256Hex(`credential-${device}`)).run();
 });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
