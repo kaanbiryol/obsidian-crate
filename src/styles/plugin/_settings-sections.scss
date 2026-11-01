@@ -108,6 +108,9 @@ body.reduce-motion .crate-action-progress {
 	border: 0;
 	background: transparent;
 	> summary {
+		display: inline-grid;
+		grid-template-columns: auto 12px;
+		column-gap: 6px;
 		min-height: 32px;
 		border: 0;
 		font-size: var(--font-ui-smaller);
