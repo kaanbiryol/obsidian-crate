@@ -34,7 +34,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 	finishInitialSetup(): Promise<void>;
 	/** Moves the vault to trash when the user chose to replace it with the joined server's contents. */
 	replaceLocalVault?(): Promise<void>;
-	tryInitialImport?(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
+	tryInitialImport(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
 	apiConfigured(): boolean;
 	recoverUploads(): Promise<void>;
 	getStatus(): SyncStatus;
@@ -51,7 +51,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 		options?: { reuseUnchangedHashes?: boolean },
 	): Promise<FullSyncPlan>;
 	/** True when this device has synced before and holds a changelog cursor. */
-	hasSyncCursor?(): boolean;
+	hasSyncCursor(): boolean;
 	processDiff(
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,
@@ -80,7 +80,7 @@ export async function runSyncWorkflow(
 		await context.replaceLocalVault?.();
 		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
-		const imported = await context.tryInitialImport?.(result, progressCallback);
+		const imported = await context.tryInitialImport(result, progressCallback);
 		if (imported) {
 			result = imported;
 			if (finalizeSyncResult(imported)) await context.finishInitialSetup();
@@ -89,7 +89,7 @@ export async function runSyncWorkflow(
 		}
 		context.updateState({ work: { phase: 'server' } });
 		context.throwIfDestroyed();
-		recovering = context.hasSyncCursor?.() ?? false;
+		recovering = context.hasSyncCursor();
 		const incrementalFailures: MutationFailure[] = [];
 		const incrementalResult = await context.incrementalSync(progressCallback, failure => { incrementalFailures.push(failure); });
 		if (incrementalResult) {

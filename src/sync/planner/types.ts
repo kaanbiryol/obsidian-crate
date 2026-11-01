@@ -53,7 +53,7 @@ export interface LocalDiffPlannerContext {
 	verifyContent(files: VaultFile[]): Promise<boolean>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
-	encrypted?(): boolean;
+	encrypted(): boolean;
 }
 
 export interface IncrementalSyncPlannerContext {
@@ -83,10 +83,10 @@ export interface IncrementalSyncPlannerContext {
 		result: SyncResult,
 		options: UploadPreparedFilesOptions,
 	): Promise<void>;
-	reconcileVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
+	reconcileVersionConflicts(paths: string[], result: SyncResult): Promise<void>;
 	/** Paths whose incoming version is saved for review. */
 	awaitingReviewPaths?(): string[];
-	getRemoteEntries?(paths: string[]): Promise<Record<string, FileEntry>>;
+	getRemoteEntries(paths: string[]): Promise<Record<string, FileEntry>>;
 }
 
 export interface FullSyncPlannerContext {
@@ -102,7 +102,7 @@ export interface FullSyncPlannerContext {
 	shouldIgnore(path: string): boolean;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
-	encrypted?(): boolean;
+	encrypted(): boolean;
 }
 
 export interface FullSyncPlan {

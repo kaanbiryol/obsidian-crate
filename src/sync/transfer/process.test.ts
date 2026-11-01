@@ -65,6 +65,7 @@ function createProcessHarness() {
 		runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 		retryWithBackoff: async <T>(fn: () => Promise<T>) => fn(),
 		getModifiedIso: vi.fn(async () => '2026-02-15T00:00:00.000Z'),
+		encrypted: () => false,
 	};
 
 	return {

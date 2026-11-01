@@ -22,6 +22,7 @@ async function fixture() {
 		get localManifest() { return manifest; },
 		throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith(`${TEST_PLUGIN_DIR}/`) || path === TEST_PLUGIN_DIR,
 		runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+		encrypted: () => false,
 		initialConfigPull: {
 			firstSync: true,
 			get: () => manifest.getInitialConfigPull(),

@@ -26,6 +26,7 @@ it('prepares the next chunk of an initial import while the current one uploads',
 		transfer: {
 			vault: {}, localManifest: { setEntry: vi.fn(), removeEntry: vi.fn() },
 			markdownBaseCache: { putBase: async () => {} },
+			encrypted: () => false,
 			runConcurrent: async (tasks: Array<() => Promise<void>>) => { for (const task of tasks) await task(); },
 		} as never,
 		api: {
@@ -47,6 +48,7 @@ function importContext(token: string | undefined, revision: string | undefined) 
 		transfer: {
 			vault: {}, localManifest: { getEntry: () => revision ? { revision } : undefined, setEntry: vi.fn(), removeEntry: vi.fn() },
 			markdownBaseCache: { putBase: async () => {} },
+			encrypted: () => false,
 			runConcurrent: async (tasks: Array<() => Promise<void>>) => { for (const task of tasks) await task(); },
 		} as never,
 		api: {
@@ -90,6 +92,7 @@ it('records verified modification times, so the next scan does not reread the im
 		transfer: {
 			vault: {}, localManifest: { setEntry, removeEntry: vi.fn() },
 			markdownBaseCache: { putBase: async () => {} },
+			encrypted: () => false,
 			runConcurrent: async (tasks: Array<() => Promise<void>>) => { for (const task of tasks) await task(); },
 		} as never,
 		api: {
@@ -118,6 +121,7 @@ it('keeps three import requests busy and checkpoints every 256 confirmed files',
 		transfer: {
 			vault: {}, localManifest: { setEntry: vi.fn(), removeEntry: vi.fn() },
 			markdownBaseCache: { putBase: async () => {} },
+			encrypted: () => false,
 		} as never,
 		api: {
 			getManifest: async () => ({ files: {} }),
@@ -158,6 +162,7 @@ it('saves the confirmed files when a later import request fails', async () => {
 		transfer: {
 			vault: {}, localManifest: { setEntry: (path: string) => { calls.push(`entry ${path}`); }, removeEntry: vi.fn() },
 			markdownBaseCache: { putBase: async () => {} },
+			encrypted: () => false,
 		} as never,
 		api: {
 			getManifest: async () => ({ files: {} }),

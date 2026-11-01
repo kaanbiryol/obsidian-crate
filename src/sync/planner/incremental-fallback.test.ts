@@ -66,6 +66,8 @@ it('falls back to full sync when cursor is expired', async () => {
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => null),
 			uploadPreparedFiles: vi.fn(async () => {}),
+			reconcileVersionConflicts: vi.fn(async () => {}),
+			getRemoteEntries: vi.fn(async () => ({})),
 		};
 
 		const result = await runIncrementalSync(context, {});
@@ -144,6 +146,8 @@ it('falls back to full sync when cursor is expired', async () => {
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => preparedUpload),
 			uploadPreparedFiles,
+			reconcileVersionConflicts: vi.fn(async () => {}),
+			getRemoteEntries: vi.fn(async () => ({})),
 		};
 
 		const result = await runIncrementalSync(context, {});
@@ -222,6 +226,8 @@ it('falls back to full sync when cursor is expired', async () => {
 			processDiff,
 			prepareUploadFromPath: vi.fn(async () => null),
 			uploadPreparedFiles: vi.fn(async () => {}),
+			reconcileVersionConflicts: vi.fn(async () => {}),
+			getRemoteEntries: vi.fn(async () => ({})),
 		};
 
 		const result = await runIncrementalSync(context, {});
@@ -276,6 +282,8 @@ it('falls back to full sync when cursor is expired', async () => {
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => null),
 			uploadPreparedFiles: vi.fn(async () => {}),
+			reconcileVersionConflicts: vi.fn(async () => {}),
+			getRemoteEntries: vi.fn(async () => ({})),
 		};
 
 		const result = await runIncrementalSync(context, {});
@@ -337,6 +345,8 @@ it('falls back to full sync when cursor is expired', async () => {
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => null),
 			uploadPreparedFiles: vi.fn(async () => {}),
+			reconcileVersionConflicts: vi.fn(async () => {}),
+			getRemoteEntries: vi.fn(async () => ({})),
 		};
 
 		const result = await runIncrementalSync(context, {});
@@ -382,6 +392,8 @@ it('falls back to full sync when cursor is expired', async () => {
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => null),
 			uploadPreparedFiles: vi.fn(async () => {}),
+			reconcileVersionConflicts: vi.fn(async () => {}),
+			getRemoteEntries: vi.fn(async () => ({})),
 		};
 
 		const result = await runIncrementalSync(context, {});

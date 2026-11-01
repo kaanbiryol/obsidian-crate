@@ -22,6 +22,7 @@ function createPlanner(localPaths: string[] = []) {
 	const context: FullSyncPlannerContext = {
 		vault, localManifest, throwIfDestroyed: () => {}, shouldIgnore: () => false,
 		runConcurrent: async tasks => Promise.all(tasks.map(task => task())),
+		encrypted: () => false,
 	};
 	return { context, readBinary, localManifest };
 }

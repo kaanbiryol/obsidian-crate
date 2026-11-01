@@ -45,7 +45,7 @@ export async function addAwaitingReviewChanges(
 	seq: number,
 ): Promise<void> {
 	const paths = [...new Set(context.awaitingReviewPaths?.())].filter(path => !changesByPath.has(path) && !context.shouldIgnore(path));
-	if (!paths.length || !context.getRemoteEntries) return;
+	if (!paths.length) return;
 	const remote = await context.getRemoteEntries(paths);
 	for (const path of paths) {
 		const entry = getPathEntry(remote, path);

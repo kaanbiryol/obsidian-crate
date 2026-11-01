@@ -21,7 +21,7 @@ export async function prepareUploadFromVaultFile(
 	options?: { force?: boolean; expectedHash?: string | null },
 ): Promise<PreparedUpload | null> {
 	return withSyncFileContext(file.path, async () => {
-		const skipped = skippedUploadIssue(file, context.encrypted?.() ?? false);
+		const skipped = skippedUploadIssue(file, context.encrypted());
 		if (skipped) {
 			logger.warn("Skipping file:", file.path);
 			throw new SkippedFileError(file.path, skipped);

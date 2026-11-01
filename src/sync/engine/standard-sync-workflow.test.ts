@@ -71,6 +71,8 @@ function createContext(options: {
 		saveLocalManifest: spies.saveLocalManifest,
 		setLastSync: spies.setLastSync,
 		setLastSeq: spies.setLastSeq,
+		tryInitialImport: async () => null,
+		hasSyncCursor: () => false,
 		reconnectNotice: new ReconnectNotice(),
 	};
 

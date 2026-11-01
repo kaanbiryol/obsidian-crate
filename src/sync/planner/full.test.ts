@@ -80,6 +80,7 @@ describe('createFullSyncPlan', () => {
 				} as never,
 				throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith('ignored/'),
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+				encrypted: () => false,
 			},
 			{
 				'notes/deleted.md': { hash: 'same-hash', size: 1, modified: new Date(0).toISOString() },
@@ -121,6 +122,7 @@ describe('createFullSyncPlan', () => {
 				} as never,
 				throwIfDestroyed: () => {}, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+				encrypted: () => false,
 			},
 			{ 'notes/video.md': { hash: 'remote-big', size: MAX_FILE_SIZE_BYTES + 1, modified: new Date(0).toISOString(), revision: 'r2' } },
 			5,
@@ -171,6 +173,7 @@ describe('createFullSyncPlan', () => {
 				} as never,
 				throwIfDestroyed: () => {}, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+				encrypted: () => false,
 			},
 			{},
 			5,
@@ -219,6 +222,7 @@ describe('createFullSyncPlan', () => {
 				} as never,
 				throwIfDestroyed: () => {}, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+				encrypted: () => false,
 			},
 			{},
 			5,
@@ -250,6 +254,7 @@ describe('createFullSyncPlan', () => {
 				for (const task of tasks) results.push(await task());
 				return results;
 			},
+			encrypted: () => false,
 		}, remote, 1);
 		await expect(plan).rejects.toBe(failure);
 		expect(readBinary).toHaveBeenCalledTimes(1);

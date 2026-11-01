@@ -56,7 +56,7 @@ export interface TransferContext {
 	retryWithBackoff<T>(fn: () => Promise<T>): Promise<T>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
-	encrypted?(): boolean;
+	encrypted(): boolean;
 }
 
 export type DiffApplyOutcome =

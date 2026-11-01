@@ -154,10 +154,7 @@ export async function runIncrementalSync(
 			},
 			retry: true,
 			onFailure: options.onFailure,
-			...(context.reconcileVersionConflicts ? {
-				onVersionConflicts: (paths: string[], syncResult: SyncResult) =>
-					context.reconcileVersionConflicts!(paths, syncResult),
-			} : {}),
+			onVersionConflicts: (paths, syncResult) => context.reconcileVersionConflicts(paths, syncResult),
 			beforeChunk: () => {
 				context.throwIfDestroyed();
 				context.reportWork?.({ phase: 'uploading', current: uploadsProcessed, total: localOnlyChanges.length });

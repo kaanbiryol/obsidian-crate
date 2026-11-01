@@ -41,7 +41,7 @@ export async function getLocalChanges(
 
 	// Skipped files stay discovered (never local deletes) but are not changes:
 	// each would fail every sync and hold back the changelog cursor.
-	const skipped = allFiles.flatMap(file => skippedUploadIssue(file, context.encrypted?.() ?? false) ?? []);
+	const skipped = allFiles.flatMap(file => skippedUploadIssue(file, context.encrypted()) ?? []);
 	const skippedPaths = new Set(skipped.map(issue => issue.path));
 
 	const candidates = allFiles.filter(file => !skippedPaths.has(file.path)

@@ -76,6 +76,7 @@ export function createTransferHarness() {
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				retryWithBackoff: retryWithBackoffTyped,
 				getModifiedIso,
+				encrypted: () => false,
 			},
 		};
 	}

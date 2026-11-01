@@ -122,6 +122,8 @@ describe('runIncrementalSync', () => {
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => null),
 			uploadPreparedFiles,
+			reconcileVersionConflicts: vi.fn(async () => {}),
+			getRemoteEntries: vi.fn(async () => ({})),
 		};
 
 		const result = await runIncrementalSync(context, {});
@@ -190,6 +192,8 @@ describe('runIncrementalSync', () => {
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => null),
 			uploadPreparedFiles: vi.fn(async () => {}),
+			reconcileVersionConflicts: vi.fn(async () => {}),
+			getRemoteEntries: vi.fn(async () => ({})),
 		};
 
 		const result = await runIncrementalSync(context, {});
@@ -294,6 +298,8 @@ describe('runIncrementalSync', () => {
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => null),
 			uploadPreparedFiles: vi.fn(async () => {}),
+			reconcileVersionConflicts: vi.fn(async () => {}),
+			getRemoteEntries: vi.fn(async () => ({})),
 		};
 
 		const result = await runIncrementalSync(context, {});

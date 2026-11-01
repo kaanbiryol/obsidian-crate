@@ -39,7 +39,7 @@ export async function createFullSyncPlan(
 	};
 	const localFiles = createPathRecord<FileEntry>();
 	const files = await scan(getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), throwIfStopped));
-	const skipped = files.flatMap(file => skippedUploadIssue(file, context.encrypted?.() ?? false) ?? []);
+	const skipped = files.flatMap(file => skippedUploadIssue(file, context.encrypted()) ?? []);
 	const skippedLocalPaths = new Set(skipped.map(issue => issue.path));
 	const eligible = files.filter((file) => !skippedLocalPaths.has(file.path));
 

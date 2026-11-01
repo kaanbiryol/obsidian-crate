@@ -37,7 +37,7 @@ export interface ForceSyncWorkflowContext {
 	removeLocalManifestEntry(path: string): void;
 	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
-	encrypted?(): boolean;
+	encrypted(): boolean;
 	prepareUploadsFromVaultFiles(
 		files: VaultFile[],
 		onPrepared?: (completed: number) => void
@@ -75,7 +75,7 @@ export async function runForceFullSyncWorkflow(
 		const localFiles = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
 		// Skipped files stay local paths, so their server copy is neither replaced nor deleted.
 		const localPaths = new Set(localFiles.map(file => file.path));
-		const skipped = localFiles.flatMap(file => skippedUploadIssue(file, context.encrypted?.() ?? false) ?? []);
+		const skipped = localFiles.flatMap(file => skippedUploadIssue(file, context.encrypted()) ?? []);
 		const skippedPaths = new Set(skipped.map(issue => issue.path));
 		const files = localFiles.filter(file => !skippedPaths.has(file.path));
 		if (skipped.length) (result.issues ??= []).push(...skipped);

@@ -45,6 +45,7 @@ describe('planner local diff helpers', () => {
 				throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith('.trash/'),
 				verifyContent: async () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+				encrypted: () => false,
 			},
 			new Set(['notes/present.md']),
 			5,
@@ -96,6 +97,7 @@ describe('planner local diff helpers', () => {
 				throwIfDestroyed: () => {}, shouldIgnore: () => false,
 				verifyContent: async () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+				encrypted: () => false,
 			},
 			5,
 		);

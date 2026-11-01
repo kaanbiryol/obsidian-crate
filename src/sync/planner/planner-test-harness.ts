@@ -70,6 +70,7 @@ export function createIncrementalHarness(overrides: Partial<{
 		prepareUploadFromPath: vi.fn(async () => null),
 		uploadPreparedFiles: vi.fn(async () => {}),
 		reconcileVersionConflicts: vi.fn(async () => {}),
+		getRemoteEntries: vi.fn(async () => ({})),
 	};
 
 	return {

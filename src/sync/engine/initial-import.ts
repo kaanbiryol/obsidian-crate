@@ -87,7 +87,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	for (const path of obsolete) transfer.localManifest.removeEntry(path);
 	const inventory = createPathRecord<FileEntry>();
 	// Skipped files are reported, not uploaded; a server row they already have stays as it is.
-	const skipped = local.flatMap(file => skippedUploadIssue(file, transfer.encrypted?.() ?? false) ?? []);
+	const skipped = local.flatMap(file => skippedUploadIssue(file, transfer.encrypted()) ?? []);
 	const skippedPaths = new Set(skipped.map(issue => issue.path));
 	const files = local.filter(file => !skippedPaths.has(file.path));
 	for (const issue of skipped) {

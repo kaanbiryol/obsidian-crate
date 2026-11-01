@@ -36,6 +36,7 @@ async function fixture(count = 1, size = 4) {
 		vault: vault as never, localManifest: manifest, throwIfDestroyed: () => signal.throwIfAborted(), shouldIgnore: () => false,
 		verifyContent: async () => false,
 		runConcurrent: <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+		encrypted: () => false,
 	};
 	return { files, adapter, manifest, hash, verify, app, plugin, planner, verifier, signal, progress, disk };
 }
