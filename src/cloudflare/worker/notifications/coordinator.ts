@@ -10,11 +10,11 @@ import { serverStateValue } from '../server-state';
 
 type NotificationWork = { ready: number; projectionRetry: number | null; dispatchAt: number | null };
 
-// Files each pass verifies and then projects, at most the four that source verification
-// takes per pass. The worst case, 36 queries with a Reading index page, stays within
-// D1_QUERIES_PER_INVOCATION (coordinator-budget.integration.ts); per-pass source byte
-// budgets bound memory and CPU for large and encrypted notes.
-const FILES_PER_PASS = 4;
+// Files each pass verifies and then projects, about two D1 queries each. The worst case,
+// 39 queries with a Reading index page, stays within D1_QUERIES_PER_INVOCATION
+// (coordinator-budget.integration.ts); per-pass source byte budgets bound memory and
+// CPU for large and encrypted notes.
+const FILES_PER_PASS = 8;
 
 function nextNotificationWork(db: D1Database): Promise<NotificationWork | null> {
 	return db.prepare(NEXT_NOTIFICATION_WORK_SQL).first<NotificationWork>();

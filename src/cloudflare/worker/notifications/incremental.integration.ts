@@ -128,3 +128,19 @@ it('does not requeue delivered occurrences outside the delivery window on unrela
 	await drainNotificationProjections(env);
 	expect(await jobs()).toMatchObject([{ reminder_id: id, operation: 'schedule' }]);
 });
+
+it('keeps a reminder scheduled when it moves to another note projected in the same pass', async () => {
+	const id = crypto.randomUUID(), other = crypto.randomUUID();
+	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/A.md', `${note(id)}\n${note(other)}`, null);
+	await drainNotificationProjections(env);
+	await drainNotificationJobs(env);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 2 });
+	// Both notes' jobs run in one pass: A queues a cancel that B's schedule must override.
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/A.md', note(other), first.hash);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/B.md', note(id), null);
+	await drainNotificationProjections(env, 8);
+	expect(await env.DB.prepare('SELECT file_path FROM reminder_projections WHERE reminder_id = ?').bind(id).first()).toEqual({ file_path: 'Reminders/B.md' });
+	await drainNotificationJobs(env);
+	expect(await jobs()).toEqual([]);
+	expect(await env.DB.prepare('SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = ?').bind(id).first()).toEqual({ reminder_id: id });
+});

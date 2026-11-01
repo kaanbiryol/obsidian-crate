@@ -54,7 +54,7 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 	const cleaning = await retireOutOfScopeSources(env.DB, folder);
 	if (folder === null || cleaning) return cleaning;
 	const scanning = await seedSourceStates(env.DB, folder);
-	const count = Math.max(1, Math.min(limit, 4));
+	const count = Math.max(1, limit);
 	// Unary + keeps SQLite on the version index; the folder range would scan every source.
 	const sources = await queryRows<{ path: string }>(env.DB.prepare(`SELECT file_path AS path
     FROM reminder_source_state WHERE parser_version < ? AND +file_path >= ? AND +file_path < ? ORDER BY parser_version, file_path LIMIT ?`)

@@ -39,15 +39,15 @@ it('reads encryption, feature and notification settings once per coordinator run
 	// the import state and the notification policy now share one read. A due dispatch
 	// is reported to the alarm, which sends it after releasing the coordinator lock.
 	let due: boolean | undefined;
-	expect(await countQueries(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 17, setup: 1 });
+	expect(await countQueries(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 18, setup: 1 });
 	expect(due).toBe(true);
 	expect(await countQueries(() => runNotificationCoordinator(state, env))).toEqual({ total: 9, setup: 1 });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS jobs FROM notification_jobs').first()).toEqual({ jobs: 1 });
 	expect(dispatchNotificationJobs).not.toHaveBeenCalled();
 });
 
-it('verifies and projects four files per pass, reading each once, within the query budget', async () => {
-	for (let file = 0; file < 5; file++) {
+it('verifies and projects eight files per pass, reading each once, within the query budget', async () => {
+	for (let file = 0; file < 9; file++) {
 		const content = Array.from({ length: 3 }, () => `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`).join('\n');
 		await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Reminders/${file}.md`, content, null);
 	}
@@ -62,13 +62,13 @@ it('verifies and projects four files per pass, reading each once, within the que
 	const state = { storage: { setAlarm: vi.fn(async () => {}) } } as unknown as DurableObjectState;
 	const get = vi.spyOn(env.BUCKET, 'get');
 	const { total } = await countQueries(() => runNotificationCoordinator(state, env));
-	expect(total).toBe(36);
+	expect(total).toBe(39);
 	// Projection reuses the bytes verification read: one read per reminder and Reading note.
-	expect(get).toHaveBeenCalledTimes(4 + 3);
+	expect(get).toHaveBeenCalledTimes(8 + 3);
 	expect(total).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_source_state WHERE verified = 1 AND parser_version = ?')
-		.bind(REMINDER_CACHE_PARSER_VERSION).first()).toEqual({ n: 4 });
-	expect(await env.DB.prepare('SELECT COUNT(DISTINCT file_path) AS n FROM reminder_projections').first()).toEqual({ n: 4 });
+		.bind(REMINDER_CACHE_PARSER_VERSION).first()).toEqual({ n: 8 });
+	expect(await env.DB.prepare('SELECT COUNT(DISTINCT file_path) AS n FROM reminder_projections').first()).toEqual({ n: 8 });
 });
 
 it('skips the dispatcher when no alarm update is due', async () => {

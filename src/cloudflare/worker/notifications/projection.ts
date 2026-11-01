@@ -1,13 +1,13 @@
 import { featureEnabled } from '../feature-policy';
 import type { FeaturePolicy } from '../../../protocol/feature-policy';
-import { planNotificationOperations, type NotificationOperation } from './projection-plan';
+import { planNotificationOperations, readExistingNotifications, type NotificationOperation } from './projection-plan';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { recordFileFailure } from './file-retries';
 import { READY_PROJECTION_JOBS_SQL } from './queue';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { queryRows } from '../db';
-import { assertUniqueReminderSources } from '../reminders/source-identity';
-import { loadStoredFileRows } from '../sync/storage';
+import { duplicateReminderIds, ReminderIdentityConflictError } from '../reminders/source-identity';
+import { loadStoredFileRows, type FileStorageRow } from '../sync/storage';
 import { readStoredMarkdownFiles } from '../storage';
 import { getNotificationPolicy } from './policy';
 import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, REMINDER_PROJECTION_SIZE_ISSUE, DUPLICATE_COMMITTED_REMINDER_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from '../reminders/source-parse';
@@ -28,7 +28,7 @@ export function notificationDatetime(reminder: Pick<RemoteReminderRecord, 'dueDa
 
 /** Bound each D1 value without imposing a second, smaller per-note limit.
  * All chunks are published in one guarded transaction below. */
-function operationChunks(operations: Awaited<ReturnType<typeof planNotificationOperations>>): string[] {
+function operationChunks(operations: ReturnType<typeof planNotificationOperations>): string[] {
 	const limit = 1536 * 1024, encoder = new TextEncoder();
 	const chunks: string[] = [];
 	let items: string[] = [], bytes = 2;
@@ -57,11 +57,11 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 		READY_PROJECTION_JOBS_SQL).bind(limit, limit, limit));
 	if (!jobs.length) return;
 	const encrypted = (loaded ? loaded.encryption : await readEncryptionState(env.DB))?.mode === 'active';
-	// Read every job's file, verification and source rows once. Projection commits
-	// write none of these rows, and a change to any of them replaces the job token
-	// that each commit below checks.
+	// Read every job's file, verification, source and projection rows once. Projection
+	// commits write only the projection rows, which are used to detect shared reminders
+	// below; a change to any other row replaces the job token each commit checks.
 	const paths = JSON.stringify(jobs.map(job => job.path));
-	const [files, verified, sourceRows] = await Promise.all([
+	const [files, verified, sourceRows, projectedRows] = await Promise.all([
 		loadStoredFileRows(env.DB, jobs.map(job => job.path)),
 		queryRows<{ file_path: string; file_revision: string }>(env.DB.prepare(`SELECT file_path, file_revision FROM reminder_source_state
       WHERE file_path IN (SELECT value FROM json_each(?)) AND parser_version = ? AND verified = 1`).bind(paths, REMINDER_CACHE_PARSER_VERSION)),
@@ -69,9 +69,13 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 			`SELECT s.file_path, s.reminder_id, s.due_key, o.first_seen_at FROM reminder_sources s
         LEFT JOIN reminder_occurrences o ON o.reminder_id = s.reminder_id AND o.due_key = s.due_key
         WHERE s.file_path IN (SELECT value FROM json_each(?))`).bind(paths)),
+		queryRows<{ file_path: string; reminder_id: string }>(env.DB.prepare(
+			'SELECT file_path, reminder_id FROM reminder_projections WHERE file_path IN (SELECT value FROM json_each(?))').bind(paths)),
 	]);
 	const verifiedRevisions = new Map(verified.map(row => [row.file_path, row.file_revision]));
-	for (const job of jobs) {
+	// Parse every job first, so the reads below serve the whole pass.
+	type Parsed = { job: typeof jobs[number]; file: FileStorageRow | null; reminders: RemoteReminderRecord[] } | { job: typeof jobs[number]; error: unknown };
+	const parsed = await Promise.all(jobs.map(async (job): Promise<Parsed> => {
 		try {
 			const file = files.get(job.path) ?? null;
 			let reminders: RemoteReminderRecord[] = [];
@@ -82,12 +86,32 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 				if (!text) throw new Error('Committed reminder content could not be verified');
 				// Policy changes can revisit sources outside the current folder. Their
 				// uncertain content still cannot authorize removal of prior reminders.
-				const parsed = parseReminderSource(job.path, text.content, policy.folderPath, encrypted);
-				if (parsed.issue) throw new PermanentReminderSourceError(parsed.issue);
+				const source = parseReminderSource(job.path, text.content, policy.folderPath, encrypted);
+				if (source.issue) throw new PermanentReminderSourceError(source.issue);
 				if (verifiedRevisions.get(job.path) !== file.storageKey) throw new Error('Reminder source is awaiting verification with the current parser. Processing will retry within its retry budget. The vault file remains synced.');
-				if (job.path.startsWith(`${policy.folderPath}/`)) reminders = parsed.reminders;
+				if (job.path.startsWith(`${policy.folderPath}/`)) reminders = source.reminders;
 			}
-			await assertUniqueReminderSources(env.DB, policy.folderPath, reminders.map(reminder => reminder.id));
+			return { job, file, reminders };
+		} catch (error) { return { job, error }; }
+	}));
+	const ids = [...new Set(parsed.flatMap(entry => 'reminders' in entry ? entry.reminders.map(reminder => reminder.id) : []))];
+	// A commit rewrites notification state only for its own reminders and those its file
+	// projected before, so one read serves every job unless two jobs touch the same one,
+	// as when a reminder moves between notes. Those jobs read after each earlier commit.
+	const touched = parsed.flatMap(entry => [...new Set([
+		...('reminders' in entry ? entry.reminders.map(reminder => reminder.id) : []),
+		...projectedRows.filter(row => row.file_path === entry.job.path).map(row => row.reminder_id),
+	])]);
+	const [duplicates, existing] = await Promise.all([
+		duplicateReminderIds(env.DB, policy.folderPath, ids),
+		new Set(touched).size === touched.length ? readExistingNotifications(env.DB, ids) : null,
+	]);
+	for (const entry of parsed) {
+		const { job } = entry;
+		try {
+			if ('error' in entry) throw entry.error;
+			const { file, reminders } = entry;
+			if (reminders.some(reminder => duplicates.has(reminder.id))) throw new ReminderIdentityConflictError();
 			const observed = new Map(sourceRows.filter(row => row.file_path === job.path).map(row => [row.reminder_id, row]));
 			const ids = new Set<string>();
 			const operations = reminders.map<NotificationOperation>(reminder => {
@@ -103,7 +127,8 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 				} } : { id: reminder.id, operation: 'cancel', payload: null };
 			});
 			const token = crypto.randomUUID();
-			const chunks = operationChunks(await planNotificationOperations(env.DB, operations, token));
+			const current = existing ?? await readExistingNotifications(env.DB, operations.map(operation => operation.id));
+			const chunks = operationChunks(planNotificationOperations(current, operations, token));
 			const fileGuard = file ? fileRevisionGuard(job.path, file.storageKey)
 				: { sql: `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`, args: filePathArgs(job.path) };
 			const guard = `EXISTS (SELECT 1 FROM notification_projection_jobs WHERE path = ? AND job_token = ?)

@@ -56,11 +56,9 @@ function canReuse(row: ExistingNotification, operation: NotificationOperation): 
 		&& samePayload({ reminderId: row.id, content: row.content!, project: row.project, dueDatetime: row.dueDatetime! }, operation.payload));
 }
 
-/** Preserve command tokens and retry state when the effective alarm is unchanged.
- * File and policy authority still advance atomically in the projection commit.
- * Missing or mismatched schedule state takes the ordinary repair path.
- */
-export async function planNotificationOperations(db: D1Database, operations: NotificationOperation[], token: string) {
+/** Current command, projection and schedule state of each reminder. */
+export async function readExistingNotifications(db: D1Database, ids: readonly string[]): Promise<Map<string, ExistingNotification>> {
+	if (!ids.length) return new Map();
 	const rows = await queryRows<ExistingNotification>(db.prepare(`SELECT ids.value AS id,
     p.notification_token AS token, j.job_token AS jobToken, j.operation, j.payload_json AS payload,
     s.schedule_token AS scheduleToken, s.content, s.project, s.due_datetime AS dueDatetime
@@ -68,8 +66,15 @@ export async function planNotificationOperations(db: D1Database, operations: Not
     LEFT JOIN reminder_projections p ON p.reminder_id = ids.value
     LEFT JOIN notification_jobs j ON j.reminder_id = ids.value
     LEFT JOIN scheduled_reminders s ON s.reminder_id = ids.value`)
-		.bind(JSON.stringify(operations.map(operation => operation.id))));
-	const existing = new Map(rows.map(row => [row.id, row]));
+		.bind(JSON.stringify(ids)));
+	return new Map(rows.map(row => [row.id, row]));
+}
+
+/** Preserve command tokens and retry state when the effective alarm is unchanged.
+ * File and policy authority still advance atomically in the projection commit.
+ * Missing or mismatched schedule state takes the ordinary repair path.
+ */
+export function planNotificationOperations(existing: ReadonlyMap<string, ExistingNotification>, operations: NotificationOperation[], token: string) {
 	return operations.map(operation => {
 		const row = existing.get(operation.id);
 		const reuse = row && canReuse(row, operation);
