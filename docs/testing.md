@@ -446,6 +446,16 @@ const context = {
   file operations. `transfer/delete.test.ts` checks bounded concurrency, progress,
   upload failure gates, local absence and accepted sibling cancellation.
 
+### Worker query budgets
+
+- Cloudflare limits live in `src/cloudflare/worker/platform-limits.ts`, with the docs
+  they were checked against. Assert budgets against `D1_QUERIES_PER_INVOCATION`, not a literal.
+- Count queries as D1 does: one per `first`/`run`/`all` and one per `db.batch()`, whatever
+  its size. Pass `countD1Queries(env.DB).db` to the one invocation under test, or use
+  `installD1QueryCounter(env.DB)` from `test-support/d1-query-test-harness.ts` when the code reads the binding itself.
+- Measure the worst case (stale writes, conflicts, encryption, a Reading index page in the
+  same pass) and size each feature batch to leave headroom below the limit.
+
 ## Feature-specific notes
 
 Coverage notes, commands and manual checks for individual features live in each feature's doc under **Testing notes**:

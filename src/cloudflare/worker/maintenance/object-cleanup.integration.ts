@@ -5,6 +5,8 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { runScheduledMaintenance } from './run';
 import { runMaintenanceEpisode } from './lifecycle';
+import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
+import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -60,12 +62,12 @@ it('drains thousands of expired versions within bounded passes and keeps referen
 	do {
 		passes++;
 		setAlarm.mockClear();
+		const count = installD1QueryCounter(env.DB);
 		const prepare = vi.spyOn(env.DB, 'prepare');
 		await runMaintenanceEpisode(state, env);
-		// Free Workers allow 50 D1 queries per invocation, regardless of batch size.
-		expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
+		expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
 		for (const [sql] of prepare.mock.calls) if (sql.startsWith('SELECT') && sql.includes('FROM object_cleanup_queue ORDER BY')) queueReads.add(sql);
-		prepare.mockRestore();
+		vi.restoreAllMocks();
 	} while (setAlarm.mock.calls.length && passes < 20);
 
 	// 6,001 queued objects at 500 per pass, beyond the ten-pass limit for other work.

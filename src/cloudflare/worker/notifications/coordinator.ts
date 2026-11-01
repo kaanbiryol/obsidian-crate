@@ -10,6 +10,12 @@ import { serverStateValue } from '../server-state';
 
 type NotificationWork = { ready: number; projectionRetry: number | null; dispatchAt: number | null };
 
+// Files each pass verifies and then projects, about eight D1 queries each. The worst
+// case, 41 queries with a Reading index page, stays within D1_QUERIES_PER_INVOCATION
+// (coordinator-budget.integration.ts); per-pass source byte budgets bound memory and
+// CPU for large and encrypted notes.
+const FILES_PER_PASS = 3;
+
 function nextNotificationWork(db: D1Database): Promise<NotificationWork | null> {
 	return db.prepare(NEXT_NOTIFICATION_WORK_SQL).first<NotificationWork>();
 }
@@ -37,13 +43,11 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
 	try {
 		// Source verification and projection share this budget. Dispatch has its own
 		// invocation so a reminder backlog does not compete with source scans.
-		// Encrypted descriptors need extra reads; leave room for shared feature and
-		// Reading scheduling checks within the per-invocation query budget.
 		const policy = notificationPolicyFromRow(loaded);
 		hasPolicy = Boolean(policy);
-		sourceWork = await revalidateReminderSources(env, encryption ? 1 : 2, { folder: policy?.folderPath ?? null, encryption });
+		sourceWork = await revalidateReminderSources(env, FILES_PER_PASS, { folder: policy?.folderPath ?? null, encryption });
 		if (hasPolicy) {
-			await drainNotificationProjections(env, 1, { features, policy, encryption });
+			await drainNotificationProjections(env, FILES_PER_PASS, { features, policy, encryption });
 			// Skip the dispatcher hop when no alarm update is due yet.
 			pending = await nextNotificationWork(env.DB);
 			dispatch = pending?.dispatchAt != null && pending.dispatchAt <= Date.now();

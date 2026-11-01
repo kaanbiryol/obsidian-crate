@@ -2,6 +2,7 @@ import { DurableUploads } from './durable-uploads';
 import { expect, it, vi } from 'vitest';
 import { LocalManifest } from '../manifest/manifest';
 import { UploadJournal } from './upload-journal';
+import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 
 function fixture() {
@@ -178,17 +179,18 @@ it.each([3, 17])('checkpoints recovered receipts before another interruption (%i
 });
 
 
-it('recovers 24 small uploads in three requests using their original identities and bytes', async () => {
+it('recovers small uploads in full requests using their original identities and bytes', async () => {
 	const { create, file } = fixture(); const manifest = create();
-	const original = await manifest.uploadJournal.prepare(Array.from({ length: 24 }, (_, i) => ({ ...file, path: `${i}.md` })), 20000);
+	const count = 3 * BATCH_UPLOAD_MAX_FILES;
+	const original = await manifest.uploadJournal.prepare(Array.from({ length: count }, (_, i) => ({ ...file, path: `${i}.md` })), 20000);
 	const batchUpload = vi.fn(async (files: typeof original) => ({ success: true, results: files.map(f => ({ path: f.path, success: true, hash: f.hash, revision: 'r' })) }));
 	const uploadFile = vi.fn(); const getServerInfo = vi.fn(); const progress = vi.fn();
 	const recovery = new DurableUploads(manifest, { assertPreparedUpload: async () => {}, batchUpload, uploadFile, getServerInfo }, { putBase: async () => {} } as never, crypto.randomUUID());
 	await recovery.recover(progress);
-	expect(batchUpload.mock.calls.map(([files]) => files.length)).toEqual([8, 8, 8]);
+	expect(batchUpload.mock.calls.map(([files]) => files.length)).toEqual([BATCH_UPLOAD_MAX_FILES, BATCH_UPLOAD_MAX_FILES, BATCH_UPLOAD_MAX_FILES]);
 	expect(batchUpload.mock.calls.flatMap(([files]) => files.map(f => [f.operationId, f.content, f.expectedHash]))).toEqual(original.map(f => [f.operationId, f.content, f.expectedHash]));
 	expect(uploadFile).not.toHaveBeenCalled(); expect(getServerInfo).not.toHaveBeenCalled();
-	expect(progress).toHaveBeenLastCalledWith(24, 24);
+	expect(progress).toHaveBeenLastCalledWith(count, count);
 	await manifest.close(); const restarted = create(); await restarted.load();
 	expect(restarted.uploadJournal.pending()).toEqual([]); await restarted.close();
 });

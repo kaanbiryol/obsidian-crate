@@ -12,6 +12,8 @@ import { BATCH_DELETE_MAX_FILES } from '../../../protocol/sync-limits';
 import { commitFileDelete } from './mutations';
 import { getStoredFileRow } from './storage';
 import { sha256Hex } from '@/platform/sha256';
+import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
+import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
 
 const secret = 'Private note content and Bearer credential';
 const path = 'Private folder/Confidential note.md';
@@ -124,15 +126,18 @@ it('returns original per-file receipts when a whole batch response is lost', asy
 	expect(await receipts()).toEqual(before);
 });
 
-it('keeps a maximum absent-file retry batch within the Free-plan D1 query budget', async () => {
+it('keeps a maximum delete batch and its absent-file retry within the Free-plan D1 query budget', async () => {
 	const files = [];
 	for (let index = 0; index < BATCH_DELETE_MAX_FILES; index++) files.push(await upload(`Notes/${index}.md`));
 	const body = JSON.stringify({ files: files.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision })) });
+	// Counts the public Worker and the coordinator together, so each fits on its own.
+	const count = installD1QueryCounter(env.DB);
 	expect((await request('/sync/batch-delete', { method: 'POST', body })).status).toBe(200);
-	const prepare = vi.spyOn(env.DB, 'prepare');
+	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
+	count.reset();
 	const retry = await request('/sync/batch-delete', { method: 'POST', body });
 	expect(retry.status).toBe(200);
-	expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
+	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
 	expect(await retry.json()).toMatchObject({ deleted: files.map(file => file.path), results: files.map(file => ({ consumedRevision: file.revision })) });
 });
 

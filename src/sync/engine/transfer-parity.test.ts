@@ -8,6 +8,7 @@ import { formatSyncProgress } from '../../ui/activity/progress-label';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import type { SyncResult } from '../types';
 import { sha256Hex } from '../../platform/sha256';
+import { BATCH_DELETE_MAX_FILES, BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 
 beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal('window', { setTimeout, clearTimeout }); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -20,8 +21,8 @@ function response(value: unknown): ApiHttpResponse {
 it.each(['selected', 'full', 'incremental', 'automatic', 'force'] as const)('shares batched uploads, guarded deletes and progress in %s sync', async mode => {
 	const content = new TextEncoder().encode('local edit').buffer;
 	const base: FileEntry = { hash: await sha256Hex(new TextEncoder().encode('base').buffer), revision: 'original', size: 4, modified: new Date(1).toISOString() };
-	const uploads = Array.from({ length: 10 }, (_, i) => `edit-${i}.md`);
-	const deletes = Array.from({ length: 9 }, (_, i) => `old-${i}.md`);
+	const uploads = Array.from({ length: 3 * BATCH_UPLOAD_MAX_FILES + 1 }, (_, i) => `edit-${i}.md`);
+	const deletes = Array.from({ length: 2 * BATCH_DELETE_MAX_FILES + 1 }, (_, i) => `old-${i}.md`);
 	const remote: Record<string, FileEntry> = Object.fromEntries([...uploads, ...deletes].map(path => [path, base]));
 	const uploaded = new Set<string>();
 	const uploadBatches: string[][] = [], deleteBatches: string[][] = [];
@@ -80,11 +81,11 @@ it.each(['selected', 'full', 'incremental', 'automatic', 'force'] as const)('sha
 		expect(result.success, result.errors.join('\n')).toBe(true);
 		expect(result).toMatchObject({ uploaded: uploads.length, deleted: deletes.length });
 	}
-	expect(uploadBatches.map(batch => batch.length).sort()).toEqual([1, 3, 3, 3]);
-	expect(deleteBatches.map(batch => batch.length).sort()).toEqual([1, 4, 4]);
+	expect(uploadBatches.map(batch => batch.length).sort((a, b) => a - b)).toEqual([1, BATCH_UPLOAD_MAX_FILES, BATCH_UPLOAD_MAX_FILES, BATCH_UPLOAD_MAX_FILES]);
+	expect(deleteBatches.map(batch => batch.length).sort((a, b) => a - b)).toEqual([1, BATCH_DELETE_MAX_FILES, BATCH_DELETE_MAX_FILES]);
 	expect(h.engine.getPendingKeys()).toEqual([]);
 	expect(h.localManifest.uploadJournal.pending()).toEqual([]);
 	expect(h.localManifest.getAllPaths().sort()).toEqual([...uploads].sort());
-	expect(labels).toContain('Deleting 9 of 9 files');
-	expect(labels).toContain('Uploading 10 of 10 files');
+	expect(labels).toContain(`Deleting ${deletes.length} of ${deletes.length} files`);
+	expect(labels).toContain(`Uploading ${uploads.length} of ${uploads.length} files`);
 });

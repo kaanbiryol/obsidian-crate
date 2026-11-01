@@ -6,7 +6,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { handleNotificationPolicy } from './policy';
 import { writeCommittedMarkdownFile } from '../storage';
 import { drainNotificationProjections } from './projection';
-import { dispatchNotificationJobs, drainNotificationJobs } from './outbox';
+import { dispatchNotificationJobs, drainNotificationJobs, OUTBOX_BATCH_SIZE } from './outbox';
 import { hasNotificationAuthority } from '../reminders/source-state';
 import { runNotificationCoordinator } from './coordinator';
 
@@ -79,7 +79,7 @@ it('repairs missing schedule state instead of treating a projection record as pr
 });
 
 it('continues ready batches immediately and keeps future retry deadlines', async () => {
-	const content = Array.from({ length: 11 }, () => note(crypto.randomUUID())).join('\n');
+	const content = Array.from({ length: OUTBOX_BATCH_SIZE + 1 }, () => note(crypto.randomUUID())).join('\n');
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	const setAlarm = vi.fn();
 	const state = { storage: { setAlarm } } as never;

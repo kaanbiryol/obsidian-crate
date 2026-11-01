@@ -19,7 +19,8 @@ interface NotificationJobRow {
 	attempts: number;
 }
 
-const OUTBOX_BATCH_SIZE = 10;
+// One read plus one acknowledgement per job stays within D1_QUERIES_PER_INVOCATION.
+export const OUTBOX_BATCH_SIZE = 40;
 const OUTBOX_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 
 /** The existing class supplies a separate request budget; no extra persistent state. */

@@ -32,9 +32,9 @@ tokens and scoped PWA enrollment keep their current behavior.
 | `POST` | `/sync/metadata` | Fetch current metadata for up to 50 selected paths |
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB) |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
-| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 3 files, 10 MiB total) |
+| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 32 files, 10 MiB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
-| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 4 files) |
+| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 12 files) |
 | `GET` | `/sync/checkpoints` | List up to 20 unexpired shared checkpoints |
 | `POST` | `/sync/checkpoints` | Capture the authoritative server inventory; unchanged generations reuse their checkpoint |
 | `GET` | `/sync/checkpoint?id=<id>` | Read the complete inventory of a live shared checkpoint |
@@ -204,7 +204,7 @@ completed file uploads. See [initial import readiness](protocol.md#initial-impor
 }
 ```
 
-Worker validates: max 3 files, total decoded content <= 10 MiB. Each file requires its own stable `operationId` with the same receipt and expiry rules as a single upload. Mutation batches are deliberately smaller than download batches to stay within Workers Free D1 query limits even on stale-write cleanup paths.
+Worker validates: max 32 files, total decoded content <= 10 MiB. Each file requires its own stable `operationId` with the same receipt and expiry rules as a single upload. Staging costs one D1 query per file and each file commits in its own coordinator invocation, so a full batch stays within Workers Free D1 query limits even on stale-write cleanup paths.
 
 Response: `{ success, results: [{ path, success, hash?, revision?, error?, code?, status?, currentHash? }] }`. A stale per-file write uses `code: "version_conflict"`, `status: 409`, and the current remote hash; storage failures use `code: "storage"` and `status: 503`.
 
@@ -367,7 +367,7 @@ Response: `{ success: true }`
 
 Vault credentials only. GET reads the shared folder, IANA timezone, all-day time, enabled state, and revision. POST initializes only an absent policy. PUT changes it explicitly with `expectedRevision`; stale changes receive 409. Starting a client never overwrites another device's policy. A PUT that changes the folder moves reminders web app credentials, their push subscriptions and unused enrollment links from the previous folder to the new one in the same transaction. A Reminders credential that then names the previous folder receives `403` with `code: "reminders_folder_changed"` and its current `folderPath`; the web app switches to that folder.
 
-Schedules derive from committed Markdown and the shared notification policy. File commits enqueue projection intent in the same D1 transaction. The Durable Object coordinator verifies at most two sources (one when encrypted) and projects one file per alarm, dispatches up to ten outbox jobs in a separate invocation after releasing its lock, fences stale work with file/policy/job revisions, and rearms while work remains. Maintenance recovers missed wakeups.
+Schedules derive from committed Markdown and the shared notification policy. File commits enqueue projection intent in the same D1 transaction. The Durable Object coordinator verifies and projects at most three files per alarm, dispatches up to forty outbox jobs in a separate invocation after releasing its lock, fences stale work with file/policy/job revisions, and rearms while work remains. Maintenance recovers missed wakeups.
 
 ## Notifications and PWA Endpoints
 

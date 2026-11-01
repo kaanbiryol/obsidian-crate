@@ -15,6 +15,8 @@ import { handleUpload } from '../sync/file-handlers';
 import { commitStagedFile } from '../sync/mutations';
 import { commitNewFiles } from '../sync/staging/bulk-new-file-commit';
 import { getStoredFileRow } from '../sync/storage';
+import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
+import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -128,10 +130,10 @@ it('keeps pace with a descriptor backlog across scheduled passes within the quer
 	do {
 		passes++;
 		setAlarm.mockClear();
-		const prepare = vi.spyOn(env.DB, 'prepare');
+		const count = installD1QueryCounter(env.DB);
 		await runMaintenanceEpisode(state, env);
-		expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
-		prepare.mockRestore();
+		expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
+		vi.restoreAllMocks();
 	} while (setAlarm.mock.calls.length && passes < 10);
 	expect(await retained()).toEqual([]);
 	expect(passes).toBe(3);
@@ -165,17 +167,16 @@ it('keeps worst-case passes within the query budget when every maintenance task 
 	const setAlarm = vi.fn();
 	const state = { storage: { get: async (key: string) => values.get(key),
 		put: async (key: string, value: unknown) => { values.set(key, value); }, setAlarm } } as never;
-	const statements: number[] = [];
+	const queries: number[] = [];
 	do {
 		setAlarm.mockClear();
-		const prepare = vi.spyOn(env.DB, 'prepare');
+		const count = installD1QueryCounter(env.DB);
 		await runMaintenanceEpisode(state, env);
-		statements.push(prepare.mock.calls.length);
-		prepare.mockRestore();
-	} while (setAlarm.mock.calls.length && statements.length < 10);
-	// Before: 52 statements on the first pass and 51 on the second, both position reads included.
-	expect(statements.filter(count => count > 50)).toEqual([]);
-	expect(statements).toHaveLength(3);
+		queries.push(count.queries);
+		vi.restoreAllMocks();
+	} while (setAlarm.mock.calls.length && queries.length < 10);
+	expect(queries.filter(count => count > D1_QUERIES_PER_INVOCATION)).toEqual([]);
+	expect(queries).toHaveLength(3);
 	expect(await retained()).toEqual([]);
 	for (const table of ['object_cleanup_queue', 'staged_uploads', 'staged_upload_batches', 'file_versions', 'file_deletion_receipts', 'reminder_occurrences', 'upload_operations', 'request_rate_limits', 'auth_tokens']) {
 		expect(await env.DB.prepare(`SELECT count(*) AS n FROM ${table}`).first(), table).toEqual({ n: 0 });

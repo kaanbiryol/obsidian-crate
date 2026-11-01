@@ -4,6 +4,7 @@ import { deleteRemoteFiles } from './delete';
 import { createEmptySyncResult } from '../sync-result';
 import { HttpError } from '../worker-api/client';
 import type { ConditionalDeleteApi } from './delete-batches';
+import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
 
 const files = (count: number) => Array.from({ length: count }, (_, i) => ({ path: `old-${i}.md`, expectedHash: 'base', expectedRevision: `r${i}` }));
 
@@ -18,7 +19,7 @@ function harness(batchDelete: ConditionalDeleteApi['batchDelete']) {
 }
 
 describe('shared remote deletion', () => {
-	it('batches four files with at most two requests in flight and reports completed files', async () => {
+	it('batches files at the server limit with at most two requests in flight and reports completed files', async () => {
 		const gates = Array.from({ length: 4 }, () => createDeferred<void>());
 		let active = 0, peak = 0, dispatched = 0;
 		const h = harness(async paths => {
@@ -28,7 +29,8 @@ describe('shared remote deletion', () => {
 			return { success: true, deleted: paths };
 		});
 		const result = createEmptySyncResult();
-		const pending = deleteRemoteFiles(h, files(13), result);
+		const count = 3 * BATCH_DELETE_MAX_FILES + 1;
+		const pending = deleteRemoteFiles(h, files(count), result);
 		await vi.waitFor(() => expect(h.files.batchDelete).toHaveBeenCalledTimes(2));
 		gates[0]!.resolve();
 		await vi.waitFor(() => expect(h.files.batchDelete).toHaveBeenCalledTimes(3));
@@ -37,9 +39,9 @@ describe('shared remote deletion', () => {
 		gates[2]!.resolve(); gates[3]!.resolve();
 		expect(await pending).toEqual([]);
 		expect(peak).toBe(2);
-		expect(h.files.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([4, 4, 4, 1]);
-		expect(result.deletedPaths).toEqual(files(13).map(file => file.path));
-		expect(h.reportWork).toHaveBeenLastCalledWith({ phase: 'deleting', current: 13, total: 13 });
+		expect(h.files.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([BATCH_DELETE_MAX_FILES, BATCH_DELETE_MAX_FILES, BATCH_DELETE_MAX_FILES, 1]);
+		expect(result.deletedPaths).toEqual(files(count).map(file => file.path));
+		expect(h.reportWork).toHaveBeenLastCalledWith({ phase: 'deleting', current: count, total: count });
 	});
 
 	it('drains an accepted sibling and checkpoints its acknowledgement before returning cancellation', async () => {
@@ -51,7 +53,7 @@ describe('shared remote deletion', () => {
 			throw new DOMException('Cancelled', 'AbortError');
 		});
 		const result = createEmptySyncResult();
-		const pending = deleteRemoteFiles(h, files(12), result);
+		const pending = deleteRemoteFiles(h, files(3 * BATCH_DELETE_MAX_FILES), result);
 		const assertion = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
 		await vi.waitFor(() => expect(h.files.batchDelete).toHaveBeenCalledTimes(2));
 		cancelled.resolve();
@@ -59,8 +61,8 @@ describe('shared remote deletion', () => {
 		accepted.resolve();
 		await assertion;
 		expect(h.files.batchDelete).toHaveBeenCalledTimes(2);
-		expect(result.deletedPaths).toEqual(files(4).map(file => file.path));
-		expect(h.localManifest.removeEntry).toHaveBeenCalledTimes(4);
+		expect(result.deletedPaths).toEqual(files(BATCH_DELETE_MAX_FILES).map(file => file.path));
+		expect(h.localManifest.removeEntry).toHaveBeenCalledTimes(BATCH_DELETE_MAX_FILES);
 		expect(h.localManifest.save).toHaveBeenCalledOnce();
 	});
 
@@ -77,13 +79,14 @@ describe('shared remote deletion', () => {
 		const gate = createDeferred<void>();
 		const h = harness(async () => { await gate.promise; throw new HttpError('Access denied', 401); });
 		const result = createEmptySyncResult();
-		const pending = deleteRemoteFiles(h, files(13), result);
+		const count = 3 * BATCH_DELETE_MAX_FILES + 1;
+		const pending = deleteRemoteFiles(h, files(count), result);
 		await vi.waitFor(() => expect(h.files.batchDelete).toHaveBeenCalledTimes(2));
 		gate.resolve();
 		const failures = await pending;
 		expect(h.files.batchDelete).toHaveBeenCalledTimes(2);
-		expect(failures).toHaveLength(13);
-		expect(new Set(failures.map(failure => failure.path)).size).toBe(13);
+		expect(failures).toHaveLength(count);
+		expect(new Set(failures.map(failure => failure.path)).size).toBe(count);
 		expect(h.localManifest.removeEntry).not.toHaveBeenCalled();
 	});
 

@@ -8,6 +8,9 @@ import { applySchema } from '../../test-support/schema-test-harness';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { handleBatchUpload } from '../batch/upload';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
+import { installD1QueryCounter } from '../../test-support/d1-query-test-harness';
+import { D1_QUERIES_PER_INVOCATION } from '../../platform-limits';
+import { BATCH_UPLOAD_MAX_FILES } from '@/protocol/sync-limits';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -20,16 +23,16 @@ const send = (files: ReturnType<typeof file>[], bulkNewFiles = true) => handleBa
 }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
 const body = async (files: ReturnType<typeof file>[], bulk = true) => (await send(files, bulk)).json() as Promise<BatchUploadResponse>;
 
-it('commits eight notes with grouped projection writes and one transaction', async () => {
-	const files = Array.from({ length: 8 }, (_, i) => file(`${i}.md`));
-	const batch = vi.spyOn(env.DB, 'batch'); const prepare = vi.spyOn(env.DB, 'prepare');
+it('commits a full batch of notes with grouped projection writes and one transaction', async () => {
+	const files = Array.from({ length: BATCH_UPLOAD_MAX_FILES }, (_, i) => file(`${i}.md`));
+	const count = installD1QueryCounter(env.DB); const batch = vi.spyOn(env.DB, 'batch');
 	const response = await body(files);
 	expect(response.success, JSON.stringify(response)).toBe(true);
-	expect(response.results).toHaveLength(8);
+	expect(response.results).toHaveLength(files.length);
 	expect(batch).toHaveBeenCalledTimes(1);
-	expect(prepare.mock.calls.length).toBeLessThanOrEqual(46);
+	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION - 4);
 	expect((await env.DB.prepare('SELECT * FROM reminder_source_state WHERE verified = 1').all()).results).toHaveLength(0);
-	expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(8);
+	expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(files.length);
 	expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toBeNull();
 	expect(await env.DB.prepare('SELECT id FROM staged_upload_batches').first()).toBeNull();
 	const repeat = await body(files);
@@ -50,12 +53,12 @@ it('preserves committed bytes and receipts after losing the transaction response
 it('does not overwrite an existing file and keeps a rejected receipt stable', async () => {
 	const original = file('existing.md', 'original');
 	expect((await body([original], false)).success).toBe(true);
-	const files = [file('existing.md', 'overwrite'), ...Array.from({ length: 7 }, (_, i) => file(`${i}.md`))];
-	const prepare = vi.spyOn(env.DB, 'prepare');
+	const files = [file('existing.md', 'overwrite'), ...Array.from({ length: BATCH_UPLOAD_MAX_FILES - 1 }, (_, i) => file(`${i}.md`))];
+	const count = installD1QueryCounter(env.DB);
 	const result = await body(files);
 	expect(result.results.find(row => row.path === 'existing.md')?.code).toBe('version_conflict');
-	expect(result.results.filter(row => row.success)).toHaveLength(7);
-	expect(prepare.mock.calls.length).toBeLessThanOrEqual(46);
+	expect(result.results.filter(row => row.success)).toHaveLength(BATCH_UPLOAD_MAX_FILES - 1);
+	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION - 4);
 	expect((await body(files)).results).toEqual(result.results);
 });
 it('serializes namespace conflicts within the same bulk transaction', async () => {

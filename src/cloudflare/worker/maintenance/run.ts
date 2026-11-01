@@ -12,20 +12,17 @@ import { pruneOperationReceipts } from './operation-receipts';
 import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
 import { pruneEncryptionMetadata, releaseExpiredVersionDescriptors, releasePrunedChangelogDescriptors } from './encryption-metadata';
 import { wakeProjection } from '../coordinator/coordinator';
+import { countD1Queries } from '../d1-query-count';
+import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 
 export interface MaintenanceResult { removedObjects: number; backlog: boolean }
 
-// Free Workers allow 50 D1 statements per invocation, batched or not.
-const STATEMENT_LIMIT = 50;
-
 /** `backlog` reports a bounded pruning task that filled its batch or a task left
  * for a later pass. `firstPass` is false for the follow-up passes of one maintenance
- * episode. `reserved` counts statements the caller runs in the same invocation. */
+ * episode. `reserved` counts D1 queries the caller runs in the same invocation. */
 export async function runScheduledMaintenance(env: Env, { firstPass = true, reserved = 0 }: { firstPass?: boolean; reserved?: number } = {}): Promise<MaintenanceResult> {
-	let statements = reserved;
-	const db: D1Database = { prepare: sql => { statements++; return env.DB.prepare(sql); },
-		batch: <T>(batch: D1PreparedStatement[]) => env.DB.batch<T>(batch), exec: query => env.DB.exec(query) };
+	const { db, count } = countD1Queries(env.DB, { queries: reserved, statements: reserved });
 	if (await db.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first()) return { removedObjects: 0, backlog: false };
 	const encryption = await readEncryptionState(db);
 	if (encryption?.mode === 'resetting') return { removedObjects: 0, backlog: false };
@@ -57,10 +54,10 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true, rese
 		['clean unfinished upload batches', async () => { removedObjects += await cleanStagedBatches(env.BUCKET, db); }],
 	];
 	if (encrypted) tasks.push(['prune unused encryption metadata', bounded(() => pruneEncryptionMetadata(db, firstPass))]);
-	// Four statements plus the run record's two; on a pass whose earlier work leaves
+	// Three queries plus the run record's batch; on a pass whose earlier work leaves
 	// too few, this waits for the next one.
 	tasks.push(['prune expired encrypted response chunks', async () => {
-		if (statements + 6 > STATEMENT_LIMIT) backlog = true;
+		if (count.queries + 4 > D1_QUERIES_PER_INVOCATION) backlog = true;
 		else await pruneEncryptedReceiptChunks(db);
 	}]);
 	for (const [name, task] of tasks) {

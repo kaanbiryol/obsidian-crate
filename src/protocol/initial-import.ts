@@ -1,8 +1,8 @@
 import { compareCodePoints, portablePathKey } from './portable-path';
 import type { SyncIssueCode } from './sync-issues';
 export const INITIAL_IMPORT_CAPABILITY = 'resumable-initial-import-v1';
-// Initial imports omit the history/projection statements used by normal uploads.
-// Leave room for authentication, staging and cleanup within D1's 50-query limit.
+// An import request costs six D1 queries whatever its size. Two requests per
+// 64-file upload pipeline chunk run in parallel on separate transfer objects.
 export const INITIAL_IMPORT_MAX_FILES = 32;
 export interface InitialImport { token: string; state: 'importing' | 'complete' }
 

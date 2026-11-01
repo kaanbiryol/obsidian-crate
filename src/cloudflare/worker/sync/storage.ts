@@ -3,6 +3,7 @@ import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { queryRows } from '../db';
 import { isSha256Hex } from '../../../platform/validation';
 import { sha256Hex } from '../../../platform/sha256';
+import { D1_MAX_BOUND_PARAMETERS } from '../platform-limits';
 export {
 	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
 	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,
@@ -11,7 +12,6 @@ export {
 	BATCH_UPLOAD_MAX_FILES as MAX_BATCH_UPLOAD_FILES,
 	MAX_FILE_SIZE_BYTES as MAX_FILE_BYTES,
 } from '../../../protocol/sync-limits';
-const MAX_D1_BOUND_PARAMETERS = 100;
 export const FILE_VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 /** A retained version's `expires_at`. Bind `Date.now() + FILE_VERSION_RETENTION_MS`;
  * the database clock, rounded up to the next second, wins when it is later. */
@@ -80,8 +80,8 @@ export async function readVerifiedBytes(bucket: R2Bucket, file: FileStorageRow):
 
 export async function loadStoredFileRows(db: D1Database, paths: string[]): Promise<Map<string, FileStorageRow>> {
 	if (paths.length === 0) return new Map();
-	if (paths.length > MAX_D1_BOUND_PARAMETERS) {
-		throw new Error(`Cannot load more than ${MAX_D1_BOUND_PARAMETERS} file rows at once`);
+	if (paths.length > D1_MAX_BOUND_PARAMETERS) {
+		throw new Error(`Cannot load more than ${D1_MAX_BOUND_PARAMETERS} file rows at once`);
 	}
 
 	const placeholders = paths.map(() => '?').join(', ');

@@ -6,7 +6,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';
 import { base64ToArrayBuffer } from '../encoding';
 import type { RestoreIntent } from '../durability/restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import { BATCH_FILE_SIZE_LIMIT, BULK_NEW_UPLOAD_CAPABILITY, MAX_PREVIEW_BYTES, maxUploadBatchFiles } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
@@ -343,16 +343,15 @@ export class SyncWorkerApi {
 			if (day === undefined) throw new Error('Update the Crate server before uploading');
 			files = files.map(file => ({ ...file, operationId: file.operationId ?? createReminderOperationId(day) }));
 		}
-		const bulkNewEligible = !this.encryption && info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY);
-		const bulkNew = bulkNewEligible && files.every(file => file.expectedHash === null);
-		const maxFiles = maxUploadBatchFiles(files, bulkNewEligible);
-		if (files.length > maxFiles) {
+		if (files.length > BATCH_UPLOAD_MAX_FILES) {
 			const results: BatchUploadResponse['results'] = [];
-			for (let offset = 0; offset < files.length; offset += maxFiles) {
-				results.push(...(await this.batchUpload(files.slice(offset, offset + maxFiles))).results);
+			for (let offset = 0; offset < files.length; offset += BATCH_UPLOAD_MAX_FILES) {
+				results.push(...(await this.batchUpload(files.slice(offset, offset + BATCH_UPLOAD_MAX_FILES))).results);
 			}
 			return { success: results.every(result => result.success), results };
 		}
+		const bulkNew = !this.encryption && info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY)
+			&& files.every(file => file.expectedHash === null);
 
 		const body = JSON.stringify({ files, ...(bulkNew ? { bulkNewFiles: true } : {}) });
 		return this.http.requestJson<BatchUploadResponse>('/sync/batch-upload', {

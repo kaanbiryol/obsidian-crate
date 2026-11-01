@@ -26,9 +26,7 @@ Run \`node scripts/check-contract-docs.mjs --write\` after changing those contra
 | Shortcut template revision | ${shortcut.revision} |
 | Oldest compatible shortcut revision | ${shortcut.minimumRevision} |
 | Registered migrations | ${release.migrations.map(item => `\`${item.id}\` (${item.from} → ${item.to})`).join(', ') || 'None'} |
-| Markdown upload batch | ${limits.BATCH_UPLOAD_MAX_FILES} files |
-| Asset upload batch | ${limits.BATCH_ASSET_UPLOAD_MAX_FILES} files |
-| New-file import batch | ${limits.BULK_NEW_UPLOAD_MAX_FILES} files |
+| Upload batch | ${limits.BATCH_UPLOAD_MAX_FILES} files |
 | Delete batch | ${limits.BATCH_DELETE_MAX_FILES} files |
 | Download batch | ${limits.BATCH_DOWNLOAD_MAX_FILES} files |
 | Upload batch bytes | ${limits.BATCH_UPLOAD_MAX_BYTES} |

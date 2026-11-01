@@ -6,8 +6,8 @@ import type { VaultFile } from "../local/file-discovery";
 import type { PreparedUpload } from '../types';
 import {
 	BATCH_UPLOAD_MAX_BYTES as BATCH_MAX_BYTES,
+	BATCH_UPLOAD_MAX_FILES,
 	MAX_FILE_SIZE_BYTES,
-	maxUploadBatchFiles,
 } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import type { TransferContext } from "./types";
@@ -106,18 +106,22 @@ export async function prepareUploadFromPath(
 	}, options);
 }
 
-/** Chunks are planned before the transport resolves the server's capabilities or
- * the vault's encryption, so new files are treated as bulk eligible here.
- * `SyncWorkerApi.batchUpload` applies the same rule with the actual eligibility and
- * splits a chunk the server cannot accept in one request. */
+/** New files share one bulk commit only when a batch holds nothing else, so they
+ * are chunked apart from replacements. Chunks upload concurrently, so this reordering
+ * changes no guarantee. */
 export function createBatchUploadChunks(prepared: PreparedUpload[]): PreparedUpload[][] {
+	const isNew = (upload: PreparedUpload) => (upload.expectedHash ?? null) === null;
+	return [...chunkUploads(prepared.filter(isNew)), ...chunkUploads(prepared.filter(upload => !isNew(upload)))];
+}
+
+function chunkUploads(prepared: PreparedUpload[]): PreparedUpload[][] {
 	const chunks: PreparedUpload[][] = [];
 	let currentChunk: PreparedUpload[] = [];
 	let currentBytes = 0;
 
 	for (const upload of prepared) {
 		if (
-			currentChunk.length >= maxUploadBatchFiles([...currentChunk, upload], true)
+			currentChunk.length >= BATCH_UPLOAD_MAX_FILES
 			|| (currentChunk.length > 0 && currentBytes + upload.size > BATCH_MAX_BYTES)
 		) {
 			chunks.push(currentChunk);

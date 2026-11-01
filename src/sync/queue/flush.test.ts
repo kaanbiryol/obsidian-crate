@@ -473,14 +473,15 @@ describe('processPendingChanges', () => {
 
 	it('chunks mass deletes to the shared server limit', async () => {
 		const harness = createFlushHarness();
-		for (let index = 0; index < 14; index++) {
+		const count = 3 * BATCH_DELETE_MAX_FILES + 2;
+		for (let index = 0; index < count; index++) {
 			harness.pendingKeys.add(pendingChangeKey('delete', `notes/${index}.md`));
 		}
 
 		await processPendingChanges(harness.context);
 
-		expect(harness.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([4, 4, 4, 2]);
-		expect(harness.removeEntry).toHaveBeenCalledTimes(14);
+		expect(harness.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([BATCH_DELETE_MAX_FILES, BATCH_DELETE_MAX_FILES, BATCH_DELETE_MAX_FILES, 2]);
+		expect(harness.removeEntry).toHaveBeenCalledTimes(count);
 		expect(harness.pendingKeys.size).toBe(0);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
 	});

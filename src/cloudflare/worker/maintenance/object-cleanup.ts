@@ -1,7 +1,7 @@
 import { changedRows, queryRows, type SqlGuard } from '../db';
 import { findReferencedStorageKeys, type ObjectReference } from '../storage-references';
 
-// R2 deletes up to 1,000 keys per call. 500 keeps the reference lookup's single
+// R2 deletes up to R2_KEYS_PER_CALL keys per call. 500 keeps the reference lookup's single
 // JSON parameter below D1's 2 MB value limit, even with 1,024-character paths.
 const CLEANUP_BATCH_LIMIT = 500;
 

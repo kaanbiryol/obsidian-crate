@@ -92,7 +92,7 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 			const [text] = await readStoredMarkdownFiles(env.BUCKET, [file]);
 			if (!text) throw new Error('Committed reminder content could not be verified');
 			await env.DB.batch([
-				...await enqueueFileProjection(env.DB, file.path, file.storageKey, text.content, true, encrypted),
+				...await enqueueFileProjection(env.DB, file.path, file.storageKey, text.content, true, encrypted, folder),
 				env.DB.prepare(`UPDATE notification_file_retries SET available_at = NULL WHERE path = ?
           AND EXISTS (SELECT 1 FROM reminder_source_state WHERE file_path = ? AND file_revision = ? AND verified = 1)`)
 					.bind(file.path, file.path, file.storageKey),

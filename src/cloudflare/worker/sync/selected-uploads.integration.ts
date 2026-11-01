@@ -5,6 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { pendingChangeKey } from '../../../sync/pending/pending-change';
+import { BATCH_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 
 let device: SyncTestDevice;
 beforeEach(async () => {
@@ -21,7 +22,7 @@ afterEach(async () => {
 });
 
 it.each(['vault', 'selected'] as const)('batches ordinary Markdown line edits through %s sync', async mode => {
-	const paths = Array.from({ length: 12 }, (_, index) => `note-${index}.md`);
+	const paths = Array.from({ length: BATCH_UPLOAD_MAX_FILES + 1 }, (_, index) => `note-${index}.md`);
 	const original = '# Note\n\nOriginal line.\n';
 	for (const path of [...paths, 'unselected.md']) device.disk.write(path, original);
 	expect((await device.engine.sync()).success).toBe(true);
@@ -36,9 +37,9 @@ it.each(['vault', 'selected'] as const)('batches ordinary Markdown line edits th
 	}
 	device.requests.length = 0;
 	const result = await (mode === 'selected' ? device.engine.syncSelected(paths) : device.engine.sync());
-	expect(result).toMatchObject({ success: true, uploaded: 12, downloaded: 0, merged: 0, errors: [] });
+	expect(result).toMatchObject({ success: true, uploaded: paths.length, downloaded: 0, merged: 0, errors: [] });
 	expect(device.requests.filter(route => route === 'PUT /sync/upload')).toHaveLength(0);
-	expect(device.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(4);
+	expect(device.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(2);
 	for (const path of paths) {
 		expect(new TextDecoder().decode((await device.api.downloadFile(path)).content)).toBe(`${original}\nAdded line.\n`);
 	}
@@ -53,9 +54,9 @@ it.each(['vault', 'selected'] as const)('batches ordinary Markdown line edits th
 	}
 	device.requests.length = 0;
 	expect(await (mode === 'selected' ? device.engine.syncSelected(paths) : device.engine.sync()))
-		.toMatchObject({ success: true, uploaded: 12, downloaded: 0, merged: 0, errors: [] });
+		.toMatchObject({ success: true, uploaded: paths.length, downloaded: 0, merged: 0, errors: [] });
 	expect(device.requests.filter(route => route === 'PUT /sync/upload')).toHaveLength(0);
-	expect(device.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(4);
+	expect(device.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(2);
 	for (const path of paths) expect(new TextDecoder().decode((await device.api.downloadFile(path)).content)).toBe(original);
 });
 

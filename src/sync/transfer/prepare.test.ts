@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { BATCH_UPLOAD_MAX_FILES, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { createBatchUploadChunks, prepareUploadFromPath, prepareUploadFromVaultFile } from './prepare';
 import { HIDDEN_CONFIG_PATH, createTransferHarness } from './transfer-test-harness';
 
@@ -116,17 +116,18 @@ describe('transfer prepare helpers', () => {
 });
 
 
-it('keeps mixed and Markdown batches small while packing four assets', () => {
-	const prepared = ['a.svg', 'b.svg', 'c.svg', 'd.svg', 'e.svg', 'note.MD', 'f.svg', 'g.svg'].map(path => ({
-		path, size: 1, hash: 'h', content: new ArrayBuffer(1),
+it('packs Markdown and assets into the same batches', () => {
+	const prepared = ['a.svg', 'b.svg', 'note.MD', 'c.svg'].map(path => ({
+		path, size: 1, hash: 'h', content: new ArrayBuffer(1), expectedHash: 'old',
 	}));
-	expect(createBatchUploadChunks(prepared).map(chunk => chunk.map(file => file.path))).toEqual([
-		['a.svg', 'b.svg', 'c.svg', 'd.svg'], ['e.svg', 'note.MD', 'f.svg'], ['g.svg'],
-	]);
+	expect(createBatchUploadChunks(prepared).map(chunk => chunk.map(file => file.path))).toEqual([['a.svg', 'b.svg', 'note.MD', 'c.svg']]);
 });
 
-it('groups eight absent files while separating replacement work', () => {
-	const prepared = Array.from({ length: 10 }, (_, i) => ({ path: `${i}.md`, size: 1, hash: 'h', content: new ArrayBuffer(1), expectedHash: null as string | null }));
-	prepared[8]!.expectedHash = 'old';
-	expect(createBatchUploadChunks(prepared).map(chunk => chunk.length)).toEqual([8, 2]);
+it('groups new files apart from replacement work', () => {
+	const prepared = Array.from({ length: BATCH_UPLOAD_MAX_FILES + 2 }, (_, i) => ({ path: `${i}.md`, size: 1, hash: 'h', content: new ArrayBuffer(1), expectedHash: null as string | null }));
+	prepared[1]!.expectedHash = 'old';
+	prepared[5]!.expectedHash = 'old';
+	expect(createBatchUploadChunks(prepared).map(chunk => chunk.map(file => file.path))).toEqual([
+		prepared.filter(file => file.expectedHash === null).slice(0, BATCH_UPLOAD_MAX_FILES).map(file => file.path), ['1.md', '5.md'],
+	]);
 });

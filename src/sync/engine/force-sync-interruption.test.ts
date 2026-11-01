@@ -12,6 +12,7 @@ afterEach(() => vi.unstubAllGlobals());
 it('keeps every checkpoint baseline when a force full sync stops mid-upload', async () => {
 	const files = 200;
 	let answered = 0;
+	const answeredPaths = new Set<string>();
 	const remoteOnly = { hash: 'b'.repeat(64), revision: 'remote-only-rev', size: 1, modified: new Date(5).toISOString() };
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		const url = new URL(request.url);
@@ -27,6 +28,7 @@ it('keeps every checkpoint baseline when a force full sync stops mid-upload', as
 			if (answered >= 90) return new Promise(() => {});
 			const body = JSON.parse(request.body as string) as { files: Array<{ path: string; hash: string }> };
 			answered += body.files.length;
+			for (const file of body.files) answeredPaths.add(file.path);
 			value = { success: true, results: body.files.map(file => ({ path: file.path, success: true, hash: file.hash, revision: `rev-${file.path}` })) };
 		} else throw new Error(`Unexpected request: ${request.url}`);
 		const text = JSON.stringify(value);
@@ -56,6 +58,8 @@ it('keeps every checkpoint baseline when a force full sync stops mid-upload', as
 	await reopened.load();
 	expect(reopened.getFileCount()).toBe(files + 1);
 	expect(reopened.getEntry('remote-only.md')).toMatchObject({ revision: 'remote-only-rev' });
-	expect(reopened.getEntry('notes/n-0.md')?.revision).toBe('rev-notes/n-0.md');
-	expect(reopened.getEntry(`notes/n-${files - 1}.md`)?.revision).toBe(`old-${files - 1}`);
+	const uploaded = [...answeredPaths][0]!;
+	const kept = Array.from({ length: files }, (_, index) => index).find(index => !answeredPaths.has(`notes/n-${index}.md`))!;
+	expect(reopened.getEntry(uploaded)?.revision).toBe(`rev-${uploaded}`);
+	expect(reopened.getEntry(`notes/n-${kept}.md`)?.revision).toBe(`old-${kept}`);
 });

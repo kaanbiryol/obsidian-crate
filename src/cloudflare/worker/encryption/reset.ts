@@ -11,6 +11,7 @@ import { drainNotificationCancellations } from '../notifications/outbox';
 import { sha256Hex } from '../../../platform/sha256';
 import { putMaintenanceValue } from '../db';
 import { saveServerState } from '../server-state';
+import { R2_KEYS_PER_CALL } from '../platform-limits';
 
 const PREFIX = 'encryption-reset:';
 // Marks a reset that turns encryption on: completion activates the saved state instead of removing it.
@@ -91,7 +92,7 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 	if (await drainNotificationCancellations(env)) return corsResponse(receipt);
 	// Delete from the start each time. No cursor can skip objects after deletion,
 	// and a timeout after R2 deletion simply retries the remaining page.
-	const objects = await env.BUCKET.list({ limit: 1000 });
+	const objects = await env.BUCKET.list({ limit: R2_KEYS_PER_CALL });
 	if (objects.objects.length) {
 		await env.BUCKET.delete(objects.objects.map(object => object.key));
 		return corsResponse(receipt);

@@ -15,6 +15,8 @@ import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import { revalidateReminderSources } from '../reminders/source-migration';
 import { drainNotificationProjections } from '../notifications/projection';
 import { runNotificationCoordinator } from '../notifications/coordinator';
+import { countD1Queries } from '../d1-query-count';
+import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
@@ -115,19 +117,15 @@ it('keeps coordinator passes within their query budget while rebuilding two dens
 	await env.DB.prepare("UPDATE notification_projection_jobs SET updated_at = '2000-01-01 00:00:00'").run();
 	// Dispatch and individual alarms have separate invocation budgets. Count only
 	// this coordinator's queries, leaving their real namespace binding untouched.
-	const prepare = vi.fn((sql: string) => env.DB.prepare(sql));
-	const measuredDb = { prepare, batch: env.DB.batch.bind(env.DB), exec: env.DB.exec.bind(env.DB) };
-	await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, { ...env, DB: measuredDb });
-	expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state WHERE verified = 1').first()).toEqual({ count: 1 });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections').first()).toEqual({ count: 0 });
-	prepare.mockClear();
-	await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, { ...env, DB: measuredDb });
-	expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
+	const pass = async () => {
+		const { db, count } = countD1Queries(env.DB);
+		await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, { ...env, DB: db });
+		expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
+	};
+	// Both sources fit one pass's file count and encrypted byte budget.
+	await pass();
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state WHERE verified = 1').first()).toEqual({ count: 2 });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections').first()).toEqual({ count: 2000 });
-	prepare.mockClear();
-	await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, { ...env, DB: measuredDb });
-	expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections').first()).toEqual({ count: 4000 });
+	await pass();
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections').first()).toEqual({ count: 4000 });
 });

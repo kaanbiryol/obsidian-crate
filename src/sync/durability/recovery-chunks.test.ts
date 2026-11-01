@@ -1,10 +1,11 @@
 import { expect, it } from 'vitest';
 import { recoveryChunks } from './recovery-chunks';
 import type { JournalUpload } from './upload-intent';
-import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 const file = (path: string, size = 1) => ({ path, size, intent: { kind: 'local' }, content: 'eA==' }) as JournalUpload;
-it('bounds batches to eight uploads', () => {
-	expect([...recoveryChunks(Array.from({ length: 20 }, (_, i) => file(`${i}.md`)))].map(chunk => chunk.length)).toEqual([8, 8, 4]);
+it('bounds batches to the upload batch limit', () => {
+	const files = Array.from({ length: 2 * BATCH_UPLOAD_MAX_FILES + 4 }, (_, i) => file(`${i}.md`));
+	expect([...recoveryChunks(files)].map(chunk => chunk.length)).toEqual([BATCH_UPLOAD_MAX_FILES, BATCH_UPLOAD_MAX_FILES, 4]);
 });
 it('keeps large files and merge uploads as ordered single requests', () => {
 	const merge = { ...file('merge.md'), intent: { kind: 'merge', preimage: { hash: 'h', content: 'eA==', size: 1 } } } as JournalUpload;

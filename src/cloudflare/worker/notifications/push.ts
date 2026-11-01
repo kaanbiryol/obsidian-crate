@@ -9,6 +9,7 @@ import { queryRows } from '../db';
 import { sendPushNotificationWithoutContact } from './web-push';
 import { PUSH_RECIPIENT_AUTHORITY } from './recipient-authority';
 import { parseEncryptedNotification, type EncryptedNotification } from '../../../encryption/notification-format';
+import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../platform-limits';
 
 interface SerializedVapidKeys {
 	publicKey: string;
@@ -31,7 +32,6 @@ export interface PushDeliveryResult {
 	failedSubscriptionIds: string[];
 }
 
-const PUSH_DELIVERY_CONCURRENCY = 6;
 
 export interface PushNotificationPayload {
 	title: string;
@@ -133,7 +133,7 @@ function importVapidKeys(serialized: SerializedVapidKeys): Promise<CryptoKeyPair
 async function runBounded<T>(items: readonly T[], worker: (item: T) => Promise<void>): Promise<void> {
 	let nextIndex = 0;
 	const workers = Array.from(
-		{ length: Math.min(PUSH_DELIVERY_CONCURRENCY, items.length) },
+		{ length: Math.min(SIMULTANEOUS_OPEN_CONNECTIONS, items.length) },
 		async () => {
 			while (nextIndex < items.length) {
 				const index = nextIndex;

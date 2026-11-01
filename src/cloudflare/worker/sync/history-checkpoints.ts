@@ -11,9 +11,11 @@ import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/
 import { putMaintenanceValue } from '../db';
 import { FILE_HASH_HEADER } from '../../../protocol/http-headers';
 import { SHARED_CHECKPOINT_AT_KEY } from './file-publication-statements';
+import { R2_KEYS_PER_CALL } from '../platform-limits';
 
 const PREFIX = HISTORY_CHECKPOINT_PREFIX;
-// Ten pages cover the largest checkpoint within the Free plan's query budget.
+// Ten pages, plus one empty read at exactly the file limit, cover the largest
+// checkpoint within the Free plan's query budget.
 export const CHECKPOINT_PAGE_SIZE = 10_000;
 const MAX_STORED_CHECKPOINT_BYTES = MAX_ENCRYPTED_CHECKPOINT_BYTES + 4096;
 const keyFor = (id: string) => `${PREFIX}${id}.json`;
@@ -151,8 +153,8 @@ export async function downloadCheckpointFile(request: Request, bucket: R2Bucket,
 export async function pruneSharedCheckpoints(bucket: R2Bucket, db: D1Database): Promise<boolean> {
 	const cursorKey = 'shared_checkpoint_cleanup_cursor';
 	const cursor = (await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(cursorKey).first<{ value: string }>())?.value;
-	// One R2 list and delete call each handle up to 1,000 keys.
-	const listing = await bucket.list({ prefix: PREFIX, limit: 1000, ...(cursor ? { cursor } : {}) });
+	// One R2 list and delete call each handle up to R2_KEYS_PER_CALL keys.
+	const listing = await bucket.list({ prefix: PREFIX, limit: R2_KEYS_PER_CALL, ...(cursor ? { cursor } : {}) });
 	const index = await readIndex(bucket);
 	const retained = new Set(index.checkpoints.filter(entry => entry.expiresAt > Date.now()).map(entry => keyFor(entry.id)));
 	const garbage = listing.objects.filter(object => object.uploaded.getTime() < Date.now() - 86_400_000 && !retained.has(object.key));

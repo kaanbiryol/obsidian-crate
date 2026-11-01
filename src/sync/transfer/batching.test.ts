@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { PreparedUpload } from '../types';
 import { createBatchUploadChunks } from './prepare';
+import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 
 describe('batch upload chunking', () => {
 	it('respects file count limit', () => {
-		const prepared: PreparedUpload[] = Array.from({ length: 14 }, (_, i) => ({
+		const prepared: PreparedUpload[] = Array.from({ length: 2 * BATCH_UPLOAD_MAX_FILES + 2 }, (_, i) => ({
 			path: `file-${i}.md`,
 			content: new ArrayBuffer(100),
 			hash: `hash-${i}`,
@@ -14,7 +15,7 @@ describe('batch upload chunking', () => {
 
 		const chunks = createBatchUploadChunks(prepared);
 
-		expect(chunks.map(chunk => chunk.length)).toEqual([3, 3, 3, 3, 2]);
+		expect(chunks.map(chunk => chunk.length)).toEqual([BATCH_UPLOAD_MAX_FILES, BATCH_UPLOAD_MAX_FILES, 2]);
 	});
 
 	it('respects byte size limit', () => {

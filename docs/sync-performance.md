@@ -77,7 +77,7 @@ completion fencing; these protect interrupted uploads and late requests.
 
 Larger batches retain the 10 MiB decoded payload limit, bounded R2 concurrency,
 conditional file writes, and resumable cleanup. Regression tests include byte-based
-splitting, successful and rejected 32-file requests below 45 prepared D1 statements,
+splitting, successful and rejected 32-file requests within 45 D1 queries,
 and selected-folder reads that remain bounded with 10,000 unrelated notes. Removing
 the Markdown index means attachments inside the selected folder also participate in
 its metadata scan; file content is still read only for Markdown. Files outside that
@@ -101,9 +101,9 @@ Run the initial-import regression with:
 npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/import/initial-import.integration.ts --reporter=verbose
 ```
 
-The normal eight-file upload path retains per-file receipts and changelog entries.
+The normal 32-file upload path retains per-file receipts and changelog entries.
 Its separate 8,000-note benchmark, with notes inside the selected reminder folder,
-measures 52,000 row writes on a new database. This is a regression check for normal
+measures 49,000 row writes on a new database. This is a regression check for normal
 uploads, not the cost of an initial import.
 
 ## Normal upload benchmark

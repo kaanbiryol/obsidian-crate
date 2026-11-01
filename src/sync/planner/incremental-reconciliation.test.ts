@@ -2,7 +2,7 @@ import { pendingChangeKey } from '../pending/pending-change';
 import type { DownloadRequest } from '../transfer/download';
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload, SyncResult } from '../types';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { BATCH_DELETE_MAX_FILES, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { runIncrementalSync } from './incremental';
 import { createIncrementalHarness, createSettings } from './planner-test-harness';
 
@@ -43,7 +43,7 @@ describe('runIncrementalSync', () => {
 	});
 
 	it('chunks more than one server batch of local deletes', async () => {
-		const paths = Array.from({ length: 14 }, (_, index) => `notes/delete-${index}.md`);
+		const paths = Array.from({ length: 3 * BATCH_DELETE_MAX_FILES + 2 }, (_, index) => `notes/delete-${index}.md`);
 		const harness = createIncrementalHarness({
 			settings: { lastSeq: 10 },
 			lastSeq: 11,
@@ -57,7 +57,7 @@ describe('runIncrementalSync', () => {
 
 		const result = await runIncrementalSync(harness.context, {});
 
-		expect(harness.api.batchDelete.mock.calls.map(([chunk]) => chunk.length)).toEqual([4, 4, 4, 2]);
+		expect(harness.api.batchDelete.mock.calls.map(([chunk]) => chunk.length)).toEqual([BATCH_DELETE_MAX_FILES, BATCH_DELETE_MAX_FILES, BATCH_DELETE_MAX_FILES, 2]);
 		expect(result?.deletedPaths).toEqual(paths);
 		expect(result?.success).toBe(true);
 	});

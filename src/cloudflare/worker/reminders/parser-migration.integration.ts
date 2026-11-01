@@ -11,6 +11,8 @@ import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from '../notifications/push';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 import { runNotificationCoordinator } from '../notifications/coordinator';
+import { countD1Queries, type D1QueryCount } from '../d1-query-count';
+import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
 import { dispatchNotificationJobs } from '../notifications/outbox';
 import { handleListReminders } from './routes/list';
 import { sha256Hex } from '../../../platform/sha256';
@@ -217,32 +219,35 @@ it('bounds each migration, projection and dispatch invocation and resumes every 
 	}
 	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0').run();
 	const alarms = new Map<string, ReminderAlarm>();
-	const counts = new Map<string, number>();
+	const counts = new Map<string, D1QueryCount>();
 	const peaks = new Map<string, number>();
-	const measuredDb = (name: string): D1Database => ({
-		prepare(sql) { counts.set(name, (counts.get(name) ?? 0) + 1); return env.DB.prepare(sql); },
-		batch: env.DB.batch.bind(env.DB), exec: env.DB.exec.bind(env.DB),
-	});
+	const measuredDb = (name: string): D1Database => {
+		const count = { queries: 0, statements: 0 };
+		counts.set(name, count);
+		return countD1Queries(env.DB, count).db;
+	};
 	const namespace = {
 		idFromName: (name: string) => name,
 		get(name: string) {
 			if (!alarms.has(name)) alarms.set(name, new ReminderAlarm(state() as never,
 				{ ...env, DB: measuredDb(name), REMINDER_ALARMS: namespace as never }));
 			return { fetch: async (input: string, init?: RequestInit) => {
-				counts.set(name, 0);
+				const count = counts.get(name)!;
+				count.queries = 0;
 				const response = await alarms.get(name)!.fetch(new Request(input, init));
-				peaks.set(name, Math.max(peaks.get(name) ?? 0, counts.get(name)!));
-				expect(counts.get(name)).toBeLessThanOrEqual(50);
+				peaks.set(name, Math.max(peaks.get(name) ?? 0, count.queries));
+				expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
 				return response;
 			} };
 		},
 	};
 	const runtime = { ...env, DB: measuredDb('projection'), REMINDER_ALARMS: namespace as never };
 	for (let pass = 0; pass < 12; pass++) {
-		counts.set('projection', 0);
+		const count = counts.get('projection')!;
+		count.queries = 0;
 		const dispatch = await runNotificationCoordinator(state() as never, runtime);
-		peaks.set('projection', Math.max(peaks.get('projection') ?? 0, counts.get('projection')!));
-		expect(counts.get('projection')).toBeLessThanOrEqual(50);
+		peaks.set('projection', Math.max(peaks.get('projection') ?? 0, count.queries));
+		expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
 		// The coordinator alarm dispatches after its locked pass.
 		if (dispatch) await dispatchNotificationJobs(runtime, true);
 	}

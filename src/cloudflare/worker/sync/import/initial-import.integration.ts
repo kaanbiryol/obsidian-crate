@@ -17,6 +17,8 @@ import { handleNotificationPolicy } from '../../notifications/policy';
 import { SyncTestDevice } from '../../test-support/sync-engine-test-harness';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { sha256Hex } from '@/platform/sha256';
+import { installD1QueryCounter } from '../../test-support/d1-query-test-harness';
+import { D1_QUERIES_PER_INVOCATION } from '../../platform-limits';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -221,18 +223,18 @@ it('keeps full import requests under the free D1 query limit, including rejected
 	}));
 	const hash = await sha256Hex('original');
 	for (const file of files) file.hash = hash;
-	const prepare = vi.spyOn(env.DB, 'prepare');
+	const count = installD1QueryCounter(env.DB);
 	expect((await client.api.initialImport.upload(session!.token, files)).success).toBe(true);
-	expect(prepare.mock.calls.length).toBeLessThanOrEqual(45);
+	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION - 5);
 	const changed = new TextEncoder().encode('changed').buffer;
 	const changedHash = await sha256Hex('changed');
-	prepare.mockClear();
+	count.reset();
 	const rejected = await client.api.initialImport.upload(session!.token, files.map(file => ({
 		...file, content: changed, size: changed.byteLength, hash: changedHash,
 	})));
 	expect(rejected.results).toHaveLength(INITIAL_IMPORT_MAX_FILES);
 	expect(rejected.results.every(result => result.code === 'version_conflict')).toBe(true);
-	expect(prepare.mock.calls.length).toBeLessThanOrEqual(45);
+	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION - 5);
 });
 
 it('splits larger import batches at the existing byte limit', async () => {

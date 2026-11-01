@@ -6,7 +6,7 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 
 | Contract | Current value |
 | --- | --- |
-| Server candidate revision | 2 |
+| Server candidate revision | 3 |
 | Fresh database schema | 1 |
 | Oldest supported database schema | 1 |
 | Wire protocol | 1 |
@@ -15,10 +15,8 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 | Shortcut template revision | 1 |
 | Oldest compatible shortcut revision | 1 |
 | Registered migrations | None |
-| Markdown upload batch | 3 files |
-| Asset upload batch | 4 files |
-| New-file import batch | 8 files |
-| Delete batch | 4 files |
+| Upload batch | 32 files |
+| Delete batch | 12 files |
 | Download batch | 50 files |
 | Upload batch bytes | 10485760 |
 | Download batch bytes | 8388608 |

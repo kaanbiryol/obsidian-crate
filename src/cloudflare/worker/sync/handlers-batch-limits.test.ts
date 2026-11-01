@@ -8,6 +8,9 @@ import {
 	handleUpload,
 } from './index';
 import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
+import { countD1Queries } from '../d1-query-count';
+import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
+import { BATCH_DELETE_MAX_FILES, BATCH_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 
 async function responseJson(response: Response): Promise<unknown> {
 	return response.json() as Promise<unknown>;
@@ -43,7 +46,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 	});
 
 	it('rejects mutation batches above the Free-plan-safe limit', async () => {
-		const files = Array.from({ length: 7 }, (_, index) => ({
+		const files = Array.from({ length: Math.max(BATCH_UPLOAD_MAX_FILES, BATCH_DELETE_MAX_FILES) + 1 }, (_, index) => ({
 			path: `notes/${index}.md`,
 			content: btoa('x'),
 			operationId: createTestUploadOperationId(), expectedHash: null,
@@ -81,7 +84,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 		const staleHash = 'b'.repeat(64);
 		const paths = Array.from({ length: 3 }, (_, index) => `notes/${index}.md`);
 		const { bucket } = createMockR2Bucket();
-		const { db } = createMockD1Database({
+		const { db: mockDb } = createMockD1Database({
 			files: Object.fromEntries(paths.map((path, index) => [path, {
 				hash: currentHash,
 				size: 1,
@@ -89,14 +92,14 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			}])),
 		});
 
-	type PreparedMock = typeof db.prepare;
+	const { db, count } = countD1Queries(mockDb);
 	const commits: number[] = [];
 	let pending = Promise.resolve();
 	const commitUpload: typeof commitStagedFile = (bucket, db, params) => {
 	  const result = pending.then(async () => {
-		const before = (db.prepare as PreparedMock).mock.calls.length;
+		const before = count.queries;
 		const committed = await commitStagedFile(bucket, db, params);
-		commits.push((db.prepare as PreparedMock).mock.calls.length - before);
+		commits.push(count.queries - before);
 		return committed;
 	  });
 	  pending = result.then(() => undefined);
@@ -131,9 +134,9 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			&& result.currentHash === currentHash,
 		)).toBe(true);
 		// Upload staging and each serialized commit have separate Worker/DO query budgets.
-		expect(db.prepare.mock.calls.length).toBeGreaterThan(0);
-		expect(db.prepare.mock.calls.length - commits.reduce((sum, count) => sum + count, 0)).toBeLessThanOrEqual(48);
-	expect(Math.max(...commits)).toBeLessThanOrEqual(50);
+		expect(count.queries).toBeGreaterThan(0);
+		expect(count.queries - commits.reduce((sum, queries) => sum + queries, 0)).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION - 2);
+	expect(Math.max(...commits)).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
 	});
 
 	it('rejects stale uploads without replacing the committed object', async () => {

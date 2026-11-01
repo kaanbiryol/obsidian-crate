@@ -1,4 +1,5 @@
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
+import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpError, SyncApiClient } from './client';
 import type { ApiHttpResponse, ApiHttpTransport } from './http';
@@ -380,31 +381,35 @@ describe('SyncApiClient', () => {
 	});
 });
 
-describe('asset batch negotiation', () => {
+describe('upload batch negotiation', () => {
 	beforeEach(() => { vi.stubGlobal('window', { setTimeout, clearTimeout }); });
 	afterEach(() => { vi.unstubAllGlobals(); });
-it.each([true, 'bulk'] as const)('negotiates larger asset uploads with server support=%s', async supported => {
+it.each([true, 'bulk'] as const)('splits uploads at the batch limit and requests bulk commits only with server support=%s', async supported => {
 	const batches: Array<Array<{ path: string; operationId: string }>> = [];
+	const bulkFlags: boolean[] = [];
 	const transport: ApiHttpTransport = async request => {
 		let value: unknown;
 		if (request.url.endsWith('/.well-known/crate')) {
 			value = { service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL,
 				reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: supported === 'bulk' ? ['sync-v1', 'bulk-new-file-uploads-v1'] : supported ? ['sync-v1'] : [] };
 		} else {
-			const { files } = JSON.parse(request.body as string) as { files: Array<{ path: string; operationId: string }> };
+			const { files, bulkNewFiles } = JSON.parse(request.body as string) as { files: Array<{ path: string; operationId: string }>; bulkNewFiles?: boolean };
 			batches.push(files);
+			bulkFlags.push(bulkNewFiles === true);
 			value = { success: true, results: files.map(file => ({ path: file.path, success: true, hash: 'h', revision: 'r' })) };
 		}
 		const text = JSON.stringify(value);
 		return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
 	};
 	const client = new SyncApiClient('https://worker.example', 'token', transport);
-	const response = await client.unjournaled.batchUpload(Array.from({ length: 8 }, (_, index) => ({
+	const count = BATCH_UPLOAD_MAX_FILES + 1;
+	const response = await client.unjournaled.batchUpload(Array.from({ length: count }, (_, index) => ({
 		path: `${index}.svg`, content: btoa('x'), size: 1, hash: 'h', contentType: 'image/svg+xml', expectedHash: null,
 	})));
-	expect(response.results).toHaveLength(8);
-	expect(batches.map(batch => batch.length)).toEqual(supported === 'bulk' ? [8] : [4, 4]);
-	expect(new Set(batches.flat().map(file => file.operationId)).size).toBe(8);
+	expect(response.results).toHaveLength(count);
+	expect(batches.map(batch => batch.length)).toEqual([BATCH_UPLOAD_MAX_FILES, 1]);
+	expect(bulkFlags).toEqual([supported === 'bulk', supported === 'bulk']);
+	expect(new Set(batches.flat().map(file => file.operationId)).size).toBe(count);
 });
 
 });

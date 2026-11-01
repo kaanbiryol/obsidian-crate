@@ -10,6 +10,7 @@ import { handleBatchUpload } from '../batch/upload';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { meterD1Writes } from '../../test-support/d1-write-meter-test-harness';
 import { drainNotificationProjections } from '../../notifications/projection';
+import { BATCH_UPLOAD_MAX_FILES } from '@/protocol/sync-limits';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -28,7 +29,7 @@ it('compares 8000 new Markdown files at four concurrent requests', { timeout: 90
 		}));
 		const prepare = vi.spyOn(env.DB, 'prepare'); const batch = vi.spyOn(env.DB, 'batch');
 		const meter = meterD1Writes(env.DB);
-		const chunkSize = bulkNewFiles ? 8 : 3;
+		const chunkSize = BATCH_UPLOAD_MAX_FILES;
 		let next = 0; let requests = 0; let completed = 0;
 		const started = performance.now();
 		await Promise.all(Array.from({ length: 4 }, async () => {
@@ -56,8 +57,8 @@ it('compares 8000 new Markdown files at four concurrent requests', { timeout: 90
 	}
 	console.info('BULK_UPLOAD_BENCHMARK', JSON.stringify(measurements));
 	expect(measurements[1]!.statements).toBeLessThan(measurements[0]!.statements);
-	expect(measurements[1]!.transactions).toBe(1000);
+	expect(measurements[1]!.transactions).toBe(8000 / BATCH_UPLOAD_MAX_FILES);
 	// Leave at least 20% of the free daily allowance for setup and other activity.
 	expect(measurements[1]!.writes).toBeLessThanOrEqual(80_000);
-	expect(measurements[1]!.writes).toBe(52_000);
+	expect(measurements[1]!.writes).toBe(49_000);
 });

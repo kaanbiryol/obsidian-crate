@@ -21,7 +21,7 @@ const entry = { hash: 'a'.repeat(64), size: 1, modified: 'now', revision: 'v1' }
 describe('ignored remote cleanup', () => {
 	it('persists acknowledged batches before reporting cancelled remote cleanup', async () => {
 		const h = harness();
-		const paths = Array.from({ length: BATCH_DELETE_MAX_FILES + 1 }, (_, index) => `.trash/deleted-${index}.md`);
+		const paths = Array.from({ length: BATCH_DELETE_MAX_FILES + 1 }, (_, index) => `.trash/deleted-${String(index).padStart(2, '0')}.md`);
 		h.api.getManifest.mockResolvedValue({ version: 1, files: Object.fromEntries(paths.map(path => [path, { hash: 'a'.repeat(64), size: 1, modified: 'now', revision: 'v1' }])) });
 		h.api.batchDelete.mockImplementationOnce(async (deleted: string[]) => ({ success: true, deleted }))
 			.mockRejectedValueOnce(new DOMException('Delete cancelled', 'AbortError'));
@@ -93,7 +93,7 @@ describe('ignored remote cleanup', () => {
 
 	it('persists earlier acknowledgements before rejecting exclusions changed between batches', async () => {
 		const h = harness();
-		const paths = Array.from({ length: BATCH_DELETE_MAX_FILES + 1 }, (_, index) => `.trash/${index}.md`);
+		const paths = Array.from({ length: BATCH_DELETE_MAX_FILES + 1 }, (_, index) => `.trash/${String(index).padStart(2, '0')}.md`);
 		h.api.getManifest.mockResolvedValue({ version: 1, files: Object.fromEntries(paths.map(path => [path, entry])) });
 		const review = await h.engine.createExclusionCleanupReview();
 		h.api.batchDelete.mockImplementationOnce(async (deleted: string[]) => {

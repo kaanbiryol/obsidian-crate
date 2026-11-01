@@ -3,7 +3,7 @@ import type { BatchUploadFile } from '../../protocol/sync-types';
 import type { PreparedUpload } from '../types';
 import { HttpError, SyncTransportError } from '../worker-api/client';
 import { runConcurrentTasks } from '../concurrency';
-import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { uploadPreparedFiles } from './upload';
 import { BATCH_UPLOAD_CONCURRENCY } from './constants';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';
@@ -65,8 +65,8 @@ describe('transfer upload helpers', () => {
 			return { success: true, results };
 		});
 
-		// Create three batches of five small files.
-		const prepared: PreparedUpload[] = Array.from({ length: 15 }, (_, i) => ({
+		// Create five full batches of small files.
+		const prepared: PreparedUpload[] = Array.from({ length: 5 * BATCH_UPLOAD_MAX_FILES }, (_, i) => ({
 			path: `file-${i}.md`,
 			content: new TextEncoder().encode('x').buffer,
 			hash: `hash-${i}`,
@@ -77,7 +77,7 @@ describe('transfer upload helpers', () => {
 
 		await uploadPreparedFiles(harness.context, prepared, result, { retry: false });
 
-		expect(harness.api.batchUpload).toHaveBeenCalledTimes(5); // 15 files, at most 3 per batch
+		expect(harness.api.batchUpload).toHaveBeenCalledTimes(5);
 		expect(maxConcurrentCalls).toBeGreaterThan(1);
 	});
 
@@ -189,15 +189,15 @@ it('limits batch concurrency and reports every completed file', async () => {
 		active--;
 		return { success: true, results: files.map(file => ({ path: file.path, success: true, hash: file.hash })) };
 	});
-	const prepared = Array.from({ length: 15 }, (_, index) => ({
+	const prepared = Array.from({ length: 5 * BATCH_UPLOAD_MAX_FILES }, (_, index) => ({
 		path: `file-${index}.md`, content: new ArrayBuffer(1), hash: 'h', size: 1,
 	}));
 	const result = emptyResult();
 	await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { retry: false, onProcessed });
 	expect(maximum).toBe(BATCH_UPLOAD_CONCURRENCY);
-	expect(result.uploaded).toBe(15);
+	expect(result.uploaded).toBe(prepared.length);
 	expect(result.errors).toEqual([]);
-	expect(onProcessed.mock.calls.map(([count]) => count)).toEqual([3, 3, 3, 3, 3]);
+	expect(onProcessed.mock.calls.map(([count]) => count)).toEqual(Array(5).fill(BATCH_UPLOAD_MAX_FILES));
 });
 
 it.each([
@@ -210,7 +210,7 @@ it.each([
 	const onProcessed = vi.fn<(count: number) => void>();
 	const onFailure = vi.fn();
 	const prepared = [
-		...Array.from({ length: 15 }, (_, index) => ({ path: `file-${index}.md`, content: new ArrayBuffer(1), hash: 'h', size: 1 })),
+		...Array.from({ length: 5 * BATCH_UPLOAD_MAX_FILES }, (_, index) => ({ path: `file-${index}.md`, content: new ArrayBuffer(1), hash: 'h', size: 1 })),
 		{ path: 'large.bin', content: new ArrayBuffer(1), hash: 'h', size: BATCH_FILE_SIZE_LIMIT },
 	];
 	const result = emptyResult();
@@ -219,7 +219,7 @@ it.each([
 	// Only the batches already in flight were sent.
 	expect(harness.api.batchUpload).toHaveBeenCalledTimes(BATCH_UPLOAD_CONCURRENCY);
 	expect(harness.api.uploadFile).not.toHaveBeenCalled();
-	expect(result.errors).toHaveLength(16);
-	expect(onFailure).toHaveBeenCalledTimes(16);
-	expect(onProcessed.mock.calls.reduce((total, [count]) => total + count, 0)).toBe(16);
+	expect(result.errors).toHaveLength(prepared.length);
+	expect(onFailure).toHaveBeenCalledTimes(prepared.length);
+	expect(onProcessed.mock.calls.reduce((total, [count]) => total + count, 0)).toBe(prepared.length);
 });

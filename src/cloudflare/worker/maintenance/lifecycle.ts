@@ -24,7 +24,7 @@ export async function runMaintenanceEpisode(state: DurableObjectState, env: Env)
 	await state.storage.put('maintenancePass', pass);
 	if (pass > MAX_DRAIN_PASSES || pass > MAX_PASSES && !await state.storage.get<boolean>('maintenanceDraining')) return;
 	const before = await position(env.DB);
-	// Both position reads, three statements each, share the pass's D1 budget.
+	// Both position reads, three queries each, share the pass's D1 budget.
 	const { removedObjects: removed, backlog } = await runScheduledMaintenance(env, { firstPass: pass === 1, reserved: 6 });
 	const after = await position(env.DB);
 	const draining = Boolean(after.queued && after.queued !== before.queued);
