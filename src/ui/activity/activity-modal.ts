@@ -1,5 +1,5 @@
 import { SharedHistoryLoader } from './shared-history-loader';
-import { describeActivityStatus } from './activity-status';
+import { describeActivityStatus, isActivityBusy } from './activity-status';
 import type { SharedCheckpoint } from '../../protocol/history-checkpoints';
 import { mergeSharedHistory } from './shared-history';
 import { openFileHistoryModal, type FileHistoryRuntime } from './file-history-modal';
@@ -94,7 +94,7 @@ export class ActivityModal extends BaseUiModal {
 		const state = this.deps.getState();
 		// Manual sync records history after the engine's final state event.
 		// Its completion progress event must refresh history as well as pending files.
-		if (state.status !== 'syncing' && !(state.initializing && state.status === 'idle') && !this.deps.getActivityProgress()) {
+		if (!isActivityBusy(state, this.deps.getActivityProgress())) {
 			this.refresh();
 			if (this.currentTabIndex === 2) void this.sharedHistory?.refresh();
 			return;
@@ -109,7 +109,7 @@ export class ActivityModal extends BaseUiModal {
 		const state = this.deps.getState();
 		const progress = this.deps.getActivityProgress();
 		const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
-		if (loadingLabel && (state.status === 'syncing' || progress || state.initializing && state.status === 'idle')) {
+		if (loadingLabel && isActivityBusy(state, progress)) {
 			// Keep the spinner mounted through frequent progress updates.
 			const text = state.status === 'syncing' || progress ? formatSyncProgress(progress, state.work) : 'Checking local files…';
 			if (loadingLabel.textContent !== text) loadingLabel.textContent = text;
@@ -118,8 +118,7 @@ export class ActivityModal extends BaseUiModal {
 		}
 		const paths = this.deps.getPendingKeys();
 		// Rebuilding the file browser discards its comparisons; keep it while the pending set is unchanged.
-		const showsBrowser = paths.length > 0 && state.status !== 'syncing' && !progress
-			&& !(state.initializing && state.status !== 'error' && state.status !== 'offline');
+		const showsBrowser = paths.length > 0 && !isActivityBusy(state, progress);
 		const rendered = this.renderedBrowserPaths;
 		if (showsBrowser && rendered?.length === paths.length && rendered.every((key, index) => key === paths[index])
 			&& this.pendingPanel.querySelector('.crate-pending-browser')) {
@@ -146,8 +145,8 @@ export class ActivityModal extends BaseUiModal {
 	}
 	private applyStateChange(): void {
 		const state = this.deps.getState();
-		if ((state.status === 'syncing' || state.initializing && state.status === 'idle')
-			&& this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.applyProgress();
+		// Completion progress does not count: a state change after the engine finishes refreshes the panel.
+		if (isActivityBusy(state, null) && this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.applyProgress();
 		else {
 			this.refresh();
 			if (this.currentTabIndex === 2 && this.deps.getState().status !== 'syncing') void this.sharedHistory?.refresh();

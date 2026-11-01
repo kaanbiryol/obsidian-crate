@@ -31,15 +31,30 @@ function runtime(overrides: Partial<ActivityModalDeps>): ActivityModalDeps {
 	};
 }
 
+/** ActivityTabs mounts these panels and the runtime calls these handlers; React is mocked here. */
+interface ModalInternals {
+	pendingPanel: FakeElement; conflictsPanel: FakeElement; pendingCount: FakeElement; conflictsCount: FakeElement;
+	header: ActivityHeader; pendingBrowserState: { dispose?: () => void };
+	onProgress(): void; onStateChange(): void; refresh(): void; renderPending(): void;
+	createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
+}
+const internals = (modal: ActivityModal) => modal as unknown as ModalInternals;
+/** Mounts every panel and the header the way ActivityTabs and ActivitySheet would. */
+function mountPanels(internal: ModalInternals, header = new FakeElement('div')): void {
+	Object.assign(internal, {
+		pendingPanel: new FakeElement('div'), conflictsPanel: new FakeElement('div'),
+		pendingCount: new FakeElement('span'), conflictsCount: new FakeElement('span'),
+	});
+	internal.header = internal.createHeader(header, new FakeElement('div'));
+}
+
 describe('activity modal completion progress', () => {
 	it.each(['idle', 'error'] as const)('refreshes saved plugin transfers after the engine becomes %s', async status => {
 		const settings = { ...DEFAULT_SETTINGS, syncHistory: [] };
 		const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, settings, runtime({ getState: () => ({ status } as SyncState) }));
 		const panel = new FakeElement('div');
-		const internal = modal as unknown as {
-			pendingPanel: HTMLElement; onProgress(): void; refresh(): void;
-		};
-		internal.pendingPanel = panel as unknown as HTMLElement;
+		const internal = internals(modal);
+		internal.pendingPanel = panel;
 		const refresh = vi.spyOn(internal, 'refresh').mockImplementation(() => {});
 		recordSyncHistory(settings, 'sync', createEmptySyncResult());
 		internal.refresh(); // Engine's final state arrives before the result is recorded.
@@ -63,7 +78,7 @@ it('shows the reachability warning without treating it as a failed sync', () => 
 		pendingChanges: 0, conflictCount: 0,
 	};
 	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
-	const internal = modal as unknown as { createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader };
+	const internal = internals(modal);
 	const content = new FakeElement('div');
 	internal.createHeader(new FakeElement('div'), content).updateSyncErrorNotice();
 	expect(content.querySelector('.crate-sync-error-title')?.textContent).toBe('Server unavailable');
@@ -77,10 +92,7 @@ it('updates progress without copying the pending list or rebuilding the empty co
 	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({
 		getState: () => state, getPendingKeys, getPendingChangeCount: () => pending.length,
 	}));
-	const internal = modal as unknown as {
-		pendingPanel: FakeElement; conflictsPanel: FakeElement; header: ActivityHeader; onProgress(): void;
-		createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
-	};
+	const internal = internals(modal);
 	internal.pendingPanel = new FakeElement('div');
 	internal.pendingPanel.createSpan({ cls: 'crate-activity-loading-label' });
 	internal.conflictsPanel = new FakeElement('div');
@@ -99,7 +111,7 @@ it('updates progress without copying the pending list or rebuilding the empty co
 it('applies a state change and progress tick from the same event once', async () => {
 	const state = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 } as SyncState;
 	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
-	const internal = modal as unknown as { pendingPanel: FakeElement; onProgress(): void; onStateChange(): void; refresh(): void };
+	const internal = internals(modal);
 	internal.pendingPanel = new FakeElement('div');
 	const refresh = vi.spyOn(internal, 'refresh').mockImplementation(() => {});
 
@@ -117,11 +129,7 @@ it('keeps the pending file browser and its comparisons while the pending set is 
 	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({
 		getState: () => state, getPendingKeys: () => [...pending], loadPendingDiff,
 	}));
-	const internal = modal as unknown as {
-		pendingPanel: FakeElement; header: ActivityHeader; renderPending(): void;
-		pendingBrowserState: { dispose?: () => void };
-		createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
-	};
+	const internal = internals(modal);
 	internal.pendingPanel = new FakeElement('div');
 	internal.header = internal.createHeader(new FakeElement('div'), new FakeElement('div'));
 	internal.renderPending();
@@ -150,15 +158,8 @@ it('keeps the conflicts panel and its focusable buttons across unrelated state e
 	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({
 		getState: () => state, getActiveConflicts: () => conflicts.map(record => ({ ...record })),
 	}));
-	const internal = modal as unknown as {
-		pendingPanel: FakeElement; conflictsPanel: FakeElement; pendingCount: FakeElement; conflictsCount: FakeElement;
-		header: ActivityHeader; refresh(): void; createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
-	};
-	Object.assign(internal, {
-		pendingPanel: new FakeElement('div'), conflictsPanel: new FakeElement('div'),
-		pendingCount: new FakeElement('span'), conflictsCount: new FakeElement('span'),
-	});
-	internal.header = internal.createHeader(new FakeElement('div'), new FakeElement('div'));
+	const internal = internals(modal);
+	mountPanels(internal);
 	internal.refresh();
 	const review = internal.conflictsPanel.querySelector('.crate-conflict-review-button');
 	expect(review).toBeTruthy();
@@ -178,17 +179,10 @@ it('ages the last-sync label every minute while open and stops when closed', asy
 	try {
 		const state = { status: 'idle', lastSync: new Date().toISOString(), lastError: null, pendingChanges: 0, conflictCount: 0 } as SyncState;
 		const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
-		const internal = modal as unknown as {
-			pendingPanel: FakeElement; conflictsPanel: FakeElement; pendingCount: FakeElement; conflictsCount: FakeElement;
-			header: ActivityHeader; refresh(): void; createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
-		};
+		const internal = internals(modal);
 		modal.onOpen();
 		const header = new FakeElement('div');
-		Object.assign(internal, {
-			pendingPanel: new FakeElement('div'), conflictsPanel: new FakeElement('div'),
-			pendingCount: new FakeElement('span'), conflictsCount: new FakeElement('span'),
-			header: internal.createHeader(header, new FakeElement('div')),
-		});
+		mountPanels(internal, header);
 		internal.refresh();
 		const label = () => header.querySelector('.crate-activity-subtitle-label')?.textContent;
 		expect(label()).toBe('Synced just now');

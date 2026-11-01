@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import type { SyncActivityProgress, SyncState } from '../../sync/types';
-import { describeActivityStatus } from './activity-status';
+import { describeActivityStatus, isActivityBusy } from './activity-status';
 
 const now = Date.parse('2026-01-01T12:00:00Z');
 const state: SyncState = { status: 'idle', lastSync: new Date(now).toISOString(), lastError: null, pendingChanges: 0, conflictCount: 0 };
@@ -57,4 +57,16 @@ it.each([[30_000, 'Synced just now'], [120_000, 'Synced 2m ago'], [7_200_000, 'S
 
 it('reports a vault that has never synced', () => {
 	expect(describeActivityStatus({ ...state, lastSync: null }, null, 0, true, false, now).lastSyncLabel).toBe('Not synced yet');
+});
+
+it.each([
+	[{ status: 'syncing' }, null, true],
+	[{ status: 'idle' }, { type: 'sync', current: 1, total: 2 }, true],
+	[{ status: 'idle', initializing: true }, null, true],
+	[{ status: 'error', initializing: true }, null, false],
+	[{ status: 'offline', initializing: true }, null, false],
+	[{ status: 'idle' }, null, false],
+	[{ status: 'error' }, null, false],
+] as const)('treats %j with progress %j as busy: %s', (patch, progress, busy) => {
+	expect(isActivityBusy({ ...state, ...patch }, progress)).toBe(busy);
 });

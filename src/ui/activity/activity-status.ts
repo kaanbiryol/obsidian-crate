@@ -21,6 +21,12 @@ export function describeSyncStatus(state: SyncState, pending: number, syncing = 
 	return { ...status, lastSyncLabel: lastSync.text };
 }
 
+/** Whether a sync or startup check is running, so Sync activity shows progress instead of
+ * pending files. `progress` is set through completion work after the engine becomes idle. */
+export function isActivityBusy(state: SyncState, progress: SyncActivityProgress | null): boolean {
+	return state.status === 'syncing' || !!progress || !!state.initializing && state.status === 'idle';
+}
+
 export function describeActivityStatus(
 	state: SyncState,
 	progress: SyncActivityProgress | null,
