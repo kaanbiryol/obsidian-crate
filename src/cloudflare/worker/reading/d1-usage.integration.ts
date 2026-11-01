@@ -15,6 +15,7 @@ import { publishCapture, type PendingCapture } from './captures';
 import { runReadingExtraction } from './extraction/jobs';
 import { readingIndexScope } from './library-index';
 import { READING_LIST_PAGE } from './queries';
+import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import type { Env } from '../types';
 
 // A full Reading library beside an equally large rest of the vault. Rows read per
@@ -91,12 +92,15 @@ it('keeps Reading reads and saves independent of library and vault size', async 
 	expect(await afterUpdate.response.json()).toMatchObject({ item: { favorite: true } });
 	const changed = await rowsRead('list', { headers: { 'If-None-Match': etag } });
 	expect(changed.response.status).toBe(200);
+	// A delta reads only the changelog since its base and the notes it names.
+	const delta = await rowsRead(`list?since=${encodeURIComponent(list.response.headers.get(DELTA_BASE_HEADER)!)}`, { headers: { 'If-None-Match': etag } });
+	expect(await delta.response.json()).toMatchObject({ delta: true, changedPaths: ['Reading/Target.md'], items: [{ crate_reading_id: id, favorite: true }] });
 	const bookmark = await rowsRead('capture', { method: 'POST', body: JSON.stringify({ url: 'https://example.invalid/bookmark', fetchArticle: false, operationId: operationId() }) });
 	expect(await bookmark.response.json()).toMatchObject({ saved: true, alreadySaved: false });
 	const duplicate = await rowsRead('capture', { method: 'POST', body: JSON.stringify({ url: 'https://example.invalid/target', operationId: operationId() }) });
 	expect(await duplicate.response.json()).toMatchObject({ alreadySaved: true, id });
 
-	for (const [step, measured] of Object.entries({ item, unchanged, unrelated, afterUpdate, duplicate })) expect(measured.rows, step).toBeLessThan(MAX_READ_ROWS);
+	for (const [step, measured] of Object.entries({ item, unchanged, unrelated, afterUpdate, delta, duplicate })) expect(measured.rows, step).toBeLessThan(MAX_READ_ROWS);
 	for (const [step, measured] of Object.entries({ update, bookmark })) expect(measured.rows, step).toBeLessThan(MAX_WRITE_ROWS);
 	// A page reads the rows it returns, plus the same small fixed cost.
 	for (const [step, measured] of Object.entries({ list, next, changed })) expect(measured.rows, step).toBeLessThan(READING_LIST_PAGE + MAX_READ_ROWS);

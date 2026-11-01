@@ -270,19 +270,32 @@ CREATE TABLE IF NOT EXISTS reading_policy (
  folder_path TEXT NOT NULL, generation TEXT NOT NULL, revision TEXT NOT NULL
 );
 -- Reading notes in the Reading folder, written in the same batch as each file commit.
+-- Lists page by `saved_at` (empty for notes with an issue). Every row change sets
+-- `change_seq` to the index's new `seq`, so a delta reads only the rows that changed.
 CREATE TABLE IF NOT EXISTS reading_items (
  portable_path TEXT PRIMARY KEY, path TEXT NOT NULL, storage_key TEXT NOT NULL,
  hash TEXT NOT NULL, size INTEGER NOT NULL, item_id TEXT, url_identity TEXT,
  metadata_json TEXT, error TEXT, article_hash TEXT, article_edited INTEGER NOT NULL DEFAULT 0,
- duplicate INTEGER NOT NULL DEFAULT 0
+ duplicate INTEGER NOT NULL DEFAULT 0, saved_at TEXT NOT NULL DEFAULT '', change_seq INTEGER NOT NULL DEFAULT 0
 ) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS reading_items_saved_idx ON reading_items(saved_at, portable_path);
+CREATE INDEX IF NOT EXISTS reading_items_change_idx ON reading_items(change_seq);
 CREATE INDEX IF NOT EXISTS reading_items_id_idx ON reading_items(item_id);
 CREATE INDEX IF NOT EXISTS reading_items_url_idx ON reading_items(url_identity);
 CREATE INDEX IF NOT EXISTS reading_items_article_idx ON reading_items(article_hash) WHERE article_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS reading_items_duplicate_idx ON reading_items(item_id) WHERE duplicate = 1;
+-- Paths removed from reading_items since a delta base, kept for 30 days.
+CREATE TABLE IF NOT EXISTS reading_removals (
+ path TEXT PRIMARY KEY, change_seq INTEGER NOT NULL, removed_at INTEGER NOT NULL
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS reading_removals_change_idx ON reading_removals(change_seq);
+CREATE INDEX IF NOT EXISTS reading_removals_expiry_idx ON reading_removals(removed_at);
 -- The scope reading_items was built for, its rebuild position, and the library revision.
+-- `epoch` names one build of the index, `seq` counts its row changes and `removed_seq`
+-- is the newest change whose removals were pruned, so older delta bases relist.
 CREATE TABLE IF NOT EXISTS reading_index (
- id INTEGER PRIMARY KEY CHECK (id = 1), scope TEXT NOT NULL, revision TEXT NOT NULL, cursor TEXT
+ id INTEGER PRIMARY KEY CHECK (id = 1), scope TEXT NOT NULL, revision TEXT NOT NULL, cursor TEXT,
+ epoch TEXT NOT NULL DEFAULT '', seq INTEGER NOT NULL DEFAULT 0, removed_seq INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS reading_jobs (
  path TEXT PRIMARY KEY, item_id TEXT NOT NULL, generation TEXT NOT NULL,

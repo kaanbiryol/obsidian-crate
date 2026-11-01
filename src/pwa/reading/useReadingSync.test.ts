@@ -327,3 +327,22 @@ it('retries the encryption check instead of sending from a read-only offline cop
 	expect(readingRequest).not.toHaveBeenCalled();
 	expect(loadReading).not.toHaveBeenCalled();
 });
+
+it('shows first-load pages while loading and withdraws them when the load fails', async () => {
+	stored.queue = [];
+	const partial: ReadingCache = { items: [], issues: [{ path: 'Reading/First.md', message: 'First page' }], savedAt: 2 };
+	let fail!: (error: Error) => void;
+	vi.mocked(loadReading).mockImplementation((_session, _previous, onProgress) => {
+		onProgress?.(partial);
+		return new Promise((_resolve, reject) => { fail = reject; });
+	});
+	const rendered = renderHook(() => {
+		const state = useReadingSession(connection);
+		useReadingSync(state);
+		return state.cache;
+	}, () => Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }));
+	await act(async () => {});
+	expect(rendered.current).toBe(partial);
+	await act(async () => { fail(new Error('Unavailable')); });
+	expect(rendered.current).toBeNull();
+});

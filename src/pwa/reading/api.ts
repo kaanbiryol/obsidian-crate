@@ -12,7 +12,8 @@ import type { ReadingItem } from '@/reading/core/model';
 import { ENCRYPTED_READING_ACTIONS, EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
 export { ReadingApiError } from './session/api-error';
-import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './storage/record-validation';
+import { isReadingArticle, parseReadingListPage, type ReadingArticle, type ReadingListPage } from './storage/record-validation';
+import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { checkEncryptionSignals, EncryptionStateChangedError, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import { responseError } from '../connection/response-error';
@@ -101,9 +102,10 @@ export const MAX_READING_LIST_ITEMS = 100_000;
 export const MAX_READING_LIST_ISSUES = 10_000;
 export const MAX_READING_LIST_PAGES = 1100;
 
-/** The first plaintext page carries the library ETag. An unchanged library
- * answers 304, so polling does not page through and rewrite every item. */
-async function firstReadingListPage(session: ReadingSession, previous?: ReadingCache): Promise<{ unchanged: true } | { unchanged: false; response: unknown; revision?: string }> {
+/** The first plaintext page carries the library ETag and delta base. An unchanged
+ * library answers 304, so polling does not page through and rewrite every item; a
+ * changed one with a delta base answers with only the changed notes. */
+async function firstReadingListPage(session: ReadingSession, previous?: ReadingCache): Promise<{ unchanged: true } | { unchanged: false; response: unknown; revision?: string; deltaBase?: string }> {
 	const unconditional = async () => ({ unchanged: false as const, response: await readingRequest<unknown>('/reading/list', session) });
 	if (await prepareReadingEncryption(session)) {
 		// The encrypted client answers an unchanged vault from its confirmed inventory.
@@ -113,22 +115,37 @@ async function firstReadingListPage(session: ReadingSession, previous?: ReadingC
 		if (revision && previous && previous.revision === revision) return { unchanged: true };
 		return { unchanged: false, response, ...(revision && revision.length <= 128 ? { revision } : {}) };
 	}
+	const path = previous?.deltaBase ? `/reading/list?since=${encodeURIComponent(previous.deltaBase)}` : '/reading/list';
 	let response: Response;
-	try { response = await rawReadingRequest('/reading/list', session, undefined, previous?.revision ? { 'If-None-Match': previous.revision } : {}); }
+	try { response = await rawReadingRequest(path, session, undefined, previous?.revision ? { 'If-None-Match': previous.revision } : {}); }
 	catch (error) { if (error instanceof EncryptionStateChangedError) return unconditional(); throw error; }
 	if (response.status === 304 && previous) return { unchanged: true };
 	const failure = response.ok ? null : await responseError(response, 'Reading request failed.');
 	const data: unknown = failure ? null : await response.json();
 	assertReadingSession(session);
 	if (failure) throw new ReadingApiError(failure.message, response.status, failure.code);
-	const revision = response.headers.get('ETag');
-	return { unchanged: false, response: data, ...(revision && revision.length <= 128 ? { revision } : {}) };
+	const revision = response.headers.get('ETag'), deltaBase = response.headers.get(DELTA_BASE_HEADER);
+	return { unchanged: false, response: data, ...(revision && revision.length <= 128 ? { revision } : {}),
+		...(deltaBase && deltaBase.length <= 128 ? { deltaBase } : {}) };
 }
 
-export async function loadReading(session: ReadingSession, previous?: ReadingCache): Promise<ReadingCache> {
+/** Replaces the previous copy's notes at `changedPaths` and its whole capture queue
+ * (items without a path). Null when the result is inconsistent, so a full list is read. */
+function mergeReadingDelta(previous: ReadingCache, page: ReadingListPage & { changedPaths: string[] }): Pick<ReadingCache, 'items' | 'issues'> | null {
+	const changed = new Set(page.changedPaths);
+	if (!page.items.every(item => !item.path || changed.has(item.path)) || !page.issues.every(issue => changed.has(issue.path))) return null;
+	const items = [...page.items, ...previous.items.filter(item => item.path && !changed.has(item.path))];
+	const issues = [...previous.issues.filter(issue => !changed.has(issue.path)), ...page.issues];
+	if (items.length > MAX_READING_LIST_ITEMS || issues.length > MAX_READING_LIST_ISSUES
+		|| new Set(items.map(item => item.crate_reading_id)).size !== items.length) return null;
+	return { items, issues };
+}
+
+/** `onProgress` receives the pages read so far when there is no previous copy to show. */
+export async function loadReading(session: ReadingSession, previous?: ReadingCache, onProgress?: (partial: ReadingCache) => void): Promise<ReadingCache> {
 	const cache: ReadingCache = { items: [], issues: [], savedAt: Date.now() }; let cursor: string | null = null;
 	const seenCursors = new Set<string>();
-	let pages = 0;
+	let pages = 0, deltaBase: string | undefined;
 	do {
 		if (++pages > MAX_READING_LIST_PAGES) throw new Error('Reading library response is too large or unreadable.');
 		let response: unknown;
@@ -137,19 +154,27 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
 			if (first.unchanged) return previous!;
 			response = first.response;
 			if (first.revision) cache.revision = first.revision;
+			deltaBase = first.deltaBase;
 		} else response = await readingRequest<unknown>(`/reading/list?cursor=${encodeURIComponent(cursor!)}`, session);
 		const page = parseReadingListPage(response, noteFolder(session));
 		if (!page) throw new Error('Reading library response is unreadable.');
+		if (page.changedPaths) {
+			const merged = previous && mergeReadingDelta(previous, { ...page, changedPaths: page.changedPaths });
+			// Read everything again rather than keep a copy the delta cannot explain.
+			if (!merged) return loadReading(session, previous && { ...previous, revision: undefined, deltaBase: undefined }, onProgress);
+			return commitReadingCache(session, { ...cache, ...merged, ...(deltaBase ? { deltaBase } : {}) });
+		}
 		if (cache.items.length + page.items.length > MAX_READING_LIST_ITEMS
 			|| cache.issues.length + page.issues.length > MAX_READING_LIST_ISSUES) throw new Error('Reading library response is too large or unreadable.');
 		if (page.cursor !== null && seenCursors.has(page.cursor)) throw new Error('Reading library did not advance.');
 		if (page.cursor !== null) seenCursors.add(page.cursor);
 		cache.items.push(...page.items); cache.issues.push(...page.issues);
 		cursor = page.cursor;
+		if (cursor && !previous && onProgress) onProgress({ ...cache, items: [...cache.items], issues: [...cache.issues] });
 	} while (cursor);
 	// Pages are already validated; only identities can conflict across pages.
 	if (new Set(cache.items.map(item => item.crate_reading_id)).size !== cache.items.length) throw new Error('Reading library response is unreadable.');
-	return commitReadingCache(session, cache);
+	return commitReadingCache(session, { ...cache, ...(deltaBase ? { deltaBase } : {}) });
 }
 
 /** A confirmed edit and the library revisions the server reported around it. */

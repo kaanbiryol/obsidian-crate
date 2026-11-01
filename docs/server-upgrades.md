@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 3 and schema 1, with no registered migrations. Servers deployed by the 0.9.0 beta (revision 1, schema 1) update in place. Vaults that ran the 0.9.0 beta plugin keep their notes and connection, but Reminders and Reading stay off until each is turned on again in Crate settings, because that plugin saved no `confirmed` flag. Earlier betas reused revision 1 with a different schema 1 definition and cannot be upgraded; the update reports this and asks users to delete and recreate the server. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 3 and schema 1, with no registered migrations. Revision 3 changes the schema 1 definition in place (Reading list paging and deltas), so servers deployed by earlier betas, including 0.9.0 (revision 1) and 0.10.0 (revision 2), cannot be upgraded; the update reports this and asks users to delete and recreate the server. `scripts/server-release-policy.json` pins the 0.10.0 release as the pre-launch baseline that allows this. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 

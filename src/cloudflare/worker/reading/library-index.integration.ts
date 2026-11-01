@@ -88,7 +88,7 @@ it('indexes edits, new notes, moves and deletions in their commits without readi
 	const added = await seed('Reading/B.md');
 	expect(await index()).toBe('complete');
 	const listed = await (await list()).json() as { items: Array<{ crate_reading_id: string; favorite: boolean; path: string }> };
-	expect(listed.items.map(item => [item.path, item.favorite])).toEqual([['Reading/A.md', true], ['Reading/B.md', false]]);
+	expect(listed.items.map(item => [item.path, item.favorite]).sort()).toEqual([['Reading/A.md', true], ['Reading/B.md', false]]);
 	await writeCommittedMarkdownMove(env.BUCKET, env.DB, { source: { path: 'Reading/B.md', expectedHash: added.file.hash, expectedRevision: added.file.storageKey },
 		destination: { path: 'Archive/B.md', content: added.note } });
 	const current = (await getStoredFileRow(env.DB, 'Reading/A.md'))!;
@@ -103,7 +103,9 @@ it('flags duplicate Reading IDs when the second copy commits and clears them whe
 	const { note } = await seed('Reading/A.md');
 	expect(await index()).toBe('complete');
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/B.md', note, null);
-	expect(await (await list()).json()).toMatchObject({ items: [], issues: [{ path: 'Reading/A.md' }, { path: 'Reading/B.md' }] });
+	const flagged = await (await list()).json() as { items: unknown[]; issues: Array<{ path: string }> };
+	expect(flagged.items).toEqual([]);
+	expect(flagged.issues.map(issue => issue.path).sort()).toEqual(['Reading/A.md', 'Reading/B.md']);
 	const copy = (await getStoredFileRow(env.DB, 'Reading/B.md'))!;
 	await commitFileDelete(env.DB, { path: 'Reading/B.md', previousFile: copy, expectedHash: copy.hash, expectedRevision: copy.storageKey });
 	expect(await (await list()).json()).toMatchObject({ items: [{ path: 'Reading/A.md' }], issues: [] });

@@ -16,7 +16,7 @@ import { R2_KEYS_PER_CALL } from '../platform-limits';
 const PREFIX = 'encryption-reset:';
 // Marks a reset that turns encryption on: completion activates the saved state instead of removing it.
 const SETUP_SUFFIX = ':setup';
-const READING_TABLES = ['reading_policy', 'reading_items', 'reading_index', 'reading_jobs', 'reading_operations',
+const READING_TABLES = ['reading_policy', 'reading_items', 'reading_removals', 'reading_index', 'reading_jobs', 'reading_operations',
 	'reading_enrollments', 'reading_handoffs', 'reading_captures'] as const;
 const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValue(db, key, JSON.stringify(value));
 

@@ -123,3 +123,68 @@ it('stores the first page ETag with a reloaded library', async () => {
 	network.mockResolvedValueOnce(Response.json({ items: [item(1)], issues: [], cursor: null }, { headers: { ETag: '"next"' } }));
 	expect(await loadReading(session, { items: [], issues: [], savedAt: 1, revision: '"old"' })).toMatchObject({ revision: '"next"', items: [{ path: 'Reading/1.md' }] });
 });
+
+const BASE = '7.0123456789abcdef0123456789abcdef', NEXT = '9.0123456789abcdef0123456789abcdef';
+const withBase = (page: unknown, base = BASE, etag = '"next"') => Response.json(page, { headers: { ETag: etag, 'X-Crate-Delta-Base': base } });
+const requested = (index: number) => network.mock.calls[index]![0];
+
+it('keeps the delta base and asks for changes since it', async () => {
+	network.mockResolvedValueOnce(withBase({ items: [item(1)], issues: [], cursor: 'next' }))
+		.mockResolvedValueOnce(Response.json({ items: [item(2)], issues: [], cursor: null }));
+	const cache = await loadReading(session);
+	expect(cache).toMatchObject({ revision: '"next"', deltaBase: BASE });
+	network.mockResolvedValueOnce(new Response(null, { status: 304 }));
+	await loadReading(session, cache);
+	expect(requested(2)).toBe(`/reading/list?since=${encodeURIComponent(BASE)}`);
+});
+
+it('replaces changed notes and the capture queue from a delta', async () => {
+	const kept = item(1), edited = item(2), removed = item(3), oldQueued = item(4, ''), newQueued = item(5, ''), added = item(6);
+	const previous: ReadingCache = { items: [oldQueued, kept, edited, removed], issues: [{ path: 'Reading/3.md', message: 'Old' }, issue], savedAt: 1, revision: '"old"', deltaBase: BASE };
+	network.mockResolvedValueOnce(withBase({ delta: true, changedPaths: ['Reading/2.md', 'Reading/3.md', 'Reading/6.md'],
+		items: [newQueued, { ...edited, favorite: true }, added], issues: [], cursor: null }, NEXT));
+	const cache = await loadReading(session, previous);
+	expect(requested(0)).toBe(`/reading/list?since=${encodeURIComponent(BASE)}`);
+	expect(network).toHaveBeenCalledOnce();
+	expect(cache.items.map(entry => [entry.crate_reading_id, entry.favorite]).sort()).toEqual(
+		[newQueued, { ...edited, favorite: true }, added, kept].map(entry => [entry.crate_reading_id, entry.favorite]).sort());
+	expect(cache).toMatchObject({ issues: [issue], revision: '"next"', deltaBase: NEXT });
+	expect(commitReadingCache).toHaveBeenCalledExactlyOnceWith(session, cache);
+});
+
+it.each([
+	['an item outside its changed paths', { items: [item(9)], changedPaths: [] }],
+	['an issue outside its changed paths', { items: [], issues: [issue], changedPaths: [] }],
+	['an identity an unchanged note holds', { items: [item(1, 'Reading/Moved.md')], changedPaths: ['Reading/Moved.md'] }],
+])('relists instead of applying a delta with %s', async (_name, delta) => {
+	const previous: ReadingCache = { items: [item(1)], issues: [], savedAt: 1, revision: '"old"', deltaBase: BASE };
+	network.mockResolvedValueOnce(withBase({ delta: true, issues: [], cursor: null, ...delta }))
+		.mockResolvedValueOnce(withBase({ items: [item(2)], issues: [], cursor: null }, NEXT));
+	expect(await loadReading(session, previous)).toMatchObject({ items: [{ path: 'Reading/2.md' }], deltaBase: NEXT });
+	expect(requested(1)).toBe('/reading/list');
+	expect(new Headers(network.mock.calls[1]![1]!.headers).has('If-None-Match')).toBe(false);
+});
+
+it.each([
+	{ delta: true, items: [], issues: [], cursor: 'next', changedPaths: [] },
+	{ delta: true, items: [], issues: [], cursor: null },
+	{ delta: true, items: [], issues: [], cursor: null, changedPaths: [42] },
+])('rejects a malformed delta envelope: %#', async page => {
+	respond(page);
+	await expect(loadReading(session, { items: [], issues: [], savedAt: 1, deltaBase: BASE })).rejects.toThrow('unreadable');
+	expect(commitReadingCache).not.toHaveBeenCalled();
+});
+
+it('shows the pages of a first load before the library is saved', async () => {
+	const progress = vi.fn();
+	respond({ items: [item(1)], issues: [], cursor: 'a' }, { items: [item(2)], issues: [issue], cursor: 'b' }, { items: [item(3)], issues: [], cursor: null });
+	const cache = await loadReading(session, undefined, progress);
+	expect(progress.mock.calls.map(([partial]) => (partial as ReadingCache).items.length)).toEqual([1, 2]);
+	expect(progress.mock.calls[1]![0]).toMatchObject({ issues: [issue] });
+	expect(cache.items).toHaveLength(3);
+	// A reload keeps showing the saved library until the new one is complete.
+	progress.mockClear();
+	respond({ items: [item(1)], issues: [], cursor: 'a' }, { items: [item(2)], issues: [], cursor: null });
+	await loadReading(session, cache, progress);
+	expect(progress).not.toHaveBeenCalled();
+});

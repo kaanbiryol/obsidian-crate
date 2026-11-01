@@ -7,6 +7,7 @@ import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './object-cl
 import type { Env } from '../types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './database';
 import { pruneFileDeletionReceipts } from '../sync/file-delete-audit';
+import { pruneReadingRemovals } from '../reading/library-index';
 import { pruneReminderOccurrences } from './reminder-history';
 import { pruneOperationReceipts } from './operation-receipts';
 import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
@@ -43,6 +44,7 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true, rese
 		// their revisions, so each descriptor is released with its last reference.
 		['prune changelog', bounded(() => pruneChangelog(db, encrypted ? expired => releasePrunedChangelogDescriptors(db, expired) : undefined))],
 		['prune file deletion receipts', bounded(() => pruneFileDeletionReceipts(db))],
+		['prune Reading removals', bounded(() => pruneReadingRemovals(db))],
 		['expire file versions', bounded(() => enqueueExpiredFileVersions(db, Date.now(),
 			encrypted ? expired => releaseExpiredVersionDescriptors(db, expired) : undefined))],
 		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, db); }],

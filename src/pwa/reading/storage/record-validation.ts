@@ -13,16 +13,24 @@ function parseReadingItem(value: unknown, folder: string): ReadingItem | null {
 	try { return { ...validateReadingMetadata(value), path: value.path }; } catch { return null; }
 }
 
-interface ReadingListPage {
+export interface ReadingListPage {
 	items: ReadingItem[];
 	issues: Array<{ path: string; message: string }>;
 	cursor: string | null;
+	/** Set on a delta: every listed path whose items and issues this page replaces. */
+	changedPaths?: string[];
 }
+
+// A delta holds at most one page of changed notes and one page of removed paths.
+const MAX_DELTA_PATHS = 2000;
 
 /** Reject a partial or malformed page before it enters the accumulated revision. */
 export function parseReadingListPage(value: unknown, folder: string): ReadingListPage | null {
 	if (!isRecord(value) || !Array.isArray(value.items) || !Array.isArray(value.issues)
 		|| !(value.cursor === null || typeof value.cursor === 'string' && value.cursor.length > 0 && value.cursor.length <= 4096)) return null;
+	const delta = value.delta === true;
+	if (delta && (value.cursor !== null || !Array.isArray(value.changedPaths) || value.changedPaths.length > MAX_DELTA_PATHS
+		|| !value.changedPaths.every((path: unknown) => typeof path === 'string'))) return null;
 	if (!value.issues.every((issue: unknown): issue is ReadingListPage['issues'][number] =>
 		isRecord(issue) && typeof issue.path === 'string' && typeof issue.message === 'string')) return null;
 	const items: ReadingItem[] = [];
@@ -31,7 +39,7 @@ export function parseReadingListPage(value: unknown, folder: string): ReadingLis
 		if (!item) return null;
 		items.push(item);
 	}
-	return { items, issues: value.issues, cursor: value.cursor };
+	return { items, issues: value.issues, cursor: value.cursor, ...(delta ? { changedPaths: value.changedPaths as string[] } : {}) };
 }
 
 export interface ReadingArticle { item: ReadingItem; markdown: string }

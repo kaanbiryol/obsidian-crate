@@ -49,14 +49,18 @@ it('paginates current sources, queues only the first page, and reports duplicate
 	expect(saved.status).toBe(200);
 	const queued = await saved.json() as { id: string };
 	const get = (suffix: string) => handleReadingRoute(new Request(`https://test/reading/${suffix}`), env, principal);
+	// Notes saved at the same time page by path, newest first: the copy of the last note
+	// and its original are on the first page with the queue.
 	const first = await (await get('list')).json() as { items: ReadingItem[]; cursor: string; issues: Array<{ path: string }> };
-	expect(first.items).toHaveLength(READING_LIST_PAGE);
+	expect(first.items).toHaveLength(READING_LIST_PAGE - 1);
 	expect(first.items[0]).toMatchObject({ path: '', crate_reading_id: queued.id });
-	expect(first.cursor).toBe(name(READING_LIST_PAGE - 1).toLowerCase());
-	expect(first.issues).toMatchObject([{ path: name(READING_LIST_PAGE - 1) }]);
-	expect(await (await get(`list?cursor=${encodeURIComponent(first.cursor)}`)).json()).toMatchObject({ items: [], cursor: null, issues: [{ path: name(READING_LIST_PAGE) }] });
+	expect(first.items[1]).toMatchObject({ path: name(READING_LIST_PAGE - 2) });
+	expect(JSON.parse(first.cursor)).toEqual([first.items.at(-1)!.saved_at, name(1).toLowerCase()]);
+	expect(first.issues).toMatchObject([{ path: name(READING_LIST_PAGE) }, { path: name(READING_LIST_PAGE - 1) }]);
+	const next = await (await get(`list?cursor=${encodeURIComponent(first.cursor)}`)).json() as { items: ReadingItem[] };
+	expect(next).toMatchObject({ items: [{ path: name(0) }], cursor: null, issues: [] });
 	expect(await (await get(`item?id=${queued.id}`)).json()).toMatchObject({ item: { path: '', crate_reading_id: queued.id }, markdown: '' });
-	expect(await (await get(`item?id=${first.items[1]!.crate_reading_id}`)).json()).toMatchObject({ item: { path: name(0) }, markdown: 'Note 0.' });
+	expect(await (await get(`item?id=${next.items[0]!.crate_reading_id}`)).json()).toMatchObject({ item: { path: name(0) }, markdown: 'Note 0.' });
 	expect((await get(`item?id=${parseReadingNote(last)!.crate_reading_id}`)).status).toBe(409);
 	expect((await get(`list?cursor=${'x'.repeat(4097)}`)).status).toBe(400);
 }, 180_000);

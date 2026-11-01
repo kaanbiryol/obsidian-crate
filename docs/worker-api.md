@@ -105,6 +105,23 @@ writes run under the coordinator lock, so a client whose cached library carries
 `before` re-reads only the edited item (or drops a deleted one) and adopts `after`; any other client, a
 replayed receipt (which omits `library`) or a capture reloads the list.
 
+`GET /reading/list` pages hold up to 1,000 notes, newest `saved_at` first, so the first
+page of a first load is the top of the library. Every index write gives the rows it adds,
+changes, removes or flags (including a duplicate flag that flips in an unchanged note)
+the index's next change number, and records removed paths in `reading_removals`. The
+first page (no `cursor`) returns `X-Crate-Delta-Base`: that change number, bound to the
+index build, Reading folder, generation, index format and article fetching setting. A
+client holding a complete library may send the base as `since`. When at most 1,000
+notes changed and 1,000 paths were removed since then, and those removals are still
+kept, the response is `{ delta: true, changedPaths, items, issues, cursor: null }`: the
+client replaces its items and issues at `changedPaths`, and its whole capture queue
+(items without a path) with the listed ones, and keeps the rest. Otherwise the first page
+of a full list is returned. Writes elsewhere in the vault never reach a delta. Removals
+are kept for 30 days; maintenance prunes older ones and records the newest change they
+covered, so an older base relists. The ETag check runs first, so an unchanged library
+still answers 304. The web app shows the pages of a first load as they arrive and saves
+the library once all pages are read; a reload keeps showing the saved library until it completes.
+
 `POST /reading/delete` accepts `{ id, before, markdownHash, operationId }` from a library credential.
 `before` holds the `reading_status`, `favorite`, `tags` and `highlights` values the client
 last saw, and `markdownHash` is the lowercase SHA-256 of the article body (the `markdown` of

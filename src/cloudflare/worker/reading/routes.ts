@@ -13,7 +13,9 @@ import { prepareHandoff, updatePolicy, handoffAuthority, labelledPolicy } from '
 import { readFolderLabel } from '../encryption/folder-labels';
 import { mutateReading } from './mutations';
 import { extractForEncryptedReading } from './encrypted-extract';
-import { etagMatches, readingItem, readingList, readingListEtag } from './queries';
+import { etagMatches, readingDeltaBase, readingItem, readingList, readingListDelta, readingListEtag } from './queries';
+import { parseDeltaBase } from '../vault-change-token';
+import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { ensureReadingIndex } from './library-index';
 import { corsHeaders } from '../cors';
 
@@ -78,7 +80,11 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 			const cursor = url.searchParams.get('cursor') ?? '';
 			const etag = cursor ? null : await readingListEtag(current, index.revision);
 			if (etag && etagMatches(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers: { ...corsHeaders(), 'Cache-Control': 'no-store', ETag: etag } });
-			return readingResponse(await readingList(env, current, cursor), 200, etag ? { ETag: etag } : {});
+			if (cursor) return readingResponse(await readingList(env, current, cursor), 200);
+			// The base is the index position read before listing: later changes replay next time.
+			const base = await readingDeltaBase(current, index), since = parseDeltaBase(url.searchParams.get('since'));
+			const delta = since && since.scope === base.slice(base.indexOf('.') + 1) ? await readingListDelta(env, current, index, since.seq) : null;
+			return readingResponse(delta ?? await readingList(env, current, ''), 200, { ETag: etag!, [DELTA_BASE_HEADER]: base });
 		}
 		return readingResponse({ error: 'Not found' }, 404);
 	} catch (error) {

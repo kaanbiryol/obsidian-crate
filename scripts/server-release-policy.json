@@ -1,5 +1,5 @@
 {
-  "baselineCommit": "fd1a2a45707844c0c507c550558e8524fe1b232e",
-  "reason": "Pre-launch: earlier betas are not upgrade sources. Schema 1 is the fresh baseline and may change in place until the first public release, which ships server revision 1.",
-  "initialRevision": 1
+  "baselineCommit": "cd636efa86a28a65da2c32947c1ee0143704bf7d",
+  "reason": "Pre-launch: no servers are upgrade sources yet. Schema 1 may change in place for server revision 3; servers deployed by earlier betas must be deleted and recreated.",
+  "initialRevision": 3
 }

@@ -13,8 +13,9 @@ import { readingKeys as readingEncryptionKeys } from '../session/encryption-sess
 /** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
 const readingFolder = (session: ReadingSession) => readingEncryptionKeys()?.folderPath ?? session.folderPath;
 
-/** `revision` is the server's list ETag for this snapshot, sent back to skip unchanged reloads. */
-export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; revision?: string }
+/** `revision` is the server's list ETag for this snapshot, sent back to skip unchanged reloads.
+ * `deltaBase` is the server's changelog position for it, sent back to receive only changed notes. */
+export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; revision?: string; deltaBase?: string }
 
 export async function readReadingCache(session: ReadingSession): Promise<ReadingCache | undefined> {
 	const value = await readReadingValue(readingKeys.list(session.id));
@@ -93,6 +94,8 @@ export async function commitReadingCache(session: ReadingSession, cache: Reading
 			// Network results remain usable, but preserve opaque local bytes and avoid
 			// pruning articles until the saved inventory can be understood again.
 			assertReadingSession(session); await tx.done;
+			// The next reload is complete, so this notice cannot outlive the problem.
+			delete cache.deltaBase;
 			cache.issues.push({ path: readingFolder(session), message: 'The saved library needs recovery. Export Reading data before clearing this device’s storage.' });
 			return cache;
 		}

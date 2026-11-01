@@ -37,6 +37,10 @@ export function useReadingSession(connection: ReadingConnection) {
 		if (result.completed) setError(null);
 		return true;
 	}, [isCurrentSession]);
+	/** Pages of a first library load, shown before the whole library is saved; null withdraws them. */
+	const publishPartialCache = useCallback((expected: ReadingSession, partial: ReadingCache | null) => {
+		if (isCurrentSession(expected)) setCache(partial);
+	}, [isCurrentSession]);
 	const refreshRecovery = useCallback(async () => {
 		const expected = authority.current;
 		const earlier = await hasEarlierReadingChanges(expected?.id);
@@ -139,5 +143,5 @@ export function useReadingSession(connection: ReadingConnection) {
 	}, [session, ready, draftReady, url, run]);
 	return { ...connection, session, readOnly, ready, resetSession, cache, pending,
 		error: storageError ?? error ?? connection.error, recovery, adding, url, setUrl, run,
-		isCurrentSession, publishPending, publishSyncResult, refreshRecovery, reportSessionError, finishCapture, openCapture, closeCapture };
+		isCurrentSession, publishPending, publishSyncResult, publishPartialCache, refreshRecovery, reportSessionError, finishCapture, openCapture, closeCapture };
 }
