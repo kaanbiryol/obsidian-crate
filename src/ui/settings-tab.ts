@@ -20,6 +20,7 @@ import { renderCrateWebApp } from './settings/reminders-web-app';
 import { renderReadingSettings } from '../reading/ui/plugin/settings-section';
 import { captureSettingsView, restoreSettingsView } from './settings/settings-view-state';
 import { sharedSettingsSync } from '../plugin/shared-settings-sync';
+import { renderGetStartedSection, renderShowGetStartedSetting } from './settings/get-started-section';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
@@ -46,6 +47,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		const showInfrastructure = isConfigured || Boolean(this.plugin.settings.cloudflareDeployment?.d1DatabaseId);
 
 		this.renderSection(renderServerUpdateNotice, containerEl);
+		this.renderSection(renderGetStartedSection, containerEl);
 
 		if (!isConfigured) {
 			new Setting(containerEl).setName('Plugin version').setDesc(this.plugin.manifest.version);
@@ -65,6 +67,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		this.renderSection(renderRemindersSettings, containerEl.createDiv({ cls: 'crate-reminders-settings' }));
 		this.renderSection(renderReadingSettings, containerEl);
 		if (isConfigured) this.renderSection(renderNotificationsSection, containerEl);
+		this.renderSection(renderShowGetStartedSetting, containerEl);
 
 		if (showInfrastructure) {
 			createSettingsSectionHeading(containerEl, 'Management');

@@ -32,6 +32,7 @@ async function display(isConfigured: boolean): Promise<string[]> {
 	vi.doMock('./settings/notifications-section', () => ({ renderNotificationsSection: section('notifications') }));
 	vi.doMock('./settings/reminders-web-app', () => ({ renderCrateWebApp: section('web app') }));
 	vi.doMock('../reading/ui/plugin/settings-section', () => ({ renderReadingSettings: section('reading') }));
+	vi.doMock('./settings/get-started-section', () => ({ renderGetStartedSection: section('get started'), renderShowGetStartedSetting: section('show get started') }));
 	vi.doMock('./settings/settings-view-state', () => ({ captureSettingsView: vi.fn(), restoreSettingsView: vi.fn() }));
 	vi.doMock('../plugin/shared-settings-sync', () => ({ sharedSettingsSync: () => ({ observe: vi.fn(), push: vi.fn() }) }));
 	const { CrateSettingTab } = await import('./settings-tab');
@@ -51,4 +52,10 @@ it('keeps notifications with the feature controls once connected', async () => {
 	const sections = await display(true);
 	const features = sections.indexOf('reminders');
 	expect(sections.slice(features, features + 3)).toEqual(['reminders', 'reading', 'notifications']);
+});
+
+it('puts the get started checklist first and its show row after the features', async () => {
+	const sections = await display(false);
+	expect(sections.slice(0, 2)).toEqual(['update notice', 'get started']);
+	expect(sections.indexOf('show get started')).toBe(sections.indexOf('reading') + 1);
 });

@@ -11,6 +11,8 @@ export interface PersistedCrateSettings extends PersistedSyncSettings {
 	usageSnapshot?: UsageSnapshot | null;
 	cloudflareDeployment: CloudflareDeploymentMetadata | null;
 	debugLogging: boolean;
+	/** This device hid the get started checklist in settings. */
+	getStartedDismissed: boolean;
 	/** Shared settings as this device last reconciled them with `workerUrl`'s server, so a
 	 * change that failed to save stays this device's edit after a restart. */
 	sharedSettingsBase?: { workerUrl: string; settings: SharedSettings };
@@ -28,4 +30,5 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	cloudflareDeployment: null,
 	deviceId: '',
 	debugLogging: false,
+	getStartedDismissed: false,
 };

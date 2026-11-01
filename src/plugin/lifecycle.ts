@@ -22,6 +22,7 @@ import {
 	handleCloudflareOAuthProtocol,
 } from "./cloudflare-operations";
 import { showCloudflareServerUpdateNotice } from "../ui/cloudflare/update-notice";
+import { showGetStartedNotice } from "../ui/settings/get-started-notice";
 import { beginPluginLifecycle, endPluginLifecycle, setSyncReady } from './lifecycle-state';
 
 import { registerCheckpointBackupCleanup } from '../sync/durability/checkpoint-backup-cleanup';
@@ -60,6 +61,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
 	setSyncReady(plugin, syncReady);
 	registerSharedFeatures(plugin);
 	showCloudflareServerUpdateNotice(plugin);
+	showGetStartedNotice(plugin);
 	registerSyncCommands(plugin);
 	registerPluginProtocols(plugin);
 	void reconcileNotificationsAfterStartupSync(plugin, signal, syncReady);

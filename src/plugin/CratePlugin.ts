@@ -41,6 +41,8 @@ export default class CratePlugin extends Plugin {
 	cloudflareSavedLogin!: CloudflareSavedLogin;
 	readonly settingsUiState: SettingsUiState = createSettingsUiState();
 	private settingTab?: CrateSettingTab;
+	/** No plugin data existed when settings loaded, as on a fresh install. */
+	firstRun = false;
 	private settingsWriteQueue: Promise<void> = Promise.resolve();
 
 	// Reminders: set while the reminders backend is loaded
@@ -63,6 +65,7 @@ export default class CratePlugin extends Plugin {
 		const signal = getPluginLifecycleSignal(this);
 		const data = await loadPluginData(this) as PluginData | null;
 		if (signal.aborted) return;
+		this.firstRun = data === null;
 		this.settings = normalizeCrateSettings(data, this.app.vault.configDir);
 		const remindersSettings = normalizeRemindersSettings(data?.reminders);
 		useRemindersSettingsStore.setState(remindersSettings, true);

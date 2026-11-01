@@ -56,7 +56,7 @@ export function renderCrateWebApp({ containerEl, plugin }: Omit<SettingsSectionC
 		});
 }
 
-async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
+export async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 	if (!plugin.syncRuntime.getApiClient()) {
 		throw new Error('Sync API is unavailable');
 	}

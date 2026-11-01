@@ -1,6 +1,7 @@
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import type { CachedDevicesState } from '../../plugin/settings-ui-state';
 import type { RegisteredDevice } from '../../protocol/sync-types';
+import type CratePlugin from '../../plugin/CratePlugin';
 import { openConfirmationModal } from '../confirmation-modal';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import { createLogger } from '../../sync/logger';
@@ -25,9 +26,7 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 	let refreshButton: ButtonComponent;
 
 	const devicesEl = containerEl;
-	const deployment = plugin.settings.cloudflareDeployment;
-	// Codes are written with the saved Cloudflare login, which a device added with a code does not have.
-	if (deployment?.accountId && deployment.d1DatabaseId && !deployment.deletion && plugin.cloudflareSavedLogin.connected) {
+	if (canAddDeviceWithCode(plugin)) {
 		new Setting(devicesEl)
 			.setName('Add a device')
 			.setDesc('Connect another Obsidian vault to this server by scanning a code. No Cloudflare sign-in is needed on that device.')
@@ -133,6 +132,24 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 	renderList();
 	void refresh();
 	return () => { disposed = true; };
+}
+
+/** Codes are written with the saved Cloudflare login, which a device added with a code does not have. */
+export function canAddDeviceWithCode(plugin: CratePlugin): boolean {
+	const deployment = plugin.settings.cloudflareDeployment;
+	return Boolean(deployment?.accountId && deployment.d1DatabaseId && !deployment.deletion && plugin.cloudflareSavedLogin.connected);
+}
+
+/** The connected devices for the current server, shared with the devices section while settings stay open. */
+export async function loadConnectedDevices(plugin: CratePlugin): Promise<RegisteredDevice[] | null> {
+	const apiClient = plugin.syncRuntime.getApiClient();
+	if (!apiClient) return null;
+	if (plugin.settingsUiState.devices?.client !== apiClient) {
+		plugin.settingsUiState.devices = { client: apiClient, tokens: null, pending: null };
+	}
+	const cache = plugin.settingsUiState.devices;
+	if (cache.tokens === null) await refreshDeviceCache(cache);
+	return cache.tokens;
 }
 
 function refreshDeviceCache(cache: CachedDevicesState): Promise<void> {

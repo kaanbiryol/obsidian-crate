@@ -27,6 +27,7 @@ export function normalizePersistedCrateSettings(
 		cloudflareDeployment: normalizeCloudflareDeployment(value?.cloudflareDeployment),
 		cloudflareRestore: validRestoreState(value?.cloudflareRestore) ? structuredClone(value.cloudflareRestore) : null,
 		debugLogging: typeof value?.debugLogging === 'boolean' ? value.debugLogging : DEFAULT_SETTINGS.debugLogging,
+		getStartedDismissed: typeof value?.getStartedDismissed === 'boolean' ? value.getStartedDismissed : DEFAULT_SETTINGS.getStartedDismissed,
 		...(sharedBase ? { sharedSettingsBase: { workerUrl, settings: sharedBase } } : {}),
 	};
 }
