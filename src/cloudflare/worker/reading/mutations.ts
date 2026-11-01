@@ -3,7 +3,8 @@ import { updatePolicy } from './access';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
 import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
 import { isEmptyReadingCapture, readingDeleteIssue, readingUpdateIssue } from '@/reading/core/mutation-policy';
-import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
+import { patchReadingFrontmatter, readReadingFrontmatter } from '@/reading/core/frontmatter';
+import { sha256Hex } from '@/platform/sha256';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
 import { commitFileDelete, commitStagedFile } from '../sync/mutations';
 import type { Env } from '../types';
@@ -12,7 +13,7 @@ import { beginOperation, operationEffects, operationStatement } from './operatio
 import { ReadingError, readingResponse, readStoredNote, sourceById } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { bumpReadingRevision, ensureReadingIndex } from './library-index';
-import { readingListEtag } from './queries';
+import { readingItemEtag, readingListEtag } from './queries';
 
 export async function mutateReading(env: Env, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string): Promise<Response> {
 	const op = await beginOperation(env.DB, principal, current, body, action);
@@ -107,5 +108,10 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	const staged = await stageMarkdownFile(env.BUCKET, env.DB, source.path, content, source.file.hash);
 	const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, readingRevision: revision, reminderFolder: op.reminderFolder, encryptionState: null, effects: operationEffects(env.DB, op, response) });
 	if (!result.committed) throw new ReadingError('This note changed. Refresh before editing it.', 409);
-	return readingResponse({ ...response, library: await library() });
+	// The note as committed, so the client needs no `GET /reading/item`: `etag` is that item's
+	// ETag and `markdownHash` its body's SHA-256, which tells whether a saved body still matches.
+	const saved = parseReadingNote(content)!;
+	const article = { item: { ...saved, path: source.path }, etag: await readingItemEtag(current, saved.crate_reading_id, { path: source.path, storage_key: staged.objectKey, hash: staged.hash }),
+		markdownHash: await sha256Hex(readReadingFrontmatter(content)?.body ?? '') };
+	return readingResponse({ ...response, library: await library(), article });
 }

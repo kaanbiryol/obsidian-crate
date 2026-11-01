@@ -135,17 +135,18 @@ it('authenticates coordinator routes once, inside the coordinator, and remembers
 		return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
 	} });
 	const limit = vi.fn(async () => ({ success: true }));
-	const attempt = (token: string, path = '/reading/list') => worker.fetch(new Request(`https://once.test${path}`, { headers: { Authorization: `Bearer ${token}` } }),
+	// A reset status read is a coordinator read; it rejects this malformed reset ID after authenticating.
+	const attempt = (token: string) => worker.fetch(new Request('https://once.test/encryption/reset', { headers: { Authorization: `Bearer ${token}` } }),
 		{ ...env, DB: edgeDb, NOTIFICATION_REQUEST_LIMITER: { limit } });
-	for (const path of ['/reading/list', '/reading/item']) expect((await attempt('invalid', path)).status).toBe(401);
-	expect(limit).toHaveBeenCalledTimes(2);
-	for (let index = 0; index < 3; index++) expect((await attempt('owner')).status).toBe(200);
+	expect((await attempt('invalid')).status).toBe(401);
+	expect(limit).toHaveBeenCalledTimes(1);
+	for (let index = 0; index < 3; index++) expect((await attempt('owner')).status).toBe(400);
 	// The first accepted answer admits the credential to the authenticated budget.
-	expect(limit).toHaveBeenCalledTimes(3);
+	expect(limit).toHaveBeenCalledTimes(2);
 	await env.DB.prepare("DELETE FROM auth_tokens WHERE id='owner'").run();
 	expect((await attempt('owner')).status).toBe(401);
 	expect((await attempt('owner')).status).toBe(401);
-	expect(limit).toHaveBeenCalledTimes(4);
+	expect(limit).toHaveBeenCalledTimes(3);
 	expect(edgeStatements.filter(sql => sql.includes('auth_tokens'))).toEqual([]);
 });
 

@@ -81,7 +81,10 @@ describe('local Reading library', () => {
 		await h.library.refresh();
 		expect(h.process).not.toHaveBeenCalled();
 		expect(h.library.getSnapshot().issues).toEqual([{ path: 'Reading/Clip.md', message: 'Close this note to add it to Reading.' }]);
+		// Only a library waiting for an editor rescans on layout changes.
+		expect(h.library.waitingForEditor).toBe(true);
 		open = false; await h.library.refresh();
+		expect(h.library.waitingForEditor).toBe(false);
 		expect(h.process).toHaveBeenCalledTimes(1);
 		expect(h.library.getSnapshot().items.map(item => item.title)).toEqual(['A clip']);
 	});

@@ -10,6 +10,8 @@ import { presentReadingItems } from './pending-view';
 import { dismissReadingArticleHistory, hasReadingArticleHistory, openReadingArticleHistory } from './storage/article-history';
 
 interface OpenReadingArticle { item: ReadingItem; markdown: string | null; availableOffline: boolean; error?: string; sourceHighlights?: string; sourceExtractionStatus?: ReadingItem['extraction_status'] }
+/** The highlights and extraction state a body was shown for; the reader reloads the body when the item's differ. */
+const bodySource = (item: ReadingItem) => ({ sourceHighlights: JSON.stringify(item.highlights ?? []), sourceExtractionStatus: item.extraction_status });
 interface ReadingArticleOptions {
 	session: ReadingSession | null; cache: ReadingCache | null; pending: PendingReading[];
 	isCurrentSession: (session: ReadingSession) => boolean;
@@ -57,12 +59,12 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 		setReader({ item, markdown: null, availableOffline: false }); reportSessionError(session, null);
 		opening.current = request;
 		void (async () => {
-			let cached = false;
+			let cached = false, saved: Awaited<ReturnType<typeof readReadingArticle>>;
 			try {
-				const saved = await readReadingArticle(session, item.crate_reading_id);
+				saved = await readReadingArticle(session, item.crate_reading_id);
 				if (saved?.item?.crate_reading_id === item.crate_reading_id && typeof saved.markdown === 'string') {
-					if (current()) { cached = true; setReader({ item, markdown: saved.markdown, availableOffline: true, sourceHighlights: JSON.stringify(saved.item.highlights ?? []), sourceExtractionStatus: saved.item.extraction_status }); }
-				}
+					if (current()) { cached = true; setReader({ item, markdown: saved.markdown, availableOffline: true, ...bodySource(saved.item) }); }
+				} else saved = undefined;
 			} catch { /* A damaged or blocked cache must not prevent an online open. */ }
 			if (!current()) return;
 			if (!navigator.onLine) {
@@ -70,11 +72,12 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 				return;
 			}
 			try {
-				const article = await loadReadingArticle(session, item.crate_reading_id);
+				// A saved copy of the current revision is kept; only a changed article downloads.
+				const article = await loadReadingArticle(session, item.crate_reading_id, cached ? saved?.etag : undefined) ?? saved!;
 				if (!current()) return;
-				setReader({ item: article.item, markdown: article.markdown, availableOffline: cached, sourceHighlights: JSON.stringify(article.item.highlights ?? []), sourceExtractionStatus: article.item.extraction_status });
+				setReader({ item: article.item, markdown: article.markdown, availableOffline: cached, ...bodySource(article.item) });
 				try {
-					await cacheReadingArticle(session, article.item, article.markdown);
+					await cacheReadingArticle(session, article.item, article.markdown, { etag: article.etag });
 					if (current()) setReader(opened => opened?.item.crate_reading_id === item.crate_reading_id ? { ...opened, availableOffline: true } : opened);
 				} catch {
 					if (current() && !cached) reportSessionError(session, 'Offline copy could not be saved.');
@@ -96,13 +99,23 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 		// Extraction and inline edits can replace the body without changing its saved highlights.
 		void (async () => {
 			try {
-				const article = await loadReadingArticle(session, reader.item.crate_reading_id);
+				let saved: Awaited<ReturnType<typeof readReadingArticle>>;
+				try { saved = await readReadingArticle(session, reader.item.crate_reading_id); } catch { /* Download the article instead. */ }
+				if (!active || request !== navigation.current) return;
+				// A saved write already moved the offline copy to this item; it needs no download.
+				const expected = bodySource(reader.item), source = saved && bodySource(saved.item);
+				if (saved && source!.sourceHighlights === expected.sourceHighlights && source!.sourceExtractionStatus === expected.sourceExtractionStatus) {
+					const copy = saved;
+					setReader(current => current?.item.crate_reading_id === copy.item.crate_reading_id ? { ...current, markdown: copy.markdown, availableOffline: true, ...expected } : current);
+					return;
+				}
+				const article = await loadReadingArticle(session, reader.item.crate_reading_id, saved?.etag) ?? saved!;
 				if (!active || request !== navigation.current) return;
 				let cached = false;
-				try { await cacheReadingArticle(session, article.item, article.markdown); cached = true; } catch { /* Preserve the confirmed online article. */ }
+				try { await cacheReadingArticle(session, article.item, article.markdown, { etag: article.etag }); cached = true; } catch { /* Preserve the confirmed online article. */ }
 				assertReadingSession(session);
 				if (!active || request !== navigation.current) return;
-				setReader(current => current?.item.crate_reading_id === article.item.crate_reading_id ? { ...current, ...article, availableOffline: cached, sourceHighlights: JSON.stringify(article.item.highlights ?? []), sourceExtractionStatus: article.item.extraction_status } : current);
+				setReader(current => current?.item.crate_reading_id === article.item.crate_reading_id ? { ...current, item: article.item, markdown: article.markdown, availableOffline: cached, ...bodySource(article.item) } : current);
 				if (!cached) reportSessionError(session, 'Offline copy could not be updated.');
 			} catch (cause) { if (active) reportSessionError(session, cause instanceof Error ? cause.message : 'Reopen this article to refresh its saved text and highlights.'); }
 		})();

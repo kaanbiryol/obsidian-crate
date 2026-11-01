@@ -104,6 +104,24 @@ Successful `POST /reading/update`, `/reading/retry` and `/reading/delete` respon
 writes run under the coordinator lock, so a client whose cached library carries
 `before` re-reads only the edited item (or drops a deleted one) and adopts `after`; any other client, a
 replayed receipt (which omits `library`) or a capture reloads the list.
+Update and retry responses also add `article: { item, etag, markdownHash }`: the committed
+item, its `GET /reading/item` ETag and the SHA-256 of its article body. A client applies
+`item` without reading the item again, and keeps a saved body whose hash matches under the
+new ETag. A replayed receipt and an older server omit `article`; the client then reads the
+item as before.
+
+`GET /reading/item` answers an indexed note with an `ETag` derived from the index format,
+Reading folder scope, item ID, path and the file revision its row names. A matching
+`If-None-Match` returns 304 before R2 is read. A queued capture has no file revision and no
+ETag. The web app sends the ETag of its offline copy and keeps that copy on 304.
+
+Plaintext list and item reads authenticate in the public Worker and read the Reading policy,
+index row and (for an item) its capture queue and index rows in one D1 batch, a single
+snapshot, so they do not wait behind writes in the coordinator. While the index is complete,
+the public Worker answers items and unchanged libraries (304) itself. It forwards to the
+coordinator a read that must continue an index rebuild, which writes, and every list body:
+a page parses up to 1,000 notes, more CPU than the public Worker's budget allows. List pages
+and deltas read their rows and the capture queue in one batch as well.
 
 `GET /reading/list` pages hold up to 1,000 notes, newest `saved_at` first, so the first
 page of a first load is the top of the library. Every index write gives the rows it adds,
@@ -619,7 +637,7 @@ The authenticated sync budget and fallback are per isolate, not global quotas;
 Cloudflare's [edge limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) are also location-scoped abuse protection, not exact
 account-wide billing caps. Keep Cloudflare account usage alerts enabled.
 Ordinary Reading requests authenticate and authorize before entering the shared
-coordinator. Public one-use Reading grants enter it after admission because
+coordinator; list and item reads enter it only to rebuild the index or list a page. Public one-use Reading grants enter it after admission because
 redemption and capture must be serialized together.
 ## Encryption API
 

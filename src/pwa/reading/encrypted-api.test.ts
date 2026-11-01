@@ -109,6 +109,27 @@ it('answers an unchanged vault from the confirmed inventory in one request', asy
 	expect(first.revision).toMatch(/^"e2ee-reading-1-[0-9a-f]{32}"$/);
 });
 
+it('opens articles from a recent confirmed inventory and skips a saved revision', async () => {
+	const { api, request } = harness(), original = await article('Original');
+	request.mockImplementation(async path => path.startsWith('/reading/encrypted-file?') ? new Response(original.bytes) : Response.json(page([original.file])));
+	await api.request('/reading/list');
+	request.mockClear();
+	const opened = await api.item(itemId);
+	expect(opened).toMatchObject({ article: { item: { title: 'Original' } } });
+	expect(opened?.etag).toMatch(/^"e2ee-file-1-[0-9a-f]{32}"$/);
+	// Within 30 seconds of the list, the inventory is not read again.
+	expect(request.mock.calls.map(([path]) => path.split('?')[0])).toEqual([]);
+	// The note was already decrypted; a copy saved at its revision needs nothing at all.
+	expect(await api.item(itemId, opened!.etag)).toBeNull();
+	expect(request).not.toHaveBeenCalled();
+	const later = Date.now() + 31_000;
+	vi.spyOn(Date, 'now').mockReturnValue(later);
+	try {
+		expect(await api.item(itemId, opened!.etag)).toBeNull();
+		expect(request.mock.calls.map(([path]) => path.split('?')[0])).toEqual(['/reading/encrypted-files']);
+	} finally { vi.restoreAllMocks(); }
+});
+
 async function notes(count: number, revision = 'r1') {
 	return Promise.all(Array.from({ length: count }, async (_, i) => {
 		const id = `00000000-0000-4000-8000-${String(i + 100).padStart(12, '0')}`;

@@ -5,7 +5,7 @@ import { decodeReadingValue, encodeReadingValue } from './private-storage';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
-import { isReadingArticleCache, isReadingCache } from './storage-validation';
+import { isReadingArticleCache, isReadingCache, type ReadingArticleCache } from './storage-validation';
 import { isReadingItem } from './record-validation';
 import { readingKeys } from '@/pwa/reading/storage/storage-keys';
 import { readingKeys as readingEncryptionKeys } from '../session/encryption-session';
@@ -148,10 +148,12 @@ function articleUses(value: unknown): Map<string, ArticleUse> {
 
 /**
  * Saves an offline copy and evicts beyond the caps. A background copy never
- * replaces a saved one or displaces an opened article. Resolves to whether the
- * copy was kept.
+ * replaces a saved one or displaces an opened article. `etag` is the server
+ * revision the copy came from. `refresh` only replaces an existing copy, keeping
+ * its use. Resolves to whether the copy was kept.
  */
-export async function cacheReadingArticle(session: ReadingSession, item: ReadingItem, markdown: string, { prefetched = false } = {}): Promise<boolean> {
+export async function cacheReadingArticle(session: ReadingSession, item: ReadingItem, markdown: string,
+	{ prefetched = false, etag, refresh = false }: { prefetched?: boolean; etag?: string; refresh?: boolean } = {}): Promise<boolean> {
 	const db = await readingDatabase(); assertReadingSession(session);
 	const tx = db.transaction('values', 'readwrite');
 	const prefix = readingKeys.articlePrefix(session.id), key = `${prefix}${item.crate_reading_id}`, indexKey = readingKeys.articleIndex(session.id);
@@ -160,11 +162,15 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
 		// Keep a damaged/newer copy exportable even when this article is opened online.
 		const previous = await tx.store.get(key);
 		if (previous !== undefined && prefetched) { await tx.done; return true; }
-		if (previous !== undefined && !isReadingArticleCache(decodeReadingValue(key, previous), readingFolder(session))) {
+		const saved = previous === undefined ? undefined : decodeReadingValue(key, previous);
+		if (previous !== undefined && !isReadingArticleCache(saved, readingFolder(session))) {
 			throw new Error('The saved article needs recovery before replacing its offline copy.');
 		}
-		const usedAt = prefetched ? savedRank(item) : Date.now();
-		await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt, ...backgroundFlag(prefetched) }), key);
+		const replaced = refresh ? saved as ReadingArticleCache | undefined : undefined;
+		if (refresh && !replaced) { await tx.done; return false; }
+		if (replaced) prefetched = replaced.prefetched === true;
+		const usedAt = replaced?.usedAt ?? (prefetched ? savedRank(item) : Date.now());
+		await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt, ...backgroundFlag(prefetched), ...etag ? { etag } : {} }), key);
 		// A small use index avoids decrypting every cached article to evict a few.
 		let indexed: Map<string, ArticleUse>;
 		try { indexed = articleUses(decodeReadingValue(indexKey, await tx.store.get(indexKey))); } catch { indexed = new Map(); }

@@ -25,6 +25,8 @@ const MAX_READING_METADATA_BYTES = 12 * 1024 * 1024;
 const SOURCE_CONCURRENCY = 6;
 const DUPLICATE_ID_ISSUE = 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.';
 const SEALED_ISSUE = 'The server created a note that would replace or take the name of another note. It was not opened.';
+// Article opens reuse the last confirmed inventory this long; a list refresh or a commit reads it again.
+const ITEM_INVENTORY_REUSE_MS = 30_000;
 /** `revision` fingerprints the Reading files and issues, so edits elsewhere in the vault keep it. */
 interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: null; revision: string }
 
@@ -84,6 +86,8 @@ export class EncryptedReadingApi {
 	// The last complete inventory and the vault sequence it was confirmed at. An
 	// unchanged first page answers from it, so polling is one request.
 	private confirmed?: { sequence: number; result: EncryptedReadingInventory };
+	// When the files and paths above last matched `confirmed`, so an article open can skip the inventory.
+	private confirmedAt?: number;
 	constructor(private options: EncryptedReadingOptions) {}
 	private async json<T>(path: string, body?: string): Promise<T> {
 		const response = await this.options.request(path, body);
@@ -123,7 +127,7 @@ export class EncryptedReadingApi {
 		const folder = encodeURIComponent(this.options.wireFolder);
 		const fetchPage = async (after?: string) => parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}${after ? '&after=' + encodeURIComponent(after) : ''}`), this.options.wireFolder, this.options.generation);
 		const first = await fetchPage();
-		if (this.confirmed?.sequence === first.sequence) return this.confirmed.result;
+		if (this.confirmed?.sequence === first.sequence) { if (this.confirmedAt !== undefined) this.confirmedAt = Date.now(); return this.confirmed.result; }
 		if (!this.indexLoaded) {
 			this.indexLoaded = true;
 			try { if (!this.indexed.size) for (const entry of await this.options.loadIndex?.() ?? []) this.indexed.set(entry.file.path, entry); }
@@ -205,18 +209,14 @@ export class EncryptedReadingApi {
 		const revision = `"e2ee-reading-${this.options.generation}-${(await sha256Hex(fingerprint)).slice(0, 32)}"`;
 		const result: EncryptedReadingInventory = this.confirmed?.result.revision === revision ? this.confirmed.result : { items, issues, cursor: null, revision };
 		if (!unavailable) this.confirmed = { sequence: sequence, result };
+		this.confirmedAt = unavailable ? undefined : Date.now();
 		if (downloaded || removed) await this.options.saveIndex?.([...nextIndex.values()]).catch(() => { /* The index is only a cache. */ });
 		return result;
 	}
 	async request(path: string, rawBody?: string): Promise<unknown> {
 		const url = new URL(path, 'https://crate.invalid'), action = url.pathname.slice('/reading/'.length);
 		if (action === 'list') return this.inventory();
-		if (action === 'item') {
-			const list = await this.inventory(), id = url.searchParams.get('id');
-			const item = list.items.find(item => item.crate_reading_id === id);
-			if (!item) throw this.options.error('Article is unavailable or has an identity conflict.', 409, 'reading_conflict');
-			return { item, markdown: readReadingFrontmatter((await this.source(this.files.get(this.wires.get(item.path)!)!)).content)!.body };
-		}
+		if (action === 'item') return (await this.item(url.searchParams.get('id') ?? ''))!.article;
 		if (!rawBody || !ENCRYPTED_READING_ACTIONS.includes(action)) throw new Error('Unsupported encrypted Reading request.');
 		const body = JSON.parse(rawBody) as Record<string, unknown>, id = body.operationId;
 		if (typeof id !== 'string') throw new Error('A saved Reading operation ID is required.');
@@ -250,7 +250,25 @@ export class EncryptedReadingApi {
 			// Other decrypted notes stay valid; `sameFile` rejects any that changed elsewhere.
 			const committed = JSON.parse(attempt.body) as { files: Array<{ path: string }>; remove?: Array<{ path: string }> };
 			for (const file of [...committed.files, ...committed.remove ?? []]) this.sources.delete(file.path);
+			this.confirmedAt = undefined;
 			return receipt.response;
+		}
+	}
+	/** One article and its revision ETag, derived from its file. With `savedEtag`, resolves
+	 * to null without downloading while that revision is current. A recently confirmed
+	 * inventory is reused; a note that changed since is read again from a new one. */
+	async item(id: string, savedEtag?: string): Promise<{ article: { item: ReadingItem; markdown: string }; etag: string } | null> {
+		const recent = this.confirmed && this.confirmedAt !== undefined && Date.now() - this.confirmedAt < ITEM_INVENTORY_REUSE_MS;
+		for (let reused = Boolean(recent); ; reused = false) {
+			const list = reused ? this.confirmed!.result : await this.inventory();
+			const item = list.items.find(item => item.crate_reading_id === id);
+			if (!item && !reused) throw this.options.error('Article is unavailable or has an identity conflict.', 409, 'reading_conflict');
+			if (!item) continue;
+			const file = this.files.get(this.wires.get(item.path)!)!;
+			const etag = `"e2ee-file-${this.options.generation}-${(await sha256Hex(`${file.path}\n${file.revision}\n${file.hash}`)).slice(0, 32)}"`;
+			if (etag === savedEtag) return null;
+			try { return { article: { item, markdown: readReadingFrontmatter((await this.source(file)).content)!.body }, etag }; }
+			catch (error) { if (!reused || !(error instanceof NoteUnavailableError)) throw error; }
 		}
 	}
 	/** Build and persist exact ciphertext for one operation against the current

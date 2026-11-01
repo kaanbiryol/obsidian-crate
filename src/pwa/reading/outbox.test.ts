@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingSession } from './session/session';
 import { drainReading, queueReading, removeReviewedReading } from './outbox';
 import { pendingReading, savePendingReading } from './storage/storage';
+import { sha256Hex } from '@/platform/sha256';
 
 const storage = vi.hoisted(() => ({ values: new Map<string, unknown>(), current: true }));
 vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
@@ -18,6 +19,12 @@ vi.mock('./storage/storage', () => ({
 	savePendingReading: vi.fn(async (session: ReadingSession, value: PendingReading[]) => { storage.values.set(`pending:${session.id}`, structuredClone(value)); }),
 	commitReadingCache: async (_session: ReadingSession, cache: import('./storage/cache').ReadingCache) => cache,
 	readReadingCache: async () => storage.values.get('cache'),
+	readReadingArticle: async (_session: ReadingSession, id: string) => storage.values.get(`article:${id}`),
+	cacheReadingArticle: vi.fn(async (_session: ReadingSession, item: { crate_reading_id: string }, markdown: string, options: { etag?: string; refresh?: boolean } = {}) => {
+		if (options.refresh && !storage.values.has(`article:${item.crate_reading_id}`)) return false;
+		storage.values.set(`article:${item.crate_reading_id}`, { item, markdown, usedAt: 1, ...options.etag ? { etag: options.etag } : {} });
+		return true;
+	}),
 }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
@@ -248,6 +255,63 @@ it('re-reads only the edited item when the edit chains from the cached library',
 	const cache = await drainReading(session);
 	expect(cache).toMatchObject({ revision: '"r2"', items: [{ crate_reading_id: item.crate_reading_id, favorite: true }] });
 	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/list');
+});
+
+it('applies the committed item an update returns, without reading the item again', async () => {
+	const item = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-000000000003', title: 'Article', path: 'Reading/article.md',
+		source_url: 'https://example.com/article', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' };
+	const highlights = [{ start: 0, end: 4, text: 'Body' }];
+	storage.values.set('cache', { items: [item], issues: [], savedAt: 1, revision: '"r1"' });
+	storage.values.set(`article:${item.crate_reading_id}`, { item, markdown: 'Body', usedAt: 1, etag: '"old"' });
+	network.mockImplementation(async path => {
+		if (path === '/reading/session') return response({ day: 20_000, generation: session.generation });
+		if (path === '/reading/update') return response({ saved: true, id: item.crate_reading_id, library: { before: '"r1"', after: '"r2"' },
+			article: { item: { ...item, highlights }, etag: '"new"', markdownHash: await sha256Hex('Body') } });
+		return response({ items: [], issues: [], cursor: null });
+	});
+	await queueReading(session, { action: 'update', intent: { id: item.crate_reading_id, before: { highlights: [] }, changes: { highlights } } });
+	const cache = await drainReading(session);
+	expect(cache).toMatchObject({ revision: '"r2"', items: [{ crate_reading_id: item.crate_reading_id, highlights }] });
+	// The unchanged body moves to the committed revision, so an open reader keeps it.
+	expect(storage.values.get(`article:${item.crate_reading_id}`)).toMatchObject({ item: { highlights }, markdown: 'Body', etag: '"new"' });
+	const paths = network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path);
+	expect(paths).not.toContain('/reading/item');
+	expect(paths).not.toContain('/reading/list');
+});
+
+it('keeps a saved body the committed item no longer matches', async () => {
+	const item = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-000000000004', title: 'Article', path: 'Reading/article.md',
+		source_url: 'https://example.com/article', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' };
+	storage.values.set('cache', { items: [item], issues: [], savedAt: 1, revision: '"r1"' });
+	storage.values.set(`article:${item.crate_reading_id}`, { item, markdown: 'Older body', usedAt: 1, etag: '"old"' });
+	network.mockImplementation(async path => {
+		if (path === '/reading/session') return response({ day: 20_000, generation: session.generation });
+		if (path === '/reading/update') return response({ saved: true, id: item.crate_reading_id, library: { before: '"r1"', after: '"r2"' },
+			article: { item: { ...item, favorite: true }, etag: '"new"', markdownHash: await sha256Hex('Body') } });
+		return response({ items: [], issues: [], cursor: null });
+	});
+	await queueReading(session, { action: 'update', intent: { id: item.crate_reading_id, before: { favorite: false }, changes: { favorite: true } } });
+	expect(await drainReading(session)).toMatchObject({ items: [{ favorite: true }] });
+	expect(storage.values.get(`article:${item.crate_reading_id}`)).toMatchObject({ markdown: 'Older body', etag: '"old"' });
+});
+
+it('reloads a library after a capture from the saved copy, so the new note arrives as a delta', async () => {
+	const kept = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-000000000005', title: 'Kept', path: 'Reading/kept.md',
+		source_url: 'https://example.com/kept', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' };
+	storage.values.set('cache', { items: [kept], issues: [], savedAt: 1, revision: '"r1"', deltaBase: '7.base' });
+	const captured = { ...kept, crate_reading_id: '12345678-1234-4123-8123-000000000006', title: 'Captured', path: '', source_url: 'https://example.com/new', extraction_status: 'pending' };
+	network.mockImplementation(async path => {
+		if (path === '/reading/session') return response({ day: 20_000, generation: session.generation });
+		if (path === '/reading/capture') return response({ saved: true, alreadySaved: false, id: captured.crate_reading_id });
+		if (typeof path === 'string' && path.startsWith('/reading/list')) return response({ delta: true, changedPaths: [], items: [captured], issues: [], cursor: null });
+		return response({});
+	});
+	await queueReading(session, { action: 'capture', intent: { url: 'https://example.com/new' } });
+	const cache = await drainReading(session);
+	expect(cache?.items.map(item => item.crate_reading_id)).toEqual([captured.crate_reading_id, kept.crate_reading_id]);
+	const list = network.mock.calls.find(([path]) => typeof path === 'string' && path.startsWith('/reading/list'))!;
+	expect(list[0]).toBe('/reading/list?since=7.base');
+	expect(new Headers(list[1]!.headers).get('If-None-Match')).toBe('"r1"');
 });
 
 it('drops a deleted item from the cached library without reloading it', async () => {

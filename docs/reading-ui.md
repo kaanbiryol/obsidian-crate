@@ -298,7 +298,12 @@ workaround remains in place.
 The PWA article opens directly into its text without Article / Highlights tabs.
 Its title, byline, reading time, and text appear together once the text is available
 and the opening slide has finished. Navigation stays available with a loading
-indicator meanwhile; cached text adds no delay beyond the slide. A load failure
+indicator meanwhile; cached text adds no delay beyond the slide. Opening an article with
+an offline copy asks the server only whether that revision is current (an `ETag` check, or
+the file revision in an encrypted vault, from an inventory confirmed in the last 30
+seconds) and downloads the text only when it changed. Background offline copies
+download three at a time, and a failed one waits for the next refresh without stopping
+the others. A load failure
 shows the article metadata and original source alongside the error and retry action.
 A floating highlighter/count button opens the article highlights in a full-height
 PWA sheet using the same sizing as Settings. Its zero-height sticky layer overlays the full reading viewport; it

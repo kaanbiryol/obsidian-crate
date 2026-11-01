@@ -5,7 +5,7 @@ import { resetReadingEncryption } from './encryption-lifecycle';
 import { prepareReadingEncryption } from './encryption-session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT } from '../../config';
-import { connectReadingFromReminders } from '../api';
+import { connectReadingFromReminders, prefetchReadingSession } from '../api';
 import { readingConnectionState, type ReadingConnectionState } from './api-error';
 import { READING_SESSION_KEY, assertReadingSession, readingSession, type ReadingSession } from './session';
 
@@ -33,13 +33,15 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 		setSession(null); setLockedSession(null); setVerificationUnavailable(false); setOfflineCopy(false); setEncryptionSetupRequired(false); setConverting(false);
 	}, []);
 	const expire = useCallback(() => { resetSession(); setIssue(SESSION_RECOVERY_ISSUE); }, [resetSession]);
-	const hydrate = useCallback(async (current: ReadingSession) => {
+	const hydrate = useCallback(async (current: ReadingSession, prefetchSession = false) => {
 		const revision = generation.current;
 		const currentRequest = () => {
 			assertReadingSession(current);
 			return alive.current && revision === generation.current;
 		};
 		if (!currentRequest()) return;
+		// The first refresh checks the session next; ask now, alongside the encryption check.
+		if (prefetchSession && current.source === 'reminders' && navigator.onLine) prefetchReadingSession();
 		try { await prepareReadingEncryption(current); } catch (cause) {
 			if (!currentRequest()) return;
 			setConverting(cause instanceof EncryptionTransitionError);
@@ -80,7 +82,7 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 			let current: ReadingSession | null = null;
 			try {
 				current = readingSession();
-				if (current) await hydrate(current);
+				if (current) await hydrate(current, true);
 			} finally {
 				if (!cancelled) {
 					setReady(true);

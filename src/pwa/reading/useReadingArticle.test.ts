@@ -106,3 +106,35 @@ it('downloads an article with a stale offline copy once', async () => {
 	expect(hook.current.reader).toMatchObject({ markdown: 'Current online text.' });
 	expect(network).toHaveBeenCalledOnce();
 });
+
+it('keeps a saved copy the server reports unchanged, without downloading its body', async () => {
+	vi.mocked(readReadingArticle).mockResolvedValue({ ...saved, etag: '"current"' });
+	network.mockResolvedValue(new Response(null, { status: 304, headers: { ETag: '"current"' } }));
+	const { hook } = harness();
+	await act(async () => { await hook.current.open(item); });
+	expect(new Headers(network.mock.calls[0]![1]!.headers).get('If-None-Match')).toBe('"current"');
+	expect(hook.current.reader).toMatchObject({ item, markdown: saved.markdown, availableOffline: true });
+	expect(cacheReadingArticle).toHaveBeenCalledWith(session, item, saved.markdown, { etag: '"current"' });
+	expect(reportSessionError).toHaveBeenLastCalledWith(session, null);
+});
+
+it('saves the ETag of a downloaded article with its offline copy', async () => {
+	vi.mocked(readReadingArticle).mockResolvedValue(undefined);
+	network.mockResolvedValue(Response.json({ item, markdown: 'Online text.' }, { headers: { ETag: '"revision"' } }));
+	const { hook } = harness();
+	await act(async () => { await hook.current.open(item); });
+	expect(new Headers(network.mock.calls[0]![1]!.headers).has('If-None-Match')).toBe(false);
+	expect(cacheReadingArticle).toHaveBeenCalledWith(session, item, 'Online text.', { etag: '"revision"' });
+});
+
+it('shows a saved copy already moved to an edited item instead of downloading it again', async () => {
+	network.mockResolvedValueOnce(Response.json({ item, markdown: 'Confirmed online text.' }));
+	const { hook, update } = harness();
+	await act(async () => { await hook.current.open(item); });
+	const highlighted = { ...item, highlights: [{ start: 0, end: 9, text: 'Confirmed' }] };
+	// A saved highlight refreshed the offline copy before the library reported it.
+	vi.mocked(readReadingArticle).mockResolvedValue({ item: highlighted, markdown: 'Confirmed online text.', usedAt: 1, etag: '"new"' });
+	await act(async () => { update(highlighted); });
+	expect(network).toHaveBeenCalledOnce();
+	expect(hook.current.reader).toMatchObject({ item: highlighted, markdown: 'Confirmed online text.', availableOffline: true });
+});

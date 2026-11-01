@@ -8,18 +8,21 @@ import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { parseJsonObject } from '../request-validation';
-import { policy, authority, readingResponse, ReadingError, readStoredNote } from './common';
+import { policy, authority, readingResponse, ReadingError, readStoredNote, policyStatement, readingItemId, readingNotModified } from './common';
 import { prepareHandoff, updatePolicy, handoffAuthority, labelledPolicy } from './access';
 import { readFolderLabel } from '../encryption/folder-labels';
 import { mutateReading } from './mutations';
 import { extractForEncryptedReading } from './encrypted-extract';
-import { etagMatches, readingDeltaBase, readingItem, readingList, readingListDelta, readingListEtag } from './queries';
+import { etagMatches, readingDeltaBase, readingItem, readingItemStatements, readingList, readingListDelta, readingListEtag, type ReadingItemRows } from './queries';
 import { parseDeltaBase } from '../vault-change-token';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
-import { ensureReadingIndex } from './library-index';
-import { corsHeaders } from '../cors';
+import { completeReadingIndex, ensureReadingIndex, readingIndexStatement, type ReadingIndexRow } from './library-index';
+import type { ReadingPolicy } from '@/protocol/reading-policy';
 
-export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, state?: DurableObjectState, authenticatedEncryption?: EncryptionServerState | null, featurePolicyValue?: string | null): Promise<Response> {
+/** `forward` runs the request under the coordinator lock. The public Worker passes it, so
+ * library reads it can answer from a complete index stay outside the lock. */
+export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, state?: DurableObjectState, authenticatedEncryption?: EncryptionServerState | null, featurePolicyValue?: string | null,
+	forward?: () => Promise<Response>): Promise<Response> {
 	try {
 		const url = new URL(request.url), path = url.pathname;
 		// Authentication loads the encryption state with the token.
@@ -61,7 +64,18 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 			if (request.method === 'GET') return readingResponse({ policy: await labelledPolicy(env.DB, await policy(env.DB)) });
 			if (request.method === 'POST') return await updatePolicy(env.DB, body);
 		}
-		const current = await authority(env.DB, principal, featurePolicyValue);
+		// Library reads load the policy, index row and item rows in one round trip and one snapshot.
+		const libraryRead = request.method === 'GET' && (path === '/reading/item' || path === '/reading/list');
+		let loaded: { policy: ReadingPolicy | null; index: ReadingIndexRow | null; item?: ReadingItemRows } | undefined;
+		if (libraryRead) {
+			const id = path === '/reading/item' ? url.searchParams.get('id') : null;
+			let itemId: string | undefined;
+			try { if (id !== null) itemId = readingItemId(id); } catch { /* Reported after the authority and index checks. */ }
+			const [policyRow, indexRow, ...item] = await env.DB.batch<{ results: unknown[] }>([policyStatement(env.DB), readingIndexStatement(env.DB), ...itemId ? readingItemStatements(env.DB, itemId) : []]);
+			loaded = { policy: (policyRow!.results[0] ?? null) as ReadingPolicy | null, index: (indexRow!.results[0] ?? null) as ReadingIndexRow | null,
+				...item.length ? { item: item as unknown as ReadingItemRows } : {} };
+		}
+		const current = await authority(env.DB, principal, featurePolicyValue, loaded?.policy);
 		if (path === '/reading/shortcut-pairing' && request.method === 'POST') return await issueShortcutPairing(env.DB, principal, current, url.origin);
 		if (shortcut?.kind === 'prepare' && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);
 		if (path === '/reading/capture' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'capture');
@@ -70,16 +84,22 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 		if (path === '/reading/update' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'update');
 		if (path === '/reading/retry' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'retry');
 		if (path === '/reading/delete' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'delete');
-		if (request.method === 'GET' && (path === '/reading/item' || path === '/reading/list')) {
-			const index = await ensureReadingIndex(env, current, file => readStoredNote(env, file));
+		if (libraryRead && loaded) {
+			// Outside the lock, only a complete index is read; a rebuild step writes, so it runs under the lock.
+			const complete = forward ? completeReadingIndex(current, loaded.index) : null;
+			if (forward && !complete) return await forward();
+			const index = complete ?? await ensureReadingIndex(env, current, file => readStoredNote(env, file), loaded.index);
 			// Reads wake notification processing only to continue a rebuild or extract what it queued.
 			if (index.rebuilt && state) await armNotificationCoordinator(state);
 			if (index.state !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Try refreshing shortly.', 503);
-			if (path === '/reading/item') return readingResponse(await readingItem(env, current, url.searchParams.get('id')));
+			// A rebuild step changed the rows read before it.
+			if (path === '/reading/item') return await readingItem(env, current, url.searchParams.get('id'), request.headers.get('If-None-Match'), index.rebuilt ? undefined : loaded.item);
 			// The first list page is conditional, so an unchanged library is one cheap request.
 			const cursor = url.searchParams.get('cursor') ?? '';
 			const etag = cursor ? null : await readingListEtag(current, index.revision);
-			if (etag && etagMatches(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers: { ...corsHeaders(), 'Cache-Control': 'no-store', ETag: etag } });
+			if (etag && etagMatches(request.headers.get('If-None-Match'), etag)) return readingNotModified(etag);
+			// A page parses up to 1,000 notes, more CPU than the public Worker allows; the coordinator lists them.
+			if (forward) return await forward();
 			if (cursor) return readingResponse(await readingList(env, current, cursor), 200);
 			// The base is the index position read before listing: later changes replay next time.
 			const base = await readingDeltaBase(current, index), since = parseDeltaBase(url.searchParams.get('since'));

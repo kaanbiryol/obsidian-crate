@@ -147,8 +147,8 @@ export function startReading(plugin: CratePlugin): void {
 		vault.on('delete', file => { changed(file.path); }),
 		vault.on('rename', (file, oldPath) => { changed(oldPath); changed(file.path); }),
 	];
-	// Closing an editor lets deferred highlight records proceed.
-	const layoutRef = plugin.app.workspace.on('layout-change', schedule);
+	// Closing an editor lets deferred imports and highlight records proceed; other layout changes need no scan.
+	const layoutRef = plugin.app.workspace.on('layout-change', () => { if (library.waitingForEditor) schedule(); });
 	plugin.syncRuntime.addStateChangeListener(schedule);
 	const stop = () => {
 		controller.abort(); window.clearTimeout(timer);

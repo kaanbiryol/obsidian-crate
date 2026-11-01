@@ -40,6 +40,8 @@ export class ReadingLibrary {
 	private cache = new Map<string, { revision: string; metadata: ReadingMetadata | null; item?: ReadingItem }>();
 	// The last parsed note: an update's rescan and reread see the same bytes.
 	private parsed: { content: string; metadata: ReadingMetadata | null } | undefined;
+	// Notes whose import or highlight records wait until no editor has them open.
+	private deferred = new Set<string>();
 	constructor(private vault: ReadingVault, readonly folder: string, private signal: AbortSignal,
 		private canAdopt: () => boolean = () => true, startAfter: Promise<void> = Promise.resolve()) {
 		this.queue = startAfter;
@@ -75,8 +77,10 @@ export class ReadingLibrary {
 		return metadata;
 	}
 	invalidate(path: string): void { this.cache.delete(path); }
+	/** True while the last scan left a note for when its editor closes. */
+	get waitingForEditor(): boolean { return this.deferred.size > 0; }
 	private async scan(): Promise<void> {
-		const items: ReadingItem[] = [];
+		const items: ReadingItem[] = [], deferredPaths = new Set<string>();
 		try {
 			this.assertActive();
 			const files = this.vault.files().filter(file => file.path.startsWith(`${this.folder}/`) && /\.md$/i.test(file.path));
@@ -128,6 +132,7 @@ export class ReadingLibrary {
 							deferred = content !== recorded;
 						}
 					}
+					if (deferred) deferredPaths.add(file.path);
 					if (metadata) {
 						const item = { ...metadata, path: file.path };
 						items.push(item);
@@ -140,6 +145,7 @@ export class ReadingLibrary {
 					issues.push({ path: file.path, message: error instanceof Error ? error.message : 'Could not read this note.' });
 				}
 			}
+			this.deferred = deferredPaths;
 			const { unique, duplicates } = filterUniqueReadingIds(items);
 			for (const item of duplicates) issues.push({ path: item.path, message: 'Another note has the same reading ID. Resolve the duplicate before editing here.' });
 			unique.sort((a, b) => b.saved_at.localeCompare(a.saved_at) || a.crate_reading_id.localeCompare(b.crate_reading_id));

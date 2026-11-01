@@ -1,19 +1,40 @@
 import type { Env } from '../types';
-import { ReadingError, sourceById } from './common';
+import { ReadingError, readingItemId, readingNotModified, readingResponse, readSourceRow, sourceRowsStatement, uniqueSourceRow, type ReadingSourceRow } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { parseReadingNote } from '@/reading/core/notes';
 import { validateReadingMetadata } from '@/reading/core/model';
 import { sha256Hex } from '@/platform/sha256';
-import { queryRows } from '../db';
 import { ARTICLE_EDITED_ERROR, readingIndexScope, type ReadingIndexState } from './library-index';
 
-/** Called only after route authorization and a complete Reading index. */
-export async function readingItem(env: Env, current: ReadingPolicy, id: string | null) {
-	const queued = await env.DB.prepare('SELECT note FROM reading_captures WHERE id=? AND generation=?').bind(id, current.generation).first<{ note: string }>();
-	if (queued) return { item: { ...parseReadingNote(queued.note)!, path: '' }, markdown: '' };
-	const source = await sourceById(env, id);
-	return { item: { ...source.item, path: source.path }, markdown: readReadingFrontmatter(source.content)?.body ?? '' };
+/** A queued capture with this ID and the index rows that name it, read together. */
+export const readingItemStatements = (db: D1Database, id: string) => [
+	db.prepare('SELECT note FROM reading_captures WHERE id = ? AND generation = (SELECT generation FROM reading_policy WHERE id = 1)').bind(id),
+	sourceRowsStatement(db, id),
+];
+type Rows<T> = { results: T[] };
+export type ReadingItemRows = [Rows<{ note: string }>, Rows<ReadingSourceRow>];
+
+// Bump when the same note revision would produce a different item response.
+const ITEM_FORMAT = 1;
+/** An indexed item's response depends only on the note revision its row names. */
+export async function readingItemEtag(current: ReadingPolicy, id: string, row: Pick<ReadingSourceRow, 'path' | 'storage_key' | 'hash'>): Promise<string> {
+	return `"${(await sha256Hex(`item:${ITEM_FORMAT}\n${readingIndexScope(current)}\n${id}\n${row.path}\n${row.storage_key}\n${row.hash}`)).slice(0, 32)}"`;
+}
+
+/** Called only after route authorization and a complete Reading index. `loaded` holds
+ * `readingItemStatements` results the caller already read. A matching indexed revision
+ * answers 304 without reading R2; a queued capture has no revision and no ETag. */
+export async function readingItem(env: Env, current: ReadingPolicy, id: unknown, ifNoneMatch: string | null, loaded?: ReadingItemRows): Promise<Response> {
+	const itemId = readingItemId(id);
+	const [queued, rows] = loaded ?? await env.DB.batch(readingItemStatements(env.DB, itemId)) as ReadingItemRows;
+	const note = queued.results[0]?.note;
+	if (note !== undefined) return readingResponse({ item: { ...parseReadingNote(note)!, path: '' }, markdown: '' });
+	const row = uniqueSourceRow(rows.results);
+	const etag = await readingItemEtag(current, itemId, row);
+	if (etagMatches(ifNoneMatch, etag)) return readingNotModified(etag);
+	const source = await readSourceRow(env, itemId, row);
+	return readingResponse({ item: { ...source.item, path: source.path }, markdown: readReadingFrontmatter(source.content)?.body ?? '' }, 200, { ETag: etag });
 }
 
 /** The library changes only with its index revision, which every note and capture
@@ -53,10 +74,12 @@ function parseListCursor(cursor: string): [string, string] | null {
 /** Pages run newest first, so the first page of a first load is what the library shows on top. */
 export async function readingList(env: Env, current: ReadingPolicy, cursor: string) {
 	const after = parseListCursor(cursor);
-	const { results } = await env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items
+	const page = env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items
     ${after ? 'WHERE (saved_at, portable_path) < (?, ?)' : ''} ORDER BY saved_at DESC, portable_path DESC LIMIT ${READING_LIST_PAGE}`)
-		.bind(...after ?? []).all<ReadingRow>();
-	const queued = cursor ? [] : (await queuedStatement(env, current).all<{ note: string }>()).results;
+		.bind(...after ?? []);
+	// The first page and the capture queue come from one snapshot.
+	const [{ results }, queuedRows] = await env.DB.batch(cursor ? [page] : [page, queuedStatement(env, current)]) as [Rows<ReadingRow>, Rows<{ note: string }>?];
+	const queued = queuedRows?.results ?? [];
 	const last = results.at(-1);
 	return { ...listedPage(current, results, queued), cursor: results.length === READING_LIST_PAGE && last ? JSON.stringify([last.saved_at, last.portable_path]) : null };
 }
@@ -72,11 +95,13 @@ export async function readingDeltaBase(current: ReadingPolicy, index: Pick<Readi
  * the future, or more notes changed than one page holds. */
 export async function readingListDelta(env: Env, current: ReadingPolicy, index: Pick<ReadingIndexState, 'seq' | 'removedSeq'>, since: number) {
 	if (since < index.removedSeq || since > index.seq) return null;
-	const rows = await queryRows<ReadingRow>(env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE change_seq > ? ORDER BY change_seq LIMIT ${READING_LIST_PAGE + 1}`).bind(since));
-	if (rows.length > READING_LIST_PAGE) return null;
-	const removed = await queryRows<{ path: string }>(env.DB.prepare(`SELECT path FROM reading_removals WHERE change_seq > ? ORDER BY change_seq LIMIT ${READING_LIST_PAGE + 1}`).bind(since));
-	if (removed.length > READING_LIST_PAGE) return null;
-	const queued = await queryRows<{ note: string }>(queuedStatement(env, current));
+	// One snapshot: changed rows, removals and the capture queue cannot disagree.
+	const [{ results: rows }, { results: removed }, { results: queued }] = await env.DB.batch([
+		env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE change_seq > ? ORDER BY change_seq LIMIT ${READING_LIST_PAGE + 1}`).bind(since),
+		env.DB.prepare(`SELECT path FROM reading_removals WHERE change_seq > ? ORDER BY change_seq LIMIT ${READING_LIST_PAGE + 1}`).bind(since),
+		queuedStatement(env, current),
+	]) as [Rows<ReadingRow>, Rows<{ path: string }>, Rows<{ note: string }>];
+	if (rows.length > READING_LIST_PAGE || removed.length > READING_LIST_PAGE) return null;
 	const changedPaths = [...new Set([...removed.map(row => row.path), ...rows.map(row => row.path)])];
 	return { delta: true as const, changedPaths, ...listedPage(current, rows, queued), cursor: null };
 }

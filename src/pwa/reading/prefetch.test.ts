@@ -23,13 +23,30 @@ it('saves each picked article as a background copy', async () => {
 	await prefetchReadingArticles(session, [], () => true);
 	expect(readingArticlesToPrefetch).toHaveBeenCalledWith(session, [], 10);
 	expect(cacheReadingArticle).toHaveBeenCalledTimes(3);
-	expect(cacheReadingArticle).toHaveBeenLastCalledWith(session, { crate_reading_id: 'id-3' }, 'Body id-3', { prefetched: true });
+	expect(cacheReadingArticle).toHaveBeenCalledWith(session, { crate_reading_id: 'id-3' }, 'Body id-3', { prefetched: true });
+});
+
+it('downloads at most three articles at a time', async () => {
+	vi.mocked(readingArticlesToPrefetch).mockResolvedValue([1, 2, 3, 4, 5, 6].map(item));
+	let active = 0, peak = 0;
+	vi.mocked(loadReadingArticle).mockImplementation(async (_session, id) => {
+		peak = Math.max(peak, ++active);
+		await new Promise(resolve => setTimeout(resolve, 1));
+		active--;
+		return { item: { crate_reading_id: id } as ReadingItem, markdown: '', etag: '"e"' };
+	});
+	await prefetchReadingArticles(session, [], () => true);
+	expect(peak).toBe(3);
+	expect(cacheReadingArticle).toHaveBeenCalledTimes(6);
+	expect(cacheReadingArticle).toHaveBeenCalledWith(session, { crate_reading_id: 'id-6' }, '', { prefetched: true, etag: '"e"' });
 });
 
 it('stops when the cache has no room, the session changes or the device goes offline', async () => {
+	vi.mocked(readingArticlesToPrefetch).mockResolvedValue([1, 2, 3, 4, 5].map(item));
 	vi.mocked(cacheReadingArticle).mockResolvedValueOnce(false);
 	await prefetchReadingArticles(session, [], () => true);
-	expect(loadReadingArticle).toHaveBeenCalledOnce();
+	// Downloads already running finish; no more start.
+	expect(loadReadingArticle).toHaveBeenCalledTimes(3);
 
 	vi.clearAllMocks();
 	let current = true;
@@ -43,10 +60,11 @@ it('stops when the cache has no room, the session changes or the device goes off
 	expect(loadReadingArticle).not.toHaveBeenCalled();
 });
 
-it('leaves failures for the next refresh and respects Data Saver', async () => {
+it('leaves failures for the next refresh, continues past them, and respects Data Saver', async () => {
 	vi.mocked(loadReadingArticle).mockRejectedValueOnce(new Error('Unavailable'));
-	await expect(prefetchReadingArticles(session, [], () => true)).rejects.toThrow('Unavailable');
-	expect(loadReadingArticle).toHaveBeenCalledOnce();
+	await prefetchReadingArticles(session, [], () => true);
+	expect(loadReadingArticle).toHaveBeenCalledTimes(3);
+	expect(cacheReadingArticle).toHaveBeenCalledTimes(2);
 
 	vi.clearAllMocks();
 	vi.stubGlobal('navigator', { onLine: true, connection: { saveData: true } });

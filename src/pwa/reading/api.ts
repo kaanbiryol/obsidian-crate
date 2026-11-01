@@ -5,14 +5,18 @@ import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingInd
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../connection/session-generation';
-import { commitReadingCache, readReadingCache, type ReadingCache } from './storage/storage';
+import { cacheReadingArticle, commitReadingCache, readReadingArticle, readReadingCache, type ReadingCache } from './storage/storage';
 import { READING_CHANGED_EVENT, READING_SESSION_KEY, assertReadingSession, readingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
 import type { ReadingItem } from '@/reading/core/model';
 import { ENCRYPTED_READING_ACTIONS, EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
 export { ReadingApiError } from './session/api-error';
-import { isReadingArticle, parseReadingListPage, type ReadingArticle, type ReadingListPage } from './storage/record-validation';
+import { isReadingArticle, isReadingItem, parseReadingListPage, type ReadingArticle, type ReadingListPage } from './storage/record-validation';
+import { mapBounded } from '@/platform/map-bounded';
+import { sha256Hex } from '@/platform/sha256';
+import { isSha256Hex } from '@/platform/validation';
+import type { FeatureKeys } from '../encryption/encryption-keys';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { checkEncryptionSignals, EncryptionStateChangedError, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
@@ -21,23 +25,45 @@ import { responseError } from '../connection/response-error';
 /** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
 const noteFolder = (session: ReadingSession) => readingKeys()?.folderPath ?? session.folderPath;
 
+interface SessionAnswer { token: string; sessionCurrent: () => boolean; status: number; ok: boolean; failure: { message: string; code?: string } | null; data: { id?: unknown; folderPath?: unknown; generation?: unknown; expiresAt?: unknown; day?: unknown } | null }
+async function requestReadingSession(token: string): Promise<SessionAnswer> {
+	const sessionCurrent = capturePwaSession();
+	const response = await fetch('/reading/session', { cache: 'no-store', signal: AbortSignal.timeout(20_000),
+		headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } });
+	const failure = response.ok ? null : await responseError(response, 'Reading is unavailable.');
+	const data = failure ? null : await response.json().catch(() => null) as SessionAnswer['data'];
+	return { token, sessionCurrent, status: response.status, ok: response.ok, failure, data };
+}
+
+// A session check started while the encryption check runs, for the refresh that follows.
+const EARLY_SESSION_MAX_AGE_MS = 10_000;
+let earlySession: { token: string; startedAt: number; answer: Promise<SessionAnswer> } | undefined;
+/** Starts the next `connectReadingFromReminders` request now. Only its network request
+ * runs early; the call that uses the answer applies it, as before. */
+export function prefetchReadingSession(): void {
+	const token = localStorage.getItem(AUTH_TOKEN_KEY);
+	if (!token) return;
+	const entry = { token, startedAt: Date.now(), answer: requestReadingSession(token) };
+	earlySession = entry;
+	// A failed check is never reused; the next caller asks again.
+	entry.answer.then(answer => { if (!answer.ok && earlySession === entry) earlySession = undefined; }, () => { if (earlySession === entry) earlySession = undefined; });
+}
+
 /** The Reminders credential's Reading session. `day` is the server's operation day
  * from the same response, so a drain right after it need not ask again. */
 export async function connectReadingFromReminders(): Promise<{ session: ReadingSession; day?: number } | null> {
 	const token = localStorage.getItem(AUTH_TOKEN_KEY);
 	if (!token) return null;
-	const sessionCurrent = capturePwaSession();
-	const response = await fetch('/reading/session', { cache: 'no-store', signal: AbortSignal.timeout(20_000),
-		headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } });
-	const failure = response.ok ? null : await responseError(response, 'Reading is unavailable.');
-	const data = failure ? null : await response.json().catch(() => null) as { id?: unknown; folderPath?: unknown; generation?: unknown; expiresAt?: unknown; day?: unknown } | null;
+	const early = earlySession; earlySession = undefined;
+	const { sessionCurrent, status, failure, data } = await (early?.token === token && Date.now() - early.startedAt < EARLY_SESSION_MAX_AGE_MS
+		? early.answer : requestReadingSession(token));
 	if (!sessionCurrent() || localStorage.getItem(AUTH_TOKEN_KEY) !== token) {
 		const stored = readingSession();
 		return stored && { session: stored };
 	}
-	if (response.status === 401) reportExpiredConnection(token);
-	if (response.status === 423) requestSharedFeaturesRefresh(true);
-	if (failure) throw new ReadingApiError(failure.message, response.status, failure.code);
+	if (status === 401) reportExpiredConnection(token);
+	if (status === 423) requestSharedFeaturesRefresh(true);
+	if (failure) throw new ReadingApiError(failure.message, status, failure.code);
 	if (!data || typeof data.id !== 'string' || !data.id || typeof data.folderPath !== 'string' || !data.folderPath
 		|| typeof data.generation !== 'string' || !data.generation || typeof data.expiresAt !== 'number' || !Number.isFinite(data.expiresAt)) {
 		throw new Error('The server returned an invalid Reading session.');
@@ -70,23 +96,27 @@ async function rawReadingRequest(path: string, session: ReadingSession | null, b
 export function readingRequest<T>(path: string, session: ReadingSession | null, body?: string): Promise<T> {
 	return retryAfterEncryptionChange(refresh => preparedReadingRequest<T>(path, session, body, refresh));
 }
+/** The encrypted client for this session and key generation. */
+function encryptedReadingApi(session: ReadingSession, keys: FeatureKeys): EncryptedReadingApi {
+	const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.generation]);
+	const indexIdentity = JSON.stringify([keys.vaultId, keys.generation, keys.folderPath]);
+	if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
+		captureArticle: url => captureServerArticle(url, body => rawReadingRequest('/reading/encrypted-extract', session, body)),
+		folderPath: keys.folderPath, wireFolder: keys.wireFolder, paths: keys.paths, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault, seal: keys.seal },
+		request: (route, wire) => rawReadingRequest(route, session, wire),
+		readAttempt: id => readReadingAttempt(session, id),
+		writeAttempt: (id, attempt) => writeReadingAttempt(session, id, attempt),
+		loadIndex: () => readEncryptedReadingIndex(session, indexIdentity, keys.folderPath),
+		saveIndex: entries => writeEncryptedReadingIndex(session, indexIdentity, entries),
+		error: (message, status, code) => new ReadingApiError(message, status, code),
+	}) };
+	return encryptedClient.api;
+}
 async function preparedReadingRequest<T>(path: string, session: ReadingSession | null, body?: string, refresh = false): Promise<T> {
 	if (session) {
 		const keys = await prepareReadingEncryption(session, refresh, body !== undefined);
 		if (keys && ENCRYPTED_READING_PATH.test(path)) {
-			const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.generation]);
-			const indexIdentity = JSON.stringify([keys.vaultId, keys.generation, keys.folderPath]);
-			if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
-				captureArticle: url => captureServerArticle(url, body => rawReadingRequest('/reading/encrypted-extract', session, body)),
-				folderPath: keys.folderPath, wireFolder: keys.wireFolder, paths: keys.paths, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault, seal: keys.seal },
-				request: (route, wire) => rawReadingRequest(route, session, wire),
-				readAttempt: id => readReadingAttempt(session, id),
-				writeAttempt: (id, attempt) => writeReadingAttempt(session, id, attempt),
-				loadIndex: () => readEncryptedReadingIndex(session, indexIdentity, keys.folderPath),
-				saveIndex: entries => writeEncryptedReadingIndex(session, indexIdentity, entries),
-				error: (message, status, code) => new ReadingApiError(message, status, code),
-			}) };
-			const value = await encryptedClient.api.request(path, body); assertReadingSession(session);
+			const value = await encryptedReadingApi(session, keys).request(path, body); assertReadingSession(session);
 			return value as T;
 		}
 		if (!keys) encryptedClient = undefined;
@@ -177,8 +207,29 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
 	return commitReadingCache(session, { ...cache, ...(deltaBase ? { deltaBase } : {}) });
 }
 
-/** A confirmed edit and the library revisions the server reported around it. */
-export interface ReadingWrite { itemId: string; library?: unknown; deleted?: true }
+/** A confirmed edit and the library revisions the server reported around it. `article`
+ * is the committed item that a newer server returns with an update. */
+export interface ReadingWrite { itemId: string; library?: unknown; article?: unknown; deleted?: true }
+
+// Edited items reload a few at a time.
+const ITEM_RELOAD_CONCURRENCY = 3;
+
+/** The committed item from an update response, or null when the server sent none. */
+function committedArticle(value: unknown, folder: string, id: string): { item: ReadingItem; etag?: string; markdownHash?: string } | null {
+	if (!value || typeof value !== 'object') return null;
+	const { item, etag, markdownHash } = value as { item?: unknown; etag?: unknown; markdownHash?: unknown };
+	if (!isReadingItem(item, folder) || item.crate_reading_id !== id || !item.path) return null;
+	return { item, ...(typeof etag === 'string' && etag.length <= 128 ? { etag } : {}), ...(isSha256Hex(markdownHash) ? { markdownHash } : {}) };
+}
+
+/** Moves an offline copy to the committed revision when its body is unchanged, so an open
+ * reader shows it without downloading the article again. */
+async function refreshSavedArticle(session: ReadingSession, item: ReadingItem, etag: string, markdownHash: string): Promise<void> {
+	try {
+		const saved = await readReadingArticle(session, item.crate_reading_id);
+		if (saved && await sha256Hex(saved.markdown) === markdownHash) await cacheReadingArticle(session, item, saved.markdown, { etag, refresh: true });
+	} catch { /* The copy is only a cache; the reader downloads the article instead. */ }
+}
 
 /** Edits that chain from the cached library revision only need their items again; any
  * other write, a lost response or a missing revision reloads the whole library. */
@@ -194,15 +245,50 @@ export async function reloadReadingAfterWrites(session: ReadingSession, writes: 
 	if (!previous || !writes.length) return loadReading(session, previous);
 	const items = new Map<string, ReadingItem | null>(previous.items.map(item => [item.crate_reading_id, item]));
 	const deleted = new Set(writes.flatMap(write => write.deleted ? [write.itemId] : []));
-	for (const id of new Set(writes.map(write => write.itemId))) {
-		if (!items.has(id)) return loadReading(session, previous);
-		items.set(id, deleted.has(id) ? null : (await loadReadingArticle(session, id)).item);
-	}
+	// The last write to an item returned its committed state; an older server returns none.
+	const latest = new Map(writes.map(write => [write.itemId, write]));
+	const ids = [...latest.keys()];
+	if (ids.some(id => !items.has(id))) return loadReading(session, previous);
+	await mapBounded(ids, ITEM_RELOAD_CONCURRENCY, async id => {
+		if (deleted.has(id)) { items.set(id, null); return; }
+		const committed = committedArticle(latest.get(id)!.article, noteFolder(session), id);
+		if (committed) {
+			items.set(id, committed.item);
+			if (committed.etag && committed.markdownHash) await refreshSavedArticle(session, committed.item, committed.etag, committed.markdownHash);
+			return;
+		}
+		const article = await loadReadingArticle(session, id);
+		items.set(id, article.item);
+		// Keep an offline copy current, so an open reader does not download the same body again.
+		await cacheReadingArticle(session, article.item, article.markdown, { etag: article.etag, refresh: true }).catch(() => false);
+	});
 	return commitReadingCache(session, { ...previous, items: previous.items.flatMap(item => items.get(item.crate_reading_id) ?? []), savedAt: Date.now(), revision });
 }
 
-export async function loadReadingArticle(session: ReadingSession, id: string): Promise<ReadingArticle> {
-	const article = await readingRequest<unknown>(`/reading/item?id=${encodeURIComponent(id)}`, session);
+/** `etag` names the server revision of the article; an encrypted vault derives it from the note's file. */
+export type LoadedReadingArticle = ReadingArticle & { etag?: string };
+/** With the ETag of a saved copy, resolves to null while that copy is current. */
+export async function loadReadingArticle(session: ReadingSession, id: string): Promise<LoadedReadingArticle>;
+export async function loadReadingArticle(session: ReadingSession, id: string, savedEtag: string | undefined): Promise<LoadedReadingArticle | null>;
+export async function loadReadingArticle(session: ReadingSession, id: string, savedEtag?: string): Promise<LoadedReadingArticle | null> {
+	const result = await retryAfterEncryptionChange(async refresh => {
+		const keys = await prepareReadingEncryption(session, refresh);
+		if (keys) {
+			const value = await encryptedReadingApi(session, keys).item(id, savedEtag); assertReadingSession(session);
+			return value;
+		}
+		encryptedClient = undefined;
+		const response = await rawReadingRequest(`/reading/item?id=${encodeURIComponent(id)}`, session, undefined, savedEtag ? { 'If-None-Match': savedEtag } : {});
+		if (response.status === 304 && savedEtag) { assertReadingSession(session); return null; }
+		const failure = response.ok ? null : await responseError(response, 'Reading request failed.');
+		const article: unknown = failure ? null : await response.json();
+		assertReadingSession(session);
+		if (failure) throw new ReadingApiError(failure.message, response.status, failure.code);
+		const etag = response.headers.get('ETag');
+		return { article, ...(etag && etag.length <= 128 ? { etag } : {}) };
+	});
+	if (!result) return null;
+	const { article } = result;
 	if (!isReadingArticle(article, noteFolder(session), id) || !article.item.path) throw new Error('Reading article response is unreadable.');
-	return article;
+	return { item: article.item, markdown: article.markdown, ...(result.etag ? { etag: result.etag } : {}) };
 }

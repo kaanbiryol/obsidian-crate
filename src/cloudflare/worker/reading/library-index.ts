@@ -161,13 +161,23 @@ export interface StoredReadingFile { path: string; storageKey: string; hash: str
 /** `epoch`, `seq` and `removedSeq` bound the deltas this index can answer. */
 export type ReadingIndexState = { state: 'complete' | 'pending' | 'unavailable'; revision: string; epoch: string; seq: number; removedSeq: number; rebuilt?: boolean };
 
+export interface ReadingIndexRow { scope: string; revision: string; cursor: string | null; epoch: string; seq: number; removedSeq: number }
+export const readingIndexStatement = (db: D1Database) => db.prepare('SELECT scope, revision, cursor, epoch, seq, removed_seq AS removedSeq FROM reading_index WHERE id = 1');
+
+/** The state of an index row that is complete for `current`, or null when it must be (re)built. */
+export function completeReadingIndex(current: ReadingPolicy, index: ReadingIndexRow | null): ReadingIndexState | null {
+	return index?.scope === readingIndexScope(current) && index.cursor === null
+		? { state: 'complete', revision: index.revision, epoch: index.epoch, seq: index.seq, removedSeq: index.removedSeq } : null;
+}
+
 /** The index state for `current`. While the index is being rebuilt, each call indexes
- * the next files from R2; a failed read keeps the position and reports `unavailable`. */
-export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readBytes: (file: StoredReadingFile) => Promise<ArrayBuffer>): Promise<ReadingIndexState> {
+ * the next files from R2; a failed read keeps the position and reports `unavailable`.
+ * `loaded` is the index row when the caller already read it in a batch. */
+export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readBytes: (file: StoredReadingFile) => Promise<ArrayBuffer>, loaded?: ReadingIndexRow | null): Promise<ReadingIndexState> {
 	const db = env.DB, scope = readingIndexScope(current);
-	let index = await db.prepare('SELECT scope, revision, cursor, epoch, seq, removed_seq AS removedSeq FROM reading_index WHERE id = 1')
-		.first<{ scope: string; revision: string; cursor: string | null; epoch: string; seq: number; removedSeq: number }>();
-	if (index?.scope === scope && index.cursor === null) return { state: 'complete', revision: index.revision, epoch: index.epoch, seq: index.seq, removedSeq: index.removedSeq };
+	let index = loaded !== undefined ? loaded : await readingIndexStatement(db).first<ReadingIndexRow>();
+	const complete = completeReadingIndex(current, index);
+	if (complete) return complete;
 	if (index?.scope !== scope) {
 		// A new build starts a new epoch, so no delta base from an earlier build applies.
 		index = { scope, revision: crypto.randomUUID(), cursor: '', epoch: crypto.randomUUID(), seq: 0, removedSeq: 0 };

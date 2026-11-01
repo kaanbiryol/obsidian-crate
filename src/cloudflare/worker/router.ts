@@ -1,5 +1,6 @@
 import { featureEnabled, handleFeaturePolicy, parseStoredFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
+import { forwardToCoordinator } from './coordinator/coordinator';
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES } from '../../encryption/receipt-format';
 import { parseJsonObject } from './request-validation';
 import { limitNotificationAction } from './rate-limit';
@@ -73,7 +74,8 @@ export async function handleAuthenticatedRoute(
 		// Sessions follow reminders folder changes; the web app switches to the folder named here.
 		if (folder !== principal.folderPath) return corsResponse({ error: 'The reminders folder changed', code: REMINDERS_FOLDER_CHANGED, folderPath: principal.folderPath }, 403);
 	}
-	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, coordinatorState, encryption, featurePolicyValue);
+	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, coordinatorState, encryption, featurePolicyValue,
+		coordinatorState ? undefined : () => forwardToCoordinator(env, request));
 	const db = env.DB;
 	const limited = await limitNotificationAction(request, db, principal.tokenId);
 	if (limited) return limited;
