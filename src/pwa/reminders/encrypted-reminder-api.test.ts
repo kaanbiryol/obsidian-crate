@@ -4,28 +4,29 @@ import { encryptJson, importEncryptionSecret } from '@/encryption/envelope';
 import { sha256Hex } from '@/platform/sha256';
 import { importNotificationFingerprintKey } from '@/encryption/reminder-projection';
 import { importSealPrivateKey } from '@/encryption/seal-key';
-import { EncryptedReminderApi } from './encrypted-reminder-api';
-import { saveEncryptedReminderIndex } from './encrypted-reminder-attempts';
-import { invalidatePwaSession } from '../connection/session-generation';
+import { EncryptedReminderApi, type EncryptedReminderStore } from './encrypted-reminder-api';
+import type { EncryptedReminderAttempt, IndexedReminderNote } from './encrypted-reminder-attempts';
+import type { ApiFetch } from '../types';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { openFile, sealFile } from '@/encryption/file-codec';
 import type { ReminderRecord } from './types';
 import { derivePathTagKey, PathTags } from '@/encryption/path-tags';
 
-const attempts = vi.hoisted(() => new Map<string, unknown>());
-const indexes = vi.hoisted(() => new Map<string, { identity: string; notes: unknown }>());
-vi.mock('./encrypted-reminder-attempts', async importOriginal => ({
-	MAX_ENCRYPTED_REMINDER_FILES: (await importOriginal<typeof import('./encrypted-reminder-attempts')>()).MAX_ENCRYPTED_REMINDER_FILES,
-	loadEncryptedReminderAttempt: async (id: string) => attempts.get(id),
-	saveEncryptedReminderAttempt: async (id: string, value: unknown) => { attempts.set(id, value); },
-	loadEncryptedReminderIndex: async (scope: string, identity: string) => indexes.get(scope)?.identity === identity ? structuredClone(indexes.get(scope)!.notes) : undefined,
-	saveEncryptedReminderIndex: vi.fn(async (scope: string, identity: string, notes: unknown) => { indexes.set(scope, { identity, notes: structuredClone(notes) }); }),
-}));
+const attempts = new Map<string, unknown>();
+const indexes = new Map<string, { identity: string; notes: unknown }>();
+const store: EncryptedReminderStore = {
+	loadAttempt: async id => attempts.get(id) as EncryptedReminderAttempt | undefined,
+	saveAttempt: async (id, value) => { attempts.set(id, value); },
+	pruneAttempts: async (_scope, _day, _current, after) => after,
+	loadIndex: async (scope, identity) => indexes.get(scope)?.identity === identity ? structuredClone(indexes.get(scope)!.notes) as IndexedReminderNote[] : undefined,
+	saveIndex: vi.fn(async (scope: string, identity: string, notes: unknown) => { indexes.set(scope, { identity, notes: structuredClone(notes) }); }),
+};
+const client = (fetch: ApiFetch, current = () => true) => new EncryptedReminderApi(keys, fetch, { store, current });
 
 let keys: FeatureKeys;
 beforeEach(async () => {
 	attempts.clear(); indexes.clear();
-	vi.stubGlobal('localStorage', { getItem: () => 'session-token' });
+	// Without Web Locks the client skips background attempt cleanup.
 	vi.stubGlobal('navigator', {});
 	const bundle = await createVaultKeyBundle();
 	const pathTag = await derivePathTagKey(bundle.vaultId, bundle.vault), paths = new PathTags(pathTag);
@@ -41,7 +42,7 @@ const page = (sequence: number, nextCursor: string | null = null) => ({ files: [
 
 it('checks only the first inventory page when a complete cached snapshot is unchanged', async () => {
 	const fetch = vi.fn(async () => Response.json(page(7, 'Reminders/next.md')));
-	const api = new EncryptedReminderApi(keys, fetch);
+	const api = client(fetch);
 	const response = await api.handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } });
 	expect(response?.status).toBe(304);
 	expect(response?.headers.get('ETag')).toBe(etag(7));
@@ -53,7 +54,7 @@ it('still paginates and confirms the sequence when the cached snapshot is older'
 		.mockResolvedValueOnce(Response.json(page(8, 'Reminders/next.md')))
 		.mockResolvedValueOnce(Response.json(page(8)))
 		.mockResolvedValueOnce(Response.json(page(8)));
-	const response = await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } });
+	const response = await client(fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } });
 	expect(response?.status).toBe(200);
 	expect(response?.headers.get('ETag')).toBe(etag(8));
 	expect(fetch).toHaveBeenCalledTimes(3);
@@ -61,32 +62,33 @@ it('still paginates and confirms the sequence when the cached snapshot is older'
 });
 
 it('does not acknowledge an unchanged snapshot after the session changes', async () => {
-	const fetch = vi.fn(async () => { invalidatePwaSession(); return Response.json(page(7)); });
-	await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } })).rejects.toThrow('Session changed');
+	let signedIn = true;
+	const fetch = vi.fn(async () => { signedIn = false; return Response.json(page(7)); });
+	await expect(client(fetch, () => signedIn).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } })).rejects.toThrow('Session changed');
 });
 
 it('validates encryption generation before using the unchanged-snapshot shortcut', async () => {
 	const fetch = vi.fn(async () => Response.json({ ...page(7), generation: keys.generation + 1 }));
-	await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } })).rejects.toThrow('Invalid encrypted file inventory');
+	await expect(client(fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } })).rejects.toThrow('Invalid encrypted file inventory');
 });
 
 it('bounds empty advancing encrypted pages independently of the file budget', async () => {
 	const fetch = vi.fn(async () => Response.json(page(7, `cursor-${String(fetch.mock.calls.length).padStart(5, '0')}`)));
-	await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('limit');
+	await expect(client(fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('limit');
 	expect(fetch).toHaveBeenCalledTimes(1000);
 });
 
 it.each([['A', 'A'], ['A', 'B', 'A']])('rejects an encrypted cursor cycle: %j', async (...cursors) => {
 	const fetch = vi.fn();
 	for (const cursor of cursors) fetch.mockResolvedValueOnce(Response.json(page(7, cursor)));
-	await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('did not advance');
+	await expect(client(fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('did not advance');
 	expect(fetch).toHaveBeenCalledTimes(cursors.length);
 });
 
 it('rejects a malformed later page before downloading any files', async () => {
 	const fetch = vi.fn().mockResolvedValueOnce(Response.json(page(7, 'A')))
 		.mockResolvedValueOnce(Response.json({ ...page(7), files: [null] }));
-	await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('Invalid encrypted file');
+	await expect(client(fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('Invalid encrypted file');
 	expect(fetch).toHaveBeenCalledTimes(2);
 });
 
@@ -94,21 +96,21 @@ it('rejects duplicate paths before downloading or projecting files', async () =>
 	const file = { path: await keys.paths.wire('Reminders/Inbox.md'), hash: 'a'.repeat(64), revision: 'first', size: 12 };
 	const fetch = vi.fn().mockResolvedValueOnce(Response.json({ ...page(7, 'A'), files: [file] }))
 		.mockResolvedValueOnce(Response.json({ ...page(7), files: [file] }));
-	await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('repeated a file');
+	await expect(client(fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('repeated a file');
 	expect(fetch).toHaveBeenCalledTimes(2);
 });
 
 it('rejects repeated paths before acknowledging an unchanged inventory', async () => {
 	const file = { path: await keys.paths.wire('Reminders/Inbox.md'), hash: 'a'.repeat(64), revision: 'first', size: 12 };
 	const fetch = vi.fn(async () => Response.json({ ...page(7), files: [file, file] }));
-	await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } })).rejects.toThrow('repeated a file');
+	await expect(client(fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } })).rejects.toThrow('repeated a file');
 	expect(fetch).toHaveBeenCalledOnce();
 });
 
 it('retains bounded retries when a sequence changes between pages', async () => {
 	const fetch = vi.fn();
 	for (let attempt = 0; attempt < 3; attempt++) fetch.mockResolvedValueOnce(Response.json(page(7, 'A'))).mockResolvedValueOnce(Response.json(page(8)));
-	await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('changed while loading');
+	await expect(client(fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('changed while loading');
 	expect(fetch).toHaveBeenCalledTimes(6);
 });
 
@@ -118,7 +120,7 @@ it('publishes decrypted cache entries only after the complete inventory is confi
 	const original = await seal('- [ ] Original <!-- crate-id:task -->\n'), changed = await seal('- [ ] Changed <!-- crate-id:task -->\n');
 	const inventory = (sealed: typeof original) => ({ ...page(7), files: [{ path: wire, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }] });
 	const fetch = vi.fn(async (route: string) => route.startsWith('/reminders/encrypted-file?') ? new Response(original.bytes) : Response.json(inventory(original)));
-	const api = new EncryptedReminderApi(keys, fetch);
+	const api = client(fetch);
 	await api.handle('/reminders/list?folderPath=Reminders');
 	fetch.mockResolvedValueOnce(Response.json(inventory(changed))).mockResolvedValueOnce(new Response(changed.bytes))
 		.mockResolvedValueOnce(Response.json({ ...page(7), nextCursor: {} }));
@@ -148,9 +150,9 @@ it('downloads only changed notes after a restart with a newer vault sequence', a
 		const wire = new URLSearchParams(route.slice(route.indexOf('?'))).get('path');
 		return new Response(notes.find(entry => entry.wire === wire)!.sealed.bytes);
 	});
-	await new EncryptedReminderApi(keys, serve(1, [inbox, work])).handle('/reminders/list?folderPath=Reminders');
+	await client(serve(1, [inbox, work])).handle('/reminders/list?folderPath=Reminders');
 	const fetch = serve(2, [inbox, edited]);
-	const listed = await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders');
+	const listed = await client(fetch).handle('/reminders/list?folderPath=Reminders');
 	expect((await listed!.json() as { reminders: ReminderRecord[] }).reminders.map(reminder => reminder.content).sort()).toEqual(['Edited work task', 'Inbox task']);
 	expect(fetch.mock.calls.filter(([route]) => route.startsWith('/reminders/encrypted-file?'))).toHaveLength(1);
 });
@@ -168,16 +170,16 @@ it('reseals the persisted index only after the listed notes change', async () =>
 		if (route.startsWith('/reminders/encrypted-files?')) return Response.json({ ...page(sequence), files: notes.map(({ wire, sealed }) => ({ path: wire, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash })) });
 		return new Response(notes[0]!.sealed.bytes);
 	});
-	const saves = vi.mocked(saveEncryptedReminderIndex).mock.calls.length;
-	await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders');
-	expect(vi.mocked(saveEncryptedReminderIndex).mock.calls.length).toBe(saves + 1);
+	const saves = vi.mocked(store.saveIndex).mock.calls.length;
+	await client(fetch).handle('/reminders/list?folderPath=Reminders');
+	expect(vi.mocked(store.saveIndex).mock.calls.length).toBe(saves + 1);
 	// A restart reuses the saved index; changes elsewhere in the vault rewrite nothing.
-	const restarted = new EncryptedReminderApi(keys, fetch);
+	const restarted = client(fetch);
 	for (sequence of [2, 3]) await restarted.handle('/reminders/list?folderPath=Reminders');
-	expect(vi.mocked(saveEncryptedReminderIndex).mock.calls.length).toBe(saves + 1);
+	expect(vi.mocked(store.saveIndex).mock.calls.length).toBe(saves + 1);
 	sequence = 4; notes = [edited];
 	await restarted.handle('/reminders/list?folderPath=Reminders');
-	expect(vi.mocked(saveEncryptedReminderIndex).mock.calls.length).toBe(saves + 2);
+	expect(vi.mocked(store.saveIndex).mock.calls.length).toBe(saves + 2);
 });
 
 it('commits a semantic revision to the listed note sealed with the vault key', async () => {
@@ -193,7 +195,7 @@ it('commits a semantic revision to the listed note sealed with the vault key', a
 		const body = JSON.parse(init!.body as string) as { acknowledgment: string; files: Array<{ path: string; content: string }> }; commits.push(body);
 		return Response.json({ encrypted: body.acknowledgment });
 	};
-	const api = new EncryptedReminderApi(keys, fetch);
+	const api = client(fetch);
 	const original = await (await api.handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: ReminderRecord[] };
 	const reminder = original.reminders[0]!;
 	expect(reminder).toBeDefined();
@@ -229,7 +231,7 @@ it('downloads only changed notes even when the folder exceeds the content cache'
 		return Response.json({ ...page(sequence, files.length === 1000 ? files.at(-1)!.wire : null),
 			files: files.map(note => ({ path: note.wire, hash: note.sealed.hash, size: note.sealed.bytes.length, revision: note.sealed.hash })) });
 	});
-	const api = new EncryptedReminderApi(keys, fetch);
+	const api = client(fetch);
 	expect((await (await api.handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: unknown[] }).reminders).toHaveLength(count);
 	const { path, wire } = notes[0]!;
 	notes[0] = { path, wire, sealed: await sealFile({ path, content: new TextEncoder().encode('- [x] Task 0 <!-- crate-id:t0 -->\n'), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
@@ -259,7 +261,7 @@ it('downloads cold notes with bounded concurrency while keeping note order and i
 		}
 		return Response.json({ ...page(4), files: notes.map(note => ({ path: note.wire, hash: note.sealed.hash, size: note.sealed.bytes.length, revision: note.sealed.hash })) });
 	});
-	const listed = await (await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: Array<{ id: string }>; issues: Array<{ path: string }> };
+	const listed = await (await client(fetch).handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: Array<{ id: string }>; issues: Array<{ path: string }> };
 	expect(maxInFlight).toBeGreaterThan(1);
 	expect(maxInFlight).toBeLessThanOrEqual(6);
 	expect(listed.reminders.map(reminder => reminder.id)).toEqual(Array.from({ length: 20 }, (_, index) => `t${index}`).filter(id => id !== 't3'));
@@ -268,7 +270,7 @@ it('downloads cold notes with bounded concurrency while keeping note order and i
 
 it('leaves page-title lookups to the server, which reads the link without storing it', async () => {
 	const fetch = vi.fn();
-	expect(await new EncryptedReminderApi(keys, fetch).handle('/links/title', { method: 'POST', body: JSON.stringify({ url: 'https://private.example' }) })).toBeNull();
+	expect(await client(fetch).handle('/links/title', { method: 'POST', body: JSON.stringify({ url: 'https://private.example' }) })).toBeNull();
 	expect(fetch).not.toHaveBeenCalled();
 });
 
@@ -278,7 +280,7 @@ const semanticHash = async (action: string, body: string) => sha256Hex(new TextE
 
 it('rejects encrypted changes for another folder or with an invalid operation id before any request', async () => {
 	const fetch = vi.fn();
-	const api = new EncryptedReminderApi(keys, fetch);
+	const api = client(fetch);
 	for (const body of [{ folderPath: 'Other', operationId }, { folderPath: 'Reminders', operationId: 'short' }]) {
 		const response = await api.handle('/reminders/update', { method: 'POST', body: JSON.stringify(body) });
 		expect(response?.status).toBe(400);
@@ -290,7 +292,7 @@ it('rejects encrypted changes for another folder or with an invalid operation id
 
 it('rejects a title that would hide the reminder as invalid input without saving an attempt', async () => {
 	const fetch = vi.fn(async (path: string) => path.startsWith('/reminders/encrypted-receipt?') ? Response.json({ envelope: null }) : Response.json(page(1)));
-	const response = await new EncryptedReminderApi(keys, fetch).handle('/reminders/create', { method: 'POST',
+	const response = await client(fetch).handle('/reminders/create', { method: 'POST',
 		body: JSON.stringify({ folderPath: 'Reminders', operationId, id: operationId, content: '!', project: 'Inbox' }) });
 	expect(response?.status).toBe(400);
 	expect(await response?.json()).toMatchObject({ code: 'invalid_reminder_input' });
@@ -301,7 +303,7 @@ it('rejects a title that would hide the reminder as invalid input without saving
 it('keeps an unresolved encrypted save from being replaced by different content', async () => {
 	attempts.set(`${keys.vaultId}:vault:${operationId}`, { semanticHash: 'different', generation: keys.generation, body: '{}' });
 	const fetch = vi.fn();
-	await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/update', { method: 'POST', body: updateBody() }))
+	await expect(client(fetch).handle('/reminders/update', { method: 'POST', body: updateBody() }))
 		.rejects.toThrow('original encrypted save is still unresolved');
 	expect(fetch).not.toHaveBeenCalled();
 });
@@ -311,7 +313,7 @@ it('answers a retried save from its encrypted acknowledgment without contacting 
 	const acknowledgment = await encryptJson({ reminder: { id: 'one' } }, keys.vault, { vaultId: keys.vaultId, scopeId: 'vault', objectId: operationId, purpose: 'reminder' });
 	attempts.set(`${keys.vaultId}:vault:${operationId}`, { semanticHash: await semanticHash('update', body), generation: keys.generation, body: '{}', acknowledgment });
 	const fetch = vi.fn();
-	const response = await new EncryptedReminderApi(keys, fetch).handle('/reminders/update', { method: 'POST', body });
+	const response = await client(fetch).handle('/reminders/update', { method: 'POST', body });
 	expect(await response?.json()).toEqual({ reminder: { id: 'one' } });
 	expect(fetch).not.toHaveBeenCalled();
 });

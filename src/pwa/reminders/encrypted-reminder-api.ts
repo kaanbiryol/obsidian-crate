@@ -40,8 +40,24 @@ async function json<T>(response: Response): Promise<T> {
 	return response.json() as Promise<T>;
 }
 
+/** Where the client keeps encrypted attempts and its parsed-note index. */
+export interface EncryptedReminderStore {
+	loadAttempt: typeof loadEncryptedReminderAttempt;
+	saveAttempt: typeof saveEncryptedReminderAttempt;
+	pruneAttempts: typeof pruneEncryptedReminderAttempts;
+	loadIndex: typeof loadEncryptedReminderIndex;
+	saveIndex: typeof saveEncryptedReminderIndex;
+}
+const encryptedReminderStore: EncryptedReminderStore = {
+	loadAttempt: loadEncryptedReminderAttempt, saveAttempt: saveEncryptedReminderAttempt, pruneAttempts: pruneEncryptedReminderAttempts,
+	loadIndex: loadEncryptedReminderIndex, saveIndex: saveEncryptedReminderIndex,
+};
+/** `current` reports whether the sign-in this client was created for still holds. */
+export interface EncryptedReminderApiOptions { store?: EncryptedReminderStore; current?: () => boolean }
+
 export class EncryptedReminderApi {
-	private readonly current = capturePwaSession();
+	private readonly current: () => boolean;
+	private readonly store: EncryptedReminderStore;
 	private cached = new Map<string, { file: RemoteFile; path: string; content: string; issue?: string }>();
 	// Parsed reminders per immutable revision. Unlike the bounded content cache,
 	// this keeps every current note, so a change re-downloads only changed notes.
@@ -51,7 +67,10 @@ export class EncryptedReminderApi {
 	private indexLoaded = false;
 	// The parsed notes the persisted index holds, so an unchanged list skips resealing it.
 	private persistedIndex?: Map<string, ScannedNote>;
-	constructor(private readonly keys: FeatureKeys, private readonly fetch: ApiFetch) {}
+	constructor(private readonly keys: FeatureKeys, private readonly fetch: ApiFetch,
+		{ store = encryptedReminderStore, current = capturePwaSession() }: EncryptedReminderApiOptions = {}) {
+		this.store = store; this.current = current;
+	}
 	/** Notes, projects and requests from the app use plaintext paths; the server sees `wireFolder`. */
 	private get localFolder() { return this.keys.folderPath; }
 	private authority(wire: string) {
@@ -66,7 +85,7 @@ export class EncryptedReminderApi {
 		if (this.indexLoaded) return;
 		this.indexLoaded = true;
 		try {
-			const notes = await loadEncryptedReminderIndex(this.indexScope, this.indexIdentity);
+			const notes = await this.store.loadIndex(this.indexScope, this.indexIdentity);
 			if (notes) this.persistedIndex = new Map(notes.map(note => [note.file.revision, note as ScannedNote]));
 			for (const note of notes ?? []) {
 				if (!this.scanned.has(note.file.revision)) this.scanned.set(note.file.revision, note as ScannedNote);
@@ -182,7 +201,7 @@ export class EncryptedReminderApi {
 				// Unchanged notes keep their parsed objects, so identity shows the index is current.
 				const persisted = this.persistedIndex;
 				if (persisted?.size !== nextScanned.size || [...nextScanned].some(([revision, note]) => persisted.get(revision) !== note)) {
-					void saveEncryptedReminderIndex(this.indexScope, this.indexIdentity, [...nextScanned.values()], this.current)
+					void this.store.saveIndex(this.indexScope, this.indexIdentity, [...nextScanned.values()], this.current)
 						.then(() => { this.persistedIndex = nextScanned; }, () => {});
 				}
 				return Response.json(result, { headers: { ETag: etag } });
@@ -203,7 +222,7 @@ export class EncryptedReminderApi {
 		this.lastCleanup = now;
 		this.cleanupRunning = true;
 		void requireCompatibleServer().then(info => navigator.locks.request(REMINDER_OUTBOX_LOCK, { ifAvailable: true }, async lock => {
-			if (lock && info.reminderOperationDay !== undefined) this.cleanupCursor = await pruneEncryptedReminderAttempts(this.keys, info.reminderOperationDay, this.current, this.cleanupCursor);
+			if (lock && info.reminderOperationDay !== undefined) this.cleanupCursor = await this.store.pruneAttempts(this.keys, info.reminderOperationDay, this.current, this.cleanupCursor);
 		})).catch(() => { /* Cleanup failure never blocks reminders or changes pending work. */ })
 			.finally(() => { this.cleanupRunning = false; });
 	}
@@ -214,14 +233,14 @@ export class EncryptedReminderApi {
 		const body = { ...original, operationId: original.operationId };
 		const key = this.attemptKey(body.operationId);
 		const semanticHash = await sha256Hex(new TextEncoder().encode(JSON.stringify([action, source])).buffer);
-		let attempt = await loadEncryptedReminderAttempt(key);
+		let attempt = await this.store.loadAttempt(key);
 		if (attempt && attempt.semanticHash !== semanticHash && !attempt.rejected) throw new Error('The original encrypted save is still unresolved. Retry it before changing the request.');
 		const movedAttempt = attempt && attempt.generation !== this.keys.generation;
 		if (attempt?.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.vault, this.context(body.operationId)));
 		if (attempt && movedAttempt) {
 			// Other keys can no longer publish, so this immutable attempt never committed; retain its semantic ID.
 			const rejected = { ...attempt, rejected: true };
-			await saveEncryptedReminderAttempt(key, rejected, attempt, this.current); attempt = rejected;
+			await this.store.saveAttempt(key, rejected, attempt, this.current); attempt = rejected;
 		}
 		for (let retry = 0; retry < 2; retry++) {
 			if (!attempt || attempt.rejected) {
@@ -245,7 +264,7 @@ export class EncryptedReminderApi {
 				const acknowledgment = await encryptJson(command.response, this.keys.vault, this.context(body.operationId));
 				const next: Attempt = { semanticHash, generation: this.keys.generation, body: JSON.stringify({ folderPath: this.keys.wireFolder, operationId: body.operationId,
 					files: replacements, acknowledgment, ...(command.createdId ? { createdId: command.createdId } : {}) }) };
-				await saveEncryptedReminderAttempt(key, next, attempt, this.current); attempt = next;
+				await this.store.saveAttempt(key, next, attempt, this.current); attempt = next;
 			}
 			this.assertCurrent();
 			if (attempt.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.vault, this.context(body.operationId)));
@@ -254,7 +273,7 @@ export class EncryptedReminderApi {
 				const details = await response.clone().json() as { code?: string };
 				if (details.code === 'version_conflict') {
 					const rejected = { ...attempt, rejected: true };
-					await saveEncryptedReminderAttempt(key, rejected, attempt, this.current); attempt = rejected;
+					await this.store.saveAttempt(key, rejected, attempt, this.current); attempt = rejected;
 					if (retry === 0) continue;
 				}
 			}
@@ -263,7 +282,7 @@ export class EncryptedReminderApi {
 			if (typeof ack.encrypted !== 'string') throw new Error('The server did not confirm the encrypted save');
 			const result = await decryptJson(ack.encrypted, this.keys.vault, this.context(body.operationId));
 			// A retry answers from the acknowledgment, so the sealed notes are no longer needed.
-			await saveEncryptedReminderAttempt(key, { ...attempt, body: '', acknowledgment: ack.encrypted }, attempt, this.current);
+			await this.store.saveAttempt(key, { ...attempt, body: '', acknowledgment: ack.encrypted }, attempt, this.current);
 			return Response.json(result);
 		}
 		throw new Error('Encrypted save could not converge');
