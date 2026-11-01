@@ -75,7 +75,7 @@ export const browserGroups = {
 		'tests/browser/plugin/conflict-review-test.mjs',
 	],
 	'file-history': ['tests/browser/plugin/file-history-test.mjs'],
-	'plugin-dialogs': ['tests/browser/plugin/plugin-dialogs-test.mjs', 'tests/browser/plugin/encryption-setup-test.mjs'],
+	'plugin-dialogs': ['tests/browser/plugin/plugin-dialogs-test.mjs', 'tests/browser/plugin/encryption-setup-test.mjs', 'tests/browser/plugin/plugin-mobile-shell-test.mjs'],
 };
 
 // These checks exercise native menus, system-font geometry, or WebKit
