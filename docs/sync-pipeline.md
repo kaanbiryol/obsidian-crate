@@ -83,7 +83,8 @@ Entry point: `engine/engine.ts:sync()` -> `planner/full.ts:createFullSyncPlan()`
 
 On a device with no successful sync, no existing file checkpoint, and no eligible
 local files outside the active Obsidian configuration folder, the first sync
-adopts existing server settings. Differing setup files are downloaded without
+adopts existing server settings. A root `Welcome.md` of 4 KiB or less does not
+count, because Obsidian creates it in every new vault; it still syncs normally. Differing setup files are downloaded without
 creating conflict copies; this includes settings created while installing BRAT
 and Crate in an otherwise empty vault. Local-only files retain ordinary upload
 behavior, and ignore patterns still apply.

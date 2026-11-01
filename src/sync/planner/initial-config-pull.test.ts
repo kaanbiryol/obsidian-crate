@@ -54,6 +54,23 @@ it.each(['note.md', '.other-settings.json'])('keeps normal conflicts when the ne
 	expect(h.context.localManifest.getInitialConfigPull()).toBeUndefined();
 });
 
+it('adopts server settings when the new vault holds only the note Obsidian creates, and still uploads it', async () => {
+	const h = await fixture();
+	h.disk.write('Welcome.md', 'This is your new *vault*.');
+	const plan = await h.plan();
+	expect(plan.downloadDiffs.map(diff => diff.path)).toContain(settingsPath);
+	expect(plan.uploadDiffs.map(diff => diff.path)).toContain('Welcome.md');
+});
+
+it('treats a large or nested welcome note as user data', async () => {
+	for (const [path, text] of [['Welcome.md', 'x'.repeat(4097)], ['Notes/Welcome.md', 'hi']]) {
+		const h = await fixture();
+		if (path.includes('/')) await h.disk.vault.adapter.mkdir('Notes');
+		h.disk.write(path, text);
+		expect((await h.plan()).remainingDiffs).toContainEqual(expect.objectContaining({ path: settingsPath, action: 'conflict' }));
+	}
+});
+
 it.each(['previous sync', 'existing checkpoint'] as const)('does not treat %s as a new empty vault', async reason => {
 	const h = await fixture();
 	if (reason === 'previous sync') h.context.initialConfigPull.firstSync = false;
