@@ -14,7 +14,6 @@ export const UPGRADE_BACKUP_STORE = `${UPGRADE_BACKUP_PREFIX}ffffffff-ffff-ffff-
 export const upgradeBackupStoreKey = (sha256: string) => `${UPGRADE_BACKUP_STORE}/objects/${sha256}`;
 
 export const MANAGED_FILE_OBJECT = /^__crate__\/files\/[a-f0-9]{64}\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
-export const UPGRADE_BACKUP_OBJECT = /^__crate__\/backups\/schema-upgrade-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\/(?:archive\.json|objects\/[a-f0-9]{64})$/;
 
 export function createManagedObjectKey(hash: string): string {
 	return `${MANAGED_FILES_PREFIX}${hash}/${crypto.randomUUID()}`;

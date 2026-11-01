@@ -4,25 +4,17 @@ import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
 import { workersDevOrigin } from '../deployment/worker-origin';
-import { literal, parseBackupRows, PREFIX, quote, readBackup, readBackupDatabase, type BackupChoice, type BackupRow, type BackupSource } from './archive';
+import { BACKUP_PREFIX, listBackupKeys, literal, manifestKey, parseBackupRows, quote, readBackup, readBackupDatabase, type BackupChoice, type BackupRow, type BackupSource } from './archive';
 import { validRestoreState, type ServerRestoreState } from './state';
 import { sha256Hex } from '../../platform/sha256';
-import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, upgradeBackupStoreKey } from '../../protocol/storage-keys';
+import { upgradeBackupStoreKey } from '../../protocol/storage-keys';
 
 export async function listUpgradeBackups(api: CloudflareApiClient, source: BackupSource): Promise<BackupChoice[]> {
-	const choices: BackupChoice[] = [], cursors = new Set<string>(); let cursor: string | undefined;
-	do {
-		const page = await api.listR2Objects(source.account, source.bucket, cursor, UPGRADE_BACKUP_PREFIX);
-		// Shared file copies sort after every backup and hold no manifests.
-		const store = page.keys.findIndex(key => key.startsWith(`${UPGRADE_BACKUP_STORE}/`));
-		for (const key of store < 0 ? page.keys : page.keys.slice(0, store)) {
-			const prefix = key.replace(/\/archive\.json$/, '');
-			if (key.endsWith('/archive.json') && PREFIX.test(prefix)) choices.push(await readBackup(api, source, prefix));
-		}
-		cursor = store < 0 ? page.cursor : undefined;
-		if (cursor && cursors.has(cursor)) throw new Error('Backup listing did not advance');
-		if (cursor) cursors.add(cursor);
-	} while (cursor);
+	const choices: BackupChoice[] = [];
+	for await (const key of listBackupKeys(api, source.account, source.bucket)) {
+		const prefix = key.replace(/\/archive\.json$/, '');
+		if (key === manifestKey(prefix) && BACKUP_PREFIX.test(prefix)) choices.push(await readBackup(api, source, prefix));
+	}
 	return choices.sort((a, b) => Date.parse(b.manifest.createdAt) - Date.parse(a.manifest.createdAt));
 }
 const MARKER = 'crate_restore_progress';

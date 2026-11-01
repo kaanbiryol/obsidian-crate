@@ -1,30 +1,61 @@
 import type { CloudflareApiClient } from '../cloudflare-api';
 import { isSha256Hex } from '../../platform/validation';
 import { sha256Hex } from '../../platform/sha256';
-import { UPGRADE_BACKUP_STORE } from '../../protocol/storage-keys';
+import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE } from '../../protocol/storage-keys';
 
 export interface BackupSource { account: string; database: string; bucket: string }
 interface BackupObject { key: string; sha256: string; size: number; contentType?: string }
-interface BackupPart { sha256: string; size: number }
+export interface BackupPart { sha256: string; size: number }
 /** Format 2 stores the database in ordered parts under the backup, named by
  * checksum, and shares checksum-named file copies through the backup store. */
 export interface UpgradeBackup { format: 2; complete: true; createdAt: string; source: BackupSource; objects: BackupObject[]; databaseParts: BackupPart[] }
 export interface BackupChoice { prefix: string; manifest: UpgradeBackup; hash: string }
 export type Cell = string | number | null;
 export interface BackupRow { table: string; columns: string[]; values: Cell[] }
-export const PREFIX = /^__crate__\/backups\/schema-upgrade-[a-f0-9-]{36}$/;
-export const quote = (name: string) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('Unsupported backup identifier'); return `"${name}"`; };
-export const literal = (value: Cell): string => value === null ? 'NULL' : typeof value === 'number' ? String(value) : `'${value.replace(/'/g, "''")}'`;
+/** One backup's location. The shared backup store uses the same shape. */
+export const BACKUP_PREFIX = /^__crate__\/backups\/schema-upgrade-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
+/** A backup's manifest or one of its checksum-named objects. */
+export const BACKUP_OBJECT = new RegExp(`${BACKUP_PREFIX.source.slice(0, -1)}\\/(?:archive\\.json|objects\\/[a-f0-9]{64})$`);
+export const manifestKey = (prefix: string) => `${prefix}/archive.json`;
+/** Quotes any SQLite identifier, including write-guard trigger names. */
+export const quoteName = (name: string) => `"${name.replace(/"/g, '""')}"`;
+/** Quotes an identifier read from a downloaded backup, accepting only names like Crate's schema uses. */
+export const quote = (name: string) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('Unsupported backup identifier'); return quoteName(name); };
+export const literal = (value: unknown): string => value === null ? 'NULL' : typeof value === 'number' && Number.isFinite(value) ? String(value) : typeof value === 'string' ? `'${value.replace(/'/g, "''")}'` : (() => { throw new Error('Unsupported database value in upgrade checkpoint'); })();
+
+/** Keys below the upgrade backup prefix in listing order, stopping at the shared
+ * store, which sorts after every backup and holds no manifests. */
+export async function* listBackupKeys(api: Pick<CloudflareApiClient, 'listR2Objects'>, account: string, bucket: string, beforePage?: () => Promise<void>): AsyncGenerator<string> {
+	const cursors = new Set<string>();
+	let cursor: string | undefined;
+	do {
+		await beforePage?.();
+		const page = await api.listR2Objects(account, bucket, cursor, UPGRADE_BACKUP_PREFIX);
+		for (const key of page.keys) {
+			if (key.startsWith(`${UPGRADE_BACKUP_STORE}/`)) return;
+			yield key;
+		}
+		cursor = page.cursor;
+		if (cursor && cursors.has(cursor)) throw new Error('Backup listing did not advance');
+		if (cursor) cursors.add(cursor);
+	} while (cursor);
+}
+
+/** Decodes a manifest that claims to be a complete format 2 backup. Callers validate the rest. */
+export function completeManifest(bytes: Uint8Array): UpgradeBackup | null {
+	const value = JSON.parse(new TextDecoder().decode(bytes)) as UpgradeBackup | null;
+	return value?.format === 2 && value.complete === true && Number.isFinite(Date.parse(value.createdAt)) && Array.isArray(value.objects) ? value : null;
+}
+
 export async function readBackup(api: Pick<CloudflareApiClient, 'getRecoveryObject'>, source: BackupSource, prefix: string): Promise<BackupChoice> {
-	if (!PREFIX.test(prefix) || prefix === UPGRADE_BACKUP_STORE) throw new Error('Invalid backup location');
-	const bytes = await api.getRecoveryObject(source.account, source.bucket, `${prefix}/archive.json`);
+	if (!BACKUP_PREFIX.test(prefix) || prefix === UPGRADE_BACKUP_STORE) throw new Error('Invalid backup location');
+	const bytes = await api.getRecoveryObject(source.account, source.bucket, manifestKey(prefix));
 	if (bytes.length > 32 * 1024 * 1024) throw new Error('Backup inventory is too large for in-app recovery');
-	const value = JSON.parse(new TextDecoder().decode(bytes)) as UpgradeBackup;
-	const database = value?.format === 2 && Array.isArray(value.databaseParts) && value.databaseParts.length > 0
+	const value = completeManifest(bytes);
+	const database = Array.isArray(value?.databaseParts) && value.databaseParts.length > 0
 		&& value.databaseParts.every(part => part && isSha256Hex(part.sha256) && Number.isSafeInteger(part.size) && part.size > 0);
-	if (!value || !database || value.complete !== true || !Number.isFinite(Date.parse(value.createdAt))
-		|| !value.source || Object.keys(source).some(key => source[key as keyof BackupSource] !== value.source[key as keyof BackupSource])
-		|| !Array.isArray(value.objects)) throw new Error('Backup is incomplete or belongs to a different server');
+	if (!value || !database || !value.source
+		|| Object.keys(source).some(key => source[key as keyof BackupSource] !== value.source[key as keyof BackupSource])) throw new Error('Backup is incomplete or belongs to a different server');
 	const keys = new Set<string>();
 	for (const item of value.objects) {
 		if (!item || typeof item.key !== 'string' || !item.key || item.key.length > 1024 || keys.has(item.key)

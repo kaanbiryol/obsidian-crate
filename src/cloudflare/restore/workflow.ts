@@ -3,7 +3,7 @@ import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { createRandomHexToken } from '../../platform/random-hex';
 import type { BackupChoice } from './archive';
-import { holdUpgradeBackup, releaseUpgradeBackupHold } from '../deployment/upgrade-backups';
+import { holdUpgradeBackup, releaseUpgradeBackupHold } from './upgrade-backups';
 import type { ServerRestoreState } from './state';
 
 /** Keep checkpoint selection and durable destination identity ahead of remote work. */

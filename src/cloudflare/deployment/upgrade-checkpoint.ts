@@ -3,11 +3,10 @@ import type { DeploymentFence } from './fence';
 import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, SHARED_SETTINGS_KEY, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 import { sha256Hex } from '../../platform/sha256';
 import { isSha256Hex } from '../../platform/validation';
-import { listBackupObjects, pruneUpgradeBackups } from './upgrade-backups';
+import { listBackupObjects, pruneUpgradeBackups } from '../restore/upgrade-backups';
+import { BACKUP_PREFIX, literal, manifestKey, quoteName, type BackupPart } from '../restore/archive';
 
 const CONTROL = new Set(['maintenance_state', 'crate_schema', 'crate_migrations', 'crate_release']);
-const quoteName = (name: string) => `"${name.replace(/"/g, '""')}"`;
-const quoteValue = (value: unknown): string => value === null ? 'NULL' : typeof value === 'number' && Number.isFinite(value) ? String(value) : typeof value === 'string' ? `'${value.replace(/'/g, "''")}'` : (() => { throw new Error('Unsupported database value in upgrade checkpoint'); })();
 const GUARDED_ACTIONS = ['INSERT', 'UPDATE', 'DELETE'];
 export function upgradeGuards(table: string): string {
 	if (CONTROL.has(table)) return '';
@@ -28,9 +27,9 @@ async function pageKey(rows: Query, table: string, definition: string): Promise<
 	return key;
 }
 function pageSql(table: string, key: string[] | null, after: unknown[] | null): string {
-	if (!key) return `SELECT rowid AS ${ROWID}, * FROM ${quoteName(table)}${after ? ` WHERE rowid > ${quoteValue(after[0])}` : ''} ORDER BY rowid LIMIT ${PAGE_ROWS};`;
+	if (!key) return `SELECT rowid AS ${ROWID}, * FROM ${quoteName(table)}${after ? ` WHERE rowid > ${literal(after[0])}` : ''} ORDER BY rowid LIMIT ${PAGE_ROWS};`;
 	const columns = key.map(quoteName).join(',');
-	return `SELECT * FROM ${quoteName(table)}${after ? ` WHERE (${columns}) > (${after.map(quoteValue).join(',')})` : ''} ORDER BY ${columns} LIMIT ${PAGE_ROWS};`;
+	return `SELECT * FROM ${quoteName(table)}${after ? ` WHERE (${columns}) > (${after.map(literal).join(',')})` : ''} ORDER BY ${columns} LIMIT ${PAGE_ROWS};`;
 }
 /** Splits a keyset page row into its key and the stored columns. */
 function pageRow(row: Record<string, unknown>, key: string[] | null): PageRow {
@@ -56,8 +55,6 @@ export function removeUpgradeGuards(table: string): string {
 const PROGRESS_KEY = 'crate_upgrade_backup';
 // Database parts end at statement boundaries, so each part stays a few megabytes.
 const PART_CHARACTERS = 4 * 1024 * 1024;
-const BACKUP_PREFIX = /^__crate__\/backups\/schema-upgrade-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
-interface BackupPart { sha256: string; size: number }
 interface FileReference { key: string; sha256: string; size: number }
 /** `copying` runs while sync continues. `dumping` and `finishing` stay valid only
  * while every write guard has existed since the dump started. */
@@ -182,7 +179,7 @@ async function dumpDatabase(context: BackupContext, saved: { raw: string; progre
 		// A table's definition precedes its rows, so a saved row position follows it.
 		if (start === null) buffer += `${definition};\n`;
 		for await (const page of tablePages(query, table, definition, start)) {
-			for (const { record } of page) buffer += `INSERT INTO ${quoteName(table)} (${Object.keys(record).map(quoteName).join(',')}) VALUES (${Object.values(record).map(quoteValue).join(',')});\n`;
+			for (const { record } of page) buffer += `INSERT INTO ${quoteName(table)} (${Object.keys(record).map(quoteName).join(',')}) VALUES (${Object.values(record).map(literal).join(',')});\n`;
 			if (page.length === PAGE_ROWS && buffer.length >= PART_CHARACTERS) await checkpoint(index, page[page.length - 1]!.after);
 		}
 		if (buffer.length >= PART_CHARACTERS) await checkpoint(index + 1, null);
@@ -190,7 +187,7 @@ async function dumpDatabase(context: BackupContext, saved: { raw: string; progre
 	buffer += definitions.filter(row => row.type === 'index').map(row => `${String(row.sql)};`).join('\n');
 	// Preserve an AUTOINCREMENT cursor even when all older changelog rows were pruned.
 	const sequences = await query('SELECT name, seq FROM sqlite_sequence;');
-	buffer += '\nDELETE FROM sqlite_sequence;\n' + sequences.map(row => `INSERT INTO sqlite_sequence(name,seq) VALUES (${quoteValue(row.name)},${quoteValue(row.seq)});`).join('\n');
+	buffer += '\nDELETE FROM sqlite_sequence;\n' + sequences.map(row => `INSERT INTO sqlite_sequence(name,seq) VALUES (${literal(row.name)},${literal(row.seq)});`).join('\n');
 	const finished: ExportedProgress = { format: 2, phase: 'finishing', prefix: progress.prefix, createdAt: progress.createdAt, parts: await savePart() };
 	return { raw: await saveProgress(query, raw, finished), progress: finished };
 }
@@ -235,7 +232,7 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
 		fence.requireVerification();
 		// Pausing writers and starting the export commit together.
 		await fence.mutate(() => api.queryD1(accountId, databaseId, `${guarded.map(upgradeGuards).join('\n')}
-UPDATE maintenance_state SET value = ${quoteValue(next)} WHERE key = '${PROGRESS_KEY}' AND value = ${quoteValue(raw)};`), 'freeze-upgrade-data');
+UPDATE maintenance_state SET value = ${literal(next)} WHERE key = '${PROGRESS_KEY}' AND value = ${literal(raw)};`), 'freeze-upgrade-data');
 		if ((await readProgress(query)).raw !== next) throw progressChanged();
 		raw = next; progress = dumping;
 	} else input.onProgress?.('Resuming the server database backup…');
@@ -269,12 +266,12 @@ UPDATE maintenance_state SET value = ${quoteValue(next)} WHERE key = '${PROGRESS
 	if (progress.parts.some(part => !isStored(parts, part.sha256, part.size))) throw new Error('Database checkpoint verification failed');
 	const manifest = JSON.stringify({ format: 2, complete: true, createdAt: progress.createdAt, source: { account: accountId, database: databaseId, bucket: bucketName }, bookmark: null, databaseParts: progress.parts, objects });
 	await api.throttle();
-	await api.putRecoveryObject(accountId, bucketName, `${progress.prefix}/archive.json`, new TextEncoder().encode(manifest));
+	await api.putRecoveryObject(accountId, bucketName, manifestKey(progress.prefix), new TextEncoder().encode(manifest));
 	await api.throttle();
-	if (await sha256Hex(await api.getRecoveryObject(accountId, bucketName, `${progress.prefix}/archive.json`)) !== await sha256Hex(manifest)) throw new Error('Checkpoint manifest verification failed');
+	if (await sha256Hex(await api.getRecoveryObject(accountId, bucketName, manifestKey(progress.prefix))) !== await sha256Hex(manifest)) throw new Error('Checkpoint manifest verification failed');
 	const complete = JSON.stringify({ ...progress, phase: 'complete' });
-	await fence.mutate(() => api.queryD1(accountId, databaseId, `UPDATE maintenance_state SET value = ${quoteValue(complete)} WHERE key = '${PROGRESS_KEY}' AND value = ${quoteValue(raw)};
-INSERT OR REPLACE INTO maintenance_state(key, value) VALUES ('crate_upgrade_checkpoint', ${quoteValue(progress.prefix)});`), 'verify-upgrade-checkpoint');
+	await fence.mutate(() => api.queryD1(accountId, databaseId, `UPDATE maintenance_state SET value = ${literal(complete)} WHERE key = '${PROGRESS_KEY}' AND value = ${literal(raw)};
+INSERT OR REPLACE INTO maintenance_state(key, value) VALUES ('crate_upgrade_checkpoint', ${literal(progress.prefix)});`), 'verify-upgrade-checkpoint');
 	if ((await readProgress(query)).raw !== complete) throw progressChanged();
 }
 

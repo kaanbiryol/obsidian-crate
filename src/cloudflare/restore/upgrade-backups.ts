@@ -1,5 +1,6 @@
 import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
-import { UPGRADE_BACKUP_OBJECT, UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, upgradeBackupStoreKey } from '../../protocol/storage-keys';
+import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, upgradeBackupStoreKey } from '../../protocol/storage-keys';
+import { BACKUP_OBJECT, completeManifest, listBackupKeys, manifestKey, type UpgradeBackup } from './archive';
 
 /** A pending restore on any device records the backup it reads from the original server. */
 const RESTORE_HOLD_PREFIX = 'crate_restore_hold:';
@@ -50,13 +51,11 @@ async function protectedBackups(api: CloudflareApiClient, account: string, datab
 	}));
 }
 
-interface Manifest { format: 2; createdAt: string; objects: Array<{ sha256: string }> }
-async function readManifest(api: CloudflareApiClient, account: string, bucket: string, prefix: string): Promise<Manifest | null> {
+async function readManifest(api: CloudflareApiClient, account: string, bucket: string, prefix: string): Promise<UpgradeBackup | null> {
 	await api.throttle();
 	try {
-		const value = JSON.parse(new TextDecoder().decode(await api.getRecoveryObject(account, bucket, `${prefix}/archive.json`))) as Partial<Manifest> & { complete?: unknown };
-		return value.format === 2 && value.complete === true && typeof value.createdAt === 'string' && Number.isFinite(Date.parse(value.createdAt))
-			&& Array.isArray(value.objects) && value.objects.every(item => typeof item?.sha256 === 'string') ? value as Manifest : null;
+		const value = completeManifest(await api.getRecoveryObject(account, bucket, manifestKey(prefix)));
+		return value && typeof value.createdAt === 'string' && value.objects.every(item => typeof item?.sha256 === 'string') ? value : null;
 	} catch (error) {
 		if (error instanceof SyntaxError || error instanceof CloudflareApiError && error.status === 404) return null;
 		throw error;
@@ -71,26 +70,16 @@ async function readManifest(api: CloudflareApiClient, account: string, bucket: s
  */
 export async function pruneUpgradeBackups(input: { api: CloudflareApiClient; accountId: string; databaseId: string; bucketName: string; onProgress?: (message: string) => void }): Promise<void> {
 	const { api, accountId, databaseId, bucketName } = input;
-	const backups = new Map<string, string[]>(), cursors = new Set<string>();
-	let cursor: string | undefined;
-	listing: do {
-		await api.throttle();
-		const page = await api.listR2Objects(accountId, bucketName, cursor, UPGRADE_BACKUP_PREFIX);
-		for (const key of page.keys) {
-			// Shared copies sort after every backup prefix.
-			if (key.startsWith(`${UPGRADE_BACKUP_STORE}/`)) break listing;
-			const prefix = key.slice(0, UPGRADE_BACKUP_PREFIX.length + 36);
-			backups.set(prefix, [...backups.get(prefix) ?? [], key]);
-		}
-		cursor = page.cursor;
-		if (cursor && cursors.has(cursor)) throw new Error('Backup listing did not advance');
-		if (cursor) cursors.add(cursor);
-	} while (cursor);
+	const backups = new Map<string, string[]>();
+	for await (const key of listBackupKeys(api, accountId, bucketName, () => api.throttle())) {
+		const prefix = key.slice(0, UPGRADE_BACKUP_PREFIX.length + 36);
+		backups.set(prefix, [...backups.get(prefix) ?? [], key]);
+	}
 
 	let unreadable = false;
-	const complete: Array<{ prefix: string; manifest: Manifest }> = [], removable: string[] = [];
+	const complete: Array<{ prefix: string; manifest: UpgradeBackup }> = [], removable: string[] = [];
 	for (const [prefix, keys] of backups) {
-		if (!keys.includes(`${prefix}/archive.json`)) { removable.push(prefix); continue; }
+		if (!keys.includes(manifestKey(prefix))) { removable.push(prefix); continue; }
 		const manifest = await readManifest(api, accountId, bucketName, prefix);
 		if (manifest) complete.push({ prefix, manifest });
 		else unreadable = true;
@@ -103,7 +92,7 @@ export async function pruneUpgradeBackups(input: { api: CloudflareApiClient; acc
 		// Read just before deleting: a restore may have started since the listing.
 		if ((await protectedBackups(api, accountId, databaseId)).has(prefix)) continue;
 		// Deleting the manifest first stops a partly removed backup from being offered for restore.
-		const keys = backups.get(prefix)!.filter(key => UPGRADE_BACKUP_OBJECT.test(key))
+		const keys = backups.get(prefix)!.filter(key => BACKUP_OBJECT.test(key))
 			.sort((a, b) => Number(b.endsWith('/archive.json')) - Number(a.endsWith('/archive.json')));
 		for (const key of keys) {
 			await api.throttle();
@@ -116,7 +105,7 @@ export async function pruneUpgradeBackups(input: { api: CloudflareApiClient; acc
 	const listed = new Set(complete.filter(backup => !removed.has(backup.prefix))
 		.flatMap(backup => backup.manifest.objects.map(item => item.sha256)));
 	for (const sha256 of (await listBackupObjects(api, accountId, bucketName, `${UPGRADE_BACKUP_STORE}/objects/`)).keys()) {
-		if (listed.has(sha256) || !UPGRADE_BACKUP_OBJECT.test(upgradeBackupStoreKey(sha256))) continue;
+		if (listed.has(sha256) || !BACKUP_OBJECT.test(upgradeBackupStoreKey(sha256))) continue;
 		await api.throttle();
 		await api.deleteRecoveryObject(accountId, bucketName, upgradeBackupStoreKey(sha256));
 	}

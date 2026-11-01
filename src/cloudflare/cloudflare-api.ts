@@ -1,6 +1,7 @@
 import { buildWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './deployment/worker-upload-payload';
 import { CloudflareApiError } from './cloudflare-api-error';
-import { BACKUPS_PREFIX, UPGRADE_BACKUP_OBJECT } from '../protocol/storage-keys';
+import { BACKUPS_PREFIX } from '../protocol/storage-keys';
+import { BACKUP_OBJECT } from './restore/archive';
 export { CloudflareApiError } from './cloudflare-api-error';
 import { verifyWorkerDeployment } from './deployment/verify-worker';
 import { deleteResetWorkerObjects, verifyResetWorker } from './server-reset/reset-worker-client';
@@ -282,7 +283,7 @@ export class CloudflareApiClient {
 
 	/** Removes one generated upgrade backup object; an already missing object counts as removed. */
 	async deleteRecoveryObject(accountId: string, bucketName: string, key: string): Promise<void> {
-		if (!UPGRADE_BACKUP_OBJECT.test(key)) throw new Error('Invalid backup object');
+		if (!BACKUP_OBJECT.test(key)) throw new Error('Invalid backup object');
 		try { await this.request(this.r2ObjectPath(accountId, bucketName, key), { method: 'DELETE' }); }
 		catch (error) { if (!(error instanceof CloudflareApiError && error.status === 404)) throw error; }
 	}

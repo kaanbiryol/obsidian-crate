@@ -1,5 +1,5 @@
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
-import type { BackupSource } from './archive';
+import { BACKUP_PREFIX, type BackupSource } from './archive';
 import { isSha256Hex } from '../../platform/validation';
 export interface ServerRestoreState {
 	id: string; source: BackupSource; prefix: string; archiveHash: string; fingerprint: string;
@@ -12,7 +12,7 @@ export function validRestoreState(value: unknown): value is ServerRestoreState {
 	return typeof state.id === 'string' && /^[a-f0-9]{16}$/.test(state.id)
 		&& !!source && /^[a-f0-9]{32}$/i.test(source.account) && /^[a-f0-9-]{36}$/i.test(source.database)
 		&& typeof source.bucket === 'string' && !!source.bucket
-		&& /^__crate__\/backups\/schema-upgrade-[a-f0-9-]{36}$/.test(state.prefix)
+		&& BACKUP_PREFIX.test(state.prefix)
 		&& isSha256Hex(state.archiveHash) && isSha256Hex(state.fingerprint)
 		&& Number.isSafeInteger(state.restoredAt) && state.restoredAt > 0
 		&& ['copying', 'publishing', 'complete'].includes(state.phase)
