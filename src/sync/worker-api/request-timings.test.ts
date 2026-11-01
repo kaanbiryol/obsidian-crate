@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WorkerApiHttpClient, type ApiHttpTransport } from './http';
 import { normalizeSyncTimings } from '../diagnostics/timings';
+import { normalizeRequestDiagnostics } from '../diagnostics/request-diagnostics';
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 it('aggregates every request, including failures, beyond the diagnostic history limit', async () => {
@@ -43,4 +44,18 @@ it('reports observed D1 usage with coverage for failures, partial metadata and o
 	expect(http.getRequestTimings().d1).toEqual(d1);
 	expect(normalizeSyncTimings({ totalMs: 1, phases: {}, requests: http.getRequestTimings() })?.requests?.d1).toEqual(d1);
 	http.resetRequestTimings(); expect(http.getRequestTimings().d1).toBeUndefined();
+});
+
+it('sums the D1 queries servers report and records them on each request', async () => {
+	const values = ['10:4:1:7', '20:7:0:5', '1:1:1', '1:1:1:x'];
+	const http = new WorkerApiHttpClient('https://test', 'token', async () => {
+		const value = values.shift()!;
+		return { status: 200, headers: { 'X-Crate-D1-Usage': value }, text: '{}', arrayBuffer: new ArrayBuffer(0) };
+	});
+	for (let i = 0; i < 4; i++) await http.requestJson('/health');
+	// An older server omits the count; a malformed header reports nothing.
+	expect(http.getRequestTimings().d1).toEqual({ rowsRead: 31, rowsWritten: 12, reportedRequests: 3, completeRequests: 2, queries: 12 });
+	expect(normalizeSyncTimings({ totalMs: 1, phases: {}, requests: http.getRequestTimings() })?.requests?.d1?.queries).toBe(12);
+	expect(http.getRequestDiagnostics().requests.map(request => request.d1Queries)).toEqual([7, 5, undefined, undefined]);
+	expect(normalizeRequestDiagnostics(http.getRequestDiagnostics())?.requests.map(request => request.d1Queries)).toEqual([7, 5, undefined, undefined]);
 });

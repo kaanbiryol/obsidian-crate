@@ -22,6 +22,8 @@ export interface RequestDiagnostic {
 	status: number;
 	outcome: 'response' | 'failed' | 'aborted';
 	uploadOperationIds?: string[];
+	/** D1 queries the server reported for this request. */
+	d1Queries?: number;
 }
 export interface RequestDiagnostics { clientSession: string; requests: RequestDiagnostic[]; uploads?: UploadDiagnostic[] }
 
@@ -54,11 +56,13 @@ export function recordRequestDiagnostic(
 		const d1 = timings.d1 ??= { rowsRead: 0, rowsWritten: 0, reportedRequests: 0, completeRequests: 0 };
 		d1.rowsRead += usage.rowsRead; d1.rowsWritten += usage.rowsWritten;
 		d1.reportedRequests++; if (usage.complete) d1.completeRequests++;
+		if (usage.queries !== undefined) d1.queries = (d1.queries ?? 0) + usage.queries;
 	}
 
 	log.requests.push({ at: new Date().toISOString(), operationId: request.operationId, method: request.method,
 		...(request.uploadOperationIds.length ? { uploadOperationIds: request.uploadOperationIds } : {}), route: diagnosticRoute(request.path),
-		status: response?.status ?? 0, outcome, requestId: response?.header(REQUEST_ID_HEADER) ?? undefined });
+		status: response?.status ?? 0, outcome, requestId: response?.header(REQUEST_ID_HEADER) ?? undefined,
+		...(usage?.queries !== undefined ? { d1Queries: usage.queries } : {}) });
 	if (log.requests.length > MAX_REQUEST_DIAGNOSTICS) log.requests.shift();
 }
 
@@ -89,6 +93,7 @@ export function normalizeRequestDiagnostics(value: unknown): RequestDiagnostics 
 			outcome: item.outcome as RequestDiagnostic['outcome'],
 			...(opaqueId(item.requestId) ? { requestId: item.requestId } : {}),
 			...(normalizeUploadOperationIds(item.uploadOperationIds).length ? { uploadOperationIds: normalizeUploadOperationIds(item.uploadOperationIds) } : {}),
+			...(typeof item.d1Queries === 'number' && Number.isSafeInteger(item.d1Queries) && item.d1Queries >= 0 ? { d1Queries: item.d1Queries } : {}),
 		});
 	}
 	return { clientSession: value.clientSession, requests,

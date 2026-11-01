@@ -19,12 +19,13 @@ export function nextD1DailyReset(now = Date.now()): number {
 
 /** In-memory accounting of returned billing metadata; never queries or writes a log table. */
 export function meterD1Usage(database: D1Database) {
-	const usage: D1Usage = { rowsRead: 0, rowsWritten: 0, complete: true };
+	const usage: D1Usage & { queries: number } = { rowsRead: 0, rowsWritten: 0, complete: true, queries: 0 };
 	const statements = new WeakMap<D1PreparedStatement, D1PreparedStatement>();
 	function add(value?: D1Usage) {
 		if (!value) { usage.complete = false; return; }
 		usage.rowsRead += value.rowsRead;
 		usage.rowsWritten += value.rowsWritten;
+		usage.queries += value.queries ?? 0;
 		usage.complete &&= value.complete;
 	}
 	function record<T>(result: T): T {
@@ -32,7 +33,9 @@ export function meterD1Usage(database: D1Database) {
 		add(parseD1Usage(`${meta?.rows_read}:${meta?.rows_written}:1`));
 		return result;
 	}
+	// One query per first/run/all, exec or batch, as the per-invocation limit counts.
 	async function execute<T>(action: () => Promise<T>): Promise<T> {
+		usage.queries++;
 		try { return await action(); }
 		catch (error) { usage.complete = false; throw error; }
 	}
@@ -53,7 +56,7 @@ export function meterD1Usage(database: D1Database) {
 		batch: <T>(batch: D1PreparedStatement[]) => execute(async () =>
 			(await database.batch<T>(batch.map(statement => statements.get(statement) ?? statement))).map(record)),
 		// exec() has no billing metadata. Keep its semantics and mark coverage incomplete.
-		exec: sql => { usage.complete = false; return database.exec(sql); },
+		exec: sql => { usage.complete = false; usage.queries++; return database.exec(sql); },
 	};
 	return { db, usage, add };
 }
@@ -77,7 +80,7 @@ export async function withD1Usage(env: Env, action: (env: Env) => Promise<Respon
 	} } : {}) };
 	const response = await action(measuredEnv);
 	const headers = new Headers(response.headers);
-	const { rowsRead, rowsWritten, complete } = meter.usage;
-	headers.set(D1_USAGE_HEADER, `${rowsRead}:${rowsWritten}:${complete ? 1 : 0}`);
+	const { rowsRead, rowsWritten, complete, queries } = meter.usage;
+	headers.set(D1_USAGE_HEADER, `${rowsRead}:${rowsWritten}:${complete ? 1 : 0}:${queries}`);
 	return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }

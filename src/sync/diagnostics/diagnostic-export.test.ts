@@ -59,11 +59,11 @@ describe('safe diagnostic export', () => {
 		expect(JSON.parse(report)).toMatchObject({ history: [{ success: false, errors: 1 }] });
 		settings.syncHistory[0]!.timings = { totalMs: 100, phases: { uploading: 90 }, requests: {
 			count: 3, totalMs: 150, maxMs: 75, serverCount: 2, serverMs: 80,
-			d1: { rowsRead: 25, rowsWritten: 12, reportedRequests: 2, completeRequests: 1 },
+			d1: { rowsRead: 25, rowsWritten: 12, reportedRequests: 2, completeRequests: 1, queries: 9 },
 		} };
 		const measured = buildDiagnosticExport(settings, h.runtime.getState(), '0.1.0');
 		expect(JSON.parse(measured)).toMatchObject({ history: [{ timings: { requests: {
-			d1: { rowsRead: 25, rowsWritten: 12, reportedRequests: 2, completeRequests: 1 },
+			d1: { rowsRead: 25, rowsWritten: 12, reportedRequests: 2, completeRequests: 1, queries: 9 },
 		} } }] });
 		expect(measured).not.toContain(sensitive);
 		h.runtime.destroy();

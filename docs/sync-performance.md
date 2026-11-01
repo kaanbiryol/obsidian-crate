@@ -140,10 +140,14 @@ client does not claim to measure pure network transit time separately.
 These summaries are stored in local sync history and add no telemetry requests.
 
 Updated servers also return `X-Crate-D1-Usage` with D1's `rows_read` and
-`rows_written` metadata. Local history and exported diagnostics aggregate these
-as `timings.requests.d1`: `rowsRead`, `rowsWritten`, `reportedRequests`, and
-`completeRequests`. Internal synchronous coordinator requests are included once.
-The meter wraps the existing statements; it adds no database operations.
+`rows_written` metadata and the number of D1 queries, counted as Cloudflare's
+per-invocation limit counts them (a `db.batch()` is one query). Local history and
+exported diagnostics aggregate these as `timings.requests.d1`: `rowsRead`,
+`rowsWritten`, `reportedRequests`, `completeRequests` and `queries`, and each
+logged request records its own `d1Queries`. Internal synchronous coordinator
+requests are included once, so a request's count can span two invocations. Older
+servers omit the query count. The meter wraps the existing statements; it adds no
+database operations.
 
 These are observed request costs, not the account's billing total. Background
 reminder processing and maintenance run separately. Lost responses, older servers,
