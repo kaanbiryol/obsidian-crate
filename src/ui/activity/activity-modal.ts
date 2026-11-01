@@ -132,6 +132,7 @@ export class ActivityModal extends BaseUiModal {
 		this.pendingBrowserState.pauseChecks = undefined;
 		this.pendingBrowserState.dispose = undefined;
 		this.pendingPanel.empty();
+		this.pendingBrowserState.configDir = this.app.vault.configDir;
 		renderPendingPanel(this.pendingPanel, paths, (path, deleted) => this.deps.loadPendingDiff(path, deleted), state.status === 'error', state.status === 'syncing',
 			progress, this.getActivityStatus().lastSyncLabel, state, this.pendingBrowserState, {
 				syncSelected: async keys => {

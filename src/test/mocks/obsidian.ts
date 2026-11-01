@@ -230,6 +230,8 @@ export class Notice {
 		}
 	}
 
+	hide(): void {}
+
 	static reset(): void {
 		Notice.messages = [];
 	}
@@ -578,5 +580,6 @@ export async function requestUrl(): Promise<never> {
 	throw new Error('requestUrl mock not implemented for this test');
 }
 
+export function requireApiVersion(_version: string): boolean { return true; }
 export function setIcon(_element: HTMLElement, _icon: string): void {}
 export function getIcon(_icon: string): SVGSVGElement | null { return null; }

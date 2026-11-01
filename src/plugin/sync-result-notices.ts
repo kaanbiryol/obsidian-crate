@@ -2,6 +2,7 @@ import { Notice } from 'obsidian';
 import type { SyncRuntime } from '../sync/runtime/runtime';
 import type { SyncResult } from '../sync/types';
 import { AUTH_ERROR_MESSAGE } from '../sync/sync-outcome';
+import { isCrateUpdatePath } from './crate-update-bundle';
 
 type NoticeRuntime = Pick<SyncRuntime, 'getState' | 'addSyncResultListener' | 'removeSyncResultListener'>;
 
@@ -23,7 +24,9 @@ export function registerSyncResultNotices(host: NoticeHost, runtime: NoticeRunti
 	let failing = false, restartShown = false;
 	const configPrefix = `${host.configDir}/`;
 	const listener = (result: SyncResult) => {
-		const changedConfig = [...result.downloadedPaths, ...result.mergedPaths].some(path => path.startsWith(configPrefix));
+		// A Crate update shows its own notice once it is installed.
+		const changedConfig = [...result.downloadedPaths, ...result.mergedPaths]
+			.some(path => path.startsWith(configPrefix) && !isCrateUpdatePath(path, host.configDir));
 		if (changedConfig && !restartShown) {
 			restartShown = true;
 			new Notice(RESTART_NOTICE, 15_000);

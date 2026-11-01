@@ -26,6 +26,7 @@ import { showGetStartedNotice } from "../ui/settings/get-started-notice";
 import { beginPluginLifecycle, endPluginLifecycle, setSyncReady } from './lifecycle-state';
 
 import { registerCheckpointBackupCleanup } from '../sync/durability/checkpoint-backup-cleanup';
+import { registerCrateUpdateSync } from './crate-update-sync';
 import { SECRET_KEYS } from "../platform/secret-keys";
 import { workersDevOrigin } from "../cloudflare/deployment/worker-origin";
 
@@ -59,6 +60,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
 		});
 	});
 	setSyncReady(plugin, syncReady);
+	registerCrateUpdateSync(plugin, signal, syncReady);
 	registerSharedFeatures(plugin);
 	showCloudflareServerUpdateNotice(plugin);
 	showGetStartedNotice(plugin);

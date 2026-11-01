@@ -34,7 +34,7 @@ function runtime(overrides: Partial<ActivityModalDeps>): ActivityModalDeps {
 describe('activity modal completion progress', () => {
 	it.each(['idle', 'error'] as const)('refreshes saved plugin transfers after the engine becomes %s', async status => {
 		const settings = { ...DEFAULT_SETTINGS, syncHistory: [] };
-		const modal = new ActivityModal({} as never, settings, runtime({ getState: () => ({ status } as SyncState) }));
+		const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, settings, runtime({ getState: () => ({ status } as SyncState) }));
 		const panel = new FakeElement('div');
 		const internal = modal as unknown as {
 			pendingPanel: HTMLElement; onProgress(): void; refresh(): void;
@@ -62,7 +62,7 @@ it('shows the reachability warning without treating it as a failed sync', () => 
 		status: 'offline', lastSync: null, lastError: 'Cannot reach the temporary tunnel address.',
 		pendingChanges: 0, conflictCount: 0,
 	};
-	const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
+	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
 	const internal = modal as unknown as { createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader };
 	const content = new FakeElement('div');
 	internal.createHeader(new FakeElement('div'), content).updateSyncErrorNotice();
@@ -74,7 +74,7 @@ it('updates progress without copying the pending list or rebuilding the empty co
 	const pending = Array.from({ length: 5000 }, (_, index) => `note-${index}.md`);
 	const state = { status: 'syncing', lastSync: null, lastError: null, pendingChanges: pending.length, conflictCount: 0 } as SyncState;
 	const getPendingKeys = vi.fn(() => [...pending]);
-	const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({
+	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({
 		getState: () => state, getPendingKeys, getPendingChangeCount: () => pending.length,
 	}));
 	const internal = modal as unknown as {
@@ -98,7 +98,7 @@ it('updates progress without copying the pending list or rebuilding the empty co
 
 it('applies a state change and progress tick from the same event once', async () => {
 	const state = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 } as SyncState;
-	const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
+	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
 	const internal = modal as unknown as { pendingPanel: FakeElement; onProgress(): void; onStateChange(): void; refresh(): void };
 	internal.pendingPanel = new FakeElement('div');
 	const refresh = vi.spyOn(internal, 'refresh').mockImplementation(() => {});
@@ -114,7 +114,7 @@ it('keeps the pending file browser and its comparisons while the pending set is 
 	let pending = ['a.md', 'b.md'];
 	const state = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 2, conflictCount: 0 } as SyncState;
 	const loadPendingDiff = vi.fn(() => new Promise<never>(() => {}));
-	const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({
+	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({
 		getState: () => state, getPendingKeys: () => [...pending], loadPendingDiff,
 	}));
 	const internal = modal as unknown as {
@@ -147,7 +147,7 @@ it('keeps the conflicts panel and its focusable buttons across unrelated state e
 	};
 	let conflicts = [conflict];
 	const state = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 0, conflictCount: 1 } as SyncState;
-	const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({
+	const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({
 		getState: () => state, getActiveConflicts: () => conflicts.map(record => ({ ...record })),
 	}));
 	const internal = modal as unknown as {
@@ -177,7 +177,7 @@ it('ages the last-sync label every minute while open and stops when closed', asy
 	vi.stubGlobal('window', globalThis);
 	try {
 		const state = { status: 'idle', lastSync: new Date().toISOString(), lastError: null, pendingChanges: 0, conflictCount: 0 } as SyncState;
-		const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
+		const modal = new ActivityModal({ vault: { configDir: '.obsidian' } } as never, DEFAULT_SETTINGS, runtime({ getState: () => state }));
 		const internal = modal as unknown as {
 			pendingPanel: FakeElement; conflictsPanel: FakeElement; pendingCount: FakeElement; conflictsCount: FakeElement;
 			header: ActivityHeader; refresh(): void; createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;

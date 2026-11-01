@@ -7,10 +7,13 @@ import { renderDiffPreview } from './pending-diff';
 import { PendingComparisons } from './pending-comparisons';
 import { createPendingActions, type PendingActions } from './pending-actions';
 import { createPendingRowSelection, type PendingRowSelectionState } from './pending-row-selection';
+import { CRATE_UPDATE_FILES, crateUpdateVersion } from '../../plugin/crate-update-bundle';
 
 export type PendingDiffLoader = (path: string, deleted: boolean) => Promise<PendingDiff>;
 export interface PendingBrowserState extends PendingRowSelectionState {
 	selectedKey?: string;
+	/** The vault's config folder, so a Crate update bundle shows as an update rather than a JSON file. */
+	configDir?: string;
 	excludedKeys?: Set<string>;
 	/** Finished file statuses by pending key, so a rebuild checks only files it has not checked. */
 	statusLabels?: Map<string, string>;
@@ -66,7 +69,8 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	let requestRevision = 0;
 	let selectedIndex = -1;
 	// Binary files have no text diff; load their metadata only when selected.
-	const canPreview = (index: number) => !isBinaryPreviewPath(changes[index]!.path);
+	const updateVersions = changes.map(({ path }) => state.configDir === undefined ? null : crateUpdateVersion(path, state.configDir));
+	const canPreview = (index: number) => !updateVersions[index] && !isBinaryPreviewPath(changes[index]!.path);
 	const labels = state.statusLabels ??= new Map<string, string>();
 	// A file that left the pending set may return with other changes.
 	const pending = new Set(paths);
@@ -117,15 +121,22 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		state.selectedKey = key;
 		if (moveFocus) state.showDetail = true;
 		browser.classList.toggle('is-reviewing', !!state.showDetail);
-		const { path } = changes[index]!;
+		const { kind, path } = changes[index]!;
 		const parts = path.split('/');
-		fileName.textContent = parts.pop() ?? path;
-		filePath.textContent = parts.join('/') || 'Vault root';
+		const updateVersion = updateVersions[index];
+		fileName.textContent = updateVersion ? crateUpdateTitle(updateVersion) : parts.pop() ?? path;
+		filePath.textContent = updateVersion ? 'Plugin update' : parts.join('/') || 'Vault root';
 		filePath.title = path;
 		toolbar.hidden = false;
 		setFocusIndex(index);
 		comparisonHeader.empty();
 		preview.empty();
+		if (updateVersion) {
+			++requestRevision;
+			renderCrateUpdate(preview, updateVersion, kind === 'delete');
+			if (moveFocus && back.getClientRects().length > 0) back.focus({ preventScroll: true });
+			return;
+		}
 		preview.createDiv({ cls: 'crate-diff-message', text: 'Loading changes…', attr: { role: 'status' } });
 		preview.setAttribute('aria-busy', 'true');
 		if (moveFocus && back.getClientRects().length > 0) back.focus({ preventScroll: true });
@@ -161,21 +172,23 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		const { kind, path } = changes[index]!;
 		const deleted = kind === 'delete';
 		const parts = path.split('/');
+		const updateVersion = updateVersions[index];
 		const row = actions ? list.createDiv({ cls: 'crate-browser-file-row' }) : list;
 		selection?.addCheckbox(row, key);
 		selection?.bindContextMenu(row, key);
 		const button = row.createEl('button', { cls: 'crate-browser-file', attr: {
-			type: 'button', 'aria-label': `${deleted ? 'Review deletion of' : 'Review changes for'} ${path}`,
+			type: 'button', 'aria-label': updateVersion ? `Review ${crateUpdateTitle(updateVersion)}` : `${deleted ? 'Review deletion of' : 'Review changes for'} ${path}`,
 			'aria-pressed': 'false', 'aria-controls': detail.id,
 		} });
 		button.tabIndex = index === focusIndex ? 0 : -1;
 		if (selection) button.setAttribute('aria-keyshortcuts', 'Space');
-		if (!actions) setIcon(button.createSpan({ cls: 'crate-browser-file-icon', attr: { 'aria-hidden': 'true' } }), deleted ? 'trash-2' : 'file-text');
+		if (!actions) setIcon(button.createSpan({ cls: 'crate-browser-file-icon', attr: { 'aria-hidden': 'true' } }), deleted ? 'trash-2' : updateVersion ? 'package' : 'file-text');
 		const info = button.createSpan({ cls: 'crate-browser-file-info' });
-		info.createSpan({ cls: 'crate-browser-file-name', text: parts.pop() ?? path, attr: { title: path } });
+		info.createSpan({ cls: 'crate-browser-file-name', text: updateVersion ? crateUpdateTitle(updateVersion) : parts.pop() ?? path, attr: { title: path } });
 		const meta = info.createSpan({ cls: 'crate-browser-file-meta' });
-		meta.createSpan({ cls: 'crate-browser-file-path', text: parts.join('/') || 'Vault root' });
-		const status = meta.createSpan({ cls: 'crate-browser-file-status', text: !canPreview(index) ? 'No preview' : autoCheck ? 'Checking…' : 'Not checked' });
+		meta.createSpan({ cls: 'crate-browser-file-path', text: updateVersion ? CRATE_UPDATE_FILES.join(', ') : parts.join('/') || 'Vault root' });
+		const status = meta.createSpan({ cls: 'crate-browser-file-status', text: updateVersion ? deleted ? 'Replaced' : 'New version'
+			: !canPreview(index) ? 'No preview' : autoCheck ? 'Checking…' : 'Not checked' });
 		const label = labels.get(key);
 		if (unavailable.has(index)) status.textContent = 'Unavailable';
 		else if (label) showStatus(status, label);
@@ -298,6 +311,20 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	queueMicrotask(() => {
 		if (browser.isConnected && browser.getClientRects().length > 0) comparisons.start();
 	});
+}
+
+const crateUpdateTitle = (version: string) => `Crate ${version} update`;
+
+/** A bundle holds a whole release, so it is described rather than diffed. */
+function renderCrateUpdate(preview: HTMLElement, version: string, deleted: boolean): void {
+	const message = preview.createDiv({ cls: 'crate-diff-message', attr: { role: 'status' } });
+	if (deleted) {
+		message.createDiv({ text: `Removes the Crate ${version} update. A newer version replaced it, so no device installs it.` });
+		return;
+	}
+	message.createDiv({ text: `Your other devices install Crate ${version} on their next sync. Crate's settings and sync state stay on each device.` });
+	const files = message.createEl('ul');
+	for (const name of CRATE_UPDATE_FILES) files.createEl('li', { text: name });
 }
 
 function describeSnapshot(snapshot: PendingDiff): string {

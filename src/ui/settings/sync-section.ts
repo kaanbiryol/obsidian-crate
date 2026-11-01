@@ -55,7 +55,14 @@ export function renderSyncSection(context: SettingsSectionContext): () => void {
 
 	new Setting(options)
 		.setName('Plugins and settings')
-		.setDesc('Other plugins and their settings sync with your vault. Settings can contain credentials or device-specific values; exclude any files you want to keep local below. Restart Obsidian after syncing to load changes. Crate itself stays local.');
+		.setDesc('Other plugins and their settings sync with your vault. Settings can contain credentials or device-specific values; exclude any files you want to keep local below. Restart Obsidian after syncing to load changes. Crate settings and sync state stay local.');
+
+	new Setting(options)
+		.setName('Sync Crate updates')
+		.setDesc('This device · share the Crate version installed here with your other devices, and install a newer version they share. Without encryption, you confirm each install. Restart Obsidian to apply an update.')
+		.addToggle(toggle => toggle
+			.setValue(plugin.settings.syncCrateUpdates)
+			.onChange(async syncCrateUpdates => { await persistSettings({ syncCrateUpdates }); }));
 
 	renderExclusionsSetting(options, plugin, async ignorePatterns => {
 		await persistSettings({ ignorePatterns });

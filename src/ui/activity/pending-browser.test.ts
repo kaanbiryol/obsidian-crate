@@ -97,3 +97,22 @@ it('renders only rows near the viewport while selection, navigation and sync cov
 	expect(syncSelected.mock.calls[0]).toEqual([paths]);
 	state.dispose?.();
 });
+
+it('shows a Crate update bundle as an update listing its files, without diffing it', async () => {
+	const { renderPendingBrowser } = await import('./pending-browser');
+	const { pendingChangeKey } = await import('../../sync/pending/pending-change');
+	const load = vi.fn(async () => modified);
+	const state: PendingBrowserState = { configDir: '.obsidian' };
+	const panel = document.createElement('div');
+	document.body.replaceChildren(panel);
+	renderPendingBrowser(panel, ['.obsidian/crate-update/0.11.0.json', pendingChangeKey('delete', '.obsidian/crate-update/0.10.0.json')], load, state);
+	await new Promise(resolve => setTimeout(resolve, 0));
+	const names = [...panel.querySelectorAll('.crate-browser-file-name')].map(name => name.textContent);
+	expect(names).toEqual(['Crate 0.11.0 update', 'Crate 0.10.0 update']);
+	expect([...panel.querySelectorAll('.crate-browser-file-path')].map(path => path.textContent)).toEqual(['styles.css, main.js, manifest.json', 'styles.css, main.js, manifest.json']);
+	expect(statuses(panel)).toEqual(['New version', 'Replaced']);
+	panel.querySelector<HTMLButtonElement>('.crate-browser-file')!.click();
+	expect([...panel.querySelectorAll('.crate-file-diff li')].map(item => item.textContent)).toEqual(['styles.css', 'main.js', 'manifest.json']);
+	expect(load).not.toHaveBeenCalled();
+	state.dispose?.();
+});

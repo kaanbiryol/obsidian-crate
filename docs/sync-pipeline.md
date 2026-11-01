@@ -260,6 +260,17 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
 
 Crate's own plugin folder (`<config folder>/plugins/crate/`, which holds its checkpoint, journals and Markdown base cache) is always excluded. Other plugins and their settings sync with the vault; exclude any that store credentials or device-specific values with an ignore pattern.
 
+### Crate update bundles
+
+Crate's releases travel through a separate synced folder, `<config folder>/crate-update/`, so the plugin folder and its device state stay local. Code lives in `src/plugin/crate-update-*.ts`.
+
+- **Publish:** after the startup sync, a device whose installed `manifest.json` version is newer than every bundle writes `<version>.json`, holding `main.js`, `styles.css` and `manifest.json` with a SHA-256 for each. Bytes are deterministic, so two devices publishing one release write the same file. Any device then removes bundles older than the newest; no device installs them.
+- **Accept:** a device installs only the newest bundle, and only when it is strictly newer than its installed version (never a downgrade), its hashes and manifest match, and Obsidian meets its `minAppVersion`. An encrypted vault installs automatically, because AES-GCM proves a paired device wrote it. Without encryption the person confirms first, since anyone with write access to the server could otherwise plant code. Other names in the folder, such as conflict copies, are ignored.
+- **Install:** files are staged in `plugins/crate/.update/`, read back and verified, then a journal is renamed into place before the targets are rewritten in the order `styles.css`, `main.js`, `manifest.json`. The next start finishes a journaled install or discards staging without a journal. `data.json` and sync state are never written. The new code loads after a restart, like an update from Community plugins. A crash during the `main.js` write itself can leave it partial, the same risk as Obsidian's own updater.
+- **Opt out:** **Sync Crate updates** in sync options is per device and on by default; when off, the device neither publishes nor installs.
+
+`crate-update.property.test.ts` checks across random publishes, syncs, installs and store updates that no device downgrades and all devices converge on the newest installed release.
+
 ## Constants
 
 Release and transfer values are also checked against source in [current contract](current-contract.md).

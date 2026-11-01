@@ -74,11 +74,23 @@ Check the file names in the confirmation before you continue. If you change your
 
 Everything in your vault syncs: new files, edits, renames, deletions, and attachments. A few things stay local:
 
-- Crate's own plugin folder. Install and connect Crate on each device separately.
+- Crate's own plugin folder. Install and connect Crate on each device separately. Updates still reach your devices; see [Crate updates](#crate-updates).
 - Workspace layout, conflict copies, and common temporary files.
 - Files over 25 MB. They stay on the device and show up as sync errors.
 
 Your other plugins and their settings sync too. After they download, restart Obsidian to load them.
+
+## Crate updates
+
+Update Crate on one device and your other devices get the same version on their next sync. Restart Obsidian on each device to load it.
+
+Until you sync, the device you updated lists the update as **Crate <version> update** in sync activity, with the files it carries: `main.js`, `styles.css` and `manifest.json`.
+
+- In an encrypted vault, the update installs on its own. Only your paired devices can create it.
+- Without encryption, Crate shows a notice first. Select **Install update** to accept it.
+- A device never installs an older version than the one it has, and never touches Crate's settings or sync state.
+
+To turn this off on a device, open **Settings → Crate → Sync → Sync options** and turn off **Sync Crate updates**.
 
 New attachments download on their own. When an existing image, PDF, or other attachment changes, Crate asks you to [review it](/docs/troubleshooting/conflicts/#attachments-and-binary-files) instead of overwriting it.
 
