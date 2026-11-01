@@ -30,6 +30,16 @@
 	padding: 0;
 }
 
+/*
+ * Mobile sidebars paint --background-secondary but keep --background-primary,
+ * which Crate's views paint. Match the drawer; the variables inherit into the
+ * shadow roots.
+ */
+.workspace-drawer .crate-reminders-view-container,
+.workspace-drawer .crate-reading-view {
+	--background-primary: var(--background-secondary);
+}
+
 .crate-status-icon {
 	display: flex;
 	align-items: center;
