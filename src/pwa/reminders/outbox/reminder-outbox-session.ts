@@ -43,14 +43,21 @@ export function createReminderOutboxSession({ storage, recovery, settlement, isC
 		onChange: onChanges,
 		onScan: refreshQuarantine,
 		onError: message => { onStorageError(message); current().showToast('error', message); },
-		onSettled: () => { void current().loadReminders({ silent: true }); },
+		// Confirmed results stay in memory during a drain; the offline copy is saved
+		// once before the reload that replaces the edited notes.
+		onSettled: () => {
+			const host = current();
+			void (async () => {
+				try { await host.persistReminderState?.(); } finally { if (isCurrent()) void host.loadReminders({ silent: true }); }
+			})();
+		},
 		commit: async (change, result) => {
 			const host = current();
 			let list = host.getSnapshot();
 			if (result.reminder) list = applyReminderListEffect(list, { kind: 'upsert', record: result.reminder });
 			else if (change.kind === 'delete') list = applyReminderListEffect(list, { kind: 'delete', recordId: change.recordId });
 			else if (change.kind === 'reorder') list = applyReminderListEffect(list, change);
-			await host.commitReminderState(list.reminders, list.projects);
+			await host.commitReminderState(list.reminders, list.projects, { persist: 'later' });
 			if (isCurrent()) settlement.publish(change, result);
 			if (isCurrent() && result.notificationWarning) host.showToast('info', `Saved. Notification sync failed: ${result.notificationWarning}`);
 			if (isCurrent() && change.kind === 'save' && !result.notificationWarning) {

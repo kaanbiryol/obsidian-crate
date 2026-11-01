@@ -3,7 +3,8 @@ import type { PendingReminderChange } from './reminder-outbox-types';
 import type { QuarantinedReminderEntry } from './reminder-outbox-storage';
 
 const outbox = vi.hoisted(() => ({ refresh: vi.fn((): PendingReminderChange[] => []), drain: vi.fn(async () => {}), retry: vi.fn() }));
-vi.mock('./reminder-outbox', () => ({ createReminderOutbox: () => outbox }));
+const outboxOptions = vi.hoisted(() => ({ current: null as null | { onSettled: () => void; commit: (change: PendingReminderChange, result: object) => Promise<void> } }));
+vi.mock('./reminder-outbox', () => ({ createReminderOutbox: (options: typeof outboxOptions.current) => { outboxOptions.current = options; return outbox; } }));
 vi.mock('./reminder-outbox-events', () => ({ subscribeReminderOutboxEvents: () => () => {} }));
 import { createReminderOutboxSession } from './reminder-outbox-session';
 
@@ -13,7 +14,7 @@ const change = (operationId: string, status: PendingReminderChange['status']) =>
 	({ operationId, status, kind: 'delete', recordId: operationId, path: '/reminders/delete', method: 'DELETE', body: '{}', attempts: 1, retryAt: 0 }) as PendingReminderChange;
 const damaged: QuarantinedReminderEntry = { key: 'damaged', raw: '{' };
 
-function harness(host: { canRecover?: boolean; hasSnapshot?: boolean } = {}) {
+function harness(host: Record<string, unknown> = {}) {
 	const lock = vi.fn(async (_name: string, work: () => unknown) => work());
 	vi.stubGlobal('navigator', { locks: { request: lock } });
 	let active = true;
@@ -25,7 +26,7 @@ function harness(host: { canRecover?: boolean; hasSnapshot?: boolean } = {}) {
 	};
 	const showToast = vi.fn(), onRecoveryChanges = vi.fn(), onQuarantine = vi.fn();
 	const session = createReminderOutboxSession({
-		storage: storage as never, recovery: recovery as never, settlement: {} as never,
+		storage: storage as never, recovery: recovery as never, settlement: { publish: vi.fn() } as never,
 		isCurrent: () => active, onChanges: vi.fn(), onRecoveryChanges, onQuarantine, onStorageError: vi.fn(),
 		current: () => ({ apiFetch: vi.fn() as never, showToast, beginLocalMutation: () => () => {}, invalidateReads: vi.fn(),
 			commitReminderState: vi.fn(), getSnapshot: () => ({ reminders: [], projects: [] }), loadReminders: vi.fn(async () => {}), ...host }),
@@ -79,4 +80,16 @@ it('keeps damaged entries when the session is replaced or the lock fails', async
 	await expect(failing.session.removeQuarantined([damaged])).resolves.toBe(false);
 	expect(failing.storage.removeQuarantined).not.toHaveBeenCalled();
 	expect(failing.showToast).toHaveBeenCalledWith('error', 'Locks unavailable');
+});
+
+it('keeps confirmed results in memory during a drain and saves them once before reloading', async () => {
+	const order: string[] = [];
+	const commitReminderState = vi.fn(async () => {});
+	const persistReminderState = vi.fn(async () => { order.push('persist'); });
+	const loadReminders = vi.fn(async () => { order.push('load'); });
+	harness({ commitReminderState, persistReminderState, loadReminders });
+	await outboxOptions.current!.commit(change('one', 'pending'), {});
+	expect(commitReminderState).toHaveBeenCalledWith([], [], { persist: 'later' });
+	outboxOptions.current!.onSettled();
+	await vi.waitFor(() => expect(order).toEqual(['persist', 'load']));
 });

@@ -67,6 +67,9 @@ function applyReminderDelta(base: ReminderRecord[], delta: { changedPaths: strin
 const DEFAULT_REMINDER_INDEX_RETRY_DELAY_MS = 1_000;
 const MAX_REMINDER_INDEX_RETRY_DELAY_MS = 5_000;
 const MAX_REMINDER_INDEX_TOTAL_WAIT_MS = 10 * 60_000;
+/** Each reply warmed a batch, so while the remaining count falls the next batch is
+ * requested sooner. The number of requests stays the same; only the wait shrinks. */
+const PROGRESS_REMINDER_INDEX_RETRY_DELAY_MS = 200;
 
 function retryDelayMs(response: Response): number {
 	const seconds = Number(response.headers.get('Retry-After') ?? '');
@@ -78,18 +81,25 @@ function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+/** `first` is a response to the same request already in flight. */
 export async function fetchReadyReminderList(
 	apiFetch: ApiFetch,
 	path: string,
 	headers: Headers,
 	onProgress?: (remaining: number, total: number) => void,
+	first?: Response | Promise<Response>,
 ): Promise<Response> {
+	let previousRemaining: number | undefined;
 	for (let totalWaitMs = 0; ;) {
-		const response = await apiFetch(path, { headers });
+		const response = await (first ?? apiFetch(path, { headers }));
+		first = undefined;
 		if (response.status !== 202) return response;
 		const progress = await response.json() as { remainingFiles?: number; totalFiles?: number };
-		onProgress?.(progress.remainingFiles ?? 0, progress.totalFiles ?? 0);
-		const waitMs = retryDelayMs(response);
+		const remaining = progress.remainingFiles ?? 0;
+		onProgress?.(remaining, progress.totalFiles ?? 0);
+		const advancing = typeof progress.remainingFiles === 'number' && (previousRemaining === undefined || remaining < previousRemaining);
+		previousRemaining = remaining;
+		const waitMs = advancing ? PROGRESS_REMINDER_INDEX_RETRY_DELAY_MS : retryDelayMs(response);
 		if (totalWaitMs + waitMs > MAX_REMINDER_INDEX_TOTAL_WAIT_MS) break;
 		await delay(waitMs);
 		totalWaitMs += waitMs;

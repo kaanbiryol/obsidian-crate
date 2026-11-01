@@ -1,5 +1,5 @@
 import { EncryptionKeyRequiredError, rememberEncryptionUnlock } from '../encryption/encryption-onboarding';
-import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError, ENCRYPTION_CHECK_TIMEOUT_MS } from '../connection/encryption';
+import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError, ENCRYPTION_CHECK_TIMEOUT_MS, hasEncryptedSessionEvidence } from '../connection/encryption';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from './private-storage';
@@ -26,6 +26,9 @@ export function consumeReminderEncryptionFragment(): void {
 	const { crateKey } = takeFragmentValues(['crateKey']);
 	if (crateKey) fragmentCode = crateKey;
 }
+
+/** This device remembers an encrypted session or holds a key from its link. */
+export const hasReminderEncryptionEvidence = () => hasEncryptedSessionEvidence(null, fragmentCode);
 
 export function resetReminderEncryption(discardKeys = false): void {
 	pending = undefined; state = undefined;

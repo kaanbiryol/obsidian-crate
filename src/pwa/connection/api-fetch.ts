@@ -32,7 +32,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 	let keys: FeatureKeys | null = null;
 	let encrypted: EncryptedReminderApi | null = null;
 	let preparing: Promise<void> | undefined;
-	async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
+	async function rawFetch(path: string, init: RequestInit = {}, unverified = false): Promise<Response> {
 		if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		if (!authToken) throw new ConnectionError('reconnect', 'Not authenticated');
 		// Capture authority at invocation. Only revocation may finish dispatching
@@ -65,7 +65,8 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		const encryptionState = response.headers.get(ENCRYPTION_STATE_HEADER);
 		// A refusal may mean another device turned encryption on and revoked or locked this credential.
 		if (encryptionState === 'on' || [401, 403, 423, 428].includes(response.status)) forgetEncryptionOff();
-		else if (encryptionState === 'off' && dispatched.resets === encryptionOffResets) encryptionOff = { token: authToken, current: sessionCurrent, at: dispatched.at };
+		// A read sent before the startup check must not let that check be skipped.
+		else if (encryptionState === 'off' && !unverified && dispatched.resets === encryptionOffResets) encryptionOff = { token: authToken, current: sessionCurrent, at: dispatched.at };
 		if (response.status === 401 && sessionCurrent()) {
 			onUnauthorized();
 			throw new ConnectionError('reconnect', 'Session expired. Open a fresh link from Crate.');
@@ -110,6 +111,13 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 			return rawFetch(path, init);
 		});
 	}
-	return Object.assign(apiFetch, { ready });
+	/** A plaintext read sent while the startup encryption check is still running, on a
+	 * device without encryption evidence. Callers apply its response only once that
+	 * check accepts unencrypted mode. */
+	function readUnverified(path: string, init: RequestInit = {}): Promise<Response> {
+		if (keys || (init.method ?? 'GET') !== 'GET') return apiFetch(path, init);
+		return rawFetch(path, init, true);
+	}
+	return Object.assign(apiFetch, { ready, readUnverified });
 }
 

@@ -4,11 +4,19 @@ import { sha256Hex } from '../../platform/sha256';
 
 export interface VaultChangeState { seq: number; importGeneration: number; resetGeneration: string }
 
-export async function readVaultChangeState(db: D1Database): Promise<VaultChangeState> {
+/** The changelog's retained range, read with the change state so a delta needs no second read. */
+export interface ChangelogBounds { lastSeq: number; minSeq: number | null; snapshotSeq: number }
+
+export async function readVaultChangeState(db: D1Database): Promise<VaultChangeState & { bounds: ChangelogBounds }> {
 	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS seq,
+		(SELECT MIN(seq) FROM changelog) AS minSeq,
+		COALESCE((SELECT snapshot_seq FROM initial_import), 0) AS snapshotSeq,
 		COALESCE((SELECT generation FROM initial_import WHERE id = 1), 0) AS importGeneration,
-		COALESCE(${serverStateValue('reset_generation')}, '') AS resetGeneration`).first<VaultChangeState>();
-	return { seq: row?.seq ?? 0, importGeneration: row?.importGeneration ?? 0, resetGeneration: row?.resetGeneration ?? '' };
+		COALESCE(${serverStateValue('reset_generation')}, '') AS resetGeneration`)
+		.first<VaultChangeState & { minSeq: number | null; snapshotSeq: number }>();
+	const seq = row?.seq ?? 0;
+	return { seq, importGeneration: row?.importGeneration ?? 0, resetGeneration: row?.resetGeneration ?? '',
+		bounds: { lastSeq: seq, minSeq: row?.minSeq ?? null, snapshotSeq: row?.snapshotSeq ?? 0 } };
 }
 
 /** Every file write advances the changelog, the initial import generation or the
@@ -42,9 +50,10 @@ export function parseDeltaBase(value: string | null): { seq: number; scope: stri
 const MAX_DELTA_CHANGES = 20_000;
 
 /** Paths in `folderPath` written or deleted after `seq`, or null when the
- * changelog cannot prove completeness (pruned, imported, or too many changes). */
-export async function changedPathsSince(db: D1Database, folderPath: string, seq: number): Promise<string[] | null> {
-	const bounds = await getChangelogBounds(db);
+ * changelog cannot prove completeness (pruned, imported, or too many changes).
+ * `known` bounds were read with the caller's change state. */
+export async function changedPathsSince(db: D1Database, folderPath: string, seq: number, known?: ChangelogBounds): Promise<string[] | null> {
+	const bounds = known ?? await getChangelogBounds(db);
 	// Retained sequence numbers are contiguous, so this bounds the rows to replay.
 	if (seq > bounds.lastSeq || seq < bounds.snapshotSeq || (bounds.minSeq !== null && seq < bounds.minSeq - 1)
 		|| bounds.lastSeq - seq > MAX_DELTA_CHANGES) return null;

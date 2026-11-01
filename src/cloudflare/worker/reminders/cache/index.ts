@@ -24,11 +24,13 @@ export async function loadIncrementalReminderIndex(
 	env: Env,
 	folderPath: string,
 	metadata: StoredMarkdownFileMetadata[],
+	/** The folder's cache rows, when the caller already started reading them. */
+	preloaded?: ReturnType<typeof loadReminderFileCache>,
 ): Promise<IncrementalReminderIndexResult> {
 	let cachedFiles = new Map<string, ReminderFileCacheEntry>();
 	let cachedPaths: string[] = [];
 	try {
-		({ entries: cachedFiles, rowPaths: cachedPaths } = await loadReminderFileCache(env.DB, folderPath));
+		({ entries: cachedFiles, rowPaths: cachedPaths } = await (preloaded ?? loadReminderFileCache(env.DB, folderPath)));
 	} catch {
 		// A missing cache table or transient D1 error falls back to reading R2.
 	}
@@ -90,10 +92,12 @@ export async function loadReminderDelta(
 	folderPath: string,
 	metadata: StoredMarkdownFileMetadata[],
 	changedPaths: readonly string[],
+	/** Cache rows for `changedPaths`, when the caller already started reading them. */
+	preloaded?: ReturnType<typeof loadReminderFileCache>,
 ): Promise<{ reminders: RemoteReminderRecord[]; projects: string[] } | null> {
 	const changed = new Set(changedPaths);
 	const files = metadata.filter(file => changed.has(file.path));
-	const { entries: cached } = await loadReminderFileCache(env.DB, folderPath, files.map(file => file.path));
+	const { entries: cached } = await (preloaded ?? loadReminderFileCache(env.DB, folderPath, files.map(file => file.path)));
 	const stale = files.filter(file => cached.get(file.path)?.fileHash !== file.hash);
 	if (selectReminderIndexWarmBatch(stale).length < stale.length) return null;
 	const fresh = new Map((await parseReminderCacheEntries(env, folderPath, stale)).map(entry => [entry.filePath, entry]));

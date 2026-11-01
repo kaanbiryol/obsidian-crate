@@ -45,7 +45,7 @@ function useRemindersController() {
 	const { modal, saving, resetEditor } = editor;
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const showToast = useSyncFeedback();
-	const reminderSync = useReminderSync({ apiFetch, authToken, authority, bootstrapped: connection.bootstrapped, config,
+	const reminderSync = useReminderSync({ apiFetch, readUnverified: apiFetch.readUnverified, authToken, authority, bootstrapped: connection.bootstrapped, config,
 		prepareSession: apiFetch.ready, onSignedOut: resetEditor, setSelectedProject, enabled });
 	const bootstrapped = connection.bootstrapped && reminderSync.hydrated;
 	const resolvePageTitle = useCallback((url: string) => fetchPageTitle(apiFetch, url), [apiFetch]);

@@ -64,6 +64,35 @@ describe('fetchReadyReminderList', () => {
 		await vi.advanceTimersByTimeAsync(1);
 		await expect(result).resolves.toMatchObject({ status: 200 });
 	});
+
+	it('requests the next batch after 200 ms while warming makes progress, and backs off when it stalls', async () => {
+		vi.useFakeTimers();
+		const warming = (remainingFiles: number) => new Response(JSON.stringify({ warming: true, remainingFiles, totalFiles: 60 }), {
+			status: 202, headers: { 'Retry-After': '1' },
+		});
+		const apiFetch = vi.fn()
+			.mockResolvedValueOnce(warming(40))
+			.mockResolvedValueOnce(warming(20))
+			.mockResolvedValueOnce(warming(20))
+			.mockResolvedValueOnce(new Response(JSON.stringify({ reminders: [] }), { status: 200 }));
+		const result = fetchReadyReminderList(apiFetch, '/reminders/list', new Headers());
+		await vi.advanceTimersByTimeAsync(200);
+		expect(apiFetch).toHaveBeenCalledTimes(2);
+		await vi.advanceTimersByTimeAsync(200);
+		expect(apiFetch).toHaveBeenCalledTimes(3);
+		// The same remaining count means no progress: wait for Retry-After.
+		await vi.advanceTimersByTimeAsync(999);
+		expect(apiFetch).toHaveBeenCalledTimes(3);
+		await vi.advanceTimersByTimeAsync(1);
+		await expect(result).resolves.toMatchObject({ status: 200 });
+	});
+
+	it('uses a response already in flight for the first request', async () => {
+		const apiFetch = vi.fn();
+		const first = new Response(JSON.stringify({ reminders: [] }), { status: 200 });
+		await expect(fetchReadyReminderList(apiFetch, '/reminders/list', new Headers(), undefined, Promise.resolve(first))).resolves.toBe(first);
+		expect(apiFetch).not.toHaveBeenCalled();
+	});
 });
 
 describe('readReminderListBody', () => {

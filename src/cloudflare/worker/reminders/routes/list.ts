@@ -7,6 +7,7 @@ import {
 	loadReminderDelta,
 	REMINDER_CACHE_PARSER_VERSION,
 } from '../cache/index';
+import { loadReminderFileCache } from '../cache/load';
 import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { changedPathsSince, deltaBase, parseChangeEtags, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../../vault-change-token';
@@ -43,16 +44,23 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 
 	const since = parseDeltaBase(url.searchParams.get('since'));
 	const sinceSeq = since && since.scope === base.slice(base.indexOf('.') + 1) ? since.seq : null;
-	let changedSinceBase: Promise<string[] | null> | undefined;
-	const changed = () => changedSinceBase ??= sinceSeq === null ? Promise.resolve(null) : changedPathsSince(env.DB, folderPath, sinceSeq);
+	// The change state already read the changelog bounds, so this is one more query.
+	const changedPaths = sinceSeq === null ? null : await changedPathsSince(env.DB, folderPath, sinceSeq, state.bounds);
 	// Other vault writes changed the token. An ETag issued at the client's delta
 	// base still holds when no folder path changed since, so skip the listing.
 	if (sinceSeq !== null) {
 		const issuedAtBase = await vaultChangeToken(env.DB, scope, { ...state, seq: sinceSeq });
 		const current = cached.find(value => value?.changeToken === issuedAtBase);
-		if (current && (await changed())?.length === 0) return notModified(`"${changeToken}.${current.revision}"`);
+		if (current && changedPaths?.length === 0) return notModified(`"${changeToken}.${current.revision}"`);
 	}
 
+	// Cache rows do not depend on the folder listing, so read them alongside it: the
+	// changed notes for a delta, or every note when no conditional answer is possible.
+	const changedCache = changedPaths ? loadReminderFileCache(env.DB, folderPath, changedPaths) : undefined;
+	const folderCache = !changedPaths && requestEtags.length === 0 ? loadReminderFileCache(env.DB, folderPath) : undefined;
+	// Their failures are handled where they are awaited.
+	changedCache?.catch(() => undefined);
+	folderCache?.catch(() => undefined);
 	const metadata = await listStoredMarkdownFileMetadataByPrefix(env.DB, folderPath);
 	const revision = (await sha256Hex([
 		`parser:${REMINDER_CACHE_PARSER_VERSION}`,
@@ -61,8 +69,7 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	const etag = `"${changeToken}.${revision}"`;
 	if (requestEtags.includes('*') || cached.some(value => value?.revision === revision)) return notModified(etag);
 	const headers = { 'Cache-Control': 'private, no-cache' };
-	const changedPaths = await changed();
-	const delta = changedPaths && await loadReminderDelta(env, folderPath, metadata, changedPaths);
+	const delta = changedPaths && await loadReminderDelta(env, folderPath, metadata, changedPaths, changedCache);
 	if (changedPaths && delta) {
 		return corsResponse({
 			delta: true,
@@ -73,7 +80,7 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 		}, 200, { ...headers, ETag: etag, [DELTA_BASE_HEADER]: base });
 	}
 
-	const workspace = await loadIncrementalReminderIndex(env, folderPath, metadata);
+	const workspace = await loadIncrementalReminderIndex(env, folderPath, metadata, folderCache);
 	if (!workspace.ready) {
 		return corsResponse({
 			warming: true,

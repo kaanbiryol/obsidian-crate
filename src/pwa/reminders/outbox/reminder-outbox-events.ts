@@ -69,7 +69,7 @@ export function subscribeReminderOutboxEvents(options: {
 				try {
 					const snapshot = current.getSnapshot();
 					const next = confirmed && current.hasSnapshot !== false ? applyReminderSettlement(snapshot.reminders, snapshot.projects, confirmed) : null;
-					// The sender persisted this result before publishing it.
+					// The sender saves its offline copy when its drain ends.
 					if (next) await current.commitReminderState(next.reminders, next.projects, { persist: false });
 				} catch (error) { if (isCurrent()) current.showToast('error', error instanceof Error ? error.message : String(error)); }
 				finally { finish(); if (isCurrent()) refreshList(); }

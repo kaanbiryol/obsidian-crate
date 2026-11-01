@@ -12,6 +12,7 @@ import { readStoredMarkdownFiles } from '../storage';
 import { getNotificationPolicy } from './policy';
 import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, REMINDER_PROJECTION_SIZE_ISSUE, DUPLICATE_COMMITTED_REMINDER_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from '../reminders/source-parse';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
+import { reminderFileCacheUpsert } from '../reminders/cache/persist';
 import type { VerifiedSourceBytes } from '../reminders/source-migration';
 import type { Env } from '../types';
 import type { RemoteReminderRecord } from '../reminders/types';
@@ -74,11 +75,13 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 	]);
 	const verifiedRevisions = new Map(verified.map(row => [row.file_path, row.file_revision]));
 	// Parse every job first, so the reads below serve the whole pass.
-	type Parsed = { job: typeof jobs[number]; file: FileStorageRow | null; reminders: RemoteReminderRecord[] } | { job: typeof jobs[number]; error: unknown };
+	type Parsed = { job: typeof jobs[number]; file: FileStorageRow | null; reminders: RemoteReminderRecord[]; cacheWrite: D1PreparedStatement | null } | { job: typeof jobs[number]; error: unknown };
 	const parsed = await Promise.all(jobs.map(async (job): Promise<Parsed> => {
 		try {
 			const file = files.get(job.path) ?? null;
 			let reminders: RemoteReminderRecord[] = [];
+			// The web app's list reuses this parse instead of reading the note again.
+			let cacheWrite: D1PreparedStatement | null = null;
 			if (file && isReminderPath(job.path, policy.folderPath)) {
 				if (file.size > reminderSourceByteLimit(encrypted)) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
 				const reused = loaded?.verified?.get(job.path);
@@ -89,9 +92,12 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 				const source = parseReminderSource(job.path, text.content, policy.folderPath, encrypted);
 				if (source.issue) throw new PermanentReminderSourceError(source.issue);
 				if (verifiedRevisions.get(job.path) !== file.storageKey) throw new Error('Reminder source is awaiting verification with the current parser. Processing will retry within its retry budget. The vault file remains synced.');
-				if (job.path.startsWith(`${policy.folderPath}/`)) reminders = source.reminders;
+				if (job.path.startsWith(`${policy.folderPath}/`)) {
+					reminders = source.reminders;
+					if (!encrypted) cacheWrite = reminderFileCacheUpsert(env.DB, policy.folderPath, { filePath: job.path, fileHash: file.hash, reminders });
+				}
 			}
-			return { job, file, reminders };
+			return { job, file, reminders, cacheWrite };
 		} catch (error) { return { job, error }; }
 	}));
 	const ids = [...new Set(parsed.flatMap(entry => 'reminders' in entry ? entry.reminders.map(reminder => reminder.id) : []))];
@@ -110,7 +116,7 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 		const { job } = entry;
 		try {
 			if ('error' in entry) throw entry.error;
-			const { file, reminders } = entry;
+			const { file, reminders, cacheWrite } = entry;
 			if (reminders.some(reminder => duplicates.has(reminder.id))) throw new ReminderIdentityConflictError();
 			const observed = new Map(sourceRows.filter(row => row.file_path === job.path).map(row => [row.reminder_id, row]));
 			const ids = new Set<string>();
@@ -162,6 +168,7 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 					.bind(job.path, file?.storageKey ?? '', policy.revision, json, ...args)),
 				env.DB.prepare(`DELETE FROM notification_file_retries WHERE path = ? AND ${guard}`).bind(job.path, ...args),
 				env.DB.prepare(`DELETE FROM notification_projection_jobs WHERE path = ? AND ${guard}`).bind(job.path, ...args),
+				...(cacheWrite ? [cacheWrite] : []),
 			]);
 		} catch (error) {
 			const message = error instanceof Error ? error.message.slice(0, 512) : 'Projection failed';

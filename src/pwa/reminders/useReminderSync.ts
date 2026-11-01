@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../connection/session-generation';
 import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
-import { reminderEncryptionSnapshot } from './encryption-session';
+import { hasReminderEncryptionEvidence, reminderEncryptionSnapshot } from './encryption-session';
 import { fetchReadyReminderList, type ReminderIndexingProgress } from './reminder-api';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from './cache/reminder-cache';
 import { createReminderRequestCoordinator } from './outbox/reminder-request-coordinator';
@@ -12,6 +12,13 @@ import { requestSharedFeaturesRefresh } from '../shared-features';
 import { responseError } from '../connection/response-error';
 import type { ApiFetch, DataMode, StoredConfig } from '../types';
 import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue, ReminderSyncHost } from './types';
+
+/** The offline copy and first list request started during the encryption check. */
+interface StartupRead {
+	key: string;
+	cached: Promise<CachedReminderSnapshot | null>;
+	list: Promise<{ path: string; headers: Headers; response: Promise<Response> }>;
+}
 
 interface ConfirmedReminderSnapshot {
 	reminders: ReminderRecord[];
@@ -35,7 +42,8 @@ export interface ReminderSyncState extends ReminderSyncHost {
 	hasHydratedCache: () => boolean;
 	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
 	rebuildOfflineCache: () => Promise<void>;
-	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => Promise<void>;
+	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean | 'later' }) => Promise<void>;
+	persistReminderState: () => Promise<void>;
 	resetReminderState: () => void;
 	refreshPresentation: () => void;
 	reportError: (message: string | null) => void;
@@ -43,6 +51,7 @@ export interface ReminderSyncState extends ReminderSyncHost {
 
 export function useReminderSync({
 	apiFetch,
+	readUnverified,
 	authToken,
 	authority,
 	bootstrapped,
@@ -54,6 +63,8 @@ export function useReminderSync({
 }: {
 	enabled?: boolean;
 	apiFetch: ApiFetch;
+	/** Sends a read before the startup encryption check answers; see startup reads below. */
+	readUnverified?: ApiFetch;
 	authToken: string | null;
 	/** Identifies the app connection whose offline copy is hydrated. */
 	authority: object;
@@ -84,6 +95,33 @@ export function useReminderSync({
 	const requestCoordinatorRef = useRef(createReminderRequestCoordinator());
 	const [cursor] = useState(createReminderListCursor);
 	const activeReadRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
+	const startupRef = useRef<StartupRead | null>(null);
+	const startupStartedRef = useRef(false);
+
+	// Without encryption evidence the vault is most likely unencrypted, so the offline
+	// copy is read and the first list request sent while the startup encryption check
+	// runs. Neither is shown or applied until that check accepts unencrypted mode.
+	useEffect(() => {
+		if (startupStartedRef.current || bootstrapped) return;
+		startupStartedRef.current = true;
+		if (!authToken || !readUnverified || !enabledRef.current || hasReminderEncryptionEvidence()
+			|| reminderEncryptionSnapshot().status !== 'checking') return;
+		// A new enrollment link replaces this credential during startup.
+		const params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
+		if (params.get('token') || params.get('browserToken')) return;
+		const folderPath = config.folderPath;
+		const cached = loadCachedReminderSnapshot(folderPath);
+		const list = cached.then(snapshot => {
+			const startup = createReminderListCursor();
+			if (snapshot) startup.hydrate(snapshot);
+			const request = startup.request(folderPath, (snapshot?.issues ?? []).length === 0);
+			const response = readUnverified(request.path, { headers: request.headers });
+			// Failures are handled where the response is used.
+			response.catch(() => undefined);
+			return { ...request, response };
+		});
+		startupRef.current = { key: `${folderPath}\0${authToken}`, cached, list };
+	}, [bootstrapped, authToken, readUnverified, config.folderPath]);
 
 	const lifetimeRef = useRef({ active: true });
 	useEffect(() => {
@@ -105,22 +143,39 @@ export function useReminderSync({
 	const hasHydratedCache = useCallback(() => hydratedCacheRef.current, []);
 	const refreshPresentation = useCallback(() => publishSnapshot([...snapshotRef.current.reminders]), [publishSnapshot]);
 
+	// Confirmed state committed with persist: 'later' that the offline copy does not hold yet.
+	const unsavedRef = useRef<{ folderPath: string; savedAt: number } | null>(null);
 	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects,
-		{ etag, deltaBase, persist = true }: { etag?: string; deltaBase?: string; persist?: boolean } = {}) => {
+		{ etag, deltaBase, persist = true }: { etag?: string; deltaBase?: string; persist?: boolean | 'later' } = {}) => {
 		const savedAt = Date.now();
 		publishSnapshot(nextReminders, nextProjects);
 		cursor.confirmed({ etag, deltaBase }, savedAt);
 		setLastUpdatedAt(savedAt);
 		setDataMode('live');
 		setIsOffline(false);
-		if (persist) await saveCachedReminderSnapshot({ folderPath: config.folderPath, reminders: nextReminders, projects: nextProjects,
+		if (persist === 'later') { unsavedRef.current = { folderPath: config.folderPath, savedAt }; return; }
+		if (!persist) return;
+		unsavedRef.current = null;
+		await saveCachedReminderSnapshot({ folderPath: config.folderPath, reminders: nextReminders, projects: nextProjects,
 			savedAt, etag, issues: issuesRef.current, deltaBase: cursor.deltaBase });
 	}, [config.folderPath, cursor, publishSnapshot]);
-	const commitReminderState = useCallback((nextReminders: ReminderRecord[], nextProjects?: string[], options?: { persist?: boolean }) =>
+	const commitReminderState = useCallback((nextReminders: ReminderRecord[], nextProjects?: string[], options?: { persist?: boolean | 'later' }) =>
 		commitConfirmedSnapshot(nextReminders, nextProjects, { persist: options?.persist }), [commitConfirmedSnapshot]);
+	/** One offline-copy write for the confirmed results of a whole outbox drain. The
+	 * durable outbox keeps each command until the server confirms it, so a lost
+	 * write only leaves an older confirmed copy that the next delta read repairs. */
+	const persistReminderState = useCallback(async () => {
+		const unsaved = unsavedRef.current;
+		if (!unsaved || unsaved.folderPath !== config.folderPath) return;
+		unsavedRef.current = null;
+		const { reminders: nextReminders, projects: nextProjects } = snapshotRef.current;
+		await saveCachedReminderSnapshot({ folderPath: config.folderPath, reminders: nextReminders, projects: nextProjects,
+			savedAt: unsaved.savedAt, etag: cursor.persistedEtag, issues: issuesRef.current, deltaBase: cursor.deltaBase });
+	}, [config.folderPath, cursor]);
 
 	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
 		hydratedCacheRef.current = true;
+		unsavedRef.current = null;
 		setLoading(false);
 		publishSnapshot(snapshot.reminders, snapshot.projects);
 		issuesRef.current = snapshot.issues ?? [];
@@ -129,6 +184,17 @@ export function useReminderSync({
 		setLastUpdatedAt(snapshot.savedAt);
 		setDataMode('cached');
 	}, [cursor, publishSnapshot]);
+
+	/** The startup request, when it matches this first read and the encryption check
+	 * accepted unencrypted mode. A failed startup request is sent again normally. */
+	const takeStartupResponse = useCallback(async (key: string, path: string, headers: Headers): Promise<Response | undefined> => {
+		const startup = startupRef.current;
+		startupRef.current = null;
+		if (!startup || startup.key !== key || reminderEncryptionSnapshot().status !== 'unencrypted') return undefined;
+		const early = await startup.list;
+		if (early.path !== path || early.headers.get('If-None-Match') !== headers.get('If-None-Match')) return undefined;
+		return early.response.catch(() => apiFetch(path, { headers }));
+	}, [apiFetch]);
 
 	const loadReminders = useCallback((options: { silent?: boolean; maxAgeMs?: number } = {}) => {
 		if (!authToken || !enabledRef.current) return Promise.resolve();
@@ -159,6 +225,8 @@ export function useReminderSync({
 							setIndexingProgress({ indexedFiles: Math.max(0, total - remaining), totalFiles: total });
 						}
 					},
+					// Only the first read after startup waits here; others dispatch at once.
+					startupRef.current ? await takeStartupResponse(requestKey, path, headers) : undefined,
 				);
 				if (response.status !== 304 && !response.ok) throw new Error((await responseError(response, 'Could not load reminders.')).message);
 				const body: unknown = response.status === 304 ? undefined : await response.json().catch(() => null);
@@ -212,9 +280,10 @@ export function useReminderSync({
 		};
 		void promise.then(clearActiveRead, clearActiveRead);
 		return promise;
-	}, [apiFetch, authToken, config.folderPath, cursor, hydrateCachedSnapshot, commitConfirmedSnapshot]);
+	}, [apiFetch, authToken, config.folderPath, cursor, hydrateCachedSnapshot, commitConfirmedSnapshot, takeStartupResponse]);
 
 	const rebuildOfflineCache = useCallback(async () => {
+		startupRef.current = null;
 		const sessionCurrent = capturePwaSession();
 		if (!await rebuildCachedReminderSnapshot(config.folderPath) || !sessionCurrent()) return;
 		cursor.forgetServerPosition();
@@ -255,6 +324,8 @@ export function useReminderSync({
 
 	const resetReminderState = useCallback(() => {
 		requestCoordinatorRef.current = createReminderRequestCoordinator();
+		unsavedRef.current = null;
+		startupRef.current = null;
 		publishSnapshot([], []);
 		issuesRef.current = [];
 		setIssues([]);
@@ -278,7 +349,11 @@ export function useReminderSync({
 				// show the plaintext copy now. Storage stays locked; the next refresh retries.
 				const view = reminderEncryptionSnapshot();
 				if (!(view.status === 'locked' && view.offlineCopy)) await prepareSession();
-				const cached = await loadCachedReminderSnapshot(config.folderPath);
+				// The startup read ran without a cipher, so an unlocked session reads again.
+				const startup = startupRef.current?.key === `${config.folderPath}\0${authToken}` && reminderEncryptionSnapshot().status !== 'ready'
+					? startupRef.current : null;
+				if (!startup) startupRef.current = null;
+				const cached = await (startup?.cached ?? loadCachedReminderSnapshot(config.folderPath));
 				if (!cancelled && current() && cached) hydrateCachedSnapshot(cached);
 			} catch (cause) {
 				if (!cancelled && current() && !(cause instanceof EncryptionKeyRequiredError)) setError(cause instanceof Error ? cause.message : String(cause));
@@ -307,6 +382,7 @@ export function useReminderSync({
 		beginLocalMutation,
 		invalidateReads,
 		commitReminderState,
+		persistReminderState,
 		resetReminderState,
 		refreshPresentation,
 		reportError: setError,

@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
@@ -10,13 +10,14 @@ import { getStoredFileRow } from '../sync/storage';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { readReminderListBody } from '@/pwa/reminders/reminder-api';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
+import { drainNotificationProjections } from '../notifications/projection';
 import type { ReminderRecord } from '@/pwa/reminders/types';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
 });
-afterEach(async () => { await reset(); });
+afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 
 const task = (id: string, title = id) => `- [ ] ${title} <!-- crate-id:${id} -->`;
 async function write(name: string, ...lines: string[]) {
@@ -28,15 +29,16 @@ async function write(name: string, ...lines: string[]) {
 /** Lists like the web app, recording whether the whole folder cache was read. */
 async function list(headers: Record<string, string> = {}, since?: string) {
 	const prepare = env.DB.prepare.bind(env.DB);
-	let fullCacheRead = false;
+	let fullCacheRead = false, queries = 0;
 	env.DB.prepare = (sql: string) => {
+		queries += 1;
 		if (sql.includes('FROM reminder_file_cache') && !sql.includes('json_each')) fullCacheRead = true;
 		return prepare(sql);
 	};
 	try {
 		const query = since ? `&since=${encodeURIComponent(since)}` : '';
 		const response = await handleListReminders(new Request(`https://worker.test/reminders/list?folderPath=Reminders${query}`, { headers }), env);
-		return { response, body: response.status === 200 ? await response.json() as Record<string, unknown> : null, fullCacheRead };
+		return { response, body: response.status === 200 ? await response.json() as Record<string, unknown> : null, fullCacheRead, queries };
 	} finally { env.DB.prepare = prepare; }
 }
 
@@ -80,4 +82,27 @@ it('lists the whole folder until its one-time source scan has finished', async (
 	const delta = await list({ 'If-None-Match': first.response.headers.get('ETag')! }, first.response.headers.get(DELTA_BASE_HEADER)!);
 	expect(delta.body).toMatchObject({ delta: true, reminders: [{ id: 'a1', content: 'Renamed' }] });
 	expect(delta.fullCacheRead).toBe(true);
+});
+
+it('answers a delta base with no reminder changes in two queries', async () => {
+	await write('Alpha.md', task('a1'));
+	const first = await list();
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Notes/Other.md', 'Elsewhere\n', null);
+	const unchanged = await list({ 'If-None-Match': first.response.headers.get('ETag')! }, first.response.headers.get(DELTA_BASE_HEADER)!);
+	expect(unchanged.response.status).toBe(304);
+	// The change state, which carries the changelog bounds, then the changed paths.
+	expect(unchanged.queries).toBe(2);
+});
+
+it('lists a note the notification projection parsed without reading it from storage', async () => {
+	await write('Alpha.md', task('a1'));
+	await env.DB.prepare('DELETE FROM reminder_file_cache').run();
+	await drainNotificationProjections(env);
+	const { hash } = (await getStoredFileRow(env.DB, 'Reminders/Alpha.md'))!;
+	expect(await env.DB.prepare('SELECT file_hash FROM reminder_file_cache WHERE folder_path = ? AND file_path = ?')
+		.bind('Reminders', 'Reminders/Alpha.md').first()).toEqual({ file_hash: hash });
+	const get = vi.spyOn(env.BUCKET, 'get');
+	const listed = await list();
+	expect(listed.body).toMatchObject({ reminders: [{ id: 'a1' }] });
+	expect(get).not.toHaveBeenCalled();
 });

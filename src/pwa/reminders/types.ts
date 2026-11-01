@@ -11,8 +11,11 @@ export interface ReminderSyncHost {
 	beginLocalMutation: () => () => void;
 	/** Drops in-flight reads without starting a write, e.g. after another tab's command settles. */
 	invalidateReads: () => void;
-	/** Peers applying another tab's persisted confirmation pass persist: false. */
-	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => void | Promise<void>;
+	/** Peers applying another tab's confirmation pass persist: false. The sending tab
+	 * passes 'later' and saves the offline copy once per drain with persistReminderState. */
+	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean | 'later' }) => void | Promise<void>;
+	/** Saves confirmed state committed with persist: 'later', if any. */
+	persistReminderState?: () => Promise<void>;
 	getSnapshot: () => { reminders: ReminderRecord[]; projects: string[] };
 	loadReminders: LoadReminders;
 }

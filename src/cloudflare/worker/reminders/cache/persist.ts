@@ -30,6 +30,7 @@ function createCacheUpsertStatement(
 	db: D1Database,
 	folderPath: string,
 	serialized: SerializedReminderFileCacheEntry,
+	onlyIfChanged = false,
 ): D1PreparedStatement {
 	const { entry, remindersJson } = serialized;
 	return db.prepare(`INSERT INTO reminder_file_cache (
@@ -43,7 +44,9 @@ function createCacheUpsertStatement(
 			file_hash = excluded.file_hash,
 			parser_version = excluded.parser_version,
 			reminders_json = excluded.reminders_json,
-			updated_at = datetime('now')`)
+			updated_at = datetime('now')${onlyIfChanged ? `
+		WHERE reminder_file_cache.file_hash IS NOT excluded.file_hash
+			OR reminder_file_cache.parser_version IS NOT excluded.parser_version` : ''}`)
 		.bind(
 			folderPath,
 			entry.filePath,
@@ -53,6 +56,13 @@ function createCacheUpsertStatement(
 			...filePathArgs(entry.filePath),
 			entry.fileHash,
 		);
+}
+
+/** An upsert to fold into another batch, or null when the entry is too large to cache.
+ * A row already holding this file hash and parser version is left unwritten. */
+export function reminderFileCacheUpsert(db: D1Database, folderPath: string, entry: ReminderFileCacheEntry): D1PreparedStatement | null {
+	const serialized = serializeCacheEntry(entry);
+	return serialized && createCacheUpsertStatement(db, folderPath, serialized, true);
 }
 
 export async function writeReminderFileCacheEntries(
