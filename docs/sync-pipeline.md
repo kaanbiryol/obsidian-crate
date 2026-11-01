@@ -75,7 +75,7 @@ Triggered when the changelog cannot be read incrementally or `lastSeq` is 0:
 
 1. Discover all local vault files
 2. Fetch the remote manifest in 2,000-file pages, then replay changes that landed after the first-page snapshot
-3. Compute hashes for local files. Automatic recovery from an expired or failed cursor reuses the baseline hash when size and mtime match; first and manual full syncs read every file
+3. Compute hashes for local files while the manifest request runs; a failed request stops the scan. Automatic recovery from an expired or failed cursor reuses the baseline hash when size and mtime match; first and manual full syncs read every file
 4. 3-way diff using `reconciliation.ts:classifyPaths()`, which applies the same `classifyPath()` policy as incremental sync
 5. Execute uploads, downloads, conflicts, deletes
 
@@ -99,7 +99,7 @@ removed after successful reconciliation.
 
 ### 5. Initial Import
 
-There is no separate initial-sync command. Each sync first asks the server for an unfinished initial import; while one is open, the vault is uploaded through it before any incremental or full reconciliation. Server files missing locally are pruned from the import, files are prepared in byte-budgeted chunks so binary contents cannot accumulate without bound in memory, and small files are committed in batches of up to 32. Files over 25 MB are reported as skipped and keep any server copy they already have. Only the device that started the import prunes or uploads for it; another device stops until it finishes (see [upload recovery](upload-recovery.md)). Finishing the import sets the changelog cursor.
+There is no separate initial-sync command. Each sync first asks the server for an unfinished initial import; while one is open, the vault is uploaded through it before any incremental or full reconciliation. Server files missing locally are pruned from the import, files are prepared in byte-budgeted chunks so binary contents cannot accumulate without bound in memory, and small files are committed in batches of up to 32. Three requests stay in flight: each takes the next prepared batch as soon as its previous one finishes, and the local manifest is saved every 256 confirmed files or 5 seconds, and when the import finishes or fails. The committed server inventory remains the resume point. Files over 25 MB are reported as skipped and keep any server copy they already have. Only the device that started the import prunes or uploads for it; another device stops until it finishes (see [upload recovery](upload-recovery.md)). Finishing the import sets the changelog cursor.
 
 Entry point: `engine/engine.ts:sync()` -> `engine/initial-import.ts:runInitialImport()`
 
@@ -281,8 +281,8 @@ Release and transfer values are also checked against source in [current contract
 | `MAX_DEBOUNCE_WAIT_MS` | 30,000 ms | `types.ts` |
 | Large upload quiet / maximum wait | 1 MiB files: 60 s / 5 min | `queue/controller.ts` |
 | `MAX_FILE_SIZE_BYTES` | 25 MB | `types.ts` |
-| `BATCH_UPLOAD_MAX_FILES` | 3 | `protocol/sync-limits.ts` |
-| `BATCH_DELETE_MAX_FILES` | 4 | `protocol/sync-limits.ts` |
+| `BATCH_UPLOAD_MAX_FILES` | 32 | `protocol/sync-limits.ts` |
+| `BATCH_DELETE_MAX_FILES` | 32 | `protocol/sync-limits.ts` |
 | `BATCH_DOWNLOAD_MAX_FILES` | 50 | `protocol/sync-limits.ts` |
 | `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
 | `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
@@ -293,6 +293,8 @@ Release and transfer values are also checked against source in [current contract
 | Large transfers on mobile | Files of 8 MiB or more transfer one at a time | `transfer/large-transfers.ts` |
 | File transfer timeout | 120 s plus 1 s per 32 KiB of body, so an upload still completes at about 0.26 Mbit/s | `worker-api/http.ts` |
 | `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
+| `BATCH_DOWNLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
+| `DOWNLOAD_APPLY_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
 | `BATCH_DELETE_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `MAX_RETRIES` | 3 | `engine/lifecycle.ts` |
 | `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine/lifecycle.ts` |
@@ -314,7 +316,7 @@ splits a chunk the server cannot accept in one request.
 Remote deletes in manual, selected-file, incremental, forced and automatic sync
 use `transfer/delete.ts:deleteRemoteFiles()`. It waits for preceding uploads and
 reconciliation to succeed, rechecks local absence, and uses `delete-batches.ts`
-to send up to 4 conditional deletes per request with 2 requests in flight.
+to send up to 32 conditional deletes per request with 2 requests in flight.
 Rename preservation, expected hashes and revisions still guard every deletion.
 A delete that clears an upload's name in the same run, as after a
 [case-only rename](#case-only-renames), runs before the uploads instead.
@@ -322,7 +324,7 @@ Accepted sibling requests drain before cancellation returns; acknowledged
 deletions are checkpointed. Activity reports **Deleting X of Y files** as batches
 complete. Queue settlement and conflict retries remain with the calling mode.
 
-Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch response does not match its request or the server refuses it with a non-retryable status. A transport failure, retryable status (408, 425, 429, 5xx) or 401 instead fails that batch and every request not yet sent, as delete batches do; batch uploads stop the same way.
+Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB), with up to 4 requests in flight on desktop or 2 on mobile. The files of one response are written to the vault up to 4 at a time on desktop or 2 on mobile; each write keeps its own local-change check and read-back verification. The Worker reads a batch's objects from R2 through a rolling pool of up to 6, its limit on simultaneous outgoing connections, and returns them in the requested order. Larger files use individual streaming downloads, with up to 2 in flight. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch response does not match its request or the server refuses it with a non-retryable status. A transport failure, retryable status (408, 425, 429, 5xx) or 401 instead fails that batch and every request not yet sent, as delete batches do; batch uploads stop the same way.
 
 Implementation: `transfer/upload.ts`, `transfer/upload-pipeline.ts`, `transfer/prepare.ts`, `transfer/delete.ts`, `delete-batches.ts`
 
@@ -415,7 +417,7 @@ Implementation: `manifest.ts:LocalManifest`
 - **Retry:** failed uploads retry up to 3 times with exponential backoff (1s base delay)
 - **Cancellation:** abort and timeout stop the caller's wait and ignore late responses. Stopping the engine rejects concurrent transfers that have not started yet and any manifest save after the manifest closes, so a partial run can never be reported as a completed one. Vault discovery checks cancellation before and after every directory listing and hidden-file stat; a cancelled scan never returns a partial inventory. Local hashing also checks cancellation before updating a baseline. Obsidian's HTTP transport may still finish and commit a mutation remotely. Uncertain queued paths remain pending; retries use expected-hash writes and reconciliation, and cancelled incremental runs do not advance the changelog cursor. Concurrent workers and filesystem reads already in progress are drained before a failed operation unwinds. **Stop sync** clears displayed progress immediately, then waits for local work, saves automatic sync as off, and reloads the idle engine.
 - **Local deletion recovery:** visible files use Obsidian's local vault trash (`vault.trash(file, false)`); hidden/unindexed files use the adapter's local trash. The vault's `.trash/` directory is always excluded from sync. A trash failure never falls back to permanent removal. The hash check and deletion are not atomic: an edit arriving between them remains recoverable in trash.
-- **Upload memory:** incremental and queued uploads reserve room for the next maximum-size file before preparation, using the 48 MiB mobile / 128 MiB desktop budget and a 128-file cap. Chunks finish uploading before further contents are prepared; history retains paths rather than file buffers. These budgets cover prepared binary contents, not total process memory or request encoding overhead. Because a transfer in flight holds several full-size copies (base64, ciphertext, decrypted bytes), mobile uploads and downloads of files of 8 MiB or more run one at a time, while smaller files keep transferring in parallel.
+- **Upload memory:** incremental and queued uploads reserve room for the next maximum-size file before preparation, using the 48 MiB mobile / 128 MiB desktop budget and a 128-file cap. Chunks finish uploading before further contents are prepared; history retains paths rather than file buffers. Up to 2 files prepare at once, and each preparation in progress reserves a maximum-size file, so on mobile the 48 MiB budget prepares one file at a time. These budgets cover prepared binary contents, not total process memory or request encoding overhead. Because a transfer in flight holds several full-size copies (base64, ciphertext, decrypted bytes), mobile uploads and downloads of files of 8 MiB or more run one at a time, while smaller files keep transferring in parallel.
 - **Incremental-to-full fallback:** if incremental sync returns `null` (changelog read error or cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
 - **Startup event recovery:** the startup sync scans the vault itself, and vault events that arrive while it runs are queued once it finishes, keeping the latest change per path. Pending verification settles download echoes and other files that still match their baseline; real edits flush like live events

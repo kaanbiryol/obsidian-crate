@@ -7,8 +7,14 @@ completes its initial sync, and then additional devices download that vault.
 Initial imports store file contents in R2 and current file metadata in D1. They
 skip per-file upload receipts, changelog entries, retained versions, and reminder
 processing. A shared staging lease covers up to 32 immutable object keys;
-publication and cleanup remain transactional. Three client requests may be in flight,
-with bounded preparation memory. Large attachments use binary requests.
+publication and cleanup remain transactional. Three client requests stay in flight:
+each starts the next prepared batch as soon as its previous one finishes, rather
+than waiting for a group of three. Preparation stays within the byte budget, and the
+local manifest is saved every 256 confirmed files or 5 seconds and when the import
+ends. Large attachments use binary requests. The Worker writes a batch's objects to
+R2 through a rolling pool of 4. The decoded bodies are already in memory, so the
+pool adds no memory or CPU, and it stays below the limit of 6 simultaneous
+outgoing connections.
 
 Committed remote path/hash/size metadata is the resume checkpoint. After a
 connection failure or restart, the client compares local bytes with that inventory,
@@ -163,7 +169,9 @@ Hosted testing exposed Free Worker CPU exhaustion during sustained 32-file impor
 Initial uploads and bulk downloads now run through a fixed pool of eight instances
 of the existing SQLite-backed Durable Object class after the public Worker checks
 authorization. Each instance processes one decoded batch at a time to bound memory;
-requests across the pool can run concurrently. These transfer instances persist no
+requests across the pool can run concurrently. Clients keep at most 4 batch downloads
+in flight on desktop (2 on mobile), below the eight transfer instances, and a batch
+download reads up to 6 R2 objects at once. These transfer instances persist no
 Durable Object state. This adds one internal Durable Object request per batch,
 without new D1 records or queries. Parsing, hashing,
 R2 writes and publication use the object's default 30-second CPU allowance; the

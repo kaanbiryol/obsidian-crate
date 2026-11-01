@@ -44,7 +44,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 	): Promise<SyncResult | null>;
 	throwIfDestroyed(): void;
 	createFullSyncPlan(
-		remoteFiles: Record<string, FileEntry>,
+		remoteFiles: Record<string, FileEntry> | Promise<Record<string, FileEntry>>,
 		concurrency: number,
 		options?: { reuseUnchangedHashes?: boolean },
 	): Promise<FullSyncPlan>;
@@ -123,9 +123,14 @@ async function runFullSync(
 	try {
 		context.throwIfDestroyed();
 		context.updateState({ work: { phase: 'server' } });
-		const remoteManifest = await context.getManifest();
+		// The local scan and hashing overlap the manifest request.
+		const manifestRequest = context.getManifest();
+		const remoteFiles = manifestRequest.then(manifest => manifest.files);
+		// Raised by the planner or by the await below, whichever comes first.
+		void remoteFiles.catch(() => {});
 		context.updateState({ work: { phase: 'scanning' } });
-		const plan = await context.createFullSyncPlan(remoteManifest.files, PREPARE_CONCURRENCY, { reuseUnchangedHashes: recovering });
+		const plan = await context.createFullSyncPlan(remoteFiles, PREPARE_CONCURRENCY, { reuseUnchangedHashes: recovering });
+		const remoteManifest = await manifestRequest;
 
 		const {
 			localFiles,

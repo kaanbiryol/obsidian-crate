@@ -229,4 +229,29 @@ describe('createFullSyncPlan', () => {
 		expect(readBinary).not.toHaveBeenCalledWith('notes/unchanged.md');
 		expect(plan.localFiles['notes/unchanged.md']?.hash).toBe(unchangedHash);
 	});
+
+	it('stops reading the vault and raises the manifest error when the pending request fails', async () => {
+		const files = Array.from({ length: 20 }, (_, index) => ({ path: `notes/${index}.md`, size: 1, mtime: 100, extension: 'md' }));
+		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue(files);
+		const failure = new Error('manifest unavailable');
+		let rejectManifest!: (error: Error) => void;
+		const remote = new Promise<Record<string, never>>((_resolve, reject) => { rejectManifest = reject; });
+		const readBinary = vi.fn(async () => {
+			rejectManifest(failure);
+			await new Promise(resolve => setTimeout(resolve, 0));
+			return new TextEncoder().encode('x').buffer;
+		});
+		const plan = createFullSyncPlan({
+			vault: { adapter: { readBinary } } as never,
+			localManifest: { getEntry: () => undefined, getManifest: () => ({ version: 1, files: {} }) } as never,
+			throwIfDestroyed: () => {}, shouldIgnore: () => false,
+			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => {
+				const results: T[] = [];
+				for (const task of tasks) results.push(await task());
+				return results;
+			},
+		}, remote, 1);
+		await expect(plan).rejects.toBe(failure);
+		expect(readBinary).toHaveBeenCalledTimes(1);
+	});
 });

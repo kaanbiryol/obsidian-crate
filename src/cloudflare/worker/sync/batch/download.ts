@@ -7,6 +7,8 @@ import {
 	storedObjectMatchesMetadata,
 	type FileStorageRow,
 } from '../storage';
+import { mapBounded } from '@/platform/map-bounded';
+import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../../platform-limits';
 
 export async function handleBatchDownload(
 	request: Request,
@@ -41,7 +43,7 @@ export async function handleBatchDownload(
 		return corsResponse({ error: 'Sync metadata unavailable' }, 503);
 	}
 
-	const files: Array<{
+	interface BatchFile {
 		path: string;
 		content: string;
 		hash: string;
@@ -49,52 +51,49 @@ export async function handleBatchDownload(
 		contentType: string;
 		revision?: string;
 		error?: string;
-	}> = [];
+	}
 	let totalBytes = 0;
 	let exceeded = false;
-	const download = async (rawPath: string) => {
+	const download = async (rawPath: string): Promise<BatchFile | null> => {
+		if (exceeded) return null;
 		const safePath = sanitizePath(rawPath);
 		if (!safePath) {
-			files.push({ path: rawPath, content: '', hash: '', size: 0, contentType: '', error: 'Invalid path' });
-			return;
+			return { path: rawPath, content: '', hash: '', size: 0, contentType: '', error: 'Invalid path' };
 		}
 
 		try {
 			const storedFile = storedFiles.get(safePath) ?? null;
 			const objectKey = storedFile?.storageKey ?? null;
 			if (!objectKey) {
-				files.push({ path: safePath, content: '', hash: '', size: 0, contentType: '', error: 'File not found' });
-				return;
+				return { path: safePath, content: '', hash: '', size: 0, contentType: '', error: 'File not found' };
 			}
 
 			const object = await bucket.get(objectKey);
 			if (!object) {
-				files.push({
+				return {
 					path: safePath,
 					content: '',
 					hash: '',
 					size: 0,
 					contentType: '',
 					error: 'File content unavailable',
-				});
-				return;
+				};
 			}
 			if (storedFile && !storedObjectMatchesMetadata(object, storedFile)) {
-				files.push({
+				return {
 					path: safePath,
 					content: '',
 					hash: storedFile.hash,
 					size: storedFile.size,
 					contentType: '',
 					error: 'File content failed integrity validation',
-				});
-				return;
+				};
 			}
 
 			totalBytes += object.size;
 			if (totalBytes > MAX_BATCH_DOWNLOAD_BYTES) {
 				exceeded = true;
-				return;
+				return null;
 			}
 
 			const arrayBuffer = await object.arrayBuffer();
@@ -106,30 +105,30 @@ export async function handleBatchDownload(
 				binary += String.fromCharCode(...chunk);
 			}
 
-			files.push({
+			return {
 				path: safePath,
 				content: btoa(binary),
 				revision: storedFile?.storageKey,
 				hash: storedFile?.hash || object.customMetadata?.hash || '',
 				size: object.size,
 				contentType: object.httpMetadata?.contentType || 'application/octet-stream',
-			});
+			};
 		} catch (error: unknown) {
-			files.push({
+			return {
 				path: safePath,
 				content: '',
 				hash: '',
 				size: 0,
 				contentType: '',
 				error: error instanceof Error ? error.message : String(error),
-			});
+			};
 		}
 	};
-	// Bound simultaneous R2 reads and decoded bodies while hiding request latency.
-	for (let index = 0; index < paths.length; index += 3) {
-		await Promise.all(paths.slice(index, index + 3).map(download));
-		if (exceeded) return corsResponse({ error: 'Batch download exceeds 8MB limit; download files individually' }, 413);
-	}
+	// A rolling pool keeps as many R2 reads in flight as the invocation may open.
+	// The byte total still bounds decoded bodies, and no read starts once it is
+	// exceeded. Files keep the requested order.
+	const files = await mapBounded(paths, SIMULTANEOUS_OPEN_CONNECTIONS, download);
+	if (exceeded) return corsResponse({ error: 'Batch download exceeds 8MB limit; download files individually' }, 413);
 
-	return corsResponse({ files });
+	return corsResponse({ files: files.filter(file => file !== null) });
 }

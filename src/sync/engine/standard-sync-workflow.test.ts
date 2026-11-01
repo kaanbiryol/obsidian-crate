@@ -82,7 +82,27 @@ describe('runSyncWorkflow', () => {
 		const { context, spies } = createContext();
 		context.hasSyncCursor = () => cursor;
 		await runSyncWorkflow(context);
-		expect(spies.createFullSyncPlan).toHaveBeenCalledWith({}, expect.any(Number), { reuseUnchangedHashes: reuse });
+		expect(spies.createFullSyncPlan).toHaveBeenCalledWith(expect.any(Promise), expect.any(Number), { reuseUnchangedHashes: reuse });
+		expect(await (spies.createFullSyncPlan.mock.calls[0] as unknown[])[0]).toEqual({});
+	});
+
+	it('scans the vault while the server manifest is still loading', async () => {
+		const { context, spies } = createContext();
+		let resolveManifest!: (manifest: { files: Record<string, FileEntry>; lastSeq: number }) => void;
+		spies.getManifest.mockImplementation(() => new Promise(resolve => { resolveManifest = resolve; }));
+		const planned = spies.createFullSyncPlan.getMockImplementation()!;
+		let manifestPending = false;
+		spies.createFullSyncPlan.mockImplementation(async (...args: unknown[]) => {
+			let settled = false;
+			void (args[0] as Promise<unknown>).then(() => { settled = true; });
+			await Promise.resolve();
+			manifestPending = !settled;
+			resolveManifest({ files: {}, lastSeq: 9 });
+			return planned();
+		});
+		await runSyncWorkflow(context);
+		// Before: planning started only after the manifest arrived.
+		expect(manifestPending).toBe(true);
 	});
 
 	it('retains acknowledged uploads and prior issues when a later transfer is cancelled', async () => {

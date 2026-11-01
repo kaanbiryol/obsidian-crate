@@ -2,6 +2,7 @@ import { oversizedRemoteFileIssue, rejectedSealedNoteIssue, withSyncFileContext 
 import { skippedUploadIssue } from '../local/local-file-changes';
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "../local/file-discovery";
+import { createAbortError } from "../abort";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./types";
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import type { FileEntry } from '../../protocol/sync-types';
@@ -11,34 +12,53 @@ import { sha256Hex } from '../../platform/sha256';
 
 /** `reuseUnchangedHashes` trusts the baseline hash when size and mtime match,
  * as incremental sync does. Only automatic recovery from an expired or failed
- * incremental cursor uses it; first and manual full syncs read every file. */
+ * incremental cursor uses it; first and manual full syncs read every file.
+ * Local hashes do not depend on the server, so a pending `remote` request overlaps
+ * the local scan; if it fails, the scan stops and raises the request's error. */
 export async function createFullSyncPlan(
 	context: FullSyncPlannerContext,
-	remoteFiles: Record<string, FileEntry>,
+	remote: Record<string, FileEntry> | Promise<Record<string, FileEntry>>,
 	prepareConcurrency: number,
 	options: { reuseUnchangedHashes?: boolean } = {},
 ): Promise<FullSyncPlan> {
+	const remoteRequest = Promise.resolve(remote);
+	let remoteFailure: { error: unknown } | undefined;
+	void remoteRequest.catch((error: unknown) => { remoteFailure = { error }; });
+	// An abort is not attributed to the file being read; `scan` raises the request's error instead.
+	const throwIfStopped = () => {
+		context.throwIfDestroyed();
+		if (remoteFailure) throw createAbortError('Remote manifest request failed');
+	};
+	// A failed request takes precedence over a local failure, as when it finished first.
+	const scan = async <T>(work: Promise<T>): Promise<T> => {
+		try { return await work; }
+		catch (error) {
+			await remoteRequest.catch(() => {});
+			throw remoteFailure ? remoteFailure.error : error;
+		}
+	};
 	const localFiles = createPathRecord<FileEntry>();
-	const files = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.throwIfDestroyed());
+	const files = await scan(getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), throwIfStopped));
 	const skipped = files.flatMap(file => skippedUploadIssue(file, context.encrypted?.() ?? false) ?? []);
 	const skippedLocalPaths = new Set(skipped.map(issue => issue.path));
 	const eligible = files.filter((file) => !skippedLocalPaths.has(file.path));
 
 	const hashTasks = eligible
 		.map((file) => () => withSyncFileContext(file.path, async () => {
-			context.throwIfDestroyed();
+			throwIfStopped();
 			const baseline = options.reuseUnchangedHashes ? context.localManifest.getEntry(file.path) : undefined;
 			if (baseline && baseline.size === file.size && new Date(baseline.modified).getTime() === file.mtime) {
 				return { path: file.path, hash: baseline.hash, size: file.size, mtime: file.mtime };
 			}
 			const content = await context.vault.adapter.readBinary(file.path);
-			context.throwIfDestroyed();
+			throwIfStopped();
 			const hash = await sha256Hex(content);
-			context.throwIfDestroyed();
+			throwIfStopped();
 			context.plannedContent?.remember(file.path, content, hash);
 			return { path: file.path, hash, size: content.byteLength, mtime: file.mtime };
 		}));
-	const hashed = await context.runConcurrent(hashTasks, prepareConcurrency);
+	const hashed = await scan(context.runConcurrent(hashTasks, prepareConcurrency));
+	const remoteFiles = await remoteRequest;
 	for (const entry of hashed) {
 		localFiles[entry.path] = {
 			hash: entry.hash,

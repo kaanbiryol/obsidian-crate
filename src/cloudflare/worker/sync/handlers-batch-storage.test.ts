@@ -10,6 +10,7 @@ import {
 	handlePutSettings,
 } from './index';
 import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
+import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../platform-limits';
 
 async function responseJson(response: Response): Promise<unknown> {
 	return response.json() as Promise<unknown>;
@@ -352,8 +353,8 @@ it('fetches batch download objects with bounded concurrency', async () => {
 		method: 'POST', body: JSON.stringify({ paths }),
 	}), bucket, db);
 	expect(response.status).toBe(200);
-	expect(peak).toBe(3);
+	expect(peak).toBe(SIMULTANEOUS_OPEN_CONNECTIONS);
 	const body = await response.json() as { files: Array<{ path: string; error?: string }> };
-	expect(body.files.map(file => file.path).sort()).toEqual([...paths].sort());
+	expect(body.files.map(file => file.path)).toEqual(paths);
 	expect(body.files.every(file => !file.error)).toBe(true);
 });

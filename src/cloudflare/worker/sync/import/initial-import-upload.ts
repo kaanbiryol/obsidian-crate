@@ -13,6 +13,9 @@ import { isSha256Hex } from '@/platform/validation';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
 import { FILE_HASH_HEADER, EXPECTED_HASH_HEADER, INITIAL_IMPORT_HEADER } from '@/protocol/http-headers';
 import { sha256Hex } from '@/platform/sha256';
+import { mapBounded } from '@/platform/map-bounded';
+
+const R2_IMPORT_WRITE_CONCURRENCY = 4;
 
 interface ImportFile {
 	path: string; hash: string; size: number; content: ArrayBuffer;
@@ -83,15 +86,18 @@ async function commitImportFiles(token: string, files: ImportFile[], bucket: R2B
 	}).map(file => ({ ...file, objectKey: createManagedObjectKey(file.hash) }));
 	if (!pending.length) return corsResponse({ success: true, results });
 	const stagingBatchId = await trackStagedBatch(db, pending.map(file => ({ storageKey: file.objectKey, path: file.path })));
-	const staged: typeof pending = [];
-	for (let offset = 0; offset < pending.length; offset += 3) {
-		await Promise.all(pending.slice(offset, offset + 3).map(async file => {
-			try {
-				await bucket.put(file.objectKey, file.content, { httpMetadata: { contentType: file.contentType }, customMetadata: { hash: file.hash } });
-				staged.push(file);
-			} catch { results.push({ path: file.path, success: false, code: 'storage', status: 503, error: 'Upload interrupted. Sync again to resume.' }); }
-		}));
-	}
+	// Every decoded body is already in memory, so a rolling pool adds no memory or
+	// CPU; it stays below the connection limit, as the fixed groups of three did.
+	const stored = await mapBounded(pending, R2_IMPORT_WRITE_CONCURRENCY, async file => {
+		try {
+			await bucket.put(file.objectKey, file.content, { httpMetadata: { contentType: file.contentType }, customMetadata: { hash: file.hash } });
+			return true;
+		} catch {
+			results.push({ path: file.path, success: false, code: 'storage', status: 503, error: 'Upload interrupted. Sync again to resume.' });
+			return false;
+		}
+	});
+	const staged = pending.filter((_file, index) => stored[index]);
 	if (staged.length) {
 		const uploads = staged.map(file => ({
 			path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey,

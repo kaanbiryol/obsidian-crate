@@ -8,6 +8,7 @@ import { Platform } from 'obsidian';
 import { runConcurrentTasks } from '../concurrency';
 import { HttpError, SyncTransportError } from '../worker-api/http';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
+import { BATCH_DOWNLOAD_CONCURRENCY, DOWNLOAD_APPLY_CONCURRENCY } from './constants';
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
@@ -401,14 +402,33 @@ it.each([
 	];
 	const result = emptyResult();
 	await parallelDownloadAndSaveFiles({ ...harness.context, runConcurrent }, requests, result, 2, onProcessed, onFailure);
-	// Only the two batches already in flight were sent.
-	expect(harness.api.batchDownload).toHaveBeenCalledTimes(2);
+	// Only the batches already in flight were sent.
+	expect(harness.api.batchDownload).toHaveBeenCalledTimes(BATCH_DOWNLOAD_CONCURRENCY);
 	expect(harness.api.downloadFile).not.toHaveBeenCalled();
 	expect(result.errors).toHaveLength(251);
 	expect(onProcessed).toHaveBeenCalledTimes(251);
 	expect(onFailure).toHaveBeenCalledTimes(251);
 	const thrown = error();
 	if (thrown instanceof HttpError) expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ path: 'large.bin', status: thrown.status }));
+});
+
+it('writes the files of one downloaded batch through a bounded pool', async () => {
+	const harness = createTransferHarness();
+	const content = new TextEncoder().encode('remote').buffer;
+	const hash = await sha256Hex(content);
+	const paths = Array.from({ length: 10 }, (_, index) => `notes/${index}.md`);
+	harness.api.batchDownload.mockResolvedValue({ files: paths.map(path => ({ path, content: btoa('remote'), hash, size: content.byteLength, revision: 'r' })) });
+	let writing = 0, peak = 0;
+	harness.vault.createBinary.mockImplementation(async () => {
+		peak = Math.max(peak, ++writing);
+		await new Promise(resolve => setTimeout(resolve, 1));
+		writing--;
+	});
+	const result = emptyResult();
+	await parallelDownloadAndSaveFiles({ ...harness.context, runConcurrent }, paths.map(path => ({ path, expectedLocalHash: null, expectedRemoteHash: hash, remoteSize: content.byteLength })), result, 2);
+	expect(result.downloaded).toBe(10);
+	// Before: one file of a batch at a time.
+	expect(peak).toBe(DOWNLOAD_APPLY_CONCURRENCY);
 });
 
 it('still downloads each file when a batch response does not match its request', async () => {

@@ -12,6 +12,7 @@ import type { MutationFailure } from '../../protocol/sync-types';
 import { fileFailure, isAuthError, isTransientSyncFailure } from '../failures';
 import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
+import { BATCH_DOWNLOAD_CONCURRENCY, DOWNLOAD_APPLY_CONCURRENCY } from './constants';
 
 const logger = createLogger("SyncTransfer");
 
@@ -146,14 +147,15 @@ export async function parallelDownloadAndSaveFiles(
 				}
 
 				const seenPaths = new Set<string>();
-				for (const file of response.files) {
+				// Paths in one response are distinct, as are the paths of concurrent batches.
+				await context.runConcurrent(response.files.map(file => async () => {
 					try {
 						const downloadRequest = requestsByPath.get(file.path);
 						if (!downloadRequest) throw new Error("Unexpected path in batch response");
 						seenPaths.add(file.path);
 						if (file.error) {
 							recordSyncError(result, `${file.error}`, file.path);
-							continue;
+							return;
 						}
 
 						const verified = "verifiedContent" in file;
@@ -174,7 +176,7 @@ export async function parallelDownloadAndSaveFiles(
 						);
 						if (outcome.status === "deferred") {
 							recordDeferredChange(result, outcome, file.path);
-							continue;
+							return;
 						}
 						await recordAppliedContent(context, file.path, content, file.revision, hash);
 						result.downloaded++;
@@ -187,7 +189,7 @@ export async function parallelDownloadAndSaveFiles(
 					} finally {
 						onProcessed?.();
 					}
-				}
+				}), DOWNLOAD_APPLY_CONCURRENCY);
 				for (const request of chunk) {
 					if (!seenPaths.has(request.path)) {
 						recordSyncError(result, `Missing from batch download response`, request.path);
@@ -208,7 +210,7 @@ export async function parallelDownloadAndSaveFiles(
 				logger.warn("Batch download failed, falling back to individual downloads:", errorMessage(error));
 				individual.push(...chunk);
 			}
-		}), Math.min(concurrency, 2));
+		}), BATCH_DOWNLOAD_CONCURRENCY);
 	}
 
 	if (individual.length > 0) {

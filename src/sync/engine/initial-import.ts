@@ -1,14 +1,16 @@
 import { recordSyncError, SyncIssueError, withSyncFileContext } from '../issues';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
-import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_BYTES } from '@/protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_BYTES, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 import type { SyncApiClient } from '../worker-api/client';
 import type { PreparedUpload, SyncResult, SyncWork } from '../types';
 import type { TransferContext } from '../transfer/types';
 import { getAllVaultFiles } from '../local/file-discovery';
 import { skippedUploadIssue } from '../local/local-file-changes';
-import { pipelineUploadChunks } from '../transfer/budget';
+import { getTransferBudgetBytes, prepareUploadChunks } from '../transfer/budget';
 
 const IMPORT_UPLOAD_CONCURRENCY = 3;
+const IMPORT_SAVE_FILES = 256;
+const IMPORT_SAVE_INTERVAL_MS = 5_000;
 import { prepareUploadFromVaultFile } from '../transfer/prepare';
 import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
 import { createPathRecord } from '@/protocol/path-record';
@@ -39,6 +41,23 @@ export async function assertNoOpenInitialImport(api: { initialImport?: Pick<Sync
 /** The committed remote inventory is the checkpoint; initial uploads need no receipt journal. */
 /** Preparation checked this mtime around its read, as ordinary uploads do. */
 const verifiedModified = (upload: PreparedUpload) => upload.mtime === undefined ? UNVERIFIED_MODIFIED : new Date(upload.mtime).toISOString();
+const batchBytes = (batch: PreparedUpload[]) => batch.reduce((sum, file) => sum + file.content.byteLength, 0);
+
+/** Small files share requests within the batch limits; larger files go one per request. */
+function importBatches(prepared: PreparedUpload[]): PreparedUpload[][] {
+	const batches: PreparedUpload[][] = [];
+	let batch: PreparedUpload[] = [];
+	let bytes = 0;
+	for (const file of prepared.filter(file => file.size < BATCH_FILE_SIZE_LIMIT)) {
+		if (batch.length >= INITIAL_IMPORT_MAX_FILES || bytes + file.size > BATCH_UPLOAD_MAX_BYTES) {
+			batches.push(batch); batch = []; bytes = 0;
+		}
+		batch.push(file); bytes += file.size;
+	}
+	if (batch.length) batches.push(batch);
+	batches.push(...prepared.filter(file => file.size >= BATCH_FILE_SIZE_LIMIT).map(file => [file]));
+	return batches;
+}
 
 export async function runInitialImport(context: ImportContext, result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null> {
 	context.throwIfDestroyed();
@@ -77,10 +96,13 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 		if (existing) inventory[issue.path!] = existing;
 	}
 	let completed = 0;
+	let saved = 0;
+	let savedAt = Date.now();
 	try {
-		// Prepare the next chunk while the current one uploads, within the byte budget.
-		// One chunk fills every import request slot.
-		const chunks = pipelineUploadChunks(files, async file => {
+		const maxBytes = getTransferBudgetBytes();
+		// Bytes of prepared files that wait for or are in an upload request.
+		let retained = 0;
+		const source = prepareUploadChunks(files, async file => {
 			context.throwIfDestroyed();
 			const upload = await prepareUploadFromVaultFile(transfer, file, { force: true, expectedHash: remote.files[file.path]?.hash ?? null });
 			if (!upload) throw new Error(`Could not prepare ${file.path}`);
@@ -93,43 +115,84 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 				return null;
 			}
 			return upload;
-		}, undefined, IMPORT_UPLOAD_CONCURRENCY * INITIAL_IMPORT_MAX_FILES);
-		for await (const prepared of chunks) {
-			const small = prepared.filter(file => file.size < BATCH_FILE_SIZE_LIMIT);
-			const batches: PreparedUpload[][] = [];
-			let batch: PreparedUpload[] = [];
-			let batchBytes = 0;
-			for (const file of small) {
-				if (batch.length >= INITIAL_IMPORT_MAX_FILES || batchBytes + file.size > BATCH_UPLOAD_MAX_BYTES) {
-					batches.push(batch); batch = []; batchBytes = 0;
+		}, maxBytes, INITIAL_IMPORT_MAX_FILES, () => maxBytes - retained);
+		const queue: PreparedUpload[][] = [];
+		let exhausted = false;
+		let producing: Promise<void> | undefined;
+		let failure: { error: unknown } | undefined;
+		const waiting: Array<() => void> = [];
+		const wake = () => { for (const resolve of waiting.splice(0)) resolve(); };
+		const stopped = () => failure !== undefined || result.errors.length > 0;
+		// Prepare one request per slot ahead while the byte budget still holds a
+		// maximum-size file beside the prepared files every request retains.
+		const produce = () => producing ??= (async () => {
+			while (!exhausted && !stopped() && queue.length < IMPORT_UPLOAD_CONCURRENCY && maxBytes - retained >= MAX_FILE_SIZE_BYTES) {
+				const next = await source.next();
+				if (next.done) { exhausted = true; break; }
+				for (const batch of importBatches(next.value)) {
+					retained += batchBytes(batch);
+					queue.push(batch);
 				}
-				batch.push(file); batchBytes += file.size;
+				wake();
 			}
-			if (batch.length) batches.push(batch);
-			batches.push(...prepared.filter(file => file.size >= BATCH_FILE_SIZE_LIMIT).map(file => [file]));
-			await transfer.runConcurrent(batches.map(batch => () => withSyncFileContext(batch.map(file => file.path), async () => {
-				context.throwIfDestroyed();
-				if (result.errors.length) return;
-				context.report({ phase: 'uploading', current: completed, total: files.length });
-				const response = await context.api.initialImport.upload(session.token, batch);
-				if (response.results.length !== batch.length || new Set(response.results.map(file => file.path)).size !== batch.length) throw new Error('Invalid initial upload results');
-				for (const upload of batch) {
-					const receipt = response.results.find(file => file.path === upload.path);
-					if (!receipt?.success) { recordSyncError(result, `${receipt?.error ?? 'Upload interrupted'}`, upload.path); continue; }
-					if (receipt.hash !== upload.hash || typeof receipt.revision !== 'string' || !receipt.revision) throw new SyncIssueError('Invalid initial upload metadata', [{ path: upload.path, message: 'Invalid initial upload metadata', code: 'transfer-unverified' }]);
-					const entry = { hash: upload.hash, size: upload.size, revision: receipt.revision, modified: verifiedModified(upload) };
-					transfer.localManifest.setEntry(upload.path, entry);
-					inventory[upload.path] = entry;
-					await transfer.markdownBaseCache.putBase(upload.path, upload.hash, upload.content);
-					result.uploaded++;
-					result.uploadedPaths.push(upload.path);
-					completed++;
+		})().catch((error: unknown) => { failure ??= { error }; }).finally(() => {
+			producing = undefined;
+			// A producer stopped by the budget resumes when an upload releases it.
+			if (exhausted || failure) wake();
+		});
+		const uploadBatch = (batch: PreparedUpload[]) => withSyncFileContext(batch.map(file => file.path), async () => {
+			context.throwIfDestroyed();
+			context.report({ phase: 'uploading', current: completed, total: files.length });
+			const response = await context.api.initialImport.upload(session.token, batch);
+			if (response.results.length !== batch.length || new Set(response.results.map(file => file.path)).size !== batch.length) throw new Error('Invalid initial upload results');
+			for (const upload of batch) {
+				const receipt = response.results.find(file => file.path === upload.path);
+				if (!receipt?.success) { recordSyncError(result, `${receipt?.error ?? 'Upload interrupted'}`, upload.path); continue; }
+				if (receipt.hash !== upload.hash || typeof receipt.revision !== 'string' || !receipt.revision) throw new SyncIssueError('Invalid initial upload metadata', [{ path: upload.path, message: 'Invalid initial upload metadata', code: 'transfer-unverified' }]);
+				const entry = { hash: upload.hash, size: upload.size, revision: receipt.revision, modified: verifiedModified(upload) };
+				transfer.localManifest.setEntry(upload.path, entry);
+				inventory[upload.path] = entry;
+				await transfer.markdownBaseCache.putBase(upload.path, upload.hash, upload.content);
+				result.uploaded++;
+				result.uploadedPaths.push(upload.path);
+				completed++;
+			}
+		});
+		// Each slot takes the next prepared request as soon as its own finishes.
+		const worker = async () => {
+			while (!stopped()) {
+				const batch = queue.shift();
+				if (!batch) {
+					if (exhausted && !producing) return;
+					const changed = new Promise<void>(resolve => waiting.push(resolve));
+					void produce();
+					await changed;
+					continue;
 				}
-			})), IMPORT_UPLOAD_CONCURRENCY);
-			if (result.errors.length) return result;
-			await context.save();
-			progress?.(completed, files.length);
+				void produce();
+				try { await uploadBatch(batch); }
+				catch (error) { failure ??= { error }; return; }
+				finally { retained -= batchBytes(batch); wake(); }
+				if (stopped()) return;
+				progress?.(completed, files.length);
+				// The committed server inventory is the resume point, so the local
+				// checkpoint only needs to keep up periodically.
+				if (completed - saved >= IMPORT_SAVE_FILES || Date.now() - savedAt >= IMPORT_SAVE_INTERVAL_MS) {
+					saved = completed;
+					savedAt = Date.now();
+					try { await context.save(); }
+					catch (error) { failure ??= { error }; return; }
+				}
+			}
+		};
+		try {
+			await Promise.all(Array.from({ length: IMPORT_UPLOAD_CONCURRENCY }, worker));
+		} finally {
+			while (producing) await producing;
+			await source.return(undefined);
 		}
+		if (failure) throw failure.error;
+		if (result.errors.length) return result;
 		context.throwIfDestroyed();
 		progress?.(completed, files.length);
 		context.report({ phase: 'saving' });
