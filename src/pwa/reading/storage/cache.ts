@@ -7,7 +7,7 @@ import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
 import { isReadingArticleCache, isReadingCache, type ReadingArticleCache } from './storage-validation';
 import { isReadingItem } from './record-validation';
-import { readingKeys } from '@/pwa/reading/storage/storage-keys';
+import { isArticleReadingKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
 import { readingKeys as readingEncryptionKeys } from '../session/encryption-session';
 
 /** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
@@ -30,14 +30,14 @@ export async function readReadingCache(session: ReadingSession): Promise<Reading
  * of downloading and decrypting every note again.
  */
 export async function readEncryptedReadingIndex(session: ReadingSession, identity: string, folder: string): Promise<EncryptedReadingIndexEntry[] | undefined> {
-	const value = await readReadingValue(`encrypted-index:${session.id}`);
+	const value = await readReadingValue(readingKeys.encryptedIndex(session.id));
 	if (!isRecord(value) || value.version !== 1 || value.identity !== identity || !Array.isArray(value.entries) || value.entries.length > MAX_READING_FILES) return undefined;
 	const entries = value.entries as unknown[];
 	return entries.every(isIndexEntry(folder)) ? entries : undefined;
 }
 
 export function writeEncryptedReadingIndex(session: ReadingSession, identity: string, entries: EncryptedReadingIndexEntry[]): Promise<void> {
-	return writeReadingValue(`encrypted-index:${session.id}`, { version: 1, identity, entries }, session);
+	return writeReadingValue(readingKeys.encryptedIndex(session.id), { version: 1, identity, entries }, session);
 }
 
 function isIndexEntry(folder: string) {
@@ -60,8 +60,8 @@ export async function readReadingArticle(session: ReadingSession, id: string) {
 /** Offline copies saved under an earlier sign-in; session IDs change with the
  * token and the folder generation. Queues, drafts and attempts are not copies. */
 function isEarlierCopyKey(key: string, sessionId: string): boolean {
-	if (key.startsWith('article:')) return !key.startsWith(readingKeys.articlePrefix(sessionId));
-	return [readingKeys.list, readingKeys.articleIndex, (id: string) => `encrypted-index:${id}`]
+	if (isArticleReadingKey(key)) return !key.startsWith(readingKeys.articlePrefix(sessionId));
+	return [readingKeys.list, readingKeys.articleIndex, readingKeys.encryptedIndex]
 		.some(build => key.startsWith(build('')) && key !== build(sessionId));
 }
 
@@ -74,8 +74,8 @@ function isReadableCopy(key: string, raw: unknown): boolean {
 		try { value = decodeReadingValue(key, raw); } catch { return false; }
 	}
 	if (!isRecord(value)) return false;
-	if (key.startsWith('article:')) return isRecord(value.item) && typeof value.markdown === 'string';
-	if (key.startsWith('list:')) return Array.isArray(value.items);
+	if (isArticleReadingKey(key)) return isRecord(value.item) && typeof value.markdown === 'string';
+	if (key.startsWith(readingKeys.list(''))) return Array.isArray(value.items);
 	return value.version === 1 && Array.isArray(value.entries);
 }
 
