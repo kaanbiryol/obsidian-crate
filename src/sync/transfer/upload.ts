@@ -9,7 +9,8 @@ import type { PreparedUpload, SyncResult } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import { isAuthError, isTransientSyncFailure, isVersionConflict } from '../failures';
-import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from './constants';
+import { UPLOAD_CONCURRENCY } from './constants';
+import { getBatchUploadConcurrency } from './budget';
 import { HttpError } from '../worker-api/http';
 
 const logger = createLogger("SyncTransfer");
@@ -96,7 +97,7 @@ export async function uploadPreparedFiles(
 			options.onProcessed?.(chunk.length);
 		});
 
-		await context.runConcurrent(batchTasks, BATCH_UPLOAD_CONCURRENCY);
+		await context.runConcurrent(batchTasks, getBatchUploadConcurrency());
 	}
 
 	if (individual.length > 0 && stopped !== undefined) {

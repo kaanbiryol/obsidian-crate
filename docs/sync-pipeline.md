@@ -310,9 +310,9 @@ Release and transfer values are also checked against source in [current contract
 | `DOWNLOAD_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `PREPARE_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer/budget.ts` |
-| Large transfers on mobile | Files of 8 MiB or more transfer one at a time | `transfer/large-transfers.ts` |
+| Large transfers on mobile | Files of 8 MiB or more transfer one at a time | `transfer/budget.ts` |
 | File transfer timeout | 120 s plus 1 s per 32 KiB of body, so an upload still completes at about 0.26 Mbit/s | `worker-api/http.ts` |
-| `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
+| Batch upload concurrency | 2 mobile / 4 desktop | `transfer/budget.ts` |
 | `BATCH_DOWNLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
 | `DOWNLOAD_APPLY_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
 | `BATCH_DELETE_CONCURRENCY` | 2 | `transfer/constants.ts` |

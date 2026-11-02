@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { prepareUploadChunks, pipelineUploadChunks } from './budget';
+import { afterEach, describe, expect, it } from 'vitest';
+import { Platform } from 'obsidian';
+import { createLargeTransferGate, getBatchUploadConcurrency, MOBILE_LARGE_TRANSFER_BYTES as LARGE, prepareUploadChunks, pipelineUploadChunks } from './budget';
 
 describe('bounded upload preparation', () => {
 	it('uploads each chunk before preparing the remaining files', async () => {
@@ -92,4 +93,42 @@ it('settles preparation before closing an interrupted pipeline', async () => {
 	await chunks.next();
 	await chunks.return(undefined);
 	expect(finished).toBe(true);
+});
+
+describe('mobile transfer policy', () => {
+	const mobile = Platform.isMobile;
+	afterEach(() => { Platform.isMobile = mobile; });
+
+	/** The most transfers of `sizes` that ran at once through one gate. */
+	async function overlap(isMobile: boolean, sizes: number[]): Promise<number> {
+		Platform.isMobile = isMobile;
+		const gate = createLargeTransferGate();
+		let active = 0, most = 0;
+		await Promise.all(sizes.map(size => gate(size, async () => {
+			most = Math.max(most, ++active);
+			await new Promise(resolve => setTimeout(resolve, 5));
+			active--;
+		})));
+		return most;
+	}
+
+	it('runs large transfers one at a time on mobile without holding back smaller ones', async () => {
+		expect(await overlap(true, [LARGE, LARGE * 3, LARGE])).toBe(1);
+		expect(await overlap(true, [LARGE, LARGE - 1, LARGE - 1])).toBe(3);
+		expect(await overlap(false, [LARGE, LARGE])).toBe(2);
+	});
+
+	it('reads the platform when batch upload concurrency is requested', () => {
+		Platform.isMobile = true;
+		expect(getBatchUploadConcurrency()).toBe(2);
+		Platform.isMobile = false;
+		expect(getBatchUploadConcurrency()).toBe(4);
+	});
+
+	it('starts the next large transfer after one fails', async () => {
+		Platform.isMobile = true;
+		const gate = createLargeTransferGate();
+		await expect(gate(LARGE, () => Promise.reject(new Error('lost')))).rejects.toThrow('lost');
+		await expect(gate(LARGE, () => Promise.resolve('next'))).resolves.toBe('next');
+	});
 });

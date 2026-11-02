@@ -13,6 +13,26 @@ export function getTransferBudgetBytes(): number {
 	return Platform.isMobile ? MOBILE_TRANSFER_BUDGET_BYTES : DESKTOP_TRANSFER_BUDGET_BYTES;
 }
 
+/** Batch upload requests in flight. Desktop overlaps small requests without increasing per-request server work. */
+export function getBatchUploadConcurrency(): number {
+	return Platform.isMobile ? 2 : 4;
+}
+
+/** A transfer in flight holds several full-size copies of the file (base64, ciphertext,
+ * decrypted bytes), so two 25 MiB files at once can exhaust a phone's memory. */
+export const MOBILE_LARGE_TRANSFER_BYTES = 8 * MIB;
+
+/** On mobile, runs transfers of large files one at a time; smaller files and desktop are not held back. */
+export function createLargeTransferGate() {
+	let tail: Promise<unknown> = Promise.resolve();
+	return <T>(size: number | undefined, run: () => Promise<T>): Promise<T> => {
+		if (!Platform.isMobile || (size ?? 0) < MOBILE_LARGE_TRANSFER_BYTES) return run();
+		const next = tail.then(run);
+		tail = next.catch(() => {});
+		return next;
+	};
+}
+
 /** Retain only one upload chunk, reserving room for the next maximum-size file.
  * Up to `concurrency` items prepare at once; each in-flight preparation reserves a
  * maximum-size file, and chunks keep item order. A failure waits for preparations

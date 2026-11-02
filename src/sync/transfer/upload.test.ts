@@ -5,7 +5,7 @@ import { HttpError, SyncTransportError } from '../worker-api/client';
 import { runConcurrentTasks } from '../concurrency';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { uploadPreparedFiles } from './upload';
-import { BATCH_UPLOAD_CONCURRENCY } from './constants';
+import { getBatchUploadConcurrency } from './budget';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';
 
 describe('transfer upload helpers', () => {
@@ -194,7 +194,7 @@ it('limits batch concurrency and reports every completed file', async () => {
 	}));
 	const result = emptyResult();
 	await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { retry: false, onProcessed });
-	expect(maximum).toBe(BATCH_UPLOAD_CONCURRENCY);
+	expect(maximum).toBe(getBatchUploadConcurrency());
 	expect(result.uploaded).toBe(prepared.length);
 	expect(result.errors).toEqual([]);
 	expect(onProcessed.mock.calls.map(([count]) => count)).toEqual(Array(5).fill(BATCH_UPLOAD_MAX_FILES));
@@ -217,7 +217,7 @@ it.each([
 	const runConcurrent = <T>(tasks: Array<() => Promise<T>>, concurrency: number) => runConcurrentTasks(tasks, concurrency, () => false);
 	await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { retry: false, onProcessed, onFailure });
 	// Only the batches already in flight were sent.
-	expect(harness.api.batchUpload).toHaveBeenCalledTimes(BATCH_UPLOAD_CONCURRENCY);
+	expect(harness.api.batchUpload).toHaveBeenCalledTimes(getBatchUploadConcurrency());
 	expect(harness.api.uploadFile).not.toHaveBeenCalled();
 	expect(result.errors).toHaveLength(prepared.length);
 	expect(onFailure).toHaveBeenCalledTimes(prepared.length);

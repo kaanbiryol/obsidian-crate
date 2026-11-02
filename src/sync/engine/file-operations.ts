@@ -8,7 +8,7 @@ import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import { assertRenamePreserved } from '../manifest/rename-dependencies';
 import type { UploadApplyPhase } from '../diagnostics/upload-diagnostics';
 import type { SyncWorkerApi } from '../worker-api/sync';
-import { createLargeTransferGate } from '../transfer/large-transfers';
+import { createLargeTransferGate } from '../transfer/budget';
 
 /** One engine's file mutations always use its checkpoint and recovery journals. */
 export function createEngineFileOperations(
