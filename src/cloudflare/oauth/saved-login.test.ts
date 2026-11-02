@@ -1,8 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import { CloudflareSavedLogin } from './saved-login';
-import { CLOUDFLARE_ANALYTICS_SCOPE as USAGE_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from './oauth/config';
-import type { UsageSnapshot } from './usage/snapshot';
-import type { HttpTransport } from './http';
+import { CLOUDFLARE_ANALYTICS_SCOPE as USAGE_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from './config';
+import type { UsageSnapshot } from '../usage/snapshot';
+import type { HttpTransport } from '../http';
 
 function setup() {
 	let time = 1_000_000;

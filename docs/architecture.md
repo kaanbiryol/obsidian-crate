@@ -273,10 +273,10 @@ and distinguishes a deleted server from a deployed server with a URL. OAuth sess
 contain a request; saved authorization runs that request directly.
 `cloudflare/deployment/target.ts` owns account selection, discovery and server reuse
 policy. The service owns authorization, cancellation, target verification and the
-ordered provisioning workflow. `plugin/cloudflare-operations.ts` coordinates
+ordered provisioning workflow. `plugin/cloudflare/operations.ts` coordinates
 the operation in prepare-device, run-deployment and connect-device steps; `ui/cloudflare/operation-presentation.ts`
 owns modal copy and recovery actions supplied by that coordinator.
-`plugin/cloudflare-connection.ts` and `plugin/self-hosted-connection.ts` connect a
+`plugin/cloudflare/connection.ts` and `plugin/self-hosted-connection.ts` connect a
 device across the plugin's runtime, settings and deployment state; `sync/connection/`
 retains pairing, address, reachability and shared-settings rules.
 
@@ -533,7 +533,7 @@ The plugin stores these local values through `SecretStorageService`. `platform/s
 | `crate-encryption-reset` | Progress of an unfinished encryption reset | Yes |
 | `crate-encryption-recovery` | This device's copy of the recovery key, which settings can copy again | Yes |
 | `crate-device-id` | Local device identity; kept out of vault-synced settings | No |
-| `crate-usage-oauth-<account>` | Saved Cloudflare login for one account (`cloudflare/saved-login.ts`) | No |
+| `crate-usage-oauth-<account>` | Saved Cloudflare login for one account (`cloudflare/oauth/saved-login.ts`) | No |
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.
 

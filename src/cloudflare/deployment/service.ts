@@ -9,7 +9,7 @@ import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { API_BASE_URL, type HttpTransport } from '../http';
 import { CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from '../oauth/client';
-import { CloudflareOAuthSession } from './oauth-session';
+import { CloudflareOAuthSession } from '../oauth/oauth-session';
 import { provisionCloudflareDeployment } from './provisioner';
 import { workersDevOrigin } from './worker-origin';
 import { changesServer, DesktopOnlyServerChangeError } from './server-changes';

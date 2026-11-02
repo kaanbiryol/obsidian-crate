@@ -3,7 +3,7 @@
  */
 
 import { Plugin } from 'obsidian';
-import type { CloudflareSavedLogin } from '../cloudflare/saved-login';
+import type { CloudflareSavedLogin } from '../cloudflare/oauth/saved-login';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment/service';
 import {
 	type RemindersSettings,

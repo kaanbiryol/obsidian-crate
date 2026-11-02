@@ -1,9 +1,9 @@
-import type { UsageSnapshot } from './usage/snapshot';
-import type { HttpTransport } from './http';
-import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from './oauth/client';
-import { CLOUDFLARE_ANALYTICS_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from './oauth/config';
-import { fetchCloudflareUsage } from './usage/service';
-import type { SecretKey } from '../platform/secret-keys';
+import type { UsageSnapshot } from '../usage/snapshot';
+import type { HttpTransport } from '../http';
+import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from './client';
+import { CLOUDFLARE_ANALYTICS_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from './config';
+import { fetchCloudflareUsage } from '../usage/service';
+import type { SecretKey } from '../../platform/secret-keys';
 
 const USAGE_SCOPE = CLOUDFLARE_ANALYTICS_SCOPE;
 // Renew early so a long deployment or reset does not outlive its access token.

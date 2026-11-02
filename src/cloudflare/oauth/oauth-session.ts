@@ -2,9 +2,9 @@ import {
 	CLOUDFLARE_OAUTH_AUTHORIZE_URL,
 	CLOUDFLARE_OAUTH_REDIRECT_URL,
 	CLOUDFLARE_OAUTH_SCOPES,
-} from '../oauth/config';
-import { constantTimeEqual, createPkcePair, randomBase64Url } from '../oauth/pkce';
-import type { DeploymentIntent, DeploymentRequest } from './types';
+} from './config';
+import { constantTimeEqual, createPkcePair, randomBase64Url } from './pkce';
+import type { DeploymentIntent, DeploymentRequest } from '../deployment/types';
 
 const OAUTH_SESSION_MAX_AGE_MS = 10 * 60 * 1000;
 

@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { CloudflareDeploymentService, type WithCloudflareAuthorization } from './service';
 import { authorizedBy, testAuthorization } from './authorization-test-harness';
-import { CloudflareSavedLogin } from '../saved-login';
+import { CloudflareSavedLogin } from '../oauth/saved-login';
 import { CloudflareReauthorizationRequired } from '../oauth/client';
 import { CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
 import { DEFAULT_SETTINGS } from '../../plugin/settings';

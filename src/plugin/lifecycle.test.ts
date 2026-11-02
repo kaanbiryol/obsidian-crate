@@ -83,7 +83,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 	}));
 	vi.doMock('./cloudflare/operations', () => ({ handleCloudflareOAuthProtocol }));
 	vi.doMock('../cloudflare/deployment/service', () => ({ CloudflareDeploymentService }));
-	vi.doMock('../cloudflare/saved-login', () => ({ CloudflareSavedLogin: class {} }));
+	vi.doMock('../cloudflare/oauth/saved-login', () => ({ CloudflareSavedLogin: class {} }));
 	vi.doMock('../cloudflare/deployment/embedded-artifacts', () => ({ loadEmbeddedCloudflareArtifacts: vi.fn() }));
 	vi.doMock('../ui/cloudflare/authorization-modal', () => ({ openCloudflareAuthorizationModal }));
 	vi.doMock('../ui/cloudflare/update-notice', () => ({ showCloudflareServerUpdateNotice }));
@@ -149,7 +149,7 @@ afterEach(() => {
 	vi.doUnmock('./deviceId');
 	vi.doUnmock('./cloudflare/operations');
 	vi.doUnmock('../cloudflare/deployment/service');
-	vi.doUnmock('../cloudflare/saved-login');
+	vi.doUnmock('../cloudflare/oauth/saved-login');
 	vi.doUnmock('../cloudflare/deployment/embedded-artifacts');
 	vi.doUnmock('../ui/cloudflare/authorization-modal');
 	vi.doUnmock('../cloudflare/update-notice');

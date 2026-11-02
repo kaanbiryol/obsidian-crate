@@ -20,7 +20,7 @@ import { handleCloudflareOAuthProtocol } from "./cloudflare/operations";
 import { showCloudflareServerUpdateNotice } from "../ui/cloudflare/update-notice";
 import { showGetStartedNotice } from "../ui/settings/get-started-notice";
 import { beginPluginLifecycle, endPluginLifecycle, getPluginLifecycleSignal, setSyncReady } from './lifecycle-state';
-import { CloudflareSavedLogin } from '../cloudflare/saved-login';
+import { CloudflareSavedLogin } from '../cloudflare/oauth/saved-login';
 import { CloudflareDeploymentService } from '../cloudflare/deployment/service';
 import { loadEmbeddedCloudflareArtifacts } from '../cloudflare/deployment/embedded-artifacts';
 import { cloudflareHttpTransport } from '../cloudflare/http';
