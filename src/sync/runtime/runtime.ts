@@ -12,7 +12,8 @@ import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { loadEncryptionKeys } from '../encryption/key-storage';
-import { runEncryptionReset, type EncryptionResetRequest } from './encryption-reset-workflow';
+import { runEncryptionReset, syncBeforeEncryptionReset, type EncryptionResetRequest } from './encryption-reset-workflow';
+import { configureClientEncryption } from './api-client-setup';
 import { changeEncryptedServerAddress, changeEncryptionResetAddress } from './address-workflow';
 import { changeServerConnection, disconnectServerConnection } from './connection-workflow';
 import type { EncryptionServerState } from '../../encryption/server-state';
@@ -305,14 +306,10 @@ export class SyncRuntime {
 			this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || ''
 		);
 		try {
-			const keys = loadEncryptionKeys(this.secretStorage);
-			if (keys) {
-				await this.apiClient.configureEncryption(keys, this.reminderFolders, this.readingFolder);
-				if (this.settings.encryptedVaultId !== keys.vaultId) await this.persistSettings({ encryptedVaultId: keys.vaultId });
-			} else {
-				this.apiClient.refusePlaintext(Boolean(this.settings.encryptedVaultId));
-				if (!this.settings.encryptedVaultId) this.rememberEncryptedVault(this.apiClient);
-			}
+			await configureClientEncryption(this.apiClient, {
+				settings: this.settings, secretStorage: this.secretStorage, persistSettings: update => this.persistSettings(update),
+				reminderFolders: this.reminderFolders, readingFolder: this.readingFolder, isCurrent: client => this.apiClient === client,
+			});
 		} catch (error) {
 			if (this.initializationRevision !== initializationRevision) return;
 			this.initializationError = errorMessage(error);
@@ -463,48 +460,12 @@ export class SyncRuntime {
 			syncBeforeReset: async () => {
 				const engine = this.syncEngine;
 				if (!engine || !this.apiClient) throw new Error('Connect sync on this device before replacing the server copy');
-				// A vault that last synced encrypted refuses plaintext here, so a sync would only
-				// fail its uploads. An empty server has nothing the wipe could lose.
-				if (this.settings.encryptedVaultId && !loadEncryptionKeys(this.secretStorage)) {
-					if (Object.keys((await this.apiClient.getManifest()).files).length) {
-						throw new Error('This server already has files without encryption. Choose Sync without encryption first, or connect an empty server.');
-					}
-					return engine.trackedPaths();
-				}
-				const result = await engine.sync();
-				if (result.outcome === 'cancelled' || !result.success || result.conflicts.length) {
-					throw new Error('Sync this device without errors or conflicts first, so no server-only changes are lost.');
-				}
-				// A successful sync can still leave server files it reported but did not take.
-				const missing = await engine.untrackedServerPaths();
-				if (missing.length) {
-					throw new Error(`${missing.length === 1 ? '1 server file isn’t' : `${missing.length} server files aren’t`} synced to this device, and replacing the server copy would delete ${missing.length === 1 ? 'it' : 'them'}. Review incoming files, or start from a device that has ${missing.length === 1 ? 'it' : 'them'}. First: ${missing[0]}`);
-				}
-				return engine.trackedPaths();
+				const refusesPlaintext = Boolean(this.settings.encryptedVaultId) && !loadEncryptionKeys(this.secretStorage);
+				return syncBeforeEncryptionReset(engine, this.apiClient, refusesPlaintext);
 			},
 			resumeEvents: () => { this.vaultEvents.open(); },
 			reportError: message => { this.initializationError = message; this.emitCurrentState(); },
 		}, request, progress, expected, signal), signal);
-	}
-
-	/** Record the vault the first time its server reports encryption to this keyless device,
-	 * so a later report that encryption is off cannot receive plaintext unprompted. */
-	private rememberEncryptedVault(client: SyncApiClient): void {
-		let reading: Promise<void> | null = null;
-		client.observeEncryption(() => {
-			reading ??= (async () => {
-				const state = await client.getEncryptionState();
-				if (this.apiClient !== client || this.settings.encryptedVaultId || loadEncryptionKeys(this.secretStorage)) {
-					client.observeEncryption(undefined);
-					return;
-				}
-				if (!state) return;
-				client.refusePlaintext(true);
-				await this.persistSettings({ encryptedVaultId: state.vaultId });
-				client.observeEncryption(undefined);
-			})().catch(error => { logger.warn('Could not record that this vault is encrypted:', errorMessage(error)); })
-				.finally(() => { reading = null; });
-		});
 	}
 
 	private configurationTransition(signal?: AbortSignal): RuntimeConfigurationTransition {

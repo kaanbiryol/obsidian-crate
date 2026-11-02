@@ -3,7 +3,7 @@ import { isRecord } from '../../platform/validation';
 import type { ConflictRecord } from '../types';
 import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
-import { getOriginalPathFromConflictFile, isConflictFile } from './conflict';
+import { getOriginalPathFromConflictFile, isConflictFile, isIncomingReview } from './conflict';
 import { getAllVaultFiles } from '../local/file-discovery';
 import { createAbortError } from '../abort';
 import { sha256Hex } from '../../platform/sha256';
@@ -166,15 +166,25 @@ export class ConflictStore {
 	 * removed without choosing a version. */
 	getIncomingReviews(): ConflictRecord[] {
 		return this.data.conflicts
-			.filter(conflict => conflict.cause === 'incoming-review' && conflict.copySide === 'remote')
+			.filter(isIncomingReview)
 			.map(conflict => ({ ...conflict }));
+	}
+
+	/** Paths whose incoming version stays saved for review. Removing the saved copy
+	 * outside the review records the baseline revision; until a choice or sync moves
+	 * it, the incoming version is saved again. */
+	awaitingReviewPaths(baseRevisionOf: (originalPath: string) => string | undefined): string[] {
+		return this.data.conflicts
+			.filter(conflict => isIncomingReview(conflict) && (conflict.status === 'active'
+				|| conflict.reviewBaseRevision !== undefined && baseRevisionOf(conflict.originalPath) === conflict.reviewBaseRevision))
+			.map(conflict => conflict.originalPath);
 	}
 
 	/** The saved copy of an incoming version that is still waiting for review
 	 * while the local file is unchanged. */
 	findIncomingReview(originalPath: string, remoteHash: string, localHash: string): ConflictRecord | undefined {
-		return this.data.conflicts.find(conflict => conflict.status === 'active' && conflict.cause === 'incoming-review'
-			&& conflict.copySide === 'remote' && conflict.originalPath === originalPath
+		return this.data.conflicts.find(conflict => conflict.status === 'active' && isIncomingReview(conflict)
+			&& conflict.originalPath === originalPath
 			&& conflict.remoteHash === remoteHash && conflict.localHash === localHash);
 	}
 
@@ -232,8 +242,7 @@ export class ConflictStore {
 		return this.enqueueMutation(async () => {
 			const candidates = this.data.conflicts.filter(conflict =>
 				conflict.status === 'active' && conflict.originalPath === originalPath
-				&& conflict.cause === 'incoming-review' && conflict.copySide === 'remote'
-				&& conflict.localHash === '' && conflict.remoteHash === hash);
+				&& isIncomingReview(conflict) && conflict.localHash === '' && conflict.remoteHash === hash);
 			if (!candidates.length) return;
 			const adapter = this.app.vault.adapter;
 			let changed = false;
@@ -314,7 +323,7 @@ export class ConflictStore {
 
 function resolveRecord(conflict: ConflictRecord, baseRevisionOf?: (originalPath: string) => string | undefined): void {
 	conflict.status = 'resolved';
-	const revision = conflict.cause === 'incoming-review' && conflict.copySide === 'remote' ? baseRevisionOf?.(conflict.originalPath) : undefined;
+	const revision = isIncomingReview(conflict) ? baseRevisionOf?.(conflict.originalPath) : undefined;
 	if (revision) conflict.reviewBaseRevision = revision;
 }
 

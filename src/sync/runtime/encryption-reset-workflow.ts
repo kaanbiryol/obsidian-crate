@@ -6,6 +6,7 @@ import { fitsEncryptedPathLimit } from '../../encryption/path-tags';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { createEncryptionReset, createEncryptionSetup, loadEncryptionReset, saveEncryptionReset, resetRemoteEncryption, EncryptionResetRejectedError } from '../encryption/reset';
 import type { SyncEngine } from '../engine/engine';
+import type { SyncApiClient } from '../worker-api/client';
 import type { RuntimeConfigurationTransition } from './runtime';
 import { resetStoredSyncState } from './sync-activity';
 import { WorkerApiHttpClient } from '../worker-api/http';
@@ -26,6 +27,32 @@ interface EncryptionResetContext {
 	syncBeforeReset: () => Promise<readonly string[]>;
 	resumeEvents: () => void;
 	reportError: (message: string) => void;
+}
+
+/** Sync once more so the wipe cannot discard changes that exist only on the server, and
+ * return the paths this device syncs. A keyless vault that last synced encrypted refuses
+ * plaintext, so a sync would only fail its uploads; it may replace only an empty server. */
+export async function syncBeforeEncryptionReset(
+	engine: Pick<SyncEngine, 'sync' | 'trackedPaths' | 'untrackedServerPaths'>,
+	api: Pick<SyncApiClient, 'getManifest'>,
+	refusesPlaintext: boolean,
+): Promise<readonly string[]> {
+	if (refusesPlaintext) {
+		if (Object.keys((await api.getManifest()).files).length) {
+			throw new Error('This server already has files without encryption. Choose Sync without encryption first, or connect an empty server.');
+		}
+		return engine.trackedPaths();
+	}
+	const result = await engine.sync();
+	if (result.outcome === 'cancelled' || !result.success || result.conflicts.length) {
+		throw new Error('Sync this device without errors or conflicts first, so no server-only changes are lost.');
+	}
+	// A successful sync can still leave server files it reported but did not take.
+	const missing = await engine.untrackedServerPaths();
+	if (missing.length) {
+		throw new Error(`${missing.length === 1 ? '1 server file isn’t' : `${missing.length} server files aren’t`} synced to this device, and replacing the server copy would delete ${missing.length === 1 ? 'it' : 'them'}. Review incoming files, or start from a device that has ${missing.length === 1 ? 'it' : 'them'}. First: ${missing[0]}`);
+	}
+	return engine.trackedPaths();
 }
 
 /** What to start when no reset is saved: turn encryption off, or on with these keys. */

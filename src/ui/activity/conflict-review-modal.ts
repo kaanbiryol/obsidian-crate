@@ -1,6 +1,7 @@
 import { Notice, Platform, setIcon, type App } from 'obsidian';
 import type { ConflictRecord } from '../../sync/types';
 import type { ConflictChoice, ConflictReview } from '../../sync/conflict/review';
+import { isIncomingReview } from '../../sync/conflict/conflict';
 import { buildConflictDiff, renderConflictDiffLine } from './conflict-diff';
 import { getPendingFileActions } from './file-actions';
 import { createModalFooter, SharedModal } from '../plugin/shared-modal';
@@ -12,7 +13,7 @@ export class ConflictReviewModal extends SharedModal {
 	private draft: string | undefined;
 	private selected: ConflictChoice | undefined;
 	private awaitingExternal = false;
-	private get incoming(): boolean { return this.record.cause === 'incoming-review' && this.record.copySide === 'remote'; }
+	private get incoming(): boolean { return isIncomingReview(this.record); }
 	private readonly returnToReview = () => {
 		if (this.awaitingExternal && !this.busy) {
 			this.awaitingExternal = false;

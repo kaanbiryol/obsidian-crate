@@ -15,7 +15,7 @@ import { SyncApiClient } from '../worker-api/client';
 import { LocalManifest } from '../manifest/manifest';
 import { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import { ConflictStore } from '../conflict/store';
-import { isConflictFile } from '../conflict/conflict';
+import { ConflictTracking } from './conflict-tracking';
 import type { VaultFile } from '../local/file-discovery';
 import { SyncQueueController } from '../queue/controller';
 import { createAbortError, isAbortError } from '../abort';
@@ -75,7 +75,7 @@ export class SyncEngine {
 	/** The patterns the pending list was last built with; settings objects are updated in place. */
 	private pendingScanPatterns: readonly string[];
 	private syncActivityRevision = 0;
-	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+	private readonly conflicts: ConflictTracking;
 	/** Per engine, so new credentials (a new engine) can show the notice again. */
 	private readonly reconnectNotice = new ReconnectNotice();
 
@@ -217,6 +217,17 @@ export class SyncEngine {
 			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
 			trackWork: operation => this.trackWork(operation),
 		});
+		this.conflicts = new ConflictTracking({
+			store: this.conflictStore,
+			api: this.api,
+			manifest: this.localManifest,
+			queue: this.queueController,
+			ignore: this.ignore,
+			trackWork: operation => this.trackWork(operation),
+			isDestroyed: () => this.lifecycle.isDestroyed,
+			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
+			updateConflictCount: conflictCount => this.updateState({ conflictCount }),
+		});
 	}
 
 	getRequestDiagnostics() {
@@ -241,7 +252,7 @@ export class SyncEngine {
 		this.lifecycle.throwIfDestroyed();
 		logger.info('Engine initialized');
 		this.plugin.app.workspace.onLayoutReady(() => {
-			this.scheduleConflictRecovery();
+			this.conflicts.scheduleRecovery();
 			if (!this.settings.automaticSync) this.restoreLocalPendingChanges();
 			else this.updateState({ initializing: false });
 		});
@@ -415,25 +426,13 @@ export class SyncEngine {
 		this.lifecycle.throwIfDestroyed();
 	}
 
-	async markConflictResolved(path: string): Promise<void> {
-		await this.conflictStore.markResolved(path);
-		this.updateState({ conflictCount: this.conflictStore.getActiveConflicts().length });
+	markConflictResolved(path: string): Promise<void> {
+		return this.conflicts.markResolved(path);
 	}
 
-	/** Preserve the user's keep-local intent without accepting a newer server edit.
-	 * Publication remains in the ordinary durable upload/CAS pipeline. */
-	async acceptIncomingConflictBaseline(record: ConflictRecord): Promise<void> {
-		if (record.copySide !== 'remote') return;
-		this.lifecycle.throwIfDestroyed();
-		const remote = (await this.api.getFileMetadata([record.originalPath])).files[record.originalPath];
-		if (!record.remoteHash || !remote || remote.hash !== record.remoteHash) {
-			throw new Error('The server file changed. Sync again and review the latest incoming copy. Both versions were kept.');
-		}
-		this.lifecycle.throwIfDestroyed();
-		this.localManifest.setEntry(record.originalPath, { ...remote, modified: 'unverified' });
-		await this.localManifest.save();
-		this.lifecycle.throwIfDestroyed();
-		this.queueController.restorePendingPaths([pendingChangeKey('upload', record.originalPath)]);
+	/** Preserve the user's keep-local intent without accepting a newer server edit. */
+	acceptIncomingConflictBaseline(record: ConflictRecord): Promise<void> {
+		return this.conflicts.acceptIncomingBaseline(record);
 	}
 
 	getActiveConflicts(): ConflictRecord[] {
@@ -536,26 +535,6 @@ export class SyncEngine {
 		});
 	}
 
-	private recoverConflictStoreInBackground(): void {
-		if (this.lifecycle.isDestroyed) return;
-		const ignoreConfigured = this.ignore.configuredMatcher();
-		void this.trackWork(() => this.conflictStore.recoverFromVault(
-			ignoreConfigured,
-			() => this.lifecycle.isDestroyed,
-			this.baselineRevision,
-		)).catch((error) => {
-			logger.warn('Conflict recovery failed:', errorMessage(error));
-		});
-	}
-
-	private scheduleConflictRecovery(): void {
-		if (this.lifecycle.isDestroyed || this.conflictRecoveryTimer !== null) return;
-		this.conflictRecoveryTimer = setTimeout(() => {
-			this.conflictRecoveryTimer = null;
-			this.recoverConflictStoreInBackground();
-		}, 0);
-	}
-
 	private pruneMarkdownBaseCacheInBackground(): void {
 		if (this.lifecycle.isDestroyed) return;
 		void this.trackWork(() => this.markdownBaseCache.pruneUnreferenced(this.localManifest)).catch((error) => {
@@ -586,17 +565,13 @@ export class SyncEngine {
 
 	onFileChange(file: VaultEntry): void {
 		if (this.lifecycle.isDestroyed) return;
-		if (isConflictFile(file.path)) {
-			this.updateConflictCopy(() => this.conflictStore.registerDiscovered(file.path), 'Failed to register conflict copy:');
-		}
+		this.conflicts.onFileChange(file.path);
 		this.queueController.onFileChange(file);
 	}
 
 	onFileDelete(file: VaultEntry): void {
 		if (this.lifecycle.isDestroyed) return;
-		if (isConflictFile(file.path)) {
-			this.updateConflictCopy(() => this.conflictStore.markResolved(file.path, this.baselineRevision), 'Failed to resolve conflict copy:');
-		}
+		this.conflicts.onFileDelete(file.path);
 		this.queueController.onFileDelete(file);
 	}
 
@@ -604,21 +579,8 @@ export class SyncEngine {
 	onFileRename(file: VaultEntry, oldPath: string): void {
 		if (this.lifecycle.isDestroyed) return;
 		if (!this.ignore.shouldIgnore(oldPath) && !this.ignore.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path, file.kind);
-		if (isConflictFile(oldPath)) {
-			this.updateConflictCopy(() => this.conflictStore.markResolved(oldPath, this.baselineRevision), 'Failed to resolve renamed conflict copy:');
-		}
-		if (isConflictFile(file.path)) {
-			this.updateConflictCopy(() => this.conflictStore.registerDiscovered(file.path), 'Failed to register renamed conflict copy:');
-		}
+		this.conflicts.onFileRename(file.path, oldPath);
 		this.queueController.onFileRename(file, oldPath);
-	}
-
-	private readonly baselineRevision = (path: string): string | undefined => this.localManifest.getEntry(path)?.revision;
-
-	private updateConflictCopy(update: () => Promise<void>, failureMessage: string): void {
-		void this.trackWork(update).catch((error) => {
-			logger.warn(failureMessage, errorMessage(error));
-		});
 	}
 
 	private verifyContent(files: VaultFile[]): Promise<boolean> {
@@ -714,10 +676,7 @@ export class SyncEngine {
 
 	destroy(): void {
 		if (this.lifecycle.isDestroyed) return;
-		if (this.conflictRecoveryTimer !== null) {
-			clearTimeout(this.conflictRecoveryTimer);
-			this.conflictRecoveryTimer = null;
-		}
+		this.conflicts.destroy();
 		this.lifecycle.destroy();
 		this.queueController.destroy();
 		// Accepted transfers and recovery jobs may still enqueue conflict metadata

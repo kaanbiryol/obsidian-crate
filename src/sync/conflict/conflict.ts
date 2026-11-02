@@ -5,9 +5,15 @@
 import { Notice, type Vault } from 'obsidian';
 import { createLogger } from '../logger';
 import { ensureParentFolder, insertBeforeExtension } from '../local/file-discovery';
+import type { ConflictRecord } from '../types';
 
 const logger = createLogger('Conflict');
 const CONFLICT_TAG_PATTERN = / \(conflict (?:\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} [a-z0-9]{4}|remote [a-f0-9]{64}(?:-\d+)?)\)(?=\.[^/]+$|$)/;
+
+/** A server version saved beside the unchanged local file for the user to review. */
+export function isIncomingReview(conflict: Pick<ConflictRecord, 'cause' | 'copySide'>): boolean {
+	return conflict.cause === 'incoming-review' && conflict.copySide === 'remote';
+}
 
 export function getIncomingConflictFileName(path: string, hash: string, variant = 0): string {
 	return insertBeforeExtension(path, ` (conflict remote ${hash}${variant ? `-${variant}` : ''})`);
