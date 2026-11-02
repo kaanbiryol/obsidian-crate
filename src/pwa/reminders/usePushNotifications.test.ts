@@ -6,7 +6,7 @@ import { usePushNotifications } from './usePushNotifications';
 const subscription = { toJSON: () => ({ endpoint: 'https://push.example/one', keys: { p256dh: 'p', auth: 'a' } }) };
 const manager = vi.hoisted(() => ({ value: null as object | null }));
 vi.mock('../shell/device', () => ({ detectDeviceName: () => 'Test device', isIosOrIpados: () => false, isStandaloneApp: () => true }));
-vi.mock('../service-worker-registration', () => ({ getPwaPushManager: async () => manager.value, urlBase64ToUint8Array: () => new Uint8Array() }));
+vi.mock('./push-manager', () => ({ getPwaPushManager: async () => manager.value, urlBase64ToUint8Array: () => new Uint8Array() }));
 
 it('reveals content for a granted subscription before the server confirms it', async () => {
 	vi.stubGlobal('Notification', { permission: 'granted' });

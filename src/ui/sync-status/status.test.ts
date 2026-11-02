@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest';
-import { FakeElement } from '../test/fakes/obsidian-ui';
-import type { SyncState } from '../sync/types';
+import { FakeElement } from '../../test/fakes/obsidian-ui';
+import type { SyncState } from '../../sync/types';
 import { StatusBarManager } from './status';
-import { describeActivityStatus } from './activity/activity-status';
-import { registerSyncStatus } from '../plugin/sync-status';
+import { describeActivityStatus } from '../activity/activity-status';
+import { registerSyncStatus } from '../../plugin/sync-status';
 
 const { render } = vi.hoisted(() => ({ render: vi.fn<(element: { props: { state: SyncState } }) => void>() }));
 vi.mock('react-dom/client', () => ({ createRoot: () => ({ render, unmount: vi.fn() }) }));

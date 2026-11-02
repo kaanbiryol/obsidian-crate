@@ -1,6 +1,6 @@
-import { createModalActions, createModalFooter, SharedModal } from './plugin/shared-modal';
+import { createModalActions, createModalFooter, SharedModal } from '../plugin/shared-modal';
 import { Setting, type App } from 'obsidian';
-import type { SharedFeatures } from '../protocol/feature-policy';
+import type { SharedFeatures } from '../../protocol/feature-policy';
 
 type Feature = keyof SharedFeatures;
 

@@ -3,7 +3,7 @@ import type CratePlugin from '../CratePlugin';
 import { beginCloudflareOperation } from './operation-guard';
 import { getPluginLifecycleSignal } from '../lifecycle-state';
 import { startCloudflareDeployment } from './operations';
-import { openConfirmationModal } from '../../ui/confirmation-modal';
+import { openConfirmationModal } from '../../ui/plugin/confirmation-modal';
 import { openCloudflareDeploymentModal } from '../../ui/cloudflare/deployment-modal';
 import { BackupPicker, RestoredServer } from '../../ui/cloudflare/restore-ui';
 import type { BackupChoice } from '../../cloudflare/restore/archive';

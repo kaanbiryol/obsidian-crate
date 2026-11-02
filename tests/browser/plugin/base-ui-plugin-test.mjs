@@ -27,7 +27,7 @@ const { outputFiles } = await build({
     import { BaseModal } from './src/ui/shared/BaseModal';
     import { ActivityTabs } from './src/ui/activity/ActivityTabs';
     import { ActivitySheet } from './src/ui/activity/ActivitySheet';
-    import { StatusBarManager } from './src/ui/status';
+    import { StatusBarManager } from './src/ui/sync-status/status';
     class HostShell extends BaseUiModal {}
     const hostShell = new HostShell({}); hostShell.open();
     const shadow = document.getElementById('host').attachShadow({mode:'open'});

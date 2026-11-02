@@ -1,6 +1,6 @@
 import { showSyncErrorNotice } from '../../sync-error-notice';
 import { Notice, Setting } from 'obsidian';
-import { openConfirmationModal } from '../../confirmation-modal';
+import { openConfirmationModal } from '../../plugin/confirmation-modal';
 import { errorMessage } from '../../../platform/logger';
 import {
 	createFileSyncProgress,

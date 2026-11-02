@@ -11,7 +11,7 @@ beforeEach(() => {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isDesktopApp: true } }));
 	vi.doMock('../../../plugin/server-request', async () => ({ ...await vi.importActual<typeof import('../../../plugin/server-request')>('../../../plugin/server-request'), serverRequest: request }));
 	vi.doMock('../../runtime', () => ({ restartReading: vi.fn(), validateReadingConfiguration: validate }));
-	vi.doMock('../../../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
+	vi.doMock('../../../ui/plugin/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	request.mockImplementation(async () => ({ policy }));
 });
 afterEach(() => {
@@ -21,7 +21,7 @@ afterEach(() => {
 	vi.doUnmock('../../ui/settings/folder-suggest');
 	vi.doUnmock('../../../plugin/server-request');
 	vi.doUnmock('../runtime');
-	vi.doUnmock('../../../ui/confirmation-modal');
+	vi.doUnmock('../../../ui/plugin/confirmation-modal');
 	request.mockReset();
 	confirm.mockClear();
 	validate.mockReset();

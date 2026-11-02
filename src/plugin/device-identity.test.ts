@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ensurePluginDeviceId } from './deviceId';
+import { ensurePluginDeviceId } from './device-identity';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
 function createPlugin(options?: {

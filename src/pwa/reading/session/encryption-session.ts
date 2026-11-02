@@ -2,7 +2,7 @@ import { rememberEncryptionUnlock } from '../../encryption/encryption-onboarding
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { crateRequestHeaders } from '../../connection/request-headers';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
-import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError, ENCRYPTION_CHECK_TIMEOUT_MS } from '../../connection/encryption';
+import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError, ENCRYPTION_CHECK_TIMEOUT_MS } from '../../encryption/encryption-verification';
 import type { EncryptionServerState } from '@/encryption/server-state';
 import { unlockLocalState, type FeatureKeys } from '../../encryption/encryption-keys';
 import { pendingReadingKey, forgetReadingKey } from '../../encryption/encryption-fragments';

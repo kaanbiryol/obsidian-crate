@@ -125,13 +125,23 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
 		}
 		if (!keys) encryptedClient = undefined;
 	}
-	const response = await rawReadingRequest(path, session, body);
+	return await readingResponseJson(await rawReadingRequest(path, session, body), session) as T;
+}
+
+/** A response's JSON body, once the session it answered is still current. A failed
+ * response raises its server message as a `ReadingApiError`. */
+async function readingResponseJson(response: Response, session: ReadingSession | null): Promise<unknown> {
 	const failure = response.ok ? null : await responseError(response, 'Reading request failed.');
-	const data = failure ? null : await response.json() as T;
+	const data: unknown = failure ? null : await response.json();
 	if (session) assertReadingSession(session);
 	if (failure) throw new ReadingApiError(failure.message, response.status, failure.code);
-	return data as T;
+	return data;
 }
+
+/** Longest revision, ETag or delta base kept from a response. */
+const MAX_REVISION_LENGTH = 128;
+const keptRevision = (value: string | null | undefined): string | undefined =>
+	value && value.length <= MAX_REVISION_LENGTH ? value : undefined;
 export const MAX_READING_LIST_ITEMS = 100_000;
 export const MAX_READING_LIST_ISSUES = 10_000;
 export const MAX_READING_LIST_PAGES = 1100;
@@ -147,20 +157,17 @@ async function firstReadingListPage(session: ReadingSession, previous?: ReadingC
 		const revision = response && typeof response === 'object' && typeof (response as { revision?: unknown }).revision === 'string'
 			? (response as { revision: string }).revision : undefined;
 		if (revision && previous && previous.revision === revision) return { unchanged: true };
-		return { unchanged: false, response, ...(revision && revision.length <= 128 ? { revision } : {}) };
+		const kept = keptRevision(revision);
+		return { unchanged: false, response, ...(kept ? { revision: kept } : {}) };
 	}
 	const path = previous?.deltaBase ? `/reading/list?since=${encodeURIComponent(previous.deltaBase)}` : '/reading/list';
 	let response: Response;
 	try { response = await rawReadingRequest(path, session, undefined, previous?.revision ? { 'If-None-Match': previous.revision } : {}); }
 	catch (error) { if (error instanceof EncryptionStateChangedError) return unconditional(); throw error; }
 	if (response.status === 304 && previous) return { unchanged: true };
-	const failure = response.ok ? null : await responseError(response, 'Reading request failed.');
-	const data: unknown = failure ? null : await response.json();
-	assertReadingSession(session);
-	if (failure) throw new ReadingApiError(failure.message, response.status, failure.code);
-	const revision = response.headers.get('ETag'), deltaBase = response.headers.get(DELTA_BASE_HEADER);
-	return { unchanged: false, response: data, ...(revision && revision.length <= 128 ? { revision } : {}),
-		...(deltaBase && deltaBase.length <= 128 ? { deltaBase } : {}) };
+	const data = await readingResponseJson(response, session);
+	const revision = keptRevision(response.headers.get('ETag')), deltaBase = keptRevision(response.headers.get(DELTA_BASE_HEADER));
+	return { unchanged: false, response: data, ...(revision ? { revision } : {}), ...(deltaBase ? { deltaBase } : {}) };
 }
 
 /** Replaces the previous copy's notes at `changedPaths` and its whole capture queue
@@ -223,7 +230,7 @@ function committedArticle(value: unknown, folder: string, id: string): { item: R
 	if (!value || typeof value !== 'object') return null;
 	const { item, etag, markdownHash } = value as { item?: unknown; etag?: unknown; markdownHash?: unknown };
 	if (!isReadingItem(item, folder) || item.crate_reading_id !== id || !item.path) return null;
-	return { item, ...(typeof etag === 'string' && etag.length <= 128 ? { etag } : {}), ...(isSha256Hex(markdownHash) ? { markdownHash } : {}) };
+	return { item, ...(typeof etag === 'string' && etag.length <= MAX_REVISION_LENGTH ? { etag } : {}), ...(isSha256Hex(markdownHash) ? { markdownHash } : {}) };
 }
 
 /** Moves an offline copy to the committed revision when its body is unchanged, so an open
@@ -243,7 +250,7 @@ export async function reloadReadingAfterWrites(session: ReadingSession, writes: 
 	for (const { library } of writes) {
 		if (!revision || !library || typeof library !== 'object') return loadReading(session, previous);
 		const { before, after } = library as { before?: unknown; after?: unknown };
-		if (before !== revision || typeof after !== 'string' || after.length > 128) return loadReading(session, previous);
+		if (before !== revision || typeof after !== 'string' || after.length > MAX_REVISION_LENGTH) return loadReading(session, previous);
 		revision = after;
 	}
 	if (!previous || !writes.length) return loadReading(session, previous);
@@ -284,12 +291,9 @@ export async function loadReadingArticle(session: ReadingSession, id: string, sa
 		encryptedClient = undefined;
 		const response = await rawReadingRequest(`/reading/item?id=${encodeURIComponent(id)}`, session, undefined, savedEtag ? { 'If-None-Match': savedEtag } : {});
 		if (response.status === 304 && savedEtag) { assertReadingSession(session); return null; }
-		const failure = response.ok ? null : await responseError(response, 'Reading request failed.');
-		const article: unknown = failure ? null : await response.json();
-		assertReadingSession(session);
-		if (failure) throw new ReadingApiError(failure.message, response.status, failure.code);
-		const etag = response.headers.get('ETag');
-		return { article, ...(etag && etag.length <= 128 ? { etag } : {}) };
+		const article = await readingResponseJson(response, session);
+		const etag = keptRevision(response.headers.get('ETag'));
+		return { article, ...(etag ? { etag } : {}) };
 	});
 	if (!result) return null;
 	const { article } = result;

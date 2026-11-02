@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
 import { createEncryptionState } from '../../encryption/server-state';
-import { onConnectionExpired } from './expiration';
-import { EncryptionVerificationUnavailableError, loadEncryptionState } from './encryption';
+import { onConnectionExpired } from '../connection/expiration';
+import { EncryptionVerificationUnavailableError, loadEncryptionState } from './encryption-verification';
 
 function storage(): Storage {
 	const values: Record<string, string> = {};

@@ -4,7 +4,7 @@ import {
 	getLogicalCursorOffset,
 	getLogicalTextLength,
 	resolveLogicalCursorPosition,
-} from './cursorPosition';
+} from './cursor-position';
 
 type FakeNode = {
 	nodeType: number;

@@ -21,7 +21,7 @@ import { readEncryptionState } from './state';
 
 const bridge = vi.hoisted(() => vi.fn());
 vi.mock('obsidian', async importOriginal => ({ ...await importOriginal<typeof import('obsidian')>(), requestUrl: bridge }));
-vi.mock('../../../ui/status', () => ({ StatusBarManager: class { update() {} destroy() {} } }));
+vi.mock('../../../ui/sync-status/status', () => ({ StatusBarManager: class { update() {} destroy() {} } }));
 let runtime: SyncRuntime;
 const clients: SyncTestDevice[] = [];
 let disk: PersistentTestVault;

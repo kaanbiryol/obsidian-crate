@@ -78,7 +78,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 		registerSyncCommands,
 		registerVaultSyncEventHandlers,
 	}));
-	vi.doMock('./deviceId', () => ({
+	vi.doMock('./device-identity', () => ({
 		ensurePluginDeviceId,
 	}));
 	vi.doMock('./cloudflare/operations', () => ({ handleCloudflareOAuthProtocol }));
@@ -146,7 +146,7 @@ afterEach(() => {
 	vi.doUnmock('../ui/settings/settings-tab');
 	vi.doUnmock('../reminders/plugin-integration');
 	vi.doUnmock('./sync-integration');
-	vi.doUnmock('./deviceId');
+	vi.doUnmock('./device-identity');
 	vi.doUnmock('./cloudflare/operations');
 	vi.doUnmock('../cloudflare/deployment/service');
 	vi.doUnmock('../cloudflare/oauth/saved-login');

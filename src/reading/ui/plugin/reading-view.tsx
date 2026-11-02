@@ -1,6 +1,6 @@
 import { ItemView, Platform, type WorkspaceLeaf } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { createShadowReactMount, type ShadowReactMount } from '../../../ui/plugin/shadowReactMount';
+import { createShadowReactMount, type ShadowReactMount } from '../../../ui/plugin/shadow-react-mount';
 import { getReadingLibrary, READING_VIEW_TYPE } from '../../runtime';
 import { PluginWorkspace } from '@/ui/plugin/PluginWorkspace';
 import { PluginRoot } from '@/ui/plugin/PluginRoot';

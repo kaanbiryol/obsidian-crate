@@ -1,6 +1,6 @@
 import release from '../../../cloudflare/server-release.json';
 import type { DevelopmentBuild } from '../../../protocol/server-build';
-import type { ConfirmationModalOptions } from '../../confirmation-modal';
+import type { ConfirmationModalOptions } from '../../plugin/confirmation-modal';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	FakeElement,
@@ -37,7 +37,7 @@ async function loadConfigSectionModule(mobile = false) {
 	vi.doMock('../../../cloudflare/deployment/embedded-artifacts', () => ({
 		EMBEDDED_CLOUDFLARE_ARTIFACT: embeddedArtifact,
 	}));
-	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal }));
+	vi.doMock('../../plugin/confirmation-modal', () => ({ openConfirmationModal }));
 	vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
 	vi.doMock('../section-helpers', () => ({ createSettingsSectionHeading: vi.fn() }));
 	vi.doMock('../../plugin/settings-disclosure', () => ({ createSettingsDisclosure: (container: FakeElement) => container.createDiv() }));

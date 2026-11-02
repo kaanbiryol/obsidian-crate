@@ -1,6 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
-import { openConfirmationModal } from '../confirmation-modal';
+import { openConfirmationModal } from '../plugin/confirmation-modal';
 import { runButtonTask } from './action-helpers';
 import { errorMessage } from '../../platform/logger';
 

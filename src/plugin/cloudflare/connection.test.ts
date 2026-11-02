@@ -18,7 +18,7 @@ vi.mock('obsidian', async importOriginal => ({
 }));
 
 const confirm = vi.hoisted(() => vi.fn(async () => true));
-vi.mock('../../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
+vi.mock('../../ui/plugin/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 
 const remote ={ ignorePatterns: ['remote-pattern'], syncInterval: 60, pushEnabled: true };
 

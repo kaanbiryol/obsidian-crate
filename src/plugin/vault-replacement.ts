@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 import { ConnectionSetupError } from '../sync/connection/connection-errors';
 import type { SyncApiClient } from '../sync/worker-api/client';
-import { openConfirmationModal } from '../ui/confirmation-modal';
+import { openConfirmationModal } from '../ui/plugin/confirmation-modal';
 
 /** Joining a server that has files replaces this vault, so ask first. Resolves
  * whether the first sync must move the vault to trash; Cancel throws. */

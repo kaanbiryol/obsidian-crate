@@ -4,7 +4,7 @@ Obsidian-only presentation: dialogs and the settings tab. Shared tokens, compone
 
 ## Sync status on mobile
 
-Obsidian mobile hides plugin status bar items, so `ui/header-status.ts` adds the
+Obsidian mobile hides plugin status bar items, so `ui/sync-status/header-status.ts` adds the
 shared sync indicator to each main-area view header instead; selecting it opens
 sync activity. On mobile a failed sync also shows one notice until a sync
 succeeds again, except offline and revoked access, which have their own notices.

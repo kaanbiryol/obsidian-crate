@@ -29,7 +29,7 @@ async function loadNotificationsSectionModule(expand = true) {
 		},
 	}));
 	vi.doMock('./external-browser-modal', () => ({ openExternalBrowserModal }));
-	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal: confirmRemoval }));
+	vi.doMock('../plugin/confirmation-modal', () => ({ openConfirmationModal: confirmRemoval }));
 
 	const notifications = await import('./notifications-section');
 	return { ...await import('./reminders-web-app'), renderNotificationsSection: (context: Parameters<typeof notifications.renderNotificationsSection>[0]) => {

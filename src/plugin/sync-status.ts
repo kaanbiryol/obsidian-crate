@@ -1,7 +1,7 @@
 import { Platform, type Plugin } from 'obsidian';
 import type { SyncRuntime } from '../sync/runtime/runtime';
-import { StatusBarManager } from '../ui/status';
-import { HeaderSyncIndicator } from '../ui/header-status';
+import { StatusBarManager } from '../ui/sync-status/status';
+import { HeaderSyncIndicator } from '../ui/sync-status/header-status';
 
 type StatusRuntime = Pick<SyncRuntime, 'isInitialized' | 'getState' | 'getActivityProgress'
 	| 'addStateChangeListener' | 'removeStateChangeListener' | 'addProgressListener' | 'removeProgressListener'>;

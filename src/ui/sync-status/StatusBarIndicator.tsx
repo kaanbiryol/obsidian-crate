@@ -1,6 +1,6 @@
 import React from 'react';
-import type { SyncState } from '../sync/types';
-import { SyncIndicator } from './shared/SyncIndicator';
+import type { SyncState } from '../../sync/types';
+import { SyncIndicator } from '../shared/SyncIndicator';
 
 export function StatusBarIndicator({ state }: { state: SyncState }) {
 	const status = state.status === 'error' || state.conflictCount > 0 ? 'error'

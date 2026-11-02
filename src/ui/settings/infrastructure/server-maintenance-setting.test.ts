@@ -7,7 +7,7 @@ const start = vi.fn();
 async function render(configured = true, deployed = false, mobile = false) {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: mobile } }));
 	vi.doMock('../../../plugin/cloudflare/operations', () => ({ startCloudflareDeployment: start }));
-	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal: confirm }));
+	vi.doMock('../../plugin/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	const { renderServerRepairSetting } = await import('./server-repair-setting');
 	const plugin = {
 		app: {},

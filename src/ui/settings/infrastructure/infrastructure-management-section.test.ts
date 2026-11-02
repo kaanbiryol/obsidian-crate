@@ -9,7 +9,7 @@ import {
 async function loadInfrastructureManagementSectionModule() {
 	vi.doMock('../../../plugin/cloudflare/operations', () => ({ startCloudflareDeployment: vi.fn() }));
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../../confirmation-modal', () => ({
+	vi.doMock('../../plugin/confirmation-modal', () => ({
 		openConfirmationModal: vi.fn(),
 	}));
 	vi.doMock('../section-helpers', () => ({

@@ -39,7 +39,7 @@ it('uses a startup toggle and preserves the saved reminder defaults', async () =
 it('changes no notes until this vault confirms turning reminders on with their folder', async () => {
 	vi.doMock('../../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
 	const confirm = vi.fn(async (_app: unknown, _options: { message: string }) => false);
-	vi.doMock('../../../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
+	vi.doMock('../../../ui/plugin/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	const setRemindersEnabled = vi.fn(async (target: { remindersSettings: { enabled: boolean } }, enabled: boolean) => { target.remindersSettings.enabled = enabled; });
 	vi.doMock('../../plugin-integration', () => ({ setRemindersEnabled }));
 	try {
@@ -71,7 +71,7 @@ it('changes no notes until this vault confirms turning reminders on with their f
 		expect(setRemindersEnabled).toHaveBeenCalledWith(plugin, true, expect.any(Function));
 		expect(plugin.remindersSettings).toMatchObject({ enabled: true, confirmed: true });
 	} finally {
-		vi.doUnmock('../../../ui/confirmation-modal');
+		vi.doUnmock('../../../ui/plugin/confirmation-modal');
 		vi.doUnmock('../../plugin-integration');
 	}
 });

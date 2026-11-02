@@ -5,7 +5,7 @@ vi.mock('react-dom/client', () => ({ createRoot: (element: HTMLElement) => ({
 	render: (node: ReactElement<{ onMount: (container: HTMLElement) => void }>) => node.props.onMount(element),
 	unmount: vi.fn(),
 }) }));
-import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../test/fakes/obsidian-ui';
+import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 
 vi.mock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: false } }));
 import { ExclusionPreviewModal } from './exclusion-preview-modal';
@@ -20,7 +20,7 @@ it('bounds rendered rows, scrolls to the last file, and searches the entire list
 	const paths = Array.from({ length: 10000 }, (_, index) => `Archive/note-${index}.md`);
 	const modal = new ExclusionPreviewModal({} as never, paths);
 	modal.open();
-	const content = modal.contentEl as unknown as import('../test/fakes/obsidian-ui').FakeElement;
+	const content = modal.contentEl as unknown as import('../../test/fakes/obsidian-ui').FakeElement;
 	expect(content.collectText()).toContain('10000 matching files');
 	const list = content.children.find(child => child.classNames.has('crate-exclusion-preview-list'))!;
 	expect(list.children).toHaveLength(42);

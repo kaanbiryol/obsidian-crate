@@ -5,7 +5,7 @@ import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../../cloudflare/deployment/emb
 import { isCloudflareServerUpdateAvailable } from '../../../cloudflare/deployment/update';
 import { startCloudflareDeployment } from '../../../plugin/cloudflare/operations';
 import { disconnectDevice } from '../../../plugin/sync-connection';
-import { openConfirmationModal } from '../../confirmation-modal';
+import { openConfirmationModal } from '../../plugin/confirmation-modal';
 import { createSettingsSectionHeading, type SettingsSectionContext } from '../section-helpers';
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
 import { openExternalBrowserModal } from '../external-browser-modal';

@@ -1,5 +1,5 @@
-import { getEditorSelectionRange } from '@/ui/shared/editorSelection';
-import { getLogicalCursorOffset, resolveLogicalCursorPosition } from '@/ui/shared/cursorPosition';
+import { getEditorSelectionRange } from '@/ui/shared/editor-selection';
+import { getLogicalCursorOffset, resolveLogicalCursorPosition } from '@/ui/shared/cursor-position';
 
 export function captureTitleSelection(element: HTMLElement) {
 	const range = getEditorSelectionRange(element);

@@ -15,7 +15,7 @@ async function flushMicrotasks(): Promise<void> {
 
 async function loadDevicesSectionModule() {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../confirmation-modal', () => ({
+	vi.doMock('../plugin/confirmation-modal', () => ({
 		openConfirmationModal,
 	}));
 
@@ -40,7 +40,7 @@ describe('renderDevicesSection', () => {
 		vi.resetModules();
 		vi.clearAllMocks();
 		vi.doUnmock('obsidian');
-		vi.doUnmock('../confirmation-modal');
+		vi.doUnmock('../plugin/confirmation-modal');
 	});
 
 	it('renders connected devices, disables the current device action, and removes stale devices', async () => {
@@ -189,7 +189,7 @@ describe('device list caching', () => {
 	afterEach(() => {
 		vi.resetModules();
 		vi.doUnmock('obsidian');
-		vi.doUnmock('../confirmation-modal');
+		vi.doUnmock('../plugin/confirmation-modal');
 	});
 
 	const device = {

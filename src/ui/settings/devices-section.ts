@@ -2,7 +2,7 @@ import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import type { CachedDevicesState } from '../../plugin/settings-ui-state';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import type CratePlugin from '../../plugin/CratePlugin';
-import { openConfirmationModal } from '../confirmation-modal';
+import { openConfirmationModal } from '../plugin/confirmation-modal';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import { createLogger } from '../../sync/logger';
 import { errorMessage } from '../../platform/logger';

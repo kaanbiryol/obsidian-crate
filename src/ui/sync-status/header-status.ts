@@ -2,8 +2,8 @@ import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { Plugin, View } from 'obsidian';
 import { StatusBarIndicator } from './StatusBarIndicator';
-import { describeSyncStatus } from './activity/activity-status';
-import type { SyncActivityProgress, SyncState } from '../sync/types';
+import { describeSyncStatus } from '../activity/activity-status';
+import type { SyncActivityProgress, SyncState } from '../../sync/types';
 
 type ActionView = View & { addAction(icon: string, title: string, callback: (evt: MouseEvent) => unknown): HTMLElement };
 

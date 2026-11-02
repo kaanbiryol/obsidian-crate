@@ -9,7 +9,7 @@ const { status, constructed } = vi.hoisted(() => ({
 	constructed: vi.fn(),
 	status: { setEnabled: vi.fn(), update: vi.fn<(state: SyncState, progress?: unknown) => void>(), destroy: vi.fn() },
 }));
-vi.mock('../ui/status', () => ({ StatusBarManager: class {
+vi.mock('../ui/sync-status/status', () => ({ StatusBarManager: class {
 	constructor(...args: unknown[]) { constructed(...args); return status; }
 } }));
 beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal('window', globalThis); });

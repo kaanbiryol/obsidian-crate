@@ -16,7 +16,7 @@ import { Reminder } from '../../../types/reminder';
 import { DEFAULT_PROJECT } from '../../../core/constants';
 import { hasReminderDraftTitle } from '../../../core/reminderDraft';
 import { clampCaretToReminderTitle } from '../../reminder-editor/reminderEditorEdits';
-import { saveCursorPosition } from '../../../../ui/shared/cursorPosition';
+import { saveCursorPosition } from '../../../../ui/shared/cursor-position';
 
 interface AddReminderModalProps {
 	onClose: () => void;

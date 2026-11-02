@@ -7,7 +7,7 @@ import type { FileHistoryPreview } from '../../sync/history/file-history-preview
 import { buildDiff } from './diff-model';
 import { renderFileText } from './history-text';
 import { diffCountsLabel, renderDiffCounts, renderDiffLines } from './diff-renderer';
-import { openConfirmationModal } from '../confirmation-modal';
+import { openConfirmationModal } from '../plugin/confirmation-modal';
 import { formatSize, parseServerTimestamp } from '../shared/format';
 
 export type FileHistoryRuntime = Pick<SyncRuntime, 'listRecentFileVersions' | 'getPendingRestores' | 'loadFileHistoryPreview' | 'restoreRecentFileVersion' | 'loadCurrentSyncedPreview'>;

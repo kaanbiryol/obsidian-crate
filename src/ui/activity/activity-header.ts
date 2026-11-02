@@ -1,7 +1,7 @@
 import { setIcon } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { StatusBarIndicator } from '../StatusBarIndicator';
+import { StatusBarIndicator } from '../sync-status/StatusBarIndicator';
 import type { SyncState } from '../../sync/types';
 import type { describeActivityStatus } from './activity-status';
 import type { PendingFileAction } from './file-actions';

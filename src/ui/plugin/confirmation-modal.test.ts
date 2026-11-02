@@ -6,7 +6,7 @@ import {
 	MockSetting,
 	createObsidianUiModule,
 	resetObsidianUiMocks,
-} from '../test/fakes/obsidian-ui';
+} from '../../test/fakes/obsidian-ui';
 
 vi.mock('react-dom/client', () => ({
 	createRoot: (element: { textContent: string }) => ({

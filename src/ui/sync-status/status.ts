@@ -1,5 +1,5 @@
-import { formatSyncProgress } from './activity/progress-label';
-import { describeSyncStatus } from './activity/activity-status';
+import { formatSyncProgress } from '../activity/progress-label';
+import { describeSyncStatus } from '../activity/activity-status';
 /**
  * Status bar component for sync status display
  */
@@ -8,7 +8,7 @@ import type { Plugin } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { StatusBarIndicator } from './StatusBarIndicator';
-import type { SyncActivityProgress, SyncState } from '../sync/types';
+import type { SyncActivityProgress, SyncState } from '../../sync/types';
 
 export class StatusBarManager {
 	private plugin: Plugin;

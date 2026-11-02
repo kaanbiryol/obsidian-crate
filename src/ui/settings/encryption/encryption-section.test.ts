@@ -40,7 +40,7 @@ beforeEach(() => {
 		close() { this.onClose(); }
 		open() { closeModal = () => this.close(); this.onOpen(); }
 	} }));
-	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal: confirmTurnOn }));
+	vi.doMock('../../plugin/confirmation-modal', () => ({ openConfirmationModal: confirmTurnOn }));
 	vi.doMock('../../../sync/worker-api/http', () => ({ WorkerApiHttpClient: class {
 		constructor(private readonly url: string) {}
 		setAbortSignal() {}

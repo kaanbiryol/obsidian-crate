@@ -4,7 +4,7 @@ import { capturePwaSession } from '../connection/session-generation';
 import { responseError } from '../connection/response-error';
 import type { ApiFetch, ShowToast } from '../types';
 import type { PushState } from './types';
-import { getPwaPushManager, urlBase64ToUint8Array } from '../service-worker-registration';
+import { getPwaPushManager, urlBase64ToUint8Array } from './push-manager';
 
 const CHECKING: PushState = { phase: 'checking', status: 'Checking notification registration…' };
 const ENABLED: PushState = { phase: 'enabled', status: 'Notifications enabled on this device.' };

@@ -4,7 +4,7 @@ import { createAbortError } from '../../sync/abort';
 import type { SyncHistoryEntry } from '../../sync/types';
 
 vi.mock('obsidian', () => createObsidianUiModule());
-vi.mock('../plugin/mountModalHeader', () => ({ mountModalHeader: () => Object.assign(() => {}, { setTitle: () => {} }) }));
+vi.mock('../plugin/mount-modal-header', () => ({ mountModalHeader: () => Object.assign(() => {}, { setTitle: () => {} }) }));
 import { HistoryRestoreModal } from './history-restore-modal';
 
 afterEach(() => { resetObsidianUiMocks(); vi.restoreAllMocks(); });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CratePlugin from './CratePlugin';
 import { normalizeCrateSettings } from './settings';
-import { ensurePluginDeviceId } from './deviceId';
+import { ensurePluginDeviceId } from './device-identity';
 import { recordSyncHistory } from '../sync/runtime/sync-activity';
 import { createEmptySyncResult } from '../sync/sync-result';
 import {

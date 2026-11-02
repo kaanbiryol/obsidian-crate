@@ -6,12 +6,12 @@ beforeEach(() => { resetObsidianUiMocks(); confirm.mockReset(); });
 afterEach(() => {
 	vi.resetModules();
 	vi.doUnmock('obsidian');
-	vi.doUnmock('../confirmation-modal');
+	vi.doUnmock('../plugin/confirmation-modal');
 });
 
 async function render() {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal: confirm }));
+	vi.doMock('../plugin/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	const { renderExclusionCleanup } = await import('./exclusion-cleanup');
 	const execute = vi.fn(async () => ({ deleted: ['.trash/reviewed.md'], errors: [] }));
 	const createExclusionCleanupReview = vi.fn(async () => ({ paths: ['.trash/reviewed.md'], execute }));

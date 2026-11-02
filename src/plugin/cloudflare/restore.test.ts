@@ -6,7 +6,7 @@ const { progress, confirm, connect } = vi.hoisted(() => ({ progress: { dismiss: 
 vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('../../ui/plugin/shared-modal', () => ({ SharedModal: class extends MockModal { bodyEl = new FakeElement('div'); openLayout() {} } }));
 vi.mock('../../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal: () => progress, revealCloudflareOperation: () => false }));
-vi.mock('../../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
+vi.mock('../../ui/plugin/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 vi.mock('./operations', () => ({ startCloudflareDeployment: connect }));
 vi.mock('../lifecycle-state', () => ({ getPluginLifecycleSignal: () => new AbortController().signal }));
 import { openServerRestore } from './restore';

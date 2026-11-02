@@ -99,7 +99,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
   ├── SecretStorageService   - OS keychain wrapper
   ├── CrateSettingTab          - settings UI (delegates to section modules)
   ├── Sync status (plugin/sync-status.ts) - subscribes to runtime state and progress
-  │     └── StatusBarManager (ui/status.ts) - status bar rendering
+  │     └── StatusBarManager (ui/sync-status/status.ts) - status bar rendering
   ├── SyncRuntime (sync/runtime/runtime.ts) - lifecycle coordinator
         ├── SyncEngine (sync/engine/engine.ts) - orchestrates sync operations
         │     uses: planner, transfer, queue, file-discovery, manifest
@@ -341,7 +341,7 @@ one unlock/reconnect surface above the feature screens; a failure confined to on
 feature still allows opening the other. When the startup encryption check gets no
 answer on a device without encryption evidence, both features show their plaintext
 offline copy read-only under an **Unable to connect** notice; writes stay locked. Scope-specific encryption adapters share
-verification and key-import policy through `connection/encryption.ts`, retaining
+verification and key-import policy through `encryption/encryption-verification.ts`, retaining
 their local storage migration and cache responsibilities. Expired credentials are
 matched against the current connection before suspension; expiry preserves drafts
 and pending changes, while explicit logout clears both features' local data.
@@ -577,8 +577,7 @@ gesture listeners and cleanup, while `reading-highlight-geometry.ts` places the
 overlay from measured rectangles.
 
 Shared icons and reduced-motion preferences live in `src/ui/shared/`; the Obsidian
-icon renderer lives in `src/ui/obsidian-icon/`. Reminder import paths re-export
-these implementations for existing feature consumers.
+icon renderer lives in `src/ui/obsidian-icon/`.
 
 `src/pwa/main.tsx` mounts the feature shell. `reminders/RemindersRuntime.tsx` composes
 reminder data, session, outbox, and editor hooks independently of the screen.

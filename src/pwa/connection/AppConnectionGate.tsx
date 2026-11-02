@@ -11,7 +11,7 @@ import { exportReadingData } from '../reading/storage/storage';
 import { useSharedFeatures } from '../shared-features';
 import { BrowserSetup, needsBrowserSetup } from './BrowserSetup';
 import { AppPairing } from './AppPairing';
-import { hasEncryptedSessionEvidence } from './encryption';
+import { hasEncryptedSessionEvidence } from '../encryption/encryption-verification';
 import { SESSION_RECOVERY_ISSUE } from './issues';
 
 /** One app-level setup/recovery surface, regardless of the initial destination. */

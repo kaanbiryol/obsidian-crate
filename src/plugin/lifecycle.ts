@@ -14,7 +14,7 @@ import {
 	registerSyncCommands,
 	registerVaultSyncEventHandlers,
 } from "./sync-integration";
-import { ensurePluginDeviceId } from "./deviceId";
+import { ensurePluginDeviceId } from "./device-identity";
 import type CratePlugin from "./CratePlugin";
 import { handleCloudflareOAuthProtocol } from "./cloudflare/operations";
 import { showCloudflareServerUpdateNotice } from "../ui/cloudflare/update-notice";

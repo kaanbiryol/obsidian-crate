@@ -15,7 +15,7 @@ import { configureCloudflareAuthorizedDevice } from './connection';
 import { isSelfHostedConnectionPending } from '../self-hosted-connection';
 import { offerFeatureChoice } from '../feature-settings';
 import { generateSecureToken, hashToken } from '../device-token';
-import { getCurrentDeviceName, getCurrentPlatformCode } from '../deviceInfo';
+import { getCurrentDeviceName, getCurrentPlatformCode } from '../device-identity';
 import { openCloudflareDeploymentModal, revealCloudflareOperation, type CloudflareDeploymentModal } from '../../ui/cloudflare/deployment-modal';
 import { dismissCloudflareAuthorizationModal } from '../../ui/cloudflare/authorization-modal';
 import { isCloudflareOAuthConfigured } from '../../cloudflare/oauth/config';

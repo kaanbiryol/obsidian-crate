@@ -1,5 +1,5 @@
 import { EncryptionKeyRequiredError, rememberEncryptionUnlock } from '../encryption/encryption-onboarding';
-import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError, ENCRYPTION_CHECK_TIMEOUT_MS, hasEncryptedSessionEvidence } from '../connection/encryption';
+import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError, ENCRYPTION_CHECK_TIMEOUT_MS, hasEncryptedSessionEvidence } from '../encryption/encryption-verification';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from './private-storage';

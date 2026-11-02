@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { Plugin } from "obsidian";
-import { attachPluginStylesheet } from "./shadowStyles";
+import { attachPluginStylesheet } from "./shadow-styles";
 
 export interface ShadowRootMount {
 	shadowRoot: ShadowRoot;

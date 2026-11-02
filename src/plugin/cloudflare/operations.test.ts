@@ -30,7 +30,7 @@ async function loadPluginIntegration() {
 	vi.doMock('../vault-replacement', () => ({ confirmVaultReplacement: async () => false }));
 	vi.doMock('../feature-settings', () => ({ offerFeatureChoice }));
 	vi.doMock('../device-token', () => ({ generateSecureToken, hashToken }));
-	vi.doMock('../deviceInfo', () => ({
+	vi.doMock('../device-identity', () => ({
 		getCurrentDeviceName: vi.fn(() => 'Test device'),
 		getCurrentPlatformCode: vi.fn(() => 'desktop'),
 	}));
@@ -91,7 +91,7 @@ afterEach(() => {
 	vi.doUnmock('../sync-integration');
 	vi.doUnmock('../vault-replacement');
 	vi.doUnmock('../sync/device-token');
-	vi.doUnmock('../deviceInfo');
+	vi.doUnmock('../device-identity');
 	vi.doUnmock('../../ui/cloudflare/deployment-modal');
 	vi.doUnmock('../../ui/cloudflare/authorization-modal');
 	vi.doUnmock('../feature-settings');

@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { attachPluginStylesheet } from './shadowStyles';
+import { attachPluginStylesheet } from './shadow-styles';
 
 class FakeSheet { css = ''; replaceSync(text: string) { this.css = text; } }
 function windowDocument() {

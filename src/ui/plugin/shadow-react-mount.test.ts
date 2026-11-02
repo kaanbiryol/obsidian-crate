@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
-vi.mock('./shadowStyles', () => ({ attachPluginStylesheet: vi.fn(async () => {}) }));
+vi.mock('./shadow-styles', () => ({ attachPluginStylesheet: vi.fn(async () => {}) }));
 vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }) }));
 afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -13,7 +13,7 @@ function host() {
 it('stops following theme changes when the view unmounts', async () => {
 	const disconnect = vi.fn();
 	vi.stubGlobal('MutationObserver', class { observe() {} disconnect = disconnect; });
-	const { createShadowReactMount } = await import('./shadowReactMount');
+	const { createShadowReactMount } = await import('./shadow-react-mount');
 	const mount = await createShadowReactMount({} as never, host() as never);
 	expect(disconnect).not.toHaveBeenCalled();
 	// Before: the observer stayed registered on the body until a later theme change.

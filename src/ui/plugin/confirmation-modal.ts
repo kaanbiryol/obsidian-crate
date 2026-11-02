@@ -1,4 +1,4 @@
-import { createModalActions, createModalFooter, SharedModal } from './plugin/shared-modal';
+import { createModalActions, createModalFooter, SharedModal } from './shared-modal';
 import { Setting, type App, type ButtonComponent } from 'obsidian';
 
 export interface ConfirmationModalOptions {

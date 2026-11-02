@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getEditorSelectionRange } from './editorSelection';
+import { getEditorSelectionRange } from './editor-selection';
 
 function editorSelection() {
 	const text = {} as Node;

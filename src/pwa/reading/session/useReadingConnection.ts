@@ -1,4 +1,4 @@
-import { EncryptionTransitionError, EncryptionVerificationUnavailableError } from '../../connection/encryption';
+import { EncryptionTransitionError, EncryptionVerificationUnavailableError } from '../../encryption/encryption-verification';
 import { connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from '../../connection/issues';
 import { EncryptionKeyRequiredError } from '../../encryption/encryption-onboarding';
 import { resetReadingEncryption } from './encryption-lifecycle';

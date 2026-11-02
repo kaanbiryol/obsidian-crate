@@ -1,7 +1,7 @@
 /**
  * Utilities for saving and restoring cursor position in contenteditable elements
  */
-import { getEditorSelectionRange } from './editorSelection';
+import { getEditorSelectionRange } from './editor-selection';
 
 const TEXT_NODE_TYPE = typeof Node !== 'undefined' ? Node.TEXT_NODE : 3;
 

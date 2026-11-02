@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CloudflareDeploymentMetadata } from '../../../cloudflare/deployment/types';
-import type { ConfirmationModalOptions } from '../../confirmation-modal';
+import type { ConfirmationModalOptions } from '../../plugin/confirmation-modal';
 import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../../test/fakes/obsidian-ui';
 
 const confirm = vi.fn<(app: unknown, options: ConfirmationModalOptions) => Promise<boolean>>();
@@ -19,7 +19,7 @@ function deployment(overrides: Partial<CloudflareDeploymentMetadata> = {}): Clou
 async function render(saved: CloudflareDeploymentMetadata | null, configured = false) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../../../plugin/cloudflare/operations', () => ({ startCloudflareDeployment: start }));
-	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal: confirm }));
+	vi.doMock('../../plugin/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	const { renderInfrastructureSection, renderServerActions } = await import('./infrastructure-section');
 	const containerEl = new FakeElement('div');
 	const plugin = {
@@ -37,7 +37,7 @@ afterEach(() => {
 	vi.resetModules();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../../../plugin/cloudflare/operations');
-	vi.doUnmock('../../confirmation-modal');
+	vi.doUnmock('../../plugin/confirmation-modal');
 });
 
 describe('advanced server actions', () => {

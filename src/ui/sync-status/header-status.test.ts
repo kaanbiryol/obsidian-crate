@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { FakeElement } from '../test/fakes/obsidian-ui';
-import type { SyncState } from '../sync/types';
+import { FakeElement } from '../../test/fakes/obsidian-ui';
+import type { SyncState } from '../../sync/types';
 import { HeaderSyncIndicator } from './header-status';
 
 const { render, unmount } = vi.hoisted(() => ({ render: vi.fn<(element: { props: { state: SyncState } }) => void>(), unmount: vi.fn() }));

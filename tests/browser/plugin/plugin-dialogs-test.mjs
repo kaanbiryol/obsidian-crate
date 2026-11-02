@@ -13,8 +13,8 @@ const { outputFiles } = await build({
     import { DeleteConfirmationModal } from './src/reminders/ui/plugin/DeleteConfirmationModal';
     import { SharedModal } from './src/ui/plugin/shared-modal';
     import { createSettingsDisclosure } from './src/ui/plugin/settings-disclosure';
-    import { openConfirmationModal } from './src/ui/confirmation-modal';
-    import { openFeatureChoiceModal } from './src/ui/feature-choice-modal';
+    import { openConfirmationModal } from './src/ui/plugin/confirmation-modal';
+    import { openFeatureChoiceModal } from './src/ui/settings/feature-choice-modal';
     import { PendingDiscardModal } from './src/ui/activity/pending-discard-modal';
     import { SyncDiagnosticsModal } from './src/ui/settings/sync-diagnostics-modal';
     import { QRModal } from './src/ui/settings/qr-modal';

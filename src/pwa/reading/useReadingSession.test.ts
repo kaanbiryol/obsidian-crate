@@ -8,7 +8,7 @@ import { adoptEarlierReadingCaptures, newestReadingShare, readReadingCache, read
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { connectReadingFromReminders } from './api';
 import { prepareReadingEncryption } from './session/encryption-session';
-import { EncryptionVerificationUnavailableError } from '../connection/encryption';
+import { EncryptionVerificationUnavailableError } from '../encryption/encryption-verification';
 
 vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('../service-worker-registration', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));

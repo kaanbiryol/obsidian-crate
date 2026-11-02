@@ -1,5 +1,5 @@
 import { Notice, Setting } from 'obsidian';
-import { openConfirmationModal } from '../../confirmation-modal';
+import { openConfirmationModal } from '../../plugin/confirmation-modal';
 import { disconnectDevice } from '../../../plugin/sync-connection';
 import type { SettingsSectionContext } from '../section-helpers';
 

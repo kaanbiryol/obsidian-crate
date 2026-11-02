@@ -1,8 +1,8 @@
-import { reportExpiredConnection } from './expiration';
-import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
+import { reportExpiredConnection } from '../connection/expiration';
+import { EncryptionKeyRequiredError } from './encryption-onboarding';
 import { validateEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
-import { readVaultKeys, type FeatureKeys } from '../encryption/encryption-keys';
-import { rememberRecoveryKey } from '../encryption/web-app-unlock';
+import { readVaultKeys, type FeatureKeys } from './encryption-keys';
+import { rememberRecoveryKey } from './web-app-unlock';
 import { PathTags } from '../../encryption/path-tags';
 import { openFolderLabel } from '../../encryption/folder-label';
 

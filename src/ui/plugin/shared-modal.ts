@@ -1,5 +1,5 @@
 import { Modal, Setting } from 'obsidian';
-import { mountModalHeader } from './mountModalHeader';
+import { mountModalHeader } from './mount-modal-header';
 
 export function hideNativeModalCloseButton(modalEl: HTMLElement): void {
 	// Scope native close-control styles to modal shells with a Crate replacement.

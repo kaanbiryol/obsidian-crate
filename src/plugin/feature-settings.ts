@@ -7,8 +7,8 @@ import { readReadingPolicy } from '../reading/server';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { parseFeaturePolicy, type FeaturePolicy, type SharedFeatures } from '../protocol/feature-policy';
 import { sharedSettingsSync } from './shared-settings-sync';
-import { openConfirmationModal } from '../ui/confirmation-modal';
-import { openFeatureChoiceModal, type FeatureChoice } from '../ui/feature-choice-modal';
+import { openConfirmationModal } from '../ui/plugin/confirmation-modal';
+import { openFeatureChoiceModal, type FeatureChoice } from '../ui/settings/feature-choice-modal';
 
 type Feature = keyof SharedFeatures;
 

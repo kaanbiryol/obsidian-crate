@@ -1,6 +1,6 @@
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { createModalActions, SharedModal } from '../../plugin/shared-modal';
-import { openConfirmationModal } from '../../confirmation-modal';
+import { openConfirmationModal } from '../../plugin/confirmation-modal';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
 import { encryptVault, loadDeviceEncryptionKeys, openEncryptionConnection, prepareEncryptionKeys, readEncryptionStatus, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';

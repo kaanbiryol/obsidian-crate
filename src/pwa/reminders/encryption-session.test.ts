@@ -5,7 +5,7 @@ import { AUTH_TOKEN_KEY } from '../config';
 import { LocalStateCipher } from '../../encryption/local-state';
 import { unlockPrivateStorage, privateStorageUnlocked, sealPrivateValue, openPrivateValue } from './private-storage';
 import { createReminderOutboxStorage } from './outbox/reminder-outbox-storage';
-import { getPwaPushManager } from '../service-worker-registration';
+import { getPwaPushManager } from './push-manager';
 
 function storage(): Storage {
 	const values: Record<string, string> = {};

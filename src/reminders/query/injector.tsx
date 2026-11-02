@@ -9,7 +9,7 @@ import {
 	createShadowReactRoot,
 	createShadowRootMount,
 	type ShadowRootMount,
-} from "@/ui/plugin/shadowReactMount";
+} from "@/ui/plugin/shadow-react-mount";
 import { PluginRoot } from "@/ui/plugin/PluginRoot";
 import { RemindersList } from "@/reminders/ui/plugin/reminder-list/RemindersList";
 import { processVaultMarkdown } from "@/reminders/data/vault-markdown";
