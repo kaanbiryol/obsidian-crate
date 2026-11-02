@@ -1,5 +1,5 @@
 import { CloudflareApiError } from '../cloudflare-api-error';
-import { parseJsonObject, type HttpTransport } from '../http';
+import { parseJsonObject, wait, type HttpTransport, type Sleep } from '../http';
 import { isSha256Hex } from '../../platform/validation';
 import { sha256Hex } from '../../platform/sha256';
 
@@ -10,7 +10,7 @@ function cleanupUrl(origin: string, path: string): string {
 	return `${url.origin}${path}`;
 }
 
-export async function verifyResetWorker(transport: HttpTransport, origin: string, resetId: string, requireRecoveryObjects = false, uploadTag?: string): Promise<boolean> {
+export async function verifyResetWorker(transport: HttpTransport, origin: string, resetId: string, requireRecoveryObjects = false, uploadTag?: string, sleep: Sleep = wait): Promise<boolean> {
 	const url = cleanupUrl(origin, '/.well-known/crate-reset');
 	// Publication can be visible in the management API before the public route.
 	for (let attempt = 0; attempt < 5; attempt++) {
@@ -20,7 +20,7 @@ export async function verifyResetWorker(transport: HttpTransport, origin: string
 			&& (!requireRecoveryObjects || value.recoveryObjects === true)
 			&& (!uploadTag || value.uploadTag === uploadTag)
 			&& (!new URL(origin).hostname.startsWith('crate-delete-') || value.deleteAll === true)) return value.recoveryObjects === true;
-		if (attempt < 4) await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+		if (attempt < 4) await sleep(500 * (attempt + 1));
 	}
 	throw new Error('The cleanup Worker is not ready yet. Retry the server deletion or reset.');
 }

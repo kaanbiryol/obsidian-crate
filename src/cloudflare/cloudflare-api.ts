@@ -6,7 +6,7 @@ export { CloudflareApiError } from './cloudflare-api-error';
 import { verifyWorkerDeployment } from './deployment/verify-worker';
 import { deleteResetWorkerObjects, verifyResetWorker } from './server-reset/reset-worker-client';
 import type { CloudflareDeploymentArtifacts } from './deployment/artifacts';
-import { API_BASE_URL, parseJsonObject, type HttpRequest, type HttpTransport } from './http';
+import { API_BASE_URL, parseJsonObject, wait, type HttpRequest, type HttpTransport, type Sleep } from './http';
 
 // Cloudflare allows about 1,200 API requests per five minutes per user and then
 // rejects every request for five minutes. Wait out one full block per request.
@@ -105,15 +105,28 @@ function retryAfterMilliseconds(headers: Record<string, string> | undefined): nu
 	return Number.isNaN(date) ? null : Math.max(0, date - Date.now());
 }
 
-const wait = (milliseconds: number) => new Promise<void>(resolve => { window.setTimeout(resolve, milliseconds); });
+/** An API path with every interpolated identifier encoded. Valid identifiers are unchanged. */
+function apiPath(strings: TemplateStringsArray, ...values: string[]): string {
+	return strings.reduce((path, part, index) => `${path}${encodeURIComponent(values[index - 1]!)}${part}`);
+}
+
+/** Resolves a lookup whose 404 means the resource does not exist. */
+async function nullOn404<T>(request: Promise<T>): Promise<T | null> {
+	try {
+		return await request;
+	} catch (error) {
+		if (error instanceof CloudflareApiError && error.status === 404) return null;
+		throw error;
+	}
+}
 
 export interface CloudflareApiOptions {
 	/** Waits before retrying a rate-limited request or pacing a bulk loop. */
-	sleep?: (milliseconds: number) => Promise<void>;
+	sleep?: Sleep;
 }
 
 export class CloudflareApiClient {
-	private readonly sleep: (milliseconds: number) => Promise<void>;
+	private readonly sleep: Sleep;
 	private nextBulkRequestAt = 0;
 
 	constructor(
@@ -146,31 +159,26 @@ export class CloudflareApiClient {
 	}
 
 	async listWorkers(accountId: string): Promise<CloudflareWorkerScript[]> {
-		return this.request<CloudflareWorkerScript[]>(`/accounts/${accountId}/workers/scripts`);
+		return this.request<CloudflareWorkerScript[]>(apiPath`/accounts/${accountId}/workers/scripts`);
 	}
 
 	async getWorkerSettings(accountId: string, workerName: string): Promise<CloudflareWorkerSettings> {
 		return this.request<CloudflareWorkerSettings>(
-			`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/settings`,
+			apiPath`/accounts/${accountId}/workers/scripts/${workerName}/settings`,
 		);
 	}
 
 	async getD1Database(accountId: string, databaseId: string): Promise<D1Database | null> {
-		try {
-			return await this.request<D1Database>(`/accounts/${accountId}/d1/database/${databaseId}`);
-		} catch (error) {
-			if (error instanceof CloudflareApiError && error.status === 404) return null;
-			throw error;
-		}
+		return nullOn404(this.request<D1Database>(apiPath`/accounts/${accountId}/d1/database/${databaseId}`));
 	}
 
 	async deleteD1Database(accountId: string, databaseId: string): Promise<void> {
-		await this.request(`/accounts/${encodeURIComponent(accountId)}/d1/database/${encodeURIComponent(databaseId)}`, { method: 'DELETE' });
+		await this.request(apiPath`/accounts/${accountId}/d1/database/${databaseId}`, { method: 'DELETE' });
 	}
 
 	async findD1Database(accountId: string, name: string): Promise<D1Database | null> {
 		const result = await this.request<D1Database[]>(
-			`/accounts/${accountId}/d1/database?name=${encodeURIComponent(name)}&per_page=100`,
+			apiPath`/accounts/${accountId}/d1/database` + `?name=${encodeURIComponent(name)}&per_page=100`,
 		);
 		const matches = result.filter(database => database.name === name);
 		if (matches.length > 1) throw new Error('Multiple D1 databases match this deployment name. Select the intended server before deploying.');
@@ -178,7 +186,7 @@ export class CloudflareApiClient {
 	}
 
 	async createD1Database(accountId: string, name: string): Promise<D1Database> {
-		return this.request(`/accounts/${accountId}/d1/database`, {
+		return this.request(apiPath`/accounts/${accountId}/d1/database`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name }),
@@ -186,16 +194,11 @@ export class CloudflareApiClient {
 	}
 
 	async getR2Bucket(accountId: string, name: string): Promise<R2Bucket | null> {
-		try {
-			return await this.request<R2Bucket>(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(name)}`);
-		} catch (error) {
-			if (error instanceof CloudflareApiError && error.status === 404) return null;
-			throw error;
-		}
+		return nullOn404(this.request<R2Bucket>(apiPath`/accounts/${accountId}/r2/buckets/${name}`));
 	}
 
 	async createR2Bucket(accountId: string, name: string): Promise<R2Bucket> {
-		return this.request(`/accounts/${accountId}/r2/buckets`, {
+		return this.request(apiPath`/accounts/${accountId}/r2/buckets`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name }),
@@ -207,7 +210,7 @@ export class CloudflareApiClient {
 		const seen = new Set<string>();
 		const invalid = () => new Error('Could not verify the complete Durable Object namespace listing.');
 		for (let page = 1; page <= 10000; page++) {
-			const response = await this.requestEnvelope<DurableObjectNamespace[]>(`/accounts/${accountId}/workers/durable_objects/namespaces?page=${page}&per_page=100`);
+			const response = await this.requestEnvelope<DurableObjectNamespace[]>(apiPath`/accounts/${accountId}/workers/durable_objects/namespaces` + `?page=${page}&per_page=100`);
 			const pages = response.result_info?.total_pages;
 			const reportedPage = response.result_info?.page;
 			if (!Array.isArray(response.result)
@@ -242,7 +245,7 @@ export class CloudflareApiClient {
 		const params = new URLSearchParams({ per_page: '1000' });
 		if (cursor) params.set('cursor', cursor);
 		if (prefix) params.set('prefix', prefix);
-		const response = await this.requestEnvelope<Array<{ key?: string; size?: unknown }>>(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects?${params}`);
+		const response = await this.requestEnvelope<Array<{ key?: string; size?: unknown }>>(apiPath`/accounts/${accountId}/r2/buckets/${bucketName}/objects` + `?${params}`);
 		const info = response.result_info;
 		const invalid = (reason: string) => new Error(`Could not verify the complete R2 object listing. ${reason}`);
 		if (!Array.isArray(response.result) || response.result.some(object => !object || typeof object.key !== 'string' || !object.key)) {
@@ -300,15 +303,15 @@ export class CloudflareApiClient {
 	}
 
 	async verifyResetWorker(origin: string, resetId: string, requireRecoveryObjects = false, uploadTag?: string): Promise<boolean> {
-		return verifyResetWorker(this.transport, origin, resetId, requireRecoveryObjects, uploadTag);
+		return verifyResetWorker(this.transport, origin, resetId, requireRecoveryObjects, uploadTag, this.sleep);
 	}
 
 	async deleteR2Bucket(accountId: string, bucketName: string): Promise<void> {
-		await this.request(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}`, { method: 'DELETE' });
+		await this.request(apiPath`/accounts/${accountId}/r2/buckets/${bucketName}`, { method: 'DELETE' });
 	}
 
 	async deleteWorker(accountId: string, workerName: string): Promise<void> {
-		const { response, envelope } = await this.send<unknown>(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, { method: 'DELETE' });
+		const { response, envelope } = await this.send<unknown>(apiPath`/accounts/${accountId}/workers/scripts/${workerName}`, { method: 'DELETE' });
 		// A successful script deletion may have an empty body instead of an envelope.
 		if (response.status < 200 || response.status >= 300 || (response.text.trim() && !envelope?.success)) {
 			throw apiError(response.status, envelope, `Worker deletion failed with HTTP ${response.status}`);
@@ -317,7 +320,7 @@ export class CloudflareApiClient {
 
 	async uploadServerDeletionWorker(accountId: string, workerName: string, deletionId: string, bucketName: string, tokenHash: string, uploadTag: string): Promise<void> {
 		const multipart = buildServerDeletionWorkerMultipartBody(deletionId, bucketName, tokenHash, uploadTag);
-		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
+		await this.request(apiPath`/accounts/${accountId}/workers/scripts/${workerName}`, {
 			method: 'PUT', headers: { 'Content-Type': multipart.contentType }, body: multipart.body,
 		}, false);
 	}
@@ -329,7 +332,7 @@ export class CloudflareApiClient {
 		params?: string[],
 	): Promise<D1QueryResult[]> {
 		const body = params === undefined ? { sql } : { sql, params };
-		const results = await this.request<D1QueryResult[]>(`/accounts/${accountId}/d1/database/${databaseId}/query`, {
+		const results = await this.request<D1QueryResult[]>(apiPath`/accounts/${accountId}/d1/database/${databaseId}/query`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body),
@@ -351,7 +354,7 @@ export class CloudflareApiClient {
 		r2BucketName: string;
 	}): Promise<void> {
 		const multipart = buildWorkerMultipartBody(input);
-		await this.request(`/accounts/${input.accountId}/workers/scripts/${encodeURIComponent(input.workerName)}`, {
+		await this.request(apiPath`/accounts/${input.accountId}/workers/scripts/${input.workerName}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': multipart.contentType },
 			body: multipart.body,
@@ -359,16 +362,16 @@ export class CloudflareApiClient {
 	}
 
 	async verifyWorkerDeployment(origin: string, fingerprint: string): Promise<void> {
-		await verifyWorkerDeployment(this.transport, origin, fingerprint);
+		await verifyWorkerDeployment(this.transport, origin, fingerprint, false, this.sleep);
 	}
 
 	async verifyPublishedWorkerDeployment(origin: string, fingerprint: string): Promise<{ revision: number; schemaVersion: number; developmentBuild?: import('../protocol/server-build').DevelopmentBuild }> {
-		return verifyWorkerDeployment(this.transport, origin, fingerprint, true);
+		return verifyWorkerDeployment(this.transport, origin, fingerprint, true, this.sleep);
 	}
 
 	async updateWorkerSchedules(accountId: string, workerName: string, crons: string[]): Promise<void> {
 		await this.request(
-			`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/schedules`,
+			apiPath`/accounts/${accountId}/workers/scripts/${workerName}/schedules`,
 			{
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
@@ -378,17 +381,12 @@ export class CloudflareApiClient {
 	}
 
 	async getWorkersSubdomain(accountId: string): Promise<string | null> {
-		try {
-			const result = await this.request<{ subdomain?: string }>(`/accounts/${accountId}/workers/subdomain`);
-			return result.subdomain?.trim() || null;
-		} catch (error) {
-			if (error instanceof CloudflareApiError && error.status === 404) return null;
-			throw error;
-		}
+		const result = await nullOn404(this.request<{ subdomain?: string }>(apiPath`/accounts/${accountId}/workers/subdomain`));
+		return result?.subdomain?.trim() || null;
 	}
 
 	async createWorkersSubdomain(accountId: string, subdomain: string): Promise<string> {
-		const result = await this.request<{ subdomain?: string }>(`/accounts/${accountId}/workers/subdomain`, {
+		const result = await this.request<{ subdomain?: string }>(apiPath`/accounts/${accountId}/workers/subdomain`, {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ subdomain }),
@@ -398,7 +396,7 @@ export class CloudflareApiClient {
 	}
 
 	async getWorkerSubdomain(accountId: string, workerName: string): Promise<{ enabled: boolean; previews_enabled: boolean }> {
-		const result = await this.request<{ enabled?: unknown; previews_enabled?: unknown }>(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/subdomain`);
+		const result = await this.request<{ enabled?: unknown; previews_enabled?: unknown }>(apiPath`/accounts/${accountId}/workers/scripts/${workerName}/subdomain`);
 		if (!result || typeof result.enabled !== 'boolean' || typeof result.previews_enabled !== 'boolean') {
 			throw new Error('Cloudflare returned invalid server address settings.');
 		}
@@ -406,7 +404,7 @@ export class CloudflareApiClient {
 	}
 
 	async enableWorkerSubdomain(accountId: string, workerName: string): Promise<void> {
-		await this.request(`/accounts/${accountId}/workers/scripts/${workerName}/subdomain`, {
+		await this.request(apiPath`/accounts/${accountId}/workers/scripts/${workerName}/subdomain`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ enabled: true, previews_enabled: false }),
@@ -414,7 +412,7 @@ export class CloudflareApiClient {
 	}
 
 	private r2ObjectPath(accountId: string, bucketName: string, key: string): string {
-		return `/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`;
+		return apiPath`/accounts/${accountId}/r2/buckets/${bucketName}/objects/` + key.split('/').map(encodeURIComponent).join('/');
 	}
 
 	/** Worker uploads pass `retryRateLimit: false`: each dispatch carries a single-use tag. */

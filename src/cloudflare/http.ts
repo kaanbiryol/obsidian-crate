@@ -2,6 +2,9 @@ import { requestUrl } from 'obsidian';
 
 export const API_BASE_URL = 'https://api.cloudflare.com/client/v4';
 
+export type Sleep = (milliseconds: number) => Promise<void>;
+export const wait: Sleep = milliseconds => new Promise<void>(resolve => { window.setTimeout(resolve, milliseconds); });
+
 /** A JSON object response body, or null for any other JSON value or unparsable text. */
 export function parseJsonObject(text: string): Record<string, unknown> | null {
 	try {

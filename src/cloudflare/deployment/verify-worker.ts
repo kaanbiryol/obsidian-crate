@@ -1,11 +1,11 @@
 import { parseDevelopmentBuild, type DevelopmentBuild } from '../../protocol/server-build';
 import { CRATE_SERVICE_ID } from '../../protocol/server-info';
 import release from '../server-release.json';
-import { parseJsonObject, type HttpTransport } from '../http';
+import { parseJsonObject, wait, type HttpTransport, type Sleep } from '../http';
 import { isSha256Hex } from '../../platform/validation';
 
 /** Wait for the public route to serve the uploaded build, without repeating mutations. */
-export async function verifyWorkerDeployment(transport: HttpTransport, origin: string, fingerprint: string, published = false): Promise<{ revision: number; schemaVersion: number; developmentBuild?: DevelopmentBuild }> {
+export async function verifyWorkerDeployment(transport: HttpTransport, origin: string, fingerprint: string, published = false, sleep: Sleep = wait): Promise<{ revision: number; schemaVersion: number; developmentBuild?: DevelopmentBuild }> {
 	let observed = '';
 	for (let attempt = 0; attempt < 8; attempt++) {
 		// Never forward management credentials to the public Worker.
@@ -26,7 +26,7 @@ export async function verifyWorkerDeployment(transport: HttpTransport, origin: s
 		const liveFingerprint = typeof info?.deploymentFingerprint === 'string' && isSha256Hex(info.deploymentFingerprint)
 			? info.deploymentFingerprint : 'missing or invalid';
 		observed = `HTTP ${response.status}; Crate identity ${info?.service === CRATE_SERVICE_ID ? 'matched' : 'missing or different'}; revision ${revision}; schema ${schema}; fingerprint ${liveFingerprint}`;
-		if (attempt < 7) await new Promise(resolve => window.setTimeout(resolve, 2000));
+		if (attempt < 7) await sleep(2000);
 	}
 	throw new Error(`The updated server did not pass its live check after 8 attempts. Expected revision ${published ? 'at most ' : ''}${release.revision}, schema ${release.schemaVersion}, fingerprint ${fingerprint}. Observed ${observed}. Check and recover the update.`);
 }
