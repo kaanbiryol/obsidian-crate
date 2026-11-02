@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { enrollmentFingerprint } from './install-enrollment';
-import { sha256Hex } from '../platform/sha256';
+import { sha256Hex } from '../../platform/sha256';
 
 it.each([
 		['', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],

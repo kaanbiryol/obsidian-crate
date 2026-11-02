@@ -16,7 +16,7 @@ import { capturePwaSession } from '../connection/session-generation';
 vi.mock('../encryption/encryption-cleanup', async importOriginal => ({ ...await importOriginal<typeof import('../encryption/encryption-cleanup')>(), clearPersistedEncryption: vi.fn(async () => {}), clearEncryptionSessionMarkers: vi.fn() }));
 vi.mock('../reminders/encryption-session', () => ({ resetReminderEncryption: vi.fn() }));
 vi.mock('./storage/storage', async importOriginal => ({ ...await importOriginal<typeof import('./storage/storage')>(), clearReadingData: vi.fn(async () => {}) }));
-vi.mock('../config', async importOriginal => ({ ...await importOriginal<typeof import('../config')>(), finishEnrollment: vi.fn() }));
+vi.mock('../connection/enrollment', async importOriginal => ({ ...await importOriginal<typeof import('../connection/enrollment')>(), finishEnrollment: vi.fn() }));
 vi.mock('../reminders/editor/reminder-drafts', () => ({ clearReminderDrafts: vi.fn(() => true) }));
 vi.mock('../reminders/outbox/reminder-outbox-storage', () => ({ clearReminderOutbox: vi.fn() }));
 vi.mock('../reminders/cache/reminder-cache', () => ({ clearCachedReminderSnapshots: vi.fn(async () => true) }));

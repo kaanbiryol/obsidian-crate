@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AuthLayout } from '../components/AuthStates';
 import { HomeScreenInstallInstructions } from '../components/HomeScreenInstall';
 import { PwaButton as Button } from '../components/PwaButton';
-import { isIosOrIpados, isStandaloneApp } from '../config';
+import { isIosOrIpados, isStandaloneApp } from '../shell/device';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 
 const CHOICE_KEY = 'crate-browser-setup-choice';

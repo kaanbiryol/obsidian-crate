@@ -4,7 +4,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { FeatureShell } from './FeatureShell';
 import { RemindersApp } from './reminders/RemindersApp';
-import { isStandaloneApp } from './config';
+import { isStandaloneApp } from './shell/device';
 import { protectInstalledAppStorage } from './storage/browser-storage';
 
 consumeReadingKeyFragment();

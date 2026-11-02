@@ -8,12 +8,12 @@ import {
 	PWA_AUTH_CHANGED_EVENT,
 	PWA_LOGOUT_KEY,
 	applyConfigFromUrl,
-	finishEnrollment,
-	isStandaloneApp,
 	loadStoredConfig,
 	saveConfig,
 } from '../config';
-import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from '../install-enrollment';
+import { finishEnrollment } from './enrollment';
+import { isStandaloneApp } from '../shell/device';
+import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from './install-enrollment';
 import { exchangeEnrollmentToken } from './enrollment-exchange';
 import { makeApiFetch } from './api-fetch';
 import type { ShowToast, StartTab, StoredConfig } from '../types';

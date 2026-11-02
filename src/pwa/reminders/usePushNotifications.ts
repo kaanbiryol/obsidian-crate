@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../config';
+import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../shell/device';
 import { capturePwaSession } from '../connection/session-generation';
 import { responseError } from '../connection/response-error';
 import type { ApiFetch, ShowToast } from '../types';

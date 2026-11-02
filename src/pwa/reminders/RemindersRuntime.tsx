@@ -1,6 +1,6 @@
 import { reminderUpdateReadiness } from '../update/update-readiness';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { isStandaloneApp } from '../config';
+import { isStandaloneApp } from '../shell/device';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
 import { usePushNotifications } from './usePushNotifications';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';

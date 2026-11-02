@@ -1,6 +1,8 @@
 import type { StartTab, StoredConfig } from './types';
 import { manifestHrefForUrl } from './shell/pwa-params';
-import { clearInstallEnrollment, preserveInstallEnrollment, restoreInstallEnrollment } from './install-enrollment';
+import { preserveInstallEnrollment, restoreInstallEnrollment } from './connection/install-enrollment';
+import { enrollmentTokenFromParams } from './connection/enrollment';
+import { isStandaloneApp } from './shell/device';
 import { normalizeTimeString } from '../platform/validation';
 
 export const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
@@ -53,83 +55,6 @@ export function adoptReminderFolder(folderPath: string): void {
 	window.dispatchEvent(new Event(PWA_FOLDER_CHANGED_EVENT));
 }
 
-function currentQueryParams(): URLSearchParams {
-	return new URLSearchParams(window.location.search);
-}
-
-export function urlWithoutEnrollmentTokens({
-	pathname,
-	search,
-	hash,
-}: Pick<Location, 'pathname' | 'search' | 'hash'>, preserveInstallToken = false): string {
-	const params = new URLSearchParams(search);
-	if (!preserveInstallToken) params.delete('token');
-	params.delete('browserToken');
-	const nextSearch = params.toString();
-	return `${pathname}${nextSearch ? `?${nextSearch}` : ''}${hash}`;
-}
-
-export function finishEnrollment(preserveInstallToken = !isStandaloneApp()): void {
-	if (!preserveInstallToken) clearInstallEnrollment();
-	const params = currentQueryParams();
-	if (!params.has('token') && !params.has('browserToken')) return;
-	// Keep Safari's install grant in the document URL as well as the manifest:
-	// Add to Home Screen may use the document URL, and reloads must retain it.
-	const nextUrl = urlWithoutEnrollmentTokens(window.location, preserveInstallToken);
-	const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-	if (nextUrl !== currentUrl) {
-		window.history.replaceState(window.history.state, '', nextUrl);
-	}
-	const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-	if (manifest) manifest.href = manifestHrefForUrl(window.location.href);
-}
-
-type DeviceNavigator = Pick<Navigator, 'maxTouchPoints' | 'userAgent'>;
-
-export function isIosOrIpados(deviceNavigator: DeviceNavigator = navigator): boolean {
-	return /iPad|iPhone|iPod/i.test(deviceNavigator.userAgent)
-		|| (/Macintosh/i.test(deviceNavigator.userAgent) && deviceNavigator.maxTouchPoints > 1);
-}
-
-export function detectDeviceName(deviceNavigator: DeviceNavigator = navigator): string {
-	const ua = deviceNavigator.userAgent;
-	if (/iPhone/i.test(ua)) return 'iPhone';
-	if (/iPad/i.test(ua) || (/Macintosh/i.test(ua) && deviceNavigator.maxTouchPoints > 1)) return 'iPad';
-	if (/Android/i.test(ua)) return 'Android';
-	if (/Mac/i.test(ua)) return 'Mac';
-	if (/Windows/i.test(ua)) return 'Windows';
-	return 'Web';
-}
-
-export function isStandaloneApp(): boolean {
-	return window.matchMedia('(display-mode: standalone)').matches
-		|| Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
-}
-
-export function formatLastUpdated(timestamp: number | null, now: number): string {
-	if (!timestamp) return 'Not updated yet';
-	const elapsedSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
-	if (elapsedSeconds < 45) return 'Last updated just now';
-	if (elapsedSeconds < 90) return 'Last updated 1m ago';
-	const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-	if (elapsedMinutes < 60) return `Last updated ${elapsedMinutes}m ago`;
-	const elapsedHours = Math.floor(elapsedMinutes / 60);
-	if (elapsedHours < 24) return `Last updated ${elapsedHours}h ago`;
-	const elapsedDays = Math.floor(elapsedHours / 24);
-	return `Last updated ${elapsedDays}d ago`;
-}
-
-export function enrollmentTokenFromParams(
-	params: URLSearchParams,
-	standalone = isStandaloneApp(),
-): string | null {
-	const installToken = params.get('token')?.trim() || null;
-	const browserToken = params.get('browserToken')?.trim() || null;
-	return standalone
-		? installToken
-		: browserToken;
-}
-
 /** Propose launch settings; bootstrap commits them after enrollment succeeds. */
 export function applyConfigFromUrl(config: StoredConfig): {
 	config: StoredConfig;
@@ -139,7 +64,7 @@ export function applyConfigFromUrl(config: StoredConfig): {
 	reminderId: string | null;
 } {
 	const standalone = isStandaloneApp();
-	const launchParams = currentQueryParams();
+	const launchParams = new URLSearchParams(window.location.search);
 	const params = standalone && !localStorage.getItem(AUTH_TOKEN_KEY)
 		? restoreInstallEnrollment(launchParams)
 		: launchParams;

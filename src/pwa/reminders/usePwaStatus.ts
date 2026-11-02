@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { formatLastUpdated, isStandaloneApp } from '../config';
+import { isStandaloneApp } from '../shell/device';
 import type { DataMode } from '../types';
 import type { PushState } from './types';
+
+function formatLastUpdated(timestamp: number | null, now: number): string {
+	if (!timestamp) return 'Not updated yet';
+	const elapsedSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+	if (elapsedSeconds < 45) return 'Last updated just now';
+	if (elapsedSeconds < 90) return 'Last updated 1m ago';
+	const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+	if (elapsedMinutes < 60) return `Last updated ${elapsedMinutes}m ago`;
+	const elapsedHours = Math.floor(elapsedMinutes / 60);
+	if (elapsedHours < 24) return `Last updated ${elapsedHours}h ago`;
+	const elapsedDays = Math.floor(elapsedHours / 24);
+	return `Last updated ${elapsedDays}d ago`;
+}
 
 export function getPwaStatusText({
 	dataMode,

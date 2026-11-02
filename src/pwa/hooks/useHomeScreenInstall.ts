@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { isIosOrIpados, isStandaloneApp } from '../config';
+import { isIosOrIpados, isStandaloneApp } from '../shell/device';
 
 export type HomeScreenPlatform = 'ios' | 'android';
 

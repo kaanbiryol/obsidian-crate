@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { isIosOrIpados } from '../config';
+import { isIosOrIpados } from '../shell/device';
 import {
 	claimDocumentScroll, documentScrollOwner, documentScrollSuspended, onDocumentScrollResume, releaseDocumentScroll,
 } from '../navigation/document-scroll';

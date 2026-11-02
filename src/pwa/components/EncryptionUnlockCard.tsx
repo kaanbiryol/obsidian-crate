@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type ReactNode } from 'react';
-import { isIosOrIpados, isStandaloneApp } from '../config';
+import { isIosOrIpados, isStandaloneApp } from '../shell/device';
 import { TextField } from '@/ui/shared/TextField';
 import { PwaButton as Button } from './PwaButton';
 import { AuthLayout } from './AuthStates';

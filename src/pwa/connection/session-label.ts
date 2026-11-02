@@ -1,4 +1,4 @@
-import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../config';
+import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../shell/device';
 
 type DeviceNavigator = Pick<Navigator, 'userAgent' | 'maxTouchPoints'>;
 
