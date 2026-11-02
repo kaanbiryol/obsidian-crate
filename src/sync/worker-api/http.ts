@@ -11,6 +11,7 @@ import { normalizeWorkerUrl } from '../connection/worker-url';
 import { normalizeRequestDiagnostics, recordRequestDiagnostic, type RequestDiagnostic, type RequestDiagnostics } from '../diagnostics/request-diagnostics';
 import { isAbortError } from '../abort';
 import { ENCRYPTION_CAPABILITY, ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '../../encryption/server-state';
+import { EncryptionDowngradeGuard } from './encryption-guard';
 
 const logger = createLogger('ApiClient');
 
@@ -23,10 +24,6 @@ const MIN_TRANSFER_BYTES_PER_SECOND = 32 * 1024;
 export function transferTimeout(bytes: number): number {
 	return TRANSFER_TIMEOUT_MS + Math.floor(bytes * 1000 / MIN_TRANSFER_BYTES_PER_SECOND);
 }
-/** How long a response saying this vault is not encrypted lets a plaintext mutation skip the probe. */
-const ENCRYPTION_OFF_TRUST_MS = 30_000;
-/** Refusals that may mean another device turned encryption on and revoked or locked this credential. */
-const ENCRYPTION_VERDICT_RESETS = new Set([401, 403, 423, 428]);
 
 export interface ApiRequestOptions {
 	body?: string | ArrayBuffer;
@@ -172,30 +169,15 @@ export class WorkerApiHttpClient {
 	private serverInfo?: { expires: number; value: CrateServerInfo };
 	private serverInfoRequest?: Promise<CrateServerInfo>;
 	private requestGeneration = 0;
-	/** When a request whose response said this vault is not encrypted was dispatched. */
-	private encryptionOffAt: number | null = null;
-	/** Bumped whenever that verdict is dropped, so a response already in flight cannot restore it. */
-	private encryptionOffResets = 0;
+	private readonly encryptionGuard = new EncryptionDowngradeGuard();
 
-	/** Set while this vault last synced encrypted but holds no keys: an unencrypted
-	 * server must not receive private plaintext until the user confirms it. */
-	private plaintextRefused = false;
-
-	refusePlaintext(refused: boolean): void { this.plaintextRefused = refused; }
-	refusesPlaintext(): boolean { return this.plaintextRefused; }
-
-	/** Called whenever an authenticated response reports that this vault is encrypted. */
-	private onEncrypted?: () => void;
-	observeEncryption(callback: (() => void) | undefined): void { this.onEncrypted = callback; }
-
-	private forgetEncryptionOff(): void {
-		this.encryptionOffAt = null;
-		this.encryptionOffResets++;
-	}
+	refusePlaintext(refused: boolean): void { this.encryptionGuard.refusePlaintext(refused); }
+	refusesPlaintext(): boolean { return this.encryptionGuard.refusesPlaintext(); }
+	observeEncryption(callback: (() => void) | undefined): void { this.encryptionGuard.observeEncryption(callback); }
 
 	private invalidateRequests(): void {
 		this.requestGeneration++;
-		this.forgetEncryptionOff();
+		this.encryptionGuard.forget();
 		this.serverInfo = undefined;
 		this.serverInfoRequest = undefined;
 	}
@@ -259,32 +241,22 @@ export class WorkerApiHttpClient {
 		const { workerUrl, authToken, externalSignal } = this;
 		this.assertRequestCurrent(generation);
 		let protocol = CRATE_PLUGIN_PROTOCOL.current;
-		const route = path.split('?')[0]!;
-		const privateRoute = ['/sync/', '/reading/', '/reminders/'].some(prefix => route.startsWith(prefix));
-		// Another device may have enabled encryption since this client last synced. Probe
-		// without a private body before dispatching plaintext; the server rejects plaintext
-		// into an encrypted vault either way.
+		const keyed = Boolean(this.encryptionHeaders[ENCRYPTION_VAULT_HEADER]);
+		// Probe without a private body before dispatching plaintext.
 		const probeEncryption = async (capable: boolean) => {
 			if (!capable) throw encryptionDowngradeError();
 			const state = await this.requestJson<{ encryption: unknown }>('/encryption', {}, Math.min(timeout, 30_000));
 			if (state.encryption !== null) throw new HttpError('Unlock this vault in Manage encryption before sending changes', 428, null, 'encryption_required');
-			if (this.plaintextRefused) throw encryptionDowngradeError();
+			if (this.encryptionGuard.refusesPlaintext()) throw encryptionDowngradeError();
 		};
 		if (isCrateMutation(path, options.method)) {
 			const info = await this.getServerInfo(Math.min(timeout, 30_000));
 			this.assertRequestCurrent(generation);
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
 			protocol = Math.min(protocol, info.protocol.current);
-			const encryptionOffConfirmed = !this.plaintextRefused && this.encryptionOffAt !== null && performance.now() - this.encryptionOffAt < ENCRYPTION_OFF_TRUST_MS;
 			const capable = info.capabilities.includes(ENCRYPTION_CAPABILITY);
-			// A recent response that confirmed encryption is off skips the probe.
-			if ((capable || this.plaintextRefused) && !this.encryptionHeaders[ENCRYPTION_VAULT_HEADER] && !encryptionOffConfirmed
-				&& (privateRoute || route === '/settings' || route === '/notifications/reminders-enrollment-token')) {
-				await probeEncryption(capable);
-			}
-		} else if (this.plaintextRefused && !this.encryptionHeaders[ENCRYPTION_VAULT_HEADER] && privateRoute
-			&& ((options.method ?? 'GET').toUpperCase() === 'POST' || /[?&](path|search)=/.test(path))) {
-			// Reads that send file paths or a search, such as metadata checks for local paths.
+			if (this.encryptionGuard.mutationNeedsProbe(path, capable, keyed)) await probeEncryption(capable);
+		} else if (this.encryptionGuard.readNeedsProbe(path, options.method, keyed)) {
 			const info = await this.getServerInfo(Math.min(timeout, 30_000));
 			this.assertRequestCurrent(generation);
 			await probeEncryption(info.capabilities.includes(ENCRYPTION_CAPABILITY));
@@ -298,7 +270,7 @@ export class WorkerApiHttpClient {
 			?? undefined;
 		const operationId = crypto.randomUUID();
 		const started = performance.now();
-		const encryptionOffResets = this.encryptionOffResets;
+		const dispatched = this.encryptionGuard.dispatched(started);
 		const timings = this.requestTimings;
 		const uploadOperationIds = normalizeUploadOperationIds((getHeader(options.headers ?? {}, UPLOAD_OPERATION_HEADER)
 			?? getHeader(options.headers ?? {}, UPLOAD_OPERATIONS_HEADER) ?? '').split(','));
@@ -321,10 +293,7 @@ export class WorkerApiHttpClient {
 				settled = true;
 				cleanup();
 				record('response', response);
-				const encryptionState = getHeader(response.headers, ENCRYPTION_STATE_HEADER);
-				if (encryptionState === 'on' || ENCRYPTION_VERDICT_RESETS.has(response.status)) this.forgetEncryptionOff();
-				else if (encryptionState === 'off' && encryptionOffResets === this.encryptionOffResets) this.encryptionOffAt = started;
-				if (encryptionState === 'on') this.onEncrypted?.();
+				this.encryptionGuard.observe(getHeader(response.headers, ENCRYPTION_STATE_HEADER), response.status, dispatched);
 				resolve(response);
 			};
 			const rejectOnce = (error: unknown) => {
