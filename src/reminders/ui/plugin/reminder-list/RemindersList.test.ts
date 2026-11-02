@@ -15,7 +15,7 @@ vi.mock('@/ui/obsidian-icon', () => ({ ObsidianIcon: () => null }));
 vi.mock('./styles.scss', () => ({}));
 vi.mock('@/reminders/ui/plugin/ShadowDOMButton', () => ({ ShadowDOMButton: () => null }));
 
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { PluginContext } from '@/ui/plugin/plugin-context';
 import { RemindersList } from './RemindersList';
 
 function localDay(offset: number): string {

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { createVaultKeyBundle } from '../../../encryption/key-bundle';
-import { createReminderProjection, importNotificationKeys } from '../../../encryption/reminder-projection';
+import { importNotificationKeys } from '../../../encryption/notification-keys';
+import { createReminderProjection } from '../../../reminders/core/encrypted-schedule-projection';
 import { ENCRYPTED_NOTIFICATION_PREFIX } from '../../../encryption/notification-format';
 import { createDeclarativePushPayload } from './push';
 import { MAX_PUSH_PAYLOAD_BYTES } from './payload-budget';

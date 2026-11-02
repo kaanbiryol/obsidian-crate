@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { PluginContext } from '@/ui/plugin/plugin-context';
 import { subscribeReminderBackend } from '@/reminders/runtime';
 
 /**

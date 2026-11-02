@@ -7,7 +7,7 @@ import { handleListReminders } from './routes/list';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { createVaultKeyBundle } from '@/encryption/key-bundle';
 import { importEncryptionSecret } from '@/encryption/envelope';
-import { importNotificationFingerprintKey } from '@/encryption/reminder-projection';
+import { importNotificationFingerprintKey } from '@/encryption/notification-keys';
 import { importSealPrivateKey } from '@/encryption/seal-key';
 import { sealFile } from '@/encryption/file-codec';
 import { EncryptedReminderApi } from '@/pwa/reminders/encrypted-reminder-api';

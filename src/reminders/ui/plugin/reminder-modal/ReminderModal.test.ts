@@ -12,7 +12,8 @@ vi.mock('obsidian', () => ({ Notice: class { constructor(message: string) { noti
 vi.mock('./AddReminderModal', () => ({ AddReminderModal: (props: NonNullable<typeof editor.current>) => { editor.current = props; return null; } }));
 vi.mock('@/ui/plugin/hooks/useObsidianKeyboardHeight', () => ({ useObsidianKeyboardHeight: () => 0 }));
 
-import { ModalContext, PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { PluginContext } from '@/ui/plugin/plugin-context';
+import { ModalContext } from '@/reminders/ui/plugin/reminders-context';
 import { ReminderModal } from './ReminderModal';
 
 const reminder: Reminder = { id: 'r1', content: 'Call Ada', priority: 4, completed: false, project: 'Inbox', lineNumber: 0 };

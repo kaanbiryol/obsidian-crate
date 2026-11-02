@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createVaultKeyBundle } from '@/encryption/key-bundle';
 import { encryptJson, importEncryptionSecret } from '@/encryption/envelope';
 import { sha256Hex } from '@/platform/sha256';
-import { importNotificationFingerprintKey } from '@/encryption/reminder-projection';
+import { importNotificationFingerprintKey } from '@/encryption/notification-keys';
 import { importSealPrivateKey } from '@/encryption/seal-key';
 import { EncryptedReminderApi, type EncryptedReminderStore } from './encrypted-reminder-api';
 import type { EncryptedReminderAttempt, IndexedReminderNote } from './encrypted-reminder-attempts';

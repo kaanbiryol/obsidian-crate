@@ -14,7 +14,7 @@ import { errorMessage } from '@/platform/logger';
 
 const log = createLogger('ReminderCardWrapper');
 import type { Reminder } from '@/reminders/types/reminder';
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { PluginContext } from '@/ui/plugin/plugin-context';
 import { openReminderEditModal } from '@/reminders/ui/plugin/reminder-modal/reminderEditorModals';
 import { requireReminderBackend } from '@/reminders/runtime';
 import type { ProjectColorScheme } from '@/reminders/ui/format/projectColors';

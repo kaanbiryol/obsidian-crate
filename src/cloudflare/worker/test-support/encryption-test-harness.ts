@@ -2,7 +2,7 @@ import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '
 import { createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { FileKeyAuthority } from '../../../encryption/file-authority';
 import { PathTags } from '../../../encryption/path-tags';
-import { importNotificationKeys } from '../../../encryption/reminder-projection';
+import { importNotificationKeys } from '../../../encryption/notification-keys';
 import { saveEncryptionState } from '../encryption/state';
 
 /** A fresh vault key bundle, its recovery code and public server state in `mode`,

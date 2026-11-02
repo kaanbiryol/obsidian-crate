@@ -3,7 +3,7 @@ import { AddReminderModal } from '@/reminders/ui/plugin/reminder-modal/AddRemind
 import { ProjectPickerContent } from '@/reminders/ui/reminder-editor/ProjectPickerContent';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-editor/ReminderEditorFields';
 import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { PluginContext } from '@/ui/plugin/plugin-context';
 
 const projects = Array.from({ length: 36 }, (_, index) => `Project ${String(index + 1).padStart(2, '0')}`);
 const plugin = { syncRuntime: { getApiClient: () => null } } as unknown as ReturnType<typeof PluginContext.use>;

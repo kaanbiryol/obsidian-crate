@@ -1,6 +1,6 @@
 import type React from 'react';
 import type CratePlugin from '@/plugin/CratePlugin';
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { PluginContext } from '@/ui/plugin/plugin-context';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { ObsidianIcon } from '@/ui/obsidian-icon';
 

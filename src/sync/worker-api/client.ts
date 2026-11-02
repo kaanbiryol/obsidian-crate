@@ -32,7 +32,8 @@ import { SyncWorkerApi, type ChangesPage, type DownloadedBatch, type DownloadedF
 import { InitialImportApi } from './initial-import';
 import { EncryptedFiles } from '../encryption/encrypted-files';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
-import { createReminderProjection, importNotificationKeys } from '../../encryption/reminder-projection';
+import { importNotificationKeys } from '../../encryption/notification-keys';
+import { createReminderProjection } from '../../reminders/core/encrypted-schedule-projection';
 import { readServerEncryption } from '../encryption/server-encryption';
 import { importEncryptionSecret, type EncryptionKey } from '../../encryption/envelope';
 import type { PathTags } from '../../encryption/path-tags';

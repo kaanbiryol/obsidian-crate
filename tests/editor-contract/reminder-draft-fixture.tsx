@@ -9,7 +9,7 @@ import { buildReminderSubmission } from '@/reminders/ui/plugin/reminder-modal/re
 import { ProjectPickerContent } from '@/reminders/ui/reminder-editor/ProjectPickerContent';
 import { RecurrencePickerModal } from '@/reminders/ui/plugin/reminder-modal/RecurrencePickerModal';
 import { AddReminderModal } from '@/reminders/ui/plugin/reminder-modal/AddReminderModal';
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { PluginContext } from '@/ui/plugin/plugin-context';
 
 const params = new URLSearchParams(location.search);
 const reminder = params.has('reminder') ? JSON.parse(params.get('reminder')!) as Reminder : undefined;

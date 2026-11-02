@@ -5,7 +5,7 @@ import { LayoutGroup } from "motion/react";
 import { ReminderMotionRow } from "@/reminders/ui/shared/ReminderMotionRow";
 
 import type { Reminder } from "@/reminders/types/reminder";
-import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
+import { PluginContext } from "@/ui/plugin/plugin-context";
 import { useIndexRefresh } from "@/reminders/ui/plugin/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/plugin/hooks/useObsidianDarkMode";
 import { useReducedMotion } from "@/ui/shared/useReducedMotion";

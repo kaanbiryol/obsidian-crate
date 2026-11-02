@@ -10,7 +10,8 @@ import { openRecoveryBundle, sameVaultKeyBundle, sealRecoveryBundle, validateVau
 import { LocalStateCipher } from './local-state';
 import { pairingCommitment, type PairingContext } from './pairing/protocol';
 import { PathTags } from './path-tags';
-import { createReminderProjection, importNotificationKeys, openNotification } from './reminder-projection';
+import { importNotificationKeys, openNotification } from './notification-keys';
+import { createReminderProjection } from '../reminders/core/encrypted-schedule-projection';
 import { sealFileForVault } from './sealed-file';
 import type { EncryptedSchedules } from './notification-format';
 

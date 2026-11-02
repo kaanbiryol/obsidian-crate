@@ -7,7 +7,7 @@ import type { TabId } from "@/reminders/ui/shared/layoutConstants";
 import { openReminderCreationModal } from "@/reminders/ui/plugin/reminder-modal/reminderEditorModals";
 import { ReminderCardWrapper } from "@/reminders/ui/plugin/ReminderCardWrapper";
 import { RemindersViewCloseButton } from "@/reminders/ui/plugin/RemindersViewCloseButton";
-import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
+import { PluginContext } from "@/ui/plugin/plugin-context";
 import { PluginRemindersAppShell } from "@/reminders/ui/plugin/PluginRemindersAppShell";
 import type { ReminderCardRenderer } from "@/reminders/ui/shared/useRemindersShellModel";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";

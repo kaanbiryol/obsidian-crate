@@ -16,7 +16,7 @@ vi.mock('@/reminders/ui/plugin/ShadowDOMButton', () => ({ ShadowDOMButton: () =>
 
 import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from '@/reminders/settings';
 import { setupReminderBackend, stopReminderBackend } from '@/reminders/runtime';
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { PluginContext } from '@/ui/plugin/plugin-context';
 import { RemindersList } from './RemindersList';
 
 const fixtures: Awaited<ReturnType<typeof createReminderByteVault>>[] = [];

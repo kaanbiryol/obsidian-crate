@@ -1,10 +1,11 @@
 import { expect, it, vi } from 'vitest';
-import { createVaultKeyBundle } from './key-bundle';
-import { createReminderProjection, importNotificationKeys, openNotification } from './reminder-projection';
-import { importEncryptionSecret } from './envelope';
-import { validateEncryptedSchedules } from './notification-format';
-import { FileKeyAuthority } from './file-authority';
-import { openFile, sealFile } from './file-codec';
+import { createVaultKeyBundle } from '../../encryption/key-bundle';
+import { importNotificationKeys, openNotification } from '../../encryption/notification-keys';
+import { createReminderProjection } from './encrypted-schedule-projection';
+import { importEncryptionSecret } from '../../encryption/envelope';
+import { validateEncryptedSchedules } from '../../encryption/notification-format';
+import { FileKeyAuthority } from '../../encryption/file-authority';
+import { openFile, sealFile } from '../../encryption/file-codec';
 
 const folders = ['Reminders'];
 

@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { PluginContext } from '../reminders-context';
+import { PluginContext } from '../../../../ui/plugin/plugin-context';
 import { PageTitleContext } from '../../shared/lexical/pageTitles';
 import type { RichTextInputHandle } from '../../shared/RichTextInput';
 import type { ReminderDraft } from './useReminderDraft';

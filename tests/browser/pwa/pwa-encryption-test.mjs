@@ -19,7 +19,8 @@ const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
 export { createEncryptionState } from './src/encryption/server-state';
 export { PathTags } from './src/encryption/path-tags';
-export * from './src/encryption/reminder-projection';
+export * from './src/encryption/notification-keys';
+export * from './src/reminders/core/encrypted-schedule-projection';
 export * from './src/sync/encryption/server-encryption';
 export * from './src/sync/encryption/reset';
 export * from './src/sync/worker-api/http';

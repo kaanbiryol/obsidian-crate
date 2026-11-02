@@ -1,12 +1,6 @@
-import { scanReminderMarkdownContent } from '../reminders/core/markdownScan';
-import { decodeMarkdownBytes } from '../reminders/core/markdownEncoding';
-import { readableLinkText } from '../reminders/core/grammar/markdownLinks';
-import { MAX_REMINDER_NOTE_BYTES, MAX_REMINDERS_PER_NOTE } from '../reminders/core/constants';
 import { decryptJson, encryptJson, importEncryptionSecret, type EncryptionKey, type EncryptionSecret } from './envelope';
-import { validateEncryptedNotification, type EncryptedNotification, type EncryptedSchedules } from './notification-format';
+import { validateEncryptedNotification, type EncryptedNotification } from './notification-format';
 import { decodeBase64Url, encodeBase64Url } from './encoding';
-import { MAX_ENCRYPTED_PUBLIC_DATA_BYTES } from './file-format';
-import { isMarkdownPath } from '../protocol/note-paths';
 
 function context(notice: Pick<EncryptedNotification, 'vaultId' | 'scopeId' | 'reminderId'>) {
 	return { vaultId: notice.vaultId, scopeId: notice.scopeId, objectId: notice.reminderId, purpose: 'notification' as const };
@@ -43,19 +37,20 @@ export async function importNotificationFingerprintKey(vaultId: string, secret: 
 		material, { name: 'HMAC', hash: 'SHA-256', length: 256 }, false, ['sign']);
 }
 
-const NOTIFICATION_CONCURRENCY = 8;
 const MAX_CACHED_ENVELOPES = 4096;
 /** Recent envelopes per notification key, by context and fingerprint. The server
  * already sees when a fingerprint is unchanged, so reusing that ciphertext for
  * identical display text reveals nothing new and skips re-encrypting it. */
 const notificationEnvelopes = new WeakMap<EncryptionKey, Map<string, string>>();
 
-async function sealNotification(vaultId: string, key: EncryptionKey, fingerprintKey: CryptoKey,
-	reminder: { id: string; content: string; project: string }): Promise<EncryptedNotification> {
+/** Seals one reminder's notification text, trimmed to the display budget. */
+export async function sealNotification(keys: NotificationKeys,
+	reminder: { id: string; title: string; body: string }): Promise<EncryptedNotification> {
+	const { vaultId, key, fingerprint: fingerprintKey } = keys;
 	const notice: EncryptedNotification = { version: 1, vaultId, scopeId: NOTIFICATION_SCOPE,
 		keyId: key.id, reminderId: reminder.id, fingerprint: '', envelope: '' };
-	const display = { title: trimDisplay(readableLinkText(reminder.content), 800),
-		body: trimDisplay(reminder.project, 160) };
+	const display = { title: trimDisplay(reminder.title, 800),
+		body: trimDisplay(reminder.body, 160) };
 	while (new TextEncoder().encode(JSON.stringify(display)).length > 1024) display.title = Array.from(display.title).slice(0, -1).join('');
 	notice.fingerprint = encodeBase64Url(new Uint8Array(await crypto.subtle.sign('HMAC', fingerprintKey,
 		new TextEncoder().encode(JSON.stringify([reminder.id, display])))));
@@ -73,36 +68,6 @@ async function sealNotification(vaultId: string, key: EncryptionKey, fingerprint
 	while (envelopes.size > MAX_CACHED_ENVELOPES) envelopes.delete(envelopes.keys().next().value!);
 	validateEncryptedNotification(notice);
 	return notice;
-}
-
-/** Publish only the current occurrence; recurrence advances on client completion.
- * Only notes inside a reminders folder carry schedules. Invalid Markdown
- * preserves the server's existing schedules via quarantine. */
-export async function createReminderProjection(keys: NotificationKeys, folders: readonly string[], path: string, bytes: ArrayBuffer): Promise<EncryptedSchedules | null> {
-	const folder = folders.filter(folder => folder && path.startsWith(`${folder}/`)).sort((left, right) => right.length - left.length)[0];
-	if (!folder || !isMarkdownPath(path)) return null;
-	if (bytes.byteLength > MAX_REMINDER_NOTE_BYTES) return { version: 1, reminders: [], issue: 'size' };
-	let scanned;
-	try { scanned = scanReminderMarkdownContent(path, decodeMarkdownBytes(bytes), folder).reminders; }
-	catch { return { version: 1, reminders: [], issue: 'invalid-reminders' }; }
-	if (scanned.length > MAX_REMINDERS_PER_NOTE) return { version: 1, reminders: [], issue: 'scheduling-capacity' };
-	const reminders: EncryptedSchedules['reminders'] = [];
-	let projectionBytes = new TextEncoder().encode(JSON.stringify({ version: 1, reminders: [] })).byteLength;
-	for (let offset = 0; offset < scanned.length; offset += NOTIFICATION_CONCURRENCY) {
-		const chunk = scanned.slice(offset, offset + NOTIFICATION_CONCURRENCY);
-		const notices = await Promise.all(chunk.map(reminder => sealNotification(keys.vaultId, keys.key, keys.fingerprint, reminder)));
-		for (const [index, reminder] of chunk.entries()) {
-			const schedule = { id: reminder.id, completed: reminder.completed,
-				...(reminder.dueDate ? { dueDate: reminder.dueDate } : {}),
-				...(reminder.dueDatetime ? { dueDatetime: reminder.dueDatetime } : {}), notification: notices[index]! };
-			projectionBytes += new TextEncoder().encode(JSON.stringify(schedule)).byteLength + (reminders.length ? 1 : 0);
-			// Optional scheduling must not prevent encrypting and syncing the vault
-			// file, including while converting an existing large reminders note.
-			if (projectionBytes > MAX_ENCRYPTED_PUBLIC_DATA_BYTES) return { version: 1, reminders: [], issue: 'scheduling-capacity' };
-			reminders.push(schedule);
-		}
-	}
-	return { version: 1, reminders };
 }
 
 export async function openNotification(notice: EncryptedNotification, key: EncryptionKey, vaultId: string): Promise<{ title: string; body: string }> {

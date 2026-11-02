@@ -6,7 +6,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
-import { createReminderProjection } from '../../../encryption/reminder-projection';
+import { createReminderProjection } from '../../../reminders/core/encrypted-schedule-projection';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { handleUpload } from '../sync/file-handlers';

@@ -2,7 +2,7 @@ import type { DBSchema } from 'idb';
 import { importEncryptionSecret, encryptBytes, decryptBytes, type EncryptionKey } from '../../encryption/envelope';
 import { validateVaultKeyBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { LocalStateCipher } from '../../encryption/local-state';
-import { importNotificationFingerprintKey } from '../../encryption/reminder-projection';
+import { importNotificationFingerprintKey } from '../../encryption/notification-keys';
 import { derivePathTagKey, type PathTags } from '../../encryption/path-tags';
 import { importSealPrivateKey } from '../../encryption/seal-key';
 import { validateP256PublicKey } from '../../encryption/p256';

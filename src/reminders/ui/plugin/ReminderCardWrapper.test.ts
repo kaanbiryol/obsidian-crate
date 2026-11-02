@@ -12,7 +12,7 @@ vi.mock('@/reminders/ui/shared/useReminderCardInteractions', () => ({
 }));
 vi.mock('@/reminders/ui/plugin/reminder-modal/reminderEditorModals', () => ({ openReminderEditModal: vi.fn() }));
 
-import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
+import { PluginContext } from '@/ui/plugin/plugin-context';
 import { ReminderCardWrapper } from './ReminderCardWrapper';
 
 it('shows why completing a reminder failed', async () => {

@@ -1,6 +1,6 @@
 import { sealFile } from '../../encryption/file-codec';
 import { decryptJson, encryptJson } from '../../encryption/envelope';
-import { createReminderProjection } from '../../encryption/reminder-projection';
+import { createReminderProjection } from '../../reminders/core/encrypted-schedule-projection';
 import { scanReminderMarkdownContent, getProjectFromPath } from '../../reminders/core/markdownScan';
 import { decodeMarkdownBytes } from '../../reminders/core/markdownEncoding';
 import { buildReminderList } from '../../reminders/core/reminder-list';

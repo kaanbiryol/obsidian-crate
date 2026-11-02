@@ -1,5 +1,5 @@
 import { validateEncryptedNotification } from '../../encryption/notification-format';
-import { openNotification } from '../../encryption/reminder-projection';
+import { openNotification } from '../../encryption/notification-keys';
 import { readVaultKeys } from './encryption-keys';
 
 /** A locked, evicted, or newly rotated device still displays the generic push. */
