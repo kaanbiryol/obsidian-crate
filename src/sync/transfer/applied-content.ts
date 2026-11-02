@@ -1,8 +1,19 @@
+import type { DataAdapter } from 'obsidian';
 import { isMarkdownPath } from '../../protocol/note-paths';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { TransferContext } from './types';
 import { sha256Hex } from '../../platform/sha256';
 import { isSyncRevision } from '../../protocol/sync-validation';
+
+/** The file's modification time, or `fallbackMtime` when the caller already read it. */
+export async function getModifiedIso(adapter: Pick<DataAdapter, 'stat'>, path: string, fallbackMtime?: number): Promise<string> {
+	if (typeof fallbackMtime === 'number' && Number.isFinite(fallbackMtime)) {
+		return new Date(fallbackMtime).toISOString();
+	}
+
+	const stat = await adapter.stat(path);
+	return new Date(stat?.mtime ?? Date.now()).toISOString();
+}
 
 // A remote baseline can be valid even when its local metadata is not. The
 // planners deliberately hash entries whose modification time is not a date.

@@ -3,6 +3,7 @@ import { normalizeCrateSettings } from '../../plugin/settings';
 import {
 	matchIgnorePattern,
 	createIgnoreMatcherContext,
+	createSyncIgnoreMatcher,
 	shouldIgnoreConfiguredPath,
 	shouldIgnoreSyncPath,
 } from './ignore';
@@ -134,5 +135,27 @@ describe('shouldIgnoreSyncPath', () => {
 		expect(shouldIgnoreConfiguredPath('.obsidian/plugins/crate/data.json', context)).toBe(true);
 		expect(shouldIgnoreConfiguredPath('notes/scratch.tmp', context)).toBe(true);
 		expect(shouldIgnoreConfiguredPath('notes/keep.md', context)).toBe(false);
+	});
+});
+
+describe('createSyncIgnoreMatcher', () => {
+	it('follows a replaced pattern list, and a reset picks up one changed in place', () => {
+		const settings = { ignorePatterns: ['*.tmp'] };
+		const matcher = createSyncIgnoreMatcher(() => ['.obsidian/plugins/crate/'], () => settings.ignorePatterns);
+		const configured = matcher.configuredMatcher();
+		expect(matcher.shouldIgnore('notes/a.tmp')).toBe(true);
+		expect(matcher.shouldIgnore('notes/a (conflict 2026-01-02 03-04-05 a1b2).md')).toBe(true);
+		expect(matcher.shouldIgnore('.obsidian/plugins/crate/data.json')).toBe(true);
+
+		settings.ignorePatterns = ['Archive/'];
+		expect(matcher.shouldIgnore('notes/a.tmp')).toBe(false);
+		expect(matcher.shouldIgnore('Archive/a.md')).toBe(true);
+		// A configured matcher keeps the patterns it was taken with.
+		expect(configured('notes/a.tmp')).toBe(true);
+
+		settings.ignorePatterns.push('Logs/');
+		expect(matcher.shouldIgnore('Logs/a.md')).toBe(false);
+		matcher.reset();
+		expect(matcher.shouldIgnore('Logs/a.md')).toBe(true);
 	});
 });

@@ -25,22 +25,19 @@ import type { SyncState, SyncResult, ConflictRecord } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { PREPARE_CONCURRENCY } from '../transfer/constants';
 import { uploadPipelined } from '../transfer/upload-pipeline';
+import { getModifiedIso } from '../transfer/applied-content';
 import { isAuthError } from '../failures';
-import {
-	createIgnoreMatcherContext,
-	type IgnoreMatcherContext,
-	shouldIgnoreConfiguredPath,
-	shouldIgnoreSyncPath,
-} from '../local/ignore';
+import { createSyncIgnoreMatcher, type SyncIgnoreMatcher } from '../local/ignore';
 import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
 import { createRawConfigEventHandler } from './raw-config-events';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';
 import { runSyncWorkflow } from './standard-sync-workflow';
-import { AUTH_ERROR_MESSAGE, beginSyncAttempt, completeTransferResult, handleWorkflowError, ReconnectNotice } from '../sync-outcome';
+import { AUTH_ERROR_MESSAGE, ReconnectNotice } from '../sync-outcome';
 import { SyncEngineContexts } from './contexts';
+import { runReconcileWorkflow } from './reconcile-paths';
 import { SyncEngineLifecycle } from './lifecycle';
-import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
+import { createEmptySyncResult } from '../sync-result';
 import { mergeSyncResults } from '../sync-result';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { LocalContentVerifier } from './content-verifier';
@@ -74,7 +71,7 @@ export class SyncEngine {
 	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private prepareReminderScope?: () => Promise<void>;
 	private readonly rawConfigEvents: (path: string) => Promise<void>;
-	private ignore: IgnoreMatcherContext;
+	private readonly ignore: SyncIgnoreMatcher;
 	/** The patterns the pending list was last built with; settings objects are updated in place. */
 	private pendingScanPatterns: readonly string[];
 	private syncActivityRevision = 0;
@@ -117,7 +114,11 @@ export class SyncEngine {
 		this.conflictStore = new ConflictStore(plugin.app, plugin.manifest, (conflictCount) => {
 			this.updateState({ conflictCount });
 		});
-		this.ignore = this.createIgnoreContext(settings);
+		const pluginDir = plugin.manifest.dir?.replace(/\/+$/, '');
+		this.ignore = createSyncIgnoreMatcher(
+			() => [...(pluginDir ? [`${pluginDir}/`] : []), this.markdownBaseCache.getIgnoredPrefix()],
+			() => this.settings.ignorePatterns,
+		);
 		this.pendingScanPatterns = [...settings.ignorePatterns];
 		this.lifecycle = new SyncEngineLifecycle({
 			apiConfigured: () => this.api.isConfigured(),
@@ -161,10 +162,10 @@ export class SyncEngine {
 			conflictStore: this.conflictStore,
 			getSettings: () => this.settings,
 			getStatus: () => this.state.status,
-			shouldIgnore: this.shouldIgnore.bind(this),
+			shouldIgnore: this.ignore.shouldIgnore,
 			runConcurrent: (tasks, concurrency) => this.lifecycle.runConcurrent(tasks, concurrency),
 			retryWithBackoff: operation => this.lifecycle.retryWithBackoff(operation),
-			getModifiedIso: this.getModifiedIso.bind(this),
+			getModifiedIso: (path, fallbackMtime) => getModifiedIso(this.vault.adapter, path, fallbackMtime),
 			getPendingKeys: () => this.queueController.getPendingKeys(),
 			verifyContent: files => this.verifyContent(files),
 			reconcileVersionConflicts: (paths, result) => this.reconcileVersionConflicts(paths, result),
@@ -187,7 +188,7 @@ export class SyncEngine {
 				isConfigured: () => this.api.isConfigured(),
 			},
 			localManifest: this.localManifest,
-			shouldIgnore: this.shouldIgnore.bind(this),
+			shouldIgnore: this.ignore.shouldIgnore,
 			...this.contexts.completion,
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			currentStatus: () => this.state.status,
@@ -204,7 +205,7 @@ export class SyncEngine {
 			queue: this.queueController,
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			isSyncing: () => this.state.status === 'syncing',
-			shouldIgnore: this.shouldIgnore.bind(this),
+			shouldIgnore: this.ignore.shouldIgnore,
 			captureSyncActivity: () => this.captureSyncActivity(),
 			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
 			trackWork: operation => this.trackWork(operation),
@@ -253,7 +254,7 @@ export class SyncEngine {
 
 	updateSettings(settings: SyncSettings): void {
 		this.settings = settings;
-		this.ignore = this.createIgnoreContext(settings);
+		this.ignore.reset();
 		const removedPattern = this.pendingScanPatterns.some(pattern => !settings.ignorePatterns.includes(pattern));
 		this.pendingScanPatterns = [...settings.ignorePatterns];
 		this.lifecycle.settingsChanged();
@@ -309,7 +310,7 @@ export class SyncEngine {
 		return createEngineHistory({
 			vault: this.vault, api: this.api, pluginDir: `${this.plugin.manifest.dir}`,
 			getSettings: () => this.settings, getManifest: () => this.localManifest.getManifest(),
-			shouldIgnore: path => this.shouldIgnore(path),
+			shouldIgnore: this.ignore.shouldIgnore,
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
 			hasPendingMutations: () => Boolean(this.getActiveConflicts().length
 				|| this.localManifest.uploadJournal.pending().length || this.files.getPendingRestores().length),
@@ -327,7 +328,7 @@ export class SyncEngine {
 	async untrackedServerPaths(): Promise<string[]> {
 		const remote = await this.api.getManifest();
 		return Object.entries(remote.files).flatMap(([path, entry]) => {
-			if (this.shouldIgnore(path)) return [];
+			if (this.ignore.shouldIgnore(path)) return [];
 			const local = this.localManifest.getEntry(path);
 			const held = local && !entry.rejected && (entry.revision && local.revision ? local.revision === entry.revision : local.hash === entry.hash);
 			return held ? [] : [path];
@@ -436,7 +437,7 @@ export class SyncEngine {
 		return this.trackWork(() => hasLocalFileChanges(
 			this.vault,
 			this.localManifest,
-			this.shouldIgnore.bind(this),
+			this.ignore.shouldIgnore,
 			files => this.verifyContent(files),
 			() => this.lifecycle.throwIfDestroyed(),
 		));
@@ -446,7 +447,7 @@ export class SyncEngine {
 		return createExclusionCleanupReview({
 			getManifest: () => this.api.getManifest(),
 			getIgnorePatterns: () => this.settings.ignorePatterns,
-			shouldIgnore: path => this.shouldIgnore(path),
+			shouldIgnore: this.ignore.shouldIgnore,
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
 			runExclusive: operation => this.runExclusiveOperation(operation),
 			retryWithBackoff: operation => this.lifecycle.retryWithBackoff(operation),
@@ -483,24 +484,6 @@ export class SyncEngine {
 		this.onStateChange?.(this.state);
 	}
 
-	private shouldIgnore(path: string): boolean {
-		return shouldIgnoreSyncPath(path, this.ignoreContext());
-	}
-
-	/** Settings writes can replace the pattern list in place before updateSettings runs. */
-	private ignoreContext(): IgnoreMatcherContext {
-		if (this.ignore.ignorePatterns !== this.settings.ignorePatterns) this.ignore = this.createIgnoreContext(this.settings);
-		return this.ignore;
-	}
-
-	private createIgnoreContext(settings: SyncSettings): IgnoreMatcherContext {
-		const pluginDir = this.plugin.manifest.dir?.replace(/\/+$/, '');
-		return createIgnoreMatcherContext(
-			[...(pluginDir ? [`${pluginDir}/`] : []), this.markdownBaseCache.getIgnoredPrefix()],
-			settings.ignorePatterns,
-		);
-	}
-
 	/** A pending-change scan stays current until sync activity starts. */
 	private captureSyncActivity(): () => boolean {
 		const revision = this.syncActivityRevision;
@@ -519,7 +502,7 @@ export class SyncEngine {
 				const paths = await findStartupPendingPaths({
 					vault: this.vault,
 					baseline: this.localManifest.getManifest().files,
-					shouldIgnore: path => this.shouldIgnore(path),
+					shouldIgnore: this.ignore.shouldIgnore,
 					throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
 					verifyContent: files => this.verifyContent(files),
 					runConcurrent: (tasks, concurrency) => this.lifecycle.runConcurrent(tasks, concurrency),
@@ -548,9 +531,9 @@ export class SyncEngine {
 
 	private recoverConflictStoreInBackground(): void {
 		if (this.lifecycle.isDestroyed) return;
-		const ignoreMatcherContext = this.ignoreContext();
+		const ignoreConfigured = this.ignore.configuredMatcher();
 		void this.trackWork(() => this.conflictStore.recoverFromVault(
-			(path) => shouldIgnoreConfiguredPath(path, ignoreMatcherContext),
+			ignoreConfigured,
 			() => this.lifecycle.isDestroyed,
 			this.baselineRevision,
 		)).catch((error) => {
@@ -613,7 +596,7 @@ export class SyncEngine {
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
 		if (this.lifecycle.isDestroyed) return;
-		if (!this.shouldIgnore(oldPath) && !this.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path, file instanceof TFolder ? 'folder' : 'file');
+		if (!this.ignore.shouldIgnore(oldPath) && !this.ignore.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path, file instanceof TFolder ? 'folder' : 'file');
 		if (isConflictFile(oldPath)) {
 			this.updateConflictCopy(() => this.conflictStore.markResolved(oldPath, this.baselineRevision), 'Failed to resolve renamed conflict copy:');
 		}
@@ -631,15 +614,6 @@ export class SyncEngine {
 		});
 	}
 
-	private async getModifiedIso(path: string, fallbackMtime?: number): Promise<string> {
-		if (typeof fallbackMtime === 'number' && Number.isFinite(fallbackMtime)) {
-			return new Date(fallbackMtime).toISOString();
-		}
-
-		const stat = await this.vault.adapter.stat(path);
-		return new Date(stat?.mtime ?? Date.now()).toISOString();
-	}
-
 	private verifyContent(files: VaultFile[]): Promise<boolean> {
 		return this.trackWork(() => this.contentVerifier.verify(this.vault, this.localManifest, files, this.lifecycle.abortSignal));
 	}
@@ -649,7 +623,7 @@ export class SyncEngine {
 		if (this.state.status === 'syncing' || this.state.initializing || !this.api.isConfigured()) return;
 		const activityCurrent = this.captureSyncActivity();
 		await this.trackWork(async () => {
-			const changed = await this.contentVerifier.verifyTracked(this.vault, this.localManifest, path => this.shouldIgnore(path), this.lifecycle.abortSignal);
+			const changed = await this.contentVerifier.verifyTracked(this.vault, this.localManifest, this.ignore.shouldIgnore, this.lifecycle.abortSignal);
 			if (changed.length && activityCurrent() && !this.settings.automaticSync) {
 				this.queueController.restorePendingPaths(changed.map(path => pendingChangeKey('upload', path)));
 			}
@@ -669,36 +643,16 @@ export class SyncEngine {
 
 
 	private async reconcileFromQueue(queueKeys: string[], selectedOnly = false): Promise<SyncResult> {
-		return this.trackWork(async () => {
-			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
-			const startFailure = beginSyncAttempt({
-				apiConfigured: () => this.api.isConfigured(),
-				getStatus: () => this.state.status,
-				updateState: updates => this.updateState(updates),
-			});
-			if (startFailure) return startFailure;
-			const outcome = this.contexts.completion;
-			let result = createEmptySyncResult();
-			const failures: MutationFailure[] = [];
-			try {
-				result = await this.reconcilePaths(queueKeys, !selectedOnly, failure => { failures.push(failure); });
-				if (result.outcome !== 'cancelled') {
-					await this.pendingChanges().settleSynced(result, pendingRevisionSnapshot);
-					if (result.success && !selectedOnly) await this.contexts.finishInitialSetup();
-				}
-				completeTransferResult(outcome, result, failures, { errorFallback: 'Reconciliation failed', failureLogPrefix: 'Reconciliation failed', logger });
-				if (result.success) this.pruneMarkdownBaseCacheInBackground();
-				return result;
-			} catch (error) {
-				handleWorkflowError(outcome, result, error, {
-					abortLogMessage: 'Reconciliation aborted',
-					failureLogPrefix: 'Reconciliation failed',
-					logger,
-				});
-				finalizeSyncResult(result);
-				return result;
-			}
-		});
+		return this.trackWork(() => runReconcileWorkflow({
+			...this.contexts.completion,
+			apiConfigured: () => this.api.isConfigured(),
+			getStatus: () => this.state.status,
+			snapshotPendingRevisions: () => this.queueController.snapshotPendingRevisions(),
+			reconcilePaths: (keys, recover, onFailure) => this.reconcilePaths(keys, recover, onFailure),
+			settleSynced: (result, revisions) => this.pendingChanges().settleSynced(result, revisions),
+			finishInitialSetup: this.contexts.finishInitialSetup,
+			onSucceeded: () => this.pruneMarkdownBaseCacheInBackground(),
+		}, queueKeys, selectedOnly));
 	}
 
 	private async reconcileVersionConflicts(paths: string[], result: SyncResult): Promise<void> {

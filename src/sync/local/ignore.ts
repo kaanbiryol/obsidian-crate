@@ -90,3 +90,32 @@ export function shouldIgnoreConfiguredPath(
 
 	return false;
 }
+
+export interface SyncIgnoreMatcher {
+	/** Whether sync leaves a path out, including conflict copies. */
+	readonly shouldIgnore: (path: string) => boolean;
+	/** The configured-path check for the patterns current now. */
+	readonly configuredMatcher: () => (path: string) => boolean;
+	/** Rebuilds the matcher after a settings change. */
+	readonly reset: () => void;
+}
+
+/** Matches paths against the current settings' patterns plus folders the host owns.
+ * Settings writes can replace the pattern list in place before the engine hears of
+ * them, so a replaced list also rebuilds the matcher. */
+export function createSyncIgnoreMatcher(fixedPrefixes: () => string[], ignorePatterns: () => string[]): SyncIgnoreMatcher {
+	const build = () => createIgnoreMatcherContext(fixedPrefixes(), ignorePatterns());
+	let context = build();
+	const current = () => {
+		if (context.ignorePatterns !== ignorePatterns()) context = build();
+		return context;
+	};
+	return {
+		shouldIgnore: path => shouldIgnoreSyncPath(path, current()),
+		configuredMatcher: () => {
+			const snapshot = current();
+			return path => shouldIgnoreConfiguredPath(path, snapshot);
+		},
+		reset: () => { context = build(); },
+	};
+}
