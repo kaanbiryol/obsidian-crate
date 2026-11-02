@@ -8,7 +8,7 @@ import { storedObjectMatchesMetadata } from './storage';
 import { sanitizePath } from '../request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
-import { putMaintenanceValue } from '../db';
+import { putMaintenanceValue, readMaintenanceValue } from '../db';
 import { FILE_HASH_HEADER } from '../../../protocol/http-headers';
 import { SHARED_CHECKPOINT_AT_KEY } from './file-publication-statements';
 import { R2_KEYS_PER_CALL } from '../platform-limits';
@@ -152,7 +152,7 @@ export async function downloadCheckpointFile(request: Request, bucket: R2Bucket,
  * their index. Returns true while a listing page found garbage and more objects remain. */
 export async function pruneSharedCheckpoints(bucket: R2Bucket, db: D1Database): Promise<boolean> {
 	const cursorKey = 'shared_checkpoint_cleanup_cursor';
-	const cursor = (await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(cursorKey).first<{ value: string }>())?.value;
+	const cursor = await readMaintenanceValue(db, cursorKey);
 	// One R2 list and delete call each handle up to R2_KEYS_PER_CALL keys.
 	const listing = await bucket.list({ prefix: PREFIX, limit: R2_KEYS_PER_CALL, ...(cursor ? { cursor } : {}) });
 	const index = await readIndex(bucket);

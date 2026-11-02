@@ -1,6 +1,6 @@
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { isWirePath } from '../../../protocol/encrypted-path';
-import { putMaintenanceValue } from '../db';
+import { putMaintenanceValue, readMaintenanceValue } from '../db';
 
 const PREFIX = 'e2ee:folder:';
 const MAX_LABEL_LENGTH = 8192;
@@ -19,5 +19,5 @@ export function saveFolderLabel(db: D1Database, folder: string, label: string): 
 
 export async function readFolderLabel(db: D1Database, folder: string | null | undefined): Promise<string | null> {
 	if (!folder) return null;
-	return (await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(PREFIX + folder).first<{ value: string }>())?.value ?? null;
+	return readMaintenanceValue(db, PREFIX + folder);
 }

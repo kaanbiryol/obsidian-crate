@@ -43,6 +43,11 @@ export async function pruneChangelog(db: D1Database, alongside?: (expired: SqlGu
 
 /** Sets a `maintenance_state` value. Conflicts keep the row's `updated_at`; the
  * statement can run alone or in a batch. */
+/** The stored value for `key`, or null when no row exists. */
+export async function readMaintenanceValue(db: D1Database, key: string): Promise<string | null> {
+	return (await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(key).first<{ value: string }>())?.value ?? null;
+}
+
 export function putMaintenanceValue(db: D1Database, key: string, value: string): D1PreparedStatement {
 	return db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(key, value);
 }

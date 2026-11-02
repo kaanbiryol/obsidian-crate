@@ -4,6 +4,7 @@ import type { EncryptionServerState } from '../../../encryption/server-state';
 import { ENCRYPTION_STATE_SQL } from './state';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
+import { readMaintenanceValue } from '../db';
 import { parseJsonObject } from '../request-validation';
 import { ReadingError } from '../reading/common';
 
@@ -51,9 +52,9 @@ export async function handleEncryptionPairing(request: Request, db: D1Database, 
 			const c = body.context;
 			if (c.vaultId !== state.vaultId || c.generation !== state.generation) return failure('This app connection changed. Start again.');
 			if (typeof body.commitment !== 'string' || decodeBase64Url(body.commitment, 32).length !== 32) return failure('Invalid pairing commitment.', 400);
-			const existing = await db.prepare('SELECT value FROM maintenance_state WHERE key=?').bind(PREFIX + c.id).first<{ value: string }>();
-			if (existing) {
-				const row = JSON.parse(existing.value) as Stored;
+			const existing = await readMaintenanceValue(db, PREFIX + c.id);
+			if (existing !== null) {
+				const row = JSON.parse(existing) as Stored;
 				return row.owner === principal.tokenId && samePairingContext(row.context, c) && row.commitment === body.commitment && row.expiresAt > Date.now() && !row.closed
 					? response({ request: visible(row) }) : failure('Start a new pairing request.');
 			}

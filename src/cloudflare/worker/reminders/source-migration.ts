@@ -2,7 +2,7 @@ import { portablePathKey } from '../../../protocol/portable-path';
 import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { loadStoredFileRows } from '../sync/storage';
 import { recordFileFailure } from '../notifications/file-retries';
-import { queryRows } from '../db';
+import { queryRows, readMaintenanceValue } from '../db';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { recordReminderSourceState } from './source-state';
 import { readStoredMarkdownFiles } from '../storage';
@@ -25,10 +25,10 @@ const MAX_REPARSE_BYTES = 2 * 1024 * 1024;
 /** One resumable pass per parser version. Normal file commits record their own source state. */
 async function seedSourceStates(db: D1Database, folder: string): Promise<boolean> {
 	const scanKey = reminderSourceScanKey(folder);
-	const saved = await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(scanKey).first<{ value: string }>();
+	const saved = await readMaintenanceValue(db, scanKey);
 	// An empty saved cursor marks completion; a missing row starts the migration.
-	if (saved?.value === '') return false;
-	const cursor = saved?.value ?? '';
+	if (saved === '') return false;
+	const cursor = saved ?? '';
 	const files = await queryRows<{ path: string }>(db.prepare(`SELECT path FROM files
     WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md' AND portable_path > ? ORDER BY portable_path LIMIT ?`)
 		.bind(...fileFolderArgs(folder), portablePathKey(cursor), SCAN_BATCH_SIZE));

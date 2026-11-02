@@ -1,5 +1,5 @@
 import { corsResponse } from '../cors';
-import { changedRows } from '../db';
+import { changedRows, readMaintenanceValue } from '../db';
 import { limitNotificationAction } from '../rate-limit';
 import { parseJsonObject, parseOptionalString } from '../request-validation';
 import { isSha256Hex } from '../../../platform/validation';
@@ -22,9 +22,9 @@ export async function exchangeDevicePairing(request: Request, db: D1Database): P
 	await db.prepare('DELETE FROM maintenance_state WHERE key >= ? AND key < ? AND json_extract(value, \'$.expiresAt\') <= ?')
 		.bind(DEVICE_PAIRING_PREFIX, DEVICE_PAIRING_END, Date.now()).run();
 	const key = DEVICE_PAIRING_PREFIX + await sha256Hex(body.code);
-	const stored = await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(key).first<{ value: string }>();
-	const record = stored && parseDevicePairingRecord(stored.value);
-	if (!stored || !record || record.expiresAt <= Date.now()) return invalid();
+	const stored = await readMaintenanceValue(db, key);
+	const record = stored !== null && parseDevicePairingRecord(stored);
+	if (stored === null || !record || record.expiresAt <= Date.now()) return invalid();
 	if (record.redeemed) {
 		const token = await db.prepare("SELECT 1 FROM auth_tokens WHERE id = ? AND token_hash = ? AND device_id = ? AND scope = 'vault'").bind(record.id, body.tokenHash, deviceId).first();
 		return record.redeemed === body.tokenHash && token ? redeemed(record) : invalid();
@@ -41,12 +41,12 @@ export async function exchangeDevicePairing(request: Request, db: D1Database): P
 	const results = await db.batch([
 		db.prepare(`INSERT INTO auth_tokens (id, token_hash, device_id, device_name, platform, scope, last_seen_at)
 			SELECT ?, ?, ?, ?, ?, 'vault', datetime('now') WHERE ${grant}`)
-			.bind(record.id, body.tokenHash, deviceId, deviceName, platform, key, stored.value),
+			.bind(record.id, body.tokenHash, deviceId, deviceName, platform, key, stored),
 		db.prepare(`DELETE FROM push_subscriptions WHERE owner_token_id IN (${previous}) AND ${created}`).bind(deviceId, record.id, record.id, body.tokenHash),
 		db.prepare(`DELETE FROM auth_tokens WHERE scope = 'reading_capture' AND device_id IN (${previous}) AND ${created}`).bind(deviceId, record.id, record.id, body.tokenHash),
 		db.prepare(`DELETE FROM auth_tokens WHERE id IN (${previous}) AND ${created}`).bind(deviceId, record.id, record.id, body.tokenHash),
 		db.prepare(`UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? AND ${created}`)
-			.bind(JSON.stringify({ ...record, redeemed: body.tokenHash }), key, stored.value, record.id, body.tokenHash),
+			.bind(JSON.stringify({ ...record, redeemed: body.tokenHash }), key, stored, record.id, body.tokenHash),
 	]);
 	return changedRows(results[0]) === 1 ? redeemed(record) : invalid();
 }

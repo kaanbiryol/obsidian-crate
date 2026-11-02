@@ -9,7 +9,7 @@ import { validateEncryptionState, type EncryptionServerState, type ResetReceipt 
 import { isSha256Hex } from '../../../platform/validation';
 import { drainNotificationCancellations } from '../notifications/outbox';
 import { sha256Hex } from '../../../platform/sha256';
-import { putMaintenanceValue } from '../db';
+import { putMaintenanceValue, readMaintenanceValue } from '../db';
 import { saveServerState } from '../server-state';
 import { R2_KEYS_PER_CALL } from '../platform-limits';
 
@@ -27,8 +27,8 @@ export async function handleEncryptionReset(request: Request, env: Env, path: st
 	if (path !== '/encryption/reset' || principal.scope !== 'vault') return null;
 	const id = new URL(request.url).searchParams.get('id');
 	if (!isEncryptionId(id)) return corsResponse({ error: 'Invalid reset ID' }, 400);
-	const row = await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(PREFIX + id).first<{ value: string }>();
-	const receipt = row ? JSON.parse(row.value) as ResetReceipt : null;
+	const value = await readMaintenanceValue(env.DB, PREFIX + id);
+	const receipt = value !== null ? JSON.parse(value) as ResetReceipt : null;
 	if (receipt) {
 		if (principal.tokenId !== id) return corsResponse({ error: 'Resume from the device that started this reset' }, 403);
 		if (request.method === 'GET' || receipt.complete) return corsResponse(receipt);

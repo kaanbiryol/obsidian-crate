@@ -1,5 +1,5 @@
 import { MAX_ENCRYPTED_REMINDER_ACK } from '../../../encryption/receipt-format';
-import { putMaintenanceValue, type SqlGuard } from '../db';
+import { putMaintenanceValue, readMaintenanceValue, type SqlGuard } from '../db';
 
 const CHUNK_SIZE = 512 * 1024;
 const MAX_CHUNKS = Math.ceil((MAX_ENCRYPTED_REMINDER_ACK + 4096) / CHUNK_SIZE);
@@ -45,7 +45,7 @@ export const RECEIPT_CHUNK_PAGE = 1000;
 
 export async function pruneEncryptedReceiptChunks(db: D1Database): Promise<void> {
 	const cursorKey = 'e2ee:receipt-cleanup-cursor';
-	const cursor = (await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(cursorKey).first<{ value: string }>())?.value ?? PREFIX;
+	const cursor = await readMaintenanceValue(db, cursorKey) ?? PREFIX;
 	const page = await db.prepare('SELECT key FROM maintenance_state WHERE key > ? AND key >= ? AND key < ? ORDER BY key LIMIT ?')
 		.bind(cursor, PREFIX, 'e2ee:receipt;', RECEIPT_CHUNK_PAGE).all<{ key: string }>();
 	const candidates = page.results.flatMap(({ key }) => {

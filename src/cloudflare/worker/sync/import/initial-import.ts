@@ -1,5 +1,5 @@
 import { INITIAL_IMPORT_VERIFY_PAGE, type ImportInventoryEntry, type InitialImport } from '@/protocol/initial-import';
-import { queryRows } from '../../db';
+import { queryRows, readMaintenanceValue } from '../../db';
 import { corsResponse } from '../../cors';
 import { parseJsonObject } from '../../request-validation';
 import { INITIAL_REMINDERS_PENDING } from './initial-import-readiness';
@@ -49,8 +49,8 @@ export async function finishInitialImport(request: Request, db: D1Database): Pro
 	const entries = parseInventoryEntries(parsed.value.entries);
 	if (typeof after !== 'string' || typeof final !== 'boolean' || !entries || (!final && !entries.length)) return corsResponse({ error: 'Invalid initial import inventory' }, 400);
 	if (after) {
-		const stored = await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(IMPORT_VERIFICATION_KEY).first<{ value: string }>();
-		const progress = stored ? JSON.parse(stored.value) as { token?: string; generation?: number; cursor?: string } : null;
+		const stored = await readMaintenanceValue(db, IMPORT_VERIFICATION_KEY);
+		const progress = stored !== null ? JSON.parse(stored) as { token?: string; generation?: number; cursor?: string } : null;
 		if (progress?.token !== current.token || progress.generation !== current.generation || progress.cursor !== after) {
 			return corsResponse({ error: 'Initial upload changed. Sync again to resume.' }, 409);
 		}
