@@ -111,6 +111,53 @@ interface ScanFileOptions {
 	preread?: string;
 }
 
+interface WriteReminderIdsOptions {
+	reservedIds: ReadonlySet<string>;
+	/** Identifier ownership was verified for the original bytes. */
+	verifyOwnership: boolean;
+	signal?: AbortSignal;
+	mustDefer: () => boolean;
+	editor?: ReminderEditorWriter;
+	remember: Parameters<typeof normalizeReminderIds>[2];
+}
+
+type WriteReminderIdsResult =
+	| { status: 'target-changed' }
+	| { status: 'write-deferred'; content: string }
+	| { status: 'written'; normalized: { content: string; remindersUpdated: number } };
+
+/** Writes missing reminder identifiers to the vault file, rechecking the scan's
+ * conditions against the bytes being replaced. */
+async function writeReminderIds(app: App, file: TFile, filePath: string, originalContent: string,
+	{ reservedIds, verifyOwnership, signal, mustDefer, editor, remember }: WriteReminderIdsOptions): Promise<WriteReminderIdsResult> {
+	let remindersUpdated = 0;
+	let targetChanged = false;
+	let writeDeferred = false;
+	const content = await processVaultMarkdown(app.vault, file, (currentContent) => {
+		// Ownership was verified for the identifiers in the original bytes.
+		// Retry with new evidence if a concurrent edit changes the target.
+		if (verifyOwnership && currentContent !== originalContent) {
+			targetChanged = true;
+			return currentContent;
+		}
+		if (signal?.aborted || mustDefer()) return currentContent;
+		// A note opened since the editor check is written through its editor later.
+		if (editor?.isOpen(filePath)) {
+			writeDeferred = true;
+			return currentContent;
+		}
+		const currentNormalization = normalizeReminderIds(currentContent, reservedIds, remember);
+		remindersUpdated = currentNormalization.remindersUpdated;
+		return currentNormalization.content;
+	});
+	if (targetChanged) return { status: 'target-changed' };
+	if (writeDeferred) return { status: 'write-deferred', content };
+	if (remindersUpdated > 0) {
+		log.info(` Added ${remindersUpdated} reminder identifiers to ${filePath}`);
+	}
+	return { status: 'written', normalized: { content, remindersUpdated } };
+}
+
 /**
  * Scan a single file for reminders
  * @param app - Obsidian app instance
@@ -173,35 +220,15 @@ export async function scanFile(
 		if (edited && !edited.complete) return pending(edited.content);
 		if (edited) log.info(` Added ${normalized.remindersUpdated} reminder identifiers to ${filePath} through its editor`);
 		else if (normalized.remindersUpdated > 0) {
-			let remindersUpdated = 0;
-			let targetChanged = false;
-			let writeDeferred = false;
-			const content = await processVaultMarkdown(app.vault, file, (currentContent) => {
-				// Ownership was verified for the identifiers in the original bytes.
-				// Retry with new evidence if a concurrent edit changes the target.
-				if (ownership && currentContent !== originalContent) {
-					targetChanged = true;
-					return currentContent;
-				}
-				if (signal?.aborted || mustDefer()) return currentContent;
-				// A note opened since the editor check is written through its editor later.
-				if (editor?.isOpen(filePath)) {
-					writeDeferred = true;
-					return currentContent;
-				}
-				const currentNormalization = normalizeReminderIds(currentContent, currentReservedIds, parses.remember);
-				remindersUpdated = currentNormalization.remindersUpdated;
-				return currentNormalization.content;
+			const write = await writeReminderIds(app, file, filePath, originalContent, {
+				reservedIds: currentReservedIds, verifyOwnership: ownership !== undefined, signal, mustDefer, editor, remember: parses.remember,
 			});
-			if (targetChanged) return deferred();
-			if (writeDeferred) {
+			if (write.status === 'target-changed') return deferred();
+			if (write.status === 'write-deferred') {
 				if (signal?.aborted) return cancelled;
-				return mustDefer() ? deferred() : pending(content);
+				return mustDefer() ? deferred() : pending(write.content);
 			}
-			normalized = { content, remindersUpdated };
-			if (remindersUpdated > 0) {
-				log.info(` Added ${remindersUpdated} reminder identifiers to ${filePath}`);
-			}
+			normalized = write.normalized;
 		}
 		if (signal?.aborted) return cancelled;
 		if (mustDefer()) return deferred();

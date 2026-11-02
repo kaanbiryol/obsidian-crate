@@ -1,7 +1,7 @@
 import type { IndexedReminder } from "./index";
 import type { ReminderLookupStore } from "./lookup-store";
 import type { ReminderOptimisticState } from "./optimistic-state";
-import type { FileScanResult } from "../vaultScanner";
+import type { FileScanResult, ScanResult } from "../vaultScanner";
 import { addReminderIdentityOwners, releaseReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from '../reminder-identity-owners';
 import type { ReminderSourceIssue } from '../reminder-source-issues';
 
@@ -63,4 +63,57 @@ export function applyFileScanResult(state: FileScanState, { filePath, project, d
 		state.lookupStore.addReminders(result.reminders);
 	}
 	return { applied: true, reminders, ambiguousOwners };
+}
+
+/** The index state a whole-folder scan replaces. */
+export interface VaultScanState {
+	reminders: IndexedReminder[];
+	ambiguousOwners: ReminderIdentityOwner[];
+	sourceIssues: Map<string, ReminderSourceIssue>;
+	discoveredProjects: Set<string>;
+	/** Whether an earlier scan already published reminders. */
+	isLoaded: boolean;
+}
+
+export interface VaultScanOutcome extends Omit<VaultScanState, 'isLoaded'> {
+	/** False when the scan stopped early and the whole load waits for later. */
+	complete: boolean;
+	/** Files to rescan on a later flush. */
+	retryPaths: string[];
+}
+
+/** Merges a finished folder scan into the index state without changing the inputs.
+ * Files held back individually keep their previous records and issues. Does no I/O. */
+export function applyVaultScanResult(state: VaultScanState, result: ScanResult): VaultScanOutcome {
+	if (result.deferred && !result.deferredPaths) {
+		const sourceIssues = new Map(state.sourceIssues);
+		for (const issue of result.issues) sourceIssues.set(issue.path, issue);
+		return {
+			complete: false,
+			reminders: state.isLoaded ? state.reminders : result.reminders,
+			ambiguousOwners: result.ambiguousOwners ?? state.ambiguousOwners,
+			sourceIssues,
+			discoveredProjects: state.isLoaded ? state.discoveredProjects : new Set(result.discoveredProjects),
+			retryPaths: [],
+		};
+	}
+
+	const heldBack = new Set(result.deferredPaths);
+	const sourceIssues = new Map(result.issues.map(issue => [issue.path, issue]));
+	for (const path of heldBack) {
+		const issue = state.sourceIssues.get(path);
+		if (issue) sourceIssues.set(path, issue);
+	}
+	// Before the first load there are no previous records, so held-back files
+	// show what could be read without normalizing them.
+	const fresh = state.isLoaded ? result.reminders.filter(reminder => !heldBack.has(reminder.filePath)) : result.reminders;
+	return {
+		complete: true,
+		reminders: [...fresh, ...state.reminders.filter(reminder => sourceIssues.has(reminder.filePath) || heldBack.has(reminder.filePath))],
+		ambiguousOwners: result.ambiguousOwners ?? [],
+		sourceIssues,
+		discoveredProjects: new Set(result.discoveredProjects),
+		// Notes whose normalization is still to be written retry on a later flush.
+		retryPaths: [...heldBack, ...result.writeDeferredPaths ?? []],
+	};
 }

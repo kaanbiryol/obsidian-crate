@@ -14,7 +14,7 @@ import { createReminderOptimisticState } from "./optimistic-state";
 import { isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
 import { getProjectFromPath } from "@/reminders/core/markdownScan";
 import { addReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from '../reminder-identity-owners';
-import { applyFileScanResult } from './file-scan-result';
+import { applyFileScanResult, applyVaultScanResult } from './file-scan-result';
 import type { ReminderSourceIssue } from '../reminder-source-issues';
 import { readVaultMarkdown } from '@/sync/local/vault-markdown';
 import { sha256Hex } from '../../../platform/sha256';
@@ -232,40 +232,20 @@ export function createReminderIndex(
 			if (signal?.aborted) return result;
 			// Only a scan that stopped early leaves the whole load for later. Files held
 			// back individually keep their previous records and are rescanned on flush.
-			if (result.deferred && !result.deferredPaths) {
+			const wasLoaded = isLoaded;
+			const merged = applyVaultScanResult({ reminders, ambiguousOwners, sourceIssues, discoveredProjects, isLoaded }, result);
+			({ reminders, ambiguousOwners, sourceIssues, discoveredProjects } = merged);
+			for (const path of merged.retryPaths) deferredPaths.add(path);
+			isLoaded = true;
+			if (!merged.complete) {
 				deferredLoad = true;
-				for (const issue of result.issues) sourceIssues.set(issue.path, issue);
-				ambiguousOwners = result.ambiguousOwners ?? ambiguousOwners;
-				if (!isLoaded) {
-					reminders = result.reminders;
-					discoveredProjects = new Set(result.discoveredProjects);
-					lookupStore.rebuild(reminders);
-					isLoaded = true;
-				}
+				if (!wasLoaded) lookupStore.rebuild(reminders);
 				notifyListeners();
 				return result;
 			}
 
-			const heldBack = new Set(result.deferredPaths);
 			deferredLoad = false;
 			isInitialLoadComplete = true;
-			const previousIssues = sourceIssues;
-			sourceIssues = new Map(result.issues.map(issue => [issue.path, issue]));
-			for (const path of heldBack) {
-				const issue = previousIssues.get(path);
-				if (issue) sourceIssues.set(path, issue);
-				deferredPaths.add(path);
-			}
-			// Notes whose normalization is still to be written retry on a later flush.
-			for (const path of result.writeDeferredPaths ?? []) deferredPaths.add(path);
-			// Before the first load there are no previous records, so held-back files
-			// show what could be read without normalizing them.
-			const fresh = isLoaded ? result.reminders.filter(reminder => !heldBack.has(reminder.filePath)) : result.reminders;
-			reminders = [...fresh, ...reminders.filter(reminder => sourceIssues.has(reminder.filePath) || heldBack.has(reminder.filePath))];
-			ambiguousOwners = result.ambiguousOwners ?? [];
-			isLoaded = true;
-			discoveredProjects = new Set(result.discoveredProjects);
-
 			lookupStore.rebuild(reminders);
 			scannedDigests.clear();
 			notifyListeners();

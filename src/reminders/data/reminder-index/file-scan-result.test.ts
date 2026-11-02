@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import type { IndexedReminder } from '@/reminders/data/reminder-index';
-import { applyFileScanResult, type FileScanState } from './file-scan-result';
+import { applyFileScanResult, applyVaultScanResult, type FileScanState, type VaultScanState } from './file-scan-result';
+import type { ScanResult } from '../vaultScanner';
 import { createReminderLookupStore } from './lookup-store';
 import { createReminderOptimisticState } from './optimistic-state';
 import type { ReminderIdentityOwners } from '../reminder-identity-owners';
@@ -75,4 +76,58 @@ it('clears optimistic state that the fresh scan confirms', () => {
 	applyFileScanResult(current, { filePath: 'Work.md', project: 'Work', result: { filePath: 'Work.md', reminders: [{ ...reminder('a', 'Work.md'), content: 'edited' }], lineCount: 1 } });
 
 	expect(current.optimisticState.getById('a', reminder('a', 'Work.md'))?.content).toBe('a');
+});
+
+function vaultState(overrides: Partial<VaultScanState> = {}): VaultScanState {
+	return { reminders: [], ambiguousOwners: [], sourceIssues: new Map(), discoveredProjects: new Set(), isLoaded: true, ...overrides };
+}
+
+function scan(overrides: Partial<ScanResult> = {}): ScanResult {
+	return { reminders: [], issues: [], filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [], ...overrides };
+}
+
+it('replaces scanned files and keeps held-back and failed files from the previous index', () => {
+	const previousIssue = { path: 'Held.md', reason: 'old failure' };
+	const current = vaultState({
+		reminders: [reminder('old', 'Work.md'), reminder('held', 'Held.md'), reminder('broken', 'Broken.md')],
+		sourceIssues: new Map([['Held.md', previousIssue], ['Gone.md', { path: 'Gone.md', reason: 'stale' }]]),
+	});
+
+	const outcome = applyVaultScanResult(current, scan({
+		reminders: [reminder('new', 'Work.md'), reminder('unwritten', 'Held.md')],
+		issues: [{ path: 'Broken.md', reason: 'failed' }],
+		discoveredProjects: ['Work'],
+		deferredPaths: ['Held.md'],
+		writeDeferredPaths: ['Work.md'],
+	}));
+
+	expect(outcome.complete).toBe(true);
+	expect(outcome.reminders.map(item => item.id)).toEqual(['new', 'held', 'broken']);
+	expect([...outcome.sourceIssues.keys()]).toEqual(['Broken.md', 'Held.md']);
+	expect(outcome.sourceIssues.get('Held.md')).toBe(previousIssue);
+	expect([...outcome.discoveredProjects]).toEqual(['Work']);
+	expect(outcome.retryPaths).toEqual(['Held.md', 'Work.md']);
+	expect(current.sourceIssues.has('Gone.md')).toBe(true);
+});
+
+it('shows held-back files as read before the first load', () => {
+	const outcome = applyVaultScanResult(vaultState({ isLoaded: false }), scan({ reminders: [reminder('a', 'Held.md')], deferredPaths: ['Held.md'] }));
+
+	expect(outcome.reminders.map(item => item.id)).toEqual(['a']);
+});
+
+it('keeps loaded reminders and adds issues when a scan stopped early', () => {
+	const loaded = vaultState({ reminders: [reminder('a', 'Work.md')], discoveredProjects: new Set(['Work']) });
+	const stopped = scan({ deferred: true, reminders: [reminder('b', 'Home.md')], issues: [{ path: 'Home.md', reason: 'failed' }], discoveredProjects: ['Home'] });
+
+	const outcome = applyVaultScanResult(loaded, stopped);
+	expect(outcome).toMatchObject({ complete: false, retryPaths: [] });
+	expect(outcome.reminders).toBe(loaded.reminders);
+	expect([...outcome.discoveredProjects]).toEqual(['Work']);
+	expect(outcome.sourceIssues.get('Home.md')?.reason).toBe('failed');
+	expect(loaded.sourceIssues.size).toBe(0);
+
+	const first = applyVaultScanResult(vaultState({ isLoaded: false }), stopped);
+	expect(first.reminders.map(item => item.id)).toEqual(['b']);
+	expect([...first.discoveredProjects]).toEqual(['Home']);
 });
