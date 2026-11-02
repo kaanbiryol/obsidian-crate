@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Reminder } from '../types';
+import type { Reminder } from '../types/reminder';
 import {
 	applyReminderDraftContentUpdate,
 	buildInitialReminderContent,

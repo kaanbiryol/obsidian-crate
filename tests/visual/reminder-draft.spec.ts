@@ -1,5 +1,5 @@
 import { chromium, webkit, expect, test, type Browser, type Page } from '@playwright/test';
-import type { RecurrenceRule } from '@/reminders/types';
+import type { RecurrenceRule } from '@/reminders/types/reminder';
 
 interface DraftState { content: string; dueDate: string | null; hasTime: boolean; recurrence: RecurrenceRule | null }
 async function readDraft(page: Page): Promise<DraftState> {

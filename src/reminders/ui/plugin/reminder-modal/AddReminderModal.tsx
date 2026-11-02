@@ -12,7 +12,7 @@ import { useReminderModalPresentation } from './useReminderModalPresentation';
 import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
 import { AnimationConfig } from '../../../../ui/shared/component-adapter';
 import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
-import { Reminder } from '../../../types';
+import { Reminder } from '../../../types/reminder';
 import { DEFAULT_PROJECT } from '../../../core/constants';
 import { hasReminderDraftTitle } from '../../../core/reminderDraft';
 import { clampCaretToReminderTitle } from '../../reminder-editor/reminderEditorEdits';

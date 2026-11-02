@@ -10,7 +10,7 @@
  */
 
 import { parseReminderContent, UnresolvedReminderScheduleError, type ParsedReminder } from './reminderParser';
-import type { Priority, RecurrenceRule } from '../../types';
+import type { Priority, RecurrenceRule } from '../../types/reminder';
 import { formatLocalDateKey, formatReminderDateText } from '../dates/reminderDate';
 import { recurrenceToText } from '../recurrence/recurrenceText';
 import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../reminderIdentity';

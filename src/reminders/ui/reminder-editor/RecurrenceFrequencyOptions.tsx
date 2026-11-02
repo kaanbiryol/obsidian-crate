@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import type { RecurrenceRule } from '../../types';
+import type { RecurrenceRule } from '../../types/reminder';
 import { Tabs } from '@base-ui/react/tabs';
 import { Toggle } from '@base-ui/react/toggle';
 import { IconButton } from '../../../ui/shared/IconButton';

@@ -2,7 +2,7 @@ import { ToggleButton } from '../../../ui/shared/ToggleButton';
 import React from 'react';
 import { Button } from '../../../ui/shared/Button';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
-import type { RecurrenceRule } from '../../types';
+import type { RecurrenceRule } from '../../types/reminder';
 import { formatRecurrence } from '../../core/recurrence/recurrenceText';
 import { formatDueDate } from '../format/dateFormatting';
 import { REMINDER_PICKER_COPY } from './pickerCopy';

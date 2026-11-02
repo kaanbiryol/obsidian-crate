@@ -1,5 +1,5 @@
 import { test, expect, type Locator } from '@playwright/test';
-import type { Reminder } from '../../src/reminders/types';
+import type { Reminder } from '../../src/reminders/types/reminder';
 
 // Only the public editor API, browser editing operations and Markdown output
 // are part of this contract. No implementation names, node classes or model APIs.

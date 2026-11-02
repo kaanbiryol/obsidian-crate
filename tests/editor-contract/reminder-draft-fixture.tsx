@@ -1,7 +1,7 @@
 import { ReminderEditorScreen } from '@/pwa/reminders/editor/ReminderEditorScreen';
 import type { ModalState } from '@/pwa/reminders/types';
 import React, { useRef, useState } from 'react';
-import type { Reminder } from '@/reminders/types';
+import type { Reminder } from '@/reminders/types/reminder';
 import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-editor/ReminderEditorFields';
 import { useReminderDraft } from '@/reminders/ui/plugin/reminder-modal/useReminderDraft';

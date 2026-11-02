@@ -1,5 +1,5 @@
 import { Tabs } from '@base-ui/react/tabs';
-import type { RecurrenceRule } from '../../types';
+import type { RecurrenceRule } from '../../types/reminder';
 import { RECURRENCE_FREQUENCIES, RECURRENCE_FREQUENCY_LABELS } from './recurrencePickerShared';
 
 export function RecurrenceFrequencyTabs({ frequency }: { frequency: RecurrenceRule['frequency'] }) {
