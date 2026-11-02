@@ -11,6 +11,7 @@ import type { EncryptionServerState } from '../../../encryption/server-state';
 import { createLogger } from '../../../sync/logger';
 import { errorMessage } from '../../../platform/logger';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
+import { cachedSettingsRequest } from '../../../plugin/settings-ui-state';
 import { EncryptionResetModal } from './encryption-reset-modal';
 import { renderRecoveryVerification } from './recovery-key-setting';
 import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-setup-ui';
@@ -82,15 +83,8 @@ export function renderEncryptionSection(container: HTMLElement, plugin: CratePlu
 /** Settings re-render on every toggle; reuse this connection's answer until the tab closes or encryption changes. */
 function cachedEncryptionStatus(plugin: CratePlugin): Promise<EncryptionServerState | null> {
 	const client = plugin.syncRuntime.getApiClient();
-	const cached = plugin.settingsUiState.encryptionStatus;
-	if (client && cached?.client === client) return cached.value;
-	const value = readEncryptionStatus(plugin, 7000);
-	if (!client) return value;
-	const entry = { client, value };
-	plugin.settingsUiState.encryptionStatus = entry;
-	// A failed check runs again on the next render.
-	value.catch(() => { if (plugin.settingsUiState.encryptionStatus === entry) plugin.settingsUiState.encryptionStatus = null; });
-	return value;
+	if (!client) return readEncryptionStatus(plugin, 7000);
+	return cachedSettingsRequest(plugin.settingsUiState, 'encryptionStatus', { client }, () => readEncryptionStatus(plugin, 7000));
 }
 
 class EncryptionModal extends SharedModal {

@@ -39,6 +39,25 @@ export function createSettingsUiState(): SettingsUiState {
 	};
 }
 
+type CachedRequestField = 'encryptionStatus' | 'notificationPolicy';
+type CachedRequestEntry<K extends CachedRequestField> = NonNullable<SettingsUiState[K]>;
+
+/** Reuses the request in `field` while its client and other `key` fields match; otherwise
+ * starts `load` and keeps it there. A failed request is dropped, so the next render retries. */
+export function cachedSettingsRequest<K extends CachedRequestField>(
+	state: SettingsUiState,
+	field: K,
+	key: Omit<CachedRequestEntry<K>, 'value'>,
+	load: () => CachedRequestEntry<K>['value'],
+): CachedRequestEntry<K>['value'] {
+	const cached = state[field];
+	if (cached && Object.entries(key).every(([name, value]) => Reflect.get(cached, name) === value)) return cached.value;
+	const entry = { ...key, value: load() } as CachedRequestEntry<K>;
+	state[field] = entry;
+	entry.value.catch(() => { if (state[field] === entry) state[field] = null; });
+	return entry.value;
+}
+
 export function buildDiagnosticsSettingsStateKey(
 	settings: Pick<CrateSettings, 'workerUrl'>
 ): string {

@@ -9,6 +9,7 @@ import { captureSyncApiConnection } from '../../plugin/server-request';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import type { SyncApiClient } from '../../sync/worker-api/client';
 import type { SettingsSectionContext } from './section-helpers';
+import { cachedSettingsRequest } from '../../plugin/settings-ui-state';
 
 export function renderNotificationsSection(context: SettingsSectionContext): () => void {
 	const { containerEl, plugin } = context;
@@ -161,15 +162,8 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 
 /** Settings re-render on every toggle; reuse this connection's policy until the tab closes. */
 function cachedNotificationPolicy(plugin: CratePlugin, client: SyncApiClient): Promise<NotificationPolicy | null> {
-	const cached = plugin.settingsUiState.notificationPolicy;
-	const folderPath = plugin.remindersSettings.remindersFolderPath;
-	if (cached?.client === client && cached.folderPath === folderPath) return cached.value;
-	const value = client.getNotificationPolicy().then(result => result.policy);
-	const entry = { client, folderPath, value };
-	plugin.settingsUiState.notificationPolicy = entry;
-	// A failed load runs again on the next render.
-	value.catch(() => { if (plugin.settingsUiState.notificationPolicy === entry) plugin.settingsUiState.notificationPolicy = null; });
-	return value;
+	return cachedSettingsRequest(plugin.settingsUiState, 'notificationPolicy', { client, folderPath: plugin.remindersSettings.remindersFolderPath },
+		() => client.getNotificationPolicy().then(result => result.policy));
 }
 
 function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, apiClient: SyncApiClient, isActive: () => boolean): void {
