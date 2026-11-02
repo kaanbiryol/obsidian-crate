@@ -205,8 +205,16 @@ export class SyncEngineContexts {
 	readonly processDiff = (diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult): Promise<DiffApplyOutcome> =>
 		transferProcessDiff(this.transfer, diff, localFiles, result);
 
-	private readonly parallelDownloadAndSaveFiles = (requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void> =>
-		transferParallelDownloadAndSaveFiles(this.transfer, requests, result, DOWNLOAD_CONCURRENCY, onProcessed, onFailure);
+	/** Publishes the downloading phase before the first file and as each one finishes. */
+	private readonly parallelDownloadAndSaveFiles = (requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void> => {
+		let processed = 0;
+		this.reportWork({ phase: 'downloading', current: processed, total: requests.length });
+		return transferParallelDownloadAndSaveFiles(this.transfer, requests, result, DOWNLOAD_CONCURRENCY, () => {
+			processed++;
+			this.reportWork({ phase: 'downloading', current: processed, total: requests.length });
+			onProcessed?.();
+		}, onFailure);
+	};
 
 	readonly setLastSync = (value: string): void => updateSyncProgress(this.dependencies.getSettings(), { lastSync: value });
 

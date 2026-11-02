@@ -86,12 +86,8 @@ export async function runIncrementalSync(
 		options.progressCallback?.(current, total);
 
 		if (downloadRequests.length > 0) {
-			let downloadsProcessed = 0;
-			context.reportWork?.({ phase: 'downloading', current: downloadsProcessed, total: downloadRequests.length });
 			await context.parallelDownloadAndSaveFiles(downloadRequests, result, () => {
-				downloadsProcessed++;
 				current++;
-				context.reportWork?.({ phase: 'downloading', current: downloadsProcessed, total: downloadRequests.length });
 				options.progressCallback?.(current, total);
 			}, options.onFailure);
 			const downloaded = new Set(result.downloadedPaths);

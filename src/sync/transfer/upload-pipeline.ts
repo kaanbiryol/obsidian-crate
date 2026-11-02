@@ -1,4 +1,4 @@
-import type { PreparedUpload, SyncResult } from '../types';
+import type { PreparedUpload, SyncResult, SyncWork } from '../types';
 import { pipelineUploadChunks } from './budget';
 import { BATCH_UPLOAD_CONCURRENCY } from './constants';
 import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
@@ -13,6 +13,8 @@ export interface UploadPipelineOptions<T> extends Pick<UploadPreparedFilesOption
 	prepare(item: T): Promise<PreparedUpload | null>;
 	/** Runs before each prepared chunk uploads. */
 	beforeChunk?(chunk: PreparedUpload[]): void;
+	/** Receives the uploading phase after `beforeChunk` and as files are processed, counted against every item. */
+	reportWork?(work: SyncWork): void;
 	/** Receives counts of processed files as the transfer reports them. */
 	onProcessed?(count: number): void;
 	/** Runs after each chunk uploads with the number of its files the transfer did
@@ -29,9 +31,12 @@ export async function uploadPipelined<T>(
 	result: SyncResult,
 	options: UploadPipelineOptions<T>,
 ): Promise<void> {
+	let processed = 0;
+	const report = () => options.reportWork?.({ phase: 'uploading', current: processed, total: items.length });
 	// One chunk fills every batch request slot; the byte budget still bounds memory.
 	for await (const chunk of pipelineUploadChunks(items, item => options.prepare(item), undefined, BATCH_UPLOAD_CONCURRENCY * BATCH_UPLOAD_MAX_FILES)) {
 		options.beforeChunk?.(chunk);
+		report();
 		let reported = 0;
 		await context.uploadPreparedFiles(chunk, result, {
 			retry: options.retry,
@@ -39,6 +44,8 @@ export async function uploadPipelined<T>(
 			...(options.onVersionConflicts ? { onVersionConflicts: options.onVersionConflicts } : {}),
 			onProcessed: count => {
 				reported += count;
+				processed += count;
+				report();
 				options.onProcessed?.(count);
 			},
 		});

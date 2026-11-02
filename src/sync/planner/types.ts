@@ -71,6 +71,7 @@ export interface IncrementalSyncPlannerContext {
 	shouldIgnore(path: string): boolean;
 	getLocalChanges(onUnchanged?: (path: string) => void): Promise<LocalChangeScan>;
 	getLocalDeletes(discoveredPaths: ReadonlySet<string>): Promise<string[]>;
+	/** Publishes the downloading phase itself. */
 	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void>;
 	processDiff(
 		diff: FileDiff,

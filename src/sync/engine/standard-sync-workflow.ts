@@ -57,6 +57,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext, WorkflowComp
 		localFiles: Record<string, FileEntry>,
 		result: SyncResult
 	): Promise<DiffApplyOutcome>;
+	/** Publishes the downloading phase itself. */
 	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void>;
 	localManifest: Pick<LocalManifest, 'getEntry' | 'setEntry' | 'save'>;
 	setLastSeq(value: number): void;
@@ -205,15 +206,11 @@ async function runFullSync(
 				});
 			}
 			const beforeDownloads = current;
-			let downloadsProcessed = 0;
-			context.updateState({ work: { phase: 'downloading', current: downloadsProcessed, total: downloadRequests.length } });
 			await context.parallelDownloadAndSaveFiles(
 				downloadRequests,
 				result,
 				() => {
-					downloadsProcessed++;
 					current++;
-					context.updateState({ work: { phase: 'downloading', current: downloadsProcessed, total: downloadRequests.length } });
 					progressCallback?.(current, total);
 				},
 				failure => { failures.push(failure); },

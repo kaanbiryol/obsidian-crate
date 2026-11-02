@@ -127,7 +127,6 @@ async function uploadQueuedChanges(
 ): Promise<{ uploads: Array<{ path: string }>; failures: QueueUploadFailure[] }> {
 	const uploads: Array<{ path: string }> = [];
 	const failures: QueueUploadFailure[] = [];
-	let uploadsProcessed = 0;
 	// Queue settlement is mode-specific; transfer and acknowledgement are shared.
 	const uploadResult = createEmptySyncResult();
 	let chunkFailures: QueueUploadFailure[] = [];
@@ -151,12 +150,8 @@ async function uploadQueuedChanges(
 			onVersionConflicts: async paths => { chunkConflicts.push(...paths); },
 			beforeChunk: chunk => {
 				uploads.push(...chunk.map(upload => ({ path: upload.path })));
-				context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: uploadPaths.length } });
 			},
-			onProcessed: count => {
-				uploadsProcessed += count;
-				context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: uploadPaths.length } });
-			},
+			reportWork: work => context.updateState({ work }),
 			afterChunk: () => {
 				const uploadFailures: QueueUploadFailure[] = [
 					...chunkFailures,

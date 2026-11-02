@@ -86,7 +86,6 @@ export async function runForceFullSyncWorkflow(
 			else remoteOnlyPaths.push(path);
 		}
 
-		let uploadsProcessed = 0;
 		const total = files.length + remoteOnlyPaths.length;
 		let current = 0;
 		const deleteRemoteOnly = async (paths: string[]) => {
@@ -113,14 +112,8 @@ export async function runForceFullSyncWorkflow(
 			},
 			retry: true,
 			onFailure: failure => { failures.push(failure); },
-			beforeChunk: () => {
-				context.throwIfDestroyed();
-				context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
-			},
-			onProcessed: count => {
-				uploadsProcessed += count;
-				context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
-			},
+			beforeChunk: () => context.throwIfDestroyed(),
+			reportWork: work => context.updateState({ work }),
 			afterChunk: () => {
 				if (result.errors.length > 0) {
 					throw new Error('Force full sync stopped before deleting remote files because an upload failed');
