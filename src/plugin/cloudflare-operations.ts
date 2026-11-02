@@ -14,7 +14,7 @@ import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { CloudflareDeploymentService } from '../cloudflare/deployment/service';
 import { loadEmbeddedCloudflareArtifacts } from '../cloudflare/deployment/embedded-artifacts';
-import { obsidianHttpTransport } from '../cloudflare/http';
+import { cloudflareHttpTransport } from '../cloudflare/http';
 import { configureCloudflareAuthorizedDevice } from './cloudflare-connection';
 import { isSelfHostedConnectionPending } from './self-hosted-connection';
 import { offerFeatureChoice } from './feature-settings';
@@ -33,7 +33,7 @@ import { changesServer, DESKTOP_ONLY_SERVER_CHANGE } from '../cloudflare/deploym
 export function createCloudflareSavedLogin(plugin: CratePlugin): CloudflareSavedLogin {
 	return new CloudflareSavedLogin({
 		clientId: CLOUDFLARE_OAUTH_CLIENT_ID,
-		transport: obsidianHttpTransport,
+		transport: cloudflareHttpTransport,
 		secrets: plugin.secretStorage,
 		cache: {
 			read: () => plugin.settings.usageSnapshot ?? null,
@@ -51,7 +51,7 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 		getVaultName: () => plugin.app.vault.getName(),
 		settingsOwner: plugin,
 		onAuthorized: (accountId, tokens) => plugin.cloudflareSavedLogin.acceptAuthorization(accountId, tokens),
-		transport: obsidianHttpTransport,
+		transport: cloudflareHttpTransport,
 		loadArtifacts: loadEmbeddedCloudflareArtifacts,
 		openExternal: url => openCloudflareAuthorization(plugin, url),
 		serverChangesAllowed: !Platform.isMobile,

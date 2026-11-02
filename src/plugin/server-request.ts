@@ -41,6 +41,15 @@ export function captureSyncApiConnection(plugin: CratePlugin) {
 	return { ...connection, api, assertCurrent };
 }
 
+/** A client that runs `assertCurrent` before each request is sent and before its response is used. */
+export function guardedServerClient(origin: string, token: string, assertCurrent: () => void): WorkerApiHttpClient {
+	return new WorkerApiHttpClient(origin, token, async request => {
+		assertCurrent();
+		try { return await obsidianHttpTransport(request); }
+		finally { assertCurrent(); }
+	});
+}
+
 /** Bind request dispatch and response publication to the same connection. */
 export async function serverRequest<T>(
 	plugin: CratePlugin,
@@ -50,11 +59,7 @@ export async function serverRequest<T>(
 ): Promise<T> {
 	const { signal, origin, token, assertCurrent } = captureServerConnection(plugin);
 	if (!origin || !token) throw new Error('Connect Crate to your server first.');
-	const client = new WorkerApiHttpClient(origin, token, async request => {
-		assertCurrent();
-		try { return await obsidianHttpTransport(request); }
-		finally { assertCurrent(); }
-	});
+	const client = guardedServerClient(origin, token, assertCurrent);
 	client.setAbortSignal(signal);
 	const keys = loadEncryptionKeys(plugin.secretStorage);
 	if (keys) client.setEncryptionAuthority(keys.vaultId, keys.generation);

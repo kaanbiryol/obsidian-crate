@@ -1,5 +1,5 @@
 import { CloudflareApiError } from '../cloudflare-api-error';
-import type { HttpTransport } from '../http';
+import { parseJsonObject, type HttpTransport } from '../http';
 import { isSha256Hex } from '../../platform/validation';
 import { sha256Hex } from '../../platform/sha256';
 
@@ -10,19 +10,12 @@ function cleanupUrl(origin: string, path: string): string {
 	return `${url.origin}${path}`;
 }
 
-function info(text: string): Record<string, unknown> | null {
-	try {
-		const value: unknown = JSON.parse(text);
-		return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
-	} catch { return null; }
-}
-
 export async function verifyResetWorker(transport: HttpTransport, origin: string, resetId: string, requireRecoveryObjects = false, uploadTag?: string): Promise<boolean> {
 	const url = cleanupUrl(origin, '/.well-known/crate-reset');
 	// Publication can be visible in the management API before the public route.
 	for (let attempt = 0; attempt < 5; attempt++) {
 		const response = await transport(url, { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
-		const value = info(response.text);
+		const value = parseJsonObject(response.text);
 		if (response.status === 200 && value?.service === 'crate-reset' && value.protocol === 1 && value.resetId === resetId
 			&& (!requireRecoveryObjects || value.recoveryObjects === true)
 			&& (!uploadTag || value.uploadTag === uploadTag)
@@ -43,7 +36,7 @@ export async function deleteResetWorkerObjects(transport: HttpTransport, origin:
 	const response = await transport(url, { method: 'POST', body,
 		headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
 	if (response.status !== 200) throw new CloudflareApiError(`Remote file cleanup failed with HTTP ${response.status}`, response.status, null);
-	const value = info(response.text);
+	const value = parseJsonObject(response.text);
 	if (value?.service !== 'crate-reset' || value.protocol !== 1 || value.resetId !== resetId
 		|| value.batchHash !== await sha256Hex(body) || value.deleted !== keys.length) throw new Error('The remote file cleanup result could not be verified.');
 }

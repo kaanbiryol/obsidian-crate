@@ -1,7 +1,7 @@
 import { parseDevelopmentBuild, type DevelopmentBuild } from '../../protocol/server-build';
 import { CRATE_SERVICE_ID } from '../../protocol/server-info';
 import release from '../server-release.json';
-import type { HttpTransport } from '../http';
+import { parseJsonObject, type HttpTransport } from '../http';
 import { isSha256Hex } from '../../platform/validation';
 
 /** Wait for the public route to serve the uploaded build, without repeating mutations. */
@@ -12,11 +12,8 @@ export async function verifyWorkerDeployment(transport: HttpTransport, origin: s
 		const response = await transport(`${origin}/.well-known/crate`, {
 			method: 'GET', headers: { 'Cache-Control': 'no-cache' },
 		});
-		let info: Record<string, unknown> | null = null;
-		try {
-			const parsed: unknown = JSON.parse(response.text);
-			if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) info = parsed as Record<string, unknown>;
-		} catch { /* A newly enabled route may temporarily return an HTML error page. */ }
+		// A newly enabled route may temporarily return an HTML error page.
+		const info = parseJsonObject(response.text);
 		if (response.status === 200 && info?.service === CRATE_SERVICE_ID
 			&& info.deploymentFingerprint === fingerprint
 			&& (published ? Number.isSafeInteger(info.serverRevision) && Number(info.serverRevision) > 0 && Number(info.serverRevision) <= release.revision : info.serverRevision === release.revision)

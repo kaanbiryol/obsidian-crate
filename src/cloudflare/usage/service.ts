@@ -1,4 +1,4 @@
-import type { HttpTransport } from '../http';
+import { API_BASE_URL, type HttpTransport } from '../http';
 
 export interface UsageMetric {
 	label: string;
@@ -38,7 +38,7 @@ export async function fetchCloudflareUsage(
 	const daily = `date_geq: ${JSON.stringify(today)}, date_leq: ${JSON.stringify(today)}`;
 	const monthly = `datetime_geq: ${JSON.stringify(monthStart)}, datetime_leq: ${JSON.stringify(now.toISOString())}`;
 	async function query(dataset: string, filter: string, fields: string): Promise<Row[]> {
-		const response = await transport('https://api.cloudflare.com/client/v4/graphql', {
+		const response = await transport(`${API_BASE_URL}/graphql`, {
 			method: 'POST',
 			headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
 			body: JSON.stringify({ query: `query { viewer { accounts(filter: { accountTag: ${JSON.stringify(accountId)} }) {

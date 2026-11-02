@@ -1,9 +1,9 @@
 import type CratePlugin from './CratePlugin';
-import { captureServerConnection } from './server-request';
+import { captureServerConnection, guardedServerClient } from './server-request';
 import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { sameVaultKeyBundle } from '../encryption/key-bundle';
 import { PAIRING_PATH, type PairingContext, type PairingTransport } from '../encryption/pairing/protocol';
-import { obsidianHttpTransport, WorkerApiHttpClient } from '../sync/worker-api/http';
+import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { readServerEncryption } from '../sync/encryption/server-encryption';
 import { assertEncryptionKeys } from '../encryption/server-state';
 
@@ -16,9 +16,7 @@ export async function openWebAppPairing(plugin: CratePlugin, signal: AbortSignal
 		const latest = loadEncryptionKeys(plugin.secretStorage);
 		if (!latest || !sameVaultKeyBundle(keys, latest)) throw new Error('The vault changed. Reopen Connect web app.');
 	};
-	const http = new WorkerApiHttpClient(connection.origin, connection.token, async request => {
-		current(); try { return await obsidianHttpTransport(request); } finally { current(); }
-	});
+	const http = guardedServerClient(connection.origin, connection.token, current);
 	http.setAbortSignal(AbortSignal.any([signal, connection.signal]));
 	http.setEncryptionAuthority(keys.vaultId, keys.generation);
 	const transport: PairingTransport = {

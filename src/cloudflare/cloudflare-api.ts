@@ -6,9 +6,8 @@ export { CloudflareApiError } from './cloudflare-api-error';
 import { verifyWorkerDeployment } from './deployment/verify-worker';
 import { deleteResetWorkerObjects, verifyResetWorker } from './server-reset/reset-worker-client';
 import type { CloudflareDeploymentArtifacts } from './deployment/artifacts';
-import type { HttpRequest, HttpTransport } from './http';
+import { API_BASE_URL, parseJsonObject, type HttpRequest, type HttpTransport } from './http';
 
-const API_BASE_URL = 'https://api.cloudflare.com/client/v4';
 // Cloudflare allows about 1,200 API requests per five minutes per user and then
 // rejects every request for five minutes. Wait out one full block per request.
 const RATE_LIMIT_WAIT_BUDGET_MS = 6 * 60_000;
@@ -84,14 +83,6 @@ export async function queryD1Rows(api: Pick<CloudflareApiClient, 'queryD1'>, ...
 	return (await api.queryD1(...query)).flatMap(result => result.results ?? []);
 }
 
-function parseJson(text: string): unknown {
-	try {
-		return JSON.parse(text);
-	} catch {
-		return null;
-	}
-}
-
 function asEnvelope<T>(value: unknown): CloudflareEnvelope<T> | null {
 	if (typeof value !== 'object' || value === null || !('success' in value)) return null;
 	return value as CloudflareEnvelope<T>;
@@ -102,7 +93,10 @@ function apiError(status: number, envelope: CloudflareEnvelope<unknown> | null, 
 	return new CloudflareApiError(firstError?.message || fallback, status, typeof firstError?.code === 'number' ? firstError.code : null);
 }
 
-/** Milliseconds requested by a Retry-After header in seconds or HTTP-date form. */
+/** Milliseconds requested by a Retry-After header in seconds or HTTP-date form.
+ * Unlike the sync client's parser, a zero or past value means retry now (0) and
+ * fractional seconds are kept, so the caller's one-second floor applies instead
+ * of exponential backoff. */
 function retryAfterMilliseconds(headers: Record<string, string> | undefined): number | null {
 	const value = Object.entries(headers ?? {}).find(([name]) => name.toLowerCase() === 'retry-after')?.[1]?.trim();
 	if (!value) return null;
@@ -446,7 +440,7 @@ export class CloudflareApiClient {
 				Authorization: `Bearer ${this.accessToken}`,
 			},
 		}, retryRateLimit);
-		return { response, envelope: asEnvelope<T>(parseJson(response.text)) };
+		return { response, envelope: asEnvelope<T>(parseJsonObject(response.text)) };
 	}
 
 	/** Cloudflare rejects a rate-limited request before processing it, so repeating it is safe. */

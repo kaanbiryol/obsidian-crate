@@ -38,7 +38,7 @@ async function loadPluginIntegration() {
 	vi.doMock('../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal, revealCloudflareOperation }));
 	vi.doMock('../ui/cloudflare/authorization-modal', () => ({ openCloudflareAuthorizationModal, dismissCloudflareAuthorizationModal }));
 	vi.doMock('../cloudflare/deployment/embedded-artifacts', () => ({ loadEmbeddedCloudflareArtifacts: vi.fn() }));
-	vi.doMock('../cloudflare/http', () => ({ obsidianHttpTransport: vi.fn() }));
+	vi.doMock('../cloudflare/http', () => ({ cloudflareHttpTransport: vi.fn() }));
 
 	return import('./cloudflare-operations');
 }

@@ -1,5 +1,15 @@
 import { requestUrl } from 'obsidian';
 
+export const API_BASE_URL = 'https://api.cloudflare.com/client/v4';
+
+/** A JSON object response body, or null for any other JSON value or unparsable text. */
+export function parseJsonObject(text: string): Record<string, unknown> | null {
+	try {
+		const value: unknown = JSON.parse(text);
+		return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+	} catch { return null; }
+}
+
 export interface HttpRequest {
 	method: string;
 	headers?: Record<string, string>;
@@ -15,7 +25,7 @@ interface HttpResponse {
 
 export type HttpTransport = (url: string, request: HttpRequest) => Promise<HttpResponse>;
 
-export const obsidianHttpTransport: HttpTransport = async (url, request) => {
+export const cloudflareHttpTransport: HttpTransport = async (url, request) => {
 	let timeout: number | undefined;
 	try {
 	const response = await Promise.race([requestUrl({

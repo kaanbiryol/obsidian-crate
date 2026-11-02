@@ -6,7 +6,7 @@ import type { CrateSettings } from '../../plugin/settings';
 import type { CloudflareDeploymentMetadata, CloudflareDeploymentResult, DeploymentIntent, DeploymentRequest, SavedDeploymentIntent } from './types';
 import { CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
-import type { HttpTransport } from '../http';
+import { API_BASE_URL, type HttpTransport } from '../http';
 import { CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from '../oauth/client';
 import { CloudflareOAuthSession } from './oauth-session';
@@ -352,7 +352,7 @@ export class CloudflareDeploymentService {
 			const response = await this.options.transport(url, request);
 			this.lifetime.signal.throwIfAborted();
 			checkTarget?.();
-			if (authorization === 'saved' && new URL(url).origin === 'https://api.cloudflare.com'
+			if (authorization === 'saved' && new URL(url).origin === new URL(API_BASE_URL).origin
 				&& (response.status === 401 || response.status === 403)) throw new CloudflareReauthorizationRequired();
 			return response;
 		}), { sleep: milliseconds => this.pause(milliseconds) });
