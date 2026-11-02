@@ -75,6 +75,7 @@ These tests protect stored user data and released clients. When one fails, the c
 ## Implementation rules
 
 - Strict TypeScript. Prefer browser-compatible dependencies, keep bundles small and within `npm run size-check` budgets; runtime dependencies must be bundled into `main.js`.
+- Name new files in kebab-case (`sync-outcome.ts`), React components in PascalCase (`ReminderCard.tsx`) and hooks as `useName.ts`. Rename an older camelCase file only when you are already changing it.
 - Shared plugin code must run on mobile: no Node or Electron APIs. Plugin file access stays inside the vault.
 - Register commands with `this.addCommand(...)` and keep released command IDs. Give settings defaults and validation; await `loadData()` / `saveData()` where ordering matters.
 - Use Obsidian `register*` helpers so reload and unload leak nothing.
