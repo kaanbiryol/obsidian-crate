@@ -1,8 +1,8 @@
 import { capturePath } from './captures';
 import { updatePolicy } from './access';
-import { createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
+import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
-import { isEmptyReadingCapture, readingDeleteIssue, readingUpdateIssue } from '@/reading/core/mutation-policy';
+import { planReadingFileCommand, type ReadingFileCommandPlan } from '@/reading/core/reading-file-command';
 import { patchReadingFrontmatter, readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { sha256Hex } from '@/platform/sha256';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
@@ -78,32 +78,18 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	// `before` revision then needs only this item again, not the whole library.
 	const revision = crypto.randomUUID().replaceAll('-', '');
 	const library = async () => ({ before: await readingListEtag(current, index.revision), after: await readingListEtag(current, revision) });
-	if (action === 'delete') {
-		// The note must still be what the client showed, so a stale delete never removes newer edits.
-		const issue = await readingDeleteIssue(source.item, source.content, body.before, body.markdownHash);
-		if (issue === 'invalid') throw new ReadingError('Choose a Reading change.');
-		if (issue === 'unsupported') throw new ReadingError('Unsupported Reading change.');
-		if (issue === 'conflict') throw new ReadingError('This item changed on another device. Refresh before deleting it.', 409, 'reading_conflict');
+	if (action === 'retry' && !current.enabled) throw new ReadingError('Allow article fetching in Reading settings before retrying.', 403);
+	const command = action === 'delete' || action === 'retry' ? action : 'update';
+	const plan = await planReadingFileCommand(source.item, source.content, { action: command, before: body.before, changes: body.changes, markdownHash: body.markdownHash });
+	if (plan.kind === 'issue') throw readingCommandError(plan, command);
+	if (plan.kind === 'remove') {
 		const response = { deleted: true, id: source.item.crate_reading_id };
 		const result = await commitFileDelete(env.DB, { path: source.path, expectedHash: source.file.hash, expectedRevision: source.file.storageKey, previousFile: source.file,
 			readingPolicy: current, readingRevision: revision, effects: operationEffects(env.DB, op, response) });
 		if (!result.committed) throw new ReadingError('This note changed. Refresh before deleting it.', 409);
 		return readingResponse({ ...response, library: await library() });
 	}
-	let content: string;
-	if (action === 'retry') {
-		if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before retrying.', 403);
-		if (!isEmptyReadingCapture(source.content, source.item)) throw new ReadingError('Only URL captures with an unchanged article section can be extracted.');
-		content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });
-	} else {
-		const changes = body.changes;
-		if (!changes || typeof changes !== 'object' || Array.isArray(changes) || !body.before || typeof body.before !== 'object') throw new ReadingError('Choose a Reading change.');
-		const issue = readingUpdateIssue(source.item, body.before, changes);
-		if (issue === 'unsupported') throw new ReadingError('Unsupported Reading change.');
-		if (issue === 'conflict') throw new ReadingError('This item changed on another device. Refresh before editing it.', 409, 'reading_conflict');
-		try { content = updateReadingNote(source.content, source.item.crate_reading_id, changes); }
-		catch (error) { throw new ReadingError(error instanceof Error ? error.message : 'Invalid Reading change.'); }
-	}
+	const content = plan.content;
 	const response = { saved: true, id: source.item.crate_reading_id };
 	const staged = await stageMarkdownFile(env.BUCKET, env.DB, source.path, content, source.file.hash);
 	const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, readingRevision: revision, reminderFolder: op.reminderFolder, encryptionState: null, effects: operationEffects(env.DB, op, response) });
@@ -114,4 +100,13 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	const article = { item: { ...saved, path: source.path }, etag: await readingItemEtag(current, saved.crate_reading_id, { path: source.path, storage_key: staged.objectKey, hash: staged.hash }),
 		markdownHash: await sha256Hex(readReadingFrontmatter(content)?.body ?? '') };
 	return readingResponse({ ...response, library: await library(), article });
+}
+
+function readingCommandError(plan: Extract<ReadingFileCommandPlan, { kind: 'issue' }>, action: 'delete' | 'retry' | 'update'): ReadingError {
+	switch (plan.issue) {
+		case 'invalid': return new ReadingError(plan.message ?? 'Choose a Reading change.');
+		case 'unsupported': return new ReadingError('Unsupported Reading change.');
+		case 'not-empty': return new ReadingError('Only URL captures with an unchanged article section can be extracted.');
+		case 'conflict': return new ReadingError(`This item changed on another device. Refresh before ${action === 'delete' ? 'deleting' : 'editing'} it.`, 409, 'reading_conflict');
+	}
 }

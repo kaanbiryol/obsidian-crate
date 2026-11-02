@@ -1,9 +1,9 @@
 import { applyLocalArticle } from '../../reading/core/article';
-import { isEmptyReadingCapture, readingDeleteIssue, readingUpdateIssue } from '../../reading/core/mutation-policy';
+import { planReadingFileCommand, type ReadingFileCommandPlan } from '../../reading/core/reading-file-command';
 import type { CapturedArticle } from '../../reading/extraction/types';
 import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
 import { decryptJson, encryptJson } from '@/encryption/envelope';
-import { createReadingNote, parseReadingNote, updateReadingNote, readingImportId } from '../../reading/core/notes';
+import { createReadingNote, parseReadingNote, readingImportId } from '../../reading/core/notes';
 import { readReadingFrontmatter, patchReadingFrontmatter } from '../../reading/core/frontmatter';
 import { MAX_READING_BYTES, readingUrl, type ReadingItem } from '../../reading/core/model';
 import { readingCapturePath, retitledCapturePath } from '../../reading/core/filename';
@@ -267,6 +267,14 @@ export class EncryptedReadingApi {
 			catch (error) { if (!reused || !(error instanceof NoteUnavailableError)) throw error; }
 		}
 	}
+	private commandError(plan: Extract<ReadingFileCommandPlan, { kind: 'issue' }>, action: 'delete' | 'retry' | 'update'): Error {
+		switch (plan.issue) {
+			case 'invalid': return new Error(plan.message ?? 'Choose a Reading change.');
+			case 'unsupported': return this.options.error('Unsupported Reading change.', 400);
+			case 'not-empty': return this.options.error('Only empty saved links can be downloaded.', 409);
+			case 'conflict': return this.options.error(`This article changed on another device. Refresh before ${action === 'delete' ? 'deleting' : 'editing'}.`, 409, 'reading_conflict');
+		}
+	}
 	/** Build and persist exact ciphertext for one operation against the current
 	 * library, or answer from a receipt the operation already committed. */
 	private async prepare(action: string, body: Record<string, unknown>, id: string, rawBody: string, requestHash: string): Promise<{ attempt: Attempt } | { response: unknown }> {
@@ -298,10 +306,10 @@ export class EncryptedReadingApi {
 			if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
 			wire = this.wires.get(item.path)!;
 			const source = await this.source(this.files.get(wire)!); path = item.path; previous = source.file; itemId = item.crate_reading_id; before = item;
-			if (action === 'delete') {
-				const issue = await readingDeleteIssue(item, source.content, body.before, body.markdownHash);
-				if (issue === 'invalid') throw new Error('Choose a Reading change.');
-				if (issue) throw this.options.error('This article changed on another device. Refresh before deleting.', 409, 'reading_conflict');
+			const command = action === 'delete' || action === 'retry' ? action : 'update';
+			const plan = await planReadingFileCommand(item, source.content, { action: command, before: body.before, changes: body.changes, markdownHash: body.markdownHash });
+			if (plan.kind === 'issue') throw this.commandError(plan, command);
+			if (plan.kind === 'remove') {
 				const response = { deleted: true, id: itemId };
 				const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
 				const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id,
@@ -309,15 +317,7 @@ export class EncryptedReadingApi {
 				await this.options.writeAttempt(id, attempt);
 				return { attempt };
 			}
-			if (action === 'retry') {
-				if (!isEmptyReadingCapture(source.content, item)) throw this.options.error('Only empty saved links can be downloaded.', 409);
-				content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });
-			}
-			else {
-				if (!body.changes || typeof body.changes !== 'object' || !body.before || typeof body.before !== 'object') throw new Error('Choose a Reading change.');
-				if (readingUpdateIssue(item, body.before, body.changes)) throw this.options.error('This article changed on another device. Refresh before editing.', 409, 'reading_conflict');
-				content = updateReadingNote(source.content, itemId, body.changes);
-			}
+			content = plan.content;
 		}
 		if ((action === 'capture' && body.fetchArticle !== false || action === 'retry') && this.options.captureArticle) {
 			const item = parseReadingNote(content)!;
