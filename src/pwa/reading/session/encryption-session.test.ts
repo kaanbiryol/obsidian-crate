@@ -6,6 +6,8 @@ import { readingRequest } from '../api';
 import { decodeReadingValue, encodeReadingValue } from '../storage/private-storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session';
 
+vi.mock('../../connection/server-compatibility', () => ({ requireCompatibleProtocol: vi.fn().mockResolvedValue(1), forgetCompatibleProtocol: vi.fn() }));
+
 afterEach(() => { resetReadingEncryption(true); vi.unstubAllGlobals(); });
 function storage(): Storage {
 	const values: Record<string, string> = {};

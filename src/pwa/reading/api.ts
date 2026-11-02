@@ -20,7 +20,7 @@ import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { checkEncryptionSignals, EncryptionStateChangedError, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import { responseError } from '../connection/response-error';
-import { crateRequestHeaders } from '../connection/request-headers';
+import { crateProtocol, crateRequestHeaders, forgetRefusedProtocol } from '../connection/request-headers';
 
 /** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
 const noteFolder = (session: ReadingSession) => readingKeys()?.folderPath ?? session.folderPath;
@@ -83,9 +83,13 @@ let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;
 onReadingEncryptionReset(() => { encryptedClient = undefined; });
 async function rawReadingRequest(path: string, session: ReadingSession | null, body?: string, extraHeaders: Record<string, string> = {}): Promise<Response> {
 	if (session) assertReadingSession(session);
-	const response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal: AbortSignal.timeout(20_000),
-		headers: { ...crateRequestHeaders(session?.token), ...session ? readingEncryptionHeaders() : {}, 'Content-Type': 'application/json', ...extraHeaders }, body });
+	const method = body === undefined ? 'GET' : 'POST';
+	const protocolHeaders = crateRequestHeaders(session?.token, await crateProtocol(path, method));
 	if (session) assertReadingSession(session);
+	const response = await fetch(path, { method, cache: 'no-store', signal: AbortSignal.timeout(20_000),
+		headers: { ...protocolHeaders, ...session ? readingEncryptionHeaders() : {}, 'Content-Type': 'application/json', ...extraHeaders }, body });
+	if (session) assertReadingSession(session);
+	await forgetRefusedProtocol(response);
 	if (session && response.status === 401) {
 		reportExpiredConnection(session.token);
 		throw new ReadingApiError(SESSION_RECOVERY_MESSAGE, 401);

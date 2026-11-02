@@ -13,6 +13,8 @@ import { clearPersistedEncryption, clearEncryptionSessionMarkers } from '../encr
 import { resetReminderEncryption } from '../reminders/encryption-session';
 import { capturePwaSession } from '../connection/session-generation';
 
+vi.mock('../connection/server-compatibility', () => ({ requireCompatibleProtocol: vi.fn().mockResolvedValue(1), forgetCompatibleProtocol: vi.fn() }));
+
 vi.mock('../encryption/encryption-cleanup', async importOriginal => ({ ...await importOriginal<typeof import('../encryption/encryption-cleanup')>(), clearPersistedEncryption: vi.fn(async () => {}), clearEncryptionSessionMarkers: vi.fn() }));
 vi.mock('../reminders/encryption-session', () => ({ resetReminderEncryption: vi.fn() }));
 vi.mock('./storage/storage', async importOriginal => ({ ...await importOriginal<typeof import('./storage/storage')>(), clearReadingData: vi.fn(async () => {}) }));

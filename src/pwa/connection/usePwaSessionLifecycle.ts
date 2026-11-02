@@ -11,7 +11,7 @@ import { captureEncryptionCleanupAuthority } from '../encryption/encryption-clea
 import { resetReminderEncryption } from '../reminders/encryption-session';
 import { resetReadingEncryption } from '../reading/session/encryption-lifecycle';
 import { clearLocalData } from './local-data-cleanup';
-import { crateRequestHeaders } from './request-headers';
+import { crateProtocol, crateRequestHeaders } from './request-headers';
 
 interface PwaLogoutOperations {
 	apiFetch: ApiFetch;
@@ -36,7 +36,7 @@ export async function performPwaLogout({
 	let unreadableCredential = false;
 	try { if (typeof localStorage !== 'undefined') reading = readingSession(); } catch { unreadableCredential = true; }
 	const cleanup = Promise.allSettled([
-	...(reading && reading.source !== 'reminders' ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: crateRequestHeaders(reading.token) }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
+	...(reading && reading.source !== 'reminders' ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: crateRequestHeaders(reading.token, await crateProtocol('/auth/session', 'DELETE')) }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
 		start(disablePushNotifications),
 		...(revokeAppSession ? [start(() => apiFetch('/auth/session', { method: 'DELETE' }).then(response => {
 			if (!response.ok) throw new Error('Session revocation failed');

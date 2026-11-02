@@ -1,4 +1,4 @@
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol/server-info';
+import { CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol/server-info';
 import { capturePwaSession } from './session-generation';
 import { ConnectionError } from './issues';
 import { CRATE_WEB_SESSION_NAME_HEADER, REMINDERS_FOLDER_CHANGED } from '@/protocol/web-session';
@@ -9,8 +9,7 @@ import { prepareReminderEncryption } from '../reminders/encryption-session';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { checkEncryptionSignals, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
-import { forgetCompatibleProtocol, requireCompatibleProtocol } from './server-compatibility';
-import { responseError } from './response-error';
+import { crateProtocol, forgetRefusedProtocol } from './request-headers';
 import { EncryptedReminderApi } from '../reminders/encrypted-reminder-api';
 
 // The token and session whose latest authenticated response said the vault is not
@@ -47,8 +46,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 				if (typeof body.operationId === 'string') headers.set(OPERATION_ID_HEADER, body.operationId);
 			} catch { /* Non-JSON requests use their server request ID. */ }
 		}
-		headers.set(CRATE_PROTOCOL_HEADER, String(CRATE_PLUGIN_PROTOCOL.current));
-		if (isCrateMutation(path, init.method)) headers.set(CRATE_PROTOCOL_HEADER, String(await requireCompatibleProtocol()));
+		headers.set(CRATE_PROTOCOL_HEADER, String(await crateProtocol(path, init.method)));
 		if (!sessionCurrent() && !revokingSession) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		headers.set('Authorization', `Bearer ${authToken}`);
 		if (keys) {
@@ -71,7 +69,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 			onUnauthorized();
 			throw new ConnectionError('reconnect', 'Session expired. Open a fresh link from Crate.');
 		}
-		if (response.status === 428 && (await responseError(response.clone(), '')).code === 'protocol_incompatible') forgetCompatibleProtocol();
+		await forgetRefusedProtocol(response);
 		// Without keys, a 428 from a newly encrypted vault retries after a fresh probe.
 		checkEncryptionSignals(response, path, { probePath: '/encryption', message: 'The vault encryption changed.', encrypted: Boolean(keys) || encryptionState === 'on' });
 		if (response.status === 403 && path.startsWith('/reminders/')) await followFolderChange(response);

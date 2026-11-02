@@ -5,6 +5,8 @@ import { drainReading, queueReading, removeReviewedReading } from './outbox';
 import { pendingReading, savePendingReading } from './storage/storage';
 import { sha256Hex } from '@/platform/sha256';
 
+vi.mock('../connection/server-compatibility', () => ({ requireCompatibleProtocol: vi.fn().mockResolvedValue(1), forgetCompatibleProtocol: vi.fn() }));
+
 const storage = vi.hoisted(() => ({ values: new Map<string, unknown>(), current: true }));
 vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('./session/session', () => ({
