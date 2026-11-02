@@ -2,8 +2,7 @@ import type { BackupChoice } from '../restore/archive';
 import { runRestoreWorkflow } from '../restore/workflow';
 import { resumeInterruptedUpdate, type DeploymentRecoveryResult } from './update-recovery';
 import { deleteCrateServer } from '../server-reset/delete';
-import type { CrateSettings } from '../../plugin/settings';
-import type { CloudflareDeploymentMetadata, CloudflareDeploymentResult, DeploymentIntent, DeploymentRequest, SavedDeploymentIntent } from './types';
+import type { CloudflareDeploymentMetadata, CloudflareDeploymentResult, DeploymentIntent, DeploymentRequest, DeploymentSettings, SavedDeploymentIntent } from './types';
 import { CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { API_BASE_URL, type HttpTransport } from '../http';
@@ -22,8 +21,8 @@ import {
 } from './device-registration';
 
 interface DeploymentSettingsOwner {
-	settings: CrateSettings;
-	writeSettings(update: Partial<CrateSettings>): Promise<void>;
+	settings: DeploymentSettings;
+	writeSettings(update: Partial<DeploymentSettings>): Promise<void>;
 }
 
 /** Runs an operation with saved Cloudflare authorization, renewing it when needed. */

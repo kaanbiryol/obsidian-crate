@@ -29,7 +29,7 @@ async function loadPluginIntegration() {
 	vi.doMock('./connection', () => ({ configureCloudflareAuthorizedDevice }));
 	vi.doMock('../vault-replacement', () => ({ confirmVaultReplacement: async () => false }));
 	vi.doMock('../feature-settings', () => ({ offerFeatureChoice }));
-	vi.doMock('../../cloudflare/device-token', () => ({ generateSecureToken, hashToken }));
+	vi.doMock('../device-token', () => ({ generateSecureToken, hashToken }));
 	vi.doMock('../deviceInfo', () => ({
 		getCurrentDeviceName: vi.fn(() => 'Test device'),
 		getCurrentPlatformCode: vi.fn(() => 'desktop'),

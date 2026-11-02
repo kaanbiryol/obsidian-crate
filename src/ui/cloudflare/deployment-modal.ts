@@ -1,4 +1,4 @@
-import { vaultChoiceLabel } from '../../cloudflare/vault-name';
+import { vaultChoiceLabel } from '../../cloudflare/deployment/vault-name';
 import type { DiscoveredCloudflareDeployment } from '../../cloudflare/deployment/discovery';
 import { Modal, Platform, type App } from 'obsidian';
 import { createElement } from 'react';

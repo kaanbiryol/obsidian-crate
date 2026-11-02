@@ -1,5 +1,5 @@
 import { createUpgradeCheckpoint } from './upgrade-checkpoint';
-import { readVaultName } from '../vault-name';
+import { readVaultName } from './vault-name';
 import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentRelease, releaseUpgradeGuards } from './database';
 import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import type { CloudflareDeploymentMetadata } from './types';

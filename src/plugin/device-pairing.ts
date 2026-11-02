@@ -4,7 +4,7 @@ import { getPluginLifecycleSignal } from './lifecycle-state';
 import { configureCloudflareAuthorizedDevice } from './cloudflare/connection';
 import { offerFeatureChoice } from './feature-settings';
 import { getCurrentDeviceName, getCurrentPlatformCode } from './deviceInfo';
-import { generateSecureToken, hashToken } from '../cloudflare/device-token';
+import { generateSecureToken, hashToken } from './device-token';
 import { normalizeCloudflareDeployment } from '../cloudflare/deployment/state';
 import { workersDevOrigin } from '../cloudflare/deployment/worker-origin';
 import { HttpError, WorkerApiHttpClient } from '../sync/worker-api/http';

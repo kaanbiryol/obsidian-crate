@@ -1,4 +1,4 @@
-import { readVaultName } from '../vault-name';
+import { readVaultName } from './vault-name';
 import type { CloudflareDeploymentMetadata } from './types';
 import type {
 	CloudflareAccount,

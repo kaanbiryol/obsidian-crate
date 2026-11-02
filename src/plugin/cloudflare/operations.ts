@@ -14,7 +14,7 @@ import { getPluginLifecycleSignal } from '../lifecycle-state';
 import { configureCloudflareAuthorizedDevice } from './connection';
 import { isSelfHostedConnectionPending } from '../self-hosted-connection';
 import { offerFeatureChoice } from '../feature-settings';
-import { generateSecureToken, hashToken } from '../../cloudflare/device-token';
+import { generateSecureToken, hashToken } from '../device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../deviceInfo';
 import { openCloudflareDeploymentModal, revealCloudflareOperation, type CloudflareDeploymentModal } from '../../ui/cloudflare/deployment-modal';
 import { dismissCloudflareAuthorizationModal } from '../../ui/cloudflare/authorization-modal';

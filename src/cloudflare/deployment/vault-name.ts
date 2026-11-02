@@ -1,5 +1,5 @@
-import type { CloudflareDeploymentMetadata } from './deployment/types';
-import type { CloudflareWorkerSettings } from './cloudflare-api';
+import type { CloudflareDeploymentMetadata } from './types';
+import type { CloudflareWorkerSettings } from '../cloudflare-api';
 
 export const VAULT_NAME_BINDING = 'CRATE_VAULT_NAME';
 

@@ -1,5 +1,5 @@
 import { isRecord, isSha256Hex } from '../../platform/validation';
-import { normalizeVaultName } from '../vault-name';
+import { normalizeVaultName } from './vault-name';
 import type { CloudflareDeploymentMetadata } from './types';
 
 function normalizeString(value: unknown, fallback = ''): string {

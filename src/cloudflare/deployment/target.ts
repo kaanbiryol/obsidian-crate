@@ -1,7 +1,7 @@
 import type { CloudflareApiClient, CloudflareAccount } from '../cloudflare-api';
 import { discoverCloudflareDeployments, type DiscoveredCloudflareDeployment } from './discovery';
 import type { CloudflareDeploymentMetadata, DeploymentRequest } from './types';
-import { normalizeVaultName } from '../vault-name';
+import { normalizeVaultName } from './vault-name';
 import { createRandomHexToken } from '../../platform/random-hex';
 import { DEVELOPMENT_BUILD } from '../../protocol/server-build';
 

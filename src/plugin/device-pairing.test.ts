@@ -16,7 +16,7 @@ vi.mock('obsidian', () => ({ Notice: class { constructor(message: string) { mock
 vi.mock('./cloudflare/connection', () => ({ configureCloudflareAuthorizedDevice: mocks.configure }));
 vi.mock('./feature-settings', () => ({ offerFeatureChoice: mocks.featureChoice }));
 vi.mock('./deviceInfo', () => ({ getCurrentDeviceName: () => 'iPhone', getCurrentPlatformCode: () => 'ios' }));
-vi.mock('../cloudflare/device-token', () => ({ generateSecureToken: () => 'phone-token', hashToken: async () => 'phone-token-hash' }));
+vi.mock('./device-token', () => ({ generateSecureToken: () => 'phone-token', hashToken: async () => 'phone-token-hash' }));
 vi.mock('../sync/encryption/server-encryption', () => ({ readServerEncryption: mocks.encryption }));
 vi.mock('../ui/confirmation-modal', () => ({ openConfirmationModal: mocks.confirm }));
 vi.mock('../ui/settings/device-key-pairing-modal', () => ({ DeviceKeyPairingModal: class { open = mocks.keysModal; } }));

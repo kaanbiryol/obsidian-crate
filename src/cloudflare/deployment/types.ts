@@ -1,3 +1,4 @@
+import type { ServerRestoreState } from '../restore/state';
 export type DeploymentIntent = 'reconnect' | 'connect' | 'switch' | 'create' | 'update' | 'delete';
 export type SavedDeploymentIntent = Exclude<DeploymentIntent, 'switch' | 'create'>;
 
@@ -43,4 +44,11 @@ export interface DeploymentRequest {
 	discoverExisting: boolean;
 	originalMetadata: string;
 	intent: DeploymentIntent;
+}
+
+/** The saved plugin settings that deployment reads and writes. */
+export interface DeploymentSettings {
+	workerUrl: string;
+	cloudflareDeployment: CloudflareDeploymentMetadata | null;
+	cloudflareRestore?: ServerRestoreState | null;
 }
