@@ -1,4 +1,4 @@
-import { processVaultMarkdown } from '@/sync/local/vault-markdown';
+import { processVaultMarkdown } from '@/reminders/data/vault-markdown';
 import { parseStoredReminderDate } from '@/reminders/core/dates/reminderDate';
 import { buildReminderCompletionPlan, setReminderCompletionInContent, type ReminderCompletionMutation } from '../../core/reminderCompletion';
 import type { IndexedReminder } from '../reminder-index';

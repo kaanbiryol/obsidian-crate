@@ -4,7 +4,7 @@ import { buildDescriptionBlock, readDescriptionBlock } from '../core/reminderDes
 import { hasAttachedMarkdownContent, markdownTaskContexts } from '../core/markdownTaskContext';
 import { createReminderMoveStorage, type ReminderMoveRecord } from './reminder-move-storage';
 import { portablePathKey } from '@/protocol/portable-path';
-import { readVaultMarkdown, processVaultMarkdown } from '@/sync/local/vault-markdown';
+import { readVaultMarkdown, processVaultMarkdown } from '@/reminders/data/vault-markdown';
 
 type MoveSide = ReminderMoveRecord['source'];
 type ObservedBlock = { state: 'absent' | 'changed' | 'exact' | 'ambiguous'; lineNumber?: number; block?: string; file: TFile | null; version: string | null };

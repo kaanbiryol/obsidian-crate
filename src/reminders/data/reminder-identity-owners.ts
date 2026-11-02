@@ -2,7 +2,7 @@ import { TFile, type App } from 'obsidian';
 import { parseCheckboxLine } from '../core/grammar/checkboxParser';
 import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { extractReminderId } from '../core/reminderIdentity';
-import { readVaultMarkdown } from '@/sync/local/vault-markdown';
+import { readVaultMarkdown } from '@/reminders/data/vault-markdown';
 
 export interface ReminderIdentityOwner { id: string; filePath: string }
 export type ReminderIdentityOwners = Map<string, Set<string>>;

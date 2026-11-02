@@ -1,7 +1,7 @@
 import { TFile, TFolder, type FileManager, type TAbstractFile, type Vault } from 'obsidian';
 import { portablePathKey } from '@/protocol/portable-path';
 import { isCurrentVaultFile } from '@/sync/local/vault-file-identity';
-import { processVaultMarkdown, readVaultMarkdown } from '@/sync/local/vault-markdown';
+import { processVaultMarkdown, readVaultMarkdown } from '@/reminders/data/vault-markdown';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import type { ReadingFile, ReadingVault } from './library';
 

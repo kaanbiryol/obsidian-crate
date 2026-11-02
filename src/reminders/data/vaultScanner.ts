@@ -20,7 +20,7 @@ import { compareProjects } from "@/reminders/core/reminder-list";
 import { createLogger } from "@/reminders/logger";
 import type { IndexedReminder } from "./reminder-index";
 import { addReminderIdentityOwners, releaseReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
-import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from '@/sync/local/vault-markdown';
+import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from '@/reminders/data/vault-markdown';
 import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
 import { isConflictFile } from '@/sync/conflict/conflict';
 import type { ReminderEditorWriter } from './editor-normalization';

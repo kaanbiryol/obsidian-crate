@@ -474,7 +474,7 @@ The reminders web app uses a separate short-lived web enrollment token in the `/
 
 `reading/data/obsidian-vault.ts` binds snapshots to Obsidian file identities and owns
 discovery, guarded reads/writes, and file-event revisions. Like reminder edits, its reads
-and writes go through `sync/local/vault-markdown.ts`, so a note that is not strict UTF-8
+and writes go through `reminders/data/vault-markdown.ts`, so a note that is not strict UTF-8
 is listed as an issue instead of being rewritten with replacement characters. `reading/runtime.ts`
 owns configuration, policy refresh, scheduling and lifecycle cleanup.
 `ReadingLibrary.close()` closes admission and drains its accepted mutation and

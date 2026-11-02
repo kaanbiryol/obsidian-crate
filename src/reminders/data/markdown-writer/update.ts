@@ -1,5 +1,5 @@
 import type { UpdateReminderInput } from '../../core/reminderMutationPlan';
-import { processVaultMarkdown, readVaultMarkdown } from '@/sync/local/vault-markdown';
+import { processVaultMarkdown, readVaultMarkdown } from '@/reminders/data/vault-markdown';
 import type { IndexedReminder } from "../reminder-index";
 import {
 	appendReminderBlockToContent,

@@ -16,7 +16,7 @@ import { getProjectFromPath } from "@/reminders/core/markdownScan";
 import { addReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from '../reminder-identity-owners';
 import { applyFileScanResult, applyVaultScanResult } from './file-scan-result';
 import type { ReminderSourceIssue } from '../reminder-source-issues';
-import { readVaultMarkdown } from '@/sync/local/vault-markdown';
+import { readVaultMarkdown } from '@/reminders/data/vault-markdown';
 import { sha256Hex } from '../../../platform/sha256';
 import type { ReminderEditorWriter } from '../editor-normalization';
 

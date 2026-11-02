@@ -12,7 +12,7 @@ import {
 } from "@/ui/plugin/shadowReactMount";
 import { PluginRoot } from "@/ui/plugin/PluginRoot";
 import { RemindersList } from "@/reminders/ui/plugin/reminder-list/RemindersList";
-import { processVaultMarkdown } from "@/sync/local/vault-markdown";
+import { processVaultMarkdown } from "@/reminders/data/vault-markdown";
 import { parseRemindersBlockOptions, setRemindersBlockShowCompleted, type RemindersBlockType } from "./remindersBlockOptions";
 
 export function renderRemindersBlock(plugin: CratePlugin, type: RemindersBlockType, source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {

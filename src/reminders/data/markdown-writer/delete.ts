@@ -1,4 +1,4 @@
-import { processVaultMarkdown } from '@/sync/local/vault-markdown';
+import { processVaultMarkdown } from '@/reminders/data/vault-markdown';
 import { deleteReminderBlockFromContent } from "../../core/markdownReminderFile";
 import type { IndexedReminder } from "../reminder-index";
 import type { MarkdownWriterContext } from "./types";

@@ -1,4 +1,4 @@
-import { processVaultMarkdown } from '@/sync/local/vault-markdown';
+import { processVaultMarkdown } from '@/reminders/data/vault-markdown';
 import { reorderReminderBlocksInContent } from "../../core/markdownReminderFile";
 import type { MarkdownWriterContext } from "./types";
 import { markdownWriterLog } from "./helpers";
