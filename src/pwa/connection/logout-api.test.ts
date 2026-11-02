@@ -1,12 +1,12 @@
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { afterEach, expect, it, vi } from 'vitest';
-import { makeApiFetch } from './connection/api-fetch';
-import { AUTH_TOKEN_KEY } from './config';
-import { READING_SESSION_KEY } from './reading/session/session';
-import { invalidatePwaSession } from './connection/session-generation';
-import { performPwaLogout } from './connection/usePwaSessionLifecycle';
+import { makeApiFetch } from './api-fetch';
+import { AUTH_TOKEN_KEY } from '../config';
+import { READING_SESSION_KEY } from '../reading/session/session';
+import { invalidatePwaSession } from './session-generation';
+import { performPwaLogout } from './usePwaSessionLifecycle';
 
-vi.mock('./connection/session-label', () => ({ detectWebSessionName: () => 'iPhone · Safari' }));
+vi.mock('./session-label', () => ({ detectWebSessionName: () => 'iPhone · Safari' }));
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
