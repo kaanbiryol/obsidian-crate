@@ -1,13 +1,12 @@
 import { ReminderDescriptionError } from '../core/reminderDescription';
 import { MarkdownEncodingError } from '../core/markdownEncoding';
+import type { ReminderSourceIssue as ListedReminderSourceIssue } from '../core/reminder-list';
 
 type ReminderSourceDiagnostic =
 	| { code: ReminderDescriptionError['code']; line?: number }
 	| { code: 'invalid-markdown-encoding' };
 
-export interface ReminderSourceIssue {
-	path: string;
-	reason: string;
+export interface ReminderSourceIssue extends ListedReminderSourceIssue {
 	diagnostic?: ReminderSourceDiagnostic;
 }
 

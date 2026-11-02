@@ -1,6 +1,9 @@
 import type { InferOutput } from 'valibot';
 import type { reminderDraftSchema, reminderRecordSchema } from './cache/reminder-storage-validation';
 import type { RecurrenceRule } from '@/reminders/types/reminder';
+import type { ReminderSourceIssue } from '@/reminders/core/reminder-list';
+
+export type { ReminderSourceIssue };
 
 export type ModalMode = 'create' | 'edit';
 export type ModalPickerId = 'date' | 'project' | 'recurrence';
@@ -48,11 +51,6 @@ export interface CachedReminderSnapshot {
 	/** Server changelog position for requesting only notes changed since this snapshot. */
 	deltaBase?: string;
 	issues?: ReminderSourceIssue[];
-}
-
-export interface ReminderSourceIssue {
-	path: string;
-	reason: string;
 }
 
 export interface ReminderMutationBody {
