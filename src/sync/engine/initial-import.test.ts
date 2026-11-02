@@ -3,7 +3,8 @@ import type { VaultFile } from '../local/file-discovery';
 
 const files: VaultFile[] = Array.from({ length: 200 }, (_, index) => ({ path: `notes/${index}.md`, size: 1, mtime: 1, extension: 'md' }));
 vi.mock('../local/file-discovery', () => ({ getAllVaultFiles: vi.fn(async () => files) }));
-vi.mock('../transfer/prepare', () => ({
+vi.mock('../transfer/prepare', async importOriginal => ({
+	...await importOriginal<typeof import('../transfer/prepare')>(),
 	prepareUploadFromVaultFile: vi.fn(async (_transfer: unknown, file: VaultFile) => {
 		events.push(`prepare ${file.path}`);
 		return { path: file.path, content: new ArrayBuffer(1), size: 1, mtime: file.mtime, hash: `h-${file.path}` };

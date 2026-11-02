@@ -111,17 +111,18 @@ export async function prepareUploadFromPath(
  * changes no guarantee. */
 export function createBatchUploadChunks(prepared: PreparedUpload[]): PreparedUpload[][] {
 	const isNew = (upload: PreparedUpload) => (upload.expectedHash ?? null) === null;
-	return [...chunkUploads(prepared.filter(isNew)), ...chunkUploads(prepared.filter(upload => !isNew(upload)))];
+	return [...chunkPreparedUploads(prepared.filter(isNew)), ...chunkPreparedUploads(prepared.filter(upload => !isNew(upload)))];
 }
 
-function chunkUploads(prepared: PreparedUpload[]): PreparedUpload[][] {
+/** Splits uploads in order into requests within the file and byte limits. */
+export function chunkPreparedUploads(prepared: PreparedUpload[], maxFiles = BATCH_UPLOAD_MAX_FILES): PreparedUpload[][] {
 	const chunks: PreparedUpload[][] = [];
 	let currentChunk: PreparedUpload[] = [];
 	let currentBytes = 0;
 
 	for (const upload of prepared) {
 		if (
-			currentChunk.length >= BATCH_UPLOAD_MAX_FILES
+			currentChunk.length >= maxFiles
 			|| (currentChunk.length > 0 && currentBytes + upload.size > BATCH_MAX_BYTES)
 		) {
 			chunks.push(currentChunk);

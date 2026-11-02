@@ -2,6 +2,7 @@ import { createDeleteCandidates, type DeleteRemoteFiles } from '../transfer/dele
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
 import { partitionSkippedUploads } from '../local/local-file-changes';
+import { uploadPipelined } from '../transfer/upload-pipeline';
 import { unsupportedLocalPathIssue } from '../local/local-path-safety';
 import { oversizedRemoteFileIssue, rejectedSealedNoteIssue } from '../issues';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
@@ -34,13 +35,10 @@ export interface ForceSyncWorkflowContext extends WorkflowCompletionContext {
 	shouldIgnore(path: string): boolean;
 	getManifest(): Promise<RemoteManifest>;
 	localManifest: Pick<LocalManifest, 'getAllPaths' | 'removeEntry' | 'save'>;
-	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
 	encrypted(): boolean;
-	prepareUploadsFromVaultFiles(
-		files: VaultFile[],
-		onPrepared?: (completed: number) => void
-	): Promise<PreparedUpload[]>;
+	/** Prepares a file even when unchanged, conditioned on the server's hash. */
+	prepareForceUpload(file: VaultFile, expectedHash: string | null): Promise<PreparedUpload | null>;
 	uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
@@ -104,30 +102,31 @@ export async function runForceFullSyncWorkflow(
 
 		// The manifest keeps its baselines while uploading, so an interrupted run
 		// leaves correct entries for every file it has not reached yet.
-		for (const chunk of context.createVaultFileChunks(files)) {
-			context.updateState({ work: { phase: 'preparing' } });
-			const prepared = await context.prepareUploadsFromVaultFiles(chunk, () => {
+		if (files.length) context.updateState({ work: { phase: 'preparing' } });
+		await uploadPipelined(context, files, result, {
+			prepare: async file => {
+				context.throwIfDestroyed();
+				const upload = await context.prepareForceUpload(file, getPathEntry(remoteManifest.files, file.path)?.hash ?? null);
 				current++;
 				progressCallback?.(current, total);
-			});
-			for (const upload of prepared) {
-				upload.expectedHash = getPathEntry(remoteManifest.files, upload.path)?.hash ?? null;
-			}
-
-			context.throwIfDestroyed();
-			context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
-			await context.uploadPreparedFiles(prepared, result, {
-				onProcessed: count => {
-					uploadsProcessed += count;
-					context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
-				},
-				onFailure: failure => { failures.push(failure); },
-				retry: true,
-			});
-			if (result.errors.length > 0) {
-				throw new Error('Force full sync stopped before deleting remote files because an upload failed');
-			}
-		}
+				return upload;
+			},
+			retry: true,
+			onFailure: failure => { failures.push(failure); },
+			beforeChunk: () => {
+				context.throwIfDestroyed();
+				context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
+			},
+			onProcessed: count => {
+				uploadsProcessed += count;
+				context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
+			},
+			afterChunk: () => {
+				if (result.errors.length > 0) {
+					throw new Error('Force full sync stopped before deleting remote files because an upload failed');
+				}
+			},
+		});
 
 		context.throwIfDestroyed();
 

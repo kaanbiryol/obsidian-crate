@@ -24,6 +24,7 @@ import { errorMessage } from '../../platform/logger';
 import type { SyncState, SyncResult, ConflictRecord } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { PREPARE_CONCURRENCY } from '../transfer/constants';
+import { uploadPipelined } from '../transfer/upload-pipeline';
 import { isAuthError } from '../failures';
 import {
 	createIgnoreMatcherContext,
@@ -358,15 +359,13 @@ export class SyncEngine {
 		return this.runExclusiveOperation(async () => {
 			const paths = this.localManifest.getAllPaths().filter(path => isMarkdownNoteInFolder(path, folder));
 			const result = createEmptySyncResult();
-			for (let offset = 0; offset < paths.length; offset += 50) {
-				this.lifecycle.throwIfDestroyed();
-				const prepared = [];
-				for (const path of paths.slice(offset, offset + 50)) {
-					const upload = await this.contexts.prepareRepublish(path);
-					if (upload) prepared.push(upload);
-				}
-				if (prepared.length) await this.contexts.uploadPreparedFiles(prepared, result, { retry: true });
-			}
+			await uploadPipelined(this.contexts, paths, result, {
+				prepare: path => {
+					this.lifecycle.throwIfDestroyed();
+					return this.contexts.prepareRepublish(path);
+				},
+				retry: true,
+			});
 			await this.localManifest.save();
 			return result.uploaded;
 		});

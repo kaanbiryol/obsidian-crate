@@ -1,6 +1,6 @@
 import { recordSyncError, SyncIssueError, withSyncFileContext } from '../issues';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
-import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_BYTES, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 import type { SyncApiClient } from '../worker-api/client';
 import type { PreparedUpload, SyncResult, SyncWork } from '../types';
 import type { TransferContext } from '../transfer/types';
@@ -11,7 +11,7 @@ import { getTransferBudgetBytes, prepareUploadChunks } from '../transfer/budget'
 const IMPORT_UPLOAD_CONCURRENCY = 3;
 const IMPORT_SAVE_FILES = 256;
 const IMPORT_SAVE_INTERVAL_MS = 5_000;
-import { prepareUploadFromVaultFile } from '../transfer/prepare';
+import { chunkPreparedUploads, prepareUploadFromVaultFile } from '../transfer/prepare';
 import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
 import { createPathRecord } from '@/protocol/path-record';
 import type { FileEntry } from '@/protocol/sync-types';
@@ -45,18 +45,10 @@ const batchBytes = (batch: PreparedUpload[]) => batch.reduce((sum, file) => sum 
 
 /** Small files share requests within the batch limits; larger files go one per request. */
 function importBatches(prepared: PreparedUpload[]): PreparedUpload[][] {
-	const batches: PreparedUpload[][] = [];
-	let batch: PreparedUpload[] = [];
-	let bytes = 0;
-	for (const file of prepared.filter(file => file.size < BATCH_FILE_SIZE_LIMIT)) {
-		if (batch.length >= INITIAL_IMPORT_MAX_FILES || bytes + file.size > BATCH_UPLOAD_MAX_BYTES) {
-			batches.push(batch); batch = []; bytes = 0;
-		}
-		batch.push(file); bytes += file.size;
-	}
-	if (batch.length) batches.push(batch);
-	batches.push(...prepared.filter(file => file.size >= BATCH_FILE_SIZE_LIMIT).map(file => [file]));
-	return batches;
+	return [
+		...chunkPreparedUploads(prepared.filter(file => file.size < BATCH_FILE_SIZE_LIMIT), INITIAL_IMPORT_MAX_FILES),
+		...prepared.filter(file => file.size >= BATCH_FILE_SIZE_LIMIT).map(file => [file]),
+	];
 }
 
 export async function runInitialImport(context: ImportContext, result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null> {

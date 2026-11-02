@@ -14,14 +14,10 @@ import type { LocalDiffPlannerContext } from '../planner/types';
 import { createFullSyncPlan } from '../planner/full';
 import { runIncrementalSync } from '../planner/incremental';
 import { getLocalChanges as planLocalChanges, getLocalDeletes as planLocalDeletes } from '../planner/local';
-import { prepareUploadFromPath as prepareTransferUploadFromPath } from '../transfer/prepare';
+import { prepareUploadFromPath as prepareTransferUploadFromPath, prepareUploadFromVaultFile } from '../transfer/prepare';
 import { parallelDownloadAndSaveFiles as transferParallelDownloadAndSaveFiles } from '../transfer/download';
 import { processDiff as transferProcessDiff } from '../transfer/process';
-import {
-	prepareUploadsFromVaultFiles as transferPrepareUploadsFromVaultFiles,
-	uploadPreparedFiles as transferUploadPreparedFiles,
-} from '../transfer/upload';
-import { createByteBudgetedVaultFileChunks } from '../transfer/budget';
+import { uploadPreparedFiles as transferUploadPreparedFiles } from '../transfer/upload';
 import { PREPARE_CONCURRENCY, DOWNLOAD_CONCURRENCY } from '../transfer/constants';
 import type { FileDiff, PreparedUpload, SyncResult, SyncState, SyncWork } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
@@ -151,9 +147,7 @@ export class SyncEngineContexts {
 			...base,
 			vault: d.vault,
 			shouldIgnore: d.shouldIgnore,
-			prepareUploadsFromVaultFiles: (files, onPrepared) =>
-				transferPrepareUploadsFromVaultFiles(this.transfer, files, PREPARE_CONCURRENCY, onPrepared, { force: true }),
-			createVaultFileChunks: createByteBudgetedVaultFileChunks,
+			prepareForceUpload: (file, expectedHash) => prepareUploadFromVaultFile(this.transfer, file, { force: true, expectedHash }),
 			encrypted: this.encrypted,
 		};
 	}

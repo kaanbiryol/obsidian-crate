@@ -1,39 +1,18 @@
 import { recordSyncError } from '../issues';
 import { isAbortError } from '../abort';
 import { arrayBufferToBase64 } from "../encoding";
-import { createBatchUploadChunks, prepareUploadFromVaultFile } from "./prepare";
+import { createBatchUploadChunks } from "./prepare";
 import { isMarkdownPath } from "../../protocol/note-paths";
 import type { TransferContext } from "./types";
 import type { BatchUploadFile, MutationFailure } from '../../protocol/sync-types';
 import type { PreparedUpload, SyncResult } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
-import type { VaultFile } from "../local/file-discovery";
 import { isAuthError, isTransientSyncFailure, isVersionConflict } from '../failures';
 import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from './constants';
 import { HttpError } from '../worker-api/http';
 
 const logger = createLogger("SyncTransfer");
-
-export async function prepareUploadsFromVaultFiles(
-	context: TransferContext,
-	files: VaultFile[],
-	concurrency: number,
-	onPrepared?: (completed: number) => void,
-	options?: { force?: boolean },
-): Promise<PreparedUpload[]> {
-	let completed = 0;
-
-	const tasks = files.map((file) => async () => {
-		const uploadFile = await prepareUploadFromVaultFile(context, file, options);
-		completed++;
-		onPrepared?.(completed);
-		return uploadFile;
-	});
-
-	const prepared = await context.runConcurrent(tasks, concurrency);
-	return prepared.filter((upload): upload is PreparedUpload => upload !== null);
-}
 
 type UploadTransferContext = Pick<TransferContext, 'runConcurrent' | 'retryWithBackoff' | 'getModifiedIso'> & {
 	files: Pick<TransferContext['files'], 'uploadFile' | 'batchUpload'>;
