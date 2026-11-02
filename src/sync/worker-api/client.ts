@@ -20,7 +20,6 @@ import type {
 } from '../../protocol/sync-types';
 import type { SharedSettings } from '../../protocol/shared-settings';
 import type { CrateServerInfo } from '../../protocol/server-info';
-import { AuthWorkerApi } from './auth';
 import { WorkerApiHttpClient } from './http';
 import type { ApiHttpTransport } from './http';
 import type {
@@ -31,7 +30,6 @@ import { NotificationsWorkerApi } from './notifications';
 import { SharedSettingsWorkerApi, type VersionedSharedSettings } from './shared-settings';
 import { SyncWorkerApi, type ChangesPage, type DownloadedBatch, type DownloadedFile } from './sync';
 import { InitialImportApi } from './initial-import';
-import { LinksWorkerApi } from './links';
 import { EncryptedFiles } from '../encryption/encrypted-files';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { createReminderProjection, importNotificationKeys } from '../../encryption/reminder-projection';
@@ -55,10 +53,11 @@ export class SyncApiClient {
 		this.sharedHistory.setEncryption(encryption);
 		this.sharedSettingsApi.setEncryption(encryption);
 		this.http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
-		this.linksApi.setEncryption(encryption);
+		this.titleLookupEncrypted = true;
 		this.folderKeys = { tags: encryption.paths.tags, key: await importEncryptionSecret(bundle.vault), vaultId: bundle.vaultId };
 	}
 	private folderKeys?: { tags: PathTags; key: EncryptionKey; vaultId: string };
+	private titleLookupEncrypted = false;
 
 	isEncrypted(): boolean { return this.folderKeys !== undefined; }
 
@@ -94,10 +93,8 @@ export class SyncApiClient {
 	 * the engine's file operations; these serve tests and tools acting as another device. */
 	readonly unjournaled: Pick<SyncWorkerApi, 'uploadFile' | 'batchUpload' | 'batchDelete'>;
 	readonly sharedHistory: SharedHistoryApi;
-	private readonly authApi: AuthWorkerApi;
 	private readonly sharedSettingsApi: SharedSettingsWorkerApi;
 	private readonly notificationsApi: NotificationsWorkerApi;
-	private readonly linksApi: LinksWorkerApi;
 
 	constructor(workerUrl: string, authToken: string, transport?: ApiHttpTransport) {
 		this.http = new WorkerApiHttpClient(workerUrl, authToken, transport);
@@ -105,10 +102,8 @@ export class SyncApiClient {
 		this.syncApi = new SyncWorkerApi(this.http);
 		this.unjournaled = this.syncApi;
 		this.sharedHistory = new SharedHistoryApi(this.http);
-		this.authApi = new AuthWorkerApi(this.http);
 		this.sharedSettingsApi = new SharedSettingsWorkerApi(this.http);
 		this.notificationsApi = new NotificationsWorkerApi(this.http);
-		this.linksApi = new LinksWorkerApi(this.http);
 	}
 
 	setAbortSignal(signal: AbortSignal): void {
@@ -119,8 +114,15 @@ export class SyncApiClient {
 		return this.http.isConfigured();
 	}
 
+	/** The server fetches the title without storing the link, also for encrypted vaults.
+	 * A device that has not unlocked an encrypted vault skips the lookup, and so does a
+	 * vault that last synced encrypted until syncing without encryption is confirmed. */
 	async fetchPageTitle(url: string): Promise<string | null> {
-		return this.linksApi.fetchPageTitle(url);
+		if (!this.titleLookupEncrypted && (this.http.refusesPlaintext() || await readServerEncryption(this.http, 7000))) return null;
+		const result = await this.http.requestJson<{ title?: unknown }>('/links/title', {
+			method: 'POST', body: JSON.stringify({ url }),
+		}, 7000);
+		return typeof result.title === 'string' ? result.title : null;
 	}
 
 	getWorkerUrl(): string {
@@ -186,15 +188,20 @@ export class SyncApiClient {
 	}
 
 	async revokeToken(id: string): Promise<{ success: boolean }> {
-		return this.authApi.revokeToken(id);
+		return this.http.requestJson<{ success: boolean }>('/auth/tokens', {
+			method: 'DELETE',
+			body: JSON.stringify({ id }),
+		});
 	}
 
 	async revokeCurrentToken(): Promise<{ success: boolean }> {
-		return this.authApi.revokeCurrentToken();
+		return this.http.requestJson<{ success: boolean }>('/auth/session', {
+			method: 'DELETE',
+		});
 	}
 
 	async listTokens(): Promise<{ tokens: RegisteredDevice[] }> {
-		return this.authApi.listTokens();
+		return this.http.requestJson<{ tokens: RegisteredDevice[] }>('/auth/tokens');
 	}
 
 	async getSharedSettings(): Promise<{ settings: SharedSettings | null; settingsVersion: string | null }> {
