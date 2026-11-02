@@ -19,7 +19,7 @@ async function load() {
 	vi.doMock('./devices-section', () => ({ canAddDeviceWithCode: () => true, loadConnectedDevices }));
 	vi.doMock('./add-device-modal', () => ({ AddDeviceModal: class { open = vi.fn(); } }));
 	vi.doMock('./reminders-web-app', () => ({ buildEnrollmentUrl: vi.fn() }));
-	vi.doMock('../qr-modal', () => ({ QRModal: class { open = vi.fn(); } }));
+	vi.doMock('./qr-modal', () => ({ QRModal: class { open = vi.fn(); } }));
 	vi.doMock('../sync-error-notice', () => ({ showSyncErrorNotice: vi.fn() }));
 	vi.doMock('../../sync/conflict/conflict', () => ({ notifyConflicts: vi.fn() }));
 	return import('./get-started-section');

@@ -239,7 +239,7 @@ export default tseslint.config(
 	{
 		// Crate's settings tab is a dynamic workflow with section-specific cleanup
 		// and OAuth/device actions that are not representable as static controls.
-		files: ['src/ui/settings-tab.ts'],
+		files: ['src/ui/settings/settings-tab.ts'],
 		rules: {
 			'obsidianmd/settings-tab/prefer-setting-definitions': 'off',
 		},

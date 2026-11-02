@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, it, vi } from 'vitest';
-import { FakeElement, MockModal, createObsidianUiModule, resetObsidianUiMocks } from '../test/fakes/obsidian-ui';
+import { FakeElement, MockModal, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 
 vi.mock('react-dom/client', () => ({
 	createRoot: (element: { textContent: string }) => ({

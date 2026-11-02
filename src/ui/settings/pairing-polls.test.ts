@@ -26,12 +26,12 @@ beforeEach(() => {
 		onClose() {}
 		close() { this.onClose(); }
 	} }));
-	vi.doMock('../qr-modal', () => ({ renderQrCode: () => {} }));
+	vi.doMock('./qr-modal', () => ({ renderQrCode: () => {} }));
 	vi.doMock('../../sync/encryption/server-encryption', () => ({ readServerEncryption: readEncryption }));
 });
 afterEach(() => {
 	vi.useRealTimers(); vi.unstubAllGlobals(); vi.resetModules();
-	for (const name of ['obsidian', '../plugin/shared-modal', '../qr-modal', '../../sync/encryption/server-encryption']) vi.doUnmock(name);
+	for (const name of ['obsidian', '../plugin/shared-modal', './qr-modal', '../../sync/encryption/server-encryption']) vi.doUnmock(name);
 });
 
 const plugin = () => ({

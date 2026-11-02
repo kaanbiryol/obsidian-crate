@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { FakeElement, MockSetting, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../test/fakes/obsidian-ui';
+import { FakeElement, MockSetting, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 
 vi.mock('obsidian', () => createObsidianUiModule());
-vi.mock('./plugin/shared-modal', async importOriginal => ({ ...await importOriginal<typeof import('./plugin/shared-modal')>(), SharedModal: class {
+vi.mock('../plugin/shared-modal', async importOriginal => ({ ...await importOriginal<typeof import('../plugin/shared-modal')>(), SharedModal: class {
 	contentEl = new FakeElement('div');
 	bodyEl = this.contentEl.createDiv();
 	modalEl = new FakeElement('div');

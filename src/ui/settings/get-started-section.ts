@@ -2,7 +2,7 @@ import { ButtonComponent, Notice, Setting, setIcon } from 'obsidian';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { errorMessage } from '../../platform/logger';
 import { writeSyncSettings } from '../../plugin/sync-connection';
-import { QRModal } from '../qr-modal';
+import { QRModal } from './qr-modal';
 import { AddDeviceModal } from './add-device-modal';
 import { canAddDeviceWithCode, loadConnectedDevices } from './devices-section';
 import { buildEnrollmentUrl } from './reminders-web-app';

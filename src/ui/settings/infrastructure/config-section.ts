@@ -8,7 +8,7 @@ import { disconnectDevice } from '../../../plugin/sync-connection';
 import { openConfirmationModal } from '../../confirmation-modal';
 import { createSettingsSectionHeading, type SettingsSectionContext } from '../section-helpers';
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
-import { openExternalBrowserModal } from '../../external-browser-modal';
+import { openExternalBrowserModal } from '../external-browser-modal';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 import { addServerChangeButton } from './server-change-button';
 

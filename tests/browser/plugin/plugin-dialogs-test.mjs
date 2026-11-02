@@ -16,9 +16,9 @@ const { outputFiles } = await build({
     import { openConfirmationModal } from './src/ui/confirmation-modal';
     import { openFeatureChoiceModal } from './src/ui/feature-choice-modal';
     import { PendingDiscardModal } from './src/ui/activity/pending-discard-modal';
-    import { SyncDiagnosticsModal } from './src/ui/sync-diagnostics-modal';
-    import { QRModal } from './src/ui/qr-modal';
-    import { openExternalBrowserModal } from './src/ui/external-browser-modal';
+    import { SyncDiagnosticsModal } from './src/ui/settings/sync-diagnostics-modal';
+    import { QRModal } from './src/ui/settings/qr-modal';
+    import { openExternalBrowserModal } from './src/ui/settings/external-browser-modal';
     import { openCloudflareAuthorizationModal } from './src/ui/cloudflare/authorization-modal';
     import { openCloudflareDeploymentModal } from './src/ui/cloudflare/deployment-modal';
     import { EncryptionResetModal } from './src/ui/settings/encryption/encryption-reset-modal';

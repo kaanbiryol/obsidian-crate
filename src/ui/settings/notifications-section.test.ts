@@ -20,7 +20,7 @@ async function flushMicrotasks(): Promise<void> {
 const confirmRemoval = vi.fn(async (_app: unknown, _options: { title: string }) => true);
 async function loadNotificationsSectionModule(expand = true) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../qr-modal', () => ({
+	vi.doMock('./qr-modal', () => ({
 		QRModal: class QRModal {
 			constructor(_app: unknown, data: string) {
 				lastQrCodeData = data;
@@ -28,7 +28,7 @@ async function loadNotificationsSectionModule(expand = true) {
 			open(): void {}
 		},
 	}));
-	vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
+	vi.doMock('./external-browser-modal', () => ({ openExternalBrowserModal }));
 	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal: confirmRemoval }));
 
 	const notifications = await import('./notifications-section');
@@ -60,8 +60,8 @@ describe('renderNotificationsSection', () => {
 		vi.unstubAllGlobals();
 		vi.clearAllMocks();
 		vi.doUnmock('obsidian');
-		vi.doUnmock('../qr-modal');
-		vi.doUnmock('../external-browser-modal');
+		vi.doUnmock('./qr-modal');
+		vi.doUnmock('./external-browser-modal');
 	});
 
 	it('keeps the push toggle and device controls inside the Notifications disclosure', async () => {

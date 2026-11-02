@@ -2,25 +2,25 @@
  * Settings tab for Crate configuration
  */
 
-import { renderAppearanceSettings } from './settings/appearance-section';
-import { createSettingsDisclosure } from './plugin/settings-disclosure';
-import { createSettingsSectionHeading, type SettingsSection } from './settings/section-helpers';
-import { renderUsageSection } from './settings/infrastructure/usage-section';
-import { renderConnectionStatus } from './settings/infrastructure/connection-status';
+import { renderAppearanceSettings } from './appearance-section';
+import { createSettingsDisclosure } from '../plugin/settings-disclosure';
+import { createSettingsSectionHeading, type SettingsSection } from './section-helpers';
+import { renderUsageSection } from './infrastructure/usage-section';
+import { renderConnectionStatus } from './infrastructure/connection-status';
 import { App, PluginSettingTab, Setting } from 'obsidian';
-import type CratePlugin from '../plugin/CratePlugin';
-import { renderForgetServerSetting } from './settings/infrastructure/server-selection-setting';
-import { renderConfigSection, renderServerSection, renderServerUpdateNotice } from './settings/infrastructure/config-section';
-import { renderDevicesSection } from './settings/devices-section';
-import { renderInfrastructureSection, renderServerActions } from './settings/infrastructure/infrastructure-section';
-import { renderSyncSection } from './settings/sync-section';
-import { renderRemindersSettings } from '../reminders/ui/plugin/settings-section';
-import { renderNotificationsSection } from './settings/notifications-section';
-import { renderCrateWebApp } from './settings/reminders-web-app';
-import { renderReadingSettings } from '../reading/ui/plugin/settings-section';
-import { captureSettingsView, restoreSettingsView } from './settings/settings-view-state';
-import { sharedSettingsSync } from '../plugin/shared-settings-sync';
-import { renderGetStartedSection, renderShowGetStartedSetting } from './settings/get-started-section';
+import type CratePlugin from '../../plugin/CratePlugin';
+import { renderForgetServerSetting } from './infrastructure/server-selection-setting';
+import { renderConfigSection, renderServerSection, renderServerUpdateNotice } from './infrastructure/config-section';
+import { renderDevicesSection } from './devices-section';
+import { renderInfrastructureSection, renderServerActions } from './infrastructure/infrastructure-section';
+import { renderSyncSection } from './sync-section';
+import { renderRemindersSettings } from '../../reminders/ui/plugin/settings-section';
+import { renderNotificationsSection } from './notifications-section';
+import { renderCrateWebApp } from './reminders-web-app';
+import { renderReadingSettings } from '../../reading/ui/plugin/settings-section';
+import { captureSettingsView, restoreSettingsView } from './settings-view-state';
+import { sharedSettingsSync } from '../../plugin/shared-settings-sync';
+import { renderGetStartedSection, renderShowGetStartedSetting } from './get-started-section';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;

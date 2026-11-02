@@ -8,8 +8,8 @@ const openExternalBrowserModal = vi.fn<(app: unknown, url: string, options: { li
 
 async function setup(encrypted = true, isMobile = false) {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile } }));
-	vi.doMock('../qr-modal', () => ({ QRModal: class {} }));
-	vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
+	vi.doMock('./qr-modal', () => ({ QRModal: class {} }));
+	vi.doMock('./external-browser-modal', () => ({ openExternalBrowserModal }));
 	const recovery = await generateRecoveryCode();
 	const bundle = await createVaultKeyBundle();
 	const secrets = new Map<string, string>([[SECRET_KEYS.AUTH_TOKEN, 'device-token']]);
@@ -36,7 +36,7 @@ async function setup(encrypted = true, isMobile = false) {
 
 afterEach(() => {
 	resetObsidianUiMocks(); vi.unstubAllGlobals(); vi.resetModules();
-	vi.doUnmock('obsidian'); vi.doUnmock('../qr-modal'); vi.doUnmock('../external-browser-modal');
+	vi.doUnmock('obsidian'); vi.doUnmock('./qr-modal'); vi.doUnmock('./external-browser-modal');
 	openExternalBrowserModal.mockClear();
 });
 

@@ -1,8 +1,8 @@
 import { Notice, Platform, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../platform/logger';
-import { QRModal } from '../qr-modal';
-import { openExternalBrowserModal } from '../external-browser-modal';
+import { QRModal } from './qr-modal';
+import { openExternalBrowserModal } from './external-browser-modal';
 import { loadEncryptionKeys } from '../../sync/encryption/key-storage';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import type { SettingsSectionContext } from './section-helpers';

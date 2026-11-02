@@ -13,7 +13,7 @@ import {
 import { type ReminderBackend } from '../reminders/runtime';
 import { configureLogger as configureRemindersLogger } from '../reminders/logger';
 import { SyncRuntime } from '../sync/runtime/runtime';
-import type { CrateSettingTab } from '../ui/settings-tab';
+import type { CrateSettingTab } from '../ui/settings/settings-tab';
 import { configureSyncLogger } from '../sync/logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';

@@ -38,7 +38,7 @@ async function loadConfigSectionModule(mobile = false) {
 		EMBEDDED_CLOUDFLARE_ARTIFACT: embeddedArtifact,
 	}));
 	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal }));
-	vi.doMock('../../external-browser-modal', () => ({ openExternalBrowserModal }));
+	vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
 	vi.doMock('../section-helpers', () => ({ createSettingsSectionHeading: vi.fn() }));
 	vi.doMock('../../plugin/settings-disclosure', () => ({ createSettingsDisclosure: (container: FakeElement) => container.createDiv() }));
 

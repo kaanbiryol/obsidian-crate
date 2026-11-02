@@ -61,7 +61,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 			error: vi.fn(),
 		})),
 	}));
-	vi.doMock('../ui/settings-tab', () => ({
+	vi.doMock('../ui/settings/settings-tab', () => ({
 		CrateSettingTab: class CrateSettingTab {
 			constructor(public readonly app: unknown, public readonly plugin: unknown) {}
 		},
@@ -143,7 +143,7 @@ afterEach(() => {
 	vi.doUnmock('obsidian');
 	vi.doUnmock('./secret-storage');
 	vi.doUnmock('./logger');
-	vi.doUnmock('../ui/settings-tab');
+	vi.doUnmock('../ui/settings/settings-tab');
 	vi.doUnmock('../reminders/plugin-integration');
 	vi.doUnmock('./sync-integration');
 	vi.doUnmock('./deviceId');

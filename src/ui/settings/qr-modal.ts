@@ -1,4 +1,4 @@
-import { createModalActions, createModalFooter, SharedModal } from './plugin/shared-modal';
+import { createModalActions, createModalFooter, SharedModal } from '../plugin/shared-modal';
 import { Notice, Setting, type App } from 'obsidian';
 import qrcode from 'qrcode-generator';
 

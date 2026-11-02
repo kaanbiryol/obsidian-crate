@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../test/fakes/obsidian-ui';
+import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 
 const rendered: string[] = [];
 const section = (name: string) => vi.fn(() => { rendered.push(name); });
@@ -17,24 +17,24 @@ async function display(isConfigured: boolean): Promise<string[]> {
 		constructor(public readonly app: unknown, public readonly plugin: unknown) {}
 		update(this: { display(): void }): void { this.display(); }
 	} }));
-	vi.doMock('./settings/appearance-section', () => ({ renderAppearanceSettings: section('appearance') }));
-	vi.doMock('./plugin/settings-disclosure', () => ({ createSettingsDisclosure: vi.fn() }));
-	vi.doMock('./settings/infrastructure/usage-section', () => ({ renderUsageSection: section('usage') }));
-	vi.doMock('./settings/infrastructure/connection-status', () => ({ renderConnectionStatus: section('connection') }));
-	vi.doMock('./settings/infrastructure/server-selection-setting', () => ({ renderForgetServerSetting: section('forget server') }));
-	vi.doMock('./settings/infrastructure/config-section', () => ({
+	vi.doMock('./appearance-section', () => ({ renderAppearanceSettings: section('appearance') }));
+	vi.doMock('../plugin/settings-disclosure', () => ({ createSettingsDisclosure: vi.fn() }));
+	vi.doMock('./infrastructure/usage-section', () => ({ renderUsageSection: section('usage') }));
+	vi.doMock('./infrastructure/connection-status', () => ({ renderConnectionStatus: section('connection') }));
+	vi.doMock('./infrastructure/server-selection-setting', () => ({ renderForgetServerSetting: section('forget server') }));
+	vi.doMock('./infrastructure/config-section', () => ({
 		renderConfigSection: section('config'), renderServerSection: section('server'), renderServerUpdateNotice: section('update notice'),
 	}));
-	vi.doMock('./settings/devices-section', () => ({ renderDevicesSection: section('devices') }));
-	vi.doMock('./settings/infrastructure/infrastructure-section', () => ({ renderInfrastructureSection: section('infrastructure'), renderServerActions: section('server actions') }));
-	vi.doMock('./settings/sync-section', () => ({ renderSyncSection: section('sync') }));
-	vi.doMock('../reminders/ui/plugin/settings-section', () => ({ renderRemindersSettings: section('reminders') }));
-	vi.doMock('./settings/notifications-section', () => ({ renderNotificationsSection: section('notifications') }));
-	vi.doMock('./settings/reminders-web-app', () => ({ renderCrateWebApp: section('web app') }));
-	vi.doMock('../reading/ui/plugin/settings-section', () => ({ renderReadingSettings: section('reading') }));
-	vi.doMock('./settings/get-started-section', () => ({ renderGetStartedSection: section('get started'), renderShowGetStartedSetting: section('show get started') }));
-	vi.doMock('./settings/settings-view-state', () => ({ captureSettingsView: vi.fn(), restoreSettingsView: vi.fn() }));
-	vi.doMock('../plugin/shared-settings-sync', () => ({ sharedSettingsSync: () => ({ observe: vi.fn(), push: vi.fn() }) }));
+	vi.doMock('./devices-section', () => ({ renderDevicesSection: section('devices') }));
+	vi.doMock('./infrastructure/infrastructure-section', () => ({ renderInfrastructureSection: section('infrastructure'), renderServerActions: section('server actions') }));
+	vi.doMock('./sync-section', () => ({ renderSyncSection: section('sync') }));
+	vi.doMock('../../reminders/ui/plugin/settings-section', () => ({ renderRemindersSettings: section('reminders') }));
+	vi.doMock('./notifications-section', () => ({ renderNotificationsSection: section('notifications') }));
+	vi.doMock('./reminders-web-app', () => ({ renderCrateWebApp: section('web app') }));
+	vi.doMock('../../reading/ui/plugin/settings-section', () => ({ renderReadingSettings: section('reading') }));
+	vi.doMock('./get-started-section', () => ({ renderGetStartedSection: section('get started'), renderShowGetStartedSetting: section('show get started') }));
+	vi.doMock('./settings-view-state', () => ({ captureSettingsView: vi.fn(), restoreSettingsView: vi.fn() }));
+	vi.doMock('../../plugin/shared-settings-sync', () => ({ sharedSettingsSync: () => ({ observe: vi.fn(), push: vi.fn() }) }));
 	const { CrateSettingTab } = await import('./settings-tab');
 	const plugin = { manifest: { version: '1.0.0' }, settings: { cloudflareDeployment: null }, syncRuntime: { isConfigured: () => isConfigured } };
 	new CrateSettingTab({} as never, plugin as never).update();

@@ -6,7 +6,7 @@ import { loadEncryptionKeys } from '../../sync/encryption/key-storage';
 import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';
 import { devicePairingLink } from '../../protocol/device-pairing';
 import { errorMessage } from '../../platform/logger';
-import { renderQrCode } from '../qr-modal';
+import { renderQrCode } from './qr-modal';
 import { WebAppPairingModal } from './web-app-pairing-modal';
 
 /** Shows a one-use QR code for a new device, then hands over to key approval for an encrypted vault. */
