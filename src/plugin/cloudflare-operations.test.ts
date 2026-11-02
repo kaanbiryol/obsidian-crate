@@ -407,7 +407,7 @@ describe('unified reconnect', () => {
 		const { startCloudflareDeployment } = await loadPluginIntegration();
 		const plugin = createPlugin(true);
 		await startCloudflareDeployment(plugin as never, 'reconnect');
-		expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).toHaveBeenCalledWith('reconnect', expect.any(Function), expect.any(Function), undefined, expect.any(Function));
+		expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).toHaveBeenCalledWith('reconnect', expect.any(Function), undefined, expect.any(Function));
 		expect(generateSecureToken).not.toHaveBeenCalled();
 		expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
 		expect(reconnectApi.testConnection).toHaveBeenCalledOnce();
@@ -420,7 +420,7 @@ describe('unified reconnect', () => {
 		reconnectApi.listTokens.mockRejectedValueOnce(new HttpError('Invalid token', 401));
 		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
 		await startCloudflareDeployment(plugin as never, 'reconnect');
-		expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mock.calls[0]?.[3]).toMatchObject({ tokenHash: 'device-token-hash' });
+		expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mock.calls[0]?.[2]).toMatchObject({ tokenHash: 'device-token-hash' });
 		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(plugin, plugin.settings.workerUrl, 'device-token', { workerUrl: plugin.settings.workerUrl, authToken: 'existing-token' });
 		expect(reconnectApi.testConnection.mock.invocationCallOrder.at(-1)).toBeLessThan(configureCloudflareAuthorizedDevice.mock.invocationCallOrder[0]!);
 		expect(progress.succeed).toHaveBeenCalled();

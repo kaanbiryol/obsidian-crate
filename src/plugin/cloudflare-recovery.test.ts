@@ -34,7 +34,7 @@ it('offers a fresh check and cancel without asking users to attest upload safety
 	expect(options.action.label).toBe('Check again');
 	options.action.onClick();
 	await vi.waitFor(() => expect(instance.cloudflareDeploymentService.recoverUpdate).toHaveBeenCalledTimes(2));
-	expect(instance.cloudflareDeploymentService.recoverUpdate).toHaveBeenLastCalledWith(expect.any(Function));
+	expect(instance.cloudflareDeploymentService.recoverUpdate).toHaveBeenLastCalledWith();
 	expect(mocks.start).not.toHaveBeenCalled();
 });
 it('offers an explicit update after successful recovery', async () => {

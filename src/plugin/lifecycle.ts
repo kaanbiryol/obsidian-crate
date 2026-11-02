@@ -101,6 +101,7 @@ function createCloudflareDeploymentService(plugin: CratePlugin): CloudflareDeplo
 		getVaultName: () => plugin.app.vault.getName(),
 		settingsOwner: plugin,
 		onAuthorized: (accountId, tokens) => plugin.cloudflareSavedLogin.acceptAuthorization(accountId, tokens),
+		withAuthorization: operation => plugin.cloudflareSavedLogin.withAuthorization(operation),
 		transport: cloudflareHttpTransport,
 		loadArtifacts: loadEmbeddedCloudflareArtifacts,
 		openExternal: url => openCloudflareAuthorization(plugin, url),

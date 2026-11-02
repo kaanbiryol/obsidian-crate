@@ -58,6 +58,7 @@ vi.mock('../cloudflare-api', () => ({
 vi.mock('./provisioner', () => ({ provisionCloudflareDeployment }));
 
 import { blockingServerOperation, CloudflareDeploymentService, type CloudflareDeploymentServiceOptions } from './service';
+import { authorizedBy, testAuthorization } from './authorization-test-harness';
 import type { CloudflareDeploymentMetadata, DeploymentIntent } from './types';
 import { DesktopOnlyServerChangeError } from './server-changes';
 
@@ -99,6 +100,7 @@ function createHarness(onAuthorized?: CloudflareDeploymentServiceOptions['onAuth
 		clientId: CLIENT_ID,
 		getVaultName: () => 'Local vault',
 		onAuthorized,
+		withAuthorization: testAuthorization,
 		settingsOwner,
 		transport,
 		loadArtifacts,
@@ -323,7 +325,7 @@ describe('Cloudflare deployment lifetime', () => {
 		vi.spyOn(crypto.subtle, 'digest').mockImplementation(() => new Promise(resolve => { release = resolve; }));
 		const h = resetHarness();
 		const pending = h.service.startDeployment('delete');
-		await h.service.deployWithSavedAuthorization('reconnect', operation => operation({ accessToken: 'saved' }), h.selectDeployment);
+		await authorizedBy(operation => operation({ accessToken: 'saved' }), h.service).deployWithSavedAuthorization('reconnect', h.selectDeployment);
 		release(new ArrayBuffer(32));
 		await pending;
 		expect(h.opened).toEqual([]);
@@ -577,7 +579,7 @@ it('updates with saved authorization without exchanging or revoking credentials'
 	h.transportCalls.length = 0;
 	h.opened.length = 0;
 	provisionCloudflareDeployment.mockClear();
-	await h.service.deployWithSavedAuthorization('update', operation => operation({ accessToken: 'saved', scope: CLOUDFLARE_OAUTH_SCOPES.join(' ') }), h.selectDeployment);
+	await authorizedBy(operation => operation({ accessToken: 'saved', scope: CLOUDFLARE_OAUTH_SCOPES.join(' ') }), h.service).deployWithSavedAuthorization('update', h.selectDeployment);
 	expect(apiMocks.constructedWithTokens.at(-1)).toBe('saved');
 	expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
 	expect(h.opened).toHaveLength(0);
@@ -589,7 +591,7 @@ it('rejects missing saved permissions before provisioning', async () => {
 	await h.service.startDeployment();
 	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, h.selectDeployment);
 	provisionCloudflareDeployment.mockClear();
-	await expect(h.service.deployWithSavedAuthorization('update', operation => operation({ accessToken: 'analytics', scope: 'account-analytics.read' }), h.selectDeployment)).rejects.toThrow('Reconnect Cloudflare');
+	await expect(authorizedBy(operation => operation({ accessToken: 'analytics', scope: 'account-analytics.read' }), h.service).deployWithSavedAuthorization('update', h.selectDeployment)).rejects.toThrow('Reconnect Cloudflare');
 	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 });
 
@@ -598,10 +600,10 @@ it('stops a saved update if the selected server changes while renewing authoriza
 	await h.service.startDeployment();
 	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, h.selectDeployment);
 	provisionCloudflareDeployment.mockClear();
-	await expect(h.service.deployWithSavedAuthorization('update', operation => {
+	await expect(authorizedBy(operation => {
 		h.settings.cloudflareDeployment!.accountId = 'different-account';
 		return operation({ accessToken: 'saved' });
-	}, h.selectDeployment)).rejects.toThrow('Server settings changed');
+	}, h.service).deployWithSavedAuthorization('update', h.selectDeployment)).rejects.toThrow('Server settings changed');
 	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 });
 
@@ -610,10 +612,10 @@ it('continues a saved update when the selected server is rewritten with reordere
 	await h.service.startDeployment();
 	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, h.selectDeployment);
 	provisionCloudflareDeployment.mockClear();
-	await h.service.deployWithSavedAuthorization('update', operation => {
+	await authorizedBy(operation => {
 		h.settings.cloudflareDeployment = Object.fromEntries(Object.entries(h.settings.cloudflareDeployment!).reverse()) as typeof h.settings.cloudflareDeployment;
 		return operation({ accessToken: 'saved' });
-	}, h.selectDeployment);
+	}, h.service).deployWithSavedAuthorization('update', h.selectDeployment);
 	expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
 });
 
@@ -622,17 +624,17 @@ it.each(['delete'] as const)('rejects a changed confirmation target during saved
 	await h.service.startDeployment();
 	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, h.selectDeployment);
 	h.settings.cloudflareDeployment!.d1DatabaseId = 'database';
-	await expect(h.service.deployWithSavedAuthorization(intent, operation => {
+	await expect(authorizedBy(operation => {
 		h.settings.cloudflareDeployment!.workerName = 'different-worker';
 		return operation({ accessToken: 'saved' });
-	}, h.selectDeployment)).rejects.toThrow('Server settings changed');
+	}, h.service).deployWithSavedAuthorization(intent, h.selectDeployment)).rejects.toThrow('Server settings changed');
 	expect(deleteCrateServer).not.toHaveBeenCalled();
 });
 
 
 it.each([false, true])('reconnects the saved server without publishing code (new device: %s)', async renew => {
 	const h = resetHarness();
-	await h.service.deployWithSavedAuthorization('reconnect', operation => operation({ accessToken: 'saved' }), h.selectDeployment, renew ? resetDevice : undefined);
+	await authorizedBy(operation => operation({ accessToken: 'saved' }), h.service).deployWithSavedAuthorization('reconnect', h.selectDeployment, renew ? resetDevice : undefined);
 	expect(h.loadArtifacts).not.toHaveBeenCalled();
 	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 	expect(h.selectDeployment).not.toHaveBeenCalled();
@@ -698,9 +700,9 @@ describe('mobile server changes', () => {
 		const h = mobile();
 		saved(h);
 		const withAuthorization = vi.fn();
-		await expect(h.service.deployWithSavedAuthorization('update', withAuthorization, h.selectDeployment)).rejects.toThrow(DesktopOnlyServerChangeError);
-		await expect(h.service.recoverUpdate(withAuthorization)).rejects.toThrow(DesktopOnlyServerChangeError);
-		await expect(h.service.listRestoreBackups(withAuthorization)).rejects.toThrow(DesktopOnlyServerChangeError);
+		await expect(authorizedBy(withAuthorization, h.service).deployWithSavedAuthorization('update', h.selectDeployment)).rejects.toThrow(DesktopOnlyServerChangeError);
+		await expect(authorizedBy(withAuthorization, h.service).recoverUpdate()).rejects.toThrow(DesktopOnlyServerChangeError);
+		await expect(authorizedBy(withAuthorization, h.service).listRestoreBackups()).rejects.toThrow(DesktopOnlyServerChangeError);
 		expect(withAuthorization).not.toHaveBeenCalled();
 	});
 
@@ -728,7 +730,7 @@ describe('device pairing codes', () => {
 	it('records only the code hash through the saved login and returns the code once', async () => {
 		const h = createHarness();
 		h.settings.cloudflareDeployment = { ...savedServer(), accountId: apiMocks.accounts[0]!.id };
-		const issued = await h.service.issueDevicePairing(operation => operation({ accessToken: 'saved', scope: CLOUDFLARE_OAUTH_SCOPES.join(' ') }));
+		const issued = await authorizedBy(operation => operation({ accessToken: 'saved', scope: CLOUDFLARE_OAUTH_SCOPES.join(' ') }), h.service).issueDevicePairing();
 		expect(issued.code).toMatch(/^[a-f0-9]{64}$/);
 		const calls = apiMocks.queryD1.mock.calls.map(call => JSON.stringify(call));
 		expect(calls).toHaveLength(2);
@@ -741,7 +743,7 @@ describe('device pairing codes', () => {
 		const h = createHarness();
 		if (reason === 'a pending deletion') h.settings.cloudflareDeployment = { ...savedServer(), deletion: { id: 'b'.repeat(32), phase: 'removing-worker', databaseId: 'old-db', bucketCreatedAt: null, workerCreatedAt: null, helperName: 'helper' } };
 		const withAuthorization = vi.fn();
-		await expect(h.service.issueDevicePairing(withAuthorization)).rejects.toThrow('Connect this vault');
+		await expect(authorizedBy(withAuthorization, h.service).issueDevicePairing()).rejects.toThrow('Connect this vault');
 		expect(withAuthorization).not.toHaveBeenCalled();
 	});
 });

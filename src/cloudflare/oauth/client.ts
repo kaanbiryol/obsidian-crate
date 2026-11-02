@@ -87,4 +87,13 @@ export class CloudflareOAuthClient {
 			throw new Error('Cloudflare did not confirm OAuth token revocation');
 		}
 	}
+
+	/** Revokes the access and refresh tokens. Resolves whether Cloudflare confirmed both; never rejects. */
+	async revokeTokens(tokens: CloudflareOAuthTokens): Promise<boolean> {
+		const results = await Promise.allSettled([
+			this.revokeAccessToken(tokens.accessToken),
+			...(tokens.refreshToken ? [this.revokeAccessToken(tokens.refreshToken)] : []),
+		]);
+		return results.every(result => result.status === 'fulfilled');
+	}
 }

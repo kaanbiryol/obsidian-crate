@@ -47,6 +47,8 @@ export interface CloudflareDeploymentServiceOptions {
 	loadArtifacts: () => Promise<CloudflareDeploymentArtifacts>;
 	openExternal: (url: string) => void;
 	onAuthorized?: (accountId: string, tokens: CloudflareOAuthTokens) => void;
+	/** Runs an operation with the saved Cloudflare login. */
+	withAuthorization: WithCloudflareAuthorization;
 	beforeServerReset?: () => Promise<void>;
 	beforeServerSwitch?: () => Promise<void>;
 	/** False on mobile, where devices only connect to existing servers. */
@@ -59,7 +61,7 @@ export class CloudflareDeploymentService {
 	private readonly oauthSession: CloudflareOAuthSession;
 	private readonly now: () => number;
 	private readonly lifetime = new AbortController();
-	private handlingCallback = false;
+	private busy = false;
 
 	constructor(private readonly options: CloudflareDeploymentServiceOptions) {
 		this.oauthClient = new CloudflareOAuthClient(options.clientId, options.transport);
@@ -67,7 +69,7 @@ export class CloudflareDeploymentService {
 		this.oauthSession = new CloudflareOAuthSession(options.clientId, this.now, options.openExternal);
 	}
 
-	get isBusy(): boolean { return this.handlingCallback; }
+	get isBusy(): boolean { return this.busy; }
 
 	get pendingIntent(): DeploymentIntent | null {
 		return this.oauthSession.intent;
@@ -99,14 +101,14 @@ export class CloudflareDeploymentService {
 	async handleCallback(params: Record<string, string>, selectDeployment: SelectDeployment, device?: CloudflareAuthorizedDevice, onProgress?: (message: string) => void): Promise<CloudflareDeploymentResult> {
 		this.assertIdle('A Cloudflare operation is already in progress.');
 		// The callback consumes the pending browser session, so it does not cancel it.
-		this.handlingCallback = true;
+		this.busy = true;
 		try {
 			return await this.whileActive(() => this.handleAuthorizedCallback(params, selectDeployment, device, message => {
 				this.lifetime.signal.throwIfAborted();
 				onProgress?.(message);
 			}));
 		} finally {
-			this.handlingCallback = false;
+			this.busy = false;
 		}
 	}
 
@@ -155,7 +157,8 @@ export class CloudflareDeploymentService {
 			}
 			return result;
 		} finally {
-			if (!retained) await this.revokeTokens(tokens);
+			// Failed operations discard credentials even if revocation is unavailable.
+			if (!retained) await this.oauthClient.revokeTokens(tokens);
 		}
 	}
 
@@ -238,20 +241,8 @@ export class CloudflareDeploymentService {
 		return { status: 'deployed', workerUrl, accountName: account.name };
 	}
 
-	private async revokeTokens(tokens: CloudflareOAuthTokens): Promise<void> {
-		try {
-			await Promise.all([
-				this.oauthClient.revokeAccessToken(tokens.accessToken),
-				...(tokens.refreshToken ? [this.oauthClient.revokeAccessToken(tokens.refreshToken)] : []),
-			]);
-		} catch {
-			// Failed operations discard credentials even if revocation is unavailable.
-		}
-	}
-
 	async deployWithSavedAuthorization(
 		intent: SavedDeploymentIntent,
-		withAuthorization: WithCloudflareAuthorization,
 		selectDeployment: SelectDeployment,
 		device?: CloudflareAuthorizedDevice,
 		onProgress?: (message: string) => void,
@@ -267,7 +258,7 @@ export class CloudflareDeploymentService {
 			originalMetadata: stableJson(metadata),
 		};
 		return this.exclusive(async () => {
-			const result = await withAuthorization(async tokens => {
+			const result = await this.options.withAuthorization(async tokens => {
 				this.lifetime.signal.throwIfAborted();
 				this.checkSavedTarget(request.metadata, request.intent);
 				if (stableJson(this.options.settingsOwner.settings.cloudflareDeployment) !== request.originalMetadata) throw new Error('Server settings changed. Confirm the operation again.');
@@ -278,25 +269,23 @@ export class CloudflareDeploymentService {
 		});
 	}
 
-	private async restoreBackups<T>(withAuthorization: WithCloudflareAuthorization,
-		operation: (api: CloudflareApiClient, source: CloudflareDeploymentMetadata) => Promise<T>): Promise<T> {
+	private async restoreBackups<T>(operation: (api: CloudflareApiClient, source: CloudflareDeploymentMetadata) => Promise<T>): Promise<T> {
 		this.assertIdle();
 		this.assertServerChangeAllowed();
 		const source = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
 		if (!source?.accountId || !source.d1DatabaseId || source.deletion) throw new Error('Select the source Cloudflare server and finish any deletion first.');
-		return this.exclusive(() => withAuthorization(tokens => operation(this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(source, 'update')), source)));
+		return this.exclusive(() => this.options.withAuthorization(tokens => operation(this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(source, 'update')), source)));
 	}
 
-	async listRestoreBackups(withAuthorization: WithCloudflareAuthorization): Promise<BackupChoice[]> {
-		return this.restoreBackups(withAuthorization, async (api, source) => {
+	async listRestoreBackups(): Promise<BackupChoice[]> {
+		return this.restoreBackups(async (api, source) => {
 			const { listUpgradeBackups } = await import('../restore/server-restore');
 			return listUpgradeBackups(api, { account: source.accountId!, database: source.d1DatabaseId!, bucket: source.r2BucketName });
 		});
 	}
 
-	async restoreBackup(withAuthorization: WithCloudflareAuthorization,
-		choice: BackupChoice | null, onProgress: (message: string) => void): Promise<string> {
-		return this.restoreBackups(withAuthorization, async (api, source) => {
+	async restoreBackup(choice: BackupChoice | null, onProgress: (message: string) => void): Promise<string> {
+		return this.restoreBackups(async (api, source) => {
 			const artifacts = await this.whileActive(this.options.loadArtifacts);
 			return runRestoreWorkflow({
 				api, source, artifacts, choice, now: this.now, onProgress,
@@ -311,25 +300,25 @@ export class CloudflareDeploymentService {
 
 	/** Issues a one-use code for adding a device. Reading the saved login is not a server
 	 * change, so any device with that login may issue one. */
-	async issueDevicePairing(withAuthorization: WithCloudflareAuthorization): Promise<IssuedDevicePairing> {
+	async issueDevicePairing(): Promise<IssuedDevicePairing> {
 		this.assertIdle();
 		const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
 		if (!metadata?.accountId || !metadata.d1DatabaseId || metadata.deletion) throw new Error('Connect this vault to its Cloudflare server first.');
 		const { accountId, d1DatabaseId } = metadata;
 		this.checkSavedTarget(metadata, 'reconnect');
-		return this.exclusive(() => withAuthorization(tokens => issueDevicePairingCode({
+		return this.exclusive(() => this.options.withAuthorization(tokens => issueDevicePairingCode({
 			api: this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(metadata, 'reconnect')),
 			accountId, databaseId: d1DatabaseId, metadata, now: this.now(),
 		})));
 	}
 
-	async recoverUpdate(withAuthorization: WithCloudflareAuthorization): Promise<DeploymentRecoveryResult> {
+	async recoverUpdate(): Promise<DeploymentRecoveryResult> {
 		this.assertIdle();
 		this.assertServerChangeAllowed();
 		const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
 		if (!metadata?.accountId) throw new Error('Connect to your Cloudflare account first.');
 		this.checkSavedTarget(metadata, 'update');
-		return this.exclusive(() => withAuthorization(async tokens => {
+		return this.exclusive(() => this.options.withAuthorization(async tokens => {
 			const api = this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(metadata, 'update'));
 			const artifacts = await this.whileActive(this.options.loadArtifacts);
 			return resumeInterruptedUpdate({
@@ -380,7 +369,7 @@ export class CloudflareDeploymentService {
 	}
 
 	cancelPendingDeployment(): void {
-		if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
+		if (this.busy) throw new Error('Wait for the current Cloudflare operation to finish.');
 		this.oauthSession.cancel();
 	}
 
@@ -391,18 +380,18 @@ export class CloudflareDeploymentService {
 
 	private assertIdle(message = 'Wait for the current Cloudflare operation to finish.'): void {
 		this.lifetime.signal.throwIfAborted();
-		if (this.handlingCallback) throw new Error(message);
+		if (this.busy) throw new Error(message);
 	}
 
-	/** Run one saved-authorization operation at a time; it replaces any pending browser authorization. */
 	private assertServerChangeAllowed(): void {
 		if (this.options.serverChangesAllowed === false) throw new DesktopOnlyServerChangeError();
 	}
 
+	/** Run one saved-authorization operation at a time; it replaces any pending browser authorization. */
 	private async exclusive<T>(operation: () => Promise<T>): Promise<T> {
 		this.cancelPendingDeployment();
-		this.handlingCallback = true;
-		try { return await operation(); } finally { this.handlingCallback = false; }
+		this.busy = true;
+		try { return await operation(); } finally { this.busy = false; }
 	}
 
 	private async whileActive<T>(operation: () => Promise<T>): Promise<T> {

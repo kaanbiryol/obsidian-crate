@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CloudflareDeploymentService } from '../deployment/service';
+import { authorizedBy, testAuthorization } from '../deployment/authorization-test-harness';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../../plugin/settings';
 import type { CloudflareOAuthTokens } from '../oauth/client';
 import { listUpgradeBackups, restoreUpgradeBackup } from './server-restore';
@@ -11,7 +12,7 @@ function harness() {
 	const settings: CrateSettings = { ...DEFAULT_SETTINGS, cloudflareDeployment: { deploymentId: 'a'.repeat(16), accountId: 'a'.repeat(32), accountName: 'Account', workerName: `crate-${'a'.repeat(16)}`, d1DatabaseName: `crate-${'a'.repeat(16)}`, d1DatabaseId: '11111111-1111-1111-1111-111111111111', r2BucketName: `crate-${'a'.repeat(16)}`, workersSubdomain: 'test', lastDeployedVersion: null, lastDeployedFingerprint: null } };
 	const writeSettings = vi.fn(async (update: Partial<CrateSettings>) => { Object.assign(settings, update); });
 	const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: [] }) }));
-	const service = new CloudflareDeploymentService({ clientId: 'a'.repeat(32), settingsOwner: { settings, writeSettings }, transport, loadArtifacts: async () => ({ version: '0.3.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: '', d1SchemaSha256: '' }), openExternal: vi.fn() });
+	const service = new CloudflareDeploymentService({ clientId: 'a'.repeat(32), settingsOwner: { settings, writeSettings }, transport, loadArtifacts: async () => ({ version: '0.3.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: '', d1SchemaSha256: '' }), openExternal: vi.fn(), withAuthorization: testAuthorization });
 	const choice: BackupChoice = { prefix: '__crate__/backups/schema-upgrade-11111111-1111-1111-1111-111111111111', hash: 'b'.repeat(64), manifest: { format: 2, complete: true, createdAt: new Date().toISOString(), source: { account: settings.cloudflareDeployment!.accountId!, database: settings.cloudflareDeployment!.d1DatabaseId!, bucket: settings.cloudflareDeployment!.r2BucketName }, databaseParts: [{ sha256: 'c'.repeat(64), size: 1 }], objects: [] } };
 	return { settings, writeSettings, transport, service, choice };
 }
@@ -24,10 +25,10 @@ it('persists the restore identity before remote work and preserves the current c
 		expect(input.state.target.workerName).toMatch(/^crate-[a-f0-9]{16}$/);
 		input.state.phase = 'publishing'; await input.save(); throw new Error('Interrupted');
 	});
-	await expect(f.service.restoreBackup(authorize, f.choice, vi.fn())).rejects.toThrow('Interrupted');
+	await expect(authorizedBy(authorize, f.service).restoreBackup(f.choice, vi.fn())).rejects.toThrow('Interrupted');
 	const checkpoint = structuredClone(f.settings.cloudflareRestore);
 	vi.mocked(restoreUpgradeBackup).mockImplementation(async input => { expect(input.state).toEqual(checkpoint); return 'restored'; });
-	await f.service.restoreBackup(authorize, null, vi.fn());
+	await authorizedBy(authorize, f.service).restoreBackup(null, vi.fn());
 	expect(f.settings.cloudflareDeployment).toEqual(source);
 	expect(f.writeSettings.mock.calls.every(([update]) => Object.keys(update).join() === 'cloudflareRestore')).toBe(true);
 });
@@ -43,7 +44,7 @@ it.each([
 		await input.save();
 		return 'restored';
 	});
-	await f.service.restoreBackup(authorize, f.choice, vi.fn());
+	await authorizedBy(authorize, f.service).restoreBackup(f.choice, vi.fn());
 	const checkpoint = structuredClone(f.settings.cloudflareRestore);
 	const choice = chooseAnother ? {
 		...f.choice, prefix: '__crate__/backups/schema-upgrade-33333333-3333-3333-3333-333333333333', hash: 'd'.repeat(64),
@@ -57,7 +58,7 @@ it.each([
 		} else expect(input.state).toEqual(checkpoint);
 		return 'restored';
 	});
-	await f.service.restoreBackup(authorize, choice, vi.fn());
+	await authorizedBy(authorize, f.service).restoreBackup(choice, vi.fn());
 });
 it('holds the selected backup on the original server until the restore completes', async () => {
 	const f = harness();
@@ -71,11 +72,11 @@ it('holds the selected backup on the original server until the restore completes
 		expect(queries()).toEqual([`${source} INSERT crate_restore_hold:${input.state.id} ${f.choice.prefix}`]);
 		throw new Error('Interrupted');
 	});
-	await expect(f.service.restoreBackup(authorize, f.choice, vi.fn())).rejects.toThrow('Interrupted');
+	await expect(authorizedBy(authorize, f.service).restoreBackup(f.choice, vi.fn())).rejects.toThrow('Interrupted');
 	const hold = `crate_restore_hold:${f.settings.cloudflareRestore!.id} ${f.choice.prefix}`;
 	expect(queries()).toEqual([`${source} INSERT ${hold}`]);
 	vi.mocked(restoreUpgradeBackup).mockImplementationOnce(async input => { input.state.phase = 'complete'; return 'restored'; });
-	await f.service.restoreBackup(authorize, null, vi.fn());
+	await authorizedBy(authorize, f.service).restoreBackup(null, vi.fn());
 	expect(queries().slice(1)).toEqual([`${source} INSERT ${hold}`, `${source} DELETE ${hold}`]);
 });
 it.each([[200, false], [404, true]])('when the hold cannot be saved and the original database lookup returns %s, restores: %s', async (lookup, restores) => {
@@ -84,7 +85,7 @@ it.each([[200, false], [404, true]])('when the hold cannot be saved and the orig
 		: request.method === 'GET' && url.includes('/d1/database/') ? { status: lookup, text: JSON.stringify({ success: lookup === 200, result: { uuid: '11111111-1111-1111-1111-111111111111' } }) }
 			: { status: 200, text: JSON.stringify({ success: true, result: [] }) });
 	vi.mocked(restoreUpgradeBackup).mockResolvedValueOnce('restored');
-	const restore = f.service.restoreBackup(authorize, f.choice, vi.fn());
+	const restore = authorizedBy(authorize, f.service).restoreBackup(f.choice, vi.fn());
 	if (restores) await expect(restore).resolves.toBe('restored');
 	else await expect(restore).rejects.toMatchObject({ status: 404 });
 	expect(restoreUpgradeBackup).toHaveBeenCalledTimes(restores ? 1 : 0);
@@ -92,7 +93,7 @@ it.each([[200, false], [404, true]])('when the hold cannot be saved and the orig
 it('does not start remote restore when the initial checkpoint cannot be saved', async () => {
 	const f = harness();
 	f.writeSettings.mockRejectedValueOnce(new Error('Storage unavailable'));
-	await expect(f.service.restoreBackup(authorize, f.choice, vi.fn())).rejects.toThrow('Storage unavailable');
+	await expect(authorizedBy(authorize, f.service).restoreBackup(f.choice, vi.fn())).rejects.toThrow('Storage unavailable');
 	expect(restoreUpgradeBackup).not.toHaveBeenCalled();
 	expect(f.settings.cloudflareRestore).toBeUndefined();
 	expect(f.service.isBusy).toBe(false);
@@ -100,12 +101,12 @@ it('does not start remote restore when the initial checkpoint cannot be saved', 
 it('does not replace a checkpoint belonging to another source server', async () => {
 	const f = harness();
 	vi.mocked(restoreUpgradeBackup).mockResolvedValueOnce('restored');
-	await f.service.restoreBackup(authorize, f.choice, vi.fn());
+	await authorizedBy(authorize, f.service).restoreBackup(f.choice, vi.fn());
 	const checkpoint = structuredClone(f.settings.cloudflareRestore);
 	f.settings.cloudflareDeployment!.d1DatabaseId = '22222222-2222-2222-2222-222222222222';
 	f.writeSettings.mockClear();
 	vi.mocked(restoreUpgradeBackup).mockClear();
-	await expect(f.service.restoreBackup(authorize, null, vi.fn())).rejects.toThrow('original server');
+	await expect(authorizedBy(authorize, f.service).restoreBackup(null, vi.fn())).rejects.toThrow('original server');
 	expect(f.writeSettings).not.toHaveBeenCalled();
 	expect(restoreUpgradeBackup).not.toHaveBeenCalled();
 	expect(f.settings.cloudflareRestore).toEqual(checkpoint);
@@ -113,10 +114,10 @@ it('does not replace a checkpoint belonging to another source server', async () 
 });
 it('holds the operation lock during authorization and releases it after failure', async () => {
 	const f = harness(); let release!: () => void;
-	const pending = f.service.listRestoreBackups(async () => { await new Promise<void>(resolve => { release = resolve; }); throw new Error('Login cancelled'); });
+	const pending = authorizedBy(async () => { await new Promise<void>(resolve => { release = resolve; }); throw new Error('Login cancelled'); }, f.service).listRestoreBackups();
 	expect(f.service.isBusy).toBe(true);
 	await expect(f.service.startDeployment('switch')).rejects.toThrow('Wait');
-	await expect(f.service.listRestoreBackups(authorize)).rejects.toThrow('Wait');
+	await expect(authorizedBy(authorize, f.service).listRestoreBackups()).rejects.toThrow('Wait');
 	release(); await expect(pending).rejects.toThrow('Login cancelled'); expect(f.service.isBusy).toBe(false);
 });
 it.each(['changed', 'destroyed'])('stops network work when the source is %s', async mode => {
@@ -125,6 +126,6 @@ it.each(['changed', 'destroyed'])('stops network work when the source is %s', as
 		if (mode === 'destroyed') f.service.destroy(); else f.settings.cloudflareDeployment = null;
 		await api.queryD1(source.account, source.database, 'SELECT 1'); return [];
 	});
-	await expect(f.service.listRestoreBackups(authorize)).rejects.toThrow();
+	await expect(authorizedBy(authorize, f.service).listRestoreBackups()).rejects.toThrow();
 	expect(f.transport).not.toHaveBeenCalled(); expect(f.service.isBusy).toBe(false);
 });

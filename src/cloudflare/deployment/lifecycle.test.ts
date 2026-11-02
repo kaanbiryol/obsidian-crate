@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../../plugin/settings';
 import { CloudflareDeploymentService } from './service';
+import { authorizedBy, testAuthorization } from './authorization-test-harness';
 import type { CloudflareWorkerSettings } from '../cloudflare-api';
 import type { HttpTransport } from '../http';
 import { createFenceQueryHarness } from './fence-test-harness';
@@ -106,7 +107,7 @@ function harness() {
 		const service = new CloudflareDeploymentService({
 			clientId: 'd'.repeat(32), settingsOwner: { settings, writeSettings }, transport: send,
 			loadArtifacts: async () => ({ version: '0.1.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: 'fresh-schema', d1SchemaSha256: '' }),
-			openExternal: url => { opened.push(url); }, beforeServerReset,
+			openExternal: url => { opened.push(url); }, beforeServerReset, withAuthorization: testAuthorization,
 		});
 		return {
 			service,
@@ -138,7 +139,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 			}),
 		});
 		const { service } = h.createService();
-		const result = await service.deployWithSavedAuthorization('delete', operation => operation({ accessToken: 'saved' }), selectNone);
+		const result = await authorizedBy(operation => operation({ accessToken: 'saved' }), service).deployWithSavedAuthorization('delete', selectNone);
 		expect(result.status).toBe('deleted');
 		expect(h.settings.cloudflareDeployment).toBeNull();
 		expect(h.remote).toEqual({ worker: false, bucket: false, database: false, retired: true });
@@ -202,12 +203,12 @@ describe('Cloudflare deployment interruption and recovery', () => {
 it('deletes with saved credentials through the real deletion path without opening OAuth or revoking the shared login', async () => {
 	const h = harness();
 	const { service } = h.createService();
-	const result = await service.deployWithSavedAuthorization('delete', async operation => {
+	const result = await authorizedBy(async operation => {
 		const result = await operation({ accessToken: 'saved' });
 		// Keep the account available until the shared credential operation settles.
 		expect(h.settings.cloudflareDeployment?.accountId).toBe('a'.repeat(32));
 		return result;
-	}, selectNone);
+	}, service).deployWithSavedAuthorization('delete', selectNone);
 	expect(result.status).toBe('deleted');
 	expect(h.settings.cloudflareDeployment).toBeNull();
 	expect(h.remote).toMatchObject({ worker: false, database: false, bucket: false });
@@ -222,8 +223,8 @@ it('keeps cleanup capability rejection distinct from account OAuth and allows de
 		return h.transport(url, request);
 	});
 	const authorize = <T>(operation: (tokens: { accessToken: string }) => Promise<T>) => operation({ accessToken: 'saved' });
-	await expect(service.deployWithSavedAuthorization('delete', authorize, selectNone)).rejects.toThrow('Remote file cleanup failed with HTTP 403');
+	await expect(authorizedBy(authorize, service).deployWithSavedAuthorization('delete', selectNone)).rejects.toThrow('Remote file cleanup failed with HTTP 403');
 	expect(h.remote).toMatchObject({ worker: false, database: true, bucket: true });
 	rejectCleanup = false;
-	await expect(service.deployWithSavedAuthorization('delete', authorize, selectNone)).resolves.toMatchObject({ status: 'deleted' });
+	await expect(authorizedBy(authorize, service).deployWithSavedAuthorization('delete', selectNone)).resolves.toMatchObject({ status: 'deleted' });
 });

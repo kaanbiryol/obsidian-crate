@@ -39,10 +39,7 @@ const plugin = () => ({
 	settings: { workerUrl: 'https://crate-0123456789abcdef.example.workers.dev' },
 	secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'token' : null },
 	cloudflareSavedLogin: { withAuthorization: (operation: (tokens: unknown) => unknown) => operation({}) },
-	cloudflareDeploymentService: { issueDevicePairing: async (run: (operation: (tokens: unknown) => unknown) => unknown) => {
-		await run(async () => {});
-		return { code: 'c'.repeat(64), tokenId: 'a'.repeat(32), expiresAt: Date.now() + 600_000 };
-	} },
+	cloudflareDeploymentService: { issueDevicePairing: async () => ({ code: 'c'.repeat(64), tokenId: 'a'.repeat(32), expiresAt: Date.now() + 600_000 }) },
 	syncRuntime: { getApiClient: () => ({ listTokens }) },
 	refreshSettingsTab: () => {},
 });

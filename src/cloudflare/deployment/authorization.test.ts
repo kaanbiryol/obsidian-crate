@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { CloudflareDeploymentService } from './service';
+import { CloudflareDeploymentService, type WithCloudflareAuthorization } from './service';
+import { authorizedBy, testAuthorization } from './authorization-test-harness';
 import { CloudflareSavedLogin } from '../saved-login';
 import { CloudflareReauthorizationRequired } from '../oauth/client';
 import { CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
@@ -20,15 +21,15 @@ function harness(status: number, scope = CLOUDFLARE_OAUTH_SCOPES.join(' ')) {
 	connection.acceptAuthorization(settings.cloudflareDeployment.accountId, { accessToken: 'synthetic', expiresIn: 3600, scope });
 	const service = new CloudflareDeploymentService({ clientId: 'client', settingsOwner: { settings, writeSettings: async update => { Object.assign(settings, update); } },
 		transport, loadArtifacts: async () => ({ version: '0.4.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: '', d1SchemaSha256: '' }),
-		openExternal: vi.fn() });
+		openExternal: vi.fn(), withAuthorization: testAuthorization });
 	const choice: BackupChoice = { prefix: `__crate__/backups/schema-upgrade-${settings.cloudflareDeployment.d1DatabaseId}`, hash: 'b'.repeat(64),
 		manifest: { format: 2, complete: true, createdAt: new Date().toISOString(), source: { account: settings.cloudflareDeployment.accountId, database: settings.cloudflareDeployment.d1DatabaseId, bucket: name }, databaseParts: [{ sha256: 'c'.repeat(64), size: 1 }], objects: [] } };
-	const authorize: Parameters<typeof service.recoverUpdate>[0] = operation => connection.withAuthorization(operation);
+	const authorize: WithCloudflareAuthorization = operation => connection.withAuthorization(operation);
 	return { connection, service, transport, operations: {
-		update: () => service.deployWithSavedAuthorization('update', authorize, async () => null),
-		recover: () => service.recoverUpdate(authorize),
-		list: () => service.listRestoreBackups(authorize),
-		restore: () => service.restoreBackup(authorize, choice, vi.fn()),
+		update: () => authorizedBy(authorize, service).deployWithSavedAuthorization('update', async () => null),
+		recover: () => authorizedBy(authorize, service).recoverUpdate(),
+		list: () => authorizedBy(authorize, service).listRestoreBackups(),
+		restore: () => authorizedBy(authorize, service).restoreBackup(choice, vi.fn()),
 	} };
 }
 

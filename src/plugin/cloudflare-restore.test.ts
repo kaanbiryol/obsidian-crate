@@ -42,7 +42,7 @@ it('reviews a completed restore locally and allows another backup selection', as
 it('resumes the saved restore without selecting another backup', async () => {
 	const f = harness({ phase: 'copying' }); await f.open();
 	expect(f.plugin.cloudflareDeploymentService.listRestoreBackups).not.toHaveBeenCalled();
-	expect(f.plugin.cloudflareDeploymentService.restoreBackup).toHaveBeenCalledWith(expect.any(Function), null, expect.any(Function));
+	expect(f.plugin.cloudflareDeploymentService.restoreBackup).toHaveBeenCalledWith(null, expect.any(Function));
 });
 
 it.each(['list', 'resume'])('explains a denied saved login during %s', async mode => {

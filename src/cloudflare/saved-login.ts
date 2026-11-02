@@ -60,7 +60,7 @@ export class CloudflareSavedLogin {
 		const credentials = this.read(accountId);
 		this.options.secrets.set(this.key(accountId), '');
 		++this.revision;
-		if (credentials) await this.revoke(credentials);
+		if (credentials) await this.oauth.revokeTokens(credentials);
 	}
 
 	async withAuthorization<T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>): Promise<T> {
@@ -81,7 +81,7 @@ export class CloudflareSavedLogin {
 					this.validateScope(refreshed);
 					credentials = this.save(accountId, { ...refreshed, refreshToken: refreshed.refreshToken ?? credentials.refreshToken, scope: refreshed.scope ?? credentials.scope });
 				} catch (error) {
-					await this.revoke(refreshed);
+					await this.oauth.revokeTokens(refreshed);
 					throw error;
 				}
 			}
@@ -146,12 +146,5 @@ export class CloudflareSavedLogin {
 	private check(accountId: string, revision: number): void {
 		this.options.signal.throwIfAborted();
 		if (revision !== this.revision || accountId !== this.options.accountId()) throw new Error('Cloudflare connection changed. Try again.');
-	}
-	private async revoke(tokens: CloudflareOAuthTokens): Promise<boolean> {
-		const results = await Promise.allSettled([
-			this.oauth.revokeAccessToken(tokens.accessToken),
-			...(tokens.refreshToken ? [this.oauth.revokeAccessToken(tokens.refreshToken)] : []),
-		]);
-		return results.every(result => result.status === 'fulfilled');
 	}
 }

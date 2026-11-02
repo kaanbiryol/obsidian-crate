@@ -23,7 +23,7 @@ export class AddDeviceModal extends SharedModal {
 		const connection = captureServerConnection(this.plugin);
 		const current = () => { this.controller.signal.throwIfAborted(); connection.assertCurrent(); };
 		void (async () => {
-			const issued = await this.plugin.cloudflareDeploymentService.issueDevicePairing(operation => this.plugin.cloudflareSavedLogin.withAuthorization(operation));
+			const issued = await this.plugin.cloudflareDeploymentService.issueDevicePairing();
 			current();
 			const link = devicePairingLink(connection.origin, issued.code);
 			status.setText('On your new device:');

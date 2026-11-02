@@ -194,8 +194,7 @@ function runDeployment(
 	};
 	const selectDeployment = (deployments: Parameters<typeof progress.selectVault>[0], missingServer?: boolean) => progress.selectVault(deployments, missingServer);
 	return savedIntent
-		? plugin.cloudflareDeploymentService.deployWithSavedAuthorization(savedIntent,
-			operation => plugin.cloudflareSavedLogin.withAuthorization(operation), selectDeployment, device, onProgress)
+		? plugin.cloudflareDeploymentService.deployWithSavedAuthorization(savedIntent, selectDeployment, device, onProgress)
 		: plugin.cloudflareDeploymentService.handleCallback(params, selectDeployment, device, onProgress);
 }
 
