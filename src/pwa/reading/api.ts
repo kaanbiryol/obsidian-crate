@@ -2,7 +2,6 @@ import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection
 import { onReadingEncryptionReset } from './session/encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders, readingKeys } from './session/encryption-session';
 import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingIndex, writeReadingAttempt } from './storage/storage';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../connection/session-generation';
 import { cacheReadingArticle, commitReadingCache, readReadingArticle, readReadingCache, type ReadingCache } from './storage/storage';
@@ -21,6 +20,7 @@ import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { checkEncryptionSignals, EncryptionStateChangedError, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import { responseError } from '../connection/response-error';
+import { crateRequestHeaders } from '../connection/request-headers';
 
 /** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
 const noteFolder = (session: ReadingSession) => readingKeys()?.folderPath ?? session.folderPath;
@@ -29,7 +29,7 @@ interface SessionAnswer { token: string; sessionCurrent: () => boolean; status: 
 async function requestReadingSession(token: string): Promise<SessionAnswer> {
 	const sessionCurrent = capturePwaSession();
 	const response = await fetch('/reading/session', { cache: 'no-store', signal: AbortSignal.timeout(20_000),
-		headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } });
+		headers: crateRequestHeaders(token) });
 	const failure = response.ok ? null : await responseError(response, 'Reading is unavailable.');
 	const data = failure ? null : await response.json().catch(() => null) as SessionAnswer['data'];
 	return { token, sessionCurrent, status: response.status, ok: response.ok, failure, data };
@@ -84,7 +84,7 @@ onReadingEncryptionReset(() => { encryptedClient = undefined; });
 async function rawReadingRequest(path: string, session: ReadingSession | null, body?: string, extraHeaders: Record<string, string> = {}): Promise<Response> {
 	if (session) assertReadingSession(session);
 	const response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal: AbortSignal.timeout(20_000),
-		headers: { ...(session ? { Authorization: `Bearer ${session.token}`, ...readingEncryptionHeaders() } : {}), 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current), ...extraHeaders }, body });
+		headers: { ...crateRequestHeaders(session?.token), ...session ? readingEncryptionHeaders() : {}, 'Content-Type': 'application/json', ...extraHeaders }, body });
 	if (session) assertReadingSession(session);
 	if (session && response.status === 401) {
 		reportExpiredConnection(session.token);
