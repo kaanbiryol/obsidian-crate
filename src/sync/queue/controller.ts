@@ -1,4 +1,5 @@
 import { pendingChangeKey, decodePendingChange, type PendingChange } from '../pending/pending-change';
+import { PendingSet } from './pending-set';
 import { TFolder, type TAbstractFile } from 'obsidian';
 import type { SyncResult } from '../types';
 import { createEmptySyncResult } from '../sync-result';
@@ -35,11 +36,7 @@ export class SyncQueueController {
 	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private consecutiveFailures = 0;
 	private maxWaitStart: number | null = null;
-	private pendingKeys: Set<string> = new Set();
-	private inFlightPaths: Set<string> = new Set();
-	private pendingRevisions = new Map<string, number>();
-	private pendingTimes = new Map<string, { first: number; last: number }>();
-	private nextRevision = 0;
+	private readonly pending = new PendingSet();
 	private flushTasks = new Set<Promise<void>>();
 	private reconciliationScheduled = false;
 	private reconciliationPaths = new Set<string>();
@@ -50,44 +47,34 @@ export class SyncQueueController {
 	constructor(private readonly context: SyncQueueControllerContext) {}
 
 	getPendingKeys(): string[] {
-		const combined = new Set(this.pendingKeys);
-		for (const path of this.inFlightPaths) combined.add(path);
-		return Array.from(combined);
+		return this.pending.keys();
 	}
 
 	/** `getPendingKeys().includes(key)` without copying the pending set. */
 	hasPendingKey(key: string): boolean {
-		return this.pendingKeys.has(key) || this.inFlightPaths.has(key);
+		return this.pending.has(key);
 	}
 
 	/** `getPendingKeys().length` without copying the pending set. */
 	getPendingChangeCount(): number {
-		let count = this.pendingKeys.size;
-		for (const path of this.inFlightPaths) if (!this.pendingKeys.has(path)) count++;
-		return count;
+		return this.pending.count();
 	}
 
 	getPendingPathCount(): number {
-		return this.pendingKeys.size;
+		return this.pending.queuedCount;
 	}
 
 	restorePendingPaths(paths: string[]): void {
-		for (const key of paths) {
-			const path = decodePendingChange(key).path;
-			// Live events take precedence over the startup snapshot.
-			if (this.pendingKeys.has(pendingChangeKey('upload', path)) || this.pendingKeys.has(pendingChangeKey('delete', path))) continue;
-			if (this.context.shouldIgnore(path)) continue;
-			this.pendingKeys.add(key);
-			this.pendingRevisions.set(key, ++this.nextRevision);
-		}
-		this.context.updateState({ pendingChanges: this.pendingKeys.size });
+		// Live events take precedence over the startup snapshot.
+		for (const key of paths) if (!this.context.shouldIgnore(decodePendingChange(key).path)) this.pending.restore(key);
+		this.context.updateState({ pendingChanges: this.pending.queuedCount });
 	}
 
 	/** Like `restorePendingPaths`, then verifies and flushes the keys as live events. */
 	restoreDroppedEvents(keys: string[]): void {
 		if (!keys.length) return;
 		this.restorePendingPaths(keys);
-		for (const key of keys) if (this.pendingKeys.has(key)) this.verificationKeys.add(key);
+		for (const key of keys) if (this.pending.queuedKeys().has(key)) this.verificationKeys.add(key);
 		this.debouncedSync(false);
 	}
 
@@ -118,42 +105,25 @@ export class SyncQueueController {
 	/** Records a new revision for the change and drops the opposite operation for
 	 * its path. Returns whether the pending set changed. */
 	private addPendingPath(change: PendingChange): boolean {
-		const path = pendingChangeKey(change.kind, change.path);
-		const oppositePath = pendingChangeKey(change.kind === 'delete' ? 'upload' : 'delete', change.path);
-		const changed = this.pendingKeys.delete(oppositePath) || !this.pendingKeys.has(path);
-		this.pendingRevisions.delete(oppositePath);
-		this.verificationKeys.delete(oppositePath);
-		this.pendingKeys.add(path);
-		this.pendingTimes.delete(oppositePath);
-		const now = Date.now();
-		this.pendingTimes.set(path, { first: this.pendingTimes.get(path)?.first ?? now, last: now });
-		this.nextRevision += 1;
-		this.pendingRevisions.set(path, this.nextRevision);
-		this.verificationKeys.add(path);
+		const { key, opposite, changed } = this.pending.add(change, Date.now());
+		this.verificationKeys.delete(opposite);
+		this.verificationKeys.add(key);
 		return changed;
 	}
 
 	snapshotPendingRevisions(): ReadonlyMap<string, number> {
-		return new Map(this.pendingRevisions);
+		return this.pending.snapshotRevisions();
 	}
 
 	/** Settles keys a successful result covered, unless a newer event arrived after
 	 * `revisionSnapshot` was taken. */
 	clearSyncedPendingPaths(result: SyncResult, revisionSnapshot: ReadonlyMap<string, number>): void {
-		if (!result.success || this.pendingKeys.size === 0) {
+		if (!result.success || this.pending.queuedCount === 0) {
 			return;
 		}
 
-		const previousPendingCount = this.pendingKeys.size;
-
-		const clearIfUnchanged = (key: string) => {
-			const startRevision = revisionSnapshot.get(key);
-			const currentRevision = this.pendingRevisions.get(key);
-			if (currentRevision !== startRevision) return;
-			this.pendingKeys.delete(key);
-			this.pendingRevisions.delete(key);
-			this.pendingTimes.delete(key);
-		};
+		const previousPendingCount = this.pending.queuedCount;
+		const clearIfUnchanged = (key: string) => this.pending.settleIfUnchanged(key, revisionSnapshot);
 
 		for (const path of result.uploadedPaths) clearIfUnchanged(pendingChangeKey('upload', path));
 		for (const path of result.downloadedPaths) clearIfUnchanged(pendingChangeKey('upload', path));
@@ -161,14 +131,14 @@ export class SyncQueueController {
 		for (const path of result.deletedPaths) clearIfUnchanged(pendingChangeKey('delete', path));
 		for (const queueKey of result.settledPaths) clearIfUnchanged(queueKey);
 
-		if (this.pendingKeys.size === previousPendingCount) {
+		if (this.pending.queuedCount === previousPendingCount) {
 			return;
 		}
 
-		if (this.pendingKeys.size === 0) {
+		if (this.pending.queuedCount === 0) {
 			this.clearDebounceTimer();
 		}
-		this.context.updateState({ pendingChanges: this.pendingKeys.size });
+		this.context.updateState({ pendingChanges: this.pending.queuedCount });
 	}
 
 	destroy(): void {
@@ -176,10 +146,7 @@ export class SyncQueueController {
 		if (this.verificationTimer !== null) clearTimeout(this.verificationTimer);
 		this.verificationTimer = null;
 		this.verificationKeys.clear();
-		this.pendingKeys.clear();
-		this.inFlightPaths.clear();
-		this.pendingRevisions.clear();
-		this.pendingTimes.clear();
+		this.pending.clear();
 		this.reconciliationScheduled = false;
 		this.reconciliationPaths.clear();
 	}
@@ -187,7 +154,7 @@ export class SyncQueueController {
 	private getQueueFlushContext(): QueueFlushContext {
 		return {
 			...this.context,
-			getPendingPathCount: () => this.pendingKeys.size,
+			getPendingPathCount: () => this.pending.queuedCount,
 			beginBatch: () => this.beginFlushBatch(),
 			triggerDebouncedSync: () => this.debouncedSync(),
 			retryAfterFailure: () => this.retryAfterFailure(),
@@ -198,43 +165,19 @@ export class SyncQueueController {
 
 	private beginFlushBatch(): QueueFlushBatch {
 		const now = Date.now();
-		const paths = [...this.pendingKeys].filter(key => this.largeUploadReadyAt(key, now) === null);
-		const revisions = new Map(paths.map(path => [path, this.pendingRevisions.get(path)]));
-		for (const path of paths) {
-			this.pendingKeys.delete(path);
-			this.pendingTimes.delete(path);
-			this.inFlightPaths.add(path);
-		}
+		const batch = this.pending.takeBatch(key => this.largeUploadReadyAt(key, now) === null);
 		this.scheduleHeldUploads(now);
-		let released = false;
-		return {
-			paths,
-			requeue: keys => { for (const key of keys) this.pendingKeys.add(key); },
-			release: () => {
-				// Reporting can outlive this batch and overlap a later flush of the
-				// same path. Its finalizer must release this ownership only once.
-				if (released) return;
-				released = true;
-				for (const path of paths) {
-					this.inFlightPaths.delete(path);
-					// Every key not requeued is settled, including unchanged files the
-					// flush skipped; a newer event keeps its own revision.
-					if (!this.pendingKeys.has(path) && this.pendingRevisions.get(path) === revisions.get(path)) {
-						this.pendingRevisions.delete(path);
-					}
-				}
-			},
-		};
+		return batch;
 	}
 
 	settingsChanged(): void {
 		this.clearDebounceTimer();
-		if (this.pendingKeys.size > 0) this.debouncedSync();
+		if (this.pending.queuedCount > 0) this.debouncedSync();
 	}
 
 	/** Re-saving an already pending file only restarts the countdown. */
 	private debouncedSync(pendingChanged = true): void {
-		if (pendingChanged) this.context.updateState({ pendingChanges: this.pendingKeys.size });
+		if (pendingChanged) this.context.updateState({ pendingChanges: this.pending.queuedCount });
 		this.schedulePendingVerification();
 		if (this.context.automaticSyncEnabled?.() === false) return;
 		this.scheduleFlush(this.context.getDebounceDelayMs(), this.context.maxDebounceWaitMs);
@@ -259,9 +202,7 @@ export class SyncQueueController {
 			if (existingTimer) {
 				clearTimeout(existingTimer);
 			}
-			this.debounceTimer = null;
-			this.maxWaitStart = null;
-			void this.processPendingChanges();
+			this.flushNow();
 			return;
 		}
 
@@ -269,19 +210,22 @@ export class SyncQueueController {
 			clearTimeout(existingTimer);
 		}
 
-		this.debounceTimer = setTimeout(() => {
-			this.debounceTimer = null;
-			this.maxWaitStart = null;
-			void this.processPendingChanges();
-		}, debounceDelayMs);
+		this.debounceTimer = setTimeout(this.flushNow, debounceDelayMs);
 	}
+
+	/** Ends the current wait and flushes. */
+	private readonly flushNow = (): void => {
+		this.debounceTimer = null;
+		this.maxWaitStart = null;
+		void this.processPendingChanges();
+	};
 
 	/** Offline or failing flushes back off exponentially to five minutes, so a
 	 * dropped connection does not re-read pending files every few seconds. A new
 	 * local event still schedules an ordinary debounced attempt. */
 	private retryAfterFailure(): void {
 		this.consecutiveFailures++;
-		this.context.updateState({ pendingChanges: this.pendingKeys.size });
+		this.context.updateState({ pendingChanges: this.pending.queuedCount });
 		if (this.context.automaticSyncEnabled?.() === false) return;
 		const delay = Math.min(this.context.getDebounceDelayMs() * 2 ** (this.consecutiveFailures - 1), MAX_RETRY_DELAY_MS);
 		this.scheduleFlush(delay);
@@ -289,7 +233,7 @@ export class SyncQueueController {
 
 	/** When a held-back large upload becomes due, or null when `key` is not held. */
 	private largeUploadReadyAt(key: string, now: number): number | null {
-		const times = this.pendingTimes.get(key);
+		const times = this.pending.timesOf(key);
 		const change = decodePendingChange(key);
 		if (!times || change.kind !== 'upload' || (this.context.localManifest.getEntry(change.path)?.size ?? 0) < LARGE_UPLOAD_BYTES) return null;
 		const readyAt = Math.min(times.last + LARGE_UPLOAD_QUIET_MS, times.first + LARGE_UPLOAD_MAX_WAIT_MS);
@@ -299,20 +243,16 @@ export class SyncQueueController {
 	/** Schedules a flush for the earliest held-back upload; returns whether any is held. */
 	private scheduleHeldUploads(now: number): boolean {
 		let readyAt = Infinity;
-		for (const key of this.pendingKeys) readyAt = Math.min(readyAt, this.largeUploadReadyAt(key, now) ?? Infinity);
+		for (const key of this.pending.queuedKeys()) readyAt = Math.min(readyAt, this.largeUploadReadyAt(key, now) ?? Infinity);
 		if (readyAt === Infinity) return false;
-		if (!this.debounceTimer) this.debounceTimer = setTimeout(() => {
-			this.debounceTimer = null;
-			this.maxWaitStart = null;
-			void this.processPendingChanges();
-		}, readyAt - now);
+		if (!this.debounceTimer) this.debounceTimer = setTimeout(this.flushNow, readyAt - now);
 		return true;
 	}
 
 	private async processPendingChanges(): Promise<void> {
 		if (this.context.automaticSyncEnabled?.() === false) return;
 		const now = Date.now();
-		if ([...this.pendingKeys].every(key => this.largeUploadReadyAt(key, now) !== null) && this.scheduleHeldUploads(now)) return;
+		if ([...this.pending.queuedKeys()].every(key => this.largeUploadReadyAt(key, now) !== null) && this.scheduleHeldUploads(now)) return;
 		const task = flushPendingQueueChanges(this.getQueueFlushContext());
 		this.flushTasks.add(task);
 		try { await task; } finally { this.flushTasks.delete(task); }
@@ -324,7 +264,7 @@ export class SyncQueueController {
 
 	/** Resume checks deferred by a sync, including events emitted by downloads. */
 	recheckPendingPaths(): void {
-		for (const key of this.pendingKeys) this.verificationKeys.add(key);
+		for (const key of this.pending.queuedKeys()) this.verificationKeys.add(key);
 		this.schedulePendingVerification();
 	}
 
@@ -351,8 +291,7 @@ export class SyncQueueController {
 		this.verificationKeys.clear();
 		const revisions = this.snapshotPendingRevisions();
 		const isCurrent = (key: string) => !this.context.isDestroyed()
-			&& this.context.currentStatus() !== 'syncing' && this.pendingKeys.has(key)
-			&& !this.inFlightPaths.has(key) && this.pendingRevisions.get(key) === revisions.get(key);
+			&& this.context.currentStatus() !== 'syncing' && this.pending.isUnchangedSince(key, revisions);
 		const result = createEmptySyncResult();
 		result.settledPaths = await this.context.verifyPendingPaths(keys, isCurrent);
 		this.clearSyncedPendingPaths(result, revisions);
