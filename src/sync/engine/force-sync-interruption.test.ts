@@ -49,13 +49,22 @@ it('keeps every checkpoint baseline when a force full sync stops mid-upload', as
 	await harness.localManifest.save();
 
 	const running = harness.engine.forceFullSync();
+	const reopen = async () => {
+		const manifest = new LocalManifest({ vault: harness.disk.vault }, { dir: TEST_PLUGIN_DIR }, 'https://server.test');
+		await manifest.load();
+		return manifest;
+	};
 	await vi.waitFor(() => expect(answered).toBeGreaterThanOrEqual(90), { timeout: 10_000 });
+	// Receipts are checkpointed after their response arrives, so wait for one on disk.
+	await vi.waitFor(async () => {
+		const saved = await reopen();
+		expect([...answeredPaths].some(path => saved.getEntry(path)?.revision === `rev-${path}`)).toBe(true);
+	}, { timeout: 10_000 });
 	harness.engine.destroy();
 	expect((await running).outcome).toBe('cancelled');
 	await harness.engine.waitForIdle();
 
-	const reopened = new LocalManifest({ vault: harness.disk.vault }, { dir: TEST_PLUGIN_DIR }, 'https://server.test');
-	await reopened.load();
+	const reopened = await reopen();
 	expect(reopened.getFileCount()).toBe(files + 1);
 	expect(reopened.getEntry('remote-only.md')).toMatchObject({ revision: 'remote-only-rev' });
 	const uploaded = [...answeredPaths][0]!;

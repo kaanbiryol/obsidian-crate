@@ -216,6 +216,7 @@ for (const engine of [chromium, webkit]) test(`${engine.name()}: invalid Reading
         let lists = 0, mutations = 0;
         window.fetch = async path => {
           if (path === '/reading/encryption') return Response.json({ encryption: null });
+          if (path === '/.well-known/crate') return Response.json({ service: 'crate', serverVersion: 'test', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['reading'] });
           if (path === '/reading/session') return Response.json({ day: 20_000, generation: session.generation });
           if (path === '/reading/update') { mutations++; return Response.json({ saved: true }); }
           const response = scenario.pages[lists++];

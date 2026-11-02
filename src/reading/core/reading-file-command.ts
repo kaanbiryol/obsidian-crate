@@ -14,7 +14,7 @@ export interface ReadingFileCommand {
 /** `invalid` is a malformed request, `unsupported` names a field no writer changes,
  * `conflict` means the note changed since the client read it, and `not-empty` is a
  * retry of a capture whose article is already saved. */
-export type ReadingFileCommandIssue = 'invalid' | 'unsupported' | 'conflict' | 'not-empty';
+type ReadingFileCommandIssue = 'invalid' | 'unsupported' | 'conflict' | 'not-empty';
 
 export type ReadingFileCommandPlan =
 	| { kind: 'remove' }

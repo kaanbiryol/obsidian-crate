@@ -29,6 +29,7 @@ const { outputFiles } = await build({
       listRecentFileVersions: unused, getPendingRestores: () => [], loadFileHistoryPreview: unused,
       restoreRecentFileVersion: unused, loadCurrentSyncedPreview: unused,
     };
+    const app = { vault: { configDir: '.obsidian' } };
     window.setSyncing = syncing => { status = syncing ? 'syncing' : 'idle'; for (const fn of listeners) fn(); };
     window.finishStartup = () => { initializing = false; for (const fn of listeners) fn(); };
     window.mount = scene => {
@@ -38,7 +39,7 @@ const { outputFiles } = await build({
         currentText: 'Current note', savedText: 'Saved note', currentSize: 12, savedSize: 10,
         openVersion: async () => {}, resolve: async () => {},
       }), () => {}).open();
-      else if (scene === 'history-loading') new ActivityModal({}, {
+      else if (scene === 'history-loading') new ActivityModal(app, {
         syncHistory: [{ timestamp: '2026-01-01T00:00:00Z', type: 'sync', success: true, uploaded: 1,
           downloaded: 0, deleted: 0, merged: 0, conflictCount: 0, errorCount: 0, uploadedPaths: ['note.md'] }],
         workerUrl: 'https://crate.example',
@@ -46,7 +47,7 @@ const { outputFiles } = await build({
         window.resolveSharedHistory = () => resolve([]);
         window.rejectSharedHistory = () => reject(new Error('Offline'));
       }) }, 'history').open();
-      else new ActivityModal({}, { syncHistory: [], workerUrl: 'https://crate.example' }, deps).open();
+      else new ActivityModal(app, { syncHistory: [], workerUrl: 'https://crate.example' }, deps).open();
     };
     window.mount('activity');
   ` },
