@@ -8,11 +8,10 @@ import { buildDiff } from './diff-model';
 import { renderFileText } from './history-text';
 import { diffCountsLabel, renderDiffCounts, renderDiffLines } from './diff-renderer';
 import { openConfirmationModal } from '../confirmation-modal';
-import { formatSize } from '../shared/format';
+import { formatSize, parseServerTimestamp } from '../shared/format';
 
 export type FileHistoryRuntime = Pick<SyncRuntime, 'listRecentFileVersions' | 'getPendingRestores' | 'loadFileHistoryPreview' | 'restoreRecentFileVersion' | 'loadCurrentSyncedPreview'>;
 
-function versionDate(value: string): Date { return new Date(value.includes(' ') ? `${value.replace(' ', 'T')}Z` : value); }
 function formatDate(date: Date, seconds = false): string {
 	return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', ...(seconds ? { second: '2-digit' as const } : {}) }).format(date);
 }
@@ -81,7 +80,7 @@ class FileHistoryModal extends SharedModal {
 		button.disabled = this.busy; button.setAttribute('data-version-key', version.storage_key);
 		button.setAttribute('aria-current', String(version.storage_key === this.selectedVersion?.storage_key));
 		{
-			button.createSpan({ cls: 'crate-history-file-name', text: formatDate(versionDate(version.created_at), seconds), attr: { title: versionDate(version.created_at).toLocaleString() } });
+			button.createSpan({ cls: 'crate-history-file-name', text: formatDate(parseServerTimestamp(version.created_at), seconds), attr: { title: parseServerTimestamp(version.created_at).toLocaleString() } });
 			button.createSpan({ cls: 'crate-history-file-folder', text: `${version.reason === 'deleted' ? 'Before deletion' : 'Before update'} · ${formatSize(version.size)}` });
 		}
 		if (this.isPending(version)) button.createSpan({ cls: 'crate-history-file-folder', text: 'Restore needs to finish' });
@@ -109,7 +108,7 @@ class FileHistoryModal extends SharedModal {
 	}
 
 	private formatHistoryDate(date: Date): string {
-		const dates = this.versionRows().map(row => versionDate(row.created_at));
+		const dates = this.versionRows().map(row => parseServerTimestamp(row.created_at));
 		const local = this.app.vault.getFileByPath(this.selectedPath);
 		if (local) dates.push(new Date(local.stat.mtime));
 		return formatDate(date, dates.filter(value => Math.floor(value.getTime() / 60_000) === Math.floor(date.getTime() / 60_000)).length > 1);
@@ -120,7 +119,7 @@ class FileHistoryModal extends SharedModal {
 		this.listEl.empty();
 		this.listEl.createEl('h4', { cls: 'crate-history-group', text: 'Versions' });
 		const rows = this.versionRows();
-		const dates = rows.map(row => versionDate(row.created_at));
+		const dates = rows.map(row => parseServerTimestamp(row.created_at));
 		const local = this.app.vault.getFileByPath(this.selectedPath);
 		if (local) dates.push(new Date(local.stat.mtime));
 		const needsSeconds = (date: Date) => dates.filter(value => Math.floor(value.getTime() / 60_000) === Math.floor(date.getTime() / 60_000)).length > 1;
@@ -134,7 +133,7 @@ class FileHistoryModal extends SharedModal {
 		current.disabled = this.busy; current.setAttribute('aria-current', String(!this.selectedVersion));
 		if (focused === 'current') current.focus();
 
-		for (const version of rows) { const button = this.versionButton(this.listEl, version, needsSeconds(versionDate(version.created_at))); if (focused === version.storage_key) button.focus(); }
+		for (const version of rows) { const button = this.versionButton(this.listEl, version, needsSeconds(parseServerTimestamp(version.created_at))); if (focused === version.storage_key) button.focus(); }
 		if (this.fileLoading) this.listEl.createEl('p', { text: 'Loading version history…', attr: { role: 'status' } });
 		else if (this.fileError) {
 			this.listEl.createEl('p', { text: this.fileError, attr: { role: 'alert' } });
@@ -175,7 +174,7 @@ class FileHistoryModal extends SharedModal {
 		try {
 			const snapshot = await this.runtime.loadCurrentSyncedPreview(path);
 			if (this.closed || revision !== this.previewRevision) return;
-			content.empty(); header.createEl('p', { cls: 'crate-file-history-count', text: `${formatDate(versionDate(snapshot.file.modified))} · ${formatSize(snapshot.file.size)}` });
+			content.empty(); header.createEl('p', { cls: 'crate-file-history-count', text: `${formatDate(parseServerTimestamp(snapshot.file.modified))} · ${formatSize(snapshot.file.size)}` });
 			if (snapshot.unavailable) content.createEl('p', { text: snapshot.unavailable });
 			else filePreview(content, snapshot.text ?? '', 'Current synced file contents');
 		} catch (error) {
@@ -188,9 +187,9 @@ class FileHistoryModal extends SharedModal {
 	private async selectVersion(version: RemoteFileVersion): Promise<void> {
 		if (this.busy) return;
 		this.selectedVersion = version; const revision = ++this.previewRevision; this.renderVersions();
-		const header = this.previewHeader(this.formatHistoryDate(versionDate(version.created_at)), `${version.reason === 'deleted' ? 'Before deletion' : 'Before update'} · ${formatSize(version.size)}`);
+		const header = this.previewHeader(this.formatHistoryDate(parseServerTimestamp(version.created_at)), `${version.reason === 'deleted' ? 'Before deletion' : 'Before update'} · ${formatSize(version.size)}`);
 		header.addClass('crate-history-version-header');
-		header.setAttribute('title', versionDate(version.created_at).toLocaleString());
+		header.setAttribute('title', parseServerTimestamp(version.created_at).toLocaleString());
 		const actions = header.createDiv({ cls: 'crate-history-version-actions' });
 		const restore = action(actions, this.isPending(version) ? 'Resume restore' : 'Restore this version', () => { void this.restore(version, restore, restoreLabel); }, 'crate-history-restore reminder-modal-header-action is-enabled');
 		const restoreText = restore.textContent ?? '';
@@ -250,7 +249,7 @@ class FileHistoryModal extends SharedModal {
 		this.busy = true; button.disabled = true; button.toggleClass('is-enabled', false); this.renderVersions();
 		try {
 			const confirmed = this.isPending(version) || await openConfirmationModal(this.app, {
-				title: 'Restore file version', message: `Restore ${version.path} from ${versionDate(version.created_at).toLocaleString()}?`,
+				title: 'Restore file version', message: `Restore ${version.path} from ${parseServerTimestamp(version.created_at).toLocaleString()}?`,
 				details: ['This restores the remote file and syncs it to this device. Local edits follow normal sync conflict handling.', 'The current remote version, if any, remains recoverable for 30 days.'], confirmText: 'Restore',
 			});
 			if (!confirmed || this.closed) return;

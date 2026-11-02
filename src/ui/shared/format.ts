@@ -11,3 +11,12 @@ export function formatTimeAgo(time: number, now = Date.now()): string {
 export function formatSize(bytes: number): string {
 	return bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
+
+/** A server timestamp: SQLite's `YYYY-MM-DD HH:MM:SS` or ISO 8601. A time without an
+ * offset is UTC, as the server stores it. Unreadable input gives an invalid Date. */
+export function parseServerTimestamp(value: string): Date {
+	const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+	// Date-only ISO strings are already UTC.
+	const zoned = !normalized.includes('T') || /[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized);
+	return new Date(zoned ? normalized : `${normalized}Z`);
+}

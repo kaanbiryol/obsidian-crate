@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { formatSize, formatTimeAgo } from './format';
+import { formatSize, formatTimeAgo, parseServerTimestamp } from './format';
 
 const now = Date.parse('2026-10-26T12:00:00Z');
 
@@ -14,3 +14,18 @@ it.each([[0, '0 B'], [1023, '1023 B'], [1024, '1.0 KiB'], [250 * 1024, '250.0 Ki
 	'formats %i bytes as %s', (bytes, label) => {
 		expect(formatSize(bytes)).toBe(label);
 	});
+
+it.each([
+	['2026-10-26 12:00:00', '2026-10-26T12:00:00.000Z'],
+	['2026-10-26T12:00:00', '2026-10-26T12:00:00.000Z'],
+	['2026-10-26T12:00:00Z', '2026-10-26T12:00:00.000Z'],
+	['2026-10-26T14:00:00+02:00', '2026-10-26T12:00:00.000Z'],
+	['2026-10-26 14:00:00+0200', '2026-10-26T12:00:00.000Z'],
+	['2026-10-26', '2026-10-26T00:00:00.000Z'],
+] as const)('reads the server timestamp %s as UTC', (value, iso) => {
+	expect(parseServerTimestamp(value).toISOString()).toBe(iso);
+});
+
+it('gives an invalid date for an unreadable timestamp', () => {
+	expect(Number.isNaN(parseServerTimestamp('yesterday').getTime())).toBe(true);
+});

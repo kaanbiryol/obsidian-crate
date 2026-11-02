@@ -7,7 +7,7 @@ import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import { createLogger } from '../../sync/logger';
 import { errorMessage } from '../../platform/logger';
 import type { SettingsSectionContext } from './section-helpers';
-import { formatTimeAgo } from '../shared/format';
+import { formatTimeAgo, parseServerTimestamp } from '../shared/format';
 import { AddDeviceModal } from './add-device-modal';
 
 const log = createLogger('DeviceSettings');
@@ -189,14 +189,12 @@ function formatDeviceLabel(token: RegisteredDevice): string {
 }
 
 function formatLastSeen(value: string): string {
-	const normalized = value.includes('T') ? value : value.replace(' ', 'T');
-	const time = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}Z`).getTime();
+	const time = parseServerTimestamp(value).getTime();
 	return Number.isFinite(time) ? formatTimeAgo(time) : value;
 }
 
 function formatDateTime(value: string): string {
-	const normalized = value.includes('T') ? value : value.replace(' ', 'T');
-	const parsed = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}Z`);
+	const parsed = parseServerTimestamp(value);
 	return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
 
