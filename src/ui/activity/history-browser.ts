@@ -1,10 +1,10 @@
-import { setIcon } from 'obsidian';
 import type { SyncHistoryEntry } from '../../sync/types';
 import type { HistoryComparison } from '../../sync/history/comparison';
 import { groupHistory } from './history-groups';
 import { historyEntryKey } from './history-point';
 import { describeHistory, historyTime, recordedHistoryFiles } from './history';
 import { renderHistoryPreview } from './history-preview';
+import { renderBackButton } from './rendering';
 
 export interface HistoryBrowserDeps {
 	load?(entry: SyncHistoryEntry): Promise<HistoryComparison>;
@@ -64,10 +64,7 @@ export class HistoryBrowser {
 	private showPane(pane: 'history' | 'files' | 'diff'): void { this.container.setAttribute('data-pane', pane); }
 
 	private back(parent: HTMLElement, label: string, pane: 'history' | 'files'): void {
-		const button = parent.createEl('button', { cls: 'crate-history-pane-back', attr: { type: 'button', 'aria-label': `Back to ${label.toLowerCase()}` } });
-		setIcon(button.createSpan({ attr: { 'aria-hidden': 'true' } }), 'arrow-left');
-		button.createSpan({ text: label });
-		button.addEventListener('click', () => {
+		renderBackButton(parent, 'crate-history-pane-back', label, () => {
 			this.showPane(pane);
 			(pane === 'history' ? this.syncs : this.files).querySelector<HTMLButtonElement>('[aria-current="true"]')?.focus();
 		});

@@ -35,3 +35,12 @@ export function renderDiffLines(container: HTMLElement, lines: DiffLine[], label
 	}
 	return code;
 }
+
+export const diffCountsLabel = ({ added, removed }: { added: number; removed: number }) => `${added} added lines, ${removed} removed lines`;
+
+/** The `+added −removed` line counts beside a comparison. `labelEach` names each count
+ * for assistive technology when no surrounding element carries `diffCountsLabel`. */
+export function renderDiffCounts(container: HTMLElement, { added, removed }: { added: number; removed: number }, labelEach = false): void {
+	container.createSpan({ text: `+${added}`, cls: 'is-added', ...labelEach ? { attr: { 'aria-label': `${added} added lines` } } : {} });
+	container.createSpan({ text: `−${removed}`, cls: 'is-removed', ...labelEach ? { attr: { 'aria-label': `${removed} removed lines` } } : {} });
+}

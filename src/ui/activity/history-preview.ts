@@ -1,6 +1,6 @@
 import type { HistoryRestorePreview } from '../../sync/history/restore-preview';
 import { buildDiff } from './diff-model';
-import { renderDiffLines } from './diff-renderer';
+import { renderDiffCounts, renderDiffLines } from './diff-renderer';
 import { renderFileText } from './history-text';
 
 /** Saved-state display for browsing vault history. */
@@ -15,7 +15,6 @@ export function renderHistoryPreview(output: HTMLElement, snapshot: HistoryResto
 	const diff = buildDiff(snapshot.current, snapshot.saved);
 	if (diff.limited) { message('This change is too large to display.'); return; }
 	if (!diff.added && !diff.removed) { message('No text differences.'); return; }
-	counts.createSpan({ text: `+${diff.added}`, cls: 'is-added', attr: { 'aria-label': `${diff.added} added lines` } });
-	counts.createSpan({ text: `−${diff.removed}`, cls: 'is-removed', attr: { 'aria-label': `${diff.removed} removed lines` } });
+	renderDiffCounts(counts, diff, true);
 	renderDiffLines(output, diff.lines, label, (el, line) => renderFileText(el, line.text || ' ', line.words));
 }

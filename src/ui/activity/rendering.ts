@@ -8,6 +8,15 @@ export function renderLoadingState(container: HTMLElement, text: string): void {
 	loading.createSpan({ cls: 'crate-activity-loading-label', text }).setAttribute('title', text);
 }
 
+/** An arrow button that returns from a detail pane to `label`, on layouts that show one pane at a time. */
+export function renderBackButton(parent: HTMLElement, cls: string, label: string, back: () => void): HTMLButtonElement {
+	const button = parent.createEl('button', { cls, attr: { type: 'button', 'aria-label': `Back to ${label.toLowerCase()}` } });
+	setIcon(button.createSpan({ attr: { 'aria-hidden': 'true' } }), 'arrow-left');
+	button.createSpan({ text: label });
+	button.addEventListener('click', back);
+	return button;
+}
+
 export type FileCardType = 'upload' | 'download' | 'merge' | 'delete' | 'conflict';
 export type EmptyStateTone = 'accent' | 'success';
 

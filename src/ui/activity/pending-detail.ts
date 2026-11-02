@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { renderDiffPreview } from './pending-diff';
+import { renderBackButton } from './rendering';
 import { CRATE_UPDATE_FILES } from '../../plugin/crate-update-bundle';
 
 export const crateUpdateTitle = (version: string) => `Crate ${version} update`;
@@ -29,9 +30,7 @@ export function createPendingDetail(browser: HTMLElement, id: string, showFiles:
 	const detail = browser.createDiv({ cls: 'crate-browser-detail', attr: { role: 'region', 'aria-label': 'File comparison' } });
 	detail.id = id;
 	const toolbar = detail.createDiv({ cls: 'crate-browser-toolbar' });
-	const back = toolbar.createEl('button', { cls: 'crate-browser-back', attr: { type: 'button', 'aria-label': 'Back to files' } });
-	setIcon(back.createSpan({ attr: { 'aria-hidden': 'true' } }), 'arrow-left');
-	back.createSpan({ text: 'Files' });
+	const back = renderBackButton(toolbar, 'crate-browser-back', 'Files', showFiles);
 	const fileInfo = toolbar.createDiv({ cls: 'crate-browser-file-heading' });
 	const fileName = fileInfo.createDiv({ cls: 'crate-browser-file-title' });
 	const filePath = fileInfo.createDiv({ cls: 'crate-browser-file-folder' });
@@ -43,7 +42,6 @@ export function createPendingDetail(browser: HTMLElement, id: string, showFiles:
 	empty.createDiv({ text: 'Select a file', cls: 'crate-browser-empty-title' });
 	empty.createDiv({ text: 'Compare this device’s changes with its last-synced copy.' });
 
-	back.addEventListener('click', showFiles);
 	detail.addEventListener('keydown', event => {
 		if (event.key === 'Escape' && back.getClientRects().length > 0) {
 			event.preventDefault();

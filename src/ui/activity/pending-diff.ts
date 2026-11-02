@@ -1,6 +1,6 @@
 import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { buildDiff } from './diff-model';
-import { renderDiffLines } from './diff-renderer';
+import { diffCountsLabel, renderDiffCounts, renderDiffLines } from './diff-renderer';
 import { formatSize } from '../shared/format';
 
 export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff, path: string, header: HTMLElement): void {
@@ -21,9 +21,7 @@ export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff,
 		message.createDiv({ text: snapshot.kind === 'modified' ? 'Matches the last-synced copy.'
 				: snapshot.kind === 'added' ? 'This empty file was added on this device since the last sync.' : 'This empty file was deleted on this device.' });
 	} else {
-		const stats = header.createDiv({ cls: 'crate-diff-stats', attr: { 'aria-label': `${diff.added} added lines, ${diff.removed} removed lines` } });
-		stats.createSpan({ text: `+${diff.added}`, cls: 'is-added' });
-		stats.createSpan({ text: `−${diff.removed}`, cls: 'is-removed' });
+		renderDiffCounts(header.createDiv({ cls: 'crate-diff-stats', attr: { 'aria-label': diffCountsLabel(diff) } }), diff);
 		renderDiffLines(container, diff.lines, `Changes for ${path}`);
 	}
 }

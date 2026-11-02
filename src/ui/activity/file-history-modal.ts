@@ -6,7 +6,7 @@ import type { SyncRuntime } from '../../sync/runtime/runtime';
 import type { FileHistoryPreview } from '../../sync/history/file-history-preview';
 import { buildDiff } from './diff-model';
 import { renderFileText } from './history-text';
-import { renderDiffLines } from './diff-renderer';
+import { diffCountsLabel, renderDiffCounts, renderDiffLines } from './diff-renderer';
 import { openConfirmationModal } from '../confirmation-modal';
 import { formatSize } from '../shared/format';
 
@@ -238,9 +238,7 @@ class FileHistoryModal extends SharedModal {
 			filePreview(details, snapshot.saved ?? '', 'Saved file contents');
 			return;
 		}
-		const stats = comparison.createSpan({ cls: 'crate-history-diff-summary', attr: { 'aria-label': `${result.added} added lines, ${result.removed} removed lines` } });
-		stats.createSpan({ cls: 'is-added', text: `+${result.added}` });
-		stats.createSpan({ cls: 'is-removed', text: `−${result.removed}` });
+		renderDiffCounts(comparison.createSpan({ cls: 'crate-history-diff-summary', attr: { 'aria-label': diffCountsLabel(result) } }), result);
 		output.addClass('crate-file-diff', 'crate-history-diff');
 		renderDiffLines(output, result.lines, 'Changes from current local file to saved version', (container, line) => renderFileText(container, line.text || ' ', line.words));
 	}
