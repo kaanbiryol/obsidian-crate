@@ -25,23 +25,33 @@ function opaqueBackground(element: HTMLElement): string {
 	return 'var(--background-primary)';
 }
 
-/**
- * Let `element` scroll the document. Its ancestors grow to its content up to
- * `boundary`, sibling chrome stays where it is drawn, and the scroll offset
- * moves to the document. Releasing reverses each step.
- */
-function promote(element: HTMLElement, boundary: HTMLElement, onLayoutChange: () => void): () => void {
+interface Chrome { element: HTMLElement; bounds: DOMRect; position: string; zIndex: string }
+
+/** A handoff's layout, measured before anything changes. */
+export interface DocumentScrollLayout {
+	/** The list's scroll offset, which moves to the document. */
+	top: number;
+	ownerBounds: DOMRect;
+	viewport: number;
+	background: string;
+	/** Ancestors above `boundary`, up to the document element. */
+	outer: HTMLElement[];
+	/** Siblings whose resize hands the scroll back for a fresh handoff. */
+	watched: Set<HTMLElement>;
+	/** Chrome to pin where it is drawn, by parent, outermost first. */
+	levels: { parent: HTMLElement; chrome: Chrome[] }[];
+	/** Screens behind a covering layer, hidden while the document scrolls. */
+	covered: HTMLElement[];
+	/** Ancestors up to `boundary` that grow to their content. */
+	growth: { element: HTMLElement; position: string; detach: boolean }[];
+}
+
+/** Reads, without changing anything, what handing `element`'s scroll to the document changes. */
+export function measureDocumentScroll(element: HTMLElement, boundary: HTMLElement): DocumentScrollLayout {
 	const document = element.ownerDocument;
 	const window = document.defaultView!;
 	const root = document.documentElement;
 	const top = element.scrollTop;
-	const saved: SavedStyle[] = [];
-	const set = (target: HTMLElement, property: string, value: string) => {
-		saved.push([target, property, target.style.getPropertyValue(property), target.style.getPropertyPriority(property)]);
-		target.style.setProperty(property, value, 'important');
-	};
-
-	// Measure everything before changing layout.
 	const ownerBounds = element.getBoundingClientRect();
 	// Installed iOS apps are 100vh tall, which includes the status bar inset that
 	// the document scrolls against (innerHeight) excludes. Fit the screen to the
@@ -60,14 +70,14 @@ function promote(element: HTMLElement, boundary: HTMLElement, onLayoutChange: ()
 	// Offsets are measured once, so any resize hands the scroll back for a fresh
 	// handoff: a notice appearing, or a pull-to-refresh indicator growing.
 	const watched = new Set<HTMLElement>();
-	const levels: { parent: HTMLElement; chrome: { element: HTMLElement; bounds: DOMRect; position: string; zIndex: string }[] }[] = [];
+	const levels: DocumentScrollLayout['levels'] = [];
 	// Screens behind a covering layer, such as a pushed project, would show
 	// below its content when the document bounces. Hide them instead.
 	const covered: HTMLElement[] = [];
 	const stackLevel = (zIndex: string) => zIndex === 'auto' ? 0 : Number(zIndex);
 	const contains = (outer: DOMRect, inner: DOMRect) => outer.left <= inner.left + 0.5 && outer.top <= inner.top + 0.5
 		&& outer.right >= inner.right - 0.5 && outer.bottom >= inner.bottom - 0.5;
-	const growth: { element: HTMLElement; position: string; detach: boolean }[] = [];
+	const growth: DocumentScrollLayout['growth'] = [];
 	const visibleSiblings = (target: HTMLElement) => Array.from(target.parentElement?.children ?? [])
 		.filter((sibling): sibling is HTMLElement => sibling !== target && sibling instanceof HTMLElement && sibling.getClientRects().length > 0);
 	for (const [index, target] of [element, ...inner].entries()) {
@@ -89,6 +99,28 @@ function promote(element: HTMLElement, boundary: HTMLElement, onLayoutChange: ()
 		const position = getComputedStyle(target).position;
 		growth.push({ element: target, position, detach: !inFlow(position) && !siblings.some(({ style }) => inFlow(style.position)) });
 	}
+	return { top, ownerBounds, viewport, background, outer, watched, levels, covered, growth };
+}
+
+/**
+ * Let `element` scroll the document. Its ancestors grow to its content up to
+ * `boundary`, sibling chrome stays where it is drawn, and the scroll offset
+ * moves to the document. Releasing reverses each step.
+ */
+function promote(element: HTMLElement, boundary: HTMLElement, onLayoutChange: () => void): () => void {
+	return applyDocumentScroll(element, measureDocumentScroll(element, boundary), onLayoutChange);
+}
+
+function applyDocumentScroll(element: HTMLElement, layout: DocumentScrollLayout, onLayoutChange: () => void): () => void {
+	const { top, ownerBounds, viewport, background, outer, watched, levels, covered, growth } = layout;
+	const document = element.ownerDocument;
+	const window = document.defaultView!;
+	const root = document.documentElement;
+	const saved: SavedStyle[] = [];
+	const set = (target: HTMLElement, property: string, value: string) => {
+		saved.push([target, property, target.style.getPropertyValue(property), target.style.getPropertyPriority(property)]);
+		target.style.setProperty(property, value, 'important');
+	};
 
 	// Grow the screen to its content; absolute layers without in-flow siblings join the flow.
 	for (const { element: target, position, detach } of growth) {
