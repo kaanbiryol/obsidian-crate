@@ -1,4 +1,4 @@
-import { featureEnabled, handleFeaturePolicy, parseStoredFeaturePolicy } from './feature-policy';
+import { featureEnabled, parseStoredFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
 import { forwardToCoordinator } from './coordinator/coordinator';
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES } from '../../encryption/receipt-format';
@@ -13,12 +13,8 @@ import { handleSyncRoute } from './routes/sync';
 import type { Env } from './types';
 import type { AuthPrincipal } from './auth/index';
 import { corsResponse } from './cors';
-import { mutationAuditContext } from './request-diagnostics';
-import { handleLinkTitle } from './link-title';
 import { apiRoutePolicy } from './routes/policy';
 import { handleEncryptionRoute } from './routes/encryption';
-import { handleEncryptedFolderFiles } from './encryption/encrypted-folder-files';
-import { handleEncryptionReset } from './encryption/reset';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { REMINDERS_FOLDER_CHANGED } from '../../protocol/web-session';
 import type { UploadCommitters } from './sync/staging/upload-committers';
@@ -37,7 +33,7 @@ export function isAuthenticatedRouteAllowed(
 	return policy ? policy.scopes.includes(principal.scope) : principal.scope === 'vault';
 }
 
-interface AuthenticatedRouteContext {
+export interface AuthenticatedRouteContext {
 	uploadCommitters: UploadCommitters;
 	path: string;
 	method: Request['method'];
@@ -53,12 +49,9 @@ interface AuthenticatedRouteContext {
 export async function handleAuthenticatedRoute(
 	request: Request,
 	env: Env,
-	{ uploadCommitters, path, method, principal, resetGeneration, requestId, encryption, featurePolicyValue, coordinatorState }: AuthenticatedRouteContext,
+	context: AuthenticatedRouteContext,
 ): Promise<Response | null> {
-	if (path === '/features' && ['GET', 'POST'].includes(method)) {
-		const limited = await limitNotificationAction(request, env.DB, principal.tokenId);
-		return limited ?? handleFeaturePolicy(request, env.DB);
-	}
+	const { path, method, principal, encryption, featurePolicyValue, coordinatorState } = context;
 	const remindersEnabled = async () => featurePolicyValue === undefined
 		? await featureEnabled(env.DB, 'reminders')
 		: parseStoredFeaturePolicy(featurePolicyValue).reminders;
@@ -76,22 +69,14 @@ export async function handleAuthenticatedRoute(
 	}
 	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, coordinatorState, encryption, featurePolicyValue,
 		coordinatorState ? undefined : () => forwardToCoordinator(env, request));
-	const db = env.DB;
-	const limited = await limitNotificationAction(request, db, principal.tokenId);
+	// Charged once for every remaining route.
+	const limited = await limitNotificationAction(request, env.DB, principal.tokenId);
 	if (limited) return limited;
-	if (path === '/links/title' && method === 'POST') {
-		if (env.NOTIFICATION_REQUEST_LIMITER && !(await env.NOTIFICATION_REQUEST_LIMITER.limit({ key: `link-titles:${principal.tokenId}` })).success) {
-			return corsResponse({ title: null }, 429, { 'Retry-After': '60' });
-		}
-		return handleLinkTitle(request, env.READING_FETCH);
-	}
 
-	return await handleEncryptionReset(request, env, path, principal)
-		?? await handleEncryptionRoute(request, db, path, principal, encryption)
-		?? await handleEncryptedFolderFiles(request, env, path, 'reminders', principal.scope === 'reminders' ? principal.folderPath : undefined, encryption)
-		?? await handleSyncRoute(request, env, uploadCommitters, path, method, resetGeneration, mutationAuditContext(request, principal, requestId), encryption)
-		?? await handleAuthRoute(request, env, path, method)
-		?? await handleRemindersRoute(request, env, path, method)
-		?? await handleNotificationsRoute(request, db, path, method, principal)
-		?? await handleServerRoute(db, path, method);
+	return await handleEncryptionRoute(request, env, context)
+		?? await handleSyncRoute(request, env, context)
+		?? await handleAuthRoute(request, env, context)
+		?? await handleRemindersRoute(request, env, context)
+		?? await handleNotificationsRoute(request, env.DB, context)
+		?? await handleServerRoute(request, env, context);
 }

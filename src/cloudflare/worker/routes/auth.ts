@@ -4,12 +4,12 @@ import {
 	handleRevokeToken,
 } from '../auth/index';
 import type { Env } from '../types';
+import type { AuthenticatedRouteContext } from '../router';
 
 export async function handleAuthRoute(
 	request: Request,
 	env: Env,
-	path: string,
-	method: Request['method'],
+	{ path, method }: Pick<AuthenticatedRouteContext, 'path' | 'method'>,
 ): Promise<Response | null> {
 	const db = env.DB;
 	if (path === '/auth/tokens' && method === 'DELETE') {

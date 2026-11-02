@@ -64,7 +64,7 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	expect(alarm?.content).not.toContain('Secret medical');
 	expect(parseEncryptedNotification(alarm!.content)).toMatchObject({ vaultId: bundle.vaultId, reminderId: 'r1' });
 	// Every session reads the same public configuration; none of it is secret.
-	const scoped = await (await handleEncryptionRoute(new Request('https://test/encryption'), env.DB, '/encryption', { tokenId: 'web', scope: 'reminders', folderPath: folder.wire }))!.text();
+	const scoped = await (await handleEncryptionRoute(new Request('https://test/encryption'), env, { path: '/encryption', method: 'GET', principal: { tokenId: 'web', scope: 'reminders', folderPath: folder.wire } }))!.text();
 	expect(JSON.parse(scoped)).toEqual({ encryption: state, folderPath: folder.wire, folderLabel: folder.label });
 	for (const secret of secrets(bundle)) expect(scoped).not.toContain(secret);
 });

@@ -1,4 +1,3 @@
-import type { EncryptionServerState } from '../../../encryption/server-state';
 import { listSharedCheckpoints, createSharedCheckpoint } from '../sync/history-checkpoints';
 import { handleFileVersionPreview } from '../sync/file-versions/preview';
 import {
@@ -17,24 +16,20 @@ import { handleListFileVersions, handleRestoreFileVersion } from '../sync/file-v
 import { handleEncryptedSettings } from '../encryption/settings';
 import { readEncryptionState } from '../encryption/state';
 import type { Env } from '../types';
-import type { MutationAuditContext } from '../request-diagnostics';
+import { mutationAuditContext } from '../request-diagnostics';
 import { beginInitialImport, finishInitialImport } from '../sync/import/initial-import';
 import { pruneInitialImport } from '../sync/import/initial-import-prune';
 import { forwardTransferRequest } from '../sync/transfer-dispatch';
 import { finishInitialReminderSetup } from '../sync/import/initial-import-readiness';
-import type { UploadCommitters } from '../sync/staging/upload-committers';
+import type { AuthenticatedRouteContext } from '../router';
 import { TRANSFER_PATHS, wakeProjection } from '../coordinator/coordinator';
 
 export async function handleSyncRoute(
 	request: Request,
 	env: Env,
-	uploadCommitters: UploadCommitters,
-	path: string,
-	method: Request['method'],
-	resetGeneration: string | null,
-	audit?: MutationAuditContext,
-	encryption?: EncryptionServerState | null,
+	{ uploadCommitters, path, method, principal, resetGeneration, requestId, encryption }: AuthenticatedRouteContext,
 ): Promise<Response | null> {
+	const audit = mutationAuditContext(request, principal, requestId);
 	const db = env.DB;
 	const bucket = env.BUCKET;
 		if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(bucket);

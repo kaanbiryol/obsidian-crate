@@ -23,8 +23,7 @@ const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValu
 /** Runs under the projection coordinator lock. The replacement credential and
  * reset receipt commit together, so a lost begin reply is safe to retry. The same
  * wipe turns encryption off (an active vault) or on (a plaintext vault given its new state). */
-export async function handleEncryptionReset(request: Request, env: Env, path: string, principal: AuthPrincipal): Promise<Response | null> {
-	if (path !== '/encryption/reset' || principal.scope !== 'vault') return null;
+export async function handleEncryptionReset(request: Request, env: Env, principal: AuthPrincipal): Promise<Response> {
 	const id = new URL(request.url).searchParams.get('id');
 	if (!isEncryptionId(id)) return corsResponse({ error: 'Invalid reset ID' }, 400);
 	const value = await readMaintenanceValue(env.DB, PREFIX + id);

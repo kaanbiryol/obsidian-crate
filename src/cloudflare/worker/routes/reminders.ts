@@ -3,15 +3,17 @@ import { handleCreateReminder } from '../reminders/routes/create';
 import { handleDeleteReminder, handleSetReminderCompleted, handleUpdateReminder } from '../reminders/routes/existing-reminder';
 import { handleListReminders } from '../reminders/routes/list';
 import { handleReorderReminders } from '../reminders/routes/reorder';
+import { handleEncryptedFolderFiles } from '../encryption/encrypted-folder-files';
 import type { Env } from '../types';
+import type { AuthenticatedRouteContext } from '../router';
 
 export async function handleRemindersRoute(
 	request: Request,
 	env: Env,
-	path: string,
-	method: Request['method'],
+	{ path, method, principal, encryption }: Pick<AuthenticatedRouteContext, 'path' | 'method' | 'principal' | 'encryption'>,
 ): Promise<Response | null> {
 	const db = env.DB;
+	if (path.startsWith('/reminders/encrypted-')) return handleEncryptedFolderFiles(request, env, path, 'reminders', principal.scope === 'reminders' ? principal.folderPath : undefined, encryption);
 	if (path === '/reminders/notification-policy' && ['GET', 'POST', 'PUT'].includes(method)) return handleNotificationPolicy(request, db);
 
 	if (path === '/reminders/list' && method === 'GET') {
