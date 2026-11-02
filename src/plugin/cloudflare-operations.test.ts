@@ -8,7 +8,6 @@ const configureCloudflareAuthorizedDevice = vi.fn();
 const generateSecureToken = vi.fn(() => 'device-token');
 const hashToken = vi.fn(async () => 'device-token-hash');
 const openCloudflareDeploymentModal = vi.fn();
-const openCloudflareAuthorizationModal = vi.fn();
 const dismissCloudflareAuthorizationModal = vi.fn();
 const platform = { isMobile: false };
 
@@ -36,9 +35,7 @@ async function loadPluginIntegration() {
 		getCurrentPlatformCode: vi.fn(() => 'desktop'),
 	}));
 	vi.doMock('../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal, revealCloudflareOperation }));
-	vi.doMock('../ui/cloudflare/authorization-modal', () => ({ openCloudflareAuthorizationModal, dismissCloudflareAuthorizationModal }));
-	vi.doMock('../cloudflare/deployment/embedded-artifacts', () => ({ loadEmbeddedCloudflareArtifacts: vi.fn() }));
-	vi.doMock('../cloudflare/http', () => ({ cloudflareHttpTransport: vi.fn() }));
+	vi.doMock('../ui/cloudflare/authorization-modal', () => ({ dismissCloudflareAuthorizationModal }));
 
 	return import('./cloudflare-operations');
 }
@@ -73,7 +70,6 @@ beforeEach(() => {
 	reconnectApi.listTokens.mockReset().mockResolvedValue({ tokens: [] });
 	reconnectApi.testConnection.mockReset().mockResolvedValue({ success: true });
 	platform.isMobile = false;
-	openCloudflareAuthorizationModal.mockReset();
 	dismissCloudflareAuthorizationModal.mockReset();
 	configureCloudflareAuthorizedDevice.mockReset();
 	generateSecureToken.mockClear();
@@ -98,31 +94,7 @@ afterEach(() => {
 	vi.doUnmock('./deviceInfo');
 	vi.doUnmock('../ui/cloudflare/deployment-modal');
 	vi.doUnmock('../ui/cloudflare/authorization-modal');
-	vi.doUnmock('../cloudflare/deployment/embedded-artifacts');
-	vi.doUnmock('../cloudflare/http');
 	vi.doUnmock('./feature-settings');
-});
-
-it('routes deployment sign-in through a tappable link on mobile', async () => {
-	platform.isMobile = true;
-	const { createCloudflareDeploymentService } = await loadPluginIntegration();
-	const plugin = createPlugin();
-	Object.assign(plugin.app, { vault: { getName: () => 'Test vault' } });
-	Object.assign(plugin, {
-		secretStorage: { get: () => null, set: vi.fn() },
-		writeSettings: vi.fn(async () => {}),
-	});
-
-	await createCloudflareDeploymentService(plugin as never).startDeployment('connect');
-
-	expect(openCloudflareAuthorizationModal).toHaveBeenCalledOnce();
-	for (const [app, url, signal] of openCloudflareAuthorizationModal.mock.calls) {
-		expect(app).toBe(plugin.app);
-		const authorizationUrl = new URL(String(url));
-		expect(authorizationUrl.origin).toBe('https://dash.cloudflare.com');
-		expect(authorizationUrl.searchParams.get('code_challenge')).toBeTruthy();
-		expect(signal).toBeInstanceOf(AbortSignal);
-	}
 });
 
 describe('handleCloudflareOAuthProtocol', () => {

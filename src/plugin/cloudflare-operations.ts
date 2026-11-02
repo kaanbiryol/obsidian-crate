@@ -9,74 +9,19 @@ import { DeploymentRecoveryRequiredError } from '../cloudflare/deployment/fence'
 import { UnupgradableServerError } from '../cloudflare/deployment/database';
 import { Notice, Platform } from 'obsidian';
 import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
-import { CloudflareSavedLogin } from '../cloudflare/saved-login';
 import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
-import { CloudflareDeploymentService } from '../cloudflare/deployment/service';
-import { loadEmbeddedCloudflareArtifacts } from '../cloudflare/deployment/embedded-artifacts';
-import { cloudflareHttpTransport } from '../cloudflare/http';
 import { configureCloudflareAuthorizedDevice } from './cloudflare-connection';
 import { isSelfHostedConnectionPending } from './self-hosted-connection';
 import { offerFeatureChoice } from './feature-settings';
 import { generateSecureToken, hashToken } from '../cloudflare/device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from './deviceInfo';
 import { openCloudflareDeploymentModal, revealCloudflareOperation, type CloudflareDeploymentModal } from '../ui/cloudflare/deployment-modal';
-import { dismissCloudflareAuthorizationModal, openCloudflareAuthorizationModal } from '../ui/cloudflare/authorization-modal';
-import {
-	CLOUDFLARE_OAUTH_CLIENT_ID,
-	isCloudflareOAuthConfigured,
-} from '../cloudflare/oauth/config';
+import { dismissCloudflareAuthorizationModal } from '../ui/cloudflare/authorization-modal';
+import { isCloudflareOAuthConfigured } from '../cloudflare/oauth/config';
 import { SECRET_KEYS } from '../platform/secret-keys';
 import { stableJson } from '../platform/stable-json';
 import { changesServer, DESKTOP_ONLY_SERVER_CHANGE } from '../cloudflare/deployment/server-changes';
-
-export function createCloudflareSavedLogin(plugin: CratePlugin): CloudflareSavedLogin {
-	return new CloudflareSavedLogin({
-		clientId: CLOUDFLARE_OAUTH_CLIENT_ID,
-		transport: cloudflareHttpTransport,
-		secrets: plugin.secretStorage,
-		cache: {
-			read: () => plugin.settings.usageSnapshot ?? null,
-			write: snapshot => plugin.writeSettings({ usageSnapshot: snapshot }),
-		},
-		accountId: () => plugin.settings.cloudflareDeployment?.accountId,
-		signal: getPluginLifecycleSignal(plugin),
-	});
-}
-
-export function createCloudflareDeploymentService(plugin: CratePlugin): CloudflareDeploymentService {
-	const signal = getPluginLifecycleSignal(plugin);
-	return new CloudflareDeploymentService({
-		clientId: CLOUDFLARE_OAUTH_CLIENT_ID,
-		getVaultName: () => plugin.app.vault.getName(),
-		settingsOwner: plugin,
-		onAuthorized: (accountId, tokens) => plugin.cloudflareSavedLogin.acceptAuthorization(accountId, tokens),
-		transport: cloudflareHttpTransport,
-		loadArtifacts: loadEmbeddedCloudflareArtifacts,
-		openExternal: url => openCloudflareAuthorization(plugin, url),
-		serverChangesAllowed: !Platform.isMobile,
-		beforeServerSwitch: async () => {
-			plugin.clearSettingsUiState();
-			await plugin.syncRuntime.clearSyncConfiguration(signal);
-			plugin.refreshSettingsTab();
-		},
-		beforeServerReset: async () => {
-			signal.throwIfAborted();
-			plugin.clearSettingsUiState();
-			await plugin.syncRuntime.clearSyncConfiguration(signal);
-			signal.throwIfAborted();
-			plugin.refreshSettingsTab();
-		},
-	});
-}
-
-function openCloudflareAuthorization(plugin: CratePlugin, url: string): void {
-	if (Platform.isMobile) {
-		openCloudflareAuthorizationModal(plugin.app, url, getPluginLifecycleSignal(plugin));
-		return;
-	}
-	window.open(url, '_blank', 'noopener,noreferrer');
-}
 
 export async function startCloudflareDeployment(plugin: CratePlugin, intent?: Exclude<DeploymentIntent, 'connect'>): Promise<void> {
 	if (isSelfHostedConnectionPending(plugin)) {

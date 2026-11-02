@@ -7,11 +7,16 @@ export async function writeSyncSettings(plugin: CratePlugin, update: Partial<Per
 	plugin.syncRuntime.updateSyncSettings();
 }
 
+/** Clears this device's sync connection and the settings state shown for it. */
+export function clearServerConnection(plugin: CratePlugin, signal?: AbortSignal): Promise<void> {
+	plugin.clearSettingsUiState();
+	return plugin.syncRuntime.clearSyncConfiguration(signal);
+}
+
 /** Disconnects this device. Forgetting also cancels a pending Cloudflare deployment
  * and drops the saved server, so nothing reconnects to it. */
 export async function disconnectDevice(plugin: CratePlugin, { forget }: { forget: boolean }): Promise<void> {
 	if (forget) plugin.cloudflareDeploymentService.cancelPendingDeployment();
-	plugin.clearSettingsUiState();
-	await plugin.syncRuntime.clearSyncConfiguration();
+	await clearServerConnection(plugin);
 	if (forget) await plugin.writeSettings({ cloudflareDeployment: null });
 }

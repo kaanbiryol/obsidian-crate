@@ -23,9 +23,11 @@ const ensurePluginDeviceId = vi.fn();
 const handleCloudflareOAuthProtocol = vi.fn();
 const showCloudflareServerUpdateNotice = vi.fn();
 const cloudflareDeploymentDestroy = vi.fn();
-const createCloudflareDeploymentService = vi.fn(() => ({
-	destroy: cloudflareDeploymentDestroy,
-}));
+const CloudflareDeploymentService = vi.fn(function (_options: { openExternal: (url: string) => void }) {
+	return { destroy: cloudflareDeploymentDestroy };
+});
+const openCloudflareAuthorizationModal = vi.fn();
+const platform = { isMobile: false };
 const secretStorageHas = vi.fn(() => false);
 
 async function loadLifecycleModule({ realSharedSettings = false } = {}) {
@@ -44,6 +46,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 				}
 			}
 		},
+		Platform: platform,
 	}));
 	vi.doMock('./secret-storage', () => ({
 		SecretStorageService: class SecretStorageService {
@@ -78,11 +81,11 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 	vi.doMock('./deviceId', () => ({
 		ensurePluginDeviceId,
 	}));
-	vi.doMock('./cloudflare-operations', () => ({
-		createCloudflareDeploymentService,
-		createCloudflareSavedLogin: vi.fn(() => ({})),
-		handleCloudflareOAuthProtocol,
-	}));
+	vi.doMock('./cloudflare-operations', () => ({ handleCloudflareOAuthProtocol }));
+	vi.doMock('../cloudflare/deployment/service', () => ({ CloudflareDeploymentService }));
+	vi.doMock('../cloudflare/saved-login', () => ({ CloudflareSavedLogin: class {} }));
+	vi.doMock('../cloudflare/deployment/embedded-artifacts', () => ({ loadEmbeddedCloudflareArtifacts: vi.fn() }));
+	vi.doMock('../ui/cloudflare/authorization-modal', () => ({ openCloudflareAuthorizationModal }));
 	vi.doMock('../ui/cloudflare/update-notice', () => ({ showCloudflareServerUpdateNotice }));
 
 	return import('./lifecycle');
@@ -127,7 +130,9 @@ beforeEach(() => {
 	handleCloudflareOAuthProtocol.mockReset();
 	showCloudflareServerUpdateNotice.mockReset();
 	cloudflareDeploymentDestroy.mockReset();
-	createCloudflareDeploymentService.mockClear();
+	CloudflareDeploymentService.mockClear();
+	openCloudflareAuthorizationModal.mockReset();
+	platform.isMobile = false;
 	secretStorageHas.mockReset().mockReturnValue(false);
 });
 
@@ -143,6 +148,10 @@ afterEach(() => {
 	vi.doUnmock('./sync-integration');
 	vi.doUnmock('./deviceId');
 	vi.doUnmock('./cloudflare-operations');
+	vi.doUnmock('../cloudflare/deployment/service');
+	vi.doUnmock('../cloudflare/saved-login');
+	vi.doUnmock('../cloudflare/deployment/embedded-artifacts');
+	vi.doUnmock('../ui/cloudflare/authorization-modal');
 	vi.doUnmock('../cloudflare/update-notice');
 	vi.doUnmock('./shared-settings-sync');
 });
@@ -173,7 +182,7 @@ describe('bootstrapPlugin', () => {
 		await vi.waitFor(() => {
 			expect(ensureReminderNotificationPolicy).toHaveBeenCalledWith(plugin);
 		});
-		expect(createCloudflareDeploymentService).toHaveBeenCalledWith(plugin);
+		expect(CloudflareDeploymentService).toHaveBeenCalledOnce();
 		expect(showCloudflareServerUpdateNotice).toHaveBeenCalledWith(plugin);
 		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(3);
 
@@ -543,4 +552,21 @@ it('does not initialize sync when the plugin unloads before the layout is ready'
 	expect(initialize).not.toHaveBeenCalled();
 	expect(waitForStartupSync).not.toHaveBeenCalled();
 	expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
+});
+
+it('routes deployment sign-in through a tappable link on mobile', async () => {
+	platform.isMobile = true;
+	const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
+	const plugin = createPlugin();
+	plugin.app.workspace.onLayoutReady.mockImplementation(() => {});
+	initializeSyncManagers.mockImplementation(target => {
+		target.syncRuntime = { isConfigured: () => false, initialize: vi.fn(async () => {}), destroy: vi.fn(), waitForStartupSync: vi.fn(async () => false) };
+	});
+
+	await bootstrapPlugin(plugin as never);
+	const url = 'https://dash.cloudflare.com/oauth2/auth?code_challenge=challenge';
+	CloudflareDeploymentService.mock.calls[0]![0].openExternal(url);
+
+	expect(openCloudflareAuthorizationModal).toHaveBeenCalledExactlyOnceWith(plugin.app, url, expect.any(AbortSignal));
+	shutdownPlugin(plugin as never);
 });
