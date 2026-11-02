@@ -1,4 +1,4 @@
-@use "../../shared/styles/sync-review";
+@use "./sync-review";
 @use "../../shared/styles/navigation-row";
 
 .crate-activity-panel.has-file-browser { padding: 0; overflow: hidden; scrollbar-gutter: auto; }

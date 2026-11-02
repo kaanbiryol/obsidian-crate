@@ -24,7 +24,7 @@ file history, conflict review and editor/picker sheets retain their workspace si
 Reminder deletion also uses `ModalLayout`, including its disabled close control
 while deletion is pending. Diagnostics uses `SharedModal` and the shared text field.
 
-`ui/shared/SettingsDisclosure.tsx` and `ui/plugin/settings-disclosure.ts` provide React and native
+`ui/cloudflare/SettingsDisclosure.tsx` and `ui/plugin/settings-disclosure.ts` provide React and native
 disclosure adapters, including an
 inline variant for dialog sections. `_native-settings.scss` owns native `Setting`
 row spacing, labels, descriptions and buttons inside shared native dialogs.

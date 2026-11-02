@@ -1,6 +1,6 @@
 @use "../../ui/shared/styles/action";
 @use "../../ui/shared/styles/tokens";
-@use "../../ui/shared/styles/native-settings";
+@use "./native-settings";
 @use "../../ui/shared/styles/modal-layout";
 /* Crate supplies its own accessible close control in these modal shells. */
 .crate-custom-modal-close > .modal-close-button,

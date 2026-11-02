@@ -1,4 +1,4 @@
-@use "../../shared/styles/sync-review";
+@use "./sync-review";
 
 .modal.crate-shared-modal.crate-file-history-modal.crate-vault-history-modal:not(.is-mobile) {
     width: min(1120px, calc(100vw - 48px));

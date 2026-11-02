@@ -82,7 +82,7 @@
 		"src/ui/shared/styles/_app-dock.scss": 6,
 		"src/ui/shared/styles/_base-modal.scss": 1,
 		"src/ui/shared/styles/_navigation-row.scss": 1,
-		"src/ui/shared/styles/_sync-review.scss": 1
+		"src/ui/activity/styles/_sync-review.scss": 1
 	},
 	"spacing": {
 		"src/pwa/reading/web.scss": 5,
@@ -115,6 +115,6 @@
 		"src/ui/shared/styles/_base-modal.scss": 1,
 		"src/ui/shared/styles/_fields.scss": 1,
 		"src/ui/shared/styles/_modal-header.scss": 1,
-		"src/ui/shared/styles/_sync-review.scss": 1
+		"src/ui/activity/styles/_sync-review.scss": 1
 	}
 }

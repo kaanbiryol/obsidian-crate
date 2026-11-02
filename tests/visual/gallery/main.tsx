@@ -19,7 +19,7 @@ import { ReminderActionChips } from '@/reminders/ui/reminder-editor/ReminderActi
 import type { RecurrencePickerState } from '@/reminders/ui/reminder-editor/recurrencePickerShared';
 import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
 import { ModalLayout } from '@/ui/shared/ModalLayout';
-import { StatusContent } from '@/ui/shared/StatusContent';
+import { StatusContent } from '@/ui/cloudflare/StatusContent';
 import { Button } from '@/ui/shared/Button';
 import { DeleteConfirmationModal } from '@/reminders/ui/plugin/DeleteConfirmationModal';
 import { AddReminderModalHeader } from '@/reminders/ui/plugin/reminder-modal/AddReminderModalHeader';

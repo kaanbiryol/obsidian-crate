@@ -5,7 +5,7 @@ import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ModalLayout } from '../shared/ModalLayout';
 import { applySharedModalShell } from '../plugin/shared-modal';
-import { StatusContent } from '../shared/StatusContent';
+import { StatusContent } from './StatusContent';
 import { Button } from '../shared/Button';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { ObsidianIcon } from '@/ui/obsidian-icon';

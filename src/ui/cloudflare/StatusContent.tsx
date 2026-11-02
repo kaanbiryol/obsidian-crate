@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SettingsDisclosure } from './SettingsDisclosure';
-import { ThemeIcon } from './ThemeIcon';
+import { ThemeIcon } from '../shared/ThemeIcon';
 
 export interface StatusContentProps {
 	state: 'working' | 'success' | 'error';

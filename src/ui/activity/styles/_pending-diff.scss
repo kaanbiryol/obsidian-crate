@@ -1,4 +1,4 @@
-@use "../../shared/styles/sync-review";
+@use "./sync-review";
 .crate-browser-detail, .crate-history-diff {
     @include sync-review.diff-colors;
 }

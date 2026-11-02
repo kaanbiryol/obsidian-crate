@@ -1,4 +1,4 @@
-@use "action";
+@use "../../ui/shared/styles/action";
 
 // Obsidian owns these controls; Crate supplies their shared geometry inside dialogs.
 @mixin styles {
