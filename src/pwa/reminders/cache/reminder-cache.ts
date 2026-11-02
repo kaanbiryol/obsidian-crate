@@ -1,3 +1,4 @@
+import type { IDBPDatabase } from 'idb';
 import { capturePwaSession } from '../../connection/session-generation';
 import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue } from '../types';
 import { AUTH_TOKEN_KEY } from '../../config';
@@ -74,6 +75,17 @@ function groupByNote(reminders: ReminderRecord[]): Map<string, ReminderRecord[]>
 	return notes;
 }
 
+/** Removes a folder's cached metadata, freshness and notes in one transaction. */
+async function deleteFolderSnapshot(database: IDBPDatabase, folderPath: string): Promise<void> {
+	const transaction = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME], 'readwrite');
+	await Promise.all([
+		transaction.objectStore(CACHE_STORE_NAME).delete(folderPath),
+		transaction.objectStore(FRESHNESS_STORE_NAME).delete(folderPath),
+		transaction.objectStore(NOTES_STORE_NAME).delete(noteRange(folderPath)),
+		transaction.done,
+	]);
+}
+
 async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminderSnapshot | null> {
 	const sessionScope = await cacheSessionScope();
 	const generation = cacheGeneration;
@@ -91,13 +103,7 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 		if (raw && !raw.encrypted && privateStorageUnlocked()) {
 			// Plaintext reminders must not outlive the switch to private storage. A
 			// locked check proves nothing, so the offline copy waits for a cipher.
-			const cleanup = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME], 'readwrite');
-			await Promise.all([
-				cleanup.objectStore(CACHE_STORE_NAME).delete(folderPath),
-				cleanup.objectStore(FRESHNESS_STORE_NAME).delete(folderPath),
-				cleanup.objectStore(NOTES_STORE_NAME).delete(noteRange(folderPath)),
-				cleanup.done,
-			]);
+			await deleteFolderSnapshot(database, folderPath);
 			return null;
 		}
 		if (!raw || raw.sessionScope !== sessionScope) return null;
@@ -248,15 +254,7 @@ export async function rebuildCachedReminderSnapshot(folderPath: string): Promise
 		const database = await openCacheDatabase();
 		try {
 			if (!sessionCurrent() || generation !== cacheGeneration) return false;
-			const transaction = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME], 'readwrite');
-			await Promise.all([
-				transaction.done,
-				(async () => {
-					await transaction.objectStore(CACHE_STORE_NAME).delete(folderPath);
-					await transaction.objectStore(FRESHNESS_STORE_NAME).delete(folderPath);
-					await transaction.objectStore(NOTES_STORE_NAME).delete(noteRange(folderPath));
-				})(),
-			]);
+			await deleteFolderSnapshot(database, folderPath);
 			persisted.delete(folderPath);
 		} finally { database.close(); }
 		reportCacheProblem(null);

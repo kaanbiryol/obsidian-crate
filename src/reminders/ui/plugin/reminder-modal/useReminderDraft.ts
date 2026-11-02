@@ -6,9 +6,29 @@ import {
 	deriveReminderDraftContentMetadata,
 	getDefaultProject,
 	reconcileReminderDraftMetadata,
+	type ReminderDraftContentMetadata,
 	type ReminderDraftContentPatch,
 	type ReminderDraftContentState,
 } from '../../../core/reminderDraft';
+
+/** Whether text already carries a date or recurrence. Removing it from text that
+ * started with one clears the schedule. */
+export function draftContentHasSchedule(content: string, projects: string[], defaultProject: string): boolean {
+	const metadata = deriveReminderDraftContentMetadata(content, projects, defaultProject);
+	return metadata.dueDate !== null || metadata.recurrence !== undefined;
+}
+
+/** Applies metadata parsed from the draft text to its fields. A recurrence equal
+ * by value keeps its previous object, so the draft state does not change. */
+export function reconcileDraftWithText(
+	current: ReminderDraftContentState,
+	metadata: ReminderDraftContentMetadata,
+	schedule: { initialContentHadSchedule: boolean; dueDateSetFromText: boolean },
+): { state: ReminderDraftContentState; dueDateSetFromText: boolean } {
+	const next = reconcileReminderDraftMetadata(current, metadata, { ...schedule, recurrenceTimezone: 'preserve' });
+	if (JSON.stringify(next.state.recurrence) === JSON.stringify(current.recurrence)) next.state.recurrence = current.recurrence;
+	return next;
+}
 
 interface UseReminderDraftOptions {
 	reminder?: Reminder;
@@ -60,14 +80,10 @@ export function useReminderDraft({
 		draftRef.current = { content, dueDate, recurrence, project, priority, hasTime };
 	}, [content, dueDate, hasTime, priority, project, recurrence]);
 
-	const initialContentHadSchedule = useMemo(() => {
-		const metadata = deriveReminderDraftContentMetadata(
-			initialContent,
-			projects,
-			resolvedDefaultProject,
-		);
-		return metadata.dueDate !== null || metadata.recurrence !== undefined;
-	}, [initialContent, projects, resolvedDefaultProject]);
+	const initialContentHadSchedule = useMemo(
+		() => draftContentHasSchedule(initialContent, projects, resolvedDefaultProject),
+		[initialContent, projects, resolvedDefaultProject],
+	);
 
 	const applyContentUpdate = useCallback((patch: ReminderDraftContentPatch) => {
 		const next = applyReminderDraftContentUpdate(
@@ -94,14 +110,14 @@ export function useReminderDraft({
 	);
 
 	useEffect(() => {
-		const next = reconcileReminderDraftMetadata(
+		const next = reconcileDraftWithText(
 			{ content, dueDate, hasTime, recurrence, project, priority }, metadata,
-			{ initialContentHadSchedule, dueDateSetFromText: dueDateSetFromText.current, recurrenceTimezone: 'preserve' },
+			{ initialContentHadSchedule, dueDateSetFromText: dueDateSetFromText.current },
 		);
 		dueDateSetFromText.current = next.dueDateSetFromText;
 		setPriority(next.state.priority);
 		setProject(next.state.project);
-		if (JSON.stringify(next.state.recurrence) !== JSON.stringify(recurrence)) setRecurrence(next.state.recurrence);
+		setRecurrence(next.state.recurrence);
 		setDueDate(next.state.dueDate);
 		setHasTime(next.state.hasTime);
 	}, [content, dueDate, hasTime, initialContentHadSchedule, metadata, priority, project, recurrence]);
