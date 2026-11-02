@@ -32,7 +32,7 @@ function harness() {
 		return null;
 	});
 	const counts: number[] = [];
-	const store = new ConflictStore({ vault: h.vault } as never, { dir: '.obsidian/plugins/crate' } as never, count => counts.push(count));
+	const store = new ConflictStore({ vault: h.vault } as never, { dir: '.obsidian/plugins/crate' }, count => counts.push(count));
 	const context = { ...h.context, conflictStore: store };
 	return { ...h, adapter, context, files, store, counts };
 }

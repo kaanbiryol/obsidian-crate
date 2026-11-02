@@ -26,7 +26,7 @@ function createHarness(initial: Record<string, string> = {}) {
 	const counts: number[] = [];
 	const store = new ConflictStore(
 		app as never,
-		{ dir: '.obsidian/plugins/crate' } as never,
+		{ dir: '.obsidian/plugins/crate' },
 		(count) => counts.push(count),
 	);
 	return { adapter, counts, files, store };

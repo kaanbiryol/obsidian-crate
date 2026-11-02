@@ -7,7 +7,7 @@ import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vaul
 
 function fixture() {
 	const disk = new PersistentTestVault();
-	const create = (authority = 'https://server.test') => new LocalManifest({ vault: disk.vault } as never, { dir: TEST_PLUGIN_DIR } as never, authority);
+	const create = (authority = 'https://server.test') => new LocalManifest({ vault: disk.vault }, { dir: TEST_PLUGIN_DIR }, authority);
 	const file = { intent: { kind: 'local' as const }, path: 'note.md', content: btoa('original'), hash: '0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5', size: 8, contentType: 'text/markdown', expectedHash: null };
 	return { disk, create, file };
 }

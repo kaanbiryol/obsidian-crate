@@ -38,7 +38,7 @@ function createCacheHarness() {
 	};
 	const cache = new MarkdownBaseCache({
 		vault: { adapter },
-	} as never, { dir: PLUGIN_DIR } as never);
+	} as never, { dir: PLUGIN_DIR });
 
 	return { adapter, cache, files };
 }

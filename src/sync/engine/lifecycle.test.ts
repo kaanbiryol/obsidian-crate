@@ -12,7 +12,7 @@ describe('SyncEngine initialization', () => {
 	it('defers conflict recovery until the workspace layout is ready', async () => {
 		vi.useFakeTimers();
 		const harness = createHarness();
-		const recoverFromVault = spyOnConflictRecovery(harness.engine).mockResolvedValue();
+		const recoverFromVault = spyOnConflictRecovery(harness).mockResolvedValue();
 		try {
 			await harness.engine.initialize();
 
@@ -33,7 +33,7 @@ describe('SyncEngine initialization', () => {
 	it('does not start deferred conflict recovery after destruction', async () => {
 		vi.useFakeTimers();
 		const harness = createHarness();
-		const recoverFromVault = spyOnConflictRecovery(harness.engine).mockResolvedValue();
+		const recoverFromVault = spyOnConflictRecovery(harness).mockResolvedValue();
 		try {
 			await harness.engine.initialize();
 			harness.workspace.runLayoutReady();

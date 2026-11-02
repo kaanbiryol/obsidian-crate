@@ -14,7 +14,7 @@ const entry = async (text: string): Promise<FileEntry> => ({ hash: await sha256H
 async function fixture() {
 	const disk = new PersistentTestVault();
 	disk.write(settingsPath, local);
-	const createManifest = () => new LocalManifest({ vault: disk.vault } as never, { dir: TEST_PLUGIN_DIR } as never, 'server');
+	const createManifest = () => new LocalManifest({ vault: disk.vault }, { dir: TEST_PLUGIN_DIR }, 'server');
 	let manifest = createManifest();
 	const remoteFiles = { [settingsPath]: await entry(remote), 'note.md': await entry('remote note') };
 	const context = {

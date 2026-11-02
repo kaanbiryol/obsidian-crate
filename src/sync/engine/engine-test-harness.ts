@@ -1,7 +1,7 @@
 import type { SyncEngineContexts } from './contexts';
 import { vi } from 'vitest';
 import { SyncEngine } from './engine';
-import type { ConflictStore } from '../conflict/store';
+import { ConflictStore } from '../conflict/store';
 import { createEmptySyncResult } from '../sync-result';
 import type { CrateSettings } from '../../plugin/settings-types';
 import type { FileManifest, UploadResult } from '../../protocol/sync-types';
@@ -31,9 +31,8 @@ export async function runPeriodicCheck(engine: SyncEngine): Promise<void> {
 	await (engine as unknown as { lifecycle: { periodicCheck(): Promise<void> } }).lifecycle.periodicCheck();
 }
 
-export function spyOnConflictRecovery(engine: SyncEngine) {
-	const conflictStore = (engine as unknown as { conflictStore: ConflictStore }).conflictStore;
-	return vi.spyOn(conflictStore, 'recoverFromVault');
+export function spyOnConflictRecovery(harness: { conflictStore: ConflictStore }) {
+	return vi.spyOn(harness.conflictStore, 'recoverFromVault');
 }
 
 export function createSyncResult(): SyncResult {
@@ -152,8 +151,13 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 		manifest: { dir: PLUGIN_DIR },
 	};
 
-	const manifest = new LocalManifest(plugin.app as never, plugin.manifest as never, getCheckpointAuthority(settings) || 'unconfigured');
-	const engine = new SyncEngine(plugin as never, api as never, settings, { localManifest: manifest, createFiles: createFiles as never });
+	const manifest = new LocalManifest(plugin.app as never, plugin.manifest, getCheckpointAuthority(settings) || 'unconfigured');
+	let conflictStore!: ConflictStore;
+	const engine = new SyncEngine(plugin as never, api as never, settings, {
+		localManifest: manifest,
+		createFiles: createFiles as never,
+		createConflictStore: onActiveCountChange => conflictStore = new ConflictStore(plugin.app as never, plugin.manifest, onActiveCountChange),
+	});
 
 	const spies = {
 		load: vi.spyOn(manifest, 'load'),
@@ -170,7 +174,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 	};
 	const localManifest: Omit<LocalManifest, keyof typeof spies> & typeof spies = Object.assign(manifest, spies);
 
-	return { engine, settings, fileManager, workspace, api, vault, localManifest };
+	return { engine, settings, fileManager, workspace, api, vault, localManifest, conflictStore };
 }
 
 export type Harness = ReturnType<typeof createHarness>;

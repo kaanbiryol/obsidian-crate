@@ -33,7 +33,7 @@ async function setup(ignorePatterns?: string[]) {
 		if (!content) throw new Error(`Missing file: ${path}`);
 		return content;
 	});
-	spyOnConflictRecovery(h.engine).mockResolvedValue();
+	spyOnConflictRecovery(h).mockResolvedValue();
 	return h;
 }
 
@@ -67,7 +67,7 @@ describe('pending changes after restart with automatic sync off', () => {
 		h.vault.getFiles.mockImplementation(() => files);
 		h.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('modified'));
 		h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		const recovery = spyOnConflictRecovery(h.engine).mockResolvedValue();
+		const recovery = spyOnConflictRecovery(h).mockResolvedValue();
 		try {
 			expect(h.settings.automaticSync).toBe(false);
 			await restore(h);
@@ -199,7 +199,7 @@ describe('startup pending scan cost', () => {
 			if (!content) throw new Error(`Missing file: ${path}`);
 			return content;
 		});
-		const recovery = spyOnConflictRecovery(h.engine).mockResolvedValue();
+		const recovery = spyOnConflictRecovery(h).mockResolvedValue();
 		const reads = () => h.vault.adapter.readBinary.mock.calls.filter(([path]) => path.startsWith('notes/')).length;
 		return { h, paths, disk, mtimes, recovery, reads };
 	}

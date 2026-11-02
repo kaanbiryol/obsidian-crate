@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { App, PluginManifest, Vault } from 'obsidian';
+import type { Vault } from 'obsidian';
 import type { FileEntry } from '../../protocol/sync-types';
 import { LocalManifest } from '../manifest/manifest';
 import { createFullSyncPlan } from './full';
@@ -18,7 +18,7 @@ function createPlanner(localPaths: string[] = []) {
 		getAbstractFileByPath: (path: string) => files.find(file => file.path === path) ?? null,
 		adapter: { list: async () => ({ files: [], folders: [] }), readBinary },
 	} as unknown as Vault;
-	const localManifest = new LocalManifest({ vault } as App, { dir: '.obsidian/plugins/crate' } as PluginManifest);
+	const localManifest = new LocalManifest({ vault }, { dir: '.obsidian/plugins/crate' });
 	const context: FullSyncPlannerContext = {
 		vault, localManifest, throwIfDestroyed: () => {}, shouldIgnore: () => false,
 		runConcurrent: async tasks => Promise.all(tasks.map(task => task())),

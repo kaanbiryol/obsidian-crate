@@ -34,7 +34,7 @@ export type LocalManifestView = Readonly<Omit<FileManifest, 'files'>> & {
 export class LocalManifest {
 	readonly uploadJournal: UploadJournal;
 	private renames = new RenameDependencies();
-	private app: App;
+	private app: Pick<App, 'vault'>;
 	private manifestPath: string;
 	private tmpPath: string;
 	private logPath: string;
@@ -61,7 +61,7 @@ export class LocalManifest {
 	// Random server names of encrypted notes learned before their entry is written.
 	private pendingWires = new Map<string, string>();
 
-	constructor(app: App, pluginManifest: PluginManifest, private readonly authority?: string) {
+	constructor(app: Pick<App, 'vault'>, pluginManifest: Pick<PluginManifest, 'dir'>, private readonly authority?: string) {
 		this.app = app;
 		const paths = syncStoragePaths(pluginManifest.dir!);
 		this.uploadJournal = new UploadJournal(app.vault.adapter, paths.uploadJournal, authority);

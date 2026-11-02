@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import type { App, PluginManifest } from 'obsidian';
+import type { App } from 'obsidian';
 import { LocalManifest } from './manifest';
 
 const entry = { hash: 'a'.repeat(64), size: 1, modified: new Date(0).toISOString(), revision: 'r1' };
@@ -17,7 +17,7 @@ function diskApp() {
 	return { vault: { adapter, configDir: '.vault-config' } } as unknown as App;
 }
 function manifestFor(app: App = diskApp()) {
-	return new LocalManifest(app, { dir: '.vault-config/plugins/crate' } as PluginManifest, 'https://server.example');
+	return new LocalManifest(app, { dir: '.vault-config/plugins/crate' }, 'https://server.example');
 }
 
 /** The previous implementation, scanning every dependency on each event. */

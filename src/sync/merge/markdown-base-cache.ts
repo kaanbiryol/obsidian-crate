@@ -28,14 +28,14 @@ export interface MarkdownBaseCacheSeedOptions {
 
 
 export class MarkdownBaseCache {
-	private readonly app: App;
+	private readonly app: Pick<App, 'vault'>;
 	private readonly cacheDir: string;
 	private readonly writtenHashes = new Set<string>();
 	private readonly pendingWrites = new Map<string, Promise<void>>();
 	private readonly invalidHashes = new Set<string>();
 	private lastPruneAt: number | null = null;
 
-	constructor(app: App, pluginManifest: PluginManifest) {
+	constructor(app: Pick<App, 'vault'>, pluginManifest: Pick<PluginManifest, 'dir'>) {
 		this.app = app;
 		this.cacheDir = `${pluginManifest.dir}/${CACHE_DIRNAME}`;
 	}

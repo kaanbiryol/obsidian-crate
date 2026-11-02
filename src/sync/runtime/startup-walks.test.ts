@@ -26,7 +26,7 @@ it('walks the vault twice at startup and still syncs an edit made during the sta
 	const settings = { ...structuredClone(DEFAULT_SETTINGS), workerUrl: 'https://server.test', automaticSync: true, syncInterval: 0,
 		debounceDelay: 0.3, lastSeq: 42, lastSync: new Date(1).toISOString() };
 	const app = { vault: disk.vault, fileManager: {}, workspace: { layoutReady: true, onLayoutReady: (callback: () => void) => callback() } };
-	const baseline = new LocalManifest(app as never, { dir: TEST_PLUGIN_DIR } as never, getCheckpointAuthority(settings));
+	const baseline = new LocalManifest(app, { dir: TEST_PLUGIN_DIR }, getCheckpointAuthority(settings));
 	await baseline.load();
 	for (let index = 0; index < 20; index++) {
 		const path = `folder-${index}/note.md`;

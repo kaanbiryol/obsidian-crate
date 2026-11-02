@@ -54,7 +54,7 @@ it('keeps every checkpoint baseline when a force full sync stops mid-upload', as
 	expect((await running).outcome).toBe('cancelled');
 	await harness.engine.waitForIdle();
 
-	const reopened = new LocalManifest({ vault: harness.disk.vault } as never, { dir: TEST_PLUGIN_DIR } as never, 'https://server.test');
+	const reopened = new LocalManifest({ vault: harness.disk.vault }, { dir: TEST_PLUGIN_DIR }, 'https://server.test');
 	await reopened.load();
 	expect(reopened.getFileCount()).toBe(files + 1);
 	expect(reopened.getEntry('remote-only.md')).toMatchObject({ revision: 'remote-only-rev' });

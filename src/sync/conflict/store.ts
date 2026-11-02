@@ -53,8 +53,8 @@ export class ConflictStore {
 	private closed = false;
 
 	constructor(
-		private readonly app: App,
-		pluginManifest: PluginManifest,
+		private readonly app: Pick<App, 'vault'>,
+		pluginManifest: Pick<PluginManifest, 'dir'>,
 		private readonly onActiveCountChange?: (count: number) => void,
 	) {
 		this.storePath = `${pluginManifest.dir}/${STORE_FILENAME}`;

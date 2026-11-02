@@ -1,7 +1,7 @@
 import { deleteRemoteFiles } from '../transfer/delete';
 import { pendingChangeKey } from '../pending/pending-change';
 import { describe, expect, it, vi } from 'vitest';
-import type { App, PluginManifest, Vault } from 'obsidian';
+import type { Vault } from 'obsidian';
 import type { FileEntry } from '../../protocol/sync-types';
 import { LocalManifest } from '../manifest/manifest';
 import { assertRenamePreserved } from '../manifest/rename-dependencies';
@@ -29,7 +29,7 @@ async function harness(destinationUploaded: boolean, destinationExists = true) {
 		getAbstractFileByPath: vi.fn((path: string) => destinationExists && path === destination
 			? { path, extension: 'md', stat: { size: content.byteLength, mtime: 1000 } } : null),
 	} as unknown as Vault;
-	const manifest = new LocalManifest({ vault } as App, { dir: '.obsidian/plugins/crate' } as PluginManifest);
+	const manifest = new LocalManifest({ vault }, { dir: '.obsidian/plugins/crate' });
 	manifest.setEntry(source, entry);
 	manifest.recordRename(source, destination);
 	const remote: Record<string, FileEntry> = { [source]: entry };
@@ -144,7 +144,7 @@ describe('targeted rename reconciliation', () => {
 			getAbstractFileByPath: (path: string) => ({ path, extension: 'md', stat: { size: 1, mtime: 1 } }),
 			adapter: { readBinary: async () => new ArrayBuffer(1) },
 		} as unknown as Vault;
-		const manifest = new LocalManifest({ vault } as App, { dir: '.obsidian/plugins/crate' } as PluginManifest);
+		const manifest = new LocalManifest({ vault }, { dir: '.obsidian/plugins/crate' });
 		manifest.setEntry('Dashboard.md', { hash: 'a'.repeat(64), size: 1, modified: new Date(1).toISOString(), revision: 'v1' });
 		manifest.recordRename('Dashboard.md', destination);
 		await expect(assertRenamePreserved(manifest, vault, 'Dashboard.md')).resolves.toBeUndefined();

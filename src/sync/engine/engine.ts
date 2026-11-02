@@ -83,8 +83,13 @@ export class SyncEngine {
 		plugin: Plugin,
 		api: SyncApiClient,
 		settings: SyncSettings,
-		/** Tests pass a manifest they observe or wrap the file operations; production lets the engine create both. */
-		stores: { localManifest?: LocalManifest; createFiles?: typeof createEngineFileOperations } = {},
+		/** Tests pass stores they observe or wrap the file operations; production lets the engine create them. */
+		stores: {
+			localManifest?: LocalManifest;
+			createFiles?: typeof createEngineFileOperations;
+			/** Receives the callback that publishes the active conflict count. */
+			createConflictStore?: (onActiveCountChange: (count: number) => void) => ConflictStore;
+		} = {},
 	) {
 		this.plugin = plugin;
 		this.vault = plugin.app.vault;
@@ -111,9 +116,11 @@ export class SyncEngine {
 			pendingChanges: 0,
 			conflictCount: 0,
 		};
-		this.conflictStore = new ConflictStore(plugin.app, plugin.manifest, (conflictCount) => {
+		const onActiveCountChange = (conflictCount: number) => {
 			this.updateState({ conflictCount });
-		});
+		};
+		this.conflictStore = stores.createConflictStore?.(onActiveCountChange)
+			?? new ConflictStore(plugin.app, plugin.manifest, onActiveCountChange);
 		const pluginDir = plugin.manifest.dir?.replace(/\/+$/, '');
 		this.ignore = createSyncIgnoreMatcher(
 			() => [...(pluginDir ? [`${pluginDir}/`] : []), this.markdownBaseCache.getIgnoredPrefix()],

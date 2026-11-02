@@ -34,7 +34,7 @@ it.each(['single', 'batch', 'merge'])('syncs an edit made after %s apply even af
 	});
 	const app = { vault: h.vault };
 	const plugin = { dir: '.obsidian/plugins/crate' };
-	const manifest = new LocalManifest(app as never, plugin as never);
+	const manifest = new LocalManifest(app as never, plugin);
 	manifest.setEntry(path, { hash: await sha256Hex(base), size: base.byteLength, modified: new Date(1000).toISOString() });
 	const context = { ...h.context, localManifest: manifest, throwIfDestroyed: () => {}, shouldIgnore: () => false, verifyContent: async () => false,
 		markdownBaseCache: { readBase: async () => base, putBase: vi.fn(async () => {}) } };
@@ -52,7 +52,7 @@ it.each(['single', 'batch', 'merge'])('syncs an edit made after %s apply even af
 	else if (mode === 'batch') await parallelDownloadAndSaveFiles(context, [request], emptyResult(), 1);
 	else await processDiff(context, { path, action: 'conflict', localHash: request.expectedLocalHash, remoteHash, cause: 'concurrent-edit' }, {}, emptyResult());
 	await manifest.save();
-	const restarted = new LocalManifest(app as never, plugin as never);
+	const restarted = new LocalManifest(app as never, plugin);
 	await restarted.load();
 	const resumed = { ...context, localManifest: restarted };
 	const actualHash = await sha256Hex(content);

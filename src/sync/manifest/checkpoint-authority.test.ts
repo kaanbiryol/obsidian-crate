@@ -19,7 +19,7 @@ function createDisk(initial: Record<string, string> = {}) {
 		remove: vi.fn(async (path: string) => { disk.delete(path); }),
 	};
 	const plugin = { app: { vault: { adapter } }, manifest: { dir } };
-	const manifest = (authority: string) => new LocalManifest(plugin.app as never, plugin.manifest as never, authority);
+	const manifest = (authority: string) => new LocalManifest(plugin.app as never, plugin.manifest, authority);
 	return { disk, adapter, plugin, manifest };
 }
 

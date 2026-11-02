@@ -7,7 +7,7 @@ const good = { version: 1, generation: 5, authority: 'server', lastSeq: 10,
 	files: { 'note.md': { hash: 'a'.repeat(64), size: 1, modified: '2026-09-09' } } };
 function fixture() {
 	const disk = new PersistentTestVault();
-	const manifest = new LocalManifest({ vault: disk.vault } as never, { dir: TEST_PLUGIN_DIR } as never, 'server');
+	const manifest = new LocalManifest({ vault: disk.vault }, { dir: TEST_PLUGIN_DIR }, 'server');
 	return { disk, manifest };
 }
 it.each([

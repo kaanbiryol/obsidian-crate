@@ -38,7 +38,7 @@ async function setup() {
 
 it('relocates the encrypted connection and preserves all local recovery work across restarts', async () => {
 	const h = await setup(), disk = new PersistentTestVault();
-	const manifest = new LocalManifest({ vault: disk.vault } as never, { dir: TEST_PLUGIN_DIR } as never, oldUrl);
+	const manifest = new LocalManifest({ vault: disk.vault }, { dir: TEST_PLUGIN_DIR }, oldUrl);
 	const file = { intent: { kind: 'local' as const }, path: 'Articles/note.md', content: btoa('original'), hash: '0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5', size: 8, contentType: 'text/markdown', expectedHash: null };
 	const pending = await manifest.uploadJournal.prepare([file], 20000);
 	manifest.setEntry('Reading/note.md', { hash: file.hash, size: 8, modified: '2026-09-09T00:00:00Z', revision: 'revision' });
@@ -54,7 +54,7 @@ it('relocates the encrypted connection and preserves all local recovery work acr
 	expect(h.plugin.app.vault.adapter.remove).not.toHaveBeenCalled();
 	expect(h.plugin.app.vault.adapter.write).not.toHaveBeenCalled();
 	const restored = normalizeCrateSettings(buildPersistedCrateSettings(h.settings), '.obsidian');
-	const reopened = new LocalManifest({ vault: disk.vault } as never, { dir: TEST_PLUGIN_DIR } as never, getCheckpointAuthority(restored));
+	const reopened = new LocalManifest({ vault: disk.vault }, { dir: TEST_PLUGIN_DIR }, getCheckpointAuthority(restored));
 	await reopened.load();
 	expect(reopened.uploadJournal.pending()).toEqual(pending);
 	expect(reopened.getEntry('Reading/note.md')?.revision).toBe('revision');

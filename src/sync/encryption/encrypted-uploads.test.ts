@@ -12,7 +12,7 @@ import { sha256Hex } from '@/platform/sha256';
 
 async function fixture() {
 	const disk = new PersistentTestVault();
-	const create = () => new LocalManifest({ vault: disk.vault } as never, { dir: TEST_PLUGIN_DIR } as never, 'https://server.test');
+	const create = () => new LocalManifest({ vault: disk.vault }, { dir: TEST_PLUGIN_DIR }, 'https://server.test');
 	const content = new TextEncoder().encode('Private content').buffer;
 	const file = { path: 'note.md', content: arrayBufferToBase64(content), hash: await sha256Hex(content), size: content.byteLength,
 		contentType: 'text/markdown', expectedHash: null };
