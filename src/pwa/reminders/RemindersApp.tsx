@@ -4,10 +4,8 @@ import { useLaunchReminderModal } from './useLaunchReminderModal';
 import { usePrepareReminderEditor } from './editor/usePrepareReminderEditor';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from '../components/PwaChrome';
-import {
-	PwaRemindersAppShell,
-	type PwaReminderCardRenderer,
-} from './PwaRemindersAppShell';
+import { PwaRemindersAppShell } from './PwaRemindersAppShell';
+import type { ReminderCardRenderer } from '@/reminders/ui/shared/useRemindersShellModel';
 import { useAppUpdate } from '../update/PwaUpdateProvider';
 import { ReminderCacheNotice } from './notices/ReminderCacheNotice';
 import { ReminderSourceNotice } from './notices/ReminderSourceNotice';
@@ -64,7 +62,7 @@ export function RemindersApp() {
 		showToast,
 	});
 
-	const renderSharedCard = useCallback<PwaReminderCardRenderer>(({ reminder, index, hideProject }) => (
+	const renderSharedCard = useCallback<ReminderCardRenderer>(({ reminder, index, hideProject }) => (
 		<WebReminderCard
 			listStyle={preferences.reminderListStyle}
 			colorScheme={colorScheme}

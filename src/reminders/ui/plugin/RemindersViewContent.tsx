@@ -8,10 +8,8 @@ import { openReminderCreationModal } from "@/reminders/ui/plugin/reminder-modal/
 import { ReminderCardWrapper } from "@/reminders/ui/plugin/ReminderCardWrapper";
 import { RemindersViewCloseButton } from "@/reminders/ui/plugin/RemindersViewCloseButton";
 import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
-import {
-	PluginRemindersAppShell,
-	type PluginReminderCardRenderer,
-} from "@/reminders/ui/plugin/PluginRemindersAppShell";
+import { PluginRemindersAppShell } from "@/reminders/ui/plugin/PluginRemindersAppShell";
+import type { ReminderCardRenderer } from "@/reminders/ui/shared/useRemindersShellModel";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import { requireReminderBackend } from "@/reminders/runtime";
 import { PluginReminderSourceNotice } from './PluginReminderSourceNotice';
@@ -62,7 +60,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ isFu
 		openReminderCreationModal(plugin, defaultProject, updateReminders);
 	}, [plugin, updateReminders]);
 
-	const renderCard = useCallback<PluginReminderCardRenderer>(({ reminder, index, hideProject }) => (
+	const renderCard = useCallback<ReminderCardRenderer>(({ reminder, index, hideProject }) => (
 		<ReminderCardWrapper
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 			reminder={reminder}

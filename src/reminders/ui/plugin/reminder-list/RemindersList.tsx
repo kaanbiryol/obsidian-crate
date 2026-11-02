@@ -26,7 +26,7 @@ import { formatDateHeader } from "@/reminders/ui/format/dateFormatting";
 import { RemindersLoading } from "../RemindersLoading";
 import "./styles.scss";
 import { useReminderClock } from '../../shared/useReminderClock';
-import { ReminderPageSizeContext, ReminderPagination, useReminderPagination } from '../../shared/reminder-pagination';
+import { REMINDER_PAGE_SIZE, ReminderPageSizeContext, ReminderPagination, useReminderPagination } from '../../shared/reminder-pagination';
 import { groupRemindersByDate } from "@/reminders/core/reminderSort";
 
 type Props = {
@@ -40,7 +40,7 @@ type Props = {
 export const RemindersList: React.FC<Props> = props => {
 	const enabled = useRemindersSettingsStore(state => state.enabled);
 	return enabled
-		? <ReminderPageSizeContext.Provider value={200}><ActiveRemindersList {...props} /></ReminderPageSizeContext.Provider>
+		? <ReminderPageSizeContext.Provider value={REMINDER_PAGE_SIZE}><ActiveRemindersList {...props} /></ReminderPageSizeContext.Provider>
 		: <p>Reminders are disabled on this device.</p>;
 };
 

@@ -10,6 +10,9 @@ import { useReminderClock } from './useReminderClock';
 
 type ViewMode = Parameters<typeof getCurrentHeaderData>[0];
 
+/** Renders one reminder card for a shell's lists and project detail. */
+export type ReminderCardRenderer = (props: { reminder: Reminder; index: number; hideProject: boolean }) => ReactNode;
+
 /** Header, add, card and reorder behavior shared by the plugin and PWA shells.
  * Host chrome (navigation, buttons, safe areas) stays in each shell. */
 export function useRemindersShellModel({ reminders, projects, upcomingDays, viewMode, selectedProject, renderCard, onAdd, onReorder, addDisabled = false }: {
@@ -18,7 +21,7 @@ export function useRemindersShellModel({ reminders, projects, upcomingDays, view
 	upcomingDays: number;
 	viewMode: ViewMode;
 	selectedProject: string | null;
-	renderCard: (props: { reminder: Reminder; index: number; hideProject: boolean }) => ReactNode;
+	renderCard: ReminderCardRenderer;
 	onAdd: (defaultProject: string) => void;
 	onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
 	addDisabled?: boolean;

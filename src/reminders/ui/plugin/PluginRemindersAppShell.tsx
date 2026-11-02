@@ -8,7 +8,7 @@ import { PWA_CONTROL_SPRING } from '@/ui/shared/navigation/motion';
 import { BackButton } from '@/ui/shared/BackButton';
 import { ProjectDetailView } from '../views';
 import type { TabId } from '../shared/layoutConstants';
-import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 
 import { ThemeIcon } from "@/ui/shared/ThemeIcon";
@@ -18,18 +18,12 @@ import { ViewHeader } from "@/ui/shared/ViewHeader";
 import type { Reminder } from "@/reminders/types/reminder";
 import { RemindersViewPanels } from "@/reminders/ui/shared/RemindersViewPanels";
 import { useReducedMotion } from "@/ui/shared/useReducedMotion";
-import { useRemindersShellModel } from '../shared/useRemindersShellModel';
+import { useRemindersShellModel, type ReminderCardRenderer } from '../shared/useRemindersShellModel';
 import {
 	getReminderProjects,
 	shouldShowReminderFab,
-	type ViewMode,
 } from "@/reminders/ui/shared/remindersViewModel";
-
-export type PluginReminderCardRenderer = (props: {
-	reminder: Reminder;
-	index: number;
-	hideProject: boolean;
-}) => React.ReactNode;
+import { usePluginReminderProjectNavigation } from './usePluginReminderProjectNavigation';
 
 interface PluginRemindersAppShellProps {
 	listStyle?: ListStyle;
@@ -55,7 +49,7 @@ interface PluginRemindersAppShellProps {
 	children?: React.ReactNode;
 	className?: string;
 	suppressFab?: boolean;
-	renderCard: PluginReminderCardRenderer;
+	renderCard: ReminderCardRenderer;
 	onAdd: (defaultProject: string) => void;
 	onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
 	onReorderDragActiveChange?: (active: boolean) => void;
@@ -93,43 +87,12 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
 	onReorderDragActiveChange,
 	reorderInteraction = 'drag',
 }) => {
-	const [localViewMode, setLocalViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
-	const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
-	const [closingProject, setClosingProject] = useState(false);
-	const [direction, setDirection] = useState<-1 | 0 | 1>(0);
-	const shell = useRef<HTMLDivElement>(null);
-	const lastProject = useRef(initialProject);
-	const restoreProjectFocus = useRef(false);
+	const { shell, viewMode, selectedProject, closingProject, direction,
+		handleViewModeChange, handleProjectSelect, handleBackToProjects, finishProjectClose } = usePluginReminderProjectNavigation({
+		initialTab, initialProject, activeTab, onTabChange,
+	});
 	const prefersReducedMotion = useReducedMotion();
-	const viewMode = activeTab ?? localViewMode;
-	const setViewMode = useCallback((tab: TabId) => {
-		setLocalViewMode(tab);
-		onTabChange?.(tab);
-	}, [onTabChange]);
 	const projects = useMemo(() => providedProjects ?? getReminderProjects(reminders), [providedProjects, reminders]);
-	const handleViewModeChange = useCallback((mode: ViewMode) => {
-		setViewMode(mode);
-		setSelectedProject(null);
-	}, [setViewMode]);
-	const handleProjectSelect = useCallback((project: string) => {
-		lastProject.current = project;
-		setDirection(1);
-		setSelectedProject(project);
-	}, []);
-	const handleBackToProjects = useCallback(() => {
-		restoreProjectFocus.current = true;
-		setDirection(-1);
-		setClosingProject(true);
-		setSelectedProject(null);
-	}, []);
-	const finishProjectClose = () => setClosingProject(false);
-	useLayoutEffect(() => {
-		if (selectedProject || closingProject || !restoreProjectFocus.current) return;
-		restoreProjectFocus.current = false;
-		const button = Array.from(shell.current?.querySelectorAll<HTMLElement>('[data-action="open-project"]') ?? [])
-			.find(candidate => candidate.dataset.project === lastProject.current);
-		button?.focus({ preventScroll: true });
-	}, [selectedProject, closingProject]);
 
 	const { currentHeader, primaryTab, handleAdd, panelCardRenderer, listCardRenderer, handleReorder } = useRemindersShellModel({
 		reminders, projects, upcomingDays, viewMode, selectedProject, renderCard, onAdd, onReorder,

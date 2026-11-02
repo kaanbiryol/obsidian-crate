@@ -21,20 +21,14 @@ import { RemindersViewPanels } from '@/reminders/ui/shared/RemindersViewPanels';
 import { ProjectDetailView } from '@/reminders/ui/views';
 import { BackButton } from '@/ui/shared/BackButton';
 import { shouldShowReminderFab } from '@/reminders/ui/shared/remindersViewModel';
-import { useRemindersShellModel } from '@/reminders/ui/shared/useRemindersShellModel';
+import { useRemindersShellModel, type ReminderCardRenderer } from '@/reminders/ui/shared/useRemindersShellModel';
 import { PwaThemeIcon } from '../components/PwaThemeIcon';
-import { ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
+import { REMINDER_PAGE_SIZE, ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
 import { EmptyStateMessageContext } from '@/ui/shared/EmptyState';
 import { useReminderProjectNavigation } from './useReminderProjectNavigation';
 
 const LOADING_EMPTY_MESSAGE = { title: 'Loading reminders…', description: 'Checking for the latest reminders.' };
 const INCOMPLETE_EMPTY_MESSAGE = { title: 'No results from available files', description: 'Some source files could not be loaded. Review the notice above for missing reminders.' };
-
-export type PwaReminderCardRenderer = (props: {
-	reminder: Reminder;
-	index: number;
-	hideProject: boolean;
-}) => React.ReactNode;
 
 interface PwaRemindersAppShellProps {
 	listStyle?: ListStyle;
@@ -54,7 +48,7 @@ interface PwaRemindersAppShellProps {
 	checkingReminders?: boolean;
 	showLoadingIndicator?: boolean;
 	initializing?: boolean;
-	renderCard: PwaReminderCardRenderer;
+	renderCard: ReminderCardRenderer;
 	onAdd: (defaultProject: string) => void;
 	onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
 	onReorderDragActiveChange?: (active: boolean) => void;
@@ -176,7 +170,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	);
 
 	return (
-		<ReminderPageSizeContext.Provider value={200}>
+		<ReminderPageSizeContext.Provider value={REMINDER_PAGE_SIZE}>
 		<EmptyStateMessageContext.Provider value={checkingReminders ? LOADING_EMPTY_MESSAGE : incomplete ? INCOMPLETE_EMPTY_MESSAGE : null}>
 		<ThemeIconProvider renderer={PwaThemeIcon}>
 		  <div

@@ -1,6 +1,9 @@
 import { Button as BaseButton } from '@base-ui/react/button';
 import { createContext, useContext, useMemo, useState } from 'react';
 
+/** Page size both hosts use for long reminder lists. */
+export const REMINDER_PAGE_SIZE = 200;
+
 /** Hosts bound rendering to pages of this size; null renders full lists. */
 export const ReminderPageSizeContext = createContext<number | null>(null);
 
