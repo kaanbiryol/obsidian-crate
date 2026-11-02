@@ -1,6 +1,10 @@
 import type { SyncHistoryEntry, SyncResult } from '../types';
 import { getSyncIssues } from '../issues';
 import { MAX_SYNC_HISTORY_PATHS, updateSyncProgress, type SyncSettings } from '../settings';
+import { createLogger } from '../logger';
+import { errorMessage } from '../../platform/logger';
+
+const logger = createLogger('SyncRuntime');
 
 const CHECKPOINT_INTERVAL_PER_FILE_MS = 360;
 
@@ -20,6 +24,34 @@ export function checkpointDue(input: {
 	const previous = input.history.find(entry => entry !== input.latest && entry.sharedCheckpoint && entry.checkpointFileCount === undefined);
 	const last = Math.max(previous ? Date.parse(previous.timestamp) : 0, input.lastCheckpointAt);
 	return !last || input.now - last >= input.trackedFiles * CHECKPOINT_INTERVAL_PER_FILE_MS;
+}
+
+/** Saves a shared history checkpoint after a successful sync once one is due. */
+export class SharedCheckpointSchedule {
+	private lastCheckpointAt = 0;
+
+	async saveIfDue(
+		settings: SyncSettings,
+		type: SyncHistoryEntry['type'],
+		result: SyncResult,
+		latest: SyncHistoryEntry,
+		engine: { trackedFileCount(): number; saveSharedHistoryCheckpoint(): Promise<{ id: string } | undefined> },
+		isCurrent: () => boolean,
+	): Promise<void> {
+		if (!result.success || result.conflicts.length || !checkpointDue({
+			type, history: settings.syncHistory, latest, lastCheckpointAt: this.lastCheckpointAt,
+			trackedFiles: engine.trackedFileCount(), now: Date.now(),
+		})) return;
+		// The server rejects vaults above the shared limits; they get no checkpoint. A failed
+		// attempt waits as long as a saved one, so it is not retried after every sync.
+		this.lastCheckpointAt = Date.now();
+		try {
+			const shared = await engine.saveSharedHistoryCheckpoint();
+			if (!isCurrent() || !shared) return;
+			updateSyncProgress(settings, { syncHistory: settings.syncHistory.map(entry => entry === latest ? { ...entry, sharedCheckpoint: shared.id } : entry) });
+		}
+		catch (error) { if (isCurrent()) logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
+	}
 }
 
 export function recordSyncHistory(

@@ -23,14 +23,14 @@ import { SyncApiClient } from '../worker-api/client';
 import { SyncEngine } from '../engine/engine';
 import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';
 import { deleteManifestFile, type ApplyInfrastructureConfigInput } from './config';
-import { checkpointDue, recordSyncHistory } from './sync-activity';
+import { recordSyncHistory, SharedCheckpointSchedule } from './sync-activity';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { RuntimeServerStatus } from './server-status';
 import { ForegroundSyncScheduler, type ForegroundSyncReason } from './foreground-sync';
 import { runStartupSync } from './startup-sync';
 import { VaultEventGate } from './vault-event-gate';
 import { SECRET_KEYS } from '../../platform/secret-keys';
-import { updateSyncProgress, type SyncRuntimeSettings, type SyncSettings } from '../settings';
+import type { SyncRuntimeSettings, SyncSettings } from '../settings';
 import { buildSharedSettings } from '../connection/shared-settings';
 
 const logger = createLogger('SyncRuntime');
@@ -67,6 +67,33 @@ export class SyncRuntime {
 		sync: () => this.sync(),
 	});
 	private readonly serverStatus: RuntimeServerStatus;
+	private readonly checkpoints = new SharedCheckpointSchedule();
+
+	constructor(
+		private plugin: Plugin,
+		private settings: SyncRuntimeSettings,
+		private secretStorage: SecretStorageService,
+		private persistSettings: (update?: Partial<SyncSettings>) => Promise<void>,
+		private prepareReminderScope?: () => Promise<void>,
+		/** Notes inside these folders carry encrypted notification schedules. */
+		private reminderFolders: () => readonly string[] = () => [],
+		/** Where notes the server sealed to the vault (Save to Crate captures) are accepted. */
+		private readingFolder: () => string | null = () => null,
+	) {
+		this.initializing = this.isConfigured();
+		this.serverStatus = new RuntimeServerStatus({
+			settings,
+			getClient: () => this.apiClient,
+			captureIdleState: () => {
+				const engine = this.syncEngine;
+				if (!engine || engine.getState().status !== 'idle') return null;
+				const lastSync = engine.getState().lastSync;
+				return () => this.syncEngine === engine
+					&& engine.getState().status === 'idle' && engine.getState().lastSync === lastSync;
+			},
+			onIssueChange: () => this.emitCurrentState(),
+		});
+	}
 
 	private requireEngine(): SyncEngine {
 		if (!this.syncEngine) throw new Error(NOT_CONFIGURED);
@@ -85,11 +112,11 @@ export class SyncRuntime {
 		if (engine !== this.syncEngine) throw stale();
 	}
 
-	/** The API client is created before its engine and kept while initialize() waits for
-	 * the old engine to stop, so server reads check only the client they used. */
 	/** Runs `read` against the current API client and rejects with `staleMessage` when the
 	 * runtime replaced that client before `read` settled. Multi-step reads check `isCurrent`
-	 * before acting on an earlier response. */
+	 * before acting on an earlier response. The API client is created before its engine and
+	 * kept while initialize() waits for the old engine to stop, so server reads check only
+	 * the client they used. */
 	async withCurrentApi<T>(read: (api: SyncApiClient, isCurrent: () => boolean) => Promise<T>, staleMessage: string): Promise<T> {
 		const api = this.requireApi();
 		const result = await read(api, () => api === this.apiClient);
@@ -124,33 +151,6 @@ export class SyncRuntime {
 		return result;
 	}
 	getPendingRestores(): RemoteFileVersion[] { return this.syncEngine?.getPendingRestores() ?? []; }
-	private lastCheckpointAt = 0;
-
-	constructor(
-		private plugin: Plugin,
-		private settings: SyncRuntimeSettings,
-		private secretStorage: SecretStorageService,
-		private persistSettings: (update?: Partial<SyncSettings>) => Promise<void>,
-	private prepareReminderScope?: () => Promise<void>,
-		/** Notes inside these folders carry encrypted notification schedules. */
-		private reminderFolders: () => readonly string[] = () => [],
-		/** Where notes the server sealed to the vault (Save to Crate captures) are accepted. */
-		private readingFolder: () => string | null = () => null,
-	) {
-		this.initializing = this.isConfigured();
-		this.serverStatus = new RuntimeServerStatus({
-			settings,
-			getClient: () => this.apiClient,
-			captureIdleState: () => {
-				const engine = this.syncEngine;
-				if (!engine || engine.getState().status !== 'idle') return null;
-				const lastSync = engine.getState().lastSync;
-				return () => this.syncEngine === engine
-					&& engine.getState().status === 'idle' && engine.getState().lastSync === lastSync;
-			},
-			onIssueChange: () => this.emitCurrentState(),
-		});
-	}
 
 	isInitialized(): boolean {
 		return this.syncEngine !== null;
@@ -453,9 +453,7 @@ export class SyncRuntime {
 	private resetEncryption(request: EncryptionResetRequest, progress: (message: string) => void,
 		expected: { workerUrl: string; authToken: string }, signal?: AbortSignal): Promise<void> {
 		return this.changeConfiguration(transition => runEncryptionReset({
-			settings: this.settings, secretStorage: this.secretStorage,
-			transition, persistSettings: this.persistSettings,
-			clearLocalState: () => deleteManifestFile(this.plugin, signal),
+			...this.configurationWorkflowContext(transition, signal),
 			getResetEngine: () => {
 				this.vaultEvents.pause();
 				if (!this.syncEngine || !this.apiClient) throw new Error('Could not start the new sync connection');
@@ -553,11 +551,18 @@ export class SyncRuntime {
 		return this.changeConfiguration(transition => changeEncryptionResetAddress(this.addressWorkflowContext(transition, signal), address, signal), signal);
 	}
 
-	private addressWorkflowContext(transition: RuntimeConfigurationTransition, signal?: AbortSignal) {
+	/** Members every configuration workflow shares. */
+	private configurationWorkflowContext(transition: RuntimeConfigurationTransition, signal?: AbortSignal) {
 		return {
 			settings: this.settings, secretStorage: this.secretStorage,
 			transition, persistSettings: this.persistSettings,
 			clearLocalState: () => deleteManifestFile(this.plugin, signal),
+		};
+	}
+
+	private addressWorkflowContext(transition: RuntimeConfigurationTransition, signal?: AbortSignal) {
+		return {
+			...this.configurationWorkflowContext(transition, signal),
 			emitCurrentState: () => this.emitCurrentState(),
 		};
 	}
@@ -571,11 +576,7 @@ export class SyncRuntime {
 	}
 
 	private connectionWorkflowContext(transition: RuntimeConfigurationTransition, signal?: AbortSignal) {
-		return {
-			settings: this.settings, secretStorage: this.secretStorage, api: this.apiClient,
-			transition, persistSettings: this.persistSettings,
-			clearLocalState: () => deleteManifestFile(this.plugin, signal),
-		};
+		return { ...this.configurationWorkflowContext(transition, signal), api: this.apiClient };
 	}
 
 	updateSyncSettings(): void {
@@ -618,20 +619,7 @@ export class SyncRuntime {
 		for (const listener of this.syncResultListeners) {
 			try { listener(result); } catch (error) { logger.warn('Sync result listener failed:', errorMessage(error)); }
 		}
-		if (result.success && !result.conflicts.length && checkpointDue({
-			type, history: this.settings.syncHistory, latest, lastCheckpointAt: this.lastCheckpointAt,
-			trackedFiles: engine.trackedFileCount(), now: Date.now(),
-		})) {
-			// The server rejects vaults above the shared limits; they get no checkpoint. A failed
-			// attempt waits as long as a saved one, so it is not retried after every sync.
-			this.lastCheckpointAt = Date.now();
-			try {
-				const shared = await engine.saveSharedHistoryCheckpoint();
-				if (this.syncEngine !== engine || !shared) return;
-				updateSyncProgress(this.settings, { syncHistory: this.settings.syncHistory.map(entry => entry === latest ? { ...entry, sharedCheckpoint: shared.id } : entry) });
-			}
-			catch (error) { if (this.syncEngine === engine) logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
-		}
+		await this.checkpoints.saveIfDue(this.settings, type, result, latest, engine, () => this.syncEngine === engine);
 	}
 
 	private emitCurrentState(): void {
