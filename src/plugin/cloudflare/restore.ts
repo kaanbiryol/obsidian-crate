@@ -1,15 +1,15 @@
 import { Notice, Platform } from 'obsidian';
-import type CratePlugin from './CratePlugin';
-import { beginCloudflareOperation } from './cloudflare-operation-guard';
-import { getPluginLifecycleSignal } from './lifecycle-state';
-import { startCloudflareDeployment } from './cloudflare-operations';
-import { openConfirmationModal } from '../ui/confirmation-modal';
-import { openCloudflareDeploymentModal } from '../ui/cloudflare/deployment-modal';
-import { BackupPicker, RestoredServer } from '../ui/cloudflare/restore-ui';
-import type { BackupChoice } from '../cloudflare/restore/archive';
-import { workersDevOrigin } from '../cloudflare/deployment/worker-origin';
-import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
-import { DESKTOP_ONLY_SERVER_CHANGE } from '../cloudflare/deployment/server-changes';
+import type CratePlugin from '../CratePlugin';
+import { beginCloudflareOperation } from './operation-guard';
+import { getPluginLifecycleSignal } from '../lifecycle-state';
+import { startCloudflareDeployment } from './operations';
+import { openConfirmationModal } from '../../ui/confirmation-modal';
+import { openCloudflareDeploymentModal } from '../../ui/cloudflare/deployment-modal';
+import { BackupPicker, RestoredServer } from '../../ui/cloudflare/restore-ui';
+import type { BackupChoice } from '../../cloudflare/restore/archive';
+import { workersDevOrigin } from '../../cloudflare/deployment/worker-origin';
+import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';
+import { DESKTOP_ONLY_SERVER_CHANGE } from '../../cloudflare/deployment/server-changes';
 
 const renewLoginMessage = 'Your Cloudflare login needs renewing. Select Reconnect under Account and devices, then resume the restore.';
 

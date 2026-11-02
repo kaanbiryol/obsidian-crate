@@ -1,7 +1,7 @@
 import { Notice } from 'obsidian';
-import type CratePlugin from './CratePlugin';
-import { getPluginLifecycleSignal } from './lifecycle-state';
-import { revealCloudflareOperation } from '../ui/cloudflare/deployment-modal';
+import type CratePlugin from '../CratePlugin';
+import { getPluginLifecycleSignal } from '../lifecycle-state';
+import { revealCloudflareOperation } from '../../ui/cloudflare/deployment-modal';
 
 /** Starts at most one Cloudflare operation: an open one is shown again, and a
  * running one is reported with `busyMessage`. Returns the plugin lifetime signal,

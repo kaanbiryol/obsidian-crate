@@ -81,7 +81,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 	vi.doMock('./deviceId', () => ({
 		ensurePluginDeviceId,
 	}));
-	vi.doMock('./cloudflare-operations', () => ({ handleCloudflareOAuthProtocol }));
+	vi.doMock('./cloudflare/operations', () => ({ handleCloudflareOAuthProtocol }));
 	vi.doMock('../cloudflare/deployment/service', () => ({ CloudflareDeploymentService }));
 	vi.doMock('../cloudflare/saved-login', () => ({ CloudflareSavedLogin: class {} }));
 	vi.doMock('../cloudflare/deployment/embedded-artifacts', () => ({ loadEmbeddedCloudflareArtifacts: vi.fn() }));
@@ -147,7 +147,7 @@ afterEach(() => {
 	vi.doUnmock('../reminders/plugin-integration');
 	vi.doUnmock('./sync-integration');
 	vi.doUnmock('./deviceId');
-	vi.doUnmock('./cloudflare-operations');
+	vi.doUnmock('./cloudflare/operations');
 	vi.doUnmock('../cloudflare/deployment/service');
 	vi.doUnmock('../cloudflare/saved-login');
 	vi.doUnmock('../cloudflare/deployment/embedded-artifacts');

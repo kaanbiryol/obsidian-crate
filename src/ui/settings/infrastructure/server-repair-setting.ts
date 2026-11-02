@@ -1,6 +1,6 @@
 import { Setting } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { startCloudflareDeployment } from '../../../plugin/cloudflare-operations';
+import { startCloudflareDeployment } from '../../../plugin/cloudflare/operations';
 import { addServerChangeButton } from './server-change-button';
 
 export function renderServerRepairSetting(containerEl: HTMLElement, plugin: CratePlugin): void {

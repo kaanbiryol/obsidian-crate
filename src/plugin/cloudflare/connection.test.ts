@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { endPluginLifecycle } from './lifecycle-state';
-import { DEFAULT_SETTINGS } from './settings';
-import { SyncApiClient } from '../sync/worker-api/client';
-import { configureCloudflareAuthorizedDevice } from './cloudflare-connection';
+import { endPluginLifecycle } from '../lifecycle-state';
+import { DEFAULT_SETTINGS } from '../settings';
+import { SyncApiClient } from '../../sync/worker-api/client';
+import { configureCloudflareAuthorizedDevice } from './connection';
 
 // An unencrypted server, so a test can send the seeding request through the real client.
 const sent = vi.hoisted(() => [] as Array<{ url: string; method?: string; body?: unknown }>);
@@ -18,7 +18,7 @@ vi.mock('obsidian', async importOriginal => ({
 }));
 
 const confirm = vi.hoisted(() => vi.fn(async () => true));
-vi.mock('../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
+vi.mock('../../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 
 const remote ={ ignorePatterns: ['remote-pattern'], syncInterval: 60, pushEnabled: true };
 

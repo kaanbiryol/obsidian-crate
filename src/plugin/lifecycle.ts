@@ -16,7 +16,7 @@ import {
 } from "./sync-integration";
 import { ensurePluginDeviceId } from "./deviceId";
 import type CratePlugin from "./CratePlugin";
-import { handleCloudflareOAuthProtocol } from "./cloudflare-operations";
+import { handleCloudflareOAuthProtocol } from "./cloudflare/operations";
 import { showCloudflareServerUpdateNotice } from "../ui/cloudflare/update-notice";
 import { showGetStartedNotice } from "../ui/settings/get-started-notice";
 import { beginPluginLifecycle, endPluginLifecycle, getPluginLifecycleSignal, setSyncReady } from './lifecycle-state';

@@ -8,10 +8,10 @@ const mocks = vi.hoisted(() => ({
 	notice: vi.fn(),
 }));
 vi.mock('obsidian', () => ({ Notice: mocks.notice, Platform: mocks.platform }));
-vi.mock('../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal, revealCloudflareOperation: mocks.reveal }));
-import { checkAndRecoverUpdate } from './cloudflare-recovery';
-import { DeploymentRecoveryRequiredError } from '../cloudflare/deployment/fence';
-import { CloudflareReauthorizationRequired } from '../cloudflare/oauth/client';
+vi.mock('../../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal, revealCloudflareOperation: mocks.reveal }));
+import { checkAndRecoverUpdate } from './recovery';
+import { DeploymentRecoveryRequiredError } from '../../cloudflare/deployment/fence';
+import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';
 
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
 function plugin(status: 'blocked' | 'recovered') {

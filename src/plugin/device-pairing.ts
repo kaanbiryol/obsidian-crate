@@ -1,7 +1,7 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
-import { configureCloudflareAuthorizedDevice } from './cloudflare-connection';
+import { configureCloudflareAuthorizedDevice } from './cloudflare/connection';
 import { offerFeatureChoice } from './feature-settings';
 import { getCurrentDeviceName, getCurrentPlatformCode } from './deviceInfo';
 import { generateSecureToken, hashToken } from '../cloudflare/device-token';

@@ -1,13 +1,13 @@
-import type { ConnectionTestResult } from '../sync/types';
-import type CratePlugin from './CratePlugin';
-import { getPluginLifecycleSignal } from './lifecycle-state';
-import { SyncApiClient } from '../sync/worker-api/client';
-import { buildSharedSettings } from '../sync/connection/shared-settings';
-import type { SharedSettings } from '../protocol/shared-settings';
-import { createLogger } from '../sync/logger';
-import { errorMessage } from '../platform/logger';
-import { writeSyncSettings } from './sync-connection';
-import { confirmVaultReplacement } from './vault-replacement';
+import type { ConnectionTestResult } from '../../sync/types';
+import type CratePlugin from '../CratePlugin';
+import { getPluginLifecycleSignal } from '../lifecycle-state';
+import { SyncApiClient } from '../../sync/worker-api/client';
+import { buildSharedSettings } from '../../sync/connection/shared-settings';
+import type { SharedSettings } from '../../protocol/shared-settings';
+import { createLogger } from '../../sync/logger';
+import { errorMessage } from '../../platform/logger';
+import { writeSyncSettings } from '../sync-connection';
+import { confirmVaultReplacement } from '../vault-replacement';
 
 const logger = createLogger('CloudflareConnection');
 

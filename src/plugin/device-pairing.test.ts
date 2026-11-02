@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('obsidian', () => ({ Notice: class { constructor(message: string) { mocks.notices.push(message); } } }));
-vi.mock('./cloudflare-connection', () => ({ configureCloudflareAuthorizedDevice: mocks.configure }));
+vi.mock('./cloudflare/connection', () => ({ configureCloudflareAuthorizedDevice: mocks.configure }));
 vi.mock('./feature-settings', () => ({ offerFeatureChoice: mocks.featureChoice }));
 vi.mock('./deviceInfo', () => ({ getCurrentDeviceName: () => 'iPhone', getCurrentPlatformCode: () => 'ios' }));
 vi.mock('../cloudflare/device-token', () => ({ generateSecureToken: () => 'phone-token', hashToken: async () => 'phone-token-hash' }));

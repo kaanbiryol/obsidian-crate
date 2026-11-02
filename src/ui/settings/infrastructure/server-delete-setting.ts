@@ -1,6 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { startCloudflareDeployment } from '../../../plugin/cloudflare-operations';
+import { startCloudflareDeployment } from '../../../plugin/cloudflare/operations';
 import { openConfirmationModal } from '../../confirmation-modal';
 import { addServerChangeButton } from './server-change-button';
 

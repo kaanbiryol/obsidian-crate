@@ -18,7 +18,7 @@ function deployment(overrides: Partial<CloudflareDeploymentMetadata> = {}): Clou
 
 async function render(saved: CloudflareDeploymentMetadata | null, configured = false) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../../../plugin/cloudflare-operations', () => ({ startCloudflareDeployment: start }));
+	vi.doMock('../../../plugin/cloudflare/operations', () => ({ startCloudflareDeployment: start }));
 	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	const { renderInfrastructureSection, renderServerActions } = await import('./infrastructure-section');
 	const containerEl = new FakeElement('div');
@@ -36,7 +36,7 @@ beforeEach(() => { resetObsidianUiMocks(); confirm.mockReset(); start.mockReset(
 afterEach(() => {
 	vi.resetModules();
 	vi.doUnmock('obsidian');
-	vi.doUnmock('../../../plugin/cloudflare-operations');
+	vi.doUnmock('../../../plugin/cloudflare/operations');
 	vi.doUnmock('../../confirmation-modal');
 });
 

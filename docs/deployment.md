@@ -283,7 +283,7 @@ should open sign-in and resume reconnect after the callback. Network or verifica
 failures must not show success. Self-hosted reconnect should accept a new pairing
 code at the saved address and keep the existing local connection on failure.
 
-Focused coverage: `src/plugin/cloudflare-operations.test.ts`,
+Focused coverage: `src/plugin/cloudflare/operations.test.ts`,
 `src/cloudflare/deployment/service.test.ts`,
 `src/plugin/self-hosted-connection.test.ts`, and the affected settings tests.
 `self-hosted-pairing.test.ts` and `ui/settings/infrastructure/self-hosted-errors.test.ts` check

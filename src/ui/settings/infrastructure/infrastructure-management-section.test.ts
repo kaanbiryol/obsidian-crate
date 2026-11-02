@@ -7,7 +7,7 @@ import {
 } from '../../../test/fakes/obsidian-ui';
 
 async function loadInfrastructureManagementSectionModule() {
-	vi.doMock('../../../plugin/cloudflare-operations', () => ({ startCloudflareDeployment: vi.fn() }));
+	vi.doMock('../../../plugin/cloudflare/operations', () => ({ startCloudflareDeployment: vi.fn() }));
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../../confirmation-modal', () => ({
 		openConfirmationModal: vi.fn(),
