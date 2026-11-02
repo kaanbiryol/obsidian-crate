@@ -11,7 +11,7 @@ import { handleListReminders } from './routes/list';
 import { handleReorderReminders } from './routes/reorder';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { ReminderFileSizeError } from './limits';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 
 const { DB: db, BUCKET: bucket } = env;
 beforeEach(async () => {

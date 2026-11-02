@@ -1,7 +1,7 @@
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import type { BatchUploadResponse } from '../../../../protocol/sync-types';
-import { corsResponse } from '../../cors';
-import { parseJsonObject, parseNonNegativeInteger, parseOptionalString, sanitizePath } from '../../request-validation';
+import { corsResponse } from '../../http/cors';
+import { parseJsonObject, parseNonNegativeInteger, parseOptionalString, sanitizePath } from '../../http/request-validation';
 import {
 	formatMutationError, MAX_BATCH_UPLOAD_FILES, MAX_BATCH_TOTAL_BYTES,
 	parseExpectedFileHash, type ExpectedFileHash,

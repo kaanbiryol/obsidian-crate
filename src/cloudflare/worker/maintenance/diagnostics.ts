@@ -1,4 +1,4 @@
-import { corsResponse } from '../cors';
+import { corsResponse } from '../http/cors';
 import { PUSH_RECIPIENT_AUTHORITY } from '../notifications/recipient-authority';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 

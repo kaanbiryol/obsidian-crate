@@ -1,6 +1,6 @@
 import { portablePathKey } from '../../../protocol/portable-path';
-import { corsResponse } from '../cors';
-import type { SqlGuard } from '../db';
+import { corsResponse } from '../http/cors';
+import type { SqlGuard } from '../d1/db';
 
 export function namespacePredicate(path: string): SqlGuard {
 	const key = portablePathKey(path);

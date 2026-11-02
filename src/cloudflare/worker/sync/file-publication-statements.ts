@@ -17,6 +17,18 @@ export function publishedChangelogStatement(
 		.bind(file.path, file.hash, file.size, file.objectKey, ...revision.args);
 }
 
+/** The delete's changelog row and its history copy for the `files` row `where`
+ * selects with `args`. Both must run before that row is deleted. */
+export function deletedFileStatements(db: D1Database, where: string, args: readonly unknown[], revision: string): D1PreparedStatement[] {
+	return [
+		db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
+			SELECT path, 'delete', '', 0, ? FROM files WHERE ${where}`).bind(revision, ...args),
+		db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, expires_at)
+			SELECT storage_key, path, hash, size, 'deleted', ${FILE_VERSION_EXPIRES_AT_SQL} FROM files WHERE ${where}`)
+			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...args),
+	];
+}
+
 const LARGE_VERSION_BYTES = 1024 * 1024;
 /** `maintenance_state` key: when the latest shared checkpoint started, in the
  * `files.modified` format. */

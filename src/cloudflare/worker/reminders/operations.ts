@@ -1,10 +1,10 @@
 import { prepareEncryptedReceipt, readEncryptedReceipt } from '../encryption/receipt-storage';
 import { fileRevisionsGuard } from '../sync/file-identity';
 import { reminderRequestHash } from './request-hash';
-import { corsResponse } from '../cors';
-import type { CommitEffects } from '../commit-effects';
+import { corsResponse } from '../http/cors';
+import type { CommitEffects } from '../sync/commit-effects';
 import { reminderOperationDay, isReminderOperationId } from '@/protocol/reminder-operation';
-import { OPERATION_VALID } from '../operation-receipts';
+import { OPERATION_VALID } from '../d1/operation-receipts';
 
 function expiredReminderOperation(): Response {
 	return corsResponse({ code: 'operation_expired', error: 'This change is outside the server’s retry window. An earlier attempt may have synced. Export it and compare your current reminders before restoring missing work.' }, 410);

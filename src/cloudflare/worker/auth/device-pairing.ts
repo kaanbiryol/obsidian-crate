@@ -1,7 +1,7 @@
-import { corsResponse } from '../cors';
-import { changedRows, readMaintenanceValue } from '../db';
-import { limitNotificationAction } from '../rate-limit';
-import { parseJsonObject, parseOptionalString } from '../request-validation';
+import { corsResponse } from '../http/cors';
+import { changedRows, readMaintenanceValue } from '../d1/db';
+import { chargeRouteAction } from '../admission/rate-limit';
+import { parseJsonObject, parseOptionalString } from '../http/request-validation';
 import { isSha256Hex } from '../../../platform/validation';
 import { sha256Hex } from '../../../platform/sha256';
 import { DEVICE_PAIRING_END, DEVICE_PAIRING_PREFIX, parseDevicePairingRecord, type DevicePairingRecord } from '../../../protocol/device-pairing';
@@ -29,7 +29,7 @@ export async function exchangeDevicePairing(request: Request, db: D1Database): P
 		const token = await db.prepare("SELECT 1 FROM auth_tokens WHERE id = ? AND token_hash = ? AND device_id = ? AND scope = 'vault'").bind(record.id, body.tokenHash, deviceId).first();
 		return record.redeemed === body.tokenHash && token ? redeemed(record) : invalid();
 	}
-	const limited = await limitNotificationAction(request, db, `device-pairing:${key}`);
+	const limited = await chargeRouteAction(request, db, `device-pairing:${key}`);
 	if (limited) return limited;
 	// The exact unclaimed record and the current reset generation authorize one token.
 	// An encryption reset replaces every credential, so a code issued before it is void.

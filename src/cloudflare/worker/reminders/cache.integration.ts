@@ -6,7 +6,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { handleListReminders } from './routes/list';
 import { saveReminderFileCache } from './cache/index';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 
 const { DB: db, BUCKET: bucket } = env;
 beforeEach(async () => {

@@ -1,5 +1,5 @@
 import { queryRows } from './db';
-import { portablePathKey } from '../../protocol/portable-path';
+import { portablePathKey } from '../../../protocol/portable-path';
 
 export interface ObjectReference { storageKey: string; path: string }
 

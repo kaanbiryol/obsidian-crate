@@ -6,7 +6,7 @@ import { applySchema } from '../../test-support/schema-test-harness';
 import { cleanStagedUploads } from '../../maintenance/staged-upload-cleanup';
 import { trackStagedUpload } from './staged-uploads';
 import { commitStagedFile } from '../mutations';
-import { writeCommittedMarkdownFile } from '../../storage';
+import { writeCommittedMarkdownFile } from '../markdown-files';
 import { getStoredFileRow } from '../storage';
 import { createManagedObjectKey } from '../../../../protocol/storage-keys';
 import { sha256Hex } from '../../../../platform/sha256';

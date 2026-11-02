@@ -1,4 +1,4 @@
-import { readStoredMarkdownFiles, type StoredMarkdownFileMetadata } from '../../storage';
+import { readStoredMarkdownFiles, type StoredMarkdownFileMetadata } from '../../sync/markdown-files';
 import type { Env } from '../../types';
 import { parseReminderSource } from '../source-parse';
 import { MAX_REMINDER_NOTE_BYTES, REMINDER_NOTE_SIZE_ISSUE } from '@/reminders/core/constants';

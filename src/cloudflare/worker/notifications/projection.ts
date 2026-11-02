@@ -1,14 +1,14 @@
-import { featureEnabled } from '../feature-policy';
+import { featureEnabled } from '../server/feature-policy';
 import type { FeaturePolicy } from '../../../protocol/feature-policy';
 import { planNotificationOperations, readExistingNotifications, type NotificationOperation } from './projection-plan';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { recordFileFailure } from './file-retries';
 import { READY_PROJECTION_JOBS_SQL } from './queue';
 import { parseDateTime, toZoned } from '@internationalized/date';
-import { queryRows } from '../db';
+import { queryRows } from '../d1/db';
 import { duplicateReminderIds, ReminderIdentityConflictError } from '../reminders/source-identity';
 import { loadStoredFileRows, type FileStorageRow } from '../sync/storage';
-import { readStoredMarkdownFiles } from '../storage';
+import { readStoredMarkdownFiles } from '../sync/markdown-files';
 import { getNotificationPolicy } from './policy';
 import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, REMINDER_PROJECTION_SIZE_ISSUE, DUPLICATE_COMMITTED_REMINDER_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from '../reminders/source-parse';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';

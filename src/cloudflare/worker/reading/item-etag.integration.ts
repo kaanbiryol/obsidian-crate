@@ -7,7 +7,7 @@ import worker from '../index';
 import { handleReadingRoute } from './routes';
 import { ensureReadingIndex } from './library-index';
 import { policy, readStoredNote } from './common';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { getStoredFileRow } from '../sync/storage';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { adoptReadingClip, parseReadingNote } from '@/reading/core/notes';

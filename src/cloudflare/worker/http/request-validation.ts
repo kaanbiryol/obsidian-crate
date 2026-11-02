@@ -1,7 +1,7 @@
 import { corsResponse } from './cors';
-import { getSyncPathIssue } from '../../protocol/portable-path';
+import { getSyncPathIssue } from '../../../protocol/portable-path';
 import { readLimitedRequestBody } from './body-reader';
-import { containsControlCharacters, isRecord } from '../../platform/validation';
+import { containsControlCharacters, isRecord } from '../../../platform/validation';
 
 export async function parseJsonObject(
 	request: Request,

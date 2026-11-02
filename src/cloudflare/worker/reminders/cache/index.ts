@@ -1,4 +1,4 @@
-import type { StoredMarkdownFileMetadata } from '../../storage';
+import type { StoredMarkdownFileMetadata } from '../../sync/markdown-files';
 import type { Env } from '../../types';
 import { loadReminderFileCache } from './load';
 import {

@@ -1,5 +1,5 @@
 import { portablePathKey } from '../../../protocol/portable-path';
-import type { SqlGuard } from '../db';
+import type { SqlGuard } from '../d1/db';
 
 export const FILE_PATH_MATCH = 'portable_path = ? AND path = ?';
 export function filePathArgs(path: string): [string, string] {

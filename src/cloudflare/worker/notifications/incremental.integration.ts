@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleNotificationPolicy } from './policy';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { drainNotificationProjections } from './projection';
 import { dispatchNotificationJobs, drainNotificationJobs, OUTBOX_BATCH_SIZE } from './outbox';
 import { hasNotificationAuthority } from '../reminders/source-state';

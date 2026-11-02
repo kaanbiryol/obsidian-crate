@@ -6,7 +6,7 @@ import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { sha256Hex } from '@/platform/sha256';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import type { Env } from '../types';
-import { changedRows } from '../db';
+import { changedRows } from '../d1/db';
 import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-paths';
 
 /** `reading_items` holds one row per Reading note in the Reading folder, written in the

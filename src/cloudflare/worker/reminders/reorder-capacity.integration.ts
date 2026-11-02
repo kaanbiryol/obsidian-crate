@@ -5,7 +5,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleReorderReminders } from './routes/reorder';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 
 const path = 'Reminders/Inbox.md';

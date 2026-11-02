@@ -8,8 +8,8 @@ import {
 	handleUpload,
 } from './index';
 import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
-import { countD1Queries } from '../d1-query-count';
-import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
+import { countD1Queries } from '../d1/d1-query-count';
+import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 import { BATCH_DELETE_MAX_FILES, BATCH_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 
 async function responseJson(response: Response): Promise<unknown> {

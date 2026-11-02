@@ -2,9 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import { applySchema } from './test-support/schema-test-harness';
-import worker from './index';
-import { sha256Hex } from '../../platform/sha256';
+import { applySchema } from '../test-support/schema-test-harness';
+import worker from '../index';
+import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -59,7 +59,7 @@ describe('authenticated page titles in the Worker runtime', () => {
 		}
 	});
 	it('serves an unlocked encrypted vault without storing the link, and refuses a locked one', async () => {
-		const { createEncryptionFixture, storeEncryptionState } = await import('./test-support/encryption-test-harness');
+		const { createEncryptionFixture, storeEncryptionState } = await import('../test-support/encryption-test-harness');
 		const { state } = await createEncryptionFixture('active');
 		await storeEncryptionState(env.DB, state);
 		const outbound = mockPage();

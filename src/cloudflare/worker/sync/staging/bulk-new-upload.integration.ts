@@ -9,7 +9,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { handleBatchUpload } from '../batch/upload';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { installD1QueryCounter } from '../../test-support/d1-query-test-harness';
-import { D1_QUERIES_PER_INVOCATION } from '../../platform-limits';
+import { D1_QUERIES_PER_INVOCATION } from '../../d1/platform-limits';
 import { BATCH_UPLOAD_MAX_FILES } from '@/protocol/sync-limits';
 
 beforeEach(async () => {

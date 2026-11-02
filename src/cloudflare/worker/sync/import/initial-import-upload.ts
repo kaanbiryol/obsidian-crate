@@ -1,14 +1,14 @@
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { BATCH_UPLOAD_MAX_BYTES, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
-import { corsResponse } from '../../cors';
-import { parseJsonObject, sanitizePath } from '../../request-validation';
+import { corsResponse } from '../../http/cors';
+import { parseJsonObject, sanitizePath } from '../../http/request-validation';
 import { readInitialImport } from './initial-import';
 import { loadStoredFileRows, parseExpectedFileHash } from '../storage';
 import { trackStagedBatch, finishStagedBatches } from '../staging/staged-upload-batches';
 import { queueReplacedUploadCleanup, uploadMutation } from '../mutations';
 import { readingIndexStatements } from '../../reading/library-index';
-import { readLimitedRequestBody } from '../../body-reader';
+import { readLimitedRequestBody } from '../../http/body-reader';
 import { isSha256Hex } from '@/platform/validation';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
 import { FILE_HASH_HEADER, EXPECTED_HASH_HEADER, INITIAL_IMPORT_HEADER } from '@/protocol/http-headers';

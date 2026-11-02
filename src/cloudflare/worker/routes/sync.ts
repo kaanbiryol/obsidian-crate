@@ -16,7 +16,7 @@ import { handleListFileVersions, handleRestoreFileVersion } from '../sync/file-v
 import { handleEncryptedSettings } from '../encryption/settings';
 import { readEncryptionState } from '../encryption/state';
 import type { Env } from '../types';
-import { mutationAuditContext } from '../request-diagnostics';
+import { mutationAuditContext } from '../http/request-diagnostics';
 import { beginInitialImport, finishInitialImport } from '../sync/import/initial-import';
 import { pruneInitialImport } from '../sync/import/initial-import-prune';
 import { forwardTransferRequest } from '../sync/transfer-dispatch';

@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { applySchema } from '../test-support/schema-test-harness';
 import { installStorageCostMeter, type StorageCostMeter } from '../test-support/storage-cost-test-harness';
 import worker from '../index';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { reminderRevision } from '@/reminders/core/reminderRevision';

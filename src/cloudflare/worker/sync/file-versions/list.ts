@@ -1,6 +1,6 @@
-import { corsResponse } from '../../cors';
-import { queryRows } from '../../db';
-import { sanitizePath } from '../../request-validation';
+import { corsResponse } from '../../http/cors';
+import { queryRows } from '../../d1/db';
+import { sanitizePath } from '../../http/request-validation';
 import { isSyncDate, isSyncRevision } from '../../../../protocol/sync-validation';
 import type { RemoteFileVersion } from '../../../../protocol/sync-types';
 

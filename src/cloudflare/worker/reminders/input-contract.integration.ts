@@ -9,7 +9,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';
 import type { ReminderRecord } from '@/pwa/reminders/types';
 import { sha256Hex } from '@/platform/sha256';

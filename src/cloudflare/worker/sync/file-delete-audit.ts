@@ -1,5 +1,5 @@
-import { changedRows, MAINTENANCE_DELETE_LIMIT } from '../db';
-import type { MutationAuditContext } from '../request-diagnostics';
+import { changedRows, MAINTENANCE_DELETE_LIMIT } from '../d1/db';
+import type { MutationAuditContext } from '../http/request-diagnostics';
 
 export interface FileDeletionReceipt {
 	revision: string;

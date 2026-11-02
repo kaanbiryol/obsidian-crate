@@ -3,9 +3,9 @@ import { trackStagedUploads } from './staging/staged-uploads';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit, MAX_ENCRYPTED_FILE_BYTES } from '../../../encryption/file-format';
 import { EncryptionStateError, validateUploadEncryption } from '../encryption/state';
 import { beginUploadOperation } from './upload-operations';
-import { exactArrayBuffer, readLimitedRequestBody } from '../body-reader';
-import { corsHeaders, corsResponse } from '../cors';
-import { sanitizePath } from '../request-validation';
+import { exactArrayBuffer, readLimitedRequestBody } from '../http/body-reader';
+import { corsHeaders, corsResponse } from '../http/cors';
+import { sanitizePath } from '../http/request-validation';
 import type { UploadCommitters } from './staging/upload-committers';
 import { FileNamespaceConflictError } from './file-namespace';
 import {

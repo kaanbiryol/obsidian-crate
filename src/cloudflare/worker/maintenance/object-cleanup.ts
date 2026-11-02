@@ -1,5 +1,5 @@
-import { changedRows, queryRows, type SqlGuard } from '../db';
-import { findReferencedStorageKeys, type ObjectReference } from '../storage-references';
+import { changedRows, queryRows, type SqlGuard } from '../d1/db';
+import { findReferencedStorageKeys, type ObjectReference } from '../d1/storage-references';
 
 // R2 deletes up to R2_KEYS_PER_CALL keys per call. 500 keeps the reference lookup's single
 // JSON parameter below D1's 2 MB value limit, even with 1,024-character paths.

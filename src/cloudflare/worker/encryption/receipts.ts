@@ -1,4 +1,4 @@
-import { corsResponse } from '../cors';
+import { corsResponse } from '../http/cors';
 
 /** The deletion receipt that consumed a file revision, if any. */
 export async function handleDeletionPrecondition(request: Request, db: D1Database): Promise<Response> {

@@ -1,8 +1,8 @@
 import { portablePathKey } from '../../../protocol/portable-path';
 import { MAX_SHARED_SETTINGS_BYTES } from '../../../encryption/settings-format';
 import { normalizeSharedSettingsValue } from '../../../protocol/shared-settings';
-import { corsResponse } from '../cors';
-import { parseJsonObject, sanitizePath } from '../request-validation';
+import { corsResponse } from '../http/cors';
+import { parseJsonObject, sanitizePath } from '../http/request-validation';
 import { CHANGELOG_BOUNDS_SQL, getChangelogBounds } from './storage';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import type { FileEntry } from '../../../protocol/sync-types';

@@ -1,19 +1,19 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
-import { publishedChangelogStatement } from './file-publication-statements';
+import { deletedFileStatements, publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
 import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
 import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { readingIndexStatements } from '../reading/library-index';
-import type { CommitEffects } from '../commit-effects';
-import { changedRows } from '../db';
+import type { CommitEffects } from './commit-effects';
+import { changedRows } from '../d1/db';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { stageMarkdownFile } from './markdown-file-staging';
-import { FileVersionConflictError } from '../storage';
+import { FileVersionConflictError } from './markdown-files';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import { recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
-import type { MutationAuditContext } from '../request-diagnostics';
-import { FILE_VERSION_EXPIRES_AT_SQL, FILE_VERSION_RETENTION_MS, getStoredFileRow } from './storage';
+import type { MutationAuditContext } from '../http/request-diagnostics';
+import { getStoredFileRow } from './storage';
 
 /** Publish `content` at a new path and delete the exact source revision in one
  * transaction, so a rename never leaves both files or neither. */
@@ -50,10 +50,7 @@ export async function writeCommittedMarkdownMove(
 		publishedChangelogStatement(db, destination),
 		...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, false, Boolean(encryption.state)),
 		finishStagedUpload(db, destination.objectKey, destination.path),
-		sourceStatement(`INSERT INTO changelog (path, action, hash, size, revision) SELECT path, 'delete', '', 0, ? FROM files`, deletion),
-		sourceStatement(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, expires_at)
-			SELECT storage_key, path, hash, size, 'deleted', ${FILE_VERSION_EXPIRES_AT_SQL} FROM files`,
-		Date.now() + FILE_VERSION_RETENTION_MS),
+		...deletedFileStatements(db, `${sourceMatch} AND ${published.sql}`, [...sourceArgs, ...published.args], deletion),
 	];
 	const results: unknown[] = await db.batch([
 		...beforeDelete,

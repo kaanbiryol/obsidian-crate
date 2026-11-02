@@ -6,11 +6,11 @@ import type { EncryptionServerState } from '../../../encryption/server-state';
 import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { readingIndexStatements } from '../reading/library-index';
-import type { CommitEffects } from '../commit-effects';
-import { changedRows } from '../db';
+import type { CommitEffects } from './commit-effects';
+import { changedRows } from '../d1/db';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { stageMarkdownFile, type StagedMarkdownFile } from './markdown-file-staging';
-import { FileVersionConflictError } from '../storage';
+import { FileVersionConflictError } from './markdown-files';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import {
 	getStoredFileRow,

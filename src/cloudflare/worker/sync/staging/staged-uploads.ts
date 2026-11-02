@@ -1,9 +1,9 @@
 import { fileRevisionGuard } from '../file-identity';
-import type { ObjectReference } from '../../storage-references';
+import type { ObjectReference } from '../../d1/storage-references';
 import { ENCRYPTION_STATE_SQL, EncryptionStateError, encryptionWriteGuard } from '../../encryption/state';
 import { validateEncryptionState, type EncryptionServerState } from '../../../../encryption/server-state';
 import { syncResetGenerationGuard } from '../reset-generation';
-import type { SqlGuard } from '../../db';
+import type { SqlGuard } from '../../d1/db';
 /** A publication lease. Cleanup may claim it after 24 hours, never before. */
 export const STAGED_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
 

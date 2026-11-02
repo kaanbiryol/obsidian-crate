@@ -6,7 +6,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleCreateReminder } from './routes/create';
 import { handleDeleteReminder, handleSetReminderCompleted, handleUpdateReminder } from './routes/existing-reminder';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import type { ReminderRecord } from '@/pwa/reminders/types';
 

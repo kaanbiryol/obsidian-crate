@@ -1,5 +1,5 @@
-import { corsHeaders, corsResponse } from '../../cors';
-import { sanitizePath } from '../../request-validation';
+import { corsHeaders, corsResponse } from '../../http/cors';
+import { sanitizePath } from '../../http/request-validation';
 import { isSyncRevision } from '../../../../protocol/sync-validation';
 import { storedObjectMatchesMetadata } from '../storage';
 import type { RemoteFileVersion } from '../../../../protocol/sync-types';

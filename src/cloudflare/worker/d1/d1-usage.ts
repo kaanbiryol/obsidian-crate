@@ -1,5 +1,5 @@
 import { D1_USAGE_HEADER, parseD1Usage, type D1Usage } from '@/protocol/d1-usage';
-import type { Env } from './types';
+import type { Env } from '../types';
 
 /**
  * Free-plan accounts can't query D1 after the daily read or write allowance

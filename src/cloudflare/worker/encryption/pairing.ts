@@ -3,9 +3,9 @@ import { decodeBase64Url, isEncryptionId } from '../../../encryption/encoding';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { ENCRYPTION_STATE_SQL } from './state';
 import type { AuthPrincipal } from '../auth/authenticate';
-import { corsResponse } from '../cors';
-import { readMaintenanceValue } from '../db';
-import { parseJsonObject } from '../request-validation';
+import { corsResponse } from '../http/cors';
+import { readMaintenanceValue } from '../d1/db';
+import { parseJsonObject } from '../http/request-validation';
 import { ReadingError } from '../reading/common';
 
 const PREFIX = 'crate_web_pairing:', END = 'crate_web_pairing;';

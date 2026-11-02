@@ -5,11 +5,11 @@ import {
 	generateVapidKeys,
 	serializeVapidKeys,
 } from 'web-push-browser';
-import { queryRows } from '../db';
+import { queryRows } from '../d1/db';
 import { sendPushNotificationWithoutContact } from './web-push';
 import { PUSH_RECIPIENT_AUTHORITY } from './recipient-authority';
 import { parseEncryptedNotification, type EncryptedNotification } from '../../../encryption/notification-format';
-import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../platform-limits';
+import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../d1/platform-limits';
 
 interface SerializedVapidKeys {
 	publicKey: string;

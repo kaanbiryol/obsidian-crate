@@ -1,6 +1,6 @@
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { isWirePath } from '../../../protocol/encrypted-path';
-import { putMaintenanceValue, readMaintenanceValue } from '../db';
+import { putMaintenanceValue, readMaintenanceValue } from '../d1/db';
 
 const PREFIX = 'e2ee:folder:';
 const MAX_LABEL_LENGTH = 8192;

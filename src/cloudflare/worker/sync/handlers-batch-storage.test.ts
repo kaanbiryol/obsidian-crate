@@ -10,7 +10,7 @@ import {
 	handlePutSettings,
 } from './index';
 import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
-import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../platform-limits';
+import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../d1/platform-limits';
 
 async function responseJson(response: Response): Promise<unknown> {
 	return response.json() as Promise<unknown>;

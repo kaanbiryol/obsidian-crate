@@ -1,6 +1,6 @@
 import { runNotificationCoordinator } from './coordinator';
 import type { Env } from '../types';
-import { isD1DailyLimitError, nextD1DailyReset } from '../d1-usage';
+import { isD1DailyLimitError, nextD1DailyReset } from '../d1/d1-usage';
 
 const RUN_KEY = 'notificationRun';
 const MAX_RUN_AGE_MS = 24 * 60 * 60 * 1000;

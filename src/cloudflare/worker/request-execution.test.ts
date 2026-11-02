@@ -14,8 +14,8 @@ vi.mock('./router', () => ({
 	handleAuthenticatedRoute: vi.fn(),
 	isAuthenticatedRouteAllowed: vi.fn(() => true),
 }));
-vi.mock('./rate-limit', () => ({ limitNotificationRequest: vi.fn(async () => null) }));
-vi.mock('./auth/admission-state', () => ({ rememberAuthenticatedRequest: vi.fn() }));
+vi.mock('./admission/rate-limit', () => ({ admitApiRequest: vi.fn(async () => null) }));
+vi.mock('./admission/admission-state', () => ({ rememberAuthenticatedRequest: vi.fn() }));
 vi.mock('./sync/transfer-dispatch', () => ({ forwardTransferRequest: vi.fn() }));
 
 const env = { DB: {} } as Env;

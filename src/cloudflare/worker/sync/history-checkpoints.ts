@@ -2,16 +2,16 @@ import { CHECKPOINT_RETENTION_MS, MAX_CHECKPOINT_BYTES, MAX_CHECKPOINT_FILES, MA
 	parseSharedCheckpointList, type SharedCheckpoint } from '../../../protocol/history-checkpoints';
 import type { FileEntry } from '../../../protocol/sync-types';
 import { portablePathKey } from '../../../protocol/portable-path';
-import { corsHeaders, corsResponse } from '../cors';
+import { corsHeaders, corsResponse } from '../http/cors';
 import { fileTransportLimit } from '../../../encryption/file-format';
 import { storedObjectMatchesMetadata } from './storage';
-import { sanitizePath } from '../request-validation';
+import { sanitizePath } from '../http/request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
-import { putMaintenanceValue, readMaintenanceValue } from '../db';
+import { putMaintenanceValue, readMaintenanceValue } from '../d1/db';
 import { FILE_HASH_HEADER } from '../../../protocol/http-headers';
 import { SHARED_CHECKPOINT_AT_KEY } from './file-publication-statements';
-import { R2_KEYS_PER_CALL } from '../platform-limits';
+import { R2_KEYS_PER_CALL } from '../d1/platform-limits';
 
 const PREFIX = HISTORY_CHECKPOINT_PREFIX;
 // Ten pages, plus one empty read at exactly the file limit, cover the largest

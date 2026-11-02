@@ -2,29 +2,29 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import { applySchema } from './test-support/schema-test-harness';
-import worker from './index';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol/server-info';
-import { limitNotificationRequest, limitNotificationAction } from './rate-limit';
-import { sha256Hex } from '../../platform/sha256';
+import { applySchema } from '../test-support/schema-test-harness';
+import worker from '../index';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
+import { admitApiRequest, chargeRouteAction } from './rate-limit';
+import { sha256Hex } from '../../../platform/sha256';
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 const request = (path = 'test') => new Request(`https://test/notifications/${path}`, { method: 'POST' });
 it('rejects arbitrary routes and edge-denied traffic without touching D1', async () => {
 	const prepare = vi.spyOn(env.DB, 'prepare');
 	const edge = { limit: vi.fn(async () => ({ success: false })) };
-	for (let index = 0; index < 100; index++) expect((await limitNotificationRequest(request(`unknown-${index}`), env.DB, edge))?.status).toBe(404);
+	for (let index = 0; index < 100; index++) expect((await admitApiRequest(request(`unknown-${index}`), env.DB, edge))?.status).toBe(404);
 	expect(edge.limit).not.toHaveBeenCalled();
-	for (let index = 0; index < 100; index++) expect((await limitNotificationRequest(request(), env.DB, edge))?.status).toBe(429);
+	for (let index = 0; index < 100; index++) expect((await admitApiRequest(request(), env.DB, edge))?.status).toBe(429);
 	expect(prepare).not.toHaveBeenCalled();
 });
 it('stops incrementing per-action counters for denied requests and resets an expired window', async () => {
-		for (let index = 0; index < 3; index++) expect(await limitNotificationAction(request(), env.DB, 'actor')).toBeNull();
-	for (let index = 0; index < 100; index++) expect((await limitNotificationAction(request(), env.DB, 'actor'))?.status).toBe(429);
+		for (let index = 0; index < 3; index++) expect(await chargeRouteAction(request(), env.DB, 'actor')).toBeNull();
+	for (let index = 0; index < 100; index++) expect((await chargeRouteAction(request(), env.DB, 'actor'))?.status).toBe(429);
 	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key NOT LIKE 'notification-daily:%'").first()).toEqual({ count: 3 });
 	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key = ?").bind(await dailyKey('actor')).first()).toEqual({ count: 3 });
 	await env.DB.prepare('UPDATE request_rate_limits SET expires_at = 0').run();
-	expect(await limitNotificationAction(request(), env.DB, 'actor')).toBeNull();
+	expect(await chargeRouteAction(request(), env.DB, 'actor')).toBeNull();
 	expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key NOT LIKE 'notification-daily:%'").first()).toEqual({ count: 1 });
 });
 
@@ -34,11 +34,11 @@ const exhaust = async (actor: string, count = 999) => env.DB.prepare('INSERT INT
 
 it('caps daily admissions across rotating addresses without growing or updating denied counters', async () => {
 	await exhaust('actor');
-	expect(await limitNotificationAction(request(), env.DB, 'actor')).toBeNull();
+	expect(await chargeRouteAction(request(), env.DB, 'actor')).toBeNull();
 	const rows = (await env.DB.prepare('SELECT * FROM request_rate_limits ORDER BY key').all()).results;
 	for (let index = 0; index < 100; index++) {
 		const attempt = request(); attempt.headers.set('CF-Connecting-IP', `192.0.2.${index}`);
-		const denied = await limitNotificationAction(attempt, env.DB, 'actor');
+		const denied = await chargeRouteAction(attempt, env.DB, 'actor');
 		expect(denied?.status).toBe(429);
 		expect(Number(denied?.headers.get('Retry-After'))).toBeGreaterThan(60);
 	}
@@ -55,7 +55,7 @@ it('one credential cannot spend the daily budget of any other credential', async
 	for (let minute = 0; ; minute++) {
 		let denied: Response | null = null;
 		for (let index = 0; index < 60 && !denied; index++) {
-			denied = await limitNotificationAction(subscribe(index % 2 ? 'DELETE' : 'POST'), env.DB, 'stolen');
+			denied = await chargeRouteAction(subscribe(index % 2 ? 'DELETE' : 'POST'), env.DB, 'stolen');
 			if (!denied) admitted++;
 		}
 		if (denied) { expect(await denied.json()).toMatchObject({ error: expect.stringContaining('daily') as string }); break; }
@@ -64,7 +64,7 @@ it('one credential cannot spend the daily budget of any other credential', async
 	}
 	expect(admitted).toBe(1000);
 	// Other web app sessions and the vault's administration keep their own budgets.
-	expect(await limitNotificationAction(subscribe('POST'), env.DB, 'other')).toBeNull();
+	expect(await chargeRouteAction(subscribe('POST'), env.DB, 'other')).toBeNull();
 	const post = (path: string, body: unknown) => worker.fetch(new Request(`https://test${path}`, {
 		method: 'POST', headers: { Authorization: 'Bearer owner', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current), 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 	}), { ...env, NOTIFICATION_REQUEST_LIMITER: { limit: async () => ({ success: true }) } });
@@ -88,14 +88,14 @@ it('invalid bearers and enrollment grants cannot spend authenticated capacity', 
 
 it('an exhausted exchange budget cannot deny an authenticated management action', async () => {
 	await env.DB.prepare("INSERT INTO request_rate_limits(key,count,expires_at) VALUES ('notification-exchange-daily',1000,?)").bind(Date.now()+86400000).run();
-	expect(await limitNotificationAction(request('reminders-enrollment-token'),env.DB,'owner')).toBeNull();
+	expect(await chargeRouteAction(request('reminders-enrollment-token'),env.DB,'owner')).toBeNull();
 });
 
 it('edge keys separate senders without placing raw addresses in the key', async () => {
 	const edge = {limit: vi.fn(async () => ({success:true}))};
 	for (const address of ['192.0.2.1','192.0.2.2']) {
 		const attempt=request(); attempt.headers.set('CF-Connecting-IP',address);
-		expect(await limitNotificationRequest(attempt,env.DB,edge)).toBeNull();
+		expect(await admitApiRequest(attempt,env.DB,edge)).toBeNull();
 	}
 	expect(edge.limit.mock.calls[0]).not.toEqual(edge.limit.mock.calls[1]);
 	expect(JSON.stringify(edge.limit.mock.calls)).not.toContain('192.0.2.');

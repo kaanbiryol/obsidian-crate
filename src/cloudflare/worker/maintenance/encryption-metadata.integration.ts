@@ -7,7 +7,7 @@ import { createEncryptionFixture, storeEncryptionState } from '../test-support/e
 import { DESCRIPTOR_CLEANUP_PAGE, pruneEncryptionMetadata, releaseExpiredVersionDescriptors, releasePrunedChangelogDescriptors } from './encryption-metadata';
 import { enqueueExpiredFileVersions } from './object-cleanup';
 import { runMaintenanceEpisode } from './lifecycle';
-import { pruneChangelog } from '../db';
+import { pruneChangelog } from '../d1/db';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
@@ -16,7 +16,7 @@ import { commitStagedFile } from '../sync/mutations';
 import { commitNewFiles } from '../sync/staging/bulk-new-file-commit';
 import { getStoredFileRow } from '../sync/storage';
 import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
-import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
+import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 
 beforeEach(async () => {
 	await applySchema(env.DB);

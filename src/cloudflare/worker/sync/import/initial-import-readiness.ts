@@ -1,5 +1,5 @@
-import { corsResponse } from '../../cors';
-import { parseJsonObject } from '../../request-validation';
+import { corsResponse } from '../../http/cors';
+import { parseJsonObject } from '../../http/request-validation';
 import { REMINDER_CACHE_PARSER_VERSION } from '../../reminders/cache/types';
 import { reminderSourceIssueCode } from '../../reminders/source-parse';
 import { REMINDER_SETUP_PROGRESS_CAP } from '@/protocol/initial-import';

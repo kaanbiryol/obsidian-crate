@@ -1,11 +1,11 @@
-import { meterD1Usage } from '../d1-usage';
+import { meterD1Usage } from '../d1/d1-usage';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { CHANGELOG_BOUNDS_SQL } from './storage';
-import { findReferencedStorageKeys } from '../storage-references';
+import { findReferencedStorageKeys } from '../d1/storage-references';
 
 beforeEach(async () => {
 	await applySchema(env.DB);

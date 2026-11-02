@@ -1,17 +1,17 @@
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
-import { corsResponse } from '../cors';
-import { parseJsonObject } from '../request-validation';
+import { corsResponse } from '../http/cors';
+import { parseJsonObject } from '../http/request-validation';
 import { hasEncryptionAuthority, readEncryptionState, saveEncryptionState } from './state';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
 import { validateEncryptionState, type EncryptionServerState, type ResetReceipt } from '../../../encryption/server-state';
 import { isSha256Hex } from '../../../platform/validation';
-import { drainNotificationCancellations } from '../notifications/outbox';
+import { cancelAllNotificationJobs, drainNotificationCancellations } from '../notifications/outbox';
 import { sha256Hex } from '../../../platform/sha256';
-import { putMaintenanceValue, readMaintenanceValue } from '../db';
-import { saveServerState } from '../server-state';
-import { R2_KEYS_PER_CALL } from '../platform-limits';
+import { putMaintenanceValue, readMaintenanceValue } from '../d1/db';
+import { saveServerState } from '../d1/server-state';
+import { R2_KEYS_PER_CALL } from '../d1/platform-limits';
 
 const PREFIX = 'encryption-reset:';
 // Marks a reset that turns encryption on: completion activates the saved state instead of removing it.
@@ -72,10 +72,7 @@ export async function handleEncryptionReset(request: Request, env: Env, principa
 		// Invalidate the Reading generation and grants in the same transaction as
 		// device revocation. Late extraction cannot publish into a replacement policy.
 		...READING_TABLES.map(table => env.DB.prepare(`DELETE FROM ${table}`)),
-		env.DB.prepare(`INSERT INTO notification_jobs(reminder_id, job_token, operation, available_at)
-			SELECT reminder_id, lower(hex(randomblob(16))), 'cancel', 0 FROM scheduled_reminders WHERE 1
-			ON CONFLICT(reminder_id) DO UPDATE SET operation = 'cancel', job_token = excluded.job_token, payload_json = NULL, available_at = 0`),
-		env.DB.prepare("UPDATE notification_jobs SET operation = 'cancel', payload_json = NULL, available_at = 0"),
+		...cancelAllNotificationJobs(env.DB),
 		// Keep cleanup authority for an R2 put that finishes after the reset.
 		env.DB.prepare("UPDATE staged_uploads SET state = 'deleting'"),
 		env.DB.prepare("UPDATE staged_upload_batches SET state = 'deleting'"),

@@ -1,7 +1,7 @@
 import { portablePathKey } from '../../../../protocol/portable-path';
 import { readInitialImport } from './initial-import';
-import { corsResponse } from '../../cors';
-import { parseJsonObject, sanitizePath } from '../../request-validation';
+import { corsResponse } from '../../http/cors';
+import { parseJsonObject, sanitizePath } from '../../http/request-validation';
 import { isSha256Hex } from '../../../../platform/validation';
 import { readingIndexStatements } from '../../reading/library-index';
 

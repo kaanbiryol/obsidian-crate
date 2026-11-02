@@ -1,4 +1,4 @@
-import type { NotificationRateLimiter } from './rate-limit';
+import type { NotificationRateLimiter } from './admission/rate-limit';
 export interface Env {
 	/** Local-only native public-network binding. Hosted deployments use strictly public global fetch. */
 	READING_FETCH?: { fetch(request: Request): Promise<Response> };

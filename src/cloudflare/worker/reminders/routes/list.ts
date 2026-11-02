@@ -1,5 +1,5 @@
-import { corsHeaders, corsResponse } from '../../cors';
-import { listStoredMarkdownFileMetadataByPrefix } from '../../storage';
+import { corsHeaders, corsResponse } from '../../http/cors';
+import { listStoredMarkdownFileMetadataByPrefix } from '../../sync/markdown-files';
 import type { Env } from '../../types';
 import { parseFolderPath } from '../requests';
 import {
@@ -10,7 +10,7 @@ import {
 import { loadReminderFileCache } from '../cache/load';
 import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
-import { changedPathsSince, deltaBase, parseChangeEtags, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../../vault-change-token';
+import { changedPathsSince, deltaBase, parseChangeEtags, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../../sync/change-token';
 import { sha256Hex } from '../../../../platform/sha256';
 
 export async function handleListReminders(request: Request, env: Env): Promise<Response> {

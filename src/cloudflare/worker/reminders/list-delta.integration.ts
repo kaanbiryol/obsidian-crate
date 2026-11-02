@@ -7,7 +7,7 @@ import { handleListReminders } from './routes/list';
 import { revalidateReminderSources } from './source-migration';
 import { commitFileDelete } from '../sync/mutations';
 import { getStoredFileRow } from '../sync/storage';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { readReminderListBody } from '@/pwa/reminders/reminder-api';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { drainNotificationProjections } from '../notifications/projection';

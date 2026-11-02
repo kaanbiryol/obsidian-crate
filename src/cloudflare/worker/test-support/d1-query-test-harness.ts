@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { countD1Queries, type D1QueryCount } from '../d1-query-count';
+import { countD1Queries, type D1QueryCount } from '../d1/d1-query-count';
 
 /** Counts queries made through the `db` binding itself, for code that reads it
  * directly, until mocks are restored. The test isolate also runs the coordinator,

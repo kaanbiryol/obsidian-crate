@@ -7,7 +7,7 @@ import { applySchema } from './test-support/schema-test-harness';
 import worker from './index';
 import { handleSubscribe, handleUnsubscribe } from './notifications/subscription-handlers';
 import { isValidPushEndpoint } from './notifications/push-endpoint';
-import { writeCommittedMarkdownFile } from './storage';
+import { writeCommittedMarkdownFile } from './sync/markdown-files';
 import { makeApiFetch } from '@/pwa/connection/api-fetch';
 import { performPwaLogout } from '@/pwa/connection/usePwaSessionLifecycle';
 import { invalidatePwaSession } from '@/pwa/connection/session-generation';

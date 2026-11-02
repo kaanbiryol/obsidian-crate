@@ -1,4 +1,4 @@
-import { queryRows } from '../db';
+import { queryRows } from '../d1/db';
 import { parseEncryptedNotification } from '../../../encryption/notification-format';
 
 /** Reminder alarms never deliver an occurrence this long after its due time. */

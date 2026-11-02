@@ -4,13 +4,13 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleNotificationPolicy } from './policy';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { runNotificationCoordinator } from './coordinator';
 import { dispatchNotificationJobs } from './outbox';
 import { armNotificationCoordinator } from './lifecycle';
 import { runCoordinatorAlarm } from '../coordinator/coordinator-alarms';
 import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
-import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
+import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 
 // Delivery runs in its own Durable Object invocation with a separate budget.

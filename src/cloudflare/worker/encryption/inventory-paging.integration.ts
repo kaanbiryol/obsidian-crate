@@ -7,7 +7,7 @@ import { createEncryptionFixture, storeEncryptionState } from '../test-support/e
 import { ENCRYPTED_INVENTORY_PAGE } from '../../../encryption/file-inventory';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { handleEncryptedFolderFiles } from './encrypted-folder-files';
-import { meterD1Usage } from '../d1-usage';
+import { meterD1Usage } from '../d1/d1-usage';
 
 const FILES = 2500;
 

@@ -251,7 +251,7 @@ coordinator forwarding remain explicit choices without fallback defaults.
 explicit JSON metadata. Direct `commitStagedFile` callers retain transaction-local
 effects for atomic domain receipts.
 
-`cloudflare/worker/operation-receipts.ts` owns the shared retry floor and window check used by
+`cloudflare/worker/d1/operation-receipts.ts` owns the shared retry floor and window check used by
 Reminders, Reading, uploads and encryption recovery. Its persisted
 `reminder_operation_floor` key remains unchanged. `maintenance/operation-receipts.ts`
 publishes that floor and prunes receipts in the same transaction, and coordinates

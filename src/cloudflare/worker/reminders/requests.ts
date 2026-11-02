@@ -1,6 +1,6 @@
 import { normalizeReminderProjectPath } from '@/reminders/core/reminderProjectPath';
-import { corsResponse } from '../cors';
-import { parseOptionalString, sanitizePath } from '../request-validation';
+import { corsResponse } from '../http/cors';
+import { parseOptionalString, sanitizePath } from '../http/request-validation';
 import type { ReminderMutationWorkspace } from './types';
 import { isMarkdownNoteInFolder } from '../../../protocol/note-paths';
 

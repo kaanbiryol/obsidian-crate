@@ -4,10 +4,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { listStoredMarkdownFileMetadataByPrefix } from '../storage';
+import { listStoredMarkdownFileMetadataByPrefix } from './markdown-files';
 import { beginInitialImport } from './import/initial-import';
 import { pruneInitialImport } from './import/initial-import-prune';
-import { meterD1Usage } from '../d1-usage';
+import { meterD1Usage } from '../d1/d1-usage';
 
 async function initialize() {
 	await applySchema(env.DB);

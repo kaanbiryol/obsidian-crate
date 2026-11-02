@@ -9,7 +9,7 @@ import { pruneReadingRemovals } from './library-index';
 import { READING_LIST_PAGE } from './queries';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { commitFileDelete } from '../sync/mutations';
 import { getStoredFileRow } from '../sync/storage';
 import { createReadingNote } from '@/reading/core/notes';

@@ -7,7 +7,7 @@ import { beginInitialImport, finishInitialImport } from './initial-import';
 import { uploadInitialFiles } from './initial-import-upload';
 import { pruneInitialImport } from './initial-import-prune';
 import { importInventoryPages, INITIAL_IMPORT_MAX_FILES, INITIAL_IMPORT_VERIFY_PAGE } from '@/protocol/initial-import';
-import { meterD1Usage } from '../../d1-usage';
+import { meterD1Usage } from '../../d1/d1-usage';
 import { meterD1Writes } from '../../test-support/d1-write-meter-test-harness';
 import { handleGetChanges, handleGetManifest } from '../metadata-handlers';
 import { revalidateReminderSources } from '../../reminders/source-migration';
@@ -18,7 +18,7 @@ import { SyncTestDevice } from '../../test-support/sync-engine-test-harness';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { sha256Hex } from '@/platform/sha256';
 import { installD1QueryCounter } from '../../test-support/d1-query-test-harness';
-import { D1_QUERIES_PER_INVOCATION } from '../../platform-limits';
+import { D1_QUERIES_PER_INVOCATION } from '../../d1/platform-limits';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {

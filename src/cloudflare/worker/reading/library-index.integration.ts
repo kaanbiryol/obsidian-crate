@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { createReadingNote, updateReadingNote } from '@/reading/core/notes';
 import { writeCommittedMarkdownMove } from '../sync/atomic-markdown-move';
 import { commitFileDelete } from '../sync/mutations';

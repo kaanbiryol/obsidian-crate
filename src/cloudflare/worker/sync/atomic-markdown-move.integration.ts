@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile, FileVersionConflictError } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile, FileVersionConflictError } from './markdown-files';
 import { writeCommittedMarkdownMove } from './atomic-markdown-move';
 import { getStoredFileRow } from './storage';
 import { FileNamespaceConflictError } from './file-namespace';

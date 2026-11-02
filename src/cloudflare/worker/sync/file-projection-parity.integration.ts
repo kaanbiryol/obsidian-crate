@@ -8,7 +8,7 @@ import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { commitNewFiles } from './staging/bulk-new-file-commit';
 import { commitStagedFile } from './mutations';
 import { handleBatchUpload } from './batch/upload';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from './markdown-files';
 import { commitCoordinatedUpload, coordinatedUpload, prepareCoordinatedUpload } from './staging/staged-upload-dispatch';
 import { commitCoordinatedNewFiles, coordinatedNewFiles, prepareCoordinatedNewFiles } from './staging/bulk-upload-dispatch';
 import { COORDINATOR_PATHS } from '../coordinator/coordinator';

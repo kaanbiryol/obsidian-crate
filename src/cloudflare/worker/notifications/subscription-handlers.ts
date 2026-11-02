@@ -1,10 +1,10 @@
-import { featureEnabled } from '../feature-policy';
+import { featureEnabled } from '../server/feature-policy';
 import { getNotificationPolicy } from './policy';
 import { isValidPushEndpoint } from './push-endpoint';
-import { corsResponse } from '../cors';
-import { changedRows, queryRows } from '../db';
+import { corsResponse } from '../http/cors';
+import { changedRows, queryRows } from '../d1/db';
 import { sendToAllSubscriptions } from './push';
-import { parseJsonObject, parseOptionalString } from '../request-validation';
+import { parseJsonObject, parseOptionalString } from '../http/request-validation';
 
 export async function handleSubscribe(request: Request, db: D1Database, ownerTokenId: string): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);

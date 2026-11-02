@@ -1,4 +1,4 @@
-import type { ObjectReference } from '../storage-references';
+import type { ObjectReference } from '../d1/storage-references';
 import { STAGED_UPLOAD_TTL_MS } from '../sync/staging/staged-uploads';
 import { deleteClaimedObjects } from './staged-upload-cleanup';
 

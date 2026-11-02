@@ -3,10 +3,10 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, isEncryptedFile, parseEncryptedFile, type 
 import { fileRevisionGuard } from '../sync/file-identity';
 import { validateEncryptedSchedules } from '../../../encryption/notification-format';
 import { isWirePath } from '../../../protocol/encrypted-path';
-import { readServerState, saveServerState, serverStateValue } from '../server-state';
+import { readServerState, saveServerState, serverStateValue } from '../d1/server-state';
 import { isMarkdownPath } from '../../../protocol/note-paths';
-import { corsResponse } from '../cors';
-import type { SqlGuard } from '../db';
+import { corsResponse } from '../http/cors';
+import type { SqlGuard } from '../d1/db';
 
 /** The stored state JSON, or NULL for a plaintext vault. */
 export const ENCRYPTION_STATE_SQL = serverStateValue('encryption');

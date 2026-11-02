@@ -1,6 +1,6 @@
 import { handleCoordinatorRequest } from './coordinator-requests';
 import { runCoordinatorAlarm } from './coordinator-alarms';
-import { withD1Usage } from '../d1-usage';
+import { withD1Usage } from '../d1/d1-usage';
 import type { Env } from '../types';
 import { deliverScheduledReminder, handleReminderScheduleRequest, type ReminderScheduleContext } from '../notifications/reminder-schedule';
 

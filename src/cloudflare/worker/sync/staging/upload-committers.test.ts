@@ -1,5 +1,5 @@
 import { expectTypeOf, it } from 'vitest';
-import type { CommitEffects } from '../../commit-effects';
+import type { CommitEffects } from '../commit-effects';
 import type { commitStagedFile, StagedFileCommitInput } from '../mutations';
 import type { UploadCommitInput, UploadCommitters } from './upload-committers';
 

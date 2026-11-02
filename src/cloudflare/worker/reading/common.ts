@@ -1,7 +1,7 @@
-import { featureEnabled, parseStoredFeaturePolicy } from '../feature-policy';
+import { featureEnabled, parseStoredFeaturePolicy } from '../server/feature-policy';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
-import { corsHeaders, corsResponse } from '../cors';
+import { corsHeaders, corsResponse } from '../http/cors';
 import { getStoredFileRow, readVerifiedBytes, type FileStorageRow } from '../sync/storage';
 import { MAX_READING_BYTES } from '@/reading/core/model';
 import { parseReadingNote } from '@/reading/core/notes';

@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleListReminders } from './routes/list';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { createVaultKeyBundle } from '@/encryption/key-bundle';
 import { importEncryptionSecret } from '@/encryption/envelope';
 import { importNotificationFingerprintKey } from '@/encryption/reminder-projection';

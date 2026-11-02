@@ -1,5 +1,5 @@
-import { serverStateValue } from '../server-state';
-import type { SqlGuard } from '../db';
+import { serverStateValue } from '../d1/server-state';
+import type { SqlGuard } from '../d1/db';
 
 /** Public uploads carry the generation read in the authentication query (null
  * before the first reset). Check it in the same transaction as staging/publishing.

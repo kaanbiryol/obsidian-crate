@@ -1,5 +1,5 @@
-import { featureEnabled } from '../feature-policy';
-import { queryRows } from '../db';
+import { featureEnabled } from '../server/feature-policy';
+import { queryRows } from '../d1/db';
 import type { Env } from '../types';
 import { cancelReminderDelivery, dispatchNotifications, scheduleReminderDelivery } from '../coordinator/coordinator';
 
@@ -90,4 +90,24 @@ export async function drainNotificationJobs(env: Env, limit = OUTBOX_BATCH_SIZE,
 	for (let offset = 0; offset < jobs.length; offset += 5) {
 		await env.DB.batch(await Promise.all(jobs.slice(offset, offset + 5).map(job => runNotificationJob(env, job))));
 	}
+}
+
+/** Wakes dormant alarms when reminders turn back on, without replacing occurrence
+ * identity or recipient progress. The caller runs it in its own batch. */
+export function resumeScheduledReminderJobs(db: D1Database): D1PreparedStatement {
+	return db.prepare(`INSERT INTO notification_jobs(reminder_id,job_token,operation,payload_json,available_at)
+      SELECT reminder_id,schedule_token,'schedule',json_object('reminderId',reminder_id,'content',content,'project',project,'dueDatetime',due_datetime,'resume',json('true')),0
+      FROM scheduled_reminders WHERE delivery_failed_at IS NULL
+      ON CONFLICT(reminder_id) DO NOTHING`);
+}
+
+/** Turns every scheduled reminder and queued job into an immediate cancellation, as
+ * when the vault's devices are reset. The caller runs them in its own batch. */
+export function cancelAllNotificationJobs(db: D1Database): D1PreparedStatement[] {
+	return [
+		db.prepare(`INSERT INTO notification_jobs(reminder_id, job_token, operation, available_at)
+			SELECT reminder_id, lower(hex(randomblob(16))), 'cancel', 0 FROM scheduled_reminders WHERE 1
+			ON CONFLICT(reminder_id) DO UPDATE SET operation = 'cancel', job_token = excluded.job_token, payload_json = NULL, available_at = 0`),
+		db.prepare("UPDATE notification_jobs SET operation = 'cancel', payload_json = NULL, available_at = 0"),
+	];
 }

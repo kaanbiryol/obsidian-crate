@@ -1,9 +1,9 @@
-import { corsResponse } from '../cors';
-import { parseOptionalString } from '../request-validation';
+import { corsResponse } from '../http/cors';
+import { parseOptionalString } from '../http/request-validation';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../../../protocol/web-session';
 import { validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { sha256Hex } from '../../../platform/sha256';
-import { isD1DailyLimitError } from '../d1-usage';
+import { isD1DailyLimitError } from '../d1/d1-usage';
 
 type AuthScope = 'vault' | 'reminders' | 'reading' | 'reading_capture';
 

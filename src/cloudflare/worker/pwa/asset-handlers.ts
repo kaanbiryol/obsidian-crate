@@ -1,4 +1,4 @@
-import { corsHeaders } from '../cors';
+import { corsHeaders } from '../http/cors';
 import {
 	APPLE_TOUCH_ICON_180_PNG,
 	CRATE_ICON_192_PNG,

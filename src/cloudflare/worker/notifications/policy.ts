@@ -1,9 +1,9 @@
 import { validateReadingFolder } from '@/reading/settings';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import type { NotificationPolicy } from '../../../protocol/notification-policy';
-import { changedRows } from '../db';
-import { corsResponse } from '../cors';
-import { parseJsonObject } from '../request-validation';
+import { changedRows } from '../d1/db';
+import { corsResponse } from '../http/cors';
+import { parseJsonObject } from '../http/request-validation';
 import { parseFolderPath } from '../reminders/requests';
 import { readEncryptionState } from '../encryption/state';
 import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';

@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from './test-support/schema-test-harness';
 import worker from './index';
-import { writeCommittedMarkdownFile } from './storage';
+import { writeCommittedMarkdownFile } from './sync/markdown-files';
 import { createReminderOperationId } from '../../protocol/reminder-operation';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol/server-info';
 import { sha256Hex } from '../../platform/sha256';

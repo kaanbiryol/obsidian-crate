@@ -1,10 +1,10 @@
-import { limitNotificationAction } from '../rate-limit';
+import { chargeRouteAction } from '../admission/rate-limit';
 import { parseFolderPath } from '../reminders/requests';
-import { corsResponse } from '../cors';
+import { corsResponse } from '../http/cors';
 import { getOrCreateVapidKeys } from './push';
-import { parseJsonObject, parseOptionalString } from '../request-validation';
+import { parseJsonObject, parseOptionalString } from '../http/request-validation';
 import { issueWebEnrollmentToken } from '../auth/web-enrollment';
-import { changedRows } from '../db';
+import { changedRows } from '../d1/db';
 import { sha256Hex } from '../../../platform/sha256';
 import { createRandomHexToken } from '../../../platform/random-hex';
 import { readEncryptionState } from '../encryption/state';
@@ -56,7 +56,7 @@ export async function handleExchangeRemindersEnrollmentToken(
 	const enrollmentHash = await sha256Hex(token);
 	const grant = await db.prepare('SELECT token_hash FROM web_enrollment_tokens WHERE token_hash = ? AND expires_at > ?').bind(enrollmentHash, Date.now()).first();
 	if (!grant) return corsResponse({ error: 'Invalid or expired enrollment token' }, 401);
-	const limited = await limitNotificationAction(request, db, `enrollment:${enrollmentHash}`);
+	const limited = await chargeRouteAction(request, db, `enrollment:${enrollmentHash}`);
 	if (limited) return limited;
 	const id = crypto.randomUUID();
 	const expiresAt = Date.now() + REMINDERS_AUTH_TOKEN_TTL_MS;

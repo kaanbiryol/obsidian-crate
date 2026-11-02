@@ -1,4 +1,4 @@
-import { queryRows } from '../../db';
+import { queryRows } from '../../d1/db';
 import type { RemoteReminderRecord } from '../types';
 import {
 	REMINDER_CACHE_PARSER_VERSION,

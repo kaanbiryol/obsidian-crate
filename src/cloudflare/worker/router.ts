@@ -1,9 +1,9 @@
-import { featureEnabled, parseStoredFeaturePolicy } from './feature-policy';
+import { featureEnabled, parseStoredFeaturePolicy } from './server/feature-policy';
 import { handleReadingRoute } from './reading/routes';
 import { forwardToCoordinator } from './coordinator/coordinator';
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES } from '../../encryption/receipt-format';
-import { parseJsonObject } from './request-validation';
-import { limitNotificationAction } from './rate-limit';
+import { parseJsonObject } from './http/request-validation';
+import { chargeRouteAction } from './admission/rate-limit';
 import { handleAuthRoute } from './routes/auth';
 import { handleNotificationsRoute } from './routes/notifications';
 import { handlePublicRoute } from './routes/public';
@@ -12,7 +12,7 @@ import { handleServerRoute } from './routes/server';
 import { handleSyncRoute } from './routes/sync';
 import type { Env } from './types';
 import type { AuthPrincipal } from './auth/index';
-import { corsResponse } from './cors';
+import { corsResponse } from './http/cors';
 import { apiRoutePolicy } from './routes/policy';
 import { handleEncryptionRoute } from './routes/encryption';
 import type { EncryptionServerState } from '../../encryption/server-state';
@@ -70,7 +70,7 @@ export async function handleAuthenticatedRoute(
 	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, coordinatorState, encryption, featurePolicyValue,
 		coordinatorState ? undefined : () => forwardToCoordinator(env, request));
 	// Charged once for every remaining route.
-	const limited = await limitNotificationAction(request, env.DB, principal.tokenId);
+	const limited = await chargeRouteAction(request, env.DB, principal.tokenId);
 	if (limited) return limited;
 
 	return await handleEncryptionRoute(request, env, context)

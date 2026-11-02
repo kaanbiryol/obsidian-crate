@@ -1,8 +1,8 @@
 import { ENCRYPTION_METADATA_BATCH } from '../../../protocol/sync-limits';
 import { ENCRYPTION_FILE_PREFIX } from './state';
 import { validateFileDescriptor } from '../../../encryption/file-format';
-import { parseJsonObject } from '../request-validation';
-import { corsResponse } from '../cors';
+import { parseJsonObject } from '../http/request-validation';
+import { corsResponse } from '../http/cors';
 
 /** Published encryption descriptors for a batch of file revisions. */
 export async function handleEncryptionMetadata(request: Request, db: D1Database): Promise<Response> {

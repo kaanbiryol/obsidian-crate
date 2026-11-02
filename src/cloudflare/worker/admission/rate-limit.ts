@@ -1,13 +1,13 @@
-import { corsResponse } from './cors';
-import { requestAdmissionKind } from './routes/admission';
-import { rateLimitedActions } from './routes/policy';
-import { admitLocally, authenticatedAdmissionKey } from './auth/admission-state';
-import { sha256Hex } from '../../platform/sha256';
+import { corsResponse } from '../http/cors';
+import { requestAdmissionKind } from '../routes/admission';
+import { rateLimitedActions } from '../routes/policy';
+import { admitLocally, authenticatedAdmissionKey } from './admission-state';
+import { sha256Hex } from '../../../platform/sha256';
 
 export interface NotificationRateLimiter { limit(input: { key: string }): Promise<{ success: boolean }> }
 const denied = () => corsResponse({ error: 'Too many requests. Try again in a minute.' }, 429, { 'Retry-After': '60' });
 
-export async function limitNotificationRequest(request: Request, db: D1Database, limiter?: NotificationRateLimiter): Promise<Response | null> {
+export async function admitApiRequest(request: Request, db: D1Database, limiter?: NotificationRateLimiter): Promise<Response | null> {
 	const url = new URL(request.url);
 	if (request.method === 'OPTIONS') return null;
 	const kind = requestAdmissionKind(request);
@@ -33,7 +33,7 @@ export async function limitNotificationRequest(request: Request, db: D1Database,
 
 /** Charge only after a bearer or enrollment grant has been verified. Both
  * counters are conditional in one transaction; denied actions spend neither. */
-export async function limitNotificationAction(request: Request, db: D1Database, actor: string): Promise<Response | null> {
+export async function chargeRouteAction(request: Request, db: D1Database, actor: string): Promise<Response | null> {
 	const url = new URL(request.url);
 	const action = `${request.method} ${url.pathname}`;
 	const limit = rateLimitedActions.get(action);
@@ -61,7 +61,7 @@ export async function limitNotificationAction(request: Request, db: D1Database, 
 	if (results[0]?.results.length) return null;
 	const daily = await db.prepare('SELECT count, expires_at FROM request_rate_limits WHERE key = ?').bind(dailyKey).first<{count: number; expires_at: number}>();
 	if (daily && daily.expires_at > now && daily.count >= dailyLimit) {
-		return corsResponse({ error: 'The daily notification request budget is exhausted. Try again tomorrow.' }, 429,
+		return corsResponse({ error: 'The daily request budget is exhausted. Try again tomorrow.' }, 429,
 			{ 'Retry-After': String(Math.ceil((midnight - now) / 1000)) });
 	}
 	return denied();

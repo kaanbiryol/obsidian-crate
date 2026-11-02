@@ -1,7 +1,7 @@
 import { beginReminderOperation } from '../operations';
-import { corsResponse } from '../../cors';
+import { corsResponse } from '../../http/cors';
 import type { Env } from '../../types';
-import { parseJsonObject, parseOptionalString } from '../../request-validation';
+import { parseJsonObject, parseOptionalString } from '../../http/request-validation';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
 import { commitReminderCommand } from '../command';
 

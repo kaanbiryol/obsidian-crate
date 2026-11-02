@@ -24,7 +24,7 @@ import {
 	handlePwaVersion,
 	handleServiceWorker,
 } from '../pwa/asset-handlers';
-import { handleServerInfo } from '../server-info';
+import { handleServerInfo } from '../server/server-info';
 import { exchangeDevicePairing } from '../auth/device-pairing';
 import { DEVICE_PAIRING_PAGE, DEVICE_PAIRING_PATH } from '../../../protocol/device-pairing';
 import type { Env } from '../types';

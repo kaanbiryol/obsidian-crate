@@ -1,7 +1,7 @@
 import { trackStagedUpload } from '../staging/staged-uploads';
 import { beginUploadOperation } from '../upload-operations';
 import { isSyncRevision } from '@/protocol/sync-validation';
-import { corsResponse } from '../../cors';
+import { corsResponse } from '../../http/cors';
 import { commitStagedFile } from '../mutations';
 import { FileNamespaceConflictError } from '../file-namespace';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../../../encryption/file-format';
@@ -9,7 +9,7 @@ import {
 	storedObjectMatchesMetadata,
 } from '../storage';
 import { parseExpectedFileHash } from '../storage';
-import { parseJsonObject, parseOptionalString, sanitizePath } from '../../request-validation';
+import { parseJsonObject, parseOptionalString, sanitizePath } from '../../http/request-validation';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
 import { sha256Hex } from '@/platform/sha256';
 export { handleListFileVersions } from './list';

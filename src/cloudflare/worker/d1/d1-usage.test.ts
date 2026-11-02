@@ -10,7 +10,7 @@ it.each([
 });
 
 it.each([
-	'The daily notification request budget is exhausted. Try again tomorrow.',
+	'The daily request budget is exhausted. Try again tomorrow.',
 	'Request body exceeded configured limit',
 	'D1_ERROR: Exceeded maximum DB size',
 ])('leaves other failures alone: %s', message => {

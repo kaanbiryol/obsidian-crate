@@ -1,7 +1,7 @@
 import { FILE_PATH_MATCH, filePathArgs } from '../../sync/file-identity';
 import { portablePathKey } from '../../../../protocol/portable-path';
 import type { RemoteReminderRecord } from '../types';
-import { changedRows } from '../../db';
+import { changedRows } from '../../d1/db';
 import {
 	REMINDER_CACHE_MAX_VALUE_BYTES,
 	REMINDER_CACHE_PARSER_VERSION,

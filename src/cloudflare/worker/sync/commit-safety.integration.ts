@@ -11,7 +11,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleUpload, handleDownload } from './file-handlers';
 import { handleBatchUpload } from './batch/upload';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from './markdown-files';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
 import { drainObjectCleanupQueue } from '../maintenance/object-cleanup';
 import { FILE_VERSION_RETENTION_MS, getStoredFileRow } from './storage';

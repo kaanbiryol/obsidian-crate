@@ -1,5 +1,5 @@
 import { readingUrl } from '@/reading/core/model';
-import { parseJsonObject } from '../request-validation';
+import { parseJsonObject } from '../http/request-validation';
 import type { Env } from '../types';
 import { ReadingError, readingResponse } from './common';
 import { fetchReadingCapture } from './extraction/transport';

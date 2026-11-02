@@ -1,5 +1,5 @@
-import { changedRows } from '../db';
-import { OPERATION_FLOOR } from '../operation-receipts';
+import { changedRows } from '../d1/db';
+import { OPERATION_FLOOR } from '../d1/operation-receipts';
 import { pruneEncryptionPairings } from '../encryption/pairing';
 import { OPERATION_ID_TAG } from '../../../protocol/reminder-operation';
 

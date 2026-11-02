@@ -3,18 +3,18 @@ import { handleEncryptedFolderFiles } from '../encryption/encrypted-folder-files
 import { issueShortcutPairing, exchangeShortcutPairing } from './shortcut-pairing';
 import { shortcutTransport, validateShortcutBody } from './shortcut-transport';
 import { armNotificationCoordinator } from '../notifications/lifecycle';
-import { limitNotificationAction } from '../rate-limit';
+import { chargeRouteAction } from '../admission/rate-limit';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { parseJsonObject } from '../request-validation';
+import { parseJsonObject } from '../http/request-validation';
 import { policy, authority, readingResponse, ReadingError, readStoredNote, policyStatement, readingItemId, readingNotModified } from './common';
 import { prepareHandoff, updatePolicy, handoffAuthority, labelledPolicy } from './access';
 import { readFolderLabel } from '../encryption/folder-labels';
 import { mutateReading } from './mutations';
 import { extractForEncryptedReading } from './encrypted-extract';
 import { etagMatches, readingDeltaBase, readingItem, readingItemStatements, readingList, readingListDelta, readingListEtag, type ReadingItemRows } from './queries';
-import { parseDeltaBase } from '../vault-change-token';
+import { parseDeltaBase } from '../sync/change-token';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { completeReadingIndex, ensureReadingIndex, readingIndexStatement, type ReadingIndexRow } from './library-index';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
@@ -31,7 +31,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 		if (path.startsWith('/reading/encrypted-')) {
 			if (!principal || principal.scope === 'reading_capture') throw new ReadingError('Library access is required.', 403);
 			const current = await authority(env.DB, principal, featurePolicyValue);
-			const limited = await limitNotificationAction(request, env.DB, principal.tokenId); if (limited) return limited;
+			const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
 			if (path === '/reading/encrypted-extract' && request.method === 'POST') {
 				if (!encryption) throw new ReadingError('Article downloads here are only for encrypted Reading folders.', 409);
 				// As in unencrypted vaults, the web app then saves the link as a bookmark.
@@ -53,12 +53,12 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 		if (shortcut?.kind === 'exchange') return await exchangeShortcutPairing(env.DB, body, request);
 		if (path === '/reading/handoff' && request.method === 'POST') {
 			const handoff = await handoffAuthority(env.DB, request);
-			const limited = await limitNotificationAction(request, env.DB, handoff.principal.tokenId); if (limited) return limited;
+			const limited = await chargeRouteAction(request, env.DB, handoff.principal.tokenId); if (limited) return limited;
 			if (state) await armNotificationCoordinator(state);
 			return await mutateReading(env, handoff.principal, handoff.current, handoff.body, 'capture');
 		}
 		if (!principal) throw new ReadingError('Reading access is required.', 401);
-		const limited = await limitNotificationAction(request, env.DB, principal.tokenId); if (limited) return limited;
+		const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
 		if (path === '/reading/policy') {
 			if (principal.scope !== 'vault') throw new ReadingError('Open Crate settings in Obsidian to change Reading setup.', 403);
 			if (request.method === 'GET') return readingResponse({ policy: await labelledPolicy(env.DB, await policy(env.DB)) });

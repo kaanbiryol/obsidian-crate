@@ -1,7 +1,7 @@
 import { INITIAL_IMPORT_VERIFY_PAGE, type ImportInventoryEntry, type InitialImport } from '@/protocol/initial-import';
-import { queryRows, readMaintenanceValue } from '../../db';
-import { corsResponse } from '../../cors';
-import { parseJsonObject } from '../../request-validation';
+import { queryRows, readMaintenanceValue } from '../../d1/db';
+import { corsResponse } from '../../http/cors';
+import { parseJsonObject } from '../../http/request-validation';
 import { INITIAL_REMINDERS_PENDING } from './initial-import-readiness';
 import { encryptionWriteGuard } from '../../encryption/state';
 

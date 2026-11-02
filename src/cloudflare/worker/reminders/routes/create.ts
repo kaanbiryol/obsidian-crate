@@ -1,8 +1,8 @@
 import { assertReminderMutationInput, parseReminderRecurrenceInput } from '@/reminders/core/reminderMutationInput';
 import { beginReminderOperation } from '../operations';
-import { corsResponse } from '../../cors';
+import { corsResponse } from '../../http/cors';
 import type { Env } from '../../types';
-import { parseJsonObject } from '../../request-validation';
+import { parseJsonObject } from '../../http/request-validation';
 import {
 	hasNonEmptyStringValue,
 	parseProjectPath,

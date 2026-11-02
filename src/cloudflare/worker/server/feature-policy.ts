@@ -1,7 +1,8 @@
-import { corsResponse } from './cors';
-import { parseJsonObject } from './request-validation';
-import { parseFeaturePolicy, type FeaturePolicy } from '../../protocol/feature-policy';
-import { readServerState, saveServerState } from './server-state';
+import { corsResponse } from '../http/cors';
+import { parseJsonObject } from '../http/request-validation';
+import { parseFeaturePolicy, type FeaturePolicy } from '../../../protocol/feature-policy';
+import { readServerState, saveServerState } from '../d1/server-state';
+import { resumeScheduledReminderJobs } from '../notifications/outbox';
 
 export async function featurePolicy(db: D1Database): Promise<FeaturePolicy> {
 	return parseStoredFeaturePolicy(await readServerState(db, 'features'));
@@ -29,11 +30,7 @@ export async function handleFeaturePolicy(request: Request, db: D1Database): Pro
 	const next = { ...current, [String(feature)]: enabled, revision: crypto.randomUUID() };
 	await db.batch([
 		saveServerState(db, 'features', JSON.stringify(next)),
-		// Wake dormant alarms without replacing occurrence identity or recipient progress.
-		...(feature === 'reminders' && enabled && !current.reminders ? [db.prepare(`INSERT INTO notification_jobs(reminder_id,job_token,operation,payload_json,available_at)
-      SELECT reminder_id,schedule_token,'schedule',json_object('reminderId',reminder_id,'content',content,'project',project,'dueDatetime',due_datetime,'resume',json('true')),0
-      FROM scheduled_reminders WHERE delivery_failed_at IS NULL
-      ON CONFLICT(reminder_id) DO NOTHING`)] : []),
+		...(feature === 'reminders' && enabled && !current.reminders ? [resumeScheduledReminderJobs(db)] : []),
 	]);
 	return corsResponse(next, 200, { 'Cache-Control': 'no-store' });
 }

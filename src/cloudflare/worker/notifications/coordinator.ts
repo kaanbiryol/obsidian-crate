@@ -1,4 +1,4 @@
-import { parseStoredFeaturePolicy } from '../feature-policy';
+import { parseStoredFeaturePolicy } from '../server/feature-policy';
 import { scheduleReading } from '../reading/extraction/jobs';
 import { NEXT_NOTIFICATION_WORK_SQL, NEXT_SOURCE_RETRY_SQL } from './queue';
 import { NOTIFICATION_POLICY_COLUMNS, notificationPolicyFromRow, type NotificationPolicyRow } from './policy';
@@ -6,7 +6,7 @@ import type { Env } from '../types';
 import { drainNotificationProjections } from './projection';
 import { revalidateReminderSources, type VerifiedSourceBytes } from '../reminders/source-migration';
 import { ENCRYPTION_STATE_SQL, parseEncryptionState } from '../encryption/state';
-import { serverStateValue } from '../server-state';
+import { serverStateValue } from '../d1/server-state';
 
 type NotificationWork = { ready: number; projectionRetry: number | null; dispatchAt: number | null };
 

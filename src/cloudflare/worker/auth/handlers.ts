@@ -1,6 +1,6 @@
-import { corsResponse } from '../cors';
-import { queryRows } from '../db';
-import { parseJsonObject, parseOptionalString } from '../request-validation';
+import { corsResponse } from '../http/cors';
+import { queryRows } from '../d1/db';
+import { parseJsonObject, parseOptionalString } from '../http/request-validation';
 import { sha256Hex } from '../../../platform/sha256';
 
 /** Shortcut capture credentials record the credential that paired them in `device_id`,

@@ -448,7 +448,7 @@ const context = {
 
 ### Worker query budgets
 
-- Cloudflare limits live in `src/cloudflare/worker/platform-limits.ts`, with the docs
+- Cloudflare limits live in `src/cloudflare/worker/d1/platform-limits.ts`, with the docs
   they were checked against. Assert budgets against `D1_QUERIES_PER_INVOCATION`, not a literal.
 - Count queries as D1 does: one per `first`/`run`/`all` and one per `db.batch()`, whatever
   its size. Pass `countD1Queries(env.DB).db` to the one invocation under test, or use

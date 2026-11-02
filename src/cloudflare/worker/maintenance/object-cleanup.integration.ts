@@ -6,7 +6,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { runScheduledMaintenance } from './run';
 import { runMaintenanceEpisode } from './lifecycle';
 import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
-import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
+import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 
 beforeEach(async () => {
 	await applySchema(env.DB);

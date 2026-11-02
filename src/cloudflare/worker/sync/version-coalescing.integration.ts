@@ -9,7 +9,7 @@ import { createReminderOperationId } from '../../../protocol/reminder-operation'
 import type { RemoteFileVersion } from '../../../protocol/sync-types';
 import { sha256Hex } from '../../../platform/sha256';
 import { drainObjectCleanupQueue } from '../maintenance/object-cleanup';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from './markdown-files';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
 import { createSharedCheckpoint } from './history-checkpoints';
 import { SHARED_CHECKPOINT_AT_KEY } from './file-publication-statements';

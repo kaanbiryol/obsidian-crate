@@ -1,6 +1,6 @@
 import { PushPayloadError } from '../notifications/payload-budget';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../feature-policy', () => ({ featureEnabled: vi.fn(async () => true) }));
+vi.mock('../server/feature-policy', () => ({ featureEnabled: vi.fn(async () => true) }));
 import { ReminderAlarm } from './reminder-alarm';
 import { listPushSubscriptions, sendToAllSubscriptions } from '../notifications/push';
 

@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
-import { pruneChangelog } from '../db';
+import { pruneChangelog } from '../d1/db';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from '../maintenance/object-cleanup';
 
 const clients: SyncTestDevice[] = [];

@@ -15,8 +15,8 @@ import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import { revalidateReminderSources } from '../reminders/source-migration';
 import { drainNotificationProjections } from '../notifications/projection';
 import { runNotificationCoordinator } from '../notifications/coordinator';
-import { countD1Queries } from '../d1-query-count';
-import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
+import { countD1Queries } from '../d1/d1-query-count';
+import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });

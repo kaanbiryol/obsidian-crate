@@ -1,9 +1,9 @@
 import { portablePathKey } from '../../../protocol/portable-path';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
-import { queryRows } from '../db';
+import { queryRows } from '../d1/db';
 import { isSha256Hex } from '../../../platform/validation';
 import { sha256Hex } from '../../../platform/sha256';
-import { D1_MAX_BOUND_PARAMETERS } from '../platform-limits';
+import { D1_MAX_BOUND_PARAMETERS } from '../d1/platform-limits';
 export {
 	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
 	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,

@@ -13,7 +13,7 @@ import { commitFileDelete } from './mutations';
 import { getStoredFileRow } from './storage';
 import { sha256Hex } from '@/platform/sha256';
 import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
-import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
+import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 
 const secret = 'Private note content and Bearer credential';
 const path = 'Private folder/Confidential note.md';

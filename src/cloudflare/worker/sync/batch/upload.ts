@@ -4,7 +4,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../../encryption/file-format'
 import { trackStagedUploads } from '../staging/staged-uploads';
 import { trackStagedBatch } from '../staging/staged-upload-batches';
 import { beginUploadOperations } from '../upload-operations';
-import { corsResponse } from '../../cors';
+import { corsResponse } from '../../http/cors';
 import { FileNamespaceConflictError } from '../file-namespace';
 import { EncryptionStateError, validateUploadEncryption } from '../../encryption/state';
 import {

@@ -8,8 +8,8 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { handleBatchUpload } from './batch/upload';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
-import { countD1Queries } from '../d1-query-count';
-import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
+import { countD1Queries } from '../d1/d1-query-count';
+import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 import { BATCH_UPLOAD_MAX_FILES } from '@/protocol/sync-limits';
 
 beforeEach(async () => {

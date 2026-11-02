@@ -1,5 +1,5 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
-import { keepReplacedVersionSql, publishedChangelogStatement } from './file-publication-statements';
+import { deletedFileStatements, keepReplacedVersionSql, publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { ENCRYPTION_STATE_SQL, encryptionWriteGuard, parseEncryptionState, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
@@ -10,12 +10,12 @@ import { decodeReceipt, readUploadReceipt, recordUploadReceipt, type UploadOpera
 import type { UploadResult } from '@/protocol/sync-types';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { readingIndexStatements, type ReadingIndexPolicy } from '../reading/library-index';
-import type { CommitEffects } from '../commit-effects';
-import { allGuards, changedRows, type SqlGuard } from '../db';
+import type { CommitEffects } from './commit-effects';
+import { allGuards, changedRows, type SqlGuard } from '../d1/db';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { assertFileNamespaceAvailable, FileNamespaceConflictError, fileNamespaceGuard } from './file-namespace';
 import { findFileDeletionReceipt, recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
-import type { MutationAuditContext } from '../request-diagnostics';
+import type { MutationAuditContext } from '../http/request-diagnostics';
 import {
 	FILE_VERSION_EXPIRES_AT_SQL,
 	FILE_VERSION_RETENTION_MS,
@@ -240,13 +240,7 @@ export async function commitFileDelete(
 		? filePathArgs(params.path)
 		: [...filePathArgs(params.path), params.expectedHash, params.expectedRevision ?? ''];
 	const results: unknown[] = await db.batch([
-		db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
-			SELECT path, 'delete', '', 0, ? FROM files WHERE ${expectedPredicate}`)
-			.bind(revision, ...predicateArgs),
-		db.prepare(`INSERT OR IGNORE INTO file_versions
-			(storage_key, path, hash, size, reason, expires_at)
-			SELECT storage_key, path, hash, size, 'deleted', ${FILE_VERSION_EXPIRES_AT_SQL} FROM files WHERE ${expectedPredicate}`)
-			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...predicateArgs),
+		...deletedFileStatements(db, expectedPredicate, predicateArgs, revision),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
 		...await enqueueFileProjection(db, params.path, null, null, false, undefined, params.reminderFolder),

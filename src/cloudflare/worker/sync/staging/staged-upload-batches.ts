@@ -1,8 +1,8 @@
 import { portablePathKey } from '../../../../protocol/portable-path';
-import type { ObjectReference } from '../../storage-references';
+import type { ObjectReference } from '../../d1/storage-references';
 import { STAGED_UPLOAD_TTL_MS } from './staged-uploads';
 import { EncryptionStateError, encryptionWriteGuard } from '../../encryption/state';
-import { changedRows, type SqlGuard } from '../../db';
+import { changedRows, type SqlGuard } from '../../d1/db';
 import { syncResetGenerationGuard } from '../reset-generation';
 
 /** Each request attempt owns distinct immutable keys, including failed R2 puts. */

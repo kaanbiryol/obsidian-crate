@@ -4,8 +4,8 @@ import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import type { EncryptionServerState } from '@/encryption/server-state';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { commitSealedReading } from '../coordinator/coordinator';
-import { limitNotificationAction } from '../rate-limit';
-import { parseJsonObject } from '../request-validation';
+import { chargeRouteAction } from '../admission/rate-limit';
+import { parseJsonObject } from '../http/request-validation';
 import type { Env } from '../types';
 import { authority, ReadingError, readingResponse } from './common';
 import { fetchReadingCapture } from './extraction/transport';
@@ -16,7 +16,7 @@ import { validateShortcutBody } from './shortcut-transport';
  * the link nor the article is stored in readable form, so there is no handoff. */
 export async function captureSealedReading(request: Request, env: Env, principal: AuthPrincipal, encryption: EncryptionServerState): Promise<Response> {
 	if (encryption.mode !== 'active') throw new ReadingError('An encryption reset is in progress. Resume it in Obsidian.', 423);
-	const limited = await limitNotificationAction(request, env.DB, principal.tokenId); if (limited) return limited;
+	const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
 	const current = await authority(env.DB, principal);
 	const parsed = await parseJsonObject(request, 24_576);
 	if (!parsed.ok) return parsed.response;

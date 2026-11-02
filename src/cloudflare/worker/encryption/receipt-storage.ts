@@ -1,5 +1,5 @@
 import { MAX_ENCRYPTED_REMINDER_ACK } from '../../../encryption/receipt-format';
-import { putMaintenanceValue, readMaintenanceValue, type SqlGuard } from '../db';
+import { putMaintenanceValue, readMaintenanceValue, type SqlGuard } from '../d1/db';
 
 const CHUNK_SIZE = 512 * 1024;
 const MAX_CHUNKS = Math.ceil((MAX_ENCRYPTED_REMINDER_ACK + 4096) / CHUNK_SIZE);

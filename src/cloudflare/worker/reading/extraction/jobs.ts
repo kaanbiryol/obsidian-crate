@@ -1,6 +1,6 @@
 import { readEncryptionState } from '../../encryption/state';
 import { capturePath, MAX_FETCH_ATTEMPTS, publishCapture, runCapture, type CapturePublication } from '../captures';
-import { featureEnabled } from '../../feature-policy';
+import { featureEnabled } from '../../server/feature-policy';
 import type { FeaturePolicy } from '../../../../protocol/feature-policy';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import type { Env } from '../../types';

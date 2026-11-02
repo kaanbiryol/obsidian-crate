@@ -5,7 +5,7 @@ import { env } from 'cloudflare:workers';
 import { reset, runDurableObjectAlarm } from 'cloudflare:test';
 import { applySchema } from './test-support/schema-test-harness';
 import { writeCommittedMarkdownFilePair } from './sync/atomic-markdown-write';
-import { MAINTENANCE_DELETE_LIMIT, pruneChangelog } from './db';
+import { MAINTENANCE_DELETE_LIMIT, pruneChangelog } from './d1/db';
 import { drainNotificationJobs } from './notifications/outbox';
 import type { Env } from './types';
 import { handleListReminders } from './reminders/routes/list';
@@ -13,7 +13,7 @@ import {
 	FileVersionConflictError,
 	readCommittedMarkdownFileVersion,
 	writeCommittedMarkdownFile,
-} from './storage';
+} from './sync/markdown-files';
 
 const runtimeEnv: Env = env;
 

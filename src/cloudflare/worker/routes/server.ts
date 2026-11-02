@@ -1,8 +1,8 @@
 import { handleDiagnostics } from '../maintenance/diagnostics';
 import { handleHealth } from '../sync/index';
-import { handleFeaturePolicy } from '../feature-policy';
-import { handleLinkTitle } from '../link-title';
-import { corsResponse } from '../cors';
+import { handleFeaturePolicy } from '../server/feature-policy';
+import { handleLinkTitle } from '../server/link-title';
+import { corsResponse } from '../http/cors';
 import type { Env } from '../types';
 import type { AuthenticatedRouteContext } from '../router';
 

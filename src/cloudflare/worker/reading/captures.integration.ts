@@ -6,7 +6,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from './routes';
 import { publishCapture, runCapture, type PendingCapture } from './captures';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { parseReadingNote } from '@/reading/core/notes';
 import { commitFileDelete } from '../sync/mutations';
 import { getStoredFileRow } from '../sync/storage';

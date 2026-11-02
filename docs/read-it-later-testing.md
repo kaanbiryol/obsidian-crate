@@ -246,7 +246,7 @@ iPhone keyboard and VoiceOver checks remain separate.
 
 Shared feature regression coverage: `src/plugin/feature-settings.test.ts` checks
 server-first updates, offline failures, and cross-device reconciliation;
-`src/cloudflare/worker/feature-policy.integration.ts` checks stale edits, scoped
+`src/cloudflare/worker/server/feature-policy.integration.ts` checks stale edits, scoped
 access, blocked Reading publication, retained jobs, and reminder resume without
 repeat delivery. The Reading capture browser test also pauses and resumes from a
 second client and verifies the current browser hides and restores Reading.

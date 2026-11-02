@@ -1,5 +1,5 @@
 import { ENCRYPTION_FILE_PREFIX, ENCRYPTION_STATE_SQL } from '../encryption/state';
-import { changedRows, type SqlGuard } from '../db';
+import { changedRows, type SqlGuard } from '../d1/db';
 
 const CURSOR_KEY = 'e2ee:descriptor-cleanup-cursor';
 // A cursor with this prefix found unused descriptors, so later passes continue.

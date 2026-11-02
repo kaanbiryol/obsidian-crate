@@ -7,7 +7,7 @@ import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleUpdateReminder } from './routes/existing-reminder';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 
 const { DB: db, BUCKET: bucket } = env;
 const sourcePath = 'Reminders/Inbox.md';

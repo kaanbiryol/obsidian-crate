@@ -1,20 +1,20 @@
-import { DEVELOPMENT_BUILD } from '../../protocol/server-build';
-import { DEVICE_PAIRING_CAPABILITY } from '../../protocol/device-pairing';
-import { SHARED_CHECKPOINT_CAPABILITY } from '../../protocol/history-checkpoints';
-import { PWA_ASSET_VERSION } from '../../pwa/shell/version';
-import release from '../server-release.json';
-import type { Env } from './types';
-import { BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';
+import { DEVELOPMENT_BUILD } from '../../../protocol/server-build';
+import { DEVICE_PAIRING_CAPABILITY } from '../../../protocol/device-pairing';
+import { SHARED_CHECKPOINT_CAPABILITY } from '../../../protocol/history-checkpoints';
+import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
+import release from '../../server-release.json';
+import type { Env } from '../types';
+import { BULK_NEW_UPLOAD_CAPABILITY } from '../../../protocol/sync-limits';
 import {
 	CRATE_PLUGIN_PROTOCOL,
 	CRATE_SERVICE_ID,
 	type CrateServerInfo,
-} from '../../protocol/server-info';
-import { corsResponse } from './cors';
+} from '../../../protocol/server-info';
+import { corsResponse } from '../http/cors';
 import { INITIAL_IMPORT_CAPABILITY } from '@/protocol/initial-import';
 import { READING_SHORTCUT_CONTRACT } from '@/reading/shortcut';
-import { readEncryptionState } from './encryption/state';
-import { ENCRYPTION_CAPABILITY } from '../../encryption/server-state';
+import { readEncryptionState } from '../encryption/state';
+import { ENCRYPTION_CAPABILITY } from '../../../encryption/server-state';
 
 declare const __CRATE_SERVER_VERSION__: string | undefined;
 

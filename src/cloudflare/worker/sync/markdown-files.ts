@@ -1,15 +1,15 @@
-import { FILE_FOLDER_MATCH, fileFolderArgs } from './sync/file-identity';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import type { CommitEffects } from './commit-effects';
-import { queryRows } from './db';
-import { stageMarkdownFile } from './sync/markdown-file-staging';
-import { commitStagedFile, type StagedFileCommitInput } from './sync/mutations';
+import { queryRows } from '../d1/db';
+import { stageMarkdownFile } from './markdown-file-staging';
+import { commitStagedFile, type StagedFileCommitInput } from './mutations';
 import {
 	getStoredFileRow,
 	MAX_FILE_BYTES,
 	type FileStorageRow,
 	readVerifiedBytes,
-} from './sync/storage';
+} from './storage';
 
 interface StoredTextFile {
 	path: string;

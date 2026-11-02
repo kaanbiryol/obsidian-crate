@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { pruneReminderOccurrences } from '../maintenance/reminder-history';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';
 

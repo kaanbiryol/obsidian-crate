@@ -1,11 +1,11 @@
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
-import { corsResponse } from '../cors';
+import { corsResponse } from '../http/cors';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
-import { OPERATION_FLOOR, OPERATION_VALID } from '../operation-receipts';
+import { OPERATION_FLOOR, OPERATION_VALID } from '../d1/operation-receipts';
 import { fileNamespaceGuard, namespacePredicate, FileNamespaceConflictError } from './file-namespace';
 import type { RestoreFileRequest, UploadResult } from '@/protocol/sync-types';
 import { sha256Hex } from '@/platform/sha256';
-import { queryRows } from '../db';
+import { queryRows } from '../d1/db';
 
 export function decodeReceipt(json: string): UploadResult {
 	const result = JSON.parse(json) as UploadResult & { conflictingPath?: string | null };

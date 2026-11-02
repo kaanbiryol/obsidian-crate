@@ -4,7 +4,7 @@ import { handleDeletionPrecondition } from '../encryption/receipts';
 import { handleEncryptionMetadata } from '../encryption/metadata';
 import { handleEncryptionReset } from '../encryption/reset';
 import { readFolderLabel } from '../encryption/folder-labels';
-import { corsResponse } from '../cors';
+import { corsResponse } from '../http/cors';
 import type { Env } from '../types';
 import type { AuthenticatedRouteContext } from '../router';
 

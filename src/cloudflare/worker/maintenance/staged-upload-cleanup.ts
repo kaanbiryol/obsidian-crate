@@ -1,5 +1,5 @@
-import { queryRows } from '../db';
-import { findReferencedStorageKeys, type ObjectReference } from '../storage-references';
+import { queryRows } from '../d1/db';
+import { findReferencedStorageKeys, type ObjectReference } from '../d1/storage-references';
 import { STAGED_UPLOAD_TTL_MS } from '../sync/staging/staged-uploads';
 
 /** Deletes claimed staged objects that nothing references. Referenced and deleted keys are

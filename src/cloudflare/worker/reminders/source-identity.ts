@@ -1,4 +1,4 @@
-import { queryRows, type SqlGuard } from '../db';
+import { queryRows, type SqlGuard } from '../d1/db';
 import { REMINDER_IDENTITY_CONFLICT_ISSUE } from '@/reminders/core/reminder-list';
 
 export class ReminderIdentityConflictError extends Error {

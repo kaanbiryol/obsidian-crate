@@ -1,8 +1,8 @@
-import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
-import { reminderOperationDay } from '../../protocol/reminder-operation';
-import type { AuthPrincipal } from './auth/authenticate';
-import { MANAGED_FILE_OBJECT } from '../../protocol/storage-keys';
-import { UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '../../protocol/http-headers';
+import { BATCH_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
+import { reminderOperationDay } from '../../../protocol/reminder-operation';
+import type { AuthPrincipal } from '../auth/authenticate';
+import { MANAGED_FILE_OBJECT } from '../../../protocol/storage-keys';
+import { UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '../../../protocol/http-headers';
 
 function opaque(value: string | null): string | undefined {
 	return value && /^[a-zA-Z0-9_-]{16,128}$/.test(value) ? value : undefined;

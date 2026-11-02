@@ -1,6 +1,6 @@
-import { corsResponse } from '../../cors';
+import { corsResponse } from '../../http/cors';
 import { COMMIT_CONTEXT_COLUMNS, commitFileDelete, parseCommitContext, type CommitContextRow } from '../mutations';
-import { parseJsonObject, parseOptionalString, sanitizePath } from '../../request-validation';
+import { parseJsonObject, parseOptionalString, sanitizePath } from '../../http/request-validation';
 import {
 	formatMetadataCommitFailure,
 	formatMutationError,
@@ -11,7 +11,7 @@ import {
 } from '../storage';
 import type { BatchDeleteFile } from './types';
 import type { MutationFailure } from '../../../../protocol/sync-types';
-import { mutationAuditContext } from '../../request-diagnostics';
+import { mutationAuditContext } from '../../http/request-diagnostics';
 import type { FileDeletionReceipt } from '../file-delete-audit';
 
 export async function handleBatchDelete(

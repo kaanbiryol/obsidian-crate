@@ -2,7 +2,7 @@ import { pruneSharedCheckpoints } from '../sync/history-checkpoints';
 import { readEncryptionState } from '../encryption/state';
 import { cleanStagedUploads } from './staged-upload-cleanup';
 import { cleanStagedBatches } from './staged-batch-cleanup';
-import { pruneChangelog } from '../db';
+import { pruneChangelog } from '../d1/db';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './object-cleanup';
 import type { Env } from '../types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './database';
@@ -13,8 +13,8 @@ import { pruneOperationReceipts } from './operation-receipts';
 import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
 import { pruneEncryptionMetadata, releaseExpiredVersionDescriptors, releasePrunedChangelogDescriptors } from './encryption-metadata';
 import { wakeProjection } from '../coordinator/coordinator';
-import { countD1Queries } from '../d1-query-count';
-import { D1_QUERIES_PER_INVOCATION } from '../platform-limits';
+import { countD1Queries } from '../d1/d1-query-count';
+import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 
 export interface MaintenanceResult { removedObjects: number; backlog: boolean }

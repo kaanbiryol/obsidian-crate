@@ -1,6 +1,6 @@
 import type { AuthPrincipal } from '../auth/authenticate';
-import { changedRows } from '../db';
-import { limitNotificationAction } from '../rate-limit';
+import { changedRows } from '../d1/db';
+import { chargeRouteAction } from '../admission/rate-limit';
 import { ReadingError, readingResponse } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
@@ -39,7 +39,7 @@ export async function exchangeShortcutPairing(db: D1Database, body: Record<strin
 	const now = Date.now();
 	const grant = await db.prepare(`SELECT a.id ${grantSql}`).bind(hash, now, now).first<{ id: string }>();
 	if (!grant) throw invalidPairing();
-	const limited = await limitNotificationAction(request, db, grant.id); if (limited) return limited;
+	const limited = await chargeRouteAction(request, db, grant.id); if (limited) return limited;
 	const token = createRandomHexToken(), id = crypto.randomUUID();
 	// Recheck the grant and its issuer within the consume transaction. Concurrent
 	// exchanges can create only one credential. A lost reply requires a new code.

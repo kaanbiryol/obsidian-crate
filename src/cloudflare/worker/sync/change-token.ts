@@ -1,6 +1,6 @@
-import { getChangelogBounds, LAST_SEQ_SQL } from './sync/storage';
-import { serverStateValue } from './server-state';
-import { sha256Hex } from '../../platform/sha256';
+import { getChangelogBounds, LAST_SEQ_SQL } from './storage';
+import { serverStateValue } from '../d1/server-state';
+import { sha256Hex } from '../../../platform/sha256';
 
 export interface VaultChangeState { seq: number; importGeneration: number; resetGeneration: string }
 

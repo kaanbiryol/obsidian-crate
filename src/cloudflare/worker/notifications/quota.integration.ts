@@ -7,7 +7,7 @@ import { READY_PROJECTION_JOBS_SQL, NEXT_NOTIFICATION_WORK_SQL } from './queue';
 import { runNotificationCoordinator } from './coordinator';
 import { revalidateReminderSources } from '../reminders/source-migration';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
-import { writeCommittedMarkdownFile } from '../storage';
+import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { ReminderAlarm } from '../coordinator/reminder-alarm';
 
 beforeEach(async () => {

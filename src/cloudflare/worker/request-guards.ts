@@ -1,6 +1,6 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '../../protocol/server-info';
 import type { EncryptionServerState } from '../../encryption/server-state';
-import { corsResponse } from './cors';
+import { corsResponse } from './http/cors';
 import { EncryptionStateError, hasEncryptionAuthority } from './encryption/state';
 import { shortcutCompatibility, shortcutTransport, type ShortcutTransport } from './reading/shortcut-transport';
 import { ENCRYPTION_RESET_PATHS, KEYLESS_ENCRYPTED_READ_PATHS } from './routes/policy';

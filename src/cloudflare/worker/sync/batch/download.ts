@@ -1,5 +1,5 @@
-import { corsResponse } from '../../cors';
-import { parseJsonObject, sanitizePath } from '../../request-validation';
+import { corsResponse } from '../../http/cors';
+import { parseJsonObject, sanitizePath } from '../../http/request-validation';
 import {
 	loadStoredFileRows,
 	MAX_BATCH_DOWNLOAD_BYTES,
@@ -8,7 +8,7 @@ import {
 	type FileStorageRow,
 } from '../storage';
 import { mapBounded } from '@/platform/map-bounded';
-import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../../platform-limits';
+import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../../d1/platform-limits';
 
 export async function handleBatchDownload(
 	request: Request,

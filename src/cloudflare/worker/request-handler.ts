@@ -2,25 +2,25 @@ import { handleReadingRoute } from './reading/routes';
 import { shortcutLaunchResponse, shortcutTransport } from './reading/shortcut-transport';
 import { captureSealedReading } from './reading/sealed-capture';
 import { ReadingError } from './reading/common';
-import { isD1DailyLimitError, withD1Usage } from './d1-usage';
+import { isD1DailyLimitError, withD1Usage } from './d1/d1-usage';
 import { coordinatedNewFiles } from './sync/staging/bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { ReminderFileSizeError } from './reminders/limits';
 import { ReminderIdentityConflictError } from './reminders/source-identity';
-import { logMutation } from './request-diagnostics';
-import { limitNotificationRequest } from './rate-limit';
-import { rememberAuthenticatedRequest } from './auth/admission-state';
+import { logMutation } from './http/request-diagnostics';
+import { admitApiRequest } from './admission/rate-limit';
+import { rememberAuthenticatedRequest } from './admission/admission-state';
 import { coordinatedUpload } from './sync/staging/staged-upload-dispatch';
 import { apiRoutePolicy } from './routes/policy';
 import { requestPlacement } from './routes/placement';
 import { armNotificationCoordinator } from './notifications/lifecycle';
 import { isCrateMutation } from '../../protocol/server-info';
-import { corsHeaders, corsResponse } from './cors';
+import { corsHeaders, corsResponse } from './http/cors';
 import { authenticateWorkerRequest } from './auth/index';
 import { handleAuthenticatedRoute, handlePublicRoute, isAuthenticatedRouteAllowed } from './router';
 import type { Env } from './types';
-import { FileVersionConflictError } from './storage';
+import { FileVersionConflictError } from './sync/markdown-files';
 import { FileNamespaceConflictError } from './sync/file-namespace';
 import { ReminderMarkdownContextError } from '@/reminders/core/markdownTaskContext';
 import { EncryptionStateError } from './encryption/state';
@@ -100,7 +100,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	// Coordinator execution receives only requests this pipeline already admitted.
 	// Transfer execution re-enters it after queuing, so edge admission and the
 	// remembered credential below run a second time for transfer requests.
-	const rateLimited = execution.kind === 'coordinator' ? null : await limitNotificationRequest(request, admissionDb, env.NOTIFICATION_REQUEST_LIMITER);
+	const rateLimited = execution.kind === 'coordinator' ? null : await admitApiRequest(request, admissionDb, env.NOTIFICATION_REQUEST_LIMITER);
 	if (rateLimited) return rateLimited;
 	const protocolError = checkRequestProtocol(request, shortcut);
 	if (protocolError) return protocolError;

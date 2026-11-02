@@ -8,7 +8,7 @@ import { beginReminderOperation } from './operations';
 import { handleCreateReminder } from './routes/create';
 import { handleSetReminderCompleted, handleUpdateReminder } from './routes/existing-reminder';
 import { pruneOperationReceipts, RECEIPT_BATCH } from '../maintenance/operation-receipts';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
+import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import type { ReminderRecord } from '@/pwa/reminders/types';
 
 const { DB: db, BUCKET: bucket } = env;
