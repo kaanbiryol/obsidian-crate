@@ -1,12 +1,12 @@
-@use './shared/styles/shell';
-@use './shared/styles/projects';
-@use './shared/styles/project-detail';
-@use './shared/styles/reminder-cards';
-@use './shared/styles/primary-screen';
+@use '../../shared/styles/shell';
+@use '../../shared/styles/projects';
+@use '../../shared/styles/project-detail';
+@use '../../shared/styles/reminder-cards';
+@use '../../shared/styles/primary-screen';
 @use './reminders-view/layout-modes';
 @use './reminders-view/card-interactions';
 @use './reminders-view/card-presentation';
-@use './plugin/reminder-source-notice';
+@use '../reminder-source-notice';
 
 .crate-reminders-ui {
 	@include shell.styles;

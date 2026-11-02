@@ -14,7 +14,7 @@ import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder
 import { requireReminderBackend } from "@/reminders/runtime";
 import { PluginReminderSourceNotice } from './PluginReminderSourceNotice';
 import { RemindersLoading } from "./RemindersLoading";
-import "../reminders-view.scss";
+import "./styles/reminders-view.scss";
 
 import { ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
 interface RemindersViewContentProps {

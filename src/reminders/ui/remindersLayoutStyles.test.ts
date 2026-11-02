@@ -104,7 +104,7 @@ describe('plugin reminder layout styles', () => {
 
 	it('uses restrained Linear-style highlight and selection states for plugin cards', async () => {
 		const interactionStyles = await readFile(
-			new URL('./reminders-view/_card-interactions.scss', import.meta.url),
+			new URL('./plugin/styles/reminders-view/_card-interactions.scss', import.meta.url),
 			'utf8',
 		);
 		const projectCard = await readFile(
@@ -177,7 +177,7 @@ describe('plugin reminder layout styles', () => {
 
 	it('extends the sidebar tab bar behind the status bar and lifts its items', async () => {
 		const styles = await readFile(
-			new URL('./reminders-view/_layout-modes.scss', import.meta.url),
+			new URL('./plugin/styles/reminders-view/_layout-modes.scss', import.meta.url),
 			'utf8',
 		);
 		const sidebarBlock = styles.match(
@@ -238,7 +238,7 @@ describe('plugin reminder layout styles', () => {
 
 	it('clears Obsidian mobile navbars with the host view bottom spacing', async () => {
 		const navigation = await readFile(new URL('../../ui/plugin/plugin-navigation.scss', import.meta.url), 'utf8');
-		const layoutModes = await readFile(new URL('./reminders-view/_layout-modes.scss', import.meta.url), 'utf8');
+		const layoutModes = await readFile(new URL('./plugin/styles/reminders-view/_layout-modes.scss', import.meta.url), 'utf8');
 
 		// --navbar-height counts a navbar that sits below the view and misses the floating navbar's safe area.
 		expect(navigation).not.toContain('var(--navbar-height');

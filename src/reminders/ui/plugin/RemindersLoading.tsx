@@ -1,6 +1,6 @@
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import '../reminders-loading.scss';
+import './styles/reminders-loading.scss';
 
 /** Shared initial loading state for the reminders pane and Markdown blocks. */
 export function RemindersLoading({ compact = false }: { compact?: boolean }) {
