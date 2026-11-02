@@ -35,11 +35,18 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 	const card = containerEl.createDiv({ cls: 'crate-get-started' });
 	let devices: RegisteredDevice[] | null = plugin.settingsUiState.devices?.tokens ?? null;
 	let disposed = false;
+	// Steps whose action is running. State changes rebuild the card, so each new button reads this.
+	const running = new Set<string>();
 
-	const addAction = (row: HTMLElement, action: NonNullable<GetStartedStep['action']>, cta: boolean) => {
-		const button = new ButtonComponent(row).setButtonText(action.label).onClick(async () => {
+	const addAction = (row: HTMLElement, name: string, action: NonNullable<GetStartedStep['action']>, cta: boolean) => {
+		const button = new ButtonComponent(row).setButtonText(action.label).setDisabled(running.has(name)).onClick(async () => {
+			if (running.has(name)) return;
+			running.add(name);
 			button.setDisabled(true);
-			try { await action.run(); } finally { if (!disposed) button.setDisabled(false); }
+			try { await action.run(); } finally {
+				running.delete(name);
+				if (!disposed) render();
+			}
 		});
 		if (cta) button.setCta();
 	};
@@ -72,7 +79,7 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 			body.createDiv({ cls: 'crate-get-started-name', text: step.name });
 			if (step !== next) continue;
 			body.createDiv({ cls: 'crate-get-started-desc', text: step.desc });
-			if (step.action) addAction(row, step.action, true);
+			if (step.action) addAction(row, step.name, step.action, true);
 		}
 
 		const suggestions = buildSuggestions(context, devices);
@@ -84,7 +91,7 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 			const body = row.createDiv({ cls: 'crate-get-started-body' });
 			body.createDiv({ cls: 'crate-get-started-name', text: suggestion.name });
 			body.createDiv({ cls: 'crate-get-started-desc', text: suggestion.desc });
-			if (suggestion.action) addAction(row, suggestion.action, false);
+			if (suggestion.action) addAction(row, suggestion.name, suggestion.action, false);
 		}
 	};
 

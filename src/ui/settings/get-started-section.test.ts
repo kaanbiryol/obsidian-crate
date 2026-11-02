@@ -126,6 +126,31 @@ it('runs the first sync and moves on to adding a device', async () => {
 	expect(text(root, 'crate-get-started-count')).toBe('2 of 3');
 });
 
+it('keeps Sync now disabled while its sync rebuilds the card', async () => {
+	const { renderGetStartedSection } = await load();
+	const root = new FakeElement('div');
+	const connected = plugin({ configured: true });
+	let finish!: () => void;
+	const listeners: Array<() => void> = [];
+	connected.syncRuntime.addStateChangeListener = (listener: () => void) => { listeners.push(listener); };
+	connected.syncRuntime.sync.mockImplementationOnce(async () => {
+		for (const listener of listeners) listener();
+		await new Promise<void>(resolve => { finish = resolve; });
+		return { outcome: 'completed', success: true, conflicts: [] };
+	});
+	renderGetStartedSection({ containerEl: root as never, plugin: connected as never, rerender: vi.fn() });
+	step(root, 'Run your first sync').button?.click();
+	await flush();
+	const rebuilt = step(root, 'Run your first sync').button;
+	expect(rebuilt?.buttonEl.classNames.has('is-disabled')).toBe(true);
+	rebuilt?.click();
+	await flush();
+	expect(connected.syncRuntime.sync).toHaveBeenCalledTimes(1);
+	finish();
+	await flush();
+	expect(step(root, 'Run your first sync').button?.buttonEl.classNames.has('is-disabled')).toBe(false);
+});
+
 it('finishes setup from sync and devices alone and keeps extras optional', async () => {
 	loadConnectedDevices.mockResolvedValueOnce([device({ is_current: true }), device({ platform: 'ios' })]);
 	const { renderGetStartedSection } = await load();
