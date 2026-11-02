@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { TAbstractFile } from 'obsidian';
 import { createPersistentEngineHarness } from './engine-persistence-test-harness';
 import { getIncomingConflictFileName } from '../conflict/conflict';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
@@ -101,7 +100,7 @@ it('saves an incoming binary again when its review copy is deleted without choos
 	expect(harness.disk.read(copy)).toEqual(harness.incoming);
 
 	harness.disk.remove(copy);
-	harness.engine.onFileDelete({ path: copy } as TAbstractFile);
+	harness.engine.onFileDelete({ path: copy, kind: 'file' });
 	await harness.engine.waitForIdle();
 	expect(harness.engine.getActiveConflicts()).toEqual([]);
 	const result = await harness.engine.sync();
@@ -120,7 +119,7 @@ it('stops replanning a removed review copy once keeping the local version upload
 	await harness.engine.sync();
 	const copy = getIncomingConflictFileName('image.bin', await sha256Hex(harness.incoming));
 	harness.disk.remove(copy);
-	harness.engine.onFileDelete({ path: copy } as TAbstractFile);
+	harness.engine.onFileDelete({ path: copy, kind: 'file' });
 	await harness.engine.waitForIdle();
 	// Keep local republishes the same local bytes, so only the revision shows the choice.
 	harness.localManifest.setEntry('image.bin', { ...harness.baseline, revision: 'r3' });

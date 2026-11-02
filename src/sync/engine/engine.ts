@@ -10,7 +10,7 @@ import { SyncTimingRecorder } from '../diagnostics/timings';
  * Core sync engine - orchestrates synchronization between local vault and remote storage
  */
 
-import { TFolder, type Plugin, type TAbstractFile, type Vault } from 'obsidian';
+import type { Plugin, Vault } from 'obsidian';
 import { SyncApiClient } from '../worker-api/client';
 import { LocalManifest } from '../manifest/manifest';
 import { MarkdownBaseCache } from '../merge/markdown-base-cache';
@@ -21,7 +21,7 @@ import { SyncQueueController } from '../queue/controller';
 import { createAbortError, isAbortError } from '../abort';
 import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
-import type { SyncState, SyncResult, ConflictRecord } from '../types';
+import type { SyncState, SyncResult, ConflictRecord, VaultEntry } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { PREPARE_CONCURRENCY } from '../transfer/constants';
 import { uploadPipelined } from '../transfer/upload-pipeline';
@@ -584,7 +584,7 @@ export class SyncEngine {
 		this.queueController.restoreDroppedEvents(keys);
 	}
 
-	onFileChange(file: TAbstractFile): void {
+	onFileChange(file: VaultEntry): void {
 		if (this.lifecycle.isDestroyed) return;
 		if (isConflictFile(file.path)) {
 			this.updateConflictCopy(() => this.conflictStore.registerDiscovered(file.path), 'Failed to register conflict copy:');
@@ -592,7 +592,7 @@ export class SyncEngine {
 		this.queueController.onFileChange(file);
 	}
 
-	onFileDelete(file: TAbstractFile): void {
+	onFileDelete(file: VaultEntry): void {
 		if (this.lifecycle.isDestroyed) return;
 		if (isConflictFile(file.path)) {
 			this.updateConflictCopy(() => this.conflictStore.markResolved(file.path, this.baselineRevision), 'Failed to resolve conflict copy:');
@@ -601,9 +601,9 @@ export class SyncEngine {
 	}
 
 
-	onFileRename(file: TAbstractFile, oldPath: string): void {
+	onFileRename(file: VaultEntry, oldPath: string): void {
 		if (this.lifecycle.isDestroyed) return;
-		if (!this.ignore.shouldIgnore(oldPath) && !this.ignore.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path, file instanceof TFolder ? 'folder' : 'file');
+		if (!this.ignore.shouldIgnore(oldPath) && !this.ignore.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path, file.kind);
 		if (isConflictFile(oldPath)) {
 			this.updateConflictCopy(() => this.conflictStore.markResolved(oldPath, this.baselineRevision), 'Failed to resolve renamed conflict copy:');
 		}

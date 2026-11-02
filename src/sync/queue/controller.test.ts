@@ -1,4 +1,3 @@
-import { TFolder } from 'obsidian';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pendingChangeKey } from '../pending/pending-change';
 import { createEmptySyncResult } from '../sync-result';
@@ -62,9 +61,9 @@ afterEach(() => {
 describe('queue event handlers', () => {
 	it('keeps literal delete-prefixed names independent during edits, deletes and renames', () => {
 		const h = createController();
-		h.controller.onFileChange({ path: 'note.md' });
-		h.controller.onFileChange({ path: 'delete:note.md' });
-		h.controller.onFileDelete({ path: 'note.md' });
+		h.controller.onFileChange({ path: 'note.md', kind: 'file' });
+		h.controller.onFileChange({ path: 'delete:note.md', kind: 'file' });
+		h.controller.onFileDelete({ path: 'note.md', kind: 'file' });
 		expect(h.pending()).toEqual(['delete:note.md', pendingChangeKey('delete', 'note.md')]);
 		h.controller.onFileRename({ path: 'renamed.md' } as never, 'delete:note.md');
 		expect(h.pending()).toEqual([
@@ -75,10 +74,10 @@ describe('queue event handlers', () => {
 
 	it('settles the matching deletion without clearing a newer edit to a prefixed filename', () => {
 		const h = createController();
-		h.controller.onFileChange({ path: 'delete:note.md' });
-		h.controller.onFileDelete({ path: 'note.md' });
+		h.controller.onFileChange({ path: 'delete:note.md', kind: 'file' });
+		h.controller.onFileDelete({ path: 'note.md', kind: 'file' });
 		const revisions = h.controller.snapshotPendingRevisions();
-		h.controller.onFileChange({ path: 'delete:note.md' });
+		h.controller.onFileChange({ path: 'delete:note.md', kind: 'file' });
 		h.controller.clearSyncedPendingPaths(createSyncResult({ uploadedPaths: ['delete:note.md'], deletedPaths: ['note.md'] }), revisions);
 		expect(h.pending()).toEqual(['delete:note.md']);
 		expect(h.revisions()).toEqual(['delete:note.md']);
@@ -87,7 +86,7 @@ describe('queue event handlers', () => {
 	it('queues file changes for syncable paths', () => {
 		const h = createController();
 
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 
 		expect(h.controller.hasPendingKey('notes/a.md')).toBe(true);
 		expect(h.updateState).toHaveBeenCalledExactlyOnceWith({ pendingChanges: 1 });
@@ -96,7 +95,7 @@ describe('queue event handlers', () => {
 	it('queues delete markers for syncable paths', () => {
 		const h = createController();
 
-		h.controller.onFileDelete({ path: 'notes/a.md' });
+		h.controller.onFileDelete({ path: 'notes/a.md', kind: 'file' });
 
 		expect(h.controller.hasPendingKey(pendingChangeKey('delete', 'notes/a.md'))).toBe(true);
 		expect(h.updateState).toHaveBeenCalledExactlyOnceWith({ pendingChanges: 1 });
@@ -116,7 +115,7 @@ describe('queue event handlers', () => {
 
 	it('does not queue deleted folders as files', () => {
 		const h = createController({ automaticSync: true });
-		const folder = Object.assign(new TFolder(), { path: 'Fake conflicts' });
+		const folder = { path: 'Fake conflicts', kind: 'folder' as const };
 		h.controller.onFileDelete(folder);
 		expect(h.pending()).toEqual([]);
 		expect(h.updateState).not.toHaveBeenCalled();
@@ -127,7 +126,7 @@ describe('queue event handlers', () => {
 describe('debounced flush', () => {
 	it('triggers flush after delay and starts a new wait window afterwards', async () => {
 		const h = createController({ automaticSync: true, maxDebounceWaitMs: 40 });
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 
 		await vi.advanceTimersByTimeAsync(24);
 		expect(h.flushes).not.toHaveBeenCalled();
@@ -136,9 +135,9 @@ describe('debounced flush', () => {
 
 		// The flush cleared the timer and the maximum-wait start, so later edits
 		// restart the countdown rather than flushing at once.
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		await vi.advanceTimersByTimeAsync(20);
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		expect(h.flushes).toHaveBeenCalledTimes(1);
 		await vi.advanceTimersByTimeAsync(25);
 		expect(h.flushes).toHaveBeenCalledTimes(2);
@@ -147,7 +146,7 @@ describe('debounced flush', () => {
 	it('no-ops when queue is destroyed', async () => {
 		const h = createController({ automaticSync: true, destroyed: true });
 
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		await vi.advanceTimersByTimeAsync(25);
 
 		expect(h.flushes).not.toHaveBeenCalled();
@@ -156,16 +155,16 @@ describe('debounced flush', () => {
 
 	it('fires immediately when max-wait is exceeded', async () => {
 		const h = createController({ automaticSync: true, maxDebounceWaitMs: 50 });
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		await vi.advanceTimersByTimeAsync(20);
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		await vi.advanceTimersByTimeAsync(20);
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		await vi.advanceTimersByTimeAsync(20);
 		expect(h.flushes).not.toHaveBeenCalled();
 
 		// 60ms after the first edit, past the 50ms maximum wait.
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 
 		expect(h.flushes).toHaveBeenCalledTimes(1);
 		await vi.advanceTimersByTimeAsync(25);
@@ -176,10 +175,10 @@ describe('debounced flush', () => {
 describe('clearSyncedPendingPaths', () => {
 	it('removes successful uploaded, downloaded, merged, and deleted paths from the queue', async () => {
 		const h = createController({ automaticSync: true });
-		h.controller.onFileChange({ path: 'notes/uploaded.md' });
-		h.controller.onFileChange({ path: 'notes/downloaded.md' });
-		h.controller.onFileChange({ path: 'notes/merged.md' });
-		h.controller.onFileDelete({ path: 'notes/deleted.md' });
+		h.controller.onFileChange({ path: 'notes/uploaded.md', kind: 'file' });
+		h.controller.onFileChange({ path: 'notes/downloaded.md', kind: 'file' });
+		h.controller.onFileChange({ path: 'notes/merged.md', kind: 'file' });
+		h.controller.onFileDelete({ path: 'notes/deleted.md', kind: 'file' });
 		h.updateState.mockClear();
 
 		h.controller.clearSyncedPendingPaths(
@@ -201,8 +200,8 @@ describe('clearSyncedPendingPaths', () => {
 
 	it('keeps unrelated pending paths and updates the pending count', async () => {
 		const h = createController({ automaticSync: true });
-		h.controller.onFileChange({ path: 'notes/uploaded.md' });
-		h.controller.onFileChange({ path: 'notes/still-pending.md' });
+		h.controller.onFileChange({ path: 'notes/uploaded.md', kind: 'file' });
+		h.controller.onFileChange({ path: 'notes/still-pending.md', kind: 'file' });
 		h.updateState.mockClear();
 
 		h.controller.clearSyncedPendingPaths(
@@ -218,7 +217,7 @@ describe('clearSyncedPendingPaths', () => {
 
 	it('does not change the queue when the sync result failed', async () => {
 		const h = createController({ automaticSync: true });
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		h.updateState.mockClear();
 
 		h.controller.clearSyncedPendingPaths(
@@ -235,7 +234,7 @@ describe('clearSyncedPendingPaths', () => {
 	it('settles the revision of an unchanged file the flush skips', async () => {
 		const h = createController({ automaticSync: true });
 		h.flushes.mockReturnValue(true);
-		h.controller.onFileChange({ path: 'notes/unchanged.md' });
+		h.controller.onFileChange({ path: 'notes/unchanged.md', kind: 'file' });
 		expect(h.revisions()).toEqual(['notes/unchanged.md']);
 		await vi.advanceTimersByTimeAsync(25);
 		expect(h.flushes).toHaveBeenCalled();
@@ -245,9 +244,9 @@ describe('clearSyncedPendingPaths', () => {
 
 	it('keeps a newer event for the same path during sync reconciliation', () => {
 		const h = createController();
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		const revisions = h.controller.snapshotPendingRevisions();
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		const newer = h.controller.snapshotPendingRevisions().get('notes/a.md');
 		h.updateState.mockClear();
 
@@ -264,8 +263,8 @@ describe('clearSyncedPendingPaths', () => {
 
 	it('coalesces opposite upload and delete events for one path', () => {
 		const h = createController();
-		h.controller.onFileDelete({ path: 'notes/a.md' });
-		h.controller.onFileChange({ path: 'notes/a.md' });
+		h.controller.onFileDelete({ path: 'notes/a.md', kind: 'file' });
+		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 
 		expect(h.pending()).toEqual(['notes/a.md']);
 		expect(h.revisions()).toEqual(['notes/a.md']);
@@ -304,8 +303,8 @@ describe('large upload pacing', () => {
 
 	it('holds an edited large file until it is quiet for a minute while small files flush', async () => {
 		const h = createPacedController();
-		h.controller.onFileChange({ path: 'drawing.excalidraw' });
-		h.controller.onFileChange({ path: 'note.md' });
+		h.controller.onFileChange({ path: 'drawing.excalidraw', kind: 'file' });
+		h.controller.onFileChange({ path: 'note.md', kind: 'file' });
 		await vi.advanceTimersByTimeAsync(30);
 		expect(h.prepared).toEqual(['note.md']);
 		expect(h.controller.getPendingKeys()).toEqual(['drawing.excalidraw']);
@@ -317,7 +316,7 @@ describe('large upload pacing', () => {
 	it('uploads a large file edited without pause after five minutes', async () => {
 		const h = createPacedController();
 		for (let elapsed = 0; elapsed < 5 * 60_000; elapsed += 30_000) {
-			h.controller.onFileChange({ path: 'drawing.excalidraw' });
+			h.controller.onFileChange({ path: 'drawing.excalidraw', kind: 'file' });
 			await vi.advanceTimersByTimeAsync(30_000);
 		}
 		expect(h.prepared).toEqual(['drawing.excalidraw']);
@@ -326,12 +325,12 @@ describe('large upload pacing', () => {
 	// Saves closer together than the debounce delay must still flush at the maximum wait.
 	it('flushes a note saved every two seconds within the maximum wait while a large file is held', async () => {
 		const h = createPacedController(5_000);
-		h.controller.onFileChange({ path: 'drawing.excalidraw' });
-		h.controller.onFileChange({ path: 'note.md' });
+		h.controller.onFileChange({ path: 'drawing.excalidraw', kind: 'file' });
+		h.controller.onFileChange({ path: 'note.md', kind: 'file' });
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(h.prepared).toEqual(['note.md']);
 		for (let elapsed = 0; elapsed < 32_000; elapsed += 2_000) {
-			h.controller.onFileChange({ path: 'note.md' });
+			h.controller.onFileChange({ path: 'note.md', kind: 'file' });
 			await vi.advanceTimersByTimeAsync(2_000);
 		}
 		expect(h.prepared).toEqual(['note.md', 'note.md']);
@@ -340,7 +339,7 @@ describe('large upload pacing', () => {
 	it('uploads a large file saved every few seconds once its five minutes pass', async () => {
 		const h = createPacedController(5_000);
 		for (let elapsed = 0; elapsed < 5 * 60_000 + 30_000; elapsed += 3_000) {
-			h.controller.onFileChange({ path: 'drawing.excalidraw' });
+			h.controller.onFileChange({ path: 'drawing.excalidraw', kind: 'file' });
 			await vi.advanceTimersByTimeAsync(3_000);
 		}
 		expect(h.prepared).toEqual(['drawing.excalidraw']);

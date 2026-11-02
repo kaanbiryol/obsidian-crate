@@ -2,6 +2,12 @@ import { TFolder, type TAbstractFile } from 'obsidian';
 import { pendingChangeKey, type PendingChange } from '../pending/pending-change';
 import { isConflictFile } from '../conflict/conflict';
 import type { SyncEngine } from '../engine/engine';
+import type { VaultEntry } from '../types';
+
+/** The path and kind of an Obsidian file or folder. */
+export function vaultEntry(file: TAbstractFile): VaultEntry {
+	return { path: file.path, kind: file instanceof TFolder ? 'folder' : 'file' };
+}
 
 type EventTarget = Pick<SyncEngine, 'onRawFileChange' | 'onFileChange' | 'onFileDelete' | 'onFileRename' | 'restoreDroppedEvents'>;
 
@@ -59,28 +65,31 @@ export class VaultEventGate {
 
 	onFileChange(file: TAbstractFile): void {
 		if (!this.layoutReady()) return;
-		if (!this.accepting && !isConflictFile(file.path)) {
-			if (!(file instanceof TFolder)) this.startupEvents?.set(file.path, 'upload');
+		const entry = vaultEntry(file);
+		if (!this.accepting && !isConflictFile(entry.path)) {
+			if (entry.kind === 'file') this.startupEvents?.set(entry.path, 'upload');
 			return;
 		}
-		this.engine()?.onFileChange(file);
+		this.engine()?.onFileChange(entry);
 	}
 
 	onFileDelete(file: TAbstractFile): void {
 		if (!this.layoutReady()) return;
-		if (!this.accepting && !isConflictFile(file.path)) {
-			if (!(file instanceof TFolder)) this.startupEvents?.set(file.path, 'delete');
+		const entry = vaultEntry(file);
+		if (!this.accepting && !isConflictFile(entry.path)) {
+			if (entry.kind === 'file') this.startupEvents?.set(entry.path, 'delete');
 			return;
 		}
-		this.engine()?.onFileDelete(file);
+		this.engine()?.onFileDelete(entry);
 	}
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
 		if (!this.layoutReady()) return;
-		if (!this.accepting && !isConflictFile(file.path) && !isConflictFile(oldPath)) {
-			if (!(file instanceof TFolder)) this.startupEvents?.set(oldPath, 'delete').set(file.path, 'upload');
+		const entry = vaultEntry(file);
+		if (!this.accepting && !isConflictFile(entry.path) && !isConflictFile(oldPath)) {
+			if (entry.kind === 'file') this.startupEvents?.set(oldPath, 'delete').set(entry.path, 'upload');
 			return;
 		}
-		this.engine()?.onFileRename(file, oldPath);
+		this.engine()?.onFileRename(entry, oldPath);
 	}
 }

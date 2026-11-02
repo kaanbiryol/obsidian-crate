@@ -167,3 +167,6 @@ export interface RemoteManifest {
 	files: Record<string, FileEntry>;
 	lastSeq?: number;
 }
+
+/** A vault file or folder as sync sees it; the runtime converts Obsidian's objects once. */
+export interface VaultEntry { path: string; kind: 'file' | 'folder' }

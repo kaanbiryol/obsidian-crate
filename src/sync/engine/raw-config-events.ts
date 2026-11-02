@@ -55,8 +55,8 @@ export function createRawConfigEventHandler(host: RawConfigEventHost): (path: st
 				});
 				if (!isCurrent() || settled.includes(path)) return;
 			}
-			if (stat?.type === 'file') host.queue.onFileChange({ path });
-			else if (!stat) host.queue.onFileDelete({ path });
+			if (stat?.type === 'file') host.queue.onFileChange({ path, kind: 'file' });
+			else if (!stat) host.queue.onFileDelete({ path, kind: 'file' });
 		} catch (error) {
 			logger.warn('Failed to inspect changed configuration file:', errorMessage(error));
 		} finally {

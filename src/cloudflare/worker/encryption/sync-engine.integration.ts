@@ -15,6 +15,7 @@ import { createOpaqueWireName } from '../../../protocol/encrypted-path';
 import { readEncryptionState } from './state';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
 import { commitStagedFile } from '../sync/mutations';
+import { vaultEntry } from '../../../sync/runtime/vault-event-gate';
 
 const devices: SyncTestDevice[] = [];
 let bundle: VaultKeyBundle;
@@ -220,12 +221,12 @@ it('preserves encrypted file renames and moves into and out of a reminders folde
 	first.disk.write('Reminders/Original.md', 'Private movable note');
 	await sync(first); await sync(second);
 	first.disk.rename('Reminders/Original.md', 'Moved.md');
-	first.engine.onFileRename(first.disk.vault.getAbstractFileByPath('Moved.md')!, 'Reminders/Original.md');
+	first.engine.onFileRename(vaultEntry(first.disk.vault.getAbstractFileByPath('Moved.md')!), 'Reminders/Original.md');
 	await sync(first); await sync(second);
 	expect(second.disk.paths()).toEqual(['Moved.md']);
 	expect(second.disk.text('Moved.md')).toBe('Private movable note');
 	first.disk.rename('Moved.md', 'Reminders/Renamed.md');
-	first.engine.onFileRename(first.disk.vault.getAbstractFileByPath('Reminders/Renamed.md')!, 'Moved.md');
+	first.engine.onFileRename(vaultEntry(first.disk.vault.getAbstractFileByPath('Reminders/Renamed.md')!), 'Moved.md');
 	await sync(first); await sync(second);
 	expect(second.disk.paths()).toEqual(['Reminders/Renamed.md']);
 	expect(second.disk.text('Reminders/Renamed.md')).toBe('Private movable note');
@@ -236,7 +237,7 @@ it('syncs an encrypted case-only rename between case-insensitive devices', async
 	const first = await device('case-first', { caseInsensitive: true }), second = await device('case-second', { caseInsensitive: true });
 	first.disk.write('todo.md', 'Private groceries'); await sync(first); await sync(second);
 	first.disk.rename('todo.md', 'TODO.md');
-	first.engine.onFileRename(first.disk.vault.getAbstractFileByPath('TODO.md')!, 'todo.md');
+	first.engine.onFileRename(vaultEntry(first.disk.vault.getAbstractFileByPath('TODO.md')!), 'todo.md');
 	await sync(first);
 	await converge([first, second], { 'TODO.md': 'Private groceries' });
 });

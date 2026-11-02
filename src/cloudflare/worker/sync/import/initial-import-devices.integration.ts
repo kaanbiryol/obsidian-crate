@@ -7,6 +7,7 @@ import { SyncTestDevice } from '../../test-support/sync-engine-test-harness';
 import { ANOTHER_DEVICE_IMPORTING, FIRST_UPLOAD_UNFINISHED } from '../../../../sync/engine/initial-import';
 import { TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { pendingChangeKey } from '../../../../sync/pending/pending-change';
+import { vaultEntry } from '../../../../sync/runtime/vault-event-gate';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -73,7 +74,7 @@ it('holds another device\'s queued and selected uploads until the first upload f
 	const second = await device('queued-uploader');
 	second.settings.automaticSync = true; second.settings.debounceDelay = 0;
 	second.disk.write('b.md', 'beta');
-	second.engine.onFileChange(second.disk.vault.getAbstractFileByPath('b.md')!);
+	second.engine.onFileChange(vaultEntry(second.disk.vault.getAbstractFileByPath('b.md')!));
 	await vi.waitFor(() => expect(second.engine.getState().lastError).toContain(FIRST_UPLOAD_UNFINISHED), { timeout: 10_000 });
 	const selected = await second.engine.syncSelected([pendingChangeKey('upload', 'b.md')]);
 	expect(selected.success).toBe(false);

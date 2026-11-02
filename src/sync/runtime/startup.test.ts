@@ -220,7 +220,7 @@ describe('SyncRuntime startup event handling', () => {
 
 		runtime.onFileDelete(conflictFile);
 
-		expect(onFileDelete).toHaveBeenCalledWith(conflictFile);
+		expect(onFileDelete).toHaveBeenCalledWith({ path: 'notes/shared (conflict 2026-01-02 03-04-05 ab12).md', kind: 'file' });
 	});
 
 	it('does not scan the vault again after the startup sync', async () => {

@@ -4,6 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
+import { vaultEntry } from '../../../sync/runtime/vault-event-gate';
 
 const devices: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -23,7 +24,7 @@ it.each(['full', 'incremental', 'offline', 'queue'])('preserves the original rem
 	client.disk.rename('original.md', 'renamed.md');
 	client.disk.write('renamed.md', 'Irreplaceable content\nEdited after rename');
 	if (mode === 'offline') await client.open();
-	else client.engine.onFileRename(client.disk.vault.getAbstractFileByPath('renamed.md')!, 'original.md');
+	else client.engine.onFileRename(vaultEntry(client.disk.vault.getAbstractFileByPath('renamed.md')!), 'original.md');
 	if (mode === 'full' || mode === 'offline') client.settings.lastSeq = 0;
 	const singleFail = vi.spyOn(client.files, 'uploadFile').mockImplementation(async path => ({ path, success: false, error: 'Storage unavailable', code: 'storage', status: 503 }));
 	const fail = vi.spyOn(client.files, 'batchUpload').mockImplementation(async files => ({ success: false, results: files.map(file => ({ path: file.path, success: false, error: 'Storage unavailable', code: 'storage', status: 503 })) }));
@@ -31,7 +32,7 @@ it.each(['full', 'incremental', 'offline', 'queue'])('preserves the original rem
 		// Flush the same event controller used by Obsidian, with its real queue.
 		client.settings.automaticSync = true;
 		client.settings.debounceDelay = 0;
-		client.engine.onFileChange(client.disk.vault.getAbstractFileByPath('renamed.md')!);
+		client.engine.onFileChange(vaultEntry(client.disk.vault.getAbstractFileByPath('renamed.md')!));
 		await vi.waitFor(() => expect(client.engine.getState().status).toBe('error'));
 	} else expect((await client.engine.sync()).errors.length).toBeGreaterThan(0);
 	expect((await client.api.getManifest()).files['original.md']).toBeDefined();

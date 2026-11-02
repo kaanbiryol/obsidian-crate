@@ -1,7 +1,6 @@
 import { pendingChangeKey, decodePendingChange, type PendingChange } from '../pending/pending-change';
 import { PendingSet } from './pending-set';
-import { TFolder, type TAbstractFile } from 'obsidian';
-import type { SyncResult } from '../types';
+import type { SyncResult, VaultEntry } from '../types';
 import { createEmptySyncResult } from '../sync-result';
 import {
 	processPendingChanges as flushPendingQueueChanges,
@@ -78,20 +77,20 @@ export class SyncQueueController {
 		this.debouncedSync(false);
 	}
 
-	onFileChange(file: Pick<TAbstractFile, 'path'>): void {
-		if (!(file instanceof TFolder) && !this.context.shouldIgnore(file.path)) {
+	onFileChange(file: VaultEntry): void {
+		if (file.kind !== 'folder' && !this.context.shouldIgnore(file.path)) {
 			this.debouncedSync(this.addPendingPath({ kind: 'upload', path: file.path }));
 		}
 	}
 
-	onFileDelete(file: Pick<TAbstractFile, 'path'>): void {
-		if (!(file instanceof TFolder) && !this.context.shouldIgnore(file.path)) {
+	onFileDelete(file: VaultEntry): void {
+		if (file.kind !== 'folder' && !this.context.shouldIgnore(file.path)) {
 			this.debouncedSync(this.addPendingPath({ kind: 'delete', path: file.path }));
 		}
 	}
 
-	onFileRename(file: TAbstractFile, oldPath: string): void {
-		if (file instanceof TFolder) return;
+	onFileRename(file: VaultEntry, oldPath: string): void {
+		if (file.kind === 'folder') return;
 
 		const oldIgnored = this.context.shouldIgnore(oldPath);
 		const newIgnored = this.context.shouldIgnore(file.path);

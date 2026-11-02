@@ -5,6 +5,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
+import { vaultEntry } from '../../../sync/runtime/vault-event-gate';
 
 const devices: SyncTestDevice[] = [];
 let mutationLogs: unknown[][] = [];
@@ -154,7 +155,7 @@ it('recovers an uncertain merge before queued edits can upload a stale local sna
 	b.close(); await pending; await b.engine.waitForIdle(); paused.release();
 	b.disk.write('note.md', b.disk.text('note.md') + '\nQueued offline edit\n');
 	await b.open(); b.settings.automaticSync = true; b.settings.debounceDelay = 0;
-	b.engine.onFileChange(b.disk.vault.getAbstractFileByPath('note.md')!);
+	b.engine.onFileChange(vaultEntry(b.disk.vault.getAbstractFileByPath('note.md')!));
 	await vi.waitFor(() => expect(b.disk.text('note.md')).toBe(expected + '\nQueued offline edit\n'), { timeout: 10_000 });
 	await vi.waitFor(() => expect(b.engine.getState().status).toBe('idle'), { timeout: 10_000 });
 	await sync(a);

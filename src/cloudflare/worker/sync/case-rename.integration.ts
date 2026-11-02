@@ -5,6 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { pendingChangeKey } from '../../../sync/pending/pending-change';
+import { vaultEntry } from '../../../sync/runtime/vault-event-gate';
 
 const devices: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -44,7 +45,7 @@ describe.each([['case-insensitive', true], ['case-sensitive', false]] as const)(
 			renamer.settings.debounceDelay = 0;
 		}
 		renamer.disk.rename('todo.md', 'TODO.md');
-		renamer.engine.onFileRename(renamer.disk.vault.getAbstractFileByPath('TODO.md')!, 'todo.md');
+		renamer.engine.onFileRename(vaultEntry(renamer.disk.vault.getAbstractFileByPath('TODO.md')!), 'todo.md');
 		if (mode === 'queue') {
 			await vi.waitFor(() => expect(renamer.engine.getPendingKeys()).toEqual([]));
 			await renamer.engine.waitForIdle();
@@ -88,7 +89,7 @@ it('deletes an unrelated queued file while a namespace conflict keeps its upload
 	first.settings.debounceDelay = 0;
 	first.disk.write('Projects.md', 'From the first device');
 	first.disk.remove('old.md');
-	first.engine.onFileChange(first.disk.vault.getAbstractFileByPath('Projects.md')!);
+	first.engine.onFileChange(vaultEntry(first.disk.vault.getAbstractFileByPath('Projects.md')!));
 	first.engine.onFileDelete({ path: 'old.md' } as never);
 	await vi.waitFor(() => expect(first.engine.getState().status).toBe('error'));
 	await first.engine.waitForIdle();
