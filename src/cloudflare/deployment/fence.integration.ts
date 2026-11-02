@@ -1,15 +1,15 @@
-import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
+import { completePublishedDeployment, recoverDeployment } from './update-recovery';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
-import { applySchema } from './test-support/schema-test-harness';
-import { provisionCloudflareDeployment } from '../deployment/provisioner';
+import { applySchema } from '../worker/test-support/schema-test-harness';
+import { provisionCloudflareDeployment } from './provisioner';
 import { CloudflareApiError, type CloudflareWorkerSettings } from '../cloudflare-api';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
-import { SERVER_RELEASE } from '../deployment/database-upgrades';
-import type { CloudflareDeploymentMetadata } from '../deployment/types';
+import { SERVER_RELEASE } from './database-upgrades';
+import type { CloudflareDeploymentMetadata } from './types';
 
 // Recovery tests exercise an older publication, independently of the launch revision.
 vi.mock('../server-release.json', async importOriginal => {
@@ -562,7 +562,7 @@ it('coordinates terminal deletion with only an old key/value administration tabl
 		step: 'unrecognized-step', stepState: 'confirmed', verificationPending: true });
 	await env.DB.prepare('INSERT INTO maintenance_state (key, value) VALUES (?, ?)').bind(DEPLOYMENT_FENCE_KEY, previous).run();
 	const api = { queryD1: async (_account: string, _database: string, sql: string, params?: string[]) => [await env.DB.prepare(sql).bind(...params ?? []).all()] };
-	const { withDeploymentFence } = await import('../deployment/fence');
+	const { withDeploymentFence } = await import('./fence');
 	await withDeploymentFence({ api, accountId: 'a'.repeat(32), databaseId: 'database', recoverDeletionValue: previous,
 		record: { worker, kind: 'delete', version: '', deletionPending: true } }, async fence => {
 		await fence.mutate(async () => {}, 'delete-worker');

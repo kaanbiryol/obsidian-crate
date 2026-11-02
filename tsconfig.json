@@ -37,6 +37,7 @@
 	],
 	"exclude": [
 		"src/cloudflare/worker/**",
+		"src/cloudflare/**/*.integration.ts",
 		"src/pwa/service-worker/**"
 	]
 }

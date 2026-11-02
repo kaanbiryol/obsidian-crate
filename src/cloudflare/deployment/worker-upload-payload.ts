@@ -1,5 +1,5 @@
 import { normalizeVaultName, VAULT_NAME_BINDING } from '../vault-name';
-import serverDeleteWorkerSource from '../worker/standalone/server-delete-worker.js?raw';
+import serverDeleteWorkerSource from '../server-reset/server-delete-worker.js?raw';
 import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from '../notification-rate-binding';
 import { randomBase64Url } from '../oauth/pkce';
 import type { CloudflareDeploymentArtifacts } from './artifacts';

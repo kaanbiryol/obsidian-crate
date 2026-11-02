@@ -35,6 +35,14 @@ export default tseslint.config(
 			},
 		},
 	},
+	{
+		// Worker runtime tests outside worker/ and the deletion Worker type-check with the Worker project.
+		files: ['src/cloudflare/**/*.integration.ts', 'src/cloudflare/server-reset/server-delete-worker.js'],
+		ignores: ['src/cloudflare/worker/**'],
+		languageOptions: {
+			parserOptions: { projectService: false, project: './src/cloudflare/worker/tsconfig.json' },
+		},
+	},
 	...obsidianmd.configs.recommended,
 	{
 		files: ['**/*.{ts,tsx,js,mjs,mts}'],

@@ -8,7 +8,9 @@
 		"./**/*.ts",
 		"./**/*.tsx",
 		"./**/*.js",
-		"./**/*.d.ts"
+		"./**/*.d.ts",
+		"../**/*.integration.ts",
+		"../server-reset/server-delete-worker.js"
 	],
 	"exclude": []
 }

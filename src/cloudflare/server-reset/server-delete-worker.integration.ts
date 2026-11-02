@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import worker from './server-delete-worker.js';
-import { sha256Hex } from '../../../platform/sha256';
+import { sha256Hex } from '../../platform/sha256';
 
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 const token = 'b'.repeat(64), id = 'c'.repeat(32), uploadTag = `crate-${crypto.randomUUID()}`;

@@ -3,8 +3,8 @@ import { afterEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import currentSchema from '../schema.sql?raw';
-import { migrationTransaction, planDatabaseUpgrade, SERVER_RELEASE } from '../deployment/database-upgrades';
-import { inspectDeploymentDatabase } from '../deployment/database';
+import { migrationTransaction, planDatabaseUpgrade, SERVER_RELEASE } from './database-upgrades';
+import { inspectDeploymentDatabase } from './database';
 import { sha256Hex } from '../../platform/sha256';
 
 afterEach(reset);
