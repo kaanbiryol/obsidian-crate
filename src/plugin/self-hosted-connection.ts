@@ -1,13 +1,12 @@
 import { ConnectionSetupError } from '../sync/connection/connection-errors';
 import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
-import { SyncApiClient } from '../sync/worker-api/client';
 import { requireNormalizedWorkerUrl } from '../sync/connection/worker-url';
 import { exchangeSelfHostedPairingCode } from '../sync/connection/self-hosted-pairing';
 import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { isSha256Hex } from '../platform/validation';
 import { SECRET_KEYS } from '../platform/secret-keys';
-import { writeSyncSettings } from './sync-connection';
+import { verifyVaultCredential, writeSyncSettings } from './sync-connection';
 import { confirmVaultReplacement } from './vault-replacement';
 
 const connecting = new WeakSet<CratePlugin>();
@@ -35,11 +34,7 @@ export async function updateSelfHostedServerAddress(plugin: CratePlugin, address
 			await plugin.syncRuntime.updateEncryptionResetAddress(workerUrl, signal);
 			return;
 		}
-		const api = new SyncApiClient(workerUrl, expected.authToken);
-		api.setAbortSignal(signal);
-		const check = await api.testConnection();
-		if (!check.success) throw new Error(check.error || 'Could not connect to this server.');
-		await api.listTokens();
+		await verifyVaultCredential(workerUrl, expected.authToken, signal);
 		const keys = loadEncryptionKeys(plugin.secretStorage);
 		if (keys) {
 			await plugin.syncRuntime.updateEncryptedServerAddress(workerUrl, signal, expected);
@@ -74,13 +69,7 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 	connecting.add(plugin);
 	try {
 		if (pairing) authToken = await exchangeSelfHostedPairingCode(workerUrl, authToken, signal);
-		const api = new SyncApiClient(workerUrl, authToken);
-		api.setAbortSignal(signal);
-		const check = await api.testConnection();
-		if (!check.success) throw new Error(check.error || 'Could not connect to this server.');
-		// Health alone is not proof of vault authority. Reminder-only sessions
-		// cannot list devices or read shared settings.
-		await api.listTokens();
+		const api = await verifyVaultCredential(workerUrl, authToken, signal);
 		const encryption = await api.getEncryptionState();
 		const shared = encryption ? { settings: null } : await api.getSharedSettings();
 		signal.throwIfAborted();
