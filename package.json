@@ -154,7 +154,7 @@
 		"htmlparser2": "12.0.0",
 		"idb": "^8.0.4",
 		"jose": "6.2.13",
-		"lexical": "0.52.0",
+		"lexical": "0.53.0",
 		"linkedom": "0.18.13",
 		"lucide-react": "^1.61.0",
 		"marked": "18.1.1",
