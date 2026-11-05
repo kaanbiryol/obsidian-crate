@@ -396,7 +396,35 @@ takes the public address offline until the next start.
 The address is tied to this computer's name in Tailscale. Renaming the computer
 changes the address, so Crate refuses to start until you rename it back. On Linux,
 Funnel needs permission for your user once: `sudo tailscale set --operator=$USER`.
-Funnel is not available in the Docker image yet. Run Crate directly on the computer.
+
+### Tailscale Funnel with Docker
+
+Docker runs Tailscale in its own container next to Crate, so the host computer
+does not need Tailscale installed. The address becomes
+`https://crate.<your-tailnet>.ts.net`; set `CRATE_TAILSCALE_HOSTNAME` to use
+another name than `crate`.
+
+1. In the Tailscale admin console, turn on **MagicDNS** and **HTTPS certificates**.
+2. Allow Funnel in your tailnet policy file. Running `tailscale funnel` once on any
+   device offers to add it for you; otherwise add:
+
+```json
+"nodeAttrs": [{ "target": ["autogroup:member"], "attr": ["funnel"] }]
+```
+
+3. Start both containers:
+
+```sh
+docker compose -f compose.yaml -f compose.tailscale.yaml up -d --build
+docker compose -f compose.yaml -f compose.tailscale.yaml logs -f crate
+```
+
+The Crate log prints a Tailscale sign-in link the first time; open it to add the
+container to your tailnet. To sign in without the link, set `TS_AUTHKEY` to an
+auth key from the admin console when starting. Tailscale keeps its sign-in in the
+`tailscale-state` volume, so later starts need neither. Crate then prints the
+address and pairing code as usual. Pass both `-f` files to every
+`docker compose` command for this setup, including `exec crate crate pair`.
 
 Tailscale terminates HTTPS on this computer and relays traffic without decrypting
 it. Funnel has bandwidth limits that Tailscale does not publish; very large

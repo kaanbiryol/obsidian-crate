@@ -6,7 +6,7 @@ import { packaged, runtimeRoot } from './assets.mjs';
 import { openLocalRuntime, issueLocalDevice, listLocalDevices, revokeLocalDevice } from './local-server-runtime.mjs';
 import { listenLocalServer } from './local-server-http.mjs';
 import { ensureCloudflared, normalizeTunnelHostname, readRemoteSettings, saveQuickSettings, saveTailscaleSettings, setupRemoteAccess, startTunnel } from './local-server-tunnel.mjs';
-import { findTailscale, startTailscaleFunnel, tailscaleHostname } from './local-server-tailscale.mjs';
+import { currentTailscaleHostname, startTailscaleFunnel, tailscaleSocket } from './local-server-tailscale.mjs';
 import { runProcess } from './local-server-process.mjs';
 import { startQuickServer } from './local-server-quick.mjs';
 import { createPairing, requestLocalControl, requestLocalPairing, startLocalControl } from './local-server-pairing.mjs';
@@ -110,7 +110,7 @@ try {
 		if (values.quick && (values.hostname || values.local || values.origin || values.host || command === 'add-device')) throw new Error('--quick cannot be combined with hostname, local, origin, host, or add-device.');
 		if (command !== 'setup' && values.hostname) throw new Error('--hostname belongs to setup. Use --origin for an external reverse proxy.');
 		if (values.tailscale && (command !== 'setup' || values.hostname || values.quick)) throw new Error('--tailscale belongs to setup and cannot be combined with --hostname or --quick. Later starts reuse it.');
-		if (values.tailscale && docker) throw new Error('Tailscale Funnel is not available in the Docker image yet. Run Crate directly on this computer, or use --hostname.');
+		if (values.tailscale && docker && !tailscaleSocket()) throw new Error('In Docker, start Tailscale Funnel with compose.tailscale.yaml. See docs/self-hosting.md.');
 		if (command === 'add-device' && !values.name?.trim()) throw new Error('Provide --name for this device.');
 		if (values.name !== undefined && (!values.name.trim() || values.name.trim().length > 128)) throw new Error('Provide a device name between 1 and 128 characters.');
 		process.umask(0o077);
@@ -173,7 +173,7 @@ try {
 				await buildIfSource();
 				// Lock and validate storage before exposing anything.
 				runtime = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
-				const hostname = await tailscaleHostname(await findTailscale());
+				const hostname = await currentTailscaleHostname(shutdown.signal);
 				if (remote && remote.hostname !== hostname) throw new Error(`This directory was set up for https://${remote.hostname}. Rename this computer back in Tailscale to keep connected devices and PWAs.`);
 				remote = await saveTailscaleSettings(dataDir, hostname, port);
 				await runtime.close();

@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
-import { findTailscale, startTailscaleFunnel, tailscaleHostname } from '../src/local-server-tailscale.mjs';
+import { findTailscale, socketTailscaleHostname, startTailscaleFunnel, tailscaleHostname } from '../src/local-server-tailscale.mjs';
 import { readRemoteSettings, remotePaths, saveTailscaleSettings } from '../src/local-server-tunnel.mjs';
 
 const missing = () => Object.assign(new Error('missing'), { code: 'ENOENT' });
@@ -36,6 +36,21 @@ test('Funnel runs in the foreground for the saved port and refuses a renamed com
 	assert.deepEqual(started, [['tailscale', 'funnel', '--https=443', 'http://127.0.0.1:8800']]);
 	await assert.rejects(startTailscaleFunnel({ hostname: 'old-mac.tail1234.ts.net', port: 8800 }, undefined, { run: status(), platform: 'linux', start }), /Rename the computer back/);
 	assert.equal(started.length, 1);
+});
+
+test('in Docker, the name comes from the shared socket after the Tailscale container signs in', async () => {
+	const responses = [Object.assign(new Error('no socket'), { code: 'ENOENT' }),
+		{ BackendState: 'NeedsLogin', AuthURL: 'https://login.tailscale.com/a/example' },
+		{ BackendState: 'NeedsLogin', AuthURL: 'https://login.tailscale.com/a/example' },
+		{ BackendState: 'Running', Self: { DNSName: 'crate.tail1234.ts.net.' } }];
+	const logged = [];
+	const status = async () => { const next = responses.shift(); if (next instanceof Error) throw next; return JSON.stringify(next); };
+	assert.equal(await socketTailscaleHostname('/sock', { interval: 1, log: line => logged.push(line), status }), 'crate.tail1234.ts.net');
+	assert.deepEqual(logged, ['Waiting for the Tailscale container to start and sign in.', 'Sign in to Tailscale to finish setup: https://login.tailscale.com/a/example']);
+	await assert.rejects(socketTailscaleHostname('/sock', { status: async () => { throw Object.assign(new Error('denied'), { code: 'EACCES' }); } }), /denied/);
+	const stopped = new AbortController();
+	stopped.abort();
+	await assert.rejects(socketTailscaleHostname('/sock', { signal: stopped.signal, status }), { name: 'AbortError' });
 });
 
 test('saved Funnel settings keep their address and reject other setups', async t => {
