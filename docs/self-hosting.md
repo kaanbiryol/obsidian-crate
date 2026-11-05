@@ -354,8 +354,8 @@ npm run pack:server
 npx ./dist/kaanbiryol-crate-server-*.tgz
 ```
 
-Once published, users run `npx @kaanbiryol/crate-server`. Maintainers publish
-it with `npm run publish:server`; see [releases](releases.md#publish-the-server-package).
+Once published, users run `npx @kaanbiryol/crate-server`. Each published plugin
+release publishes the matching version; see [releases](releases.md#publish-the-server-package).
 Subsequent runs reuse `~/.crate/server` by default.
 Pass **--data-dir** to keep multiple vault servers separate. Run
 `npx ./dist/kaanbiryol-crate-server-*.tgz pair --name "My phone"`

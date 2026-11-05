@@ -137,16 +137,26 @@ because token-created release events do not start another workflow.
 The standalone server, `@kaanbiryol/crate-server`, ships the Worker built from the
 release commit, so it always carries the plugin's version. Packaging takes the
 version from the root `package.json`; `packages/server` has none of its own.
-Publish it after the plugin release, from a clean checkout of the release
-commit, signed in with `npm login`:
 
-```sh
-npm run publish:server
-```
+Publishing the GitHub release starts **Publish server package**
+(`.github/workflows/publish-server.yml`). It checks out the release tag, refuses a
+draft or a tag that does not match the version, then runs `npm run publish:server`:
+it builds the stable Worker into `dist/server`, runs the packed `npx` installation
+test and publishes the staged package. Prereleases are skipped, and a version
+already on npm is left alone, so rerunning it is safe. To retry or publish an
+older published release, run the workflow from **Actions** with its tag.
 
-This builds the stable Worker into `dist/server`, runs the packed `npx`
-installation test, then publishes the staged package. A development build is
-refused. Append `-- --dry-run` to check the package contents without publishing.
-Publish every plugin release, even when the server did not change, so users can
-match the server to their plugin version. npm never accepts the same version
-twice, so a failed publish after upload needs a new release version.
+The workflow uses npm trusted publishing: npm accepts it only from this
+repository's workflow, needs no stored token and records provenance for each
+version. npm only lets an existing package add a trusted publisher, so the first
+version is published by hand:
+
+1. Sign in with `npm login` and, from a clean checkout of the release commit with
+   no watcher rebuilding `.generated/`, run `npm run publish:server`. Append
+   `-- --dry-run` to check the package contents first.
+2. On npmjs.com, open the package's **Settings**, add a trusted publisher for
+   GitHub Actions with repository `kaanbiryol/obsidian-crate` and workflow
+   `publish-server.yml`, and require trusted publishing for new versions.
+
+A development build is always refused. npm never accepts the same version twice,
+so a failed publish after upload needs a new release version.

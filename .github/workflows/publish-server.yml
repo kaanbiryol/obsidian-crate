@@ -1,0 +1,63 @@
+name: Publish server package
+
+# Publishes @kaanbiryol/crate-server with the plugin's version once its GitHub
+# release is published, never from a draft. npm accepts each version only once.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag to publish to npm
+        required: true
+        type: string
+
+concurrency:
+  group: publish-server-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # npm trusted publishing: no stored token, and npm records provenance.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+      - name: Check the release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          test "$version" = "$RELEASE_TAG" || { echo "Tag $RELEASE_TAG does not match package version $version"; exit 1; }
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = "false" || { echo "Refusing to publish a draft release"; exit 1; }
+          node -e "const [a, b, c] = process.argv[1].split('.').map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)" "$(npm --version)" \
+            || { echo "Trusted publishing needs npm 11.5.1 or later"; exit 1; }
+          if npm view "@kaanbiryol/crate-server@$version" version >/dev/null 2>&1; then
+            echo "@kaanbiryol/crate-server@$version is already on npm; nothing to publish."
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.check.outputs.published != 'true'
+        run: npm ci --no-audit --no-fund
+      - name: Build, test and publish the packed server
+        if: steps.check.outputs.published != 'true'
+        run: npm run publish:server
