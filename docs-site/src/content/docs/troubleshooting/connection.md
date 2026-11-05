@@ -18,7 +18,7 @@ If signing in was interrupted, go back to Crate settings and select **Connect wi
 
 R2 is Cloudflare's file storage, and Crate needs it turned on.
 
-1. Open the Cloudflare dashboard, signed in to the same account you chose during setup.
+1. Select **Open R2 in Cloudflare**, or open the Cloudflare dashboard signed in to the same account you chose during setup.
 2. Finish turning on R2.
 3. Try connecting again.
 

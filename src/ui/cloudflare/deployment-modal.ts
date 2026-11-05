@@ -18,6 +18,7 @@ export type CloudflareDeploymentMode = 'setup' | 'update';
 interface FailureOptions {
 	dismissLabel?: string;
 	technicalDetails?: string;
+	helpLink?: { label: string; url: string };
 	action?: { label: string; onClick: () => void };
 }
 

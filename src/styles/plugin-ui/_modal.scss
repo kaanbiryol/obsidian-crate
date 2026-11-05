@@ -45,6 +45,12 @@
   overflow-wrap: anywhere;
 }
 
+.crate-status-link a {
+  color: var(--link-color, var(--interactive-accent));
+  text-decoration: underline;
+  &:hover { color: var(--link-color-hover, var(--link-color, var(--interactive-accent))); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .crate-status-icon.is-working svg { animation: none; }
 }

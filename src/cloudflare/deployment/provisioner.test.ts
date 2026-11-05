@@ -4,7 +4,7 @@ import type { CloudflareDeploymentMetadata } from './types';
 import { CloudflareApiError, type CloudflareWorkerSettings } from '../cloudflare-api';
 import { recoverDeployment } from './update-recovery';
 import type { CloudflareApiClient } from '../cloudflare-api';
-import { provisionCloudflareDeployment } from './provisioner';
+import { provisionCloudflareDeployment, R2NotActiveError } from './provisioner';
 import { createFenceQueryHarness } from './fence-test-harness';
 import { UPDATE_STEPS } from './fence';
 
@@ -188,7 +188,8 @@ describe('provisionCloudflareDeployment', () => {
 	it('records only steps that update recovery can resume from', async () => {
 		const api = createApi();
 		// A first installation creates its resources; the second run is an ordinary update.
-		api.getR2Bucket.mockResolvedValueOnce(null);
+		// The first run reads the bucket twice: the R2 access check, then bucket preparation.
+		api.getR2Bucket.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 		api.getWorkersSubdomain.mockResolvedValueOnce(null as never);
 		api.createWorkersSubdomain.mockImplementation(async (_account: string, name: string) => name);
 		const query = api.queryD1.getMockImplementation()!;
@@ -204,17 +205,25 @@ describe('provisionCloudflareDeployment', () => {
 		expect([...steps].filter(step => !(UPDATE_STEPS as readonly string[]).includes(step))).toEqual([]);
 	});
 
-	it('explains how to activate R2 when the account is not entitled', async () => {
+	it('explains how to activate R2 before creating any resource when the account is not entitled', async () => {
 		const api = createApi();
 		api.getR2Bucket.mockRejectedValue(new CloudflareApiError('not entitled', 403, 10042));
+		const metadata = createMetadata();
+		metadata.d1DatabaseId = null;
 
-		await expect(provisionCloudflareDeployment({
+		const result = provisionCloudflareDeployment({
 			api: api as never,
 			accountId: '0123456789abcdef0123456789abcdef',
-			metadata: createMetadata(),
+			metadata,
 			artifacts,
 			onMetadataChanged: vi.fn(async () => {}),
-		})).rejects.toThrow('Enable an R2 subscription');
+		});
+		await expect(result).rejects.toThrow('Complete the R2 checkout');
+		await expect(result).rejects.toBeInstanceOf(R2NotActiveError);
+		await expect(result).rejects.toMatchObject({ accountId: '0123456789abcdef0123456789abcdef' });
+		expect(api.findD1Database).not.toHaveBeenCalled();
+		expect(api.createD1Database).not.toHaveBeenCalled();
+		expect(api.createR2Bucket).not.toHaveBeenCalled();
 	});
 
 	it('keeps the update locked and unrecorded when live verification fails', async () => {

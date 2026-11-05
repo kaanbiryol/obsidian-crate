@@ -29,7 +29,7 @@ export function renderConfigSection(context: SettingsSectionContext, showHeading
 				? 'Reconnect to your previous server using your saved Cloudflare login. Sign in again only if needed.'
 				: Platform.isMobile
 					? 'Sign in to connect to your existing Crate server. To create a server, use Obsidian on a desktop.'
-					: 'Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.')
+					: 'Sign in to connect to an existing Crate server or create one in your Cloudflare account. A new server needs a Cloudflare account with R2 turned on. Cloudflare plan limits and usage charges may apply.')
 			.addButton(button => button
 				.setButtonText(connectionLabel)
 				.setCta()

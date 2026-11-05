@@ -7,6 +7,7 @@ export interface StatusContentProps {
 	description: string;
 	details?: string[];
 	technicalDetails?: string;
+	helpLink?: { label: string; url: string };
 }
 
 function WorkingDuration() {
@@ -20,7 +21,7 @@ function WorkingDuration() {
 	return <p className="crate-status-guidance">Elapsed: {duration} · Keep Obsidian open.</p>;
 }
 
-export function StatusContent({ state, description, details, technicalDetails }: StatusContentProps) {
+export function StatusContent({ state, description, details, technicalDetails, helpLink }: StatusContentProps) {
 	return <>
 		<div className="crate-status-content" role="status" aria-live="polite" aria-busy={state === 'working'}>
 			<span className={`crate-status-icon is-${state}`} aria-hidden="true">
@@ -30,6 +31,7 @@ export function StatusContent({ state, description, details, technicalDetails }:
 		</div>
 		{state === 'working' && <WorkingDuration />}
 		{details?.map((detail, index) => <p className="crate-status-guidance" key={index}>{detail}</p>)}
+		{helpLink && <p className="crate-status-link"><a href={helpLink.url} target="_blank" rel="noopener noreferrer">{helpLink.label}</a></p>}
 		{technicalDetails && <SettingsDisclosure title="Technical details">
 			<p>{technicalDetails}</p>
 		</SettingsDisclosure>}

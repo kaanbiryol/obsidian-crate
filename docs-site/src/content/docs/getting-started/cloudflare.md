@@ -50,6 +50,6 @@ For billing and account management, use your Cloudflare dashboard.
 
 ## If setup doesn't finish
 
-- **R2 is not active for this Cloudflare account:** finish turning on R2 in that same account, then try again.
+- **Turn on R2 in Cloudflare:** select **Open R2 in Cloudflare**, finish turning on R2 in that same account, then try again.
 - **Sign-in doesn't return to Obsidian, or the server can't be reached:** see [Connection problems](/docs/troubleshooting/connection/).
 - **Crate asks for a newer server:** connecting an existing server doesn't upgrade it. Follow [Updates](/docs/troubleshooting/updates/).

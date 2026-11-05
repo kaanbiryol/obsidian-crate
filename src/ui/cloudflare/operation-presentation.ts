@@ -1,4 +1,5 @@
 import type { DeploymentIntent } from '../../cloudflare/deployment/types';
+import { r2DashboardUrl } from '../../cloudflare/deployment/provisioner';
 import type { ConnectionTestResult } from '../../sync/types';
 import type { CloudflareDeploymentModal } from './deployment-modal';
 
@@ -9,6 +10,8 @@ interface OperationContext {
 	openSettings: () => void;
 	recoverUpdate: () => void;
 }
+
+const R2_SETUP_DOCS_URL = 'https://crate.kaanbiryol.com/docs/getting-started/cloudflare/#before-you-connect';
 
 /** Presentation only: authorization, target checks and service dispatch stay with the caller. */
 export class CloudflareOperationPresentation {
@@ -30,7 +33,7 @@ export class CloudflareOperationPresentation {
 		this.progress.fail('Could not connect to Cloudflare', message, ['Try again from Crate settings.']);
 	}
 
-	operationFailed(message: string, recovery: { needsReview: boolean; canResumeDeletion: boolean; unupgradable?: boolean }): void {
+	operationFailed(message: string, recovery: { needsReview: boolean; canResumeDeletion: boolean; unupgradable?: boolean; r2InactiveAccountId?: string }): void {
 		const { intent, shouldConnectDevice, openSettings, recoverUpdate } = this.context;
 		const deleteAction = recovery.canResumeDeletion ? 'Resume server deletion' : 'Delete server and all data';
 		const deleting = intent === 'delete' || recovery.canResumeDeletion;
@@ -61,6 +64,14 @@ export class CloudflareOperationPresentation {
 			this.progress.fail('This server can’t be updated', message,
 				['Open Crate settings → Advanced server actions and select Delete server and all data, then connect again to create a new server. Your local vault files are kept.'],
 				{ action: { label: 'Open settings', onClick: openSettings } });
+			return;
+		}
+		if (recovery.r2InactiveAccountId && intent !== 'delete') {
+			const url = r2DashboardUrl(recovery.r2InactiveAccountId);
+			this.progress.fail('Turn on R2 in Cloudflare', 'Crate stores your vault files in Cloudflare R2, which isn’t active for this account yet.',
+				['In Cloudflare, open R2 and complete the checkout. Cloudflare may ask for a payment method even if you stay within the free allowance.',
+					shouldConnectDevice ? 'Then select “Connect with Cloudflare” in Crate settings again.' : 'Then select “Update server” in Crate settings again.'],
+				{ technicalDetails: message, helpLink: { label: 'R2 setup guide', url: R2_SETUP_DOCS_URL }, action: { label: 'Open R2 in Cloudflare', onClick: () => { window.open(url, '_blank', 'noopener,noreferrer'); } } });
 			return;
 		}
 		if (intent === 'delete') {

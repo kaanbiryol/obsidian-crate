@@ -46,6 +46,23 @@ async function ensureD1Database(
 	return created.uuid;
 }
 
+/** Cloudflare rejects R2 calls with 10042 until the account completes R2 checkout. */
+export class R2NotActiveError extends Error {
+	constructor(readonly accountId: string) {
+		super('R2 is not active for this Cloudflare account. Complete the R2 checkout in the Cloudflare dashboard, then select Connect with Cloudflare again.');
+		this.name = 'R2NotActiveError';
+	}
+}
+
+export function r2DashboardUrl(accountId: string): string {
+	return `https://dash.cloudflare.com/${encodeURIComponent(accountId)}/r2/overview`;
+}
+
+function rethrowR2Error(error: unknown, accountId: string): never {
+	if (error instanceof CloudflareApiError && error.code === 10042) throw new R2NotActiveError(accountId);
+	throw error;
+}
+
 async function ensureR2Bucket(
 	api: CloudflareApiClient,
 	accountId: string,
@@ -58,12 +75,7 @@ async function ensureR2Bucket(
 		if (!allowCreate) throw new Error('The saved server file bucket is missing. Restore its data or explicitly create a new server.');
 		await fence.mutate(() => api.createR2Bucket(accountId, bucketName), 'create-file-bucket');
 	} catch (error) {
-		if (error instanceof CloudflareApiError && error.code === 10042) {
-			throw new Error(
-				'R2 is not active for this Cloudflare account. Enable an R2 subscription in the Cloudflare dashboard, then select Connect with Cloudflare again.',
-			);
-		}
-		throw error;
+		rethrowR2Error(error, accountId);
 	}
 }
 
@@ -133,6 +145,8 @@ export async function provisionCloudflareDeployment(input: {
 	}
 	const previousVaultName = input.metadata.vaultName;
 	const expectedRemote = await checkRemoteDeployment(input);
+	// Read-only R2 check first, so an account without R2 fails before any resource is created.
+	await input.api.getR2Bucket(input.accountId, input.metadata.r2BucketName).catch((error: unknown) => rethrowR2Error(error, input.accountId));
 	input.onProgress?.('Preparing the server database…');
 	const databaseId = await ensureD1Database(input.api, input.accountId, input.metadata);
 	if (!databaseId) throw new Error('Cloudflare did not return the new D1 database ID');

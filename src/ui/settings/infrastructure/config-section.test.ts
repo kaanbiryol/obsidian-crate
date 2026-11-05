@@ -127,7 +127,7 @@ describe('renderConfigSection integration', () => {
 			'Server address', 'Pairing code or access token', 'Connect to your server',
 		]);
 		expect(getSettingByName('Connect with Cloudflare').descEl.textContent).toBe(
-			'Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.',
+			'Sign in to connect to an existing Crate server or create one in your Cloudflare account. A new server needs a Cloudflare account with R2 turned on. Cloudflare plan limits and usage charges may apply.',
 		);
 		getSettingByName('Connect with Cloudflare').buttons[0]?.click();
 		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);

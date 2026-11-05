@@ -7,6 +7,7 @@ import { checkAndRecoverUpdate } from './recovery';
 import { beginCloudflareOperation } from './operation-guard';
 import { DeploymentRecoveryRequiredError } from '../../cloudflare/deployment/fence';
 import { UnupgradableServerError } from '../../cloudflare/deployment/database';
+import { R2NotActiveError } from '../../cloudflare/deployment/provisioner';
 import { Notice, Platform } from 'obsidian';
 import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';
 import type CratePlugin from '../CratePlugin';
@@ -215,6 +216,7 @@ async function handleDeploymentFailure({ plugin, signal, savedIntent, intent, pr
 		needsReview,
 		canResumeDeletion: Boolean(plugin.settings.cloudflareDeployment?.deletion),
 		unupgradable: error instanceof UnupgradableServerError,
+		r2InactiveAccountId: error instanceof R2NotActiveError ? error.accountId : undefined,
 	});
 }
 

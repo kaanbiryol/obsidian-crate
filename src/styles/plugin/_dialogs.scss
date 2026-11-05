@@ -196,6 +196,7 @@
 	&:not(.is-working) .crate-modal-body {
 		> .crate-status-content { margin-bottom: 12px; }
 		> .crate-status-guidance { margin: 0 0 8px; }
+		> .crate-status-link { margin: 0 0 8px; }
 		> .crate-settings-disclosure { margin-top: 16px; }
 		> :last-child { margin-bottom: 0; }
 	}

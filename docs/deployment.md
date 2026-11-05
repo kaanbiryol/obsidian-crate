@@ -112,7 +112,7 @@ Stored data includes retained file versions as well as current vault files. Othe
 
 ### R2 activation error
 
-If Crate shows **R2 is not active for this Cloudflare account** (Cloudflare error `10042`):
+If Crate shows **Turn on R2 in Cloudflare** (Cloudflare error `10042`), it checked R2 before creating any server resources. Select **Open R2 in Cloudflare** to open R2 for the selected account, then:
 
 1. Follow the [activation steps above](#activate-r2-before-connecting) for the account selected during authorization. Adding a payment method alone does not complete R2 activation; finish the R2 checkout flow.
 2. Return to Crate and select **Connect with Cloudflare** again, authorizing that same account.
