@@ -13,7 +13,7 @@ Vault sync and the web app need a Crate server. You decide where it runs, and yo
 | Setup | Connect your Cloudflare account in Obsidian | Run the repository's Docker setup |
 | Where your data lives | Storage and a database in your Cloudflare account | A persistent Docker volume on your machine |
 | Availability | Your computer can sleep | Your machine must stay awake and online |
-| Address | A server address from your deployment | A temporary tunnel address by default; a custom domain makes it permanent |
+| Address | A server address from your deployment | A temporary tunnel address by default; Tailscale or a custom domain makes it permanent |
 | What you look after | Cloudflare account, usage, and server updates | The machine, Docker, backups, and server updates |
 
 ## Cloudflare
@@ -28,7 +28,7 @@ Before connecting, you need to turn on R2, Cloudflare's file storage. Cloudflare
 
 Choose Docker if you want the server's files and database on hardware you manage. The default setup includes an HTTPS tunnel, so you don't need a Cloudflare account or your own domain.
 
-Your machine needs to stay awake, online, and running Docker for sync and scheduled notifications to work. The default tunnel address changes whenever it restarts.
+Your machine needs to stay awake, online, and running Docker for sync and scheduled notifications to work. The default tunnel address changes whenever it restarts; a free Tailscale account gives you [one that never changes](/docs/getting-started/self-hosting/#get-an-address-that-never-changes), without a domain.
 
 [Set up with Docker →](/docs/getting-started/self-hosting/)
 

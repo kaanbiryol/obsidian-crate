@@ -54,7 +54,25 @@ Running the server directly with Node instead of Docker? See the [server command
 
 Sync and scheduled notifications only work while the server is running. Keep the machine awake, online, and running Docker.
 
-The default tunnel address changes every time the server restarts. When it does, on each Obsidian device use **Settings → Crate → Server → Update server address**, sync, then reconnect the web app. For an address that never changes, set up a [custom-domain tunnel](/docs/reference/self-hosting/#access-away-from-home-with-cloudflare-tunnel).
+The default tunnel address changes every time the server restarts. When it does, on each Obsidian device use **Settings → Crate → Server → Update server address**, sync, then reconnect the web app. To avoid this, [get an address that never changes](#get-an-address-that-never-changes).
+
+## Get an address that never changes
+
+Without your own domain, use Tailscale Funnel. It gives the server a permanent address like `https://crate.your-tailnet.ts.net`, and your phone doesn't need Tailscale installed. You need a free Tailscale account:
+
+1. In the [Tailscale admin console](https://login.tailscale.com/admin/dns), turn on **MagicDNS** and **HTTPS certificates**, and [allow Funnel](/docs/reference/self-hosting/#tailscale-funnel-with-docker) for your devices.
+2. Start Crate with the Tailscale setup instead:
+
+   ```sh
+   docker compose -f compose.yaml -f compose.tailscale.yaml up -d --build
+   docker compose -f compose.yaml -f compose.tailscale.yaml logs -f crate
+   ```
+
+3. Open the Tailscale sign-in link from the logs. Crate then prints its address and pairing code as before.
+
+Use both `-f` files in every later command, including `exec crate crate pair`. If you already connected devices with the default tunnel, use **Update server address** on each one and reconnect the web app once.
+
+If you have a domain on Cloudflare, you can use a [custom-domain tunnel](/docs/reference/self-hosting/#access-away-from-home-with-cloudflare-tunnel) instead.
 
 ## Look after your data
 
