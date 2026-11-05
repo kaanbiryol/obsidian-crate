@@ -5,6 +5,7 @@
   .crate-modal-body.crate-encryption-setup { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 
   .crate-encryption-status > .setting-item { border: 0; padding: 0; }
+  .crate-encryption-status > .crate-settings-disclosure { margin-top: 12px; }
   .crate-encryption-status > .setting-item .setting-item-info { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
   .crate-encryption-status > .setting-item .setting-item-control { display: none; }
   .crate-encryption-manage__status { display: flex; flex-direction: column; gap: 4px; padding-bottom: var(--crate-dialog-gap); font-size: var(--crate-settings-label-size); }
@@ -30,6 +31,7 @@
   .crate-recovery-verification .setting-item-control { width: 100%; }
   .crate-encryption-feedback { margin: 8px 0 0; font-size: var(--crate-settings-description-size); line-height: 1.5; color: var(--text-muted); overflow-wrap: anywhere; }
   .crate-encryption-feedback:empty { display: none; }
+  .crate-modal-body > .crate-encryption-feedback:not(:last-child) { margin-bottom: 12px; }
   .crate-encryption-feedback.is-verified { color: var(--text-success); }
   .crate-encryption-operation { display: flex; flex-direction: column; justify-content: safe center; gap: 16px; }
   .crate-encryption-operation__title { margin: 0; font-size: var(--font-ui-medium, 16px); font-weight: var(--font-semibold, 600); line-height: 1.4; }

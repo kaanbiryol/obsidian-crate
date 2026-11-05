@@ -247,6 +247,7 @@ body.is-mobile .crate-pending-browser .crate-browser-actions button {
 
         > p { margin: 0; line-height: 1.5; }
         > [role="status"]:empty { display: none; }
+        > [role="status"] > button { margin-left: var(--crate-space-8, 8px); }
     }
     .crate-discard-help { font-size: var(--font-ui-smaller); color: var(--text-muted); }
 }

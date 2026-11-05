@@ -110,6 +110,10 @@
       line-height: 1.5;
       overflow-wrap: anywhere;
     }
+    // Text after a block without its own bottom spacing (a wrapper, status row or
+    // action row) needs a top gap. Setting rows already pad their bottom edge.
+    > :where(:not(p, ul, .setting-item:not(.crate-modal-actions))) + :where(p, ul) { margin-top: var(--crate-dialog-gap); }
+    > :where(div[role="status"]:not(:empty)) { margin-bottom: var(--crate-dialog-gap); }
     > :last-child { margin-bottom: 0; }
     > [role="status"]:empty { display: none; }
   }
@@ -187,9 +191,18 @@
 		overflow-wrap: anywhere;
 	}
 
+	// The shared body rule gives every paragraph only a bottom margin, which
+	// leaves the first guidance line touching the message above it.
+	&:not(.is-working) .crate-modal-body {
+		> .crate-status-content { margin-bottom: 12px; }
+		> .crate-status-guidance { margin: 0 0 8px; }
+		> .crate-settings-disclosure { margin-top: 16px; }
+		> :last-child { margin-bottom: 0; }
+	}
+
 	&.is-working .crate-status-guidance {
-		// Align the secondary line with the message, beside the 18px icon + 10px gap.
-		margin: 6px 0 0 28px;
+		// Align the secondary line with the message, beside the 18px icon + 8px gap.
+		margin: 6px 0 0 26px;
 		font-variant-numeric: tabular-nums;
 	}
 

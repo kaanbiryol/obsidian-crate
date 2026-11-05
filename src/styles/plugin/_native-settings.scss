@@ -122,17 +122,21 @@
 
 
   .crate-settings-disclosure--inline {
-    margin: 0;
+    // Extend the divider and hover highlight 8px past the text on both sides,
+    // so the text stays aligned with the body and the two edges line up.
+    margin: 0 -8px;
+    padding-inline: 8px;
     border: 0;
     border-top: 1px solid var(--background-modifier-border);
     border-radius: 0;
     background: transparent;
-    > summary { padding-inline: 0; min-height: 44px; }
-    &[open] > summary { border: 0; border-radius: 0; }
+    > summary { padding-inline: 8px; margin-inline: -8px; min-height: 44px; border-radius: var(--radius-s, 4px); }
+    &[open] > summary { border: 0; border-radius: var(--radius-s, 4px); }
     > div { padding: 0 0 var(--crate-settings-row-padding); }
     > div > :first-child { margin-top: 0; }
     > div > :last-child { margin-bottom: 0; }
   }
+  .crate-settings-disclosure > div > .crate-settings-disclosure--inline { margin: 8px -8px; }
 
   @media (hover: hover) and (pointer: fine) {
     .crate-settings-disclosure > summary:hover { background: var(--background-modifier-hover); }

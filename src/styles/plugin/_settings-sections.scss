@@ -215,12 +215,16 @@ body.reduce-motion .crate-action-progress {
 	.crate-usage-unavailable { margin: 0; }
 }
 
-.crate-qr-link-fallback .setting-item {
+.modal.crate-shared-modal .crate-modal-body > .crate-qr-caption { margin: 8px 0 0; }
+.modal.crate-shared-modal .crate-modal-body > .crate-qr-link-fallback { margin-top: var(--crate-dialog-gap); }
+
+// Raised to beat the shared dialog row geometry, which would keep the link field in a narrow row.
+.modal.crate-shared-modal .crate-qr-link-fallback .setting-item {
 	flex-direction: column;
 	align-items: stretch;
 }
 
-.crate-qr-link-fallback :is(.setting-item-control, textarea) {
+.modal.crate-shared-modal .crate-qr-link-fallback :is(.setting-item-control, textarea) {
 	width: 100%;
 	max-width: 100%;
 }
