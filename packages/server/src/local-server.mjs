@@ -5,7 +5,8 @@ import { createInterface } from 'node:readline/promises';
 import { packaged, runtimeRoot } from './assets.mjs';
 import { openLocalRuntime, issueLocalDevice, listLocalDevices, revokeLocalDevice } from './local-server-runtime.mjs';
 import { listenLocalServer } from './local-server-http.mjs';
-import { ensureCloudflared, normalizeTunnelHostname, readRemoteSettings, saveQuickSettings, setupRemoteAccess, startTunnel } from './local-server-tunnel.mjs';
+import { ensureCloudflared, normalizeTunnelHostname, readRemoteSettings, saveQuickSettings, saveTailscaleSettings, setupRemoteAccess, startTunnel } from './local-server-tunnel.mjs';
+import { findTailscale, startTailscaleFunnel, tailscaleHostname } from './local-server-tailscale.mjs';
 import { runProcess } from './local-server-process.mjs';
 import { startQuickServer } from './local-server-quick.mjs';
 import { createPairing, requestLocalControl, requestLocalPairing, startLocalControl } from './local-server-pairing.mjs';
@@ -19,6 +20,7 @@ const help = `Crate local server
 
 npm run server -- setup [--data-dir PATH] [--name "My Mac"]
 npm run server -- setup --hostname crate.example.com [--data-dir PATH] [--port 8787]
+npm run server -- setup --tailscale [--data-dir PATH] [--port 8787]
 npm run server -- start [--data-dir PATH]
 npm run server -- start --local [--port 8787] [--host 127.0.0.1] [--origin https://crate.example.com]
 npm run server -- add-device --name "My Mac" [--data-dir PATH]
@@ -34,6 +36,7 @@ Setup defaults to a Quick Tunnel: no account or domain. It initializes storage,
 installs cloudflared if missing, and prints your address and first pairing code.
 Quick Tunnel addresses change on restart; reconnect devices and re-enroll PWAs.
 --hostname selects a permanent named tunnel and requires a Cloudflare domain.
+--tailscale uses Tailscale Funnel for a permanent address without a domain.
 Start reuses saved remote settings; --local skips the managed tunnel.
 Without remote setup, start uses localhost (build first: npm run build:worker).
 Use pair while the server is running to connect another device without downtime.
@@ -97,7 +100,7 @@ try {
 	const { values, positionals } = parseArgs({ allowPositionals: true, options: {
 		'data-dir': { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, origin: { type: 'string' },
 		output: { type: 'string' }, backup: { type: 'string' },
-		hostname: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' }, local: { type: 'boolean' }, quick: { type: 'boolean' }, help: { type: 'boolean' },
+		hostname: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' }, local: { type: 'boolean' }, quick: { type: 'boolean' }, tailscale: { type: 'boolean' }, help: { type: 'boolean' },
 	} });
 	let command = positionals[0];
 	if (values.help || !command) console.log(help);
@@ -106,6 +109,8 @@ try {
 		if (command === 'setup' && (values.local || values.host || values.origin)) throw new Error('Setup uses a loopback listener and --hostname for the public address.');
 		if (values.quick && (values.hostname || values.local || values.origin || values.host || command === 'add-device')) throw new Error('--quick cannot be combined with hostname, local, origin, host, or add-device.');
 		if (command !== 'setup' && values.hostname) throw new Error('--hostname belongs to setup. Use --origin for an external reverse proxy.');
+		if (values.tailscale && (command !== 'setup' || values.hostname || values.quick)) throw new Error('--tailscale belongs to setup and cannot be combined with --hostname or --quick. Later starts reuse it.');
+		if (values.tailscale && docker) throw new Error('Tailscale Funnel is not available in the Docker image yet. Run Crate directly on this computer, or use --hostname.');
 		if (command === 'add-device' && !values.name?.trim()) throw new Error('Provide --name for this device.');
 		if (values.name !== undefined && (!values.name.trim() || values.name.trim().length > 128)) throw new Error('Provide a device name between 1 and 128 characters.');
 		process.umask(0o077);
@@ -139,7 +144,10 @@ try {
 			printPairing(pairing);
 		} else {
 		let remote = command !== 'add-device' && !values.local ? await readRemoteSettings(dataDir) : null;
-		const quick = values.quick || remote?.mode === 'quick' || (command === 'setup' && !remote && !values.hostname);
+		const quick = values.quick || remote?.mode === 'quick' || (command === 'setup' && !remote && !values.hostname && !values.tailscale);
+		if (values.tailscale && remote && remote.mode !== 'tailscale') throw new Error('This directory already uses another remote access setup. Keep it or choose another data directory.');
+		const tailscale = values.tailscale || remote?.mode === 'tailscale';
+		if (tailscale && command === 'setup' && values.hostname) throw new Error('This directory uses Tailscale Funnel. Its address comes from Tailscale, not --hostname.');
 		if (quick && (values.hostname || values.origin || values.host || (remote && remote.mode !== 'quick'))) throw new Error('Quick Tunnel and named tunnel settings cannot be combined.');
 		const port = values.port === undefined ? remote?.port ?? (quick ? 0 : 8787) : Number(values.port);
 		if (!Number.isInteger(port) || port < (quick ? 0 : 1) || port > 65535) throw new Error('Port must be between 1 and 65535 (or 0 for an automatic Quick Tunnel port).');
@@ -160,7 +168,18 @@ try {
 			if (remote && (port !== remote.port || host !== '127.0.0.1' || (values.origin && values.origin !== `https://${remote.hostname}`))) {
 				throw new Error('Saved tunnel settings require their original hostname, port, and loopback listener. Use --local for an independent reverse proxy.');
 			}
-			if (command === 'setup') {
+			if (command === 'setup' && tailscale) {
+				console.log('Setting up Tailscale Funnel. Files stay on this computer; public HTTPS traffic passes through Tailscale.');
+				await buildIfSource();
+				// Lock and validate storage before exposing anything.
+				runtime = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
+				const hostname = await tailscaleHostname(await findTailscale());
+				if (remote && remote.hostname !== hostname) throw new Error(`This directory was set up for https://${remote.hostname}. Rename this computer back in Tailscale to keep connected devices and PWAs.`);
+				remote = await saveTailscaleSettings(dataDir, hostname, port);
+				await runtime.close();
+				runtime = null;
+				command = 'start';
+			} else if (command === 'setup') {
 				let hostname = values.hostname ?? remote?.hostname;
 				if (!hostname) {
 					if (!process.stdin.isTTY) throw new Error('Provide --hostname crate.example.com when setup runs without an interactive terminal.');
@@ -182,7 +201,7 @@ try {
 				command = 'start';
 			}
 			shutdown.signal.throwIfAborted();
-			if (remote && !remote.ready) throw new Error('Remote setup is incomplete. Run npm run server -- setup again.');
+			if (remote && !tailscale && !remote.ready) throw new Error('Remote setup is incomplete. Run npm run server -- setup again.');
 			const origin = remote ? `https://${remote.hostname}` : values.origin ?? `http://localhost:${port}`;
 			if (!['127.0.0.1', '::1', 'localhost'].includes(host) && !origin.startsWith('https://')) {
 				throw new Error('Listening beyond localhost requires --origin with the HTTPS address of your reverse proxy.');
@@ -198,12 +217,14 @@ try {
 				const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
 				if (existing.count === 0) printPairing(pairing.issue(values.name?.trim() || computerName().slice(0, 128)));
 				shutdown.signal.throwIfAborted();
-				if (remote) tunnel = await startTunnel(dataDir, remote, shutdown.signal);
+				if (remote) tunnel = tailscale ? await startTailscaleFunnel(remote, shutdown.signal) : await startTunnel(dataDir, remote, shutdown.signal);
 				console.log(`Server address to paste into Obsidian: ${runtime.origin}\nInternal listener (diagnostics only): ${host}:${port}\nData: ${runtime.dataDir}\nAdd a device without restarting: ${pairCommand}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Press Ctrl+C to stop safely.'}`);
 				if (origin.startsWith('https://')) readiness = monitorPublicReadiness({ origin, instance, signal: shutdown.signal, onChange: readinessChanged });
-				if (remote) console.log('Tunnel is starting; initial DNS/certificate propagation may take a few minutes.\nUse this HTTPS server address in Obsidian, then Copy setup link or Show QR code to enroll the PWA.');
+				if (remote) console.log(`${tailscale ? 'Tailscale Funnel is starting; the first time, approve Funnel at the link Tailscale prints. A new public name can take up to 10 minutes to resolve.' : 'Tunnel is starting; initial DNS/certificate propagation may take a few minutes.'}\nUse this HTTPS server address in Obsidian, then Copy setup link or Show QR code to enroll the PWA.`);
 				const result = await Promise.race([stopped.then(() => null), ...(tunnel ? [tunnel.exited] : [])]);
-				if (result && !shutdown.signal.aborted) throw new Error(`Cloudflare Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check cloudflared output and restart.`);
+				if (result && !shutdown.signal.aborted) throw new Error(tailscale
+					? `Tailscale Funnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check the Tailscale output above. On Linux, allow your user once with: sudo tailscale set --operator=$USER`
+					: `Cloudflare Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check cloudflared output and restart.`);
 			}
 		}
 		}

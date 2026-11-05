@@ -33,7 +33,7 @@ export async function localBuildInfo() {
 
 /** Matches the plugin's embedded artifact fingerprint (scripts/vite/cloudflare-artifacts-vite-plugin.mjs),
  * so a connected plugin can tell whether this server runs the build it bundles. */
-export function localDeploymentFingerprint({ worker, schema, release }) {
+function localDeploymentFingerprint({ worker, schema, release }) {
 	return digest(JSON.stringify({ workerBundleSha256: digest(worker), d1SchemaSha256: digest(schema), serverRelease: release }));
 }
 

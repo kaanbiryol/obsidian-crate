@@ -7,7 +7,9 @@ client is needed for local operation. Server data stays in your chosen directory
 For access away from home, the default [Quick Tunnel setup](#one-command-remote-setup-without-a-domain)
 needs no account or domain. Its HTTPS address changes on restart. A
 [named Cloudflare Tunnel](#access-away-from-home-with-cloudflare-tunnel) gives you
-a stable address using your own domain. Phones can use either without a VPN.
+a stable address using your own domain. Without a domain,
+[Tailscale Funnel](#stable-address-without-a-domain-tailscale-funnel) also gives a
+stable address. Phones can use any of these without a VPN.
 
 This initial implementation uses the exact Miniflare version already used by
 Crate's integration tests, currently a pinned prerelease. Automated tests cover
@@ -368,6 +370,39 @@ license, with explicit runtime dependencies to preserve the repository's sharp
 version override. Native binaries are installed for the user's platform.
 `npm run test:server-package` packs it, installs it through npx in an
 isolated cache, and tests startup and restart without repository files.
+
+## Stable address without a domain: Tailscale Funnel
+
+Tailscale Funnel gives this computer a permanent public HTTPS address such as
+`https://my-mac.tail1234.ts.net`. It survives restarts, so the PWA and connected
+devices keep working. You need a free Tailscale account and the Tailscale app on
+the server computer only. Phones and other devices do not need Tailscale.
+
+1. Install [Tailscale](https://tailscale.com/download) on the server computer and sign in.
+2. In the Tailscale admin console, turn on **MagicDNS** and **HTTPS certificates**
+   under **DNS**.
+3. From the repository, after `npm ci`, run:
+
+```sh
+npm run server -- setup --tailscale
+```
+
+Setup reads this computer's Tailscale name, saves it, starts Crate and runs Funnel
+alongside it. The first time, Tailscale prints a link to approve Funnel for your
+tailnet; open it and approve. A new public name can take up to 10 minutes to
+resolve. Then connect Obsidian with the printed address and pairing code. Later,
+`npm run server -- start` reuses the saved address. **Ctrl+C** stops Crate and
+takes the public address offline until the next start.
+
+The address is tied to this computer's name in Tailscale. Renaming the computer
+changes the address, so Crate refuses to start until you rename it back. On Linux,
+Funnel needs permission for your user once: `sudo tailscale set --operator=$USER`.
+Funnel is not available in the Docker image yet. Run Crate directly on the computer.
+
+Tailscale terminates HTTPS on this computer and relays traffic without decrypting
+it. Funnel has bandwidth limits that Tailscale does not publish; very large
+uploads have not been verified through it. See Tailscale's
+[Funnel documentation](https://tailscale.com/kb/1223/funnel) for requirements.
 
 ## Access away from home with Cloudflare Tunnel
 

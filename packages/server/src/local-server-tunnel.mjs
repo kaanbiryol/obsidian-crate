@@ -38,6 +38,12 @@ export async function readRemoteSettings(dataDir) {
 		if (contents.some(name => name !== '.DS_Store')) throw new Error('Remote configuration files exist without remote.json. Restore the complete remote directory before continuing.');
 		return null;
 	}
+	if (settings?.mode === 'tailscale') {
+		if (settings.format !== 1 || typeof settings.hostname !== 'string' || !settings.hostname.endsWith('.ts.net')
+			|| normalizeTunnelHostname(settings.hostname) !== settings.hostname
+			|| !Number.isInteger(settings.port) || settings.port < 1 || settings.port > 65535) throw new Error('Invalid saved Tailscale Funnel settings. Restore them before continuing.');
+		return settings;
+	}
 	if (settings?.mode === 'quick') {
 		if (settings.format !== 1 || !Number.isInteger(settings.port) || settings.port < 0 || settings.port > 65535) throw new Error('Invalid saved Quick Tunnel settings.');
 		return settings;
@@ -54,10 +60,25 @@ export async function readRemoteSettings(dataDir) {
 
 export async function saveQuickSettings(dataDir, port) {
 	const existing = await readRemoteSettings(dataDir);
-	if (existing && existing.mode !== 'quick') throw new Error('This directory uses a named tunnel. Keep that setup or choose another data directory.');
+	if (existing && existing.mode !== 'quick') throw new Error('This directory uses a saved stable address. Keep that setup or choose another data directory.');
 	const paths = remotePaths(dataDir);
 	await mkdir(paths.directory, { recursive: true, mode: 0o700 });
 	await writePrivate(paths.settings, { format: 1, mode: 'quick', port });
+}
+
+/** A Funnel address belongs to this computer's Tailscale name, so it is saved once and then reused. */
+export async function saveTailscaleSettings(dataDir, hostname, port) {
+	const existing = await readRemoteSettings(dataDir);
+	if (existing && existing.mode !== 'tailscale') throw new Error('This directory already uses another remote access setup. Keep it or choose another data directory.');
+	if (existing && (existing.hostname !== hostname || existing.port !== port)) {
+		throw new Error('This data directory already has a saved address and port. Reuse them; changing the PWA origin requires a deliberate migration.');
+	}
+	const paths = remotePaths(dataDir);
+	await mkdir(paths.directory, { recursive: true, mode: 0o700 });
+	await chmod(paths.directory, 0o700);
+	const settings = { format: 1, mode: 'tailscale', hostname, port };
+	await writePrivate(paths.settings, settings);
+	return settings;
 }
 
 async function writePrivate(path, value) {

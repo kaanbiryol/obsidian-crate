@@ -2,7 +2,9 @@
 
 Run Crate's sync server and reminders PWA on your computer. Requires Node.js
 26.8.2+ in the 26.x series. No Cloudflare account or domain is needed for the
-default Quick Tunnel mode.
+default Quick Tunnel mode. For a permanent address without a domain, use
+Tailscale Funnel: `npx @kaanbiryol/crate-server setup --tailscale`. See the
+self-hosting docs for its one-time Tailscale setup.
 
 ```sh
 npx @kaanbiryol/crate-server
