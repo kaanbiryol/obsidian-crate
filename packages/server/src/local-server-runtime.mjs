@@ -31,6 +31,12 @@ export async function localBuildInfo() {
 		schemaHash: digest(schema), serverRevision: release.revision, release };
 }
 
+/** Matches the plugin's embedded artifact fingerprint (scripts/vite/cloudflare-artifacts-vite-plugin.mjs),
+ * so a connected plugin can tell whether this server runs the build it bundles. */
+export function localDeploymentFingerprint({ worker, schema, release }) {
+	return digest(JSON.stringify({ workerBundleSha256: digest(worker), d1SchemaSha256: digest(schema), serverRelease: release }));
+}
+
 export function assertCompatibleLocalMetadata(previous, expected) {
 	if (!previous || previous.format !== 1 || !Number.isSafeInteger(previous.serverRevision)
 		|| previous.serverRevision < 1 || typeof previous.instanceId !== 'string' || previous.schemaHash !== expected.schemaHash
@@ -123,7 +129,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 			host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false },
 			resourcePersistencePath: join(dataDir, 'resources'),
 			isolatedResourcePersistencePath: join(dataDir, 'isolated'),
-			bindings: { CRATE_PUBLIC_ORIGIN: origin },
+			bindings: { CRATE_PUBLIC_ORIGIN: origin, CRATE_DEPLOYMENT_FINGERPRINT: localDeploymentFingerprint({ worker, schema, release }) },
 			d1Databases: { DB: 'crate-local-db' },
 		};
 		// Validate and initialize with no Durable Objects registered: overdue
@@ -188,4 +194,24 @@ export async function issueLocalDevice(db, name) {
 	await db.prepare("INSERT INTO auth_tokens (id, token_hash, device_name, platform, scope) VALUES (?, ?, ?, 'self-hosted', 'vault')")
 		.bind(id, digest(token), name).run();
 	return { id, token };
+}
+
+/** Every credential the server holds, newest activity first. Shortcut capture
+ * credentials are listed too; revoking their issuing device removes them. */
+export async function listLocalDevices(db) {
+	const { results } = await db.prepare(`SELECT id, device_name AS name, platform, scope, created_at AS createdAt, last_seen_at AS lastSeenAt
+		FROM auth_tokens ORDER BY COALESCE(last_seen_at, created_at) DESC, created_at DESC`).all();
+	return results;
+}
+
+/** Matches the Worker's device revocation: the credential, its push subscriptions
+ * and the shortcut capture credentials it issued go together. */
+export async function revokeLocalDevice(db, id) {
+	if (typeof id !== 'string' || !id.trim() || id.length > 128) throw new Error('Provide --id with a token ID from the devices command.');
+	const results = await db.batch([
+		db.prepare('DELETE FROM push_subscriptions WHERE owner_token_id = ?').bind(id),
+		db.prepare("DELETE FROM auth_tokens WHERE scope = 'reading_capture' AND device_id = ?").bind(id),
+		db.prepare('DELETE FROM auth_tokens WHERE id = ?').bind(id),
+	]);
+	return results[2].meta.changes === 1;
 }

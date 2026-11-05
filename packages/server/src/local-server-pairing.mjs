@@ -3,7 +3,7 @@ import { createServer, request as httpRequest } from 'node:http';
 import { chmod, readFile, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { issueLocalDevice } from './local-server-runtime.mjs';
+import { issueLocalDevice, listLocalDevices, revokeLocalDevice } from './local-server-runtime.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const codePattern = /^crate-pair-[a-f0-9]{64}$/;
@@ -38,24 +38,36 @@ export function sendJson(response, status, value) {
 	response.end(JSON.stringify(value));
 }
 
-export async function readSmallJson(request) {
+export async function readSmallJson(request, limit = 2048) {
 	let body = '';
 	for await (const chunk of request) {
 		body += chunk.toString();
-		if (body.length > 2048) throw new Error('Request too large');
+		if (body.length > limit) throw new Error('Request too large');
 	}
 	return JSON.parse(body);
 }
 
 /** Administration stays on a private local socket and additionally requires a
  * random secret stored in the owner's private data directory. Never proxied. */
-export async function startLocalControl({ dataDir, pairing, origin }) {
+export async function startLocalControl({ dataDir, pairing, origin, db }) {
 	const file = join(dataDir, 'control.json');
 	const id = randomBytes(16).toString('hex');
 	const socket = process.platform === 'win32' ? `\\\\.\\pipe\\crate-${id}` : join(tmpdir(), `crate-${id}.sock`);
 	const secret = randomBytes(32).toString('hex');
 	const server = createServer(async (request, response) => {
 		if (request.headers.authorization !== `Bearer ${secret}`) { sendJson(response, 403, { error: 'Not authorized' }); return; }
+		if (request.method === 'GET' && request.url === '/devices') {
+			try { sendJson(response, 200, { devices: await listLocalDevices(db) }); }
+			catch { sendJson(response, 500, { error: 'Could not list devices.' }); }
+			return;
+		}
+		if (request.method === 'POST' && request.url === '/revoke') {
+			try {
+				const { id } = await readSmallJson(request);
+				sendJson(response, 200, { revoked: await revokeLocalDevice(db, id) });
+			} catch (error) { sendJson(response, 400, { error: error.message }); }
+			return;
+		}
 		if (request.method !== 'POST' || request.url !== '/pair') { sendJson(response, 404, { error: 'Not found' }); return; }
 		try {
 			const { name } = await readSmallJson(request);
@@ -76,22 +88,27 @@ export async function startLocalControl({ dataDir, pairing, origin }) {
 	} };
 }
 
-export async function requestLocalPairing(dataDir, name) {
-	try {
-		const { socket, secret } = JSON.parse(await readFile(join(dataDir, 'control.json'), 'utf8'));
-		return await new Promise((resolve, reject) => {
-			const request = httpRequest({ socketPath: socket, path: '/pair', method: 'POST',
-				headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' }, timeout: 5000,
-			}, async response => {
-				try {
-					const body = await readSmallJson(response);
-					if (response.statusCode !== 200) throw new Error(body.error);
-					resolve(body);
-				} catch (error) { reject(error); }
-			});
-			request.on('error', reject);
-			request.on('timeout', () => request.destroy(new Error('Local administration timed out.')));
-			request.end(JSON.stringify({ name }));
+/** Sends one request to the running server's private control socket. Rejects with
+ * code ENOENT when no server is running for this data directory. */
+export async function requestLocalControl(dataDir, method, path, body) {
+	const { socket, secret } = JSON.parse(await readFile(join(dataDir, 'control.json'), 'utf8'));
+	return new Promise((resolve, reject) => {
+		const request = httpRequest({ socketPath: socket, path, method,
+			headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' }, timeout: 5000,
+		}, async response => {
+			try {
+				const result = await readSmallJson(response, 1024 * 1024);
+				if (response.statusCode !== 200) throw new Error(result.error);
+				resolve(result);
+			} catch (error) { reject(error); }
 		});
-	} catch { throw new Error('Could not create a pairing code. Keep Crate running, check the data directory and device name, then try again.'); }
+		request.on('error', reject);
+		request.on('timeout', () => request.destroy(new Error('Local administration timed out.')));
+		request.end(body === undefined ? undefined : JSON.stringify(body));
+	});
+}
+
+export async function requestLocalPairing(dataDir, name) {
+	try { return await requestLocalControl(dataDir, 'POST', '/pair', { name }); }
+	catch { throw new Error('Could not create a pairing code. Keep Crate running, check the data directory and device name, then try again.'); }
 }

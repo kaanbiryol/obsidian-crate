@@ -32,6 +32,8 @@ the package. Runtime/schema compatibility is checked before opening stored data.
 
 ```sh
 npx @kaanbiryol/crate-server pair --name "My phone"
+npx @kaanbiryol/crate-server devices
+npx @kaanbiryol/crate-server revoke --id TOKEN_ID
 npx @kaanbiryol/crate-server --data-dir /path/to/another-vault
 ```
 
@@ -39,7 +41,8 @@ Use the pair command while the server is running. Pairing codes expire after ten
 minutes and can be exchanged once; they never contain the device token itself.
 The plugin receives a separate device token and saves it in Obsidian secret
 storage. The server stores only its hash. Long-lived tokens are not printed by
-normal startup. An expired or lost code can be replaced with the pair command.
+normal startup. An expired or lost code can be replaced with the pair command. List and revoke
+device credentials from the server computer with the devices and revoke commands.
 
 The launcher reports public access as ready only after an HTTPS probe reaches
 this running instance. It keeps retrying while DNS or the tunnel is unavailable.

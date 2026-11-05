@@ -3,14 +3,15 @@ import { resolve, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline/promises';
 import { packaged, runtimeRoot } from './assets.mjs';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice, listLocalDevices, revokeLocalDevice } from './local-server-runtime.mjs';
 import { listenLocalServer } from './local-server-http.mjs';
 import { ensureCloudflared, normalizeTunnelHostname, readRemoteSettings, saveQuickSettings, setupRemoteAccess, startTunnel } from './local-server-tunnel.mjs';
 import { runProcess } from './local-server-process.mjs';
 import { startQuickServer } from './local-server-quick.mjs';
-import { createPairing, requestLocalPairing, startLocalControl } from './local-server-pairing.mjs';
+import { createPairing, requestLocalControl, requestLocalPairing, startLocalControl } from './local-server-pairing.mjs';
 import { monitorPublicReadiness } from './local-server-readiness.mjs';
 import { randomUUID } from 'node:crypto';
+import { access } from 'node:fs/promises';
 import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from './local-server-backup.mjs';
 import { closeLocalServerResources } from './local-server-lifecycle.mjs';
 
@@ -22,6 +23,8 @@ npm run server -- start [--data-dir PATH]
 npm run server -- start --local [--port 8787] [--host 127.0.0.1] [--origin https://crate.example.com]
 npm run server -- add-device --name "My Mac" [--data-dir PATH]
 npm run server -- pair --name "My phone" [--data-dir PATH]
+npm run server -- devices [--data-dir PATH]
+npm run server -- revoke --id TOKEN_ID [--data-dir PATH]
 npm run server -- backup --output PATH [--data-dir PATH]
 npm run server -- upgrade --output NEW_BACKUP_PATH [--data-dir PATH]
 npm run server -- restore --backup PATH --data-dir EMPTY_PATH
@@ -34,6 +37,7 @@ Quick Tunnel addresses change on restart; reconnect devices and re-enroll PWAs.
 Start reuses saved remote settings; --local skips the managed tunnel.
 Without remote setup, start uses localhost (build first: npm run build:worker).
 Use pair while the server is running to connect another device without downtime.
+devices and revoke work while the server runs or while it is stopped.
 Stop the server before offline add-device administration.
 Default data directory: ~/.crate/server (one vault per directory).
 See docs/self-hosting.md for backups, updates, and other HTTPS proxies.`;
@@ -64,6 +68,27 @@ async function buildIfSource() {
 	if (!packaged) await runProcess(process.execPath, [join(runtimeRoot, 'scripts/build-worker.mjs')], { signal: shutdown.signal });
 }
 
+/** Uses the running server's control socket, or opens the stopped server's data. */
+async function administer(dataDir, method, path, body, offline) {
+	try { return await requestLocalControl(dataDir, method, path, body); }
+	catch (error) {
+		if (error.code !== 'ENOENT') throw new Error(error.message || 'Could not reach the running server. Keep Crate running, check the data directory, then try again.');
+	}
+	// Never initialize an empty directory as a side effect of administration.
+	await access(join(dataDir, 'server.json')).catch(() => { throw new Error(`No Crate server data in ${dataDir}. Pass the server's --data-dir.`); });
+	const admin = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
+	try { return await offline(admin.db); } finally { await admin.close(); }
+}
+
+function printDevices(devices) {
+	if (!devices.length) { console.log('No devices are connected.'); return; }
+	const labels = { vault: 'Obsidian', reminders: 'Reminders web app', reading: 'Reading web app', reading_capture: 'Reading shortcut' };
+	for (const device of devices) {
+		console.log(`${device.id}  ${device.name || 'Unnamed'} · ${labels[device.scope] ?? device.scope}${device.platform ? ` (${device.platform})` : ''} · last seen ${device.lastSeenAt ?? 'never'} UTC`);
+	}
+	console.log('Revoke one with the revoke command and --id TOKEN_ID.');
+}
+
 function printDevice(name, credential) {
 	console.log(`Device: ${name}\nToken ID: ${credential.id}\nAccess token (shown once): ${credential.token}\nPaste this token into Crate → Connect to your server. Keep it private.`);
 }
@@ -72,12 +97,12 @@ try {
 	const { values, positionals } = parseArgs({ allowPositionals: true, options: {
 		'data-dir': { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, origin: { type: 'string' },
 		output: { type: 'string' }, backup: { type: 'string' },
-		hostname: { type: 'string' }, name: { type: 'string' }, local: { type: 'boolean' }, quick: { type: 'boolean' }, help: { type: 'boolean' },
+		hostname: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' }, local: { type: 'boolean' }, quick: { type: 'boolean' }, help: { type: 'boolean' },
 	} });
 	let command = positionals[0];
 	if (values.help || !command) console.log(help);
 	else {
-		if (positionals.length !== 1 || !['start', 'setup', 'add-device', 'pair', 'backup', 'restore', 'check-upgrade', 'upgrade'].includes(command)) throw new Error('Unknown command. Use --help for usage.');
+		if (positionals.length !== 1 || !['start', 'setup', 'add-device', 'pair', 'devices', 'revoke', 'backup', 'restore', 'check-upgrade', 'upgrade'].includes(command)) throw new Error('Unknown command. Use --help for usage.');
 		if (command === 'setup' && (values.local || values.host || values.origin)) throw new Error('Setup uses a loopback listener and --hostname for the public address.');
 		if (values.quick && (values.hostname || values.local || values.origin || values.host || command === 'add-device')) throw new Error('--quick cannot be combined with hostname, local, origin, host, or add-device.');
 		if (command !== 'setup' && values.hostname) throw new Error('--hostname belongs to setup. Use --origin for an external reverse proxy.');
@@ -100,6 +125,14 @@ try {
 		} else if (command === 'check-upgrade') {
 			const checked = await checkLocalUpgrade(dataDir);
 			console.log(`Compatible: server revision ${checked.from} → ${checked.to}, runtime ${checked.runtime}.${checked.requiresMigration ? ' The database needs a migration: run upgrade with a new --output backup directory before starting.' : ''} Back up before updating; no data was changed by this check.`);
+		} else if (command === 'devices') {
+			printDevices((await administer(dataDir, 'GET', '/devices', undefined, async db => ({ devices: await listLocalDevices(db) }))).devices);
+		} else if (command === 'revoke') {
+			if (!values.id?.trim()) throw new Error('Provide --id with a token ID from the devices command.');
+			const id = values.id.trim();
+			const { revoked } = await administer(dataDir, 'POST', '/revoke', { id }, async db => ({ revoked: await revokeLocalDevice(db, id) }));
+			if (!revoked) throw new Error('No device has that token ID. Run the devices command to list current IDs.');
+			console.log('Device revoked. It can no longer sync; pair it again to reconnect.');
 		} else if (command === 'pair') {
 			const pairing = await requestLocalPairing(dataDir, values.name);
 			console.log(`Server address to paste into Obsidian: ${pairing.origin}`);
@@ -161,7 +194,7 @@ try {
 				const instance = randomUUID();
 				const pairing = createPairing({ db: runtime.db });
 				server = await listenLocalServer(runtime, { host, port, pairing, instance, tunnel: Boolean(remote) });
-				control = await startLocalControl({ dataDir, pairing, origin });
+				control = await startLocalControl({ dataDir, pairing, origin, db: runtime.db });
 				const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
 				if (existing.count === 0) printPairing(pairing.issue(values.name?.trim() || computerName().slice(0, 128)));
 				shutdown.signal.throwIfAborted();

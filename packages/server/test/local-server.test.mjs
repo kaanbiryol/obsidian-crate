@@ -9,7 +9,7 @@ import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
-import { openLocalRuntime, issueLocalDevice, normalizeLocalOrigin } from '../src/local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice, normalizeLocalOrigin, revokeLocalDevice } from '../src/local-server-runtime.mjs';
 import { listenLocalServer } from '../src/local-server-http.mjs';
 
 test('local origin requires HTTPS except on the server computer', () => {
@@ -77,6 +77,75 @@ test('CLI initializes a device offline and releases the directory on SIGTERM', {
 	}
 });
 
+test('host CLI lists and revokes devices while running and while stopped', { timeout: 40_000 }, async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-devices-'));
+	let child;
+	try {
+		const cli = new URL('../../../scripts/local-server.mjs', import.meta.url).pathname;
+		const run = (...args) => promisify(execFile)(process.execPath, [cli, ...args, '--data-dir', dataDir]);
+		await assert.rejects(run('devices'), /No Crate server data/);
+		const credential = async name => {
+			const { stdout } = await run('add-device', '--name', name);
+			return { id: /Token ID: (\S+)/.exec(stdout)[1], token: /Access token \(shown once\): ([a-f0-9]{64})/.exec(stdout)[1] };
+		};
+		const lost = await credential('Lost phone');
+		const kept = await credential('Mac');
+		const socket = createServer();
+		await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
+		const port = socket.address().port;
+		await new Promise(resolve => socket.close(resolve));
+		child = spawn(process.execPath, [cli, 'start', '--data-dir', dataDir, '--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] });
+		const exited = once(child, 'exit');
+		let output = '';
+		let errors = '';
+		child.stdout.on('data', chunk => { output += chunk; });
+		child.stderr.on('data', chunk => { errors += chunk; });
+		const deadline = Date.now() + 10_000;
+		while (!output.includes('Press Ctrl+C')) {
+			assert.equal(child.exitCode, null, errors);
+			assert.ok(Date.now() < deadline, `CLI startup timed out: ${errors}`);
+			await delay(50);
+		}
+		const health = async token => (await fetch(`http://127.0.0.1:${port}/health`, { headers: { Authorization: `Bearer ${token}` } })).status;
+		const listed = (await run('devices')).stdout;
+		assert.match(listed, new RegExp(`${lost.id}  Lost phone`));
+		assert.match(listed, new RegExp(`${kept.id}  Mac`));
+		assert.ok(!listed.includes(lost.token), 'Listing must not print credentials');
+		assert.match((await run('revoke', '--id', lost.id)).stdout, /Device revoked/);
+		assert.equal(await health(lost.token), 401);
+		assert.equal(await health(kept.token), 200);
+		child.kill('SIGTERM');
+		assert.equal((await exited)[0], 0, errors);
+		const offline = (await run('devices')).stdout;
+		assert.ok(!offline.includes(lost.id) && offline.includes(kept.id));
+		await assert.rejects(run('revoke', '--id', lost.id), /No device has that token ID/);
+	} finally {
+		if (child?.exitCode === null) child.kill('SIGKILL');
+		await rm(dataDir, { recursive: true, force: true });
+	}
+});
+
+test('revoking a device also removes its push subscriptions and the shortcut credentials it issued', { timeout: 20_000 }, async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-revoke-'));
+	const runtime = await openLocalRuntime({ dataDir, administrative: true });
+	try {
+		const { db } = runtime;
+		const issuer = await issueLocalDevice(db, 'Phone');
+		const other = await issueLocalDevice(db, 'Mac');
+		await db.batch([
+			db.prepare("INSERT INTO auth_tokens (id, token_hash, device_id, scope) VALUES ('capture', ?, ?, 'reading_capture')").bind('c'.repeat(64), issuer.id),
+			db.prepare("INSERT INTO push_subscriptions (owner_token_id, id, endpoint, p256dh, auth) VALUES (?, 'push', 'https://push.example', 'key', 'auth')").bind(issuer.id),
+		]);
+		assert.equal(await revokeLocalDevice(db, issuer.id), true);
+		assert.deepEqual((await db.prepare('SELECT id FROM auth_tokens').all()).results.map(row => row.id), [other.id]);
+		assert.equal((await db.prepare('SELECT COUNT(*) AS count FROM push_subscriptions').first()).count, 0);
+		assert.equal(await revokeLocalDevice(db, issuer.id), false);
+	} finally {
+		await runtime.close();
+		await rm(dataDir, { recursive: true, force: true });
+	}
+});
+
 test('interrupting CLI during storage startup still releases its lock', { timeout: 20_000 }, async () => {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-interrupt-'));
 	const child = spawn(process.execPath, [new URL('../../../scripts/local-server.mjs', import.meta.url).pathname, 'start', '--data-dir', dataDir], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -123,6 +192,11 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		const first = await issueLocalDevice(runtime.db, 'Mac');
 		const second = await issueLocalDevice(runtime.db, 'Phone');
 		const info = await (await fetch(`${origin}/.well-known/crate`)).json();
+		// Same formula as the plugin's embedded artifact fingerprint.
+		const sha = value => createHash('sha256').update(value).digest('hex');
+		const [workerBundle, schema, release] = await Promise.all(['.generated/cloudflare/worker.mjs', 'src/cloudflare/schema.sql', 'src/cloudflare/server-release.json']
+			.map(path => readFile(new URL(`../../../${path}`, import.meta.url))));
+		assert.equal(info.deploymentFingerprint, sha(JSON.stringify({ workerBundleSha256: sha(workerBundle), d1SchemaSha256: sha(schema), serverRelease: JSON.parse(release) })));
 		const headers = { Authorization: `Bearer ${first.token}`, 'X-Crate-Protocol': String(info.protocol.current) };
 		assert.equal((await fetch(`${origin}/health`)).status, 401);
 		assert.equal((await fetch(`${origin}/health`, { headers })).status, 200);

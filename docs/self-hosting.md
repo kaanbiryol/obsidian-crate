@@ -253,6 +253,23 @@ Devices and sessions**. **Disconnect this device** attempts revocation and remov
 the local credential. If the server was unreachable, revoke that credential from
 another connected device later. Generate a new token to reconnect.
 
+The server computer can also list and revoke credentials itself, for example when
+a lost phone was your only connected device. Both commands work while the server
+runs or while it is stopped:
+
+```sh
+npm run server -- devices
+npm run server -- revoke --id TOKEN_ID
+```
+
+With Docker, use `docker compose exec crate crate devices` and
+`docker compose exec crate crate revoke --id TOKEN_ID`. Revoking a device also
+removes its push subscriptions and the Reading shortcut credentials it issued.
+
+When this plugin bundles a newer server than the one you run, Crate settings show
+**Server update available**. Update the server on its computer as described in
+[Backups, restore, and updates](#backups-restore-and-updates).
+
 ## Access from another device
 
 `localhost` means the device you are using. A phone needs an address that reaches

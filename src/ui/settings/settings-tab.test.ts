@@ -26,6 +26,7 @@ async function display(isConfigured: boolean): Promise<string[]> {
 		renderConfigSection: section('config'), renderServerSection: section('server'), renderServerUpdateNotice: section('update notice'),
 	}));
 	vi.doMock('./devices-section', () => ({ renderDevicesSection: section('devices') }));
+	vi.doMock('./infrastructure/self-hosted-update-notice', () => ({ renderSelfHostedUpdateNotice: section('self-hosted update notice') }));
 	vi.doMock('./infrastructure/infrastructure-section', () => ({ renderInfrastructureSection: section('infrastructure'), renderServerActions: section('server actions') }));
 	vi.doMock('./sync-section', () => ({ renderSyncSection: section('sync') }));
 	vi.doMock('../../reminders/ui/plugin/settings-section', () => ({ renderRemindersSettings: section('reminders') }));
@@ -56,6 +57,6 @@ it('keeps notifications with the feature controls once connected', async () => {
 
 it('puts the get started checklist first and its show row after the features', async () => {
 	const sections = await display(false);
-	expect(sections.slice(0, 2)).toEqual(['update notice', 'get started']);
+	expect(sections.slice(0, 3)).toEqual(['update notice', 'self-hosted update notice', 'get started']);
 	expect(sections.indexOf('show get started')).toBe(sections.indexOf('reading') + 1);
 });

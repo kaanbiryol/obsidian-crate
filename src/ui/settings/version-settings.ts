@@ -27,6 +27,16 @@ async function checkVersion(plugin: CratePlugin) {
 	return info;
 }
 
+/** True when the live server runs an older revision, or a different build this plugin's bundled server can replace. */
+export function isBundledServerNewer(info: Pick<CrateServerInfo, 'serverRevision' | 'deploymentFingerprint' | 'developmentBuild'>): boolean {
+	const bundled = { revision: release.revision, fingerprint: EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint, development: EMBEDDED_CLOUDFLARE_ARTIFACT.development };
+	if (!info.serverRevision) return false;
+	if (info.serverRevision < bundled.revision) return true;
+	const fingerprint = info.deploymentFingerprint;
+	return Boolean(fingerprint && fingerprint !== bundled.fingerprint
+		&& canReplaceServerBuild({ revision: info.serverRevision, fingerprint, development: info.developmentBuild }, bundled));
+}
+
 export function renderVersionSettings(container: HTMLElement, plugin: CratePlugin): void {
 	new Setting(container).setName('Plugin version').setDesc(plugin.manifest.version);
 	new Setting(container).setName('Bundled server').setDesc(`Revision ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}`);
