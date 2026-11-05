@@ -351,14 +351,14 @@ end users do not need the repository or a build toolchain. To build and test it:
 
 ```sh
 npm run pack:server
-npx ./dist/kaanbiryol-crate-server-0.1.0.tgz
+npx ./dist/kaanbiryol-crate-server-*.tgz
 ```
 
 Once published, users run `npx @kaanbiryol/crate-server`. Maintainers publish
 it with `npm run publish:server`; see [releases](releases.md#publish-the-server-package).
 Subsequent runs reuse `~/.crate/server` by default.
 Pass **--data-dir** to keep multiple vault servers separate. Run
-`npx ./dist/kaanbiryol-crate-server-0.1.0.tgz pair --name "My phone"`
+`npx ./dist/kaanbiryol-crate-server-*.tgz pair --name "My phone"`
 while running to issue another pairing code without restarting.
 
 Package source and its dependency shrinkwrap live in `packages/server`.

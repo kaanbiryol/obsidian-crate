@@ -134,9 +134,11 @@ because token-created release events do not start another workflow.
 
 ## Publish the server package
 
-The standalone server, `@kaanbiryol/crate-server`, is versioned separately from
-the plugin in `packages/server/package.json`. To release it, raise that version,
-sign in with `npm login`, and run from a clean checkout of the release commit:
+The standalone server, `@kaanbiryol/crate-server`, ships the Worker built from the
+release commit, so it always carries the plugin's version. Packaging takes the
+version from the root `package.json`; `packages/server` has none of its own.
+Publish it after the plugin release, from a clean checkout of the release
+commit, signed in with `npm login`:
 
 ```sh
 npm run publish:server
@@ -145,5 +147,6 @@ npm run publish:server
 This builds the stable Worker into `dist/server`, runs the packed `npx`
 installation test, then publishes the staged package. A development build is
 refused. Append `-- --dry-run` to check the package contents without publishing.
-npm never accepts the same version twice, so a failed publish after upload needs
-a new version.
+Publish every plugin release, even when the server did not change, so users can
+match the server to their plugin version. npm never accepts the same version
+twice, so a failed publish after upload needs a new release version.

@@ -1,12 +1,10 @@
 {
   "name": "@kaanbiryol/crate-server",
-  "version": "0.1.0",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@kaanbiryol/crate-server",
-      "version": "0.1.0",
       "license": "MIT",
       "dependencies": {
         "@cspotcode/source-map-support": "0.8.1",

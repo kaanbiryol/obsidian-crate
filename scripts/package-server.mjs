@@ -31,10 +31,14 @@ await mkdir(vendor, { recursive: true });
 await cp(join(miniflareRoot, 'dist'), join(vendor, 'dist'), { recursive: true });
 await copyFile(join(miniflareRoot, 'package.json'), join(vendor, 'package.json'));
 await copyFile(join(root, 'packages/server/MINIFLARE_LICENSE'), join(vendor, 'LICENSE'));
-await writeFile(join(destination, 'package.json'), JSON.stringify({ ...packageInfo, crateServerAssets: true }, null, 2) + '\n');
-for (const file of ['npm-shrinkwrap.json', 'README.md']) {
-	await copyFile(join(root, 'packages/server', file), join(destination, file));
-}
+// The server ships the Worker built from this commit, so it takes the plugin's version.
+const { name, ...packageFields } = packageInfo;
+await writeFile(join(destination, 'package.json'), JSON.stringify({ name, version: repositoryInfo.version, ...packageFields, crateServerAssets: true }, null, 2) + '\n');
+const shrinkwrap = JSON.parse(await readFile(join(root, 'packages/server/npm-shrinkwrap.json'), 'utf8'));
+const { packages: { '': rootPackage, ...lockedPackages }, ...lockFields } = shrinkwrap;
+await writeFile(join(destination, 'npm-shrinkwrap.json'), JSON.stringify({ name: lockFields.name, version: repositoryInfo.version, ...lockFields,
+	packages: { '': { name: rootPackage.name, version: repositoryInfo.version, ...rootPackage }, ...lockedPackages } }, null, 2) + '\n');
+await copyFile(join(root, 'packages/server/README.md'), join(destination, 'README.md'));
 for (const file of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) await copyFile(join(root, file), join(destination, file));
 // The source directory is the package boundary; filenames do not select runtime code.
 await cp(join(root, 'packages/server/src'), join(destination, 'scripts'), { recursive: true });

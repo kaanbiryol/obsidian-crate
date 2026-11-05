@@ -19,6 +19,12 @@ test('packed npx installation starts without repository files and preserves data
 	t.after(() => rm(directory, { recursive: true, force: true }));
 	const { stdout: packOutput } = await exec('npm', ['pack', join(root, 'dist/server'), '--pack-destination', directory, '--json'], { cwd: directory });
 	const [packed] = JSON.parse(packOutput);
+	// The package ships this commit's Worker, so it carries the plugin's version.
+	const { version } = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
+	assert.equal(packed.version, version);
+	const shrinkwrap = JSON.parse(await readFile(join(root, 'dist/server/npm-shrinkwrap.json'), 'utf8'));
+	assert.equal(shrinkwrap.version, version);
+	assert.equal(shrinkwrap.packages[''].version, version);
 	const paths = packed.files.map(file => file.path);
 	assert.ok(paths.includes('assets/worker.mjs'));
 	assert.ok(paths.includes('assets/database-upgrade-rules.mjs'));
