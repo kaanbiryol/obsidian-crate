@@ -9,7 +9,7 @@ import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
-import { openLocalRuntime, issueLocalDevice, normalizeLocalOrigin, revokeLocalDevice } from '../src/local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice, isLockFromEarlierBoot, lockLocalData, normalizeLocalOrigin, revokeLocalDevice } from '../src/local-server-runtime.mjs';
 import { listenLocalServer } from '../src/local-server-http.mjs';
 
 test('local origin requires HTTPS except on the server computer', () => {
@@ -18,6 +18,35 @@ test('local origin requires HTTPS except on the server computer', () => {
 	for (const value of ['http://192.168.1.2:8787', 'https://user:pass@example.com', 'https://example.com/path', 'https://example.com?token=x']) {
 		assert.throws(() => normalizeLocalOrigin(value));
 	}
+});
+
+test('a lock is reclaimed only when it predates this boot and its process is gone', async () => {
+	const now = Date.parse('2026-11-05T12:00:00Z'), uptime = 3600;
+	const lock = (startedAt, pid = 4242) => JSON.stringify({ pid, startedAt });
+	const options = running => ({ now, uptime, isRunning: () => running });
+	assert.equal(isLockFromEarlierBoot(lock('2026-11-05T10:00:00Z'), options(false)), true);
+	// A running process keeps its lock, even when a corrected clock makes it look old.
+	assert.equal(isLockFromEarlierBoot(lock('2026-11-05T10:00:00Z'), options(true)), false);
+	// A crash during this boot may have left workerd running: keep the lock.
+	assert.equal(isLockFromEarlierBoot(lock('2026-11-05T11:30:00Z'), options(false)), false);
+	for (const text of ['', 'null', '{"pid":"1","startedAt":"2026-11-05T10:00:00Z"}', '{"pid":1,"startedAt":"soon"}']) {
+		assert.equal(isLockFromEarlierBoot(text, options(false)), false);
+	}
+});
+
+test('starting after a reboot replaces a lock left by the previous boot', async t => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-lock-'));
+	t.after(() => rm(dataDir, { recursive: true, force: true }));
+	const path = join(dataDir, 'server.lock');
+	const exited = spawn(process.execPath, ['-e', '']);
+	await once(exited, 'exit');
+	await writeFile(path, JSON.stringify({ pid: exited.pid, startedAt: '2000-01-01T00:00:00Z' }));
+	const unlock = await lockLocalData(dataDir);
+	assert.equal(JSON.parse(await readFile(path, 'utf8')).pid, process.pid);
+	await assert.rejects(lockLocalData(dataDir), /locked/);
+	await unlock();
+	await writeFile(path, JSON.stringify({ pid: exited.pid, startedAt: new Date().toISOString() }));
+	await assert.rejects(lockLocalData(dataDir), /locked/);
 });
 
 test('damaged metadata and missing storage cannot silently create a fresh server', { timeout: 20_000 }, async () => {

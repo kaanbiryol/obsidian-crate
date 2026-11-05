@@ -3,6 +3,7 @@ import { packaged, runtimeVersion, serverAssetPath, workerPath } from './assets.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { uptime as osUptime } from 'node:os';
 const { Miniflare, convertV4MiniflareOptions } = await import(packaged
 	? '../vendor/miniflare/dist/src/index.js' : 'miniflare');
 
@@ -57,14 +58,35 @@ export function normalizeLocalOrigin(value) {
 
 // Every command owns the complete data directory. Never run two workerd
 // processes against the same SQLite files, including administrative commands.
+/** A lock is left over from an earlier boot only when it predates this boot and its
+ * process is gone. Both are required: a clock corrected after boot can make a live
+ * server's lock look old, and a reused process ID keeps a stale one. Every
+ * process from before a restart has exited, so no workerd can still use the data. */
+export function isLockFromEarlierBoot(text, { now = Date.now(), uptime = osUptime(), isRunning = pidIsRunning } = {}) {
+	let lock;
+	try { lock = JSON.parse(text); } catch { return false; }
+	const startedAt = Date.parse(lock?.startedAt);
+	return Number.isSafeInteger(lock?.pid) && Number.isFinite(startedAt)
+		&& startedAt < now - uptime * 1000 && !isRunning(lock.pid);
+}
+
+function pidIsRunning(pid) {
+	try { process.kill(pid, 0); return true; }
+	catch (error) { return error.code !== 'ESRCH'; }
+}
+
 export async function lockLocalData(dataDir) {
 	await mkdir(dataDir, { recursive: true, mode: 0o700 });
 	const path = join(dataDir, 'server.lock');
 	let handle;
-	try { handle = await open(path, 'wx', 0o600); }
-	catch (error) {
-		if (error.code !== 'EEXIST') throw error;
-		throw new Error(`Data directory is locked. Stop its Crate server first. After a crash, verify no Crate/workerd process uses this directory before removing ${path}.`);
+	for (let attempt = 0; !handle; attempt++) {
+		try { handle = await open(path, 'wx', 0o600); }
+		catch (error) {
+			if (error.code !== 'EEXIST') throw error;
+			const previous = await readFile(path, 'utf8').catch(() => '');
+			if (attempt === 0 && isLockFromEarlierBoot(previous)) { await unlink(path).catch(() => {}); continue; }
+			throw new Error(`Data directory is locked. Stop its Crate server first. After a crash, verify no Crate/workerd process uses this directory before removing ${path}.`);
+		}
 	}
 	await handle.writeFile(`${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`);
 	await handle.close();

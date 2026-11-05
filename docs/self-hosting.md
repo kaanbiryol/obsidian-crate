@@ -304,9 +304,8 @@ retry and expiry rules; overdue delivery is not guaranteed.
 
 Other computers need Node and workerd binaries supported by the pinned versions.
 Linux, Windows, physical mobile clients, HTTPS deployment and automatic startup
-services need separate acceptance checks. This change does not install a
-background service. A service manager should run the built server with absolute
-repository and data paths and send SIGTERM for a graceful shutdown.
+services need separate acceptance checks. To start Crate at login or boot, see
+[Start Crate automatically](#start-crate-automatically).
 
 ## One-command remote setup without a domain
 
@@ -474,8 +473,8 @@ stops Crate and reports the failure. `cloudflared` handles temporary network
 reconnections. Initial DNS and HTTPS certificate propagation can take a few
 minutes; a running process alone does not prove remote reachability.
 
-The command runs in the foreground; automatic startup after reboot remains a
-service-manager setup. `npm run server -- start --local` skips the saved tunnel
+The command runs in the foreground; to start it after a reboot, see
+[Start Crate automatically](#start-crate-automatically). `npm run server -- start --local` skips the saved tunnel
 for local troubleshooting. For an independently managed tunnel or HTTPS proxy,
 use `start --local --origin https://crate.example.com` and manage that proxy
 yourself. Do not run both tunnel workflows for the same hostname.
@@ -511,6 +510,128 @@ tunnel in Cloudflare and recover its credentials or remove the unused tunnel
 before retrying. A missing credential for a saved tunnel stops startup; restore
 the remote directory from backup. Stopping the launcher does not delete the DNS
 record or tunnel.
+
+## Start Crate automatically
+
+`start` runs in the foreground, so closing the terminal, logging out or rebooting
+stops Crate. A service manager can start it for you and restart it if it stops.
+Docker users already have this: Compose restarts Crate, and Docker Desktop can
+start at login.
+
+First run `setup` once in a terminal, since the first Cloudflare login or Funnel
+approval needs you. Then install Crate somewhere a background service can read.
+On a Mac, macOS blocks background services from reading **Documents**, **Desktop**
+and **Downloads** without a permission prompt, so do not point the service at a
+checkout in those folders. Installing the package globally avoids that:
+
+```sh
+npm install -g @kaanbiryol/crate-server
+node -p process.execPath
+echo "$(npm root -g)/@kaanbiryol/crate-server/scripts/crate-server.mjs"
+```
+
+The last two commands print the absolute Node and Crate paths for the files
+below. Use those exact paths: version managers put shims on `PATH` that a service
+cannot use. After upgrading Node, update the Node path and restart the service.
+
+A Quick Tunnel gets a new address on each restart, so use a service with a
+[named tunnel](#access-away-from-home-with-cloudflare-tunnel) or
+[Tailscale Funnel](#stable-address-without-a-domain-tailscale-funnel). The
+saved setup is reused, and `crate-server pair` still works while the service runs.
+
+### macOS (launchd)
+
+Save this as `~/Library/LaunchAgents/local.crate.server.plist`, replacing the
+paths and `you` with your own:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>local.crate.server</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/path/to/node</string>
+		<string>/path/to/crate-server.mjs</string>
+		<string>start</string>
+		<string>--data-dir</string>
+		<string>/Users/you/.crate/server</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>ThrottleInterval</key>
+	<integer>30</integer>
+	<key>StandardOutPath</key>
+	<string>/Users/you/Library/Logs/crate-server.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/you/Library/Logs/crate-server.log</string>
+</dict>
+</plist>
+```
+
+`PATH` lets Crate find `cloudflared` or `tailscale`. Then load it, and check the log:
+
+```sh
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.crate.server.plist
+tail -f ~/Library/Logs/crate-server.log
+```
+
+Crate now starts when you log in and restarts 30 seconds after it stops with an
+error, such as a tunnel that exited. Stop it with
+`launchctl bootout gui/$(id -u)/local.crate.server`, which shuts it down cleanly.
+A launch agent runs only while you are logged in. Under **System Settings →
+Energy** (or **Battery**), keep the Mac from sleeping while it serves devices.
+The log can contain a first pairing code; keep it private.
+
+### Linux (systemd)
+
+Save this as `~/.config/systemd/user/crate.service`, replacing the paths:
+
+```ini
+[Unit]
+Description=Crate server
+
+[Service]
+ExecStart=/path/to/node /path/to/crate-server.mjs start --data-dir /home/you/.crate/server
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
+```
+
+Enable it, keep it running after you log out, and follow its log:
+
+```sh
+systemctl --user daemon-reload
+systemctl --user enable --now crate
+sudo loginctl enable-linger "$USER"
+journalctl --user -u crate -f
+```
+
+`systemctl --user stop crate` shuts Crate down cleanly. If the network or
+Tailscale is not ready at boot, Crate exits and systemd retries it 30 seconds later.
+
+### After a crash or power loss
+
+A lock file stops two servers from using the same data. After a reboot, Crate
+replaces a lock left by the previous boot on its own. If Crate was force-quit
+without a reboot, the lock stays: check that no Crate or workerd process is
+running, then remove `server.lock` from the data directory and start again.
 
 ## Backups, restore, and updates
 
