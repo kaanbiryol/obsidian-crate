@@ -131,3 +131,19 @@ are not modified automatically. Publishing manually through
 GitHub triggers Pages; if publishing via a workflow's `GITHUB_TOKEN`, explicitly
 dispatch **Deploy GitHub Pages** with `release_tag` set to the published tag,
 because token-created release events do not start another workflow.
+
+## Publish the server package
+
+The standalone server, `@kaanbiryol/crate-server`, is versioned separately from
+the plugin in `packages/server/package.json`. To release it, raise that version,
+sign in with `npm login`, and run from a clean checkout of the release commit:
+
+```sh
+npm run publish:server
+```
+
+This builds the stable Worker into `dist/server`, runs the packed `npx`
+installation test, then publishes the staged package. A development build is
+refused. Append `-- --dry-run` to check the package contents without publishing.
+npm never accepts the same version twice, so a failed publish after upload needs
+a new version.

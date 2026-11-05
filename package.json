@@ -29,6 +29,7 @@
 		"server": "node scripts/local-server.mjs",
 		"test:local-server": "npm run build:worker && node --test \"packages/server/test/*.test.mjs\"",
 		"test:server-package": "npm run build:server && node --test scripts/server-package.test.mjs",
+		"publish:server": "npm run test:server-package && npm publish ./dist/server",
 		"test:docker": "docker compose build && node --test scripts/docker-server.test.mjs",
 		"build:plugin": "vite build",
 		"build:plugin:dev": "CRATE_ALLOW_DEV_BUILD=1 vite build --mode development",

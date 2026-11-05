@@ -355,9 +355,9 @@ npm run pack:server
 npx ./dist/kaanbiryol-crate-server-0.1.0.tgz
 ```
 
-The intended registry command after publication is
-`npx @kaanbiryol/crate-server`. This implementation prepares and tests the package;
-it does not publish it. Subsequent runs reuse `~/.crate/server` by default.
+Once published, users run `npx @kaanbiryol/crate-server`. Maintainers publish
+it with `npm run publish:server`; see [releases](releases.md#publish-the-server-package).
+Subsequent runs reuse `~/.crate/server` by default.
 Pass **--data-dir** to keep multiple vault servers separate. Run
 `npx ./dist/kaanbiryol-crate-server-0.1.0.tgz pair --name "My phone"`
 while running to issue another pairing code without restarting.
