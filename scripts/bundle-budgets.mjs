@@ -11,10 +11,10 @@ export const bundleBudgets = {
 	},
 	{
 		path: 'dist/styles.css',
-		// 0.6.0 shared dialogs, controls and transcript player styles measure
-		// 384.3 KB raw / 46.8 KB gzip across the plugin and shared PWA surfaces.
+		// 0.12.0 onboarding checklist and dialog spacing styles measure
+		// 385.8 KB raw / 47.8 KB gzip across the plugin and shared PWA surfaces.
 		maxBytes: 390000,
-		maxGzipBytes: 47500,
+		maxGzipBytes: 48500,
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',

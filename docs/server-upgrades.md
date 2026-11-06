@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 3 and schema 1, with no registered migrations. Revision 3 changes the schema 1 definition in place (Reading list paging and deltas), so servers deployed by earlier betas, including 0.9.0 (revision 1) and 0.10.0 (revision 2), cannot be upgraded; the update reports this and asks users to delete and recreate the server. `scripts/server-release-policy.json` pins the 0.10.0 release as the pre-launch baseline that allows this. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 4 and schema 1, with no registered migrations. Revision 3 (0.11.0) changed the schema 1 definition in place (Reading list paging and deltas), so servers deployed by earlier betas, including 0.9.0 (revision 1) and 0.10.0 (revision 2), cannot be upgraded; the update reports this and asks users to delete and recreate the server. `scripts/server-release-policy.json` pins the 0.10.0 release as the pre-launch baseline that allows this. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 
