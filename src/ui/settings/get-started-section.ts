@@ -7,6 +7,7 @@ import { AddDeviceModal } from './add-device-modal';
 import { canAddDeviceWithCode, loadConnectedDevices } from './devices-section';
 import { buildEnrollmentUrl } from './reminders-web-app';
 import { showSyncErrorNotice } from '../sync-error-notice';
+import { ActivityModal } from '../activity/activity-modal';
 import { notifyConflicts } from '../../sync/conflict/conflict';
 import type { SettingsSectionContext } from './section-helpers';
 
@@ -27,10 +28,10 @@ export function connectedDeviceKinds(devices: RegisteredDevice[] | null): { othe
 	};
 }
 
-/** Sync setup steps, each checked off from this device's real state, plus optional suggestions. Hidden once dismissed. */
+/** Setup steps, each checked off from this device's real state, plus optional suggestions. Shown once a server is connected, hidden once dismissed. */
 export function renderGetStartedSection(context: SettingsSectionContext): () => void {
 	const { containerEl, plugin, rerender } = context;
-	if (plugin.settings.getStartedDismissed) return () => {};
+	if (plugin.settings.getStartedDismissed || !plugin.syncRuntime.isConfigured()) return () => {};
 
 	const card = containerEl.createDiv({ cls: 'crate-get-started' });
 	let devices: RegisteredDevice[] | null = plugin.settingsUiState.devices?.tokens ?? null;
@@ -57,7 +58,7 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 		const done = steps.filter(step => step.done).length;
 		const header = card.createDiv({ cls: 'crate-get-started-header' });
 		header.createDiv({ cls: 'crate-get-started-title', text: 'Get started' });
-		header.createSpan({ cls: 'crate-get-started-count', text: done === steps.length ? 'Sync is set up' : `${done} of ${steps.length}` });
+		header.createSpan({ cls: 'crate-get-started-count', text: done === steps.length ? 'All set' : `${done} of ${steps.length}` });
 		new ButtonComponent(header).setButtonText(done === steps.length ? 'Done' : 'Hide').onClick(async () => {
 			try {
 				await plugin.writeSettings({ getStartedDismissed: true });
@@ -82,7 +83,7 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 			if (step.action) addAction(row, step.name, step.action, true);
 		}
 
-		const suggestions = buildSuggestions(context, devices);
+		const suggestions = buildSuggestions(context);
 		if (suggestions.length === 0) return;
 		card.createDiv({ cls: 'crate-get-started-subtitle', text: 'Also try' });
 		const extras = card.createDiv({ cls: 'crate-get-started-steps' });
@@ -99,7 +100,7 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 	// A first sync from the status row or the command palette checks its step off here too.
 	const onStateChange = () => { if (!disposed) render(); };
 	plugin.syncRuntime.addStateChangeListener(onStateChange);
-	if (plugin.syncRuntime.isConfigured() && devices === null) {
+	if (devices === null) {
 		void loadConnectedDevices(plugin).then(tokens => {
 			if (disposed) return;
 			devices = tokens;
@@ -113,18 +114,15 @@ export function renderGetStartedSection(context: SettingsSectionContext): () => 
 }
 
 function buildSteps({ containerEl, plugin }: SettingsSectionContext, devices: RegisteredDevice[] | null): GetStartedStep[] {
-	const connected = plugin.syncRuntime.isConfigured();
+	const showFeatures = { label: 'Show', run: () => { openSettingsSection(containerEl, 'Features'); } };
 	return [
-		{
-			name: 'Connect a server',
-			desc: 'Sign in with Cloudflare, paste a pairing link, or use your own server below.',
-			done: connected,
-		},
 		{
 			name: 'Run your first sync',
 			desc: 'Sync this vault with your server. Until automatic sync is on, Crate syncs only when you select Sync now.',
-			done: connected && Boolean(plugin.settings.lastSync),
+			done: Boolean(plugin.settings.lastSync),
 			action: { label: 'Sync now', run: async () => {
+				// The first sync is often the longest, so show its progress.
+				new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
 				try {
 					const result = await plugin.syncRuntime.sync();
 					if (result.outcome === 'cancelled') return;
@@ -144,41 +142,36 @@ function buildSteps({ containerEl, plugin }: SettingsSectionContext, devices: Re
 				else openSettingsSection(containerEl, 'Account and devices');
 			} },
 		},
+		{ name: 'Turn on reminders', desc: 'Keep reminders in your notes and get notified on your phone.', done: plugin.remindersSettings.enabled, action: showFeatures },
+		{ name: 'Turn on Reading', desc: 'Save articles to read and highlight later.', done: plugin.settings.reading.enabled, action: showFeatures },
+		{
+			name: 'Install the web app',
+			desc: 'Reminder notifications and Reading, from your home screen.',
+			done: connectedDeviceKinds(devices).webApp,
+			action: { label: 'Show code', run: async () => {
+				try {
+					new QRModal(plugin.app, await buildEnrollmentUrl(plugin)).open();
+				} catch (error) {
+					new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
+				}
+			} },
+		},
 	];
 }
 
 /** Optional extras. They never count toward setup and each disappears once it is on. */
-function buildSuggestions({ containerEl, plugin, rerender }: SettingsSectionContext, devices: RegisteredDevice[] | null): GetStartedStep[] {
-	const connected = plugin.syncRuntime.isConfigured();
-	const remindersOn = plugin.remindersSettings.enabled;
-	const readingOn = plugin.settings.reading.enabled;
-	const showFeatures = { label: 'Show', run: () => { openSettingsSection(containerEl, 'Features'); } };
+function buildSuggestions({ plugin, rerender }: SettingsSectionContext): GetStartedStep[] {
 	const suggestions: GetStartedStep[] = [
 		{
 			name: 'Automatic sync',
 			desc: 'Sync after edits, on startup, and at an interval.',
-			done: !connected || plugin.settings.automaticSync,
+			done: plugin.settings.automaticSync,
 			action: { label: 'Turn on', run: async () => {
 				try {
 					await writeSyncSettings(plugin, { automaticSync: true });
 					rerender();
 				} catch (error) {
 					new Notice(`Failed to save sync settings: ${errorMessage(error)}`);
-				}
-			} },
-		},
-		{ name: 'Reminders', desc: 'Keep reminders in your notes and get notified on your phone.', done: remindersOn, action: showFeatures },
-		{ name: 'Reading', desc: 'Save articles to read and highlight later.', done: readingOn, action: showFeatures },
-		{
-			name: 'Install the web app',
-			desc: 'Reminder notifications and Reading, from your home screen.',
-			// The web app only serves reminders and Reading, so it is suggested once one of them is on.
-			done: !connected || !(remindersOn || readingOn) || connectedDeviceKinds(devices).webApp,
-			action: { label: 'Show code', run: async () => {
-				try {
-					new QRModal(plugin.app, await buildEnrollmentUrl(plugin)).open();
-				} catch (error) {
-					new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
 				}
 			} },
 		},
@@ -204,7 +197,7 @@ function openSettingsSection(containerEl: HTMLElement, title: string): void {
 
 /** A settings row that brings the checklist back after it was hidden. */
 export function renderShowGetStartedSetting({ containerEl, plugin, rerender }: SettingsSectionContext): void {
-	if (!plugin.settings.getStartedDismissed) return;
+	if (!plugin.settings.getStartedDismissed || !plugin.syncRuntime.isConfigured()) return;
 	new Setting(containerEl)
 		.setName('Get started')
 		.setDesc('Show the setup checklist at the top of these settings.')
