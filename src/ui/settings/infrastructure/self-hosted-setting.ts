@@ -1,6 +1,7 @@
 import { Notice, Setting, type TextComponent } from 'obsidian';
 import { connectSelfHostedServer, updateSelfHostedServerAddress } from '../../../plugin/self-hosted-connection';
 import { offerFeatureChoice } from '../../../plugin/feature-settings';
+import { startVaultReplacement } from '../../../plugin/sync-integration';
 import type { SettingsSectionContext } from '../section-helpers';
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { selfHostedConnectionMessage } from './self-hosted-errors';
@@ -64,12 +65,15 @@ export function renderSelfHostedSetting({ containerEl, plugin, rerender }: Setti
 			addressInput.setDisabled(true);
 			tokenInput.setDisabled(true);
 			try {
-				await connectSelfHostedServer(plugin, address, token, reconnect);
+				const { encrypted } = await connectSelfHostedServer(plugin, address, token, reconnect);
 				token = '';
 				tokenInput.setValue('');
-				new Notice('Connected to your server. You can now sync this vault.');
 				rerender();
-				if (!reconnect) void offerFeatureChoice(plugin);
+				if (reconnect) new Notice('Connected to your server. You can now sync this vault.');
+				// An encrypted vault syncs only after this device has its keys.
+				else void offerFeatureChoice(plugin).finally(() => {
+					if (encrypted || !startVaultReplacement(plugin)) new Notice('Connected to your server. You can now sync this vault.');
+				});
 			} catch (error) {
 				errorEl.setText(selfHostedConnectionMessage(error, address));
 				errorEl.hidden = false;

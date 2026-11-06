@@ -47,7 +47,8 @@ export async function updateSelfHostedServerAddress(plugin: CratePlugin, address
 }
 
 /** Validate the server and vault credential before changing local settings. */
-export async function connectSelfHostedServer(plugin: CratePlugin, address: string, token: string, reconnect = false): Promise<void> {
+/** Resolves whether the server is encrypted, since syncing it first needs this device's keys. */
+export async function connectSelfHostedServer(plugin: CratePlugin, address: string, token: string, reconnect = false): Promise<{ encrypted: boolean }> {
 	const expected = { workerUrl: plugin.settings.workerUrl, authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '' };
 	const assertAvailable = () => {
 		if (reconnect && (plugin.settings.workerUrl !== expected.workerUrl || (plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '') !== expected.authToken)) throw new ConnectionSetupError('changed');
@@ -83,6 +84,7 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 			// Normalizing adds this device's own workspace exclusion to the server's patterns.
 			await writeSyncSettings(plugin, shared.settings);
 		}
+		return { encrypted: Boolean(encryption) };
 	} finally {
 		connecting.delete(plugin);
 	}

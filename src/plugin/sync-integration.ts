@@ -104,6 +104,15 @@ function openFileHistoryWhenReady(plugin: CratePlugin, path: string): void {
 	});
 }
 
+/** A confirmed vault replacement waits for the first sync. Start it now and show its
+ * progress, so selecting Replace visibly replaces the vault. Resolves whether it started. */
+export function startVaultReplacement(plugin: CratePlugin): boolean {
+	if (!plugin.settings.replaceVault || !plugin.syncRuntime.isConfigured()) return false;
+	new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
+	void runSyncNow(plugin);
+	return true;
+}
+
 async function runSyncNow(plugin: CratePlugin): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	try {

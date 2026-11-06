@@ -107,7 +107,8 @@ export class CloudflareOperationPresentation {
 			[this.context.intent === 'reconnect' ? 'Select “Reconnect” in Crate settings to try again.' : 'Select “Connect with Cloudflare” in Crate settings to try again.']);
 	}
 
-	connected(connection: ConnectionTestResult): void {
+	/** `replacing` says the first sync is starting to replace this vault. */
+	connected(connection: ConnectionTestResult, replacing = false): void {
 		const { intent, openSettings } = this.context;
 		if (!connection.success) {
 			if (connection.code === 'incompatible_protocol') {
@@ -124,7 +125,8 @@ export class CloudflareOperationPresentation {
 		this.progress.succeed(
 			intent === 'reconnect' ? 'Connection verified' : 'Crate is connected',
 			intent === 'reconnect' ? 'Cloudflare and this device are connected. Select Sync now to retry syncing.'
-				: 'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
+				: replacing ? 'Connected. Crate is replacing this vault with the server copy. Sync activity shows the progress.'
+					: 'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
 		);
 	}
 }

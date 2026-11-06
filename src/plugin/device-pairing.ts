@@ -3,6 +3,7 @@ import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { configureCloudflareAuthorizedDevice } from './cloudflare/connection';
 import { offerFeatureChoice } from './feature-settings';
+import { startVaultReplacement } from './sync-integration';
 import { getCurrentDeviceName, getCurrentPlatformCode } from './device-identity';
 import { generateSecureToken, hashToken } from './device-token';
 import { normalizeCloudflareDeployment } from '../cloudflare/deployment/state';
@@ -59,8 +60,11 @@ export async function startDevicePairing(plugin: CratePlugin, target: { origin: 
 		const result = await redeemDevicePairing(plugin, target);
 		plugin.refreshSettingsTab();
 		if (result.encrypted) { new DeviceKeyPairingModal(plugin).open(); return; }
-		new Notice(result.synced ? 'Connected. Open the command palette and select Crate: Sync now.' : 'Connected, but the connection test failed. Check Crate settings.');
-		if (result.synced) void offerFeatureChoice(plugin);
+		if (!result.synced) { new Notice('Connected, but the connection test failed. Check Crate settings.'); return; }
+		// Choose features first, so the replacement syncs the chosen folders.
+		void offerFeatureChoice(plugin).finally(() => {
+			if (!startVaultReplacement(plugin)) new Notice('Connected. Open the command palette and select Crate: Sync now.');
+		});
 	} catch (error) {
 		if (error instanceof ConnectionSetupError && error.code === 'replace-cancelled') new Notice(error.message);
 		else if (!getPluginLifecycleSignal(plugin).aborted) new Notice(`Could not connect: ${errorMessage(error)}`);

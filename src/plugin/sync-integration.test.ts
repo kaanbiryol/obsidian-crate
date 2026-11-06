@@ -2,7 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { TFile, TFolder, type Command, type Menu, type MenuItem, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
-import { registerSyncCommands } from './sync-integration';
+import { registerSyncCommands, startVaultReplacement } from './sync-integration';
+import { ActivityModal } from '../ui/activity/activity-modal';
 import { setSyncReady } from './lifecycle-state';
 
 vi.mock('../ui/activity/file-history-modal', () => ({ openFileHistoryModal: vi.fn() }));
@@ -68,5 +69,18 @@ it('waits for startup sync initialization before running sync now', async () => 
  await Promise.resolve();
  expect(sync).not.toHaveBeenCalled();
  ready();
+ await vi.waitFor(() => expect(sync).toHaveBeenCalledOnce());
+});
+
+it('opens activity and syncs only when a confirmed replacement is pending', async () => {
+ const open = vi.fn();
+ vi.mocked(ActivityModal).mockImplementation(function () { return { open }; });
+ const sync = vi.fn(async () => ({ outcome: 'completed', success: true, conflicts: [] }));
+ const plugin = { app: {}, settings: { replaceVault: false }, syncRuntime: { isConfigured: () => true, sync } } as unknown as CratePlugin;
+ expect(startVaultReplacement(plugin)).toBe(false);
+ expect(open).not.toHaveBeenCalled();
+ plugin.settings.replaceVault = true;
+ expect(startVaultReplacement(plugin)).toBe(true);
+ expect(open).toHaveBeenCalledOnce();
  await vi.waitFor(() => expect(sync).toHaveBeenCalledOnce());
 });

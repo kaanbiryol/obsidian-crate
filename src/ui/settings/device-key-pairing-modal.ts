@@ -4,6 +4,7 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import { captureServerConnection } from '../../plugin/server-request';
 import { unlockVaultWithPairedKeys } from '../../plugin/encryption-setup';
 import { offerFeatureChoice } from '../../plugin/feature-settings';
+import { startVaultReplacement } from '../../plugin/sync-integration';
 import { requestAppPairing } from '../../encryption/pairing/session';
 import { PAIRING_PATH, PairingEndedError, type PairingTransport } from '../../encryption/pairing/protocol';
 import { validateVaultKeyBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
@@ -93,10 +94,12 @@ export class DeviceKeyPairingModal extends SharedModal {
 					await unlockVaultWithPairedKeys(this.plugin, latest, pairedBundle(result.payload), current);
 					this.finished = true;
 					await this.attempt.close(true).catch(() => {});
-					new Notice('This vault is unlocked. Open the command palette and select Crate: Sync now.');
 					this.plugin.refreshSettingsTab();
 					this.close();
-					void offerFeatureChoice(this.plugin);
+					const plugin = this.plugin;
+					void offerFeatureChoice(plugin).finally(() => {
+						if (!startVaultReplacement(plugin)) new Notice('This vault is unlocked. Open the command palette and select Crate: Sync now.');
+					});
 					return;
 				}
 				if (result.code) {

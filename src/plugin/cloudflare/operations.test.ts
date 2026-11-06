@@ -13,6 +13,8 @@ const platform = { isMobile: false };
 
 const revealCloudflareOperation = vi.fn(() => false);
 const offerFeatureChoice = vi.fn(async () => {});
+const startVaultReplacement = vi.fn(() => true);
+const readServerEncryption = vi.fn(async (): Promise<unknown> => null);
 
 const progress = {
 	dismiss: vi.fn(),
@@ -29,6 +31,8 @@ async function loadPluginIntegration() {
 	vi.doMock('./connection', () => ({ configureCloudflareAuthorizedDevice }));
 	vi.doMock('../vault-replacement', () => ({ confirmVaultReplacement: async () => false }));
 	vi.doMock('../feature-settings', () => ({ offerFeatureChoice }));
+	vi.doMock('../sync-integration', () => ({ startVaultReplacement }));
+	vi.doMock('../../sync/encryption/server-encryption', () => ({ readServerEncryption }));
 	vi.doMock('../device-token', () => ({ generateSecureToken, hashToken }));
 	vi.doMock('../device-identity', () => ({
 		getCurrentDeviceName: vi.fn(() => 'Test device'),
@@ -95,6 +99,7 @@ afterEach(() => {
 	vi.doUnmock('../../ui/cloudflare/deployment-modal');
 	vi.doUnmock('../../ui/cloudflare/authorization-modal');
 	vi.doUnmock('../feature-settings');
+	vi.doUnmock('../../sync/encryption/server-encryption');
 });
 
 describe('handleCloudflareOAuthProtocol', () => {
@@ -128,6 +133,28 @@ describe('handleCloudflareOAuthProtocol', () => {
 			'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
 		);
 		expect(offerFeatureChoice).toHaveBeenCalledExactlyOnceWith(plugin);
+	});
+
+	it.each([
+		['starts a confirmed replacement after the feature choice', null, true],
+		['waits for keys before replacing an encrypted vault', { mode: 'active' }, false],
+	] as const)('%s', async (_label, encryption, starts) => {
+		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
+		readServerEncryption.mockResolvedValueOnce(encryption);
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const plugin = createPlugin();
+		Object.assign(plugin.settings, { replaceVault: true });
+		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+		await vi.waitFor(() => expect(offerFeatureChoice).toHaveBeenCalledOnce());
+		await Promise.resolve();
+		if (starts) {
+			expect(startVaultReplacement).toHaveBeenCalledExactlyOnceWith(plugin);
+			expect(offerFeatureChoice.mock.invocationCallOrder[0]).toBeLessThan(startVaultReplacement.mock.invocationCallOrder[0]!);
+			expect(progress.succeed).toHaveBeenCalledWith('Crate is connected', expect.stringContaining('replacing this vault'));
+		} else {
+			expect(startVaultReplacement).not.toHaveBeenCalled();
+			expect(progress.succeed).toHaveBeenCalledWith('Crate is connected', expect.stringContaining('Sync now'));
+		}
 	});
 
 	it('passes the settings document to the OAuth dialog without waiting for animation frames', async () => {

@@ -10,11 +10,13 @@ const mocks = vi.hoisted(() => ({
 	keysModal: vi.fn(),
 	notices: [] as string[],
 	featureChoice: vi.fn(async () => {}),
+	replacement: vi.fn(() => false),
 }));
 
 vi.mock('obsidian', () => ({ Notice: class { constructor(message: string) { mocks.notices.push(message); } } }));
 vi.mock('./cloudflare/connection', () => ({ configureCloudflareAuthorizedDevice: mocks.configure }));
 vi.mock('./feature-settings', () => ({ offerFeatureChoice: mocks.featureChoice }));
+vi.mock('./sync-integration', () => ({ startVaultReplacement: mocks.replacement }));
 vi.mock('./device-identity', () => ({ getCurrentDeviceName: () => 'iPhone', getCurrentPlatformCode: () => 'ios' }));
 vi.mock('./device-token', () => ({ generateSecureToken: () => 'phone-token', hashToken: async () => 'phone-token-hash' }));
 vi.mock('../sync/encryption/server-encryption', () => ({ readServerEncryption: mocks.encryption }));
@@ -57,6 +59,7 @@ beforeEach(() => {
 	mocks.capabilities = ['device-pairing-v1'];
 	mocks.exchange.mockReset().mockResolvedValue({ tokenId: 'token-id', deployment });
 	mocks.configure.mockClear(); mocks.encryption.mockReset().mockResolvedValue(null); mocks.confirm.mockClear(); mocks.keysModal.mockClear();
+	mocks.replacement.mockReset().mockReturnValue(false);
 });
 
 describe('redeemDevicePairing', () => {
@@ -98,6 +101,26 @@ describe('redeemDevicePairing', () => {
 		await handleDevicePairingLink(plugin as never, `${origin}/notifications/pair#${target.code}`);
 		expect(mocks.featureChoice).toHaveBeenCalledWith(plugin);
 		expect(mocks.keysModal).not.toHaveBeenCalled();
+	});
+
+	it('starts a confirmed replacement after the feature choice instead of asking for Sync now', async () => {
+		mocks.featureChoice.mockClear();
+		mocks.replacement.mockReturnValue(true);
+		await handleDevicePairingLink(plugin as never, `${origin}/notifications/pair#${target.code}`);
+		await vi.waitFor(() => expect(mocks.replacement).toHaveBeenCalledWith(plugin));
+		expect(mocks.featureChoice.mock.invocationCallOrder[0]).toBeLessThan(mocks.replacement.mock.invocationCallOrder[0]!);
+		expect(mocks.notices.some(notice => notice.includes('Sync now'))).toBe(false);
+	});
+
+	it('asks for Sync now when there is no replacement to start', async () => {
+		await handleDevicePairingLink(plugin as never, `${origin}/notifications/pair#${target.code}`);
+		await vi.waitFor(() => expect(mocks.notices).toContainEqual(expect.stringContaining('Sync now')));
+	});
+
+	it('does not start a replacement for an encrypted vault before its keys arrive', async () => {
+		mocks.encryption.mockResolvedValue({ mode: 'active' });
+		await handleDevicePairingLink(plugin as never, `${origin}/notifications/pair#${target.code}`);
+		expect(mocks.replacement).not.toHaveBeenCalled();
 	});
 
 	it('does nothing when the user cancels or the link is invalid', async () => {

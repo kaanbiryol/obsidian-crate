@@ -15,6 +15,9 @@ import { getPluginLifecycleSignal } from '../lifecycle-state';
 import { configureCloudflareAuthorizedDevice } from './connection';
 import { isSelfHostedConnectionPending } from '../self-hosted-connection';
 import { offerFeatureChoice } from '../feature-settings';
+import { startVaultReplacement } from '../sync-integration';
+import { readServerEncryption } from '../../sync/encryption/server-encryption';
+import { WorkerApiHttpClient } from '../../sync/worker-api/http';
 import { generateSecureToken, hashToken } from '../device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../device-identity';
 import { openCloudflareDeploymentModal, revealCloudflareOperation, type CloudflareDeploymentModal } from '../../ui/cloudflare/deployment-modal';
@@ -229,6 +232,7 @@ async function connectDevice(operation: CloudflareOperation, workerUrl: string, 
 	const { plugin, signal, isReconnect, originalWorkerUrl, originalToken, presentation } = operation;
 	presentation.connecting();
 	let connection: ConnectionTestResult;
+	let replacing = false;
 	try {
 		assertDeviceConnectionUnchanged(operation);
 		const token = deviceToken ?? existingToken;
@@ -246,6 +250,7 @@ async function connectDevice(operation: CloudflareOperation, workerUrl: string, 
 		else {
 			connection = await configureCloudflareAuthorizedDevice(plugin, workerUrl, token, ...(isReconnect ? [{ workerUrl: originalWorkerUrl, authToken: originalToken || '' }] : []));
 		}
+		replacing = connection.success && !isReconnect && plugin.settings.replaceVault && !await isEncryptedServer(workerUrl, token, signal);
 	} catch (error) {
 		if (signal.aborted) return;
 		plugin.refreshSettingsTab();
@@ -255,8 +260,18 @@ async function connectDevice(operation: CloudflareOperation, workerUrl: string, 
 	if (signal.aborted) return;
 
 	plugin.refreshSettingsTab();
-	presentation.connected(connection);
-	if (connection.success && !isReconnect) void offerFeatureChoice(plugin);
+	presentation.connected(connection, replacing);
+	if (connection.success && !isReconnect) {
+		// Choose features first, so the replacement syncs the chosen folders.
+		void offerFeatureChoice(plugin).finally(() => { if (replacing) startVaultReplacement(plugin); });
+	}
+}
+
+/** An encrypted vault syncs only after this device has its keys. An unknown answer counts as encrypted. */
+async function isEncryptedServer(workerUrl: string, token: string, signal: AbortSignal): Promise<boolean> {
+	const http = new WorkerApiHttpClient(workerUrl, token);
+	http.setAbortSignal(signal);
+	return readServerEncryption(http).then(state => state !== null, () => true);
 }
 
 function deploymentErrorMessage(error: unknown): string {
