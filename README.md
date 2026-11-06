@@ -1,6 +1,6 @@
 # Crate
 
-Self-hosted Obsidian vault sync and reminders using Cloudflare R2, Workers, D1, and push notifications.
+Self-hosted Obsidian vault sync, reminders and reading list on Cloudflare or your own server.
 
 ![Crate in Obsidian on desktop, with the reminders web app on a phone](docs/images/crate-overview.png)
 
