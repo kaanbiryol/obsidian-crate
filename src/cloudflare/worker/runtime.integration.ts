@@ -8,7 +8,7 @@ import { writeCommittedMarkdownFilePair } from './sync/atomic-markdown-write';
 import { MAINTENANCE_DELETE_LIMIT, pruneChangelog } from './d1/db';
 import { drainNotificationJobs } from './notifications/outbox';
 import type { Env } from './types';
-import { handleListReminders } from './reminders/routes/list';
+import { handleListReminders } from './reminders/handlers/list';
 import {
 	FileVersionConflictError,
 	readCommittedMarkdownFileVersion,

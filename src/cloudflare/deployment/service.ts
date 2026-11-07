@@ -37,6 +37,8 @@ export function blockingServerOperation(saved: CloudflareDeploymentMetadata | nu
 
 const resumeBeforeStarting = { deletion: 'Resume server deletion before connecting or updating.' };
 const resumeBeforeContinuing = { deletion: 'Resume server deletion before continuing.' };
+/** A restore reads backups from the saved server, which must be complete. */
+const restoreSource = { missing: 'Select the source Cloudflare server and finish any deletion first.' };
 
 export interface CloudflareDeploymentServiceOptions {
 	clientId: string;
@@ -268,23 +270,30 @@ export class CloudflareDeploymentService {
 		});
 	}
 
-	private async restoreBackups<T>(operation: (api: CloudflareApiClient, source: CloudflareDeploymentMetadata) => Promise<T>): Promise<T> {
+	/** Runs one saved-login operation on a copy of the saved server's metadata, through an API
+	 * that rechecks around every request that the saved server is unchanged. A server without
+	 * its account, or unless `accountOnly`, without its database or with a deletion pending,
+	 * is rejected with `required.missing`. */
+	private withSavedServer<T>(intent: 'update' | 'reconnect', required: { missing: string; accountOnly?: boolean },
+		operation: (api: CloudflareApiClient, metadata: CloudflareDeploymentMetadata) => Promise<T>): Promise<T> {
 		this.assertIdle();
-		this.assertServerChangeAllowed();
-		const source = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
-		if (!source?.accountId || !source.d1DatabaseId || source.deletion) throw new Error('Select the source Cloudflare server and finish any deletion first.');
-		return this.exclusive(() => this.options.withAuthorization(tokens => operation(this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(source, 'update')), source)));
+		if (changesServer(intent)) this.assertServerChangeAllowed();
+		const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
+		if (!metadata?.accountId || !required.accountOnly && (!metadata.d1DatabaseId || metadata.deletion)) throw new Error(required.missing);
+		this.checkSavedTarget(metadata, intent);
+		return this.exclusive(() => this.options.withAuthorization(tokens =>
+			operation(this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(metadata, intent)), metadata)));
 	}
 
 	async listRestoreBackups(): Promise<BackupChoice[]> {
-		return this.restoreBackups(async (api, source) => {
+		return this.withSavedServer('update', restoreSource, async (api, source) => {
 			const { listUpgradeBackups } = await import('../restore/server-restore');
 			return listUpgradeBackups(api, { account: source.accountId!, database: source.d1DatabaseId!, bucket: source.r2BucketName });
 		});
 	}
 
 	async restoreBackup(choice: BackupChoice | null, onProgress: (message: string) => void): Promise<string> {
-		return this.restoreBackups(async (api, source) => {
+		return this.withSavedServer('update', restoreSource, async (api, source) => {
 			const artifacts = await this.whileActive(this.options.loadArtifacts);
 			return runRestoreWorkflow({
 				api, source, artifacts, choice, now: this.now, onProgress,
@@ -300,32 +309,20 @@ export class CloudflareDeploymentService {
 	/** Issues a one-use code for adding a device. Reading the saved login is not a server
 	 * change, so any device with that login may issue one. */
 	async issueDevicePairing(): Promise<IssuedDevicePairing> {
-		this.assertIdle();
-		const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
-		if (!metadata?.accountId || !metadata.d1DatabaseId || metadata.deletion) throw new Error('Connect this vault to its Cloudflare server first.');
-		const { accountId, d1DatabaseId } = metadata;
-		this.checkSavedTarget(metadata, 'reconnect');
-		return this.exclusive(() => this.options.withAuthorization(tokens => issueDevicePairingCode({
-			api: this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(metadata, 'reconnect')),
-			accountId, databaseId: d1DatabaseId, metadata, now: this.now(),
-		})));
+		return this.withSavedServer('reconnect', { missing: 'Connect this vault to its Cloudflare server first.' }, (api, metadata) => issueDevicePairingCode({
+			api, accountId: metadata.accountId!, databaseId: metadata.d1DatabaseId!, metadata, now: this.now(),
+		}));
 	}
 
 	async recoverUpdate(): Promise<DeploymentRecoveryResult> {
-		this.assertIdle();
-		this.assertServerChangeAllowed();
-		const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
-		if (!metadata?.accountId) throw new Error('Connect to your Cloudflare account first.');
-		this.checkSavedTarget(metadata, 'update');
-		return this.exclusive(() => this.options.withAuthorization(async tokens => {
-			const api = this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(metadata, 'update'));
+		return this.withSavedServer('update', { missing: 'Connect to your Cloudflare account first.', accountOnly: true }, async (api, metadata) => {
 			const artifacts = await this.whileActive(this.options.loadArtifacts);
 			return resumeInterruptedUpdate({
 				api, metadata, artifacts,
 				whileActive: operation => this.whileActive(operation),
 				persist: () => this.persistMetadata(metadata),
 			});
-		}));
+		});
 	}
 
 	private createGuardedApi(tokens: CloudflareOAuthTokens, authorization: 'saved' | 'temporary', checkTarget?: () => void): CloudflareApiClient {

@@ -1,7 +1,7 @@
 import { chargeRouteAction } from '../admission/rate-limit';
 import { parseFolderPath } from '../reminders/requests';
 import { corsResponse } from '../http/cors';
-import { getOrCreateVapidKeys } from './push';
+import { getOrCreateVapidKeys } from './vapid-keys';
 import { parseJsonObject, parseOptionalString } from '../http/request-validation';
 import { issueWebEnrollmentToken } from '../auth/web-enrollment';
 import { changedRows } from '../d1/db';

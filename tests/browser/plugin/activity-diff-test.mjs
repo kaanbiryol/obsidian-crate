@@ -50,21 +50,26 @@ const { outputFiles } = await build({
                 state.dispose?.();
                 const panel = document.querySelector('.crate-activity-panel');
                 panel.replaceChildren();
-                renderPendingPanel(panel, window.paths, async (path, deleted) => {
+                renderPendingPanel(panel, {
+                    paths: window.paths,
+                    loadDiff: async (path, deleted) => {
                         window.calls++;
                         window.loadArguments.push({ path, deleted });
                         if (window.delayed) { window.delayed = false; await new Promise(resolve => { window.release = resolve; }); }
                         if (window.fail) throw new Error('Could not reach the sync server.');
                         return { before, after: deleted ? '' : window.allChanged || path.endsWith('appearance.json') ? after : before, beforeSize: before.length, afterSize: deleted ? 0 : after.length, kind: deleted ? 'deleted' : 'modified' };
-                    }, false, false, null, '', undefined, state, actions);
+                    },
+                    progress: null, lastSyncLabel: '', browserState: state, actions,
+                });
             };
             window.mount();
             window.showSyncProgress = work => {
                 state.dispose?.();
                 const panel = document.querySelector('.crate-activity-panel');
                 panel.empty();
-                renderPendingPanel(panel, [], () => Promise.reject(new Error('Nothing is pending')), false, true, null, '', {
-                    status: 'syncing', work, lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0,
+                renderPendingPanel(panel, {
+                    paths: [], loadDiff: () => Promise.reject(new Error('Nothing is pending')), progress: null, lastSyncLabel: '',
+                    state: { status: 'syncing', work, lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 },
                 });
             };
         `,

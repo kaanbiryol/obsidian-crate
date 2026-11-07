@@ -1,4 +1,4 @@
-import { handleReadingRoute } from './reading/routes';
+import { handleReadingRoute } from './routes/reading';
 import { shortcutLaunchResponse, shortcutTransport } from './reading/shortcut-transport';
 import { captureSealedReading } from './reading/sealed-capture';
 import { ReadingError } from './reading/common';
@@ -144,8 +144,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	const mutation = isCrateMutation(path, method);
 	// Download outside the coordinator; only the sealed commit takes its lock.
 	if (shortcut?.kind === 'prepare' && encryption && execution.kind !== 'coordinator') {
-		try { return await captureSealedReading(request, env, authResult.principal, encryption); }
-		catch (error) { if (error instanceof ReadingError) return error.toResponse(); throw error; }
+		return await captureSealedReading(request, env, authResult.principal, encryption);
 	}
 	if (placement === 'forward-after-auth') return forwardedResponse(await forwardToCoordinator(env, request), context);
 	if (!mutation && execution.kind !== 'coordinator' && routePolicy?.initializeProjection && !ensuredProjections.has(projectionBinding)) {
@@ -170,6 +169,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 
 /** Domain errors keep their status and code; anything else is logged and hidden. */
 function errorResponse(error: unknown, request: Request, requestId: string): Response {
+	if (error instanceof ReadingError) return error.toResponse();
 	if (error instanceof EncryptionStateError) return error.toResponse();
 	if (error instanceof MarkdownEncodingError) return corsResponse({ error: error.message, code: 'unsupported_markdown_encoding' }, 409);
 	if (error instanceof ReminderInputError) return corsResponse({ error: error.message, field: error.field, code: 'invalid_reminder_input' }, 400);

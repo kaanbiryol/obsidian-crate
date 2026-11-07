@@ -2,10 +2,20 @@
  * Shared constants used across the plugin
  */
 
+import type { Priority } from '../types/reminder';
+
 /**
  * Default project name for reminders without a project
  */
 export const DEFAULT_PROJECT = 'Inbox';
+
+/** Priority of a reminder that does not set one. */
+export const DEFAULT_PRIORITY: Priority = 4;
+
+/** Switches between high priority (1) and the default. */
+export function togglePriority(priority: Priority): Priority {
+	return priority === 1 ? DEFAULT_PRIORITY : 1;
+}
 
 /** Reminder notes larger than this are reported as issues instead of parsed,
  * and web app edits cannot read or grow a note past it. */

@@ -37,12 +37,12 @@ test('files named by package scripts exist', () => {
 	assert.deepEqual(missing, []);
 });
 
-test('every tooling test in scripts/ runs from a package script', () => {
+test('every tooling test in scripts/ and tests/ runs from a package script', () => {
 	const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts).join(' ');
-	const referenced = new Set(scripts.match(/scripts\/[\w@./-]+\.test\.mjs/g));
-	const unlisted = readdirSync(join(root, 'scripts'))
-		.filter(name => name.endsWith('.test.mjs'))
-		.map(name => `scripts/${name}`)
-		.filter(file => !referenced.has(file));
+	const referenced = new Set(scripts.match(/(?:scripts|tests)\/[\w@./-]+\.test\.mjs/g));
+	const unlisted = [
+		...readdirSync(join(root, 'scripts')).map(name => `scripts/${name}`),
+		...readdirSync(join(root, 'tests'), { recursive: true }).map(name => `tests/${name.split('\\').join('/')}`),
+	].filter(file => file.endsWith('.test.mjs') && !referenced.has(file));
 	assert.deepEqual(unlisted, []);
 });

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
 import { type CloudflareDeploymentArtifacts } from '../deployment/artifacts';
-import { createUpgradeCheckpoint } from '../deployment/upgrade-checkpoint';
+import { createUpgradeCheckpoint } from './upgrade-checkpoint';
 import { SERVER_RELEASE } from '../deployment/database-upgrades';
 import type { DeploymentFence } from '../deployment/fence';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';

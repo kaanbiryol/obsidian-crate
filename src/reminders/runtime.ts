@@ -24,6 +24,8 @@ export interface ReminderBackend {
 }
 
 const remindersLogger = createLogger('Reminders');
+/** The plugin settings, vault, sync state and published backend the reminder runtime uses. */
+type ReminderRuntimeHost = Pick<CratePlugin, 'app' | 'manifest' | 'settings' | 'syncRuntime' | 'reminders'>;
 /** Reminder backend state of one plugin instance; the backend itself is `plugin.reminders`. */
 interface ReminderPluginState {
 	/** The newest setup's lifetime, including a setup that has not published its backend yet. */
@@ -31,22 +33,22 @@ interface ReminderPluginState {
 	/** Views subscribe once and follow every backend that replaces the current one. */
 	listeners: Set<() => void>;
 }
-const states = new WeakMap<CratePlugin, ReminderPluginState>();
-function reminderState(plugin: CratePlugin): ReminderPluginState {
+const states = new WeakMap<ReminderRuntimeHost, ReminderPluginState>();
+function reminderState(plugin: ReminderRuntimeHost): ReminderPluginState {
 	let state = states.get(plugin);
 	if (!state) { state = { listeners: new Set() }; states.set(plugin, state); }
 	return state;
 }
 
 /** Open views read the plugin's index and repository, which a folder change replaces. */
-export function subscribeReminderBackend(plugin: CratePlugin, listener: () => void): () => void {
+export function subscribeReminderBackend(plugin: ReminderRuntimeHost, listener: () => void): () => void {
 	const { listeners } = reminderState(plugin);
 	listeners.add(listener);
 	return () => { listeners.delete(listener); };
 }
 
 /** User actions report a stopped or still-loading backend instead of failing on a missing field. */
-export function requireReminderBackend(plugin: CratePlugin): ReminderBackend {
+export function requireReminderBackend(plugin: ReminderRuntimeHost): ReminderBackend {
 	if (!plugin.reminders) throw new Error('Reminders are not loaded. Try again, or check your folder in Crate settings.');
 	return plugin.reminders;
 }
@@ -64,7 +66,7 @@ function createMoveRecoveryReporter(): (issues: string[]) => void {
 	};
 }
 
-export function stopReminderBackend(plugin: CratePlugin): void {
+export function stopReminderBackend(plugin: ReminderRuntimeHost): void {
 	const state = states.get(plugin);
 	state?.setup?.abort();
 	if (state) state.setup = undefined;
@@ -72,7 +74,7 @@ export function stopReminderBackend(plugin: CratePlugin): void {
 	plugin.reminders = undefined;
 }
 
-export async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Promise<ReminderBackend | undefined> {
+export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPath: string): Promise<ReminderBackend | undefined> {
 	if (plugin.settings.reading?.enabled) validateReadingFolder(plugin.settings.reading.folderPath, folderPath, plugin.app.vault.configDir);
 	const lifetime = getPluginLifecycleSignal(plugin);
 	if (lifetime.aborted) return undefined;

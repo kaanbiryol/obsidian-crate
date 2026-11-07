@@ -26,7 +26,7 @@ export class SharedHistoryApi {
 		if (this.encryption) {
 			// Checkpoints list server paths; each entry keeps its server path for downloads.
 			const wires = Object.keys(result.files);
-			const entries = await this.encryption.metadata(wires.map(path => ({ path, entry: result.files[path]! })), false);
+			const entries = await this.encryption.metadata(wires.map(path => ({ path, entry: result.files[path]! })), { historical: true });
 			result.files = createPathRecord<FileEntry>();
 			for (const { path, wire, entry } of entries) result.files[path] ??= { ...entry, wire };
 		}
@@ -41,7 +41,7 @@ export class SharedHistoryApi {
 			if (error instanceof HttpError && error.status === 410 && error.code === 'version_unavailable') throw new HistoryVersionUnavailableError(path);
 			throw error;
 		}
-		if (this.encryption) body = (await this.encryption.download(wire, body, undefined, path, false)).content;
+		if (this.encryption) body = (await this.encryption.download(wire, body, { expected: path, historical: true })).content;
 		if (body.byteLength > MAX_FILE_SIZE_BYTES || body.byteLength !== file.size || await sha256Hex(body) !== file.hash) throw new Error(`${path}: checkpoint file failed integrity validation.`);
 		return body;
 	}

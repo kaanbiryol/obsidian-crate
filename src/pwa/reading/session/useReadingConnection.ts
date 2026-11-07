@@ -5,7 +5,7 @@ import { resetReadingEncryption } from './encryption-lifecycle';
 import { prepareReadingEncryption } from './encryption-session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT } from '../../config';
-import { connectReadingFromReminders, prefetchReadingSession } from '../api';
+import { connectReadingFromReminders, prefetchReadingSession } from './reminders-session';
 import { readingConnectionState, type ReadingConnectionState } from './api-error';
 import { READING_SESSION_KEY, assertReadingSession, readingSession, type ReadingSession } from './session';
 

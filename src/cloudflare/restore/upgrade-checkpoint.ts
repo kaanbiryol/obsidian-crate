@@ -1,11 +1,12 @@
 import { CloudflareApiError, queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
-import type { DeploymentFence } from './fence';
+import type { DeploymentFence } from '../deployment/fence';
 import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, SHARED_SETTINGS_KEY, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 import { sha256Hex } from '../../platform/sha256';
 import { isSha256Hex } from '../../platform/validation';
-import { listBackupObjects, pruneUpgradeBackups } from '../restore/upgrade-backups';
-import { BACKUP_PREFIX, literal, manifestKey, quoteName, type BackupPart } from '../restore/archive';
-import { guardedTables, UPGRADE_GUARD_TRIGGERS, UPGRADE_PROGRESS_KEY, upgradeGuards, writesPaused } from './database';
+import { listBackupObjects, pruneUpgradeBackups } from './upgrade-backups';
+import { BACKUP_PREFIX, encodeManifest, manifestKey, type BackupPart } from './archive';
+import { literal, quoteName } from '../d1-sql';
+import { guardedTables, UPGRADE_CHECKPOINT_KEY, UPGRADE_GUARD_TRIGGERS, UPGRADE_PROGRESS_KEY, upgradeGuards, writesPaused } from '../deployment/database';
 
 const PAGE_ROWS = 500;
 const ROWID = 'crate_upgrade_rowid';
@@ -259,13 +260,13 @@ async function finishArchive(context: BackupContext, input: { databaseId: string
 	objects.sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 	const parts = await listBackupObjects(api, accountId, bucketName, `${progress.prefix}/objects/`);
 	if (progress.parts.some(part => !isStored(parts, part.sha256, part.size))) throw new Error('Database checkpoint verification failed');
-	const manifest = JSON.stringify({ format: 2, complete: true, createdAt: progress.createdAt, source: { account: accountId, database: databaseId, bucket: bucketName }, bookmark: null, databaseParts: progress.parts, objects });
+	const manifest = encodeManifest({ createdAt: progress.createdAt, source: { account: accountId, database: databaseId, bucket: bucketName }, databaseParts: progress.parts, objects });
 	await api.throttle();
-	await api.putRecoveryObject(accountId, bucketName, manifestKey(progress.prefix), new TextEncoder().encode(manifest));
+	await api.putRecoveryObject(accountId, bucketName, manifestKey(progress.prefix), manifest);
 	await api.throttle();
 	if (await sha256Hex(await api.getRecoveryObject(accountId, bucketName, manifestKey(progress.prefix))) !== await sha256Hex(manifest)) throw new Error('Checkpoint manifest verification failed');
 	const complete = JSON.stringify({ ...progress, phase: 'complete' });
 	await fence.mutate(() => api.queryD1(accountId, databaseId, `UPDATE maintenance_state SET value = ${literal(complete)} WHERE key = '${UPGRADE_PROGRESS_KEY}' AND value = ${literal(raw)};
-INSERT OR REPLACE INTO maintenance_state(key, value) VALUES ('crate_upgrade_checkpoint', ${literal(progress.prefix)});`), 'verify-upgrade-checkpoint');
+INSERT OR REPLACE INTO maintenance_state(key, value) VALUES ('${UPGRADE_CHECKPOINT_KEY}', ${literal(progress.prefix)});`), 'verify-upgrade-checkpoint');
 	if ((await readProgress(query)).raw !== complete) throw progressChanged();
 }

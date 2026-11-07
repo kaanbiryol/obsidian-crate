@@ -9,6 +9,8 @@ import { updateReminderVisibility } from './visibility';
 import { VIEW_TYPE_REMINDERS } from './ui/plugin/reminders-view';
 import { activateOrRevealRemindersLeaf } from './ui/plugin/workspaceLayout';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
+import { validateReadingFolder } from '../reading/settings';
+import { getPortablePathIssue } from '../protocol/portable-path';
 
 const remindersLogger = createLogger('Reminders');
 
@@ -35,11 +37,22 @@ export async function reinitializeReminders(
 	remindersLogger.info('Reinitialization complete');
 }
 
-export async function reinitializeWithFolder(plugin: CratePlugin, newFolderPath: string): Promise<void> {
-	if (!plugin.remindersSettings.enabled) {
-		return;
-	}
-	await reinitializeReminders(plugin, newFolderPath);
+/** Folder and retry intent share one local save, before any network request. */
+export async function changeReminderFolder(plugin: CratePlugin, folderPath: string): Promise<void> {
+	const folder = normalizeRemindersFolderPath(folderPath);
+	// Windows devices skip paths they cannot store, which would hide every reminder there.
+	const issue = getPortablePathIssue(folder);
+	if (issue) throw new Error(`Invalid reminders folder: ${issue}.`);
+	if (plugin.settings.reading?.enabled) validateReadingFolder(plugin.settings.reading.folderPath, folder, plugin.app.vault.configDir);
+	await plugin.writeRemindersSettings({ remindersFolderPath: folder,
+		pendingServerFolder: plugin.settings.workerUrl
+			? { id: crypto.randomUUID(), workerUrl: plugin.settings.workerUrl, folderPath: folder } : undefined });
+	void ensureReminderNotificationPolicy(plugin);
+	void plugin.syncRuntime.republishReminderNotes(folder).catch(error => {
+		new Notice(`Reminders in ${folder} will schedule notifications after their next edit. ${error instanceof Error ? error.message : ''}`.trim());
+	});
+	if (!plugin.remindersSettings.enabled) return;
+	await reinitializeReminders(plugin, folder);
 }
 
 export async function setRemindersEnabled(plugin: CratePlugin, enabled: boolean, assertCurrent?: () => void): Promise<void> {

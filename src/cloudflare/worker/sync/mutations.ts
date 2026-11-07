@@ -239,8 +239,9 @@ export async function commitFileDelete(
 	const predicateArgs = params.expectedHash === null
 		? filePathArgs(params.path)
 		: [...filePathArgs(params.path), params.expectedHash, params.expectedRevision ?? ''];
+	const recorded = deletedFileStatements(db, expectedPredicate, predicateArgs, revision);
 	const results: unknown[] = await db.batch([
-		...deletedFileStatements(db, expectedPredicate, predicateArgs, revision),
+		...recorded,
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
 		...await enqueueFileProjection(db, params.path, null, null, false, undefined, params.reminderFolder),
@@ -248,7 +249,7 @@ export async function commitFileDelete(
 		...(params.effects?.([{ path: params.path, storageKey: null }]) ?? []),
 	]);
 
-	if (changedRows(results[2]) !== 1) {
+	if (changedRows(results[recorded.length]) !== 1) {
 		const current = await getStoredFileRow(db, params.path);
 		if (!current) {
 			const deletion = await findFileDeletionReceipt(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '');

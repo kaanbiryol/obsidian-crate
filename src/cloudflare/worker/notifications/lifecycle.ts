@@ -2,6 +2,10 @@ import { runNotificationCoordinator } from './coordinator';
 import type { Env } from '../types';
 import { isD1DailyLimitError, nextD1DailyReset } from '../d1/d1-usage';
 
+/** Coordinator storage flag: its alarm runs notification projection. */
+export const PROJECTION_COORDINATOR_KEY = 'projectionCoordinator';
+/** Coordinator storage: the reminder parser version projection was last armed for. */
+export const PROJECTION_PARSER_VERSION_KEY = 'projectionParserVersion';
 const RUN_KEY = 'notificationRun';
 const MAX_RUN_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_RUN_PASSES = 10_000;
@@ -10,7 +14,7 @@ interface NotificationRun { startedAt: number; passes: number; failures: number 
 
 /** Called under the same DO lock as the mutation, before any file is changed. */
 export async function armNotificationCoordinator(state: DurableObjectState): Promise<void> {
-	await state.storage.put('projectionCoordinator', true);
+	await state.storage.put(PROJECTION_COORDINATOR_KEY, true);
 	await state.storage.put<NotificationRun>(RUN_KEY, { startedAt: Date.now(), passes: 0, failures: 0 });
 	await state.storage.setAlarm(Date.now() + 1);
 }

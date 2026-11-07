@@ -8,7 +8,7 @@ import type { BatchUploadFile, MutationFailure } from '../../protocol/sync-types
 import type { PreparedUpload, SyncResult } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
-import { isAuthError, isTransientSyncFailure, isVersionConflict } from '../failures';
+import { fileFailure, isAuthError, isTransientSyncFailure, isVersionConflict, isVersionConflictError } from '../failures';
 import { UPLOAD_CONCURRENCY } from './constants';
 import { getBatchUploadConcurrency } from './budget';
 import { HttpError } from '../worker-api/http';
@@ -165,7 +165,7 @@ async function uploadPreparedFilesIndividually(
 			recordUploadError(result, new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code), upload.path, options);
 		} catch (error) {
 			if (isAbortError(error)) throw error;
-			if (error instanceof HttpError && isVersionConflict(error.status, error.code)) {
+			if (isVersionConflictError(error)) {
 				return upload.path;
 			}
 			recordUploadError(result, error, upload.path, options);
@@ -201,9 +201,5 @@ async function recordAcceptedUpload(context: UploadTransferContext, result: Sync
 
 function recordUploadError(result: SyncResult, error: unknown, path: string, options: Pick<UploadPreparedFilesOptions, 'onFailure'>): void {
 	recordSyncError(result, error, path);
-	options.onFailure?.({
-		path,
-		error: error instanceof Error ? error.message : String(error),
-		...(error instanceof HttpError ? { status: error.status, code: error.code as MutationFailure['code'] } : {}),
-	});
+	options.onFailure?.(fileFailure(path, error));
 }

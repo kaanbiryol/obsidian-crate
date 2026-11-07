@@ -5,9 +5,9 @@ import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 import { isMarkdownPath } from '../../protocol/note-paths';
+import { syncStoragePaths } from '../manifest/storage-paths';
 
 const logger = createLogger('MarkdownBaseCache');
-const CACHE_DIRNAME = 'markdown-base-cache';
 const HASH_RE = /^[a-f0-9]{64}$/;
 const SEED_CONCURRENCY = 2;
 const SEED_BATCH_FILES = 32;
@@ -37,7 +37,7 @@ export class MarkdownBaseCache {
 
 	constructor(app: Pick<App, 'vault'>, pluginManifest: Pick<PluginManifest, 'dir'>) {
 		this.app = app;
-		this.cacheDir = `${pluginManifest.dir}/${CACHE_DIRNAME}`;
+		this.cacheDir = syncStoragePaths(`${pluginManifest.dir}`).markdownBaseCache;
 	}
 
 	getIgnoredPrefix(): string {

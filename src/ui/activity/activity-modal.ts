@@ -14,7 +14,7 @@ import { Notice, Platform, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ActivitySheet } from './ActivitySheet';
-import { ActivityTabs } from './ActivityTabs';
+import { ActivityTabs, type ActivityTab } from './ActivityTabs';
 import { ActivityHeader } from './activity-header';
 import { hideNativeModalCloseButton } from '../plugin/shared-modal';
 import type { CrateSettings } from '../../plugin/settings-types';
@@ -26,7 +26,7 @@ import type { HistoryRestoreReview } from '../../sync/history/restore';
 import type { SyncHistoryEntry } from '../../sync/types';
 import { renderConflictsPanel, renderPendingPanel } from './panels';
 import { renderLoadingState } from './rendering';
-import type { PendingDiffLoader, PendingBrowserState } from './pending-browser';
+import { resetPendingChecks, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
 
 export interface ActivityModalDeps extends FileHistoryRuntime {
 	loadHistoryComparison(entry: SyncHistoryEntry): Promise<HistoryComparison>;
@@ -56,7 +56,7 @@ export class ActivityModal extends BaseUiModal {
 	private readonly settings: CrateSettings;
 	private readonly deps: ActivityModalDeps;
 	private tabsRoot: Root | undefined;
-	private currentTabIndex = 0;
+	private currentTab: ActivityTab = 'pending';
 	private activityHistory?: ActivityHistory;
 	private sharedHistory?: SharedHistoryLoader;
 	private header!: ActivityHeader;
@@ -96,7 +96,7 @@ export class ActivityModal extends BaseUiModal {
 		// Its completion progress event must refresh history as well as pending files.
 		if (!isActivityBusy(state, this.deps.getActivityProgress())) {
 			this.refresh();
-			if (this.currentTabIndex === 2) void this.sharedHistory?.refresh();
+			if (this.currentTab === 'history') void this.sharedHistory?.refresh();
 			return;
 		}
 		const status = this.getActivityStatus();
@@ -126,21 +126,21 @@ export class ActivityModal extends BaseUiModal {
 			return;
 		}
 		this.renderedBrowserPaths = showsBrowser ? paths : undefined;
-		this.pendingBrowserState.dispose?.();
-		this.pendingBrowserState.startChecks = undefined;
-		this.pendingBrowserState.pauseChecks = undefined;
-		this.pendingBrowserState.dispose = undefined;
+		resetPendingChecks(this.pendingBrowserState);
 		this.pendingPanel.empty();
 		this.pendingBrowserState.configDir = this.app.vault.configDir;
-		renderPendingPanel(this.pendingPanel, paths, (path, deleted) => this.deps.loadPendingDiff(path, deleted), state.status === 'error', state.status === 'syncing',
-			progress, this.getActivityStatus().lastSyncLabel, state, this.pendingBrowserState, {
+		renderPendingPanel(this.pendingPanel, {
+			paths, loadDiff: (path, deleted) => this.deps.loadPendingDiff(path, deleted), state, progress,
+			lastSyncLabel: this.getActivityStatus().lastSyncLabel, browserState: this.pendingBrowserState,
+			actions: {
 				syncSelected: async keys => {
 					try { return await this.deps.syncSelected(keys); }
 					catch (error) { new Notice(error instanceof Error ? error.message : 'Could not sync selected files.'); throw error; }
 				},
 				fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
 				discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard(keys.filter(key => this.deps.hasPendingKey(key))), () => this.refresh()).open(),
-			});
+			},
+		});
 		this.header.updateSyncBtn();
 	}
 	private applyStateChange(): void {
@@ -149,11 +149,11 @@ export class ActivityModal extends BaseUiModal {
 		if (isActivityBusy(state, null) && this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.applyProgress();
 		else {
 			this.refresh();
-			if (this.currentTabIndex === 2 && this.deps.getState().status !== 'syncing') void this.sharedHistory?.refresh();
+			if (this.currentTab === 'history' && this.deps.getState().status !== 'syncing') void this.sharedHistory?.refresh();
 		}
 	}
 
-	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly initialTab: 'pending' | 'conflicts' | 'history' = 'pending') {
+	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly initialTab: ActivityTab = 'pending') {
 		super(app);
 		this.settings = settings;
 		this.deps = deps;
@@ -186,7 +186,7 @@ export class ActivityModal extends BaseUiModal {
 		this.tabsRoot = createRoot(tabsHost);
 		this.tabsRoot.render(createElement(ActivityTabs, {
 			initialTab: this.initialTab,
-			onTabChange: index => this.switchTab(index),
+			onTabChange: tab => this.switchTab(tab),
 			onMount: elements => {
 				this.pendingPanel = elements.pending;
 				this.conflictsPanel = elements.conflicts;
@@ -195,7 +195,7 @@ export class ActivityModal extends BaseUiModal {
 				this.conflictsCount = elements.conflictsCount;
 				this.renderedConflicts = undefined;
 				this.refresh();
-				this.switchTab(this.initialTab === 'history' ? 2 : this.initialTab === 'conflicts' ? 1 : 0);
+				this.switchTab(this.initialTab);
 				this.deps.addStateChangeListener(this.onStateChange);
 				this.deps.addProgressListener(this.onProgress);
 			},
@@ -225,11 +225,11 @@ export class ActivityModal extends BaseUiModal {
 		}
 	}
 
-	private switchTab(index: number): void {
-		if (index === 0) this.pendingBrowserState.startChecks?.();
+	private switchTab(tab: ActivityTab): void {
+		if (tab === 'pending') this.pendingBrowserState.startChecks?.();
 		else this.pendingBrowserState.pauseChecks?.();
-		this.currentTabIndex = index;
-		if (index === 2) { this.renderHistory(); void this.sharedHistory?.refresh(); }
+		this.currentTab = tab;
+		if (tab === 'history') { this.renderHistory(); void this.sharedHistory?.refresh(); }
 		this.header.updateSyncBtn();
 		this.header.updateSyncStatusText();
 	}
@@ -260,7 +260,7 @@ export class ActivityModal extends BaseUiModal {
 		this.updateTabCounts();
 		this.renderPending();
 		this.renderConflicts();
-		if (this.currentTabIndex === 2) this.renderHistory();
+		if (this.currentTab === 'history') this.renderHistory();
 	}
 
 	private renderConflicts(status = this.getActivityStatus()): void {

@@ -2,7 +2,7 @@ import { Notice } from 'obsidian';
 import type { SyncRuntime } from '../sync/runtime/runtime';
 import type { SyncResult } from '../sync/types';
 import { AUTH_ERROR_MESSAGE } from '../sync/sync-outcome';
-import { isCrateUpdatePath } from './crate-update-bundle';
+import { isCrateUpdatePath } from './crate-update/bundle';
 
 type NoticeRuntime = Pick<SyncRuntime, 'getState' | 'addSyncResultListener' | 'removeSyncResultListener'>;
 

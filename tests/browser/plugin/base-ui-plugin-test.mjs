@@ -84,7 +84,7 @@ const { outputFiles } = await build({
           onSave={() => new Promise(resolve => {window.finishSave=resolve})}
           onDelete={() => new Promise(resolve => {window.finishDelete=resolve})} />}
         {open === 'tabs' && <BaseModal variant='centered' onClose={() => setOpen(null)} ariaLabel='Tabs test'>
-          <ActivityTabs initialTab='pending' onTabChange={index => {window.tabIndex=index}} onMount={elements => {
+          <ActivityTabs initialTab='pending' onTabChange={tab => {window.activeTab=tab}} onMount={elements => {
             elements.pending.textContent='Pending files'; elements.conflicts.textContent='Conflicting files'; elements.history.textContent='Sync history';
           }} />
         </BaseModal>}

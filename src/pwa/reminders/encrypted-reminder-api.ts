@@ -17,14 +17,14 @@ import { requireCompatibleServer } from '../connection/server-compatibility';
 import { responseError } from '../connection/response-error';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import type { ApiFetch } from '../types';
-import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile, sameInventoryFile } from '../../encryption/file-inventory';
+import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, sameInventoryFile } from '../../encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { isReminderOperationId } from '@/protocol/reminder-operation';
 import { isSyncPath } from '@/protocol/sync-validation';
 import { REMINDER_OUTBOX_LOCK } from '@/pwa/reminders/private-storage';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
-import { resolveEncryptedPath } from '@/encryption/path-binding';
+import { encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
 import { compareCodePoints } from '@/protocol/portable-path';
 
 const NOTE_CONCURRENCY = 6;
@@ -92,7 +92,7 @@ export class EncryptedReminderApi {
 			}
 		} catch { /* A missing or unreadable index only costs downloads. */ }
 	}
-	private context(operationId: string) { return { vaultId: this.keys.vaultId, scopeId: 'vault', objectId: operationId, purpose: 'reminder' as const }; }
+	private context(operationId: string) { return encryptedOperationContext(this.keys.vaultId, 'vault', operationId); }
 	private attemptKey(operationId: string) { return `${this.keys.vaultId}:vault:${operationId}`; }
 
 	async handle(path: string, init: RequestInit = {}): Promise<Response | null> {
@@ -140,8 +140,8 @@ export class EncryptedReminderApi {
 		const query = new URLSearchParams({ folderPath: this.keys.wireFolder, path: file.path, revision: file.revision });
 		const response = await this.fetch(`/reminders/encrypted-file?${query}`);
 		if (!response.ok) await json(response);
-		const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, this.authority(file.path),
-			'Encrypted reminder transfer failed integrity validation', (metadataPath, sealed) => resolveEncryptedPath(this.keys.paths, file.path, metadataPath, sealed, null));
+		const { opened } = await openEncryptedNote(response, file, { authority: this.authority(file.path),
+			integrityError: 'Encrypted reminder transfer failed integrity validation', paths: this.keys.paths, sealedFolder: null });
 		this.names.set(file.path, opened.metadata.path);
 		if (opened.content.byteLength > MAX_REMINDER_NOTE_BYTES) throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
 		const content = decodeMarkdownBytes(opened.content);
@@ -268,21 +268,19 @@ export class EncryptedReminderApi {
 			}
 			this.assertCurrent();
 			if (attempt.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.vault, this.context(body.operationId)));
-			const response = await this.fetch('/reminders/encrypted-commit', { method: 'POST', body: attempt.body });
-			if (response.status === 409) {
-				const details = await response.clone().json() as { code?: string };
-				if (details.code === 'version_conflict') {
-					const rejected = { ...attempt, rejected: true };
-					await this.store.saveAttempt(key, rejected, attempt, this.current); attempt = rejected;
-					if (retry === 0) continue;
-				}
+			const outcome = await postEncryptedCommit((path, commit) => this.fetch(path, { method: 'POST', body: commit }), '/reminders', attempt.body);
+			if (outcome.kind === 'conflict') {
+				const rejected = { ...attempt, rejected: true };
+				await this.store.saveAttempt(key, rejected, attempt, this.current); attempt = rejected;
+				if (retry === 0) continue;
 			}
-			if (!response.ok) return response;
-			const ack = await response.json() as { encrypted?: string };
-			if (typeof ack.encrypted !== 'string') throw new Error('The server did not confirm the encrypted save');
-			const result = await decryptJson(ack.encrypted, this.keys.vault, this.context(body.operationId));
+			if (outcome.kind !== 'committed') {
+				if (!outcome.response.ok) return outcome.response;
+				throw new Error('The server did not confirm the encrypted save');
+			}
+			const result = await decryptJson(outcome.encrypted, this.keys.vault, this.context(body.operationId));
 			// A retry answers from the acknowledgment, so the sealed notes are no longer needed.
-			await this.store.saveAttempt(key, { ...attempt, body: '', acknowledgment: ack.encrypted }, attempt, this.current);
+			await this.store.saveAttempt(key, { ...attempt, body: '', acknowledgment: outcome.encrypted }, attempt, this.current);
 			return Response.json(result);
 		}
 		throw new Error('Encrypted save could not converge');

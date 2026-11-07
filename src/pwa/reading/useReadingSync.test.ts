@@ -3,7 +3,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY } from '../config';
 import { PWA_PREFERENCES_KEY } from '../settings/preferences';
-import { ReadingApiError, connectReadingFromReminders, loadReading, readingRequest } from './api';
+import { ReadingApiError, loadReading, readingRequest } from './api';
+import { connectReadingFromReminders } from './session/reminders-session';
 import { type ReadingCache } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import type { PendingReading } from './outbox';
@@ -14,7 +15,10 @@ import type { ReadingConnection } from './session/useReadingConnection';
 
 const stored = vi.hoisted(() => ({ queue: [] as PendingReading[], session: null as ReadingSession | null, sessionError: null as Error | null }));
 vi.mock('./api', async importOriginal => ({
-	...await importOriginal<typeof import('./api')>(), readingRequest: vi.fn(), loadReading: vi.fn(), connectReadingFromReminders: vi.fn(),
+	...await importOriginal<typeof import('./api')>(), readingRequest: vi.fn(), loadReading: vi.fn(),
+}));
+vi.mock('./session/reminders-session', async importOriginal => ({
+	...await importOriginal<typeof import('./session/reminders-session')>(), connectReadingFromReminders: vi.fn(),
 }));
 vi.mock('./prefetch', () => ({ prefetchReadingArticles: vi.fn(async () => {}) }));
 vi.mock('./session/session', async importOriginal => ({

@@ -11,7 +11,8 @@ vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('./ActivitySheet', () => ({ ActivitySheet: vi.fn() }));
 vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }) }));
 vi.mock('./conflict-review-modal', () => ({ ConflictReviewModal: vi.fn() }));
-vi.mock('./pending-browser', () => ({
+vi.mock('./pending-browser', async importOriginal => ({
+	...await importOriginal<typeof import('./pending-browser')>(),
 	renderPendingBrowser: (container: FakeElement) => { container.createDiv({ cls: 'crate-pending-browser' }); },
 }));
 

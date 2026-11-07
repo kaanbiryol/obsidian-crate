@@ -4,7 +4,8 @@ import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
 import { workersDevOrigin } from '../deployment/worker-origin';
-import { BACKUP_PREFIX, listBackupKeys, literal, manifestKey, parseBackupRows, quote, readBackup, readBackupDatabase, type BackupChoice, type BackupRow, type BackupSource } from './archive';
+import { BACKUP_PREFIX, listBackupKeys, manifestKey, pagedListing, parseBackupRows, quote, readBackup, readBackupDatabase, type BackupChoice, type BackupRow, type BackupSource } from './archive';
+import { literal } from '../d1-sql';
 import { validRestoreState, type ServerRestoreState } from './state';
 import { sha256Hex } from '../../platform/sha256';
 import { upgradeBackupStoreKey } from '../../protocol/storage-keys';
@@ -106,14 +107,12 @@ export async function restoreUpgradeBackup(input: {
 		const progress = typeof marker === 'string' && marker.startsWith(`${plan}:`) ? Number(marker.slice(plan.length + 1)) : -1;
 		if (!Number.isSafeInteger(progress) || progress < 0 || progress > batches.length + 1) throw new Error('Restore storage belongs to another operation');
 		const allowedKeys = new Set(backup.manifest.objects.map(item => item.key));
-		let cursor: string | undefined; const cursors = new Set<string>();
-		do {
+		for await (const key of pagedListing(async cursor => {
 			const page = await api.listR2Objects(account, target.r2BucketName, cursor);
-			if (page.keys.some(key => !allowedKeys.has(key))) throw new Error('Restore bucket contains unrelated files');
-			cursor = page.cursor;
-			if (cursor && cursors.has(cursor)) throw new Error('Restore bucket listing did not advance');
-			if (cursor) cursors.add(cursor);
-		} while (cursor);
+			return { items: page.keys, cursor: page.cursor };
+		}, 'Restore bucket listing did not advance')) {
+			if (!allowedKeys.has(key)) throw new Error('Restore bucket contains unrelated files');
+		}
 		for (const [index, item] of backup.manifest.objects.entries()) {
 			let bytes: Uint8Array;
 			try { bytes = await api.getRecoveryObject(account, target.r2BucketName, item.key); }

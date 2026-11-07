@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import contract from '../src/reading/shortcut-contract.json' with { type: 'json' };
+import workerRuntime from '../src/cloudflare/worker-runtime.json' with { type: 'json' };
 import { openLocalRuntime, issueLocalDevice, localNetworkOptions } from '../packages/server/src/local-server-runtime.mjs';
 
 const operation = () => `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
@@ -148,7 +149,7 @@ test('production local outbound policy blocks private connections through global
   try {
     const options = {
       name: 'crate-network-regression', modules: true, host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false },
-      compatibilityDate: '2026-08-18', compatibilityFlags: ['global_fetch_strictly_public'],
+      compatibilityDate: workerRuntime.compatibilityDate, compatibilityFlags: workerRuntime.compatibilityFlags,
       ...localNetworkOptions(),
       script: `export default { async fetch(request, env) {
         const { target, bound } = await request.json();

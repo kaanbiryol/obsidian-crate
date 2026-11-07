@@ -1,14 +1,13 @@
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
-import type { CachedDevicesState } from '../../plugin/settings-ui-state';
+import { connectedDevicesCache, refreshDeviceCache } from '../../plugin/settings-ui-state';
 import type { RegisteredDevice } from '../../protocol/sync-types';
-import type CratePlugin from '../../plugin/CratePlugin';
 import { openConfirmationModal } from '../plugin/confirmation-modal';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import { createLogger } from '../../sync/logger';
 import { errorMessage } from '../../platform/logger';
 import type { SettingsSectionContext } from './section-helpers';
 import { formatTimeAgo, parseServerTimestamp } from '../shared/format';
-import { AddDeviceModal } from './add-device-modal';
+import { AddDeviceModal, canAddDeviceWithCode } from './add-device-modal';
 
 const log = createLogger('DeviceSettings');
 
@@ -17,10 +16,7 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (!apiClient) return () => {};
 
-	if (plugin.settingsUiState.devices?.client !== apiClient) {
-		plugin.settingsUiState.devices = { client: apiClient, tokens: null, pending: null };
-	}
-	const cache = plugin.settingsUiState.devices;
+	const cache = connectedDevicesCache(plugin.settingsUiState, apiClient);
 	let disposed = false;
 	const isActive = () => !disposed && plugin.settingsUiState.devices === cache;
 	let refreshButton: ButtonComponent;
@@ -132,33 +128,6 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 	renderList();
 	void refresh();
 	return () => { disposed = true; };
-}
-
-/** Codes are written with the saved Cloudflare login, which a device added with a code does not have. */
-export function canAddDeviceWithCode(plugin: CratePlugin): boolean {
-	const deployment = plugin.settings.cloudflareDeployment;
-	return Boolean(deployment?.accountId && deployment.d1DatabaseId && !deployment.deletion && plugin.cloudflareSavedLogin.connected);
-}
-
-/** The connected devices for the current server, shared with the devices section while settings stay open. */
-export async function loadConnectedDevices(plugin: CratePlugin): Promise<RegisteredDevice[] | null> {
-	const apiClient = plugin.syncRuntime.getApiClient();
-	if (!apiClient) return null;
-	if (plugin.settingsUiState.devices?.client !== apiClient) {
-		plugin.settingsUiState.devices = { client: apiClient, tokens: null, pending: null };
-	}
-	const cache = plugin.settingsUiState.devices;
-	if (cache.tokens === null) await refreshDeviceCache(cache);
-	return cache.tokens;
-}
-
-function refreshDeviceCache(cache: CachedDevicesState): Promise<void> {
-	if (!cache.pending) {
-		cache.pending = cache.client.listTokens()
-			.then(({ tokens }) => { cache.tokens = tokens; })
-			.finally(() => { cache.pending = null; });
-	}
-	return cache.pending;
 }
 
 function orderDevices(tokens: RegisteredDevice[]): RegisteredDevice[] {

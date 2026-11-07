@@ -1,8 +1,8 @@
 import { handleNotificationPolicy } from '../notifications/policy';
-import { handleCreateReminder } from '../reminders/routes/create';
-import { handleDeleteReminder, handleSetReminderCompleted, handleUpdateReminder } from '../reminders/routes/existing-reminder';
-import { handleListReminders } from '../reminders/routes/list';
-import { handleReorderReminders } from '../reminders/routes/reorder';
+import { handleCreateReminder } from '../reminders/handlers/create';
+import { handleDeleteReminder, handleSetReminderCompleted, handleUpdateReminder } from '../reminders/handlers/existing-reminder';
+import { handleListReminders } from '../reminders/handlers/list';
+import { handleReorderReminders } from '../reminders/handlers/reorder';
 import { handleEncryptedFolderFiles } from '../encryption/encrypted-folder-files';
 import type { Env } from '../types';
 import type { AuthenticatedRouteContext } from '../router';

@@ -1,14 +1,14 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from '../test/factories/sync-vault';
-import { compareVersions, crateUpdateFolder, crateUpdatePath, parseCrateUpdate } from './crate-update-bundle';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
+import { compareVersions, crateUpdateFolder, crateUpdatePath, parseCrateUpdate } from './bundle';
 import {
 	installCrateUpdate,
 	installedCrateVersion,
 	newerCrateUpdate,
 	publishCrateUpdate,
 	type CrateUpdateHost,
-} from './crate-update-install';
+} from './install';
 
 const configDir = '.obsidian';
 const manifest = (version: string) => JSON.stringify({ id: 'crate', name: 'Crate', version, minAppVersion: '1.13.0' });

@@ -1,4 +1,4 @@
-import { createUpgradeCheckpoint } from './upgrade-checkpoint';
+import { createUpgradeCheckpoint } from '../restore/upgrade-checkpoint';
 import { readVaultName } from './vault-name';
 import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentRelease, releaseUpgradeGuards } from './database';
 import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';

@@ -45,3 +45,14 @@ export function presentReadingItems(items: ReadingItem[], pending: PendingReadin
 		return changes ? { ...item, ...changes } : item;
 	});
 }
+
+/** Items that take no edits yet. Ordinary edits remain usable while sending, but new links
+ * need their server ID, and rejected changes or text extraction need settlement first. */
+export function blockedReadingItemIds(items: readonly ReadingItem[], pending: readonly PendingReading[]): Set<string> {
+	const blocked = new Set(items.filter(item => !item.path).map(item => item.crate_reading_id));
+	for (const op of pending) {
+		if (op.action === 'capture') blocked.add(op.id);
+		else if ((op.review || op.action === 'retry') && typeof op.intent.id === 'string') blocked.add(op.intent.id);
+	}
+	return blocked;
+}

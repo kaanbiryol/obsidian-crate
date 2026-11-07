@@ -1,21 +1,21 @@
-import { runReadingExtraction } from '../reading/extraction/jobs';
-import { runMaintenanceEpisode } from '../maintenance/lifecycle';
-import { recordNotificationDispatchFailure, runBoundedNotificationCoordinator } from '../notifications/lifecycle';
+import { READING_COORDINATOR_KEY, runReadingExtraction } from '../reading/extraction/jobs';
+import { MAINTENANCE_COORDINATOR_KEY, runMaintenanceEpisode } from '../maintenance/lifecycle';
+import { PROJECTION_COORDINATOR_KEY, recordNotificationDispatchFailure, runBoundedNotificationCoordinator } from '../notifications/lifecycle';
 import { dispatchNotificationJobs } from '../notifications/outbox';
 import type { StateLock } from './coordinator-requests';
 import type { Env } from '../types';
 
 /** Return false for ordinary reminder delivery; coordinator storage identities stay stable. */
 export async function runCoordinatorAlarm(state: DurableObjectState, env: Env, withStateLock: StateLock): Promise<boolean> {
-	if (await state.storage.get<boolean>('readingCoordinator')) {
+	if (await state.storage.get<boolean>(READING_COORDINATOR_KEY)) {
 		await runReadingExtraction(state, env);
 		return true;
 	}
-	if (await state.storage.get<boolean>('maintenanceCoordinator')) {
+	if (await state.storage.get<boolean>(MAINTENANCE_COORDINATOR_KEY)) {
 		await withStateLock(() => runMaintenanceEpisode(state, env));
 		return true;
 	}
-	if (await state.storage.get<boolean>('projectionCoordinator')) {
+	if (await state.storage.get<boolean>(PROJECTION_COORDINATOR_KEY)) {
 		if (!env.BUCKET || !env.REMINDER_ALARMS) throw new Error('Projection bindings unavailable');
 		// Wakeups and the final idle/retry decision must share the mutation lock.
 		const episode = await withStateLock(() => runBoundedNotificationCoordinator(state, env));

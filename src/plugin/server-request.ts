@@ -10,12 +10,16 @@ interface ServerRequestOptions {
 	capabilities?: Readonly<Record<string, string>>;
 }
 
+/** The plugin's server address and credentials; `syncRuntime` adds its sync client. */
+type ServerConnectionHost = Pick<CratePlugin, 'settings' | 'secretStorage'>;
+export type SyncApiConnectionHost = ServerConnectionHost & Pick<CratePlugin, 'syncRuntime'>;
+
 function connectionChanged(): DOMException {
 	return new DOMException('The server connection changed. Reopen settings and try again.', 'AbortError');
 }
 
 /** Capture once for operations that span requests, queued saves and UI publication. */
-export function captureServerConnection(plugin: CratePlugin) {
+export function captureServerConnection(plugin: ServerConnectionHost) {
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
 	const origin = plugin.settings.workerUrl;
@@ -31,7 +35,7 @@ export function captureServerConnection(plugin: CratePlugin) {
 
 /** Also captures the sync runtime's client, whose encryption keys map folder labels, so a
  * mapping and the request it accompanies cannot come from different connections. */
-export function captureSyncApiConnection(plugin: CratePlugin) {
+export function captureSyncApiConnection(plugin: SyncApiConnectionHost) {
 	const connection = captureServerConnection(plugin);
 	const api = plugin.syncRuntime.getApiClient();
 	const assertCurrent = () => {
@@ -52,7 +56,7 @@ export function guardedServerClient(origin: string, token: string, assertCurrent
 
 /** Bind request dispatch and response publication to the same connection. */
 export async function serverRequest<T>(
-	plugin: CratePlugin,
+	plugin: ServerConnectionHost,
 	path: string,
 	body?: unknown,
 	{ timeout = 30_000, capabilities = {} }: ServerRequestOptions = {},

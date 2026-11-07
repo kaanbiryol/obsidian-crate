@@ -10,7 +10,7 @@ import { commitFileDelete } from '../sync/mutations';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { ensureReadingIndex } from './library-index';
 import { readStoredNote } from './common';
-import { handleReadingRoute } from './routes';
+import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { getStoredFileRow } from '../sync/storage';
 import { runNotificationCoordinator } from '../notifications/coordinator';
 import { sha256Hex } from '@/platform/sha256';

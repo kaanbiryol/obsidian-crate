@@ -3,10 +3,9 @@ import { uploadPipelined } from '../transfer/upload-pipeline';
 import { createAbortError } from '../abort';
 import { createLogger } from '../logger';
 import { isAbortError } from '../abort';
-import { isQueueTerminalFailure, isRetryableSyncError, isVersionConflict } from '../failures';
+import { isQueueTerminalFailure, isRetryableSyncError, isVersionConflict, isVersionConflictError } from '../failures';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import { syncErrorIssues, formatSyncIssue, SkippedFileError, withSyncFileContext } from '../issues';
-import { HttpError } from '../worker-api/http';
 import { beginSyncAttempt, completeTransferResult, completeWorkflowResult, handleWorkflowError } from '../sync-outcome';
 import { namespaceConflictLookup } from '../namespace-conflicts';
 import { deferBlockedUploads, planQueueDeletes } from './delete-plan';
@@ -17,25 +16,11 @@ import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { PreparedUpload, SyncIssue, SyncResult, SyncState } from '../types';
 import type { WorkflowCompletionContext } from '../sync-outcome';
 
-interface QueueApi {
-	isConfigured(): boolean;
-}
-
 interface QueueManifest {
 	getEntry(path: string): Readonly<FileEntry> | undefined;
 	/** Where a file renamed since its last acknowledged upload now lives. */
 	renameDestination(path: string): string | undefined;
 	save(): Promise<void>;
-}
-
-type QueueDeleteCandidate = ConditionalDeleteCandidate;
-type QueueDeleteFailure = MutationFailure;
-
-interface QueueUploadFailure {
-	code?: string;
-	path: string;
-	error: string;
-	status?: number;
 }
 
 export interface QueueFlushBatch {
@@ -51,10 +36,10 @@ export interface QueueFlushContext extends WorkflowCompletionContext {
 	recoverUploads(): Promise<void>;
 	getPendingPathCount(): number;
 	beginBatch(): QueueFlushBatch;
-	api: QueueApi;
+	apiConfigured(): boolean;
 	localManifest: QueueManifest;
 	isDestroyed(): boolean;
-	currentStatus(): SyncState['status'];
+	getStatus(): SyncState['status'];
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
 	triggerDebouncedSync(): void;
 	/** Schedule the next attempt after a failed flush, backing off while it keeps failing. */
@@ -104,11 +89,11 @@ function routeFailure(state: FlushState, key: string, failure: { status?: number
 
 async function deletePendingFiles(
 	context: QueueFlushContext,
-	deletes: QueueDeleteCandidate[],
+	deletes: ConditionalDeleteCandidate[],
 	state: FlushState,
-): Promise<QueueDeleteFailure[]> {
+): Promise<MutationFailure[]> {
 	const result = createEmptySyncResult();
-	let failures: QueueDeleteFailure[];
+	let failures: MutationFailure[];
 	try {
 		failures = await context.deleteRemoteFiles(deletes, result);
 	} finally {
@@ -125,12 +110,12 @@ async function uploadQueuedChanges(
 	batch: QueueFlushBatch,
 	uploadPaths: string[],
 	state: FlushState,
-): Promise<{ uploads: Array<{ path: string }>; failures: QueueUploadFailure[] }> {
+): Promise<{ uploads: Array<{ path: string }>; failures: MutationFailure[] }> {
 	const uploads: Array<{ path: string }> = [];
-	const failures: QueueUploadFailure[] = [];
+	const failures: MutationFailure[] = [];
 	// Queue settlement is mode-specific; transfer and acknowledgement are shared.
 	const uploadResult = createEmptySyncResult();
-	let chunkFailures: QueueUploadFailure[] = [];
+	let chunkFailures: MutationFailure[] = [];
 	let chunkConflicts: string[] = [];
 	try {
 		await uploadPipelined(context, uploadPaths, uploadResult, {
@@ -154,9 +139,9 @@ async function uploadQueuedChanges(
 			},
 			reportWork: work => context.updateState({ work }),
 			afterChunk: () => {
-				const uploadFailures: QueueUploadFailure[] = [
+				const uploadFailures: MutationFailure[] = [
 					...chunkFailures,
-					...chunkConflicts.map(path => ({ path, error: 'Remote file changed since it was read', status: 409, code: 'version_conflict' })),
+					...chunkConflicts.map((path): MutationFailure => ({ path, error: 'Remote file changed since it was read', status: 409, code: 'version_conflict' })),
 				];
 				chunkFailures = [];
 				chunkConflicts = [];
@@ -194,18 +179,14 @@ export async function processPendingChanges(
 	}
 
 	let batch!: QueueFlushBatch;
-	const startFailure = beginSyncAttempt({
-		apiConfigured: () => context.api.isConfigured(),
-		getStatus: () => context.currentStatus(),
-		updateState: updates => context.updateState(updates),
-	}, () => {
+	const startFailure = beginSyncAttempt(context, () => {
 		batch = context.beginBatch();
 		logger.info(`Processing ${batch.paths.length} pending changes`);
 		return { pendingChanges: context.getPendingPathCount() };
 	});
 	if (startFailure) {
 		context.updateState({ pendingChanges: context.getPendingPathCount() });
-		if (context.currentStatus() === 'syncing') context.triggerDebouncedSync();
+		if (context.getStatus() === 'syncing') context.triggerDebouncedSync();
 		return;
 	}
 
@@ -303,7 +284,7 @@ export async function processPendingChanges(
 			const retryable = isRetryableSyncError(error);
 			batch.requeue(paths.filter(path => !completedQueueKeys.has(path)));
 			if (!retryable) {
-				if (error instanceof HttpError && isVersionConflict(error.status, error.code)) {
+				if (isVersionConflictError(error)) {
 					for (const path of paths) {
 						if (!completedQueueKeys.has(path)) reconciliationPaths.add(path);
 					}

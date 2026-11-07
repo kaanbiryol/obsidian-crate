@@ -17,7 +17,7 @@ Scripts in `package.json` are the source of truth. [Framework and Config](#frame
 | Local server | `npm run test:local-server` | Builds the Worker, then runs every `packages/server/test/*.test.mjs`. |
 | Server package | `npm run test:server-package` | Packs the server and installs it through npx in an isolated cache. |
 | Docker hosting | `npm run test:docker` | Needs a running Docker engine and Compose. |
-| Tooling and release scripts | `npm run test:ci` | Node tests in `scripts/`, including the source-path guard and PWA browser shard coverage. The guard also fails when a `scripts/*.test.mjs` file runs from no package script. |
+| Tooling and release scripts | `npm run test:ci` | Node tests in `scripts/`, including the source-path guard and PWA browser shard coverage. The guard also fails when a `scripts/*.test.mjs` or `tests/**/*.test.mjs` file runs from no package script. |
 | Server revision | `npm run test:server-revision` and `npm run check:server-revision` | The second checks the server revision and schema against the published release baseline; it needs Git history and `gh`, so it runs beside `check:source` in CI and `release:check` rather than inside it. |
 | Recovery tooling | `npm run test:recovery` | Python `unittest`. |
 | Contract docs | `npm run check:contracts` | Rejects stale values in `current-contract.md`; `node scripts/check-contract-docs.mjs --write` refreshes them. |
@@ -50,7 +50,7 @@ Pull requests and pushes to `master` and `release/**` run `lint.yml` ("Node.js b
 | `reading` (2 groups) | Linux, Playwright container | `test:reading-browser:library` or `test:reading-browser:annotations`. |
 | `reproducible` | Linux | Only when a release tag is supplied: a clean-install Worker and plugin build (`build:worker` and `build:plugin`, without the repeated type check) compared with the checked artifacts. |
 
-`release:check` covers the same suites except `test:docker` and the `reproducible` rebuild, which run only in CI. A release run that reuses a successful push build of the tag commit, or of its version-only parent, skips the test jobs; see [Release verification](#release-verification).
+`release:check` covers the same suites except `test:docker` and the `reproducible` rebuild, which run only in CI. `test:ci` fails when a `release:check` command has no matching CI step; `scripts/release-verification.test.mjs` maps sharded commands and allowlists local-only steps, such as exporting `CRATE_WORKER_PREBUILT`. A release run that reuses a successful push build of the tag commit, or of its version-only parent, skips the test jobs; see [Release verification](#release-verification).
 
 Other workflows: `pages.yml` runs `check:docs`, the shortcut and site-deployment tests and the site build for documentation, site and shortcut changes; it deploys only for a published release or a manual run. `visual.yml` is manual, for baseline review and generation.
 

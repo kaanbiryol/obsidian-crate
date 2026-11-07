@@ -2,7 +2,7 @@ import { setIcon } from 'obsidian';
 import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { renderDiffPreview } from './pending-diff';
 import { renderBackButton } from './rendering';
-import { CRATE_UPDATE_FILES } from '../../plugin/crate-update-bundle';
+import { CRATE_UPDATE_FILES } from '../../plugin/crate-update/bundle';
 
 export const crateUpdateTitle = (version: string) => `Crate ${version} update`;
 

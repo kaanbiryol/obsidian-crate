@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useSyncExterna
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { usePwaUpdate } from './usePwaUpdate';
 import { useToast } from '../hooks/useToast';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { PwaToast } from '../components/PwaToast';
 import { useSettingsOpen, useSettingsStore } from '../settings/settings-context';
 import { startUpdateChecks, fetchPwaAssetVersion } from './update-checker';
@@ -31,12 +32,7 @@ export function PwaUpdateProvider({ activeSection, children }: { activeSection: 
 	const models = useSyncExternalStore(store.subscribe, store.getSnapshot);
 	const [version, setVersion] = useState<string | null>(null);
 	const [checkComplete, setCheckComplete] = useState(false);
-	const [online, setOnline] = useState(() => navigator.onLine);
-	useEffect(() => {
-		const changed = () => setOnline(navigator.onLine);
-		window.addEventListener('online', changed); window.addEventListener('offline', changed);
-		return () => { window.removeEventListener('online', changed); window.removeEventListener('offline', changed); };
-	}, []);
+	const online = useOnlineStatus();
 	const { toast, showToast } = useToast();
 	useEffect(() => {
 		let active = true;

@@ -1,6 +1,10 @@
 import { runScheduledMaintenance } from './run';
 import type { Env } from '../types';
 
+/** Maintenance role storage flag: its alarm runs maintenance episodes. */
+export const MAINTENANCE_COORDINATOR_KEY = 'maintenanceCoordinator';
+/** Maintenance role storage: passes run in the current episode. */
+const MAINTENANCE_PASS_KEY = 'maintenancePass';
 const MAX_PASSES = 10;
 // Retained-object draining continues past MAX_PASSES; at 500 objects per pass
 // this bounds one episode at 100,000 deletions.
@@ -17,11 +21,20 @@ async function position(db: D1Database) {
 		batch: batch && batch.expires_at <= Date.now() ? batch.id : undefined, batchAt: batch?.expires_at };
 }
 
+/** Called under the maintenance role's lock. A scheduled episode keeps its alarm and pass count. */
+export async function armMaintenanceCoordinator(state: DurableObjectState): Promise<void> {
+	await state.storage.put(MAINTENANCE_COORDINATOR_KEY, true);
+	if (await state.storage.getAlarm() === null) {
+		await state.storage.put(MAINTENANCE_PASS_KEY, 0);
+		await state.storage.setAlarm(Date.now() + 24 * 60 * 60 * 1000);
+	}
+}
+
 /** Continue only while a bounded storage or pruning backlog advances, at most ten
  * passes per episode unless the object cleanup queue head is still moving. */
 export async function runMaintenanceEpisode(state: DurableObjectState, env: Env): Promise<void> {
-	const pass = (await state.storage.get<number>('maintenancePass') ?? 0) + 1;
-	await state.storage.put('maintenancePass', pass);
+	const pass = (await state.storage.get<number>(MAINTENANCE_PASS_KEY) ?? 0) + 1;
+	await state.storage.put(MAINTENANCE_PASS_KEY, pass);
 	if (pass > MAX_DRAIN_PASSES || pass > MAX_PASSES && !await state.storage.get<boolean>('maintenanceDraining')) return;
 	const before = await position(env.DB);
 	// Both position reads, three queries each, share the pass's D1 budget.

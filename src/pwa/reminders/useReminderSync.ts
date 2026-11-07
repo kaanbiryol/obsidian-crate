@@ -10,6 +10,7 @@ import { createReminderListCursor } from './reminder-list-cursor';
 import { beginStartupRead, reusableStartupRead, startupReadKey, takeStartupResponse, type StartupRead } from './startup-reminder-read';
 import { decideReminderListFailure, decideReminderListResponse, needsDiskFallback } from './reminder-list-response';
 import { requestSharedFeaturesRefresh } from '../shared-features';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { responseError } from '../connection/response-error';
 import type { ApiFetch, DataMode, StoredConfig } from '../types';
 import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue, ReminderSyncHost } from './types';
@@ -80,7 +81,10 @@ export function useReminderSync({
 	const [error, setError] = useState<string | null>(null);
 	const [dataMode, setDataMode] = useState<DataMode>('live');
 	const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
-	const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
+	// A confirmed response shows the server is reachable while the browser still reports
+	// offline, until the browser's next online or offline event.
+	const [answered, setAnswered] = useState(false);
+	const isOffline = !useOnlineStatus(() => setAnswered(false)) && !answered;
 	const [issues, setIssues] = useState<ReminderSourceIssue[]>([]);
 	const [hydratedAuthority, setHydratedAuthority] = useState<object | null>(null);
 	const issuesRef = useRef<ReminderSourceIssue[]>([]);
@@ -128,7 +132,7 @@ export function useReminderSync({
 		cursor.confirmed({ etag, deltaBase }, savedAt);
 		setLastUpdatedAt(savedAt);
 		setDataMode('live');
-		setIsOffline(false);
+		setAnswered(true);
 		if (persist === 'later') { unsavedRef.current = { folderPath: config.folderPath, savedAt }; return; }
 		if (!persist) return;
 		unsavedRef.current = null;
@@ -209,7 +213,7 @@ export function useReminderSync({
 					cursor.notModified(response.headers, savedAt);
 					setLastUpdatedAt(savedAt);
 					setDataMode('live');
-					setIsOffline(false);
+					setAnswered(true);
 					void refreshCachedReminderSnapshot(
 						config.folderPath,
 						savedAt,
@@ -280,18 +284,6 @@ export function useReminderSync({
 		};
 	}, []);
 
-
-	useEffect(() => {
-		const handleOnline = () => setIsOffline(false);
-		const handleOffline = () => setIsOffline(true);
-
-		window.addEventListener('online', handleOnline);
-		window.addEventListener('offline', handleOffline);
-		return () => {
-			window.removeEventListener('online', handleOnline);
-			window.removeEventListener('offline', handleOffline);
-		};
-	}, []);
 
 	const resetReminderState = useCallback(() => {
 		requestCoordinatorRef.current = createReminderRequestCoordinator();

@@ -45,9 +45,11 @@ await cp(join(root, 'packages/server/src'), join(destination, 'scripts'), { recu
 await chmod(join(destination, 'scripts/crate-server.mjs'), 0o755);
 await copyFile(join(root, '.generated/cloudflare/worker.mjs'), join(destination, 'assets/worker.mjs'));
 await copyFile(join(root, 'src/cloudflare/schema.sql'), join(destination, 'assets/schema.sql'));
-await copyFile(join(root, 'src/cloudflare/server-release.json'), join(destination, 'assets/server-release.json'));
+for (const file of ['server-release.json', 'worker-runtime.json']) await copyFile(join(root, 'src/cloudflare', file), join(destination, 'assets', file));
 await cp(join(root, 'src/cloudflare/migrations'), join(destination, 'assets/migrations'), { recursive: true });
-// Installed packages cannot strip TypeScript, so ship the shared upgrade rules as JavaScript.
-await build({ absWorkingDir: root, entryPoints: ['src/cloudflare/deployment/database-upgrade-rules.ts'], outfile: join(destination, 'assets/database-upgrade-rules.mjs'),
-	bundle: true, format: 'esm', platform: 'node', logLevel: 'warning' });
+// Installed packages cannot strip TypeScript, so ship the shared modules as JavaScript.
+for (const [source, asset] of [['src/cloudflare/deployment/database-upgrade-rules.ts', 'database-upgrade-rules.mjs'],
+	['src/cloudflare/worker/auth/revocation.ts', 'credential-revocation.mjs'], ['src/cloudflare/worker/coordinator/coordinator.ts', 'coordinator.mjs']]) {
+	await build({ absWorkingDir: root, entryPoints: [source], outfile: join(destination, 'assets', asset), bundle: true, format: 'esm', platform: 'node', logLevel: 'warning' });
+}
 console.log(`Standalone server package prepared in ${destination}`);

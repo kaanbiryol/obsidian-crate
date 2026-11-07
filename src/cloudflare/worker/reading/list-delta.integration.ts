@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleReadingRoute } from './routes';
+import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { publishCapture, type PendingCapture } from './captures';
 import { pruneReadingRemovals } from './library-index';
 import { READING_LIST_PAGE } from './queries';

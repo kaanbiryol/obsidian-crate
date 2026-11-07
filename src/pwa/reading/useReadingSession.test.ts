@@ -6,14 +6,14 @@ import { useReadingSession } from './useReadingSession';
 import { AUTH_TOKEN_KEY } from '../config';
 import { adoptEarlierReadingCaptures, newestReadingShare, readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, saveReadingDraft } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
-import { connectReadingFromReminders } from './api';
+import { connectReadingFromReminders } from './session/reminders-session';
 import { prepareReadingEncryption } from './session/encryption-session';
 import { EncryptionVerificationUnavailableError } from '../encryption/encryption-verification';
 
 vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('../service-worker-registration', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
-vi.mock('./api', async importOriginal => ({
-	...await importOriginal<typeof import('./api')>(), connectReadingFromReminders: vi.fn(async () => null),
+vi.mock('./session/reminders-session', async importOriginal => ({
+	...await importOriginal<typeof import('./session/reminders-session')>(), connectReadingFromReminders: vi.fn(async () => null),
 }));
 vi.mock('./storage/storage', async importOriginal => ({
 	...await importOriginal<typeof import('./storage/storage')>(),

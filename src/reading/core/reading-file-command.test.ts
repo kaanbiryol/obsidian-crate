@@ -3,7 +3,7 @@ import { sha256Hex } from '@/platform/sha256';
 import { managedArticle } from './article';
 import { readReadingFrontmatter } from './frontmatter';
 import { createReadingNote, parseReadingNote } from './notes';
-import { planReadingFileCommand } from './reading-file-command';
+import { planReadingFileCommand, readingFileCommandRefusal } from './reading-file-command';
 
 const ID = '7f1c2a3e-1b4d-4c5e-8f60-9a8b7c6d5e4f';
 const content = createReadingNote({ id: ID, url: 'https://example.com/a', title: 'Example', savedAt: '2026-01-01T00:00:00.000Z' });
@@ -33,4 +33,13 @@ it('retries only a capture whose article section is still empty', async () => {
 	const block = managedArticle(content)!;
 	const filled = `${content.slice(0, block.start)}\nSaved text\n${content.slice(block.end)}`;
 	expect(await planReadingFileCommand(parseReadingNote(filled)!, filled, { action: 'retry' })).toMatchObject({ issue: 'not-empty' });
+});
+
+it('words each refusal as the Worker answers it', () => {
+	expect(readingFileCommandRefusal({ kind: 'issue', issue: 'invalid' }, 'update')).toEqual({ message: 'Choose a Reading change.', status: 400 });
+	expect(readingFileCommandRefusal({ kind: 'issue', issue: 'invalid', message: 'Use fewer tags.' }, 'update')).toEqual({ message: 'Use fewer tags.', status: 400 });
+	expect(readingFileCommandRefusal({ kind: 'issue', issue: 'unsupported' }, 'delete')).toEqual({ message: 'Unsupported Reading change.', status: 400 });
+	expect(readingFileCommandRefusal({ kind: 'issue', issue: 'not-empty' }, 'retry')).toEqual({ message: 'Only URL captures with an unchanged article section can be extracted.', status: 400 });
+	expect(readingFileCommandRefusal({ kind: 'issue', issue: 'conflict' }, 'delete')).toEqual({ message: 'This item changed on another device. Refresh before deleting it.', status: 409, code: 'reading_conflict' });
+	expect(readingFileCommandRefusal({ kind: 'issue', issue: 'conflict' }, 'update')).toEqual({ message: 'This item changed on another device. Refresh before editing it.', status: 409, code: 'reading_conflict' });
 });

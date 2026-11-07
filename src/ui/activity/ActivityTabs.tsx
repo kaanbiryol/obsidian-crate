@@ -9,10 +9,12 @@ interface ActivityTabElements {
 	conflictsCount: HTMLSpanElement;
 }
 
+export type ActivityTab = 'pending' | 'conflicts' | 'history';
+
 interface Props {
-	initialTab: 'pending' | 'conflicts' | 'history';
+	initialTab: ActivityTab;
 	onMount: (elements: ActivityTabElements) => void;
-	onTabChange: (index: number) => void;
+	onTabChange: (tab: ActivityTab) => void;
 }
 
 /** React owns tab semantics; Obsidian's incremental renderers own each panel's contents. */
@@ -29,9 +31,9 @@ export function ActivityTabs({ initialTab, onMount, onTabChange }: Props) {
 			pendingCount: pendingCount.current, conflictsCount: conflictsCount.current });
 	}, [onMount]);
 	return <Tabs.Root value={active} onValueChange={value => {
-		const tab = value as typeof active;
+		const tab = value as ActivityTab;
 		setActive(tab);
-		onTabChange(tab === 'pending' ? 0 : tab === 'conflicts' ? 1 : 2);
+		onTabChange(tab);
 	}} className="crate-activity-tabs-layout">
 		<div className="crate-activity-tab-bar">
 			<Tabs.List className="crate-activity-tabs" aria-label="Sync activity" activateOnFocus>

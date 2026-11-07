@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleListReminders } from './routes/list';
+import { handleListReminders } from './handlers/list';
 import { revalidateReminderSources } from './source-migration';
 import { commitFileDelete } from '../sync/mutations';
 import { getStoredFileRow } from '../sync/storage';

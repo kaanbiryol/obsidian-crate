@@ -82,8 +82,9 @@ enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
 
 `cloudflare/deployment/worker-upload-payload.ts` builds multipart metadata and module bytes for
 normal and deletion Workers. `cloudflare/cloudflare-api.ts` owns authenticated
-transport, response handling and pagination. Binding and export policy belongs with
-the payload builders.
+transport, response handling and pagination. Export policy belongs with the payload
+builders; binding names, compatibility settings and the rate limit come from
+`cloudflare/worker-runtime.json`, which the local server reads too.
 
 | Binding | Type | Purpose |
 |---|---|---|
@@ -220,8 +221,8 @@ Encrypted web apps run it in the browser. The plaintext Worker routes run it,
 then add operation receipts, identity checks, conditional writes and parsed
 caches. They map its failures to their released responses;
 `reminders/plaintext-parity.integration.ts` records where those differ from the
-web app's answers. `cloudflare/worker/reminders/` holds these routes in
-`routes/`, the parsed reminder cache in `cache/`, and the operation receipts
+web app's answers. `cloudflare/worker/reminders/` holds these handlers in
+`handlers/`, the parsed reminder cache in `cache/`, and the operation receipts
 and notification source records they share.
 
 `reminders/core/reminder-list.ts` builds the web list from parsed notes for the
@@ -293,7 +294,7 @@ queued resets, address changes, connection changes and encryption setup even whe
 caller supplies no cancellation signal. `sync/connection/connection-errors.ts` defines stable
 codes for owned setup failures; settings presentation uses those codes to preserve
 recovery guidance while redacting unknown transport failures.
-`sync/engine/contexts.ts` builds the transfer and workflow contexts once, binding planners
+`sync/engine/contexts.ts` builds the transfer, workflow and queue contexts once, binding planners
 and transfers directly to their dependencies; only the planners that snapshot settings are
 built per sync. The engine supplies live state, pending paths, lifecycle guards and
 reconciliation; planner and transfer calls do not round-trip through engine forwarding methods.
@@ -403,6 +404,7 @@ connection, and each feature retains its own records and transactions.
 `reading/session/session.ts` owns session authority. The storage facade exposes specific
 draft, pending-command, share and immutable-attempt operations, keeping raw keys
 inside persistence and migration code. Export and logout retain their recovery guards.
+`pwa/reading/session/reminders-session.ts` signs into Reading with the Reminders credential.
 `pwa/reading/api.ts` retains pagination and response validation, including
 `loadReadingArticle`. Network and cache reads share item/article validation in
 `reading/storage/record-validation.ts`; live articles must match the requested identity and
@@ -658,7 +660,7 @@ specialized SQL.
 execution, notification wakeup and projection initialization requirements.
 Admission, scope authorization and the request handler's execution choice consume
 that policy; dispatch does not. `router.ts` checks the Reminders pause and a web
-session's enrolled folder, sends `/reading/` paths to the Reading routes, and
+session's enrolled folder, sends `/reading/` paths to `routes/reading.ts`, and
 otherwise tries each domain dispatcher in `routes/` in turn. Each dispatcher
 matches its own methods and paths and returns null for others; an unmatched
 request receives 404. Route modules hold no SQL. `routes/sync.ts` owns `/settings`

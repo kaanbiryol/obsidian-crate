@@ -5,6 +5,7 @@ import { corsHeaders, corsResponse } from '../http/cors';
 import { getStoredFileRow, readVerifiedBytes, type FileStorageRow } from '../sync/storage';
 import { MAX_READING_BYTES } from '@/reading/core/model';
 import { parseReadingNote } from '@/reading/core/notes';
+import { READING_DUPLICATE_ID_ISSUE } from '@/reading/core/inventory';
 import { decodeReadingNote, READING_ENCODING_ERROR, READING_SIZE_ERROR, type StoredReadingFile } from './library-index';
 import { apiRoutePolicy } from '../routes/policy';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
@@ -64,7 +65,7 @@ export function readingItemId(id: unknown): string {
 }
 export const sourceRowsStatement = (db: D1Database, id: string) => db.prepare('SELECT path, storage_key, hash, size FROM reading_items WHERE item_id = ? LIMIT 2').bind(id);
 export function uniqueSourceRow(rows: ReadingSourceRow[]): ReadingSourceRow {
-	if (rows.length !== 1) throw new ReadingError(rows.length ? 'Several notes have this Reading ID. Fix the duplicate notes in Obsidian.' : 'This reading note was moved or deleted. Refresh your library.', 409);
+	if (rows.length !== 1) throw new ReadingError(rows.length ? READING_DUPLICATE_ID_ISSUE : 'This reading note was moved or deleted. Refresh your library.', 409);
 	return rows[0]!;
 }
 /** The index row names the current file revision, committed with it, so its bytes are read directly. */

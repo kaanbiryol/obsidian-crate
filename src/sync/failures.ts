@@ -14,9 +14,28 @@ export function isAuthError(error: unknown): boolean {
 	return error instanceof HttpError && isAuthFailure(error.status);
 }
 
-/** One file's failure with the HTTP status that rejected it, so its workflow can classify it. */
+/** One file's failure with the HTTP status, code and current server hash that rejected
+ * it, so its workflow can classify it. A code the protocol does not define is dropped. */
 export function fileFailure(path: string, error: unknown): MutationFailure {
-	return { path, error: errorMessage(error), ...(error instanceof HttpError ? { status: error.status } : {}) };
+	if (!(error instanceof HttpError)) return { path, error: errorMessage(error) };
+	const { status, code, currentHash } = error;
+	return {
+		path,
+		error: error.message,
+		status,
+		...(isMutationFailureCode(code) ? { code } : {}),
+		...(currentHash === undefined ? {} : { currentHash }),
+	};
+}
+
+function isMutationFailureCode(value: string | undefined): value is NonNullable<MutationFailure['code']> {
+	return value === 'version_conflict'
+		|| value === 'namespace_conflict'
+		|| value === 'operation_expired'
+		|| value === 'operation_mismatch'
+		|| value === 'validation'
+		|| value === 'storage'
+		|| value === 'unknown';
 }
 
 /** Request retries and queue requeues: anything but a non-retryable server status may succeed later. */
@@ -35,6 +54,11 @@ export function isTransientSyncFailure(error: unknown): boolean {
 export function isVersionConflict(status: number | undefined, code?: string): boolean {
 	return code === 'version_conflict'
 		|| (code !== 'namespace_conflict' && status !== undefined && VERSION_CONFLICT_HTTP_STATUSES.has(status));
+}
+
+/** A thrown request error that a replan against fresh metadata can resolve. */
+export function isVersionConflictError(error: unknown): boolean {
+	return error instanceof HttpError && isVersionConflict(error.status, error.code);
 }
 
 /** Queue flushes: a failure that neither a retry nor a targeted replan can fix. */

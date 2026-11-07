@@ -26,7 +26,7 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			include: ['src/**/*.{ts,tsx}'],
-			exclude: ['src/**/*.test.ts', 'src/test/**', 'src/**/*.d.ts'],
+			exclude: ['src/**/*.test.ts', 'src/**/*-test-harness.ts', 'src/**/test-support/**', 'src/test/**', 'src/**/*.d.ts'],
 			thresholds: {
 				'src/sync/**': { statements: 86, branches: 80, functions: 85, lines: 89 },
 				'src/encryption/**': { statements: 76, branches: 76, functions: 86, lines: 81 },

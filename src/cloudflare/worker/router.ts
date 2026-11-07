@@ -1,5 +1,5 @@
 import { featureEnabled, parseStoredFeaturePolicy } from './server/feature-policy';
-import { handleReadingRoute } from './reading/routes';
+import { handleReadingRoute } from './routes/reading';
 import { forwardToCoordinator } from './coordinator/coordinator';
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES } from '../../encryption/receipt-format';
 import { parseJsonObject } from './http/request-validation';

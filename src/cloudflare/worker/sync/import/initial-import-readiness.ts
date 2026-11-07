@@ -2,6 +2,7 @@ import { corsResponse } from '../../http/cors';
 import { parseJsonObject } from '../../http/request-validation';
 import { REMINDER_CACHE_PARSER_VERSION } from '../../reminders/cache/types';
 import { reminderSourceIssueCode } from '../../reminders/source-parse';
+import { SCAN_KEY } from '../../reminders/source-migration';
 import { REMINDER_SETUP_PROGRESS_CAP } from '@/protocol/initial-import';
 
 export const INITIAL_REMINDERS_PENDING = 'initial_import_reminders_pending';
@@ -9,7 +10,7 @@ export const INITIAL_REMINDERS_PENDING = 'initial_import_reminders_pending';
 // Readiness uses indexed existence checks; progress counts only outstanding work.
 const READY_SQL = `NOT EXISTS (SELECT 1 FROM notification_policy) OR (
   EXISTS (SELECT 1 FROM notification_policy p JOIN maintenance_state m
-    ON m.key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:' || p.folder_path AND m.value = '')
+    ON m.key = '${SCAN_KEY}:' || p.folder_path AND m.value = '')
   AND NOT EXISTS (SELECT 1 FROM reminder_source_state WHERE parser_version < ${REMINDER_CACHE_PARSER_VERSION} LIMIT 1)
   AND NOT EXISTS (SELECT 1 FROM reminder_source_state WHERE verified = 0 LIMIT 1)
   AND NOT EXISTS (SELECT 1 FROM notification_projection_jobs LIMIT 1)
@@ -41,7 +42,7 @@ export async function finishInitialReminderSetup(request: Request, db: D1Databas
 	// Clients poll throughout setup, so each count stops at REMINDER_SETUP_PROGRESS_CAP rows.
 	const progress = status.ready ? undefined : await db.prepare(`SELECT
     NOT EXISTS (SELECT 1 FROM notification_policy p JOIN maintenance_state m
-      ON m.key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:' || p.folder_path AND m.value = '') AS scanning,
+      ON m.key = '${SCAN_KEY}:' || p.folder_path AND m.value = '') AS scanning,
     (SELECT COUNT(*) FROM (
       SELECT * FROM (SELECT file_path FROM reminder_source_state WHERE parser_version < ${REMINDER_CACHE_PARSER_VERSION} LIMIT ${REMINDER_SETUP_PROGRESS_CAP})
       UNION SELECT * FROM (SELECT file_path FROM reminder_source_state WHERE verified = 0 LIMIT ${REMINDER_SETUP_PROGRESS_CAP})

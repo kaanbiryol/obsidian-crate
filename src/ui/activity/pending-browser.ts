@@ -7,7 +7,7 @@ import { createPendingDetail, crateUpdateTitle } from './pending-detail';
 import { PendingComparisons } from './pending-comparisons';
 import { createPendingActions, type PendingActions } from './pending-actions';
 import { createPendingRowSelection, type PendingRowSelectionState } from './pending-row-selection';
-import { CRATE_UPDATE_FILES, crateUpdateVersion } from '../../plugin/crate-update-bundle';
+import { CRATE_UPDATE_FILES, crateUpdateVersion } from '../../plugin/crate-update/bundle';
 
 export type PendingDiffLoader = (path: string, deleted: boolean) => Promise<PendingDiff>;
 export interface PendingBrowserState extends PendingRowSelectionState {
@@ -22,6 +22,14 @@ export interface PendingBrowserState extends PendingRowSelectionState {
 	startChecks?: () => void;
 	pauseChecks?: () => void;
 	dispose?: () => void;
+}
+
+/** Stops the rendered browser's checks before a rebuild, which installs new ones. */
+export function resetPendingChecks(state: PendingBrowserState): void {
+	state.dispose?.();
+	state.startChecks = undefined;
+	state.pauseChecks = undefined;
+	state.dispose = undefined;
 }
 
 let nextBrowserId = 0;

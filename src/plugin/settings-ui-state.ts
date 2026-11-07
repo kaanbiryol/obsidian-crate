@@ -4,13 +4,14 @@ import type { DiagnosticResult } from '../sync/diagnostics/checks';
 import type { EncryptionServerState } from '../encryption/server-state';
 import type { NotificationPolicy } from '../protocol/notification-policy';
 import type { CrateSettings } from './settings-types';
+import type CratePlugin from './CratePlugin';
 
 interface CachedDiagnosticsState {
 	key: string;
 	results: DiagnosticResult[];
 }
 
-export interface CachedDevicesState {
+interface CachedDevicesState {
 	client: SyncApiClient;
 	tokens: RegisteredDevice[] | null;
 	pending: Promise<void> | null;
@@ -37,6 +38,44 @@ export function createSettingsUiState(): SettingsUiState {
 		encryptionStatus: null,
 		notificationPolicy: null,
 	};
+}
+
+/** Reopening settings asks the server again for its encryption status and notification policy. */
+export function clearSettingsRequests(state: SettingsUiState): void {
+	state.encryptionStatus = null;
+	state.notificationPolicy = null;
+}
+
+/** A connection change also drops the device list and diagnostics, which describe the old server. */
+export function clearSettingsUiState(state: SettingsUiState): void {
+	state.diagnostics = null;
+	state.devices = null;
+	clearSettingsRequests(state);
+}
+
+/** This client's device list, replacing one kept for another connection. */
+export function connectedDevicesCache(state: SettingsUiState, client: SyncApiClient): CachedDevicesState {
+	if (state.devices?.client !== client) state.devices = { client, tokens: null, pending: null };
+	return state.devices;
+}
+
+/** Lists the cache's devices again, sharing one request among callers. */
+export function refreshDeviceCache(cache: CachedDevicesState): Promise<void> {
+	if (!cache.pending) {
+		cache.pending = cache.client.listTokens()
+			.then(({ tokens }) => { cache.tokens = tokens; })
+			.finally(() => { cache.pending = null; });
+	}
+	return cache.pending;
+}
+
+/** The connected devices for the current server, shared with the devices section while settings stay open. */
+export async function loadConnectedDevices(plugin: CratePlugin): Promise<RegisteredDevice[] | null> {
+	const client = plugin.syncRuntime.getApiClient();
+	if (!client) return null;
+	const cache = connectedDevicesCache(plugin.settingsUiState, client);
+	if (cache.tokens === null) await refreshDeviceCache(cache);
+	return cache.tokens;
 }
 
 type CachedRequestField = 'encryptionStatus' | 'notificationPolicy';

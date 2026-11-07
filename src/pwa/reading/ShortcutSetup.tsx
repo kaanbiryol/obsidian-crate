@@ -7,6 +7,7 @@ import { CopyableText } from '@/ui/shared/CopyableText';
 import { DEVELOPMENT_SHORTCUT_PATH, READING_SHORTCUT_URL } from '@/reading/shortcut';
 import { readingRequest } from './api';
 import { assertReadingSession, type ReadingSession } from './session/session';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface Pairing { pairingCode: string; expiresAt: number }
 
@@ -17,14 +18,14 @@ const shortcutDownloadUrl = typeof __CRATE_DEVELOPMENT_SHORTCUT_AVAILABLE__ === 
 export function ShortcutSetup({ session }: { session: ReadingSession }) {
 	const [pairing, setPairing] = useState<Pairing | null>(null);
 	const [busy, setBusy] = useState(false), [error, setError] = useState('');
-	const [now, setNow] = useState(Date.now), [online, setOnline] = useState(navigator.onLine);
+	const [now, setNow] = useState(Date.now), online = useOnlineStatus(() => setNow(Date.now()));
 	const alive = useRef(false), working = useRef(false);
 	useEffect(() => {
 		alive.current = true;
-		const update = () => { setNow(Date.now()); setOnline(navigator.onLine); };
+		const update = () => setNow(Date.now());
 		const timer = window.setInterval(update, 1000);
-		window.addEventListener('online', update); window.addEventListener('offline', update); document.addEventListener('visibilitychange', update);
-		return () => { alive.current = false; clearInterval(timer); window.removeEventListener('online', update); window.removeEventListener('offline', update); document.removeEventListener('visibilitychange', update); };
+		document.addEventListener('visibilitychange', update);
+		return () => { alive.current = false; clearInterval(timer); document.removeEventListener('visibilitychange', update); };
 	}, []);
 	const expired = pairing !== null && pairing.expiresAt <= now;
 	const create = async () => {

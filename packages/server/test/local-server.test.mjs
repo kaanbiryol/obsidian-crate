@@ -154,9 +154,10 @@ test('host CLI lists and revokes devices while running and while stopped', { tim
 	}
 });
 
-test('revoking a device also removes its push subscriptions and the shortcut credentials it issued', { timeout: 20_000 }, async () => {
+// A running server revokes through the coordinator lock; a stopped one has no Worker to race.
+for (const administrative of [true, false]) test(`revoking a device ${administrative ? 'while stopped' : 'while running'} also removes its push subscriptions and the shortcut credentials it issued`, { timeout: 20_000 }, async () => {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-revoke-'));
-	const runtime = await openLocalRuntime({ dataDir, administrative: true });
+	const runtime = await openLocalRuntime({ dataDir, administrative });
 	try {
 		const { db } = runtime;
 		const issuer = await issueLocalDevice(db, 'Phone');
@@ -165,10 +166,10 @@ test('revoking a device also removes its push subscriptions and the shortcut cre
 			db.prepare("INSERT INTO auth_tokens (id, token_hash, device_id, scope) VALUES ('capture', ?, ?, 'reading_capture')").bind('c'.repeat(64), issuer.id),
 			db.prepare("INSERT INTO push_subscriptions (owner_token_id, id, endpoint, p256dh, auth) VALUES (?, 'push', 'https://push.example', 'key', 'auth')").bind(issuer.id),
 		]);
-		assert.equal(await revokeLocalDevice(db, issuer.id), true);
+		assert.equal(await revokeLocalDevice(runtime, issuer.id), true);
 		assert.deepEqual((await db.prepare('SELECT id FROM auth_tokens').all()).results.map(row => row.id), [other.id]);
 		assert.equal((await db.prepare('SELECT COUNT(*) AS count FROM push_subscriptions').first()).count, 0);
-		assert.equal(await revokeLocalDevice(db, issuer.id), false);
+		assert.equal(await revokeLocalDevice(runtime, issuer.id), false);
 	} finally {
 		await runtime.close();
 		await rm(dataDir, { recursive: true, force: true });

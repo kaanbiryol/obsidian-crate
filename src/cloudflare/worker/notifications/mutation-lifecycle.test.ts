@@ -8,7 +8,7 @@ vi.mock('../sync/staging/staged-upload-dispatch', () => ({ prepareCoordinatedUpl
 vi.mock('../router', () => ({ handleAuthenticatedRoute: vi.fn(), isAuthenticatedRouteAllowed: () => true, handlePublicRoute: vi.fn(async () => null) }));
 vi.mock('../auth/index', () => ({ authenticateWorkerRequest: vi.fn(async () => ({ principal: { id: 'device', scope: 'vault' } })) }));
 vi.mock('../http/request-diagnostics', () => ({ logMutation: vi.fn() }));
-vi.mock('../maintenance/lifecycle', () => ({ runMaintenanceEpisode: vi.fn() }));
+vi.mock('../maintenance/lifecycle', async original => ({ ...await original<typeof import('../maintenance/lifecycle')>(), runMaintenanceEpisode: vi.fn() }));
 vi.mock('../encryption/state', () => ({ ENCRYPTION_STATE_SQL: '(SELECT encryption FROM server_state WHERE id = 1)', readEncryptionState: vi.fn(async () => null), EncryptionStateError: class extends Error {} }));
 
 function fixture() {

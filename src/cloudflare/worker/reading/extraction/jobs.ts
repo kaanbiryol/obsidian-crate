@@ -19,6 +19,8 @@ import { DEPLOYMENT_FENCE_KEY } from '@/protocol/deployment-fence';
 
 /** Fetch and publication attempts per article job, like the other durable queues. */
 export const MAX_JOB_ATTEMPTS = 8;
+/** Reading role storage flag: its alarm runs captures and extraction. */
+export const READING_COORDINATOR_KEY = 'readingCoordinator';
 /** After its attempts, a job retries hourly as a bookmark only until it publishes. */
 const EXHAUSTED_JOB_RETRY_MS = 60 * 60_000;
 
@@ -60,6 +62,12 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
 		// A failed publication keeps its leased row instead, so that queue cannot restart its attempts.
 		if (!failed) await env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision).run();
 	}
+}
+
+/** Called under the Reading role's lock; an alarm already scheduled keeps its time. */
+export async function armReadingCoordinator(state: DurableObjectState): Promise<void> {
+	await state.storage.put(READING_COORDINATOR_KEY, true);
+	if (await state.storage.getAlarm() === null) await state.storage.setAlarm(Date.now() + 100);
 }
 
 export async function runReadingExtraction(state: DurableObjectState, env: Env): Promise<void> {

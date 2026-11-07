@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleListReminders } from './routes/list';
+import { handleListReminders } from './handlers/list';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/index';
 import { sha256Hex } from '../../../platform/sha256';

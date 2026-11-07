@@ -150,6 +150,30 @@ it('skips a repeated rescan of unchanged note content without notifying listener
 	expect(scanFile).toHaveBeenCalledTimes(2);
 });
 
+it('holds a rename during a deferred flush for its single notification', async () => {
+	let syncing = false;
+	const file = Object.assign(new TFile(), { path: 'Reminders/A.md', basename: 'A', extension: 'md' });
+	const index = createReminderIndex({ vault: { getAbstractFileByPath: (path: string) => path === file.path ? file : null } } as unknown as App,
+		'Reminders', { shouldDeferScan: () => syncing });
+	vi.mocked(scanVault).mockResolvedValue(snapshot([reminder()]));
+	await index.load();
+	syncing = true;
+	await index.rescanFile(file);
+	const started = deferred<void>(), result = deferred<FileScanResult>();
+	vi.mocked(scanFile).mockImplementation(async () => { started.resolve(); return result.promise; });
+	const listener = vi.fn();
+	index.onIndexChange(listener);
+	syncing = false;
+	const flushing = index.flushDeferredScans();
+	await started.promise;
+	index.renameFile(oldPath, newPath);
+	expect(listener).not.toHaveBeenCalled();
+	result.resolve({ filePath: file.path, reminders: [{ ...reminder(file.path), id: 'A' }], lineCount: 1 });
+	await flushing;
+	expect(listener).toHaveBeenCalledOnce();
+	expect(index.getAll().map(item => `${item.id}@${item.filePath}`).sort()).toEqual(['A@Reminders/A.md', 'one@Reminders/New.md']);
+});
+
 it('flushes deferred file scans with one owner map and one notification', async () => {
 	let syncing = false;
 	const paths = ['Reminders/A.md', 'Reminders/B.md', 'Reminders/C.md'];

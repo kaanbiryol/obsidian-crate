@@ -37,7 +37,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 	vi.doMock('../reading/register-integrations', () => ({ registerReading: vi.fn() }));
 	vi.doMock('../reading/runtime', () => ({ stopReading: vi.fn() }));
 	vi.doMock('../sync/durability/checkpoint-backup-cleanup', () => ({ registerCheckpointBackupCleanup: vi.fn() }));
-	vi.doMock('./crate-update-sync', () => ({ registerCrateUpdateSync: vi.fn() }));
+	vi.doMock('./crate-update/sync', () => ({ registerCrateUpdateSync: vi.fn() }));
 	vi.doMock('obsidian', () => ({
 		Notice: class Notice {
 			constructor(message?: string | object) {

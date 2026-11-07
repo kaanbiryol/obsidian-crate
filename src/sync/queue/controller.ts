@@ -10,8 +10,8 @@ import {
 
 /** The engine supplies the flush members; the controller adds its batch and scheduling ones. */
 export interface SyncQueueControllerContext extends Pick<QueueFlushContext,
-	| 'finishInitialSetup' | 'uploadPreparedFiles' | 'deleteRemoteFiles' | 'recoverUploads' | 'api' | 'localManifest'
-	| 'updateState' | 'setLastSync' | 'reconnectNotice' | 'isDestroyed' | 'currentStatus' | 'prepareUploadFromPath'> {
+	| 'finishInitialSetup' | 'uploadPreparedFiles' | 'deleteRemoteFiles' | 'recoverUploads' | 'apiConfigured' | 'localManifest'
+	| 'updateState' | 'setLastSync' | 'reconnectNotice' | 'isDestroyed' | 'getStatus' | 'prepareUploadFromPath'> {
 	automaticSyncEnabled?(): boolean;
 	shouldIgnore(path: string): boolean;
 	verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean): Promise<string[]>;
@@ -269,7 +269,7 @@ export class SyncQueueController {
 
 	private schedulePendingVerification(): void {
 		if (!this.verificationKeys.size || this.verificationTimer !== null || this.verificationTask
-			|| this.context.isDestroyed() || this.context.currentStatus() === 'syncing') return;
+			|| this.context.isDestroyed() || this.context.getStatus() === 'syncing') return;
 		// Coalesce bursts independently of the automatic network-sync preference.
 		this.verificationTimer = setTimeout(() => {
 			this.verificationTimer = null;
@@ -285,12 +285,12 @@ export class SyncQueueController {
 	}
 
 	private async verifyPendingChanges(): Promise<void> {
-		if (this.context.isDestroyed() || this.context.currentStatus() === 'syncing') return;
+		if (this.context.isDestroyed() || this.context.getStatus() === 'syncing') return;
 		const keys = [...this.verificationKeys];
 		this.verificationKeys.clear();
 		const revisions = this.snapshotPendingRevisions();
 		const isCurrent = (key: string) => !this.context.isDestroyed()
-			&& this.context.currentStatus() !== 'syncing' && this.pending.isUnchangedSince(key, revisions);
+			&& this.context.getStatus() !== 'syncing' && this.pending.isUnchangedSince(key, revisions);
 		const result = createEmptySyncResult();
 		result.settledPaths = await this.context.verifyPendingPaths(keys, isCurrent);
 		this.clearSyncedPendingPaths(result, revisions);

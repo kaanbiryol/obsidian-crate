@@ -2,12 +2,17 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import CratePlugin from '../plugin/CratePlugin';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from './settings';
-import { changeReminderFolder, ensureReminderNotificationPolicy, policySettings, refreshReminderNotificationPolicy, saveNotificationPolicy } from './notification-policy-sync';
+import { ensureReminderNotificationPolicy, openNotificationPolicy, policySettings, refreshReminderNotificationPolicy, saveNotificationPolicy } from './notification-policy-sync';
 import { beginPluginLifecycle } from '../plugin/lifecycle-state';
-import { reinitializeWithFolder } from './plugin-integration';
+import { changeReminderFolder } from './plugin-integration';
+import { setupReminderBackend } from './runtime';
 
 vi.mock('../plugin/lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
-vi.mock('./plugin-integration', () => ({ reinitializeWithFolder: vi.fn(async () => {}) }));
+// Folder changes rebuild the reminder backend; these tests cover only the server policy.
+vi.mock('./runtime', () => ({ setupReminderBackend: vi.fn(async () => null), stopReminderBackend: vi.fn() }));
+vi.mock('./register-integrations', () => ({ registerReminderIntegrations: vi.fn() }));
+vi.mock('./ui/plugin/reminders-view', () => ({ VIEW_TYPE_REMINDERS: 'reminders-view' }));
+vi.mock('./ui/plugin/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
 beforeEach(() => useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS, enabled: true, confirmed: true }, true));
 afterEach(() => vi.restoreAllMocks());
 
@@ -41,7 +46,7 @@ it('saves and applies an offline edit, then retries its persisted intent after r
 	await changeReminderFolder(h.plugin, ' /Tasks/Work/ ');
 	await ensureReminderNotificationPolicy(h.plugin);
 	expect(h.plugin.remindersSettings.remindersFolderPath).toBe('Tasks/Work');
-	expect(reinitializeWithFolder).toHaveBeenCalledWith(h.plugin, 'Tasks/Work');
+	expect(setupReminderBackend).toHaveBeenCalledWith(h.plugin, 'Tasks/Work');
 	expect(h.plugin.remindersSettings.pendingServerFolder).toMatchObject({ folderPath: 'Tasks/Work', workerUrl: 'https://first.example' });
 	useRemindersSettingsStore.setState(DEFAULT_REMINDERS_SETTINGS, true);
 	await h.plugin.loadSettings(); h.setOnline(true);
@@ -207,4 +212,34 @@ it('creates a missing policy from device settings, then merges an explicit edit 
 	h.ensureNotificationPolicy.mockClear(); h.setOnline(false);
 	await expect(saveNotificationPolicy(h.api, h.plugin, saved, { enabled: true })).rejects.toThrow('offline');
 	expect(h.ensureNotificationPolicy).not.toHaveBeenCalled();
+});
+
+it('shows a policy read before a connection change but saves it only to the connection that read it', async () => {
+	const h = harness();
+	let release!: () => void;
+	Object.assign(h.api, { getNotificationPolicy: vi.fn(async () => {
+		await new Promise<void>(resolve => { release = resolve; });
+		return { policy: h.policy() };
+	}) });
+	const opened = openNotificationPolicy(h.plugin);
+	expect(opened.api).toBe(h.api);
+	h.plugin.settings.workerUrl = 'https://second.example';
+	release(); await opened.loaded;
+	expect(opened.policy).toMatchObject({ revision: 'first' });
+	await expect(opened.save({ enabled: true })).rejects.toThrow('server connection changed');
+	expect(h.ensureNotificationPolicy).not.toHaveBeenCalled();
+	expect(h.updateNotificationPolicy).not.toHaveBeenCalled();
+});
+
+it('refuses to save over a policy it could not read, and reads it again next time', async () => {
+	const h = harness();
+	const getNotificationPolicy = vi.fn(async () => { throw new Error('offline'); });
+	Object.assign(h.api, { getNotificationPolicy });
+	const opened = openNotificationPolicy(h.plugin);
+	await opened.loaded;
+	expect(opened.policy).toBeNull();
+	await expect(opened.save({ enabled: true })).rejects.toThrow('offline');
+	expect(h.ensureNotificationPolicy).not.toHaveBeenCalled();
+	openNotificationPolicy(h.plugin);
+	expect(getNotificationPolicy).toHaveBeenCalledTimes(2);
 });

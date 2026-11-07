@@ -1,6 +1,6 @@
 import { youtubeVideoId } from '../core/youtube';
 import { enrichReadingBookmark } from '../core/duplicates';
-import { filterUniqueReadingIds, findSavedReadingLink } from '../core/inventory';
+import { filterUniqueReadingIds, findSavedReadingLink, READING_DUPLICATE_ID_ISSUE } from '../core/inventory';
 import { applyLocalArticle } from '../core/article';
 import { isEmptyReadingCapture, readingUpdateIssue } from '../core/mutation-policy';
 import type { CapturedArticle } from '../extraction/types';
@@ -147,7 +147,7 @@ export class ReadingLibrary {
 			}
 			this.deferred = deferredPaths;
 			const { unique, duplicates } = filterUniqueReadingIds(items);
-			for (const item of duplicates) issues.push({ path: item.path, message: 'Another note has the same reading ID. Resolve the duplicate before editing here.' });
+			for (const item of duplicates) issues.push({ path: item.path, message: READING_DUPLICATE_ID_ISSUE });
 			unique.sort((a, b) => b.saved_at.localeCompare(a.saved_at) || a.crate_reading_id.localeCompare(b.crate_reading_id));
 			// Rescans after unrelated changes find the same notes; keep listeners quiet.
 			const previous = this.snapshot;

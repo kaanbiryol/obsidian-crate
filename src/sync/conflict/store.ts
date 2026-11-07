@@ -3,14 +3,13 @@ import { isRecord } from '../../platform/validation';
 import type { ConflictRecord } from '../types';
 import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
-import { getOriginalPathFromConflictFile, isConflictFile, isIncomingReview } from './conflict';
+import { getOriginalPathFromConflictFile, isConflictFile, isIncomingConflictFile, isIncomingReview } from './conflict';
 import { getAllVaultFiles } from '../local/file-discovery';
 import { createAbortError } from '../abort';
 import { sha256Hex } from '../../platform/sha256';
+import { syncStoragePaths } from '../manifest/storage-paths';
 
 const logger = createLogger('ConflictStore');
-const STORE_FILENAME = 'conflicts.json';
-const STORE_TMP_FILENAME = 'conflicts.json.tmp';
 const MAX_RESOLVED_CONFLICTS = 200;
 
 interface ConflictStoreData {
@@ -35,7 +34,7 @@ function discoveredConflictRecord(conflictPath: string): ConflictRecord {
 		conflictPath,
 		createdAt: new Date().toISOString(),
 		cause: 'unknown',
-		...(conflictPath.includes('(conflict remote ') ? { copySide: 'remote' as const } : {}),
+		...(isIncomingConflictFile(conflictPath) ? { copySide: 'remote' as const } : {}),
 		status: 'active',
 	};
 }
@@ -57,8 +56,9 @@ export class ConflictStore {
 		pluginManifest: Pick<PluginManifest, 'dir'>,
 		private readonly onActiveCountChange?: (count: number) => void,
 	) {
-		this.storePath = `${pluginManifest.dir}/${STORE_FILENAME}`;
-		this.tmpPath = `${pluginManifest.dir}/${STORE_TMP_FILENAME}`;
+		const paths = syncStoragePaths(`${pluginManifest.dir}`);
+		this.storePath = paths.conflicts;
+		this.tmpPath = paths.conflictsTmp;
 	}
 
 	load(): Promise<void> {

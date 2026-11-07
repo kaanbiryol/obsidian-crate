@@ -3,7 +3,7 @@ import type { MarkdownReminderUpdate } from './markdownReminderMutation';
 import type { Priority, Reminder, UpdateReminderParams } from '../types/reminder';
 import { parseReminderDateValue } from './dates/reminderDate';
 import { normalizeRecurrenceRule } from './recurrence/recurrenceRule';
-import { DEFAULT_PROJECT } from './constants';
+import { DEFAULT_PRIORITY, DEFAULT_PROJECT } from './constants';
 
 /** Normalized domain input consumed by both Obsidian and server Markdown writers. */
 export interface UpdateReminderInput extends MarkdownReminderUpdate { project?: string }
@@ -26,7 +26,7 @@ export function buildCreateReminderArgs(params: {
 		params.dueDatetime ?? params.dueDate,
 		Boolean(params.dueDatetime),
 	);
-	const priority: Priority = params.priority ?? 4;
+	const priority: Priority = params.priority ?? DEFAULT_PRIORITY;
 
 	return {
 		project,

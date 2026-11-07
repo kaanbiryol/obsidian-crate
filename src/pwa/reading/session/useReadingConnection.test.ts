@@ -2,10 +2,10 @@ import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { renderHook } from '../../../test/react-hooks';
 import { AUTH_TOKEN_KEY } from '../../config';
-import { connectReadingFromReminders } from '../api';
+import { connectReadingFromReminders } from './reminders-session';
 import { useReadingConnection } from './useReadingConnection';
 
-vi.mock('../api', async importOriginal => ({ ...await importOriginal<typeof import('../api')>(), connectReadingFromReminders: vi.fn() }));
+vi.mock('./reminders-session', async importOriginal => ({ ...await importOriginal<typeof import('./reminders-session')>(), connectReadingFromReminders: vi.fn() }));
 vi.mock('./session', async importOriginal => ({ ...await importOriginal<typeof import('./session')>(), readingSession: () => null }));
 
 it('reports the first automatic connection in the same render that becomes ready', async () => {

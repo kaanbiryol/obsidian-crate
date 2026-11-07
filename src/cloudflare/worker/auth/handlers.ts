@@ -2,13 +2,7 @@ import { corsResponse } from '../http/cors';
 import { queryRows } from '../d1/db';
 import { parseJsonObject, parseOptionalString } from '../http/request-validation';
 import { sha256Hex } from '../../../platform/sha256';
-
-/** Shortcut capture credentials record the credential that paired them in `device_id`,
- * which their scope does not otherwise use, so none outlives its issuer. `issuers` is
- * SQL selecting issuer IDs. */
-function revokeIssuedCaptures(db: D1Database, issuers: string, ...bindings: unknown[]): D1PreparedStatement {
-	return db.prepare(`DELETE FROM auth_tokens WHERE scope = 'reading_capture' AND device_id IN (${issuers})`).bind(...bindings);
-}
+import { revokeCredential, revokeCredentialStatements } from './revocation';
 
 export async function handleRevokeToken(request: Request, db: D1Database): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -20,7 +14,7 @@ export async function handleRevokeToken(request: Request, db: D1Database): Promi
 	if (!id) {
 		return corsResponse({ error: 'id required' }, 400);
 	}
-	await db.batch([db.prepare('DELETE FROM push_subscriptions WHERE owner_token_id = ?').bind(id), revokeIssuedCaptures(db, '?', id), db.prepare('DELETE FROM auth_tokens WHERE id = ?').bind(id)]);
+	await revokeCredential(db, id);
 	return corsResponse({ success: true });
 }
 
@@ -32,8 +26,7 @@ export async function handleRevokeCurrentToken(request: Request, db: D1Database)
 	}
 
 	const tokenHash = await sha256Hex(token);
-	await db.batch([db.prepare('DELETE FROM push_subscriptions WHERE owner_token_id IN (SELECT id FROM auth_tokens WHERE token_hash = ?)').bind(tokenHash),
-		revokeIssuedCaptures(db, 'SELECT id FROM auth_tokens WHERE token_hash = ?', tokenHash), db.prepare('DELETE FROM auth_tokens WHERE token_hash = ?').bind(tokenHash)]);
+	await db.batch(revokeCredentialStatements(db, 'SELECT id FROM auth_tokens WHERE token_hash = ?', tokenHash));
 	return corsResponse({ success: true });
 }
 

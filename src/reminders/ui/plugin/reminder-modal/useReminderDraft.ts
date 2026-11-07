@@ -10,6 +10,7 @@ import {
 	type ReminderDraftContentPatch,
 	type ReminderDraftContentState,
 } from '../../../core/reminderDraft';
+import { DEFAULT_PRIORITY, togglePriority as toggledPriority } from '../../../core/constants';
 
 /** Whether text already carries a date or recurrence. Removing it from text that
  * started with one clears the schedule. */
@@ -51,7 +52,7 @@ export function useReminderDraft({
 	const initialProject = (reminder?.project && String(reminder.project).trim()) || resolvedDefaultProject;
 	const initialDueDateValue = reminder?.dueDatetime || reminder?.dueDate || initialDueDate || null;
 	const initialHasTime = reminder ? !!reminder.dueDatetime : false;
-	const initialPriority = reminder?.priority || 4;
+	const initialPriority = reminder?.priority || DEFAULT_PRIORITY;
 	const initialRecurrence = reminder?.recurrence;
 
 	const [content, setContent] = useState(() => initialContent);
@@ -141,8 +142,7 @@ export function useReminderDraft({
 	}, [applyContentUpdate]);
 
 	const togglePriority = useCallback(() => {
-		const nextPriority = draftRef.current.priority === 1 ? 4 : 1;
-		return applyContentUpdate({ priority: nextPriority });
+		return applyContentUpdate({ priority: toggledPriority(draftRef.current.priority) });
 	}, [applyContentUpdate]);
 
 	return {

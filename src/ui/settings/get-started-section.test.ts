@@ -17,8 +17,8 @@ async function load() {
 		constructor(containerEl: FakeElement) { super(containerEl); buttons.push(this); }
 	} }));
 	vi.doMock('../../plugin/sync-connection', () => ({ writeSyncSettings }));
-	vi.doMock('./devices-section', () => ({ canAddDeviceWithCode: () => true, loadConnectedDevices }));
-	vi.doMock('./add-device-modal', () => ({ AddDeviceModal: class { open = vi.fn(); } }));
+	vi.doMock('../../plugin/settings-ui-state', () => ({ loadConnectedDevices }));
+	vi.doMock('./add-device-modal', () => ({ AddDeviceModal: class { open = vi.fn(); }, canAddDeviceWithCode: () => true }));
 	vi.doMock('./reminders-web-app', () => ({ buildEnrollmentUrl: vi.fn() }));
 	vi.doMock('./qr-modal', () => ({ QRModal: class { open = vi.fn(); } }));
 	vi.doMock('../activity/activity-modal', () => ({ ActivityModal: class { open = openActivity; } }));

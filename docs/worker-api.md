@@ -1,6 +1,8 @@
 # Worker API
 
-Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment.
+Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment. `src/cloudflare/worker-runtime.json` holds the compatibility date, flags, binding names and rate limit that the deployment payload and the local server both use; a test keeps `wrangler.jsonc` in step with it.
+
+Each route is declared once in `routes/policy.ts`, with its methods, token scopes and execution. `routes/<domain>.ts` dispatches that domain's paths to handlers and holds no SQL. Handlers and their SQL live in the feature folders, such as `reminders/handlers/` and `reading/`, and throw domain errors that the request handler maps to responses.
 
 App mutations require `X-Crate-Protocol: 1`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. The versioned native Shortcut transport has its own compatibility contract, described below. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics. Authenticated responses also carry `X-Crate-Encryption-State: on|off`; clients skip the `/encryption` probe before plaintext requests while it reports `off`, and the server still rejects plaintext into an encrypted vault with 428.
 
@@ -338,7 +340,7 @@ Response: `{ success: true, settingsVersion }`. A stale version returns `409` in
 
 Closing Crate settings writes only the shared settings changed on this device since it last synced them. It merges those changes onto the server's settings as it last read or wrote them, reading first when it has not, and writes against that version. A newer version, or a setting both devices changed, loads the server's settings with a short notice instead of overwriting them. The plugin saves the server's settings as it last reconciled them in its plugin data (`sharedSettingsBase`, cleared when the server address changes), so a change that could not be saved is still written on a later close after a restart. The periodic refresh loads other devices' changes, keeps this device's unsaved ones, and waits while Crate settings are open.
 
-Reminder handlers live in `src/cloudflare/worker/reminders/routes/`. Mutations apply the shared Markdown command described in the [architecture](architecture.md).
+Reminder handlers live in `src/cloudflare/worker/reminders/handlers/`. Mutations apply the shared Markdown command described in the [architecture](architecture.md).
 
 Create, update and set-completed respond with the saved reminder as `{ success: true, reminder }`. `reminder` has the fields of a listed reminder: `revision`, `id`, `content`, optional `description`, `dueDate` and `dueDatetime`, `priority`, `completed`, `project`, optional `recurrence`, `filePath` and `lineNumber`. A retried operation returns its original response.
 

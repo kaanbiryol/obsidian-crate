@@ -1,6 +1,7 @@
 import { normalizeVaultName, VAULT_NAME_BINDING } from './vault-name';
 import serverDeleteWorkerSource from '../server-reset/server-delete-worker.js?raw';
-import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from './notification-rate-binding';
+import { notificationRateNamespace } from './notification-rate-binding';
+import runtime from '../worker-runtime.json';
 import { randomBase64Url } from '../oauth/pkce';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { deletionWorkerMessage, releaseWorkerMessage } from './discovery';
@@ -26,8 +27,8 @@ export function buildWorkerMultipartBody(input: {
 }): { body: ArrayBuffer; contentType: string } {
 	const metadata = {
 		main_module: 'worker.mjs',
-		compatibility_date: '2026-08-18',
-		compatibility_flags: ['global_fetch_strictly_public'],
+		compatibility_date: runtime.compatibilityDate,
+		compatibility_flags: runtime.compatibilityFlags,
 		annotations: {
 			'workers/message': releaseWorkerMessage(input.artifacts.version, input.artifacts.fingerprint),
 			'workers/tag': input.uploadTag ?? 'crate',
@@ -36,13 +37,13 @@ export function buildWorkerMultipartBody(input: {
 			...(normalizeVaultName(input.vaultName) ? [{ type: 'plain_text', name: VAULT_NAME_BINDING, text: normalizeVaultName(input.vaultName) }] : []),
 			{ type: 'plain_text', name: 'CRATE_DEPLOYMENT_FINGERPRINT', text: input.artifacts.fingerprint },
 			{ type: 'plain_text', name: 'CRATE_PUBLIC_ORIGIN', text: new URL(input.publicOrigin).origin },
-			{ type: 'd1', name: 'DB', id: input.d1DatabaseId },
-			{ type: 'r2_bucket', name: 'BUCKET', bucket_name: input.r2BucketName },
-			{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
-			{ type: 'ratelimit', name: NOTIFICATION_RATE_BINDING, namespace_id: notificationRateNamespace(input.r2BucketName), simple: { limit: 60, period: 60 } },
+			{ type: 'd1', name: runtime.bindings.database, id: input.d1DatabaseId },
+			{ type: 'r2_bucket', name: runtime.bindings.bucket, bucket_name: input.r2BucketName },
+			{ type: 'durable_object_namespace', name: runtime.bindings.reminderAlarms, class_name: runtime.durableObjectClass },
+			{ type: 'ratelimit', name: runtime.bindings.notificationRateLimiter, namespace_id: notificationRateNamespace(input.r2BucketName), simple: runtime.notificationRateLimit },
 		],
 		exports: {
-			ReminderAlarm: { type: 'durable-object', storage: 'sqlite', state: 'created' },
+			[runtime.durableObjectClass]: { type: 'durable-object', storage: 'sqlite', state: 'created' },
 		},
 	};
 	return buildWorkerModule(metadata, input.artifacts.workerBundle);
@@ -50,8 +51,8 @@ export function buildWorkerMultipartBody(input: {
 
 export function buildServerDeletionWorkerMultipartBody(deletionId: string, bucketName: string, tokenHash: string, uploadTag: string): { body: ArrayBuffer; contentType: string } {
 	return buildWorkerModule({
-		main_module: 'worker.mjs', compatibility_date: '2026-08-18',
-		compatibility_flags: ['global_fetch_strictly_public'],
+		main_module: 'worker.mjs', compatibility_date: runtime.compatibilityDate,
+		compatibility_flags: runtime.compatibilityFlags,
 		annotations: { 'workers/message': deletionWorkerMessage(deletionId), 'workers/tag': uploadTag },
 		bindings: [{ type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName },
 			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: deletionId },

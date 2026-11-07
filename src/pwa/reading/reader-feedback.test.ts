@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import type { PendingReading } from './outbox';
-import { pendingReadingHighlights, readingFailureFeedback, readingItemPending, readingItemSyncStatus, readingUpdateFeedback } from './reader-feedback';
+import { pendingReadingHighlights, readerStatus, readingFailureFeedback, readingItemPending, readingItemSyncStatus, readingUpdateFeedback } from './reader-feedback';
 
 const id = 'ab3b8ec4-dad3-44e4-8d29-0fbd026790ee', otherId = '3f0ef2a8-0d2f-4ad4-bb35-fd1a0f0e6a51';
 const saved = { start: 0, end: 5, text: 'Hello' }, added = { start: 10, end: 15, text: 'world' };
@@ -60,5 +60,20 @@ describe('reader toast decisions', () => {
 		expect(readingFailureFeedback(update({ favorite: true }, { error: 'Failed' }))).toMatchObject({ message: 'Couldn’t favorite', action: 'retry' });
 		expect(readingFailureFeedback(update({ reading_status: 'archived' }, { review: true }))).toMatchObject({ message: 'Couldn’t archive', action: 'review' });
 		expect(readingFailureFeedback(update({ tags: ['a'] }, { error: 'Failed' })).message).toBe('Tags didn’t sync');
+	});
+});
+
+describe('reader download status', () => {
+	const video = { ...article, source_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
+	it('tells a link saved only here from one the server is downloading', () => {
+		const local = { ...article, path: '' };
+		expect(readerStatus({ item: local, availableOffline: false }, null)).toBe('Saved on this device');
+		expect(readerStatus({ item: local, availableOffline: false }, { items: [article] })).toBe('Fetching article');
+		expect(readerStatus({ item: { ...video, path: '' }, availableOffline: false }, { items: [video] })).toBe('Fetching video details');
+	});
+	it('reports an offline copy of a saved note, and nothing otherwise', () => {
+		expect(readerStatus({ item: article, availableOffline: true }, undefined)).toBe('Available offline');
+		expect(readerStatus({ item: video, availableOffline: true }, undefined)).toBe('Details available offline');
+		expect(readerStatus({ item: article, availableOffline: false }, { items: [article] })).toBeUndefined();
 	});
 });

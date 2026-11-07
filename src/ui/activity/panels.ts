@@ -4,7 +4,19 @@ import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync
 import { renderEmptyState, renderFileMicroCard, renderLoadingState } from './rendering';
 import { renderPendingBrowser, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
 
-export function renderPendingPanel(container: HTMLElement, paths: string[], loadDiff: PendingDiffLoader, hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState, browserState?: PendingBrowserState, actions?: PendingActions): void {
+interface PendingPanelOptions {
+	paths: string[];
+	loadDiff: PendingDiffLoader;
+	state?: SyncState;
+	progress?: SyncActivityProgress | null;
+	lastSyncLabel?: string;
+	browserState?: PendingBrowserState;
+	actions?: PendingActions;
+}
+
+export function renderPendingPanel(container: HTMLElement, { paths, loadDiff, state, progress, lastSyncLabel = 'Your vault is up to date.', browserState, actions }: PendingPanelOptions): void {
+	const hasError = state?.status === 'error';
+	const syncing = state?.status === 'syncing';
 	const checking = state?.initializing && !hasError && state.status !== 'offline';
 	container.toggleClass('has-file-browser', paths.length > 0 && !syncing && !progress && !checking);
 	if (syncing || progress) {

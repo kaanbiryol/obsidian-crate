@@ -3,7 +3,7 @@ import { createModalActions, SharedModal } from '../../plugin/shared-modal';
 import { openConfirmationModal } from '../../plugin/confirmation-modal';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { encryptVault, loadDeviceEncryptionKeys, openEncryptionConnection, prepareEncryptionKeys, readEncryptionStatus, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
+import { encryptionModalState, encryptVault, loadDeviceEncryptionKeys, openEncryptionConnection, prepareEncryptionKeys, readEncryptionStatus, syncWithoutEncryption, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
 import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import type { WorkerApiHttpClient } from '../../../sync/worker-api/http';
 import { readServerEncryption } from '../../../sync/encryption/server-encryption';
@@ -132,18 +132,19 @@ class EncryptionModal extends SharedModal {
 		const state = await readServerEncryption(this.http);
 		this.assertCurrentConnection();
 		this.setLayoutTitle(encryptionModalTitle(state));
-		const keys = loadDeviceEncryptionKeys(this.plugin, state);
-		if (state?.mode === 'resetting') { this.clearContent(); this.bodyEl.createEl('p', { text: 'An encryption reset is in progress. Resume it on the Obsidian device that started it.' }); return; }
-		if (state && !keys) {
-			// Servers that pair devices also accept key requests from a device without keys.
-			const pairing = state.mode === 'active' && (await this.http.getServerInfo()).capabilities.includes(DEVICE_PAIRING_CAPABILITY);
-			this.assertCurrentConnection();
-			this.clearContent(); this.status(); this.recover(state, pairing); return;
+		const view = encryptionModalState(state, loadDeviceEncryptionKeys(this.plugin, state), this.plugin.settings);
+		switch (view.kind) {
+			case 'resetting': this.clearContent(); this.bodyEl.createEl('p', { text: 'An encryption reset is in progress. Resume it on the Obsidian device that started it.' }); return;
+			case 'locked': {
+				// Servers that pair devices also accept key requests from a device without keys.
+				const pairing = view.state.mode === 'active' && (await this.http.getServerInfo()).capabilities.includes(DEVICE_PAIRING_CAPABILITY);
+				this.assertCurrentConnection();
+				this.clearContent(); this.status(); this.recover(view.state, pairing); return;
+			}
+			case 'ready': this.clearContent(); this.ready(view.keys, view.state); return;
+			case 'downgraded': this.clearContent(); this.downgraded(); return;
+			case 'setup': await this.setup(view.keys);
 		}
-		if (state?.mode === 'active' && keys) { this.clearContent(); this.ready(keys, state); return; }
-		if (!state && !keys && this.plugin.settings.encryptedVaultId) { this.clearContent(); this.downgraded(); return; }
-		// Only an unencrypted server reaches setup: an encrypted one is unlocked or managed above.
-		await this.setup(keys);
 	}
 	private async setup(keys: VaultKeyBundle | null): Promise<void> {
 		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin, keys);
@@ -200,9 +201,7 @@ class EncryptionModal extends SharedModal {
 			if (!confirmed) return;
 			button.setDisabled(true);
 			try {
-				this.assertCurrentConnection();
-				await this.plugin.writeSettings({ encryptedVaultId: null }, () => this.assertCurrentConnection());
-				this.plugin.syncRuntime.getApiClient()?.refusePlaintext(false);
+				await syncWithoutEncryption(this.plugin, () => this.assertCurrentConnection());
 				this.close();
 				this.onChanged();
 			} catch (error) { status.setText(errorMessage(error)); button.setDisabled(false); }

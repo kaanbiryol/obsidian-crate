@@ -52,7 +52,11 @@ const navigationItems = readingSections.map(item => ({ ...item, iconName: sectio
 const PAGE_SIZE = 100;
 
 /** Shared workspace. Uses the same stacked app layout at every width. */
-export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onRefresh, onEnrich, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false, notice, beforeListContent, listContent }: ReadingLibraryProps) {
+export function ReadingLibraryPanel({
+	listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onRefresh, onEnrich,
+	onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false,
+	notice, beforeListContent, listContent,
+}: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [articleFilter, setArticleFilter] = useState('');
@@ -116,41 +120,65 @@ export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavi
 		else resetList();
 	};
 	const renderLibrary = (content: React.ReactNode) => renderLibraryContent ? renderLibraryContent(section, content) : content;
+	const highlightsCopy = emptyHighlightsCopy(Boolean(listQuery || articleFilter || tag)), linksCopy = emptyLinksCopy(section, Boolean(listQuery || tag));
 	return <section className="crate-reading crate-reading-workspace" aria-label="Reading" data-list-style={listStyle} data-reader-open={!!reader} data-reader-motion={readerMotion}>
 		<div className="crate-reading__layout">
 			<aside className="crate-reading__sidebar" inert={readerMotion !== undefined && (!!reader || readerClosing)}>
-				{renderNavigation ? renderNavigation({ items: navigationItems, activeTab: section, onTabChange: selectSection, onAdd, inert: !!reader || readerClosing, disabled: false }) : <NavigationBar className="crate-reading__mobile-nav" items={navigationItems} activeTab={section} onTabChange={selectSection} label="Reading filters" action="switch-reading-section" animateActiveIndicator={animateTabIndicator} />}
+				{renderNavigation
+					? renderNavigation({ items: navigationItems, activeTab: section, onTabChange: selectSection, onAdd, inert: !!reader || readerClosing, disabled: false })
+					: <NavigationBar className="crate-reading__mobile-nav" items={navigationItems} activeTab={section} onTabChange={selectSection} label="Reading filters"
+						action="switch-reading-section" animateActiveIndicator={animateTabIndicator} />}
 
 			</aside>
 			<div className="crate-reading__library" aria-busy={busy.size > 0} inert={readerMotion !== undefined && (!!reader || readerClosing)}>
 				{renderLibrary(<>
-				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} count={count} countUnit={section === 'highlights' ? 'highlight' : 'saved link'} showMeta={!snapshot.loading} reserveMetaSpace rightContent={<div className="crate-view-header-actions">{headerStatus}{onSettings && <IconButton size="large" iconSize="l" icon="settings" label={settingsLabel} onClick={onSettings} />}<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" onClick={onAdd} />{headerActions}</div>} />
-				<TextField fieldClassName="crate-reading__search" label="Search reading" hideLabel type="search" placeholder={section === 'highlights' ? 'Search highlights and notes' : 'Search your reading'} leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />} value={query} onChange={event => { setQuery(event.target.value); resetList(); }} trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
-				{tags.length > 0 && <label className="crate-reading__tag-picker">Tags<select aria-label="Filter by tag" value={tag ?? ''} onChange={event => { setTag(event.target.value || null); resetList(); }}><option value="">All tags</option>{tags.map(value => <option key={value} value={value}>{value}</option>)}</select><ThemeIcon id="chevron-down" size="s" aria-hidden="true" /></label>}
+				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} count={count}
+					countUnit={section === 'highlights' ? 'highlight' : 'saved link'} showMeta={!snapshot.loading} reserveMetaSpace rightContent={<div className="crate-view-header-actions">
+						{headerStatus}
+						{onSettings && <IconButton size="large" iconSize="l" icon="settings" label={settingsLabel} onClick={onSettings} />}
+						<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" onClick={onAdd} />
+						{headerActions}
+					</div>} />
+				<TextField fieldClassName="crate-reading__search" label="Search reading" hideLabel type="search"
+					placeholder={section === 'highlights' ? 'Search highlights and notes' : 'Search your reading'} leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />}
+					value={query} onChange={event => { setQuery(event.target.value); resetList(); }}
+					trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
+				{tags.length > 0 && <label className="crate-reading__tag-picker">Tags<select aria-label="Filter by tag" value={tag ?? ''}
+					onChange={event => { setTag(event.target.value || null); resetList(); }}>
+					<option value="">All tags</option>
+					{tags.map(value => <option key={value} value={value}>{value}</option>)}
+				</select><ThemeIcon id="chevron-down" size="s" aria-hidden="true" /></label>}
 				{section === 'highlights' && <HighlightArticleFilter items={snapshot.items} value={articleFilter} onChange={value => { setArticleFilter(value); resetList(); }} />}
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1}>
 					{notice}
-					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, section))} onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />
-					{(error || snapshot.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error} <Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
-					{snapshot.issues.length > 0 && <details className="crate-reading__notice"><summary>{snapshot.issues.length} {snapshot.issues.length === 1 ? 'note needs' : 'notes need'} attention</summary><ul>{snapshot.issues.map(issue => <li key={issue.path}><strong>{issue.path}</strong>: {issue.message}</li>)}</ul></details>}
-					{tag && <Button variant="outline" className="crate-reading__tag-filter" onClick={() => { setTag(null); resetList(); }}><ThemeIcon id="hash" size="xs" aria-hidden="true" />{tag}<ThemeIcon id="x" size="xs" aria-hidden="true" /><span className="crate-reading__sr-only">Clear tag filter</span></Button>}
+					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, section))}
+						onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />
+					{(error || snapshot.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error}{' '}
+						<Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
+					{snapshot.issues.length > 0 && <ReadingIssues issues={snapshot.issues} />}
+					{tag && <Button variant="outline" className="crate-reading__tag-filter" onClick={() => { setTag(null); resetList(); }}>
+						<ThemeIcon id="hash" size="xs" aria-hidden="true" />{tag}<ThemeIcon id="x" size="xs" aria-hidden="true" /><span className="crate-reading__sr-only">Clear tag filter</span>
+					</Button>}
 					{listContent ?? (snapshot.loading ? <LoadingIndicator label="Loading Reading" /> : <>
 						{section === 'highlights' && (count > 0
-							? <HighlightGroups key={`${listQuery}:${articleFilter}:${tag ?? ''}`} disabled={busy.has('open')} entries={excerptGroups.slice(0, visible).flatMap(group => group.entries)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />
-							: <EmptyState className="crate-reading__empty" icon="highlighter"
-								title={listQuery || articleFilter || tag ? 'No matching highlights' : 'Keep the passages that stay with you'}
-								description={listQuery || articleFilter || tag ? 'Try another passage, note, or article.' : 'Select text while reading. Your highlights appear here and in your Obsidian notes.'} />)}
-						{section !== 'highlights' && items.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open"
-							title={listQuery || tag ? 'No matching links' : section === 'inbox' ? 'Save something worth your time' : section === 'favorites' ? 'Keep your favorites close' : 'A home for what you’ve read'}
-							description={listQuery || tag ? 'Try another title, source, or tag.' : section === 'inbox' ? 'An essay, an idea, a little inspiration. Keep it here for a quieter moment.' : section === 'favorites' ? 'Star an article to find it here.' : 'Finished reading? Archive it. You can always come back.'}>
-							{section === 'inbox' && !listQuery && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}><ThemeIcon id="plus" size="m" aria-hidden="true" />Save your first link</Button>}
+							? <HighlightGroups key={`${listQuery}:${articleFilter}:${tag ?? ''}`} disabled={busy.has('open')}
+								entries={excerptGroups.slice(0, visible).flatMap(group => group.entries)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />
+							: <EmptyState className="crate-reading__empty" icon="highlighter" title={highlightsCopy.title} description={highlightsCopy.description} />)}
+						{section !== 'highlights' && items.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open" title={linksCopy.title} description={linksCopy.description}>
+							{section === 'inbox' && !listQuery && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}>
+								<ThemeIcon id="plus" size="m" aria-hidden="true" />Save your first link
+							</Button>}
 						</EmptyState>}
-						{section !== 'highlights' && groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}><h3>{group.label}</h3><ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
-							<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${readingTitle(item)}`} aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, section))}>
-								<ReadingItemContent item={item} />
-							</Button>
-						</li>)}</ul></section>)}
+						{section !== 'highlights' && groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}>
+							<h3>{group.label}</h3>
+							<ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
+								<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${readingTitle(item)}`}
+									aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, section))}>
+									<ReadingItemContent item={item} />
+								</Button>
+							</li>)}</ul>
+						</section>)}
 						{visible < (section === 'highlights' ? excerptGroups.length : count) && <Button variant="outline" className="crate-reading__more" onClick={() => setVisible(value => value + PAGE_SIZE)}>Show more</Button>}
 					</>)}
 				</div>
@@ -162,4 +190,26 @@ export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavi
 			}}>{reader ?? (retainReaderOnClose ? exitingReader : null)}</div>
 		</div>
 	</section>;
+}
+
+/** Empty highlights, either before any are saved or when filters match none. */
+function emptyHighlightsCopy(filtered: boolean): { title: string; description: string } {
+	return filtered
+		? { title: 'No matching highlights', description: 'Try another passage, note, or article.' }
+		: { title: 'Keep the passages that stay with you', description: 'Select text while reading. Your highlights appear here and in your Obsidian notes.' };
+}
+
+/** An empty list of saved links, by section, or when the search or tag matches none. */
+function emptyLinksCopy(section: ReadingSection, filtered: boolean): { title: string; description: string } {
+	if (filtered) return { title: 'No matching links', description: 'Try another title, source, or tag.' };
+	if (section === 'inbox') return { title: 'Save something worth your time', description: 'An essay, an idea, a little inspiration. Keep it here for a quieter moment.' };
+	if (section === 'favorites') return { title: 'Keep your favorites close', description: 'Star an article to find it here.' };
+	return { title: 'A home for what you’ve read', description: 'Finished reading? Archive it. You can always come back.' };
+}
+
+function ReadingIssues({ issues }: { issues: ReadingSnapshot['issues'] }) {
+	return <details className="crate-reading__notice">
+		<summary>{issues.length} {issues.length === 1 ? 'note needs' : 'notes need'} attention</summary>
+		<ul>{issues.map(issue => <li key={issue.path}><strong>{issue.path}</strong>: {issue.message}</li>)}</ul>
+	</details>;
 }

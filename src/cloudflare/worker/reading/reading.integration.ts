@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset, runInDurableObject } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleReadingRoute } from './routes';
+import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { ensureReadingIndex, queueReadingArticles } from './library-index';
 import { publishExtraction, runReadingExtraction } from './extraction/jobs';
 import type { Publication } from './extraction/jobs';

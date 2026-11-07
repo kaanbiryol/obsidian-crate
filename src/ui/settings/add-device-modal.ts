@@ -9,6 +9,12 @@ import { errorMessage } from '../../platform/logger';
 import { renderQrCode } from './qr-modal';
 import { WebAppPairingModal } from './web-app-pairing-modal';
 
+/** Codes are written with the saved Cloudflare login, which a device added with a code does not have. */
+export function canAddDeviceWithCode(plugin: CratePlugin): boolean {
+	const deployment = plugin.settings.cloudflareDeployment;
+	return Boolean(deployment?.accountId && deployment.d1DatabaseId && !deployment.deletion && plugin.cloudflareSavedLogin.connected);
+}
+
 /** Shows a one-use QR code for a new device, then hands over to key approval for an encrypted vault. */
 export class AddDeviceModal extends SharedModal {
 	private readonly controller = new AbortController();

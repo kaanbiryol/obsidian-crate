@@ -2,7 +2,7 @@ import { capturePath } from './captures';
 import { updatePolicy } from './access';
 import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
-import { planReadingFileCommand, type ReadingFileCommandPlan } from '@/reading/core/reading-file-command';
+import { planReadingFileCommand, readingFileCommandRefusal } from '@/reading/core/reading-file-command';
 import { patchReadingFrontmatter, readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { sha256Hex } from '@/platform/sha256';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
@@ -81,7 +81,10 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	if (action === 'retry' && !current.enabled) throw new ReadingError('Allow article fetching in Reading settings before retrying.', 403);
 	const command = action === 'delete' || action === 'retry' ? action : 'update';
 	const plan = await planReadingFileCommand(source.item, source.content, { action: command, before: body.before, changes: body.changes, markdownHash: body.markdownHash });
-	if (plan.kind === 'issue') throw readingCommandError(plan, command);
+	if (plan.kind === 'issue') {
+		const refusal = readingFileCommandRefusal(plan, command);
+		throw new ReadingError(refusal.message, refusal.status, refusal.code);
+	}
 	if (plan.kind === 'remove') {
 		const response = { deleted: true, id: source.item.crate_reading_id };
 		const result = await commitFileDelete(env.DB, { path: source.path, expectedHash: source.file.hash, expectedRevision: source.file.storageKey, previousFile: source.file,
@@ -100,13 +103,4 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	const article = { item: { ...saved, path: source.path }, etag: await readingItemEtag(current, saved.crate_reading_id, { path: source.path, storage_key: staged.objectKey, hash: staged.hash }),
 		markdownHash: await sha256Hex(readReadingFrontmatter(content)?.body ?? '') };
 	return readingResponse({ ...response, library: await library(), article });
-}
-
-function readingCommandError(plan: Extract<ReadingFileCommandPlan, { kind: 'issue' }>, action: 'delete' | 'retry' | 'update'): ReadingError {
-	switch (plan.issue) {
-		case 'invalid': return new ReadingError(plan.message ?? 'Choose a Reading change.');
-		case 'unsupported': return new ReadingError('Unsupported Reading change.');
-		case 'not-empty': return new ReadingError('Only URL captures with an unchanged article section can be extracted.');
-		case 'conflict': return new ReadingError(`This item changed on another device. Refresh before ${action === 'delete' ? 'deleting' : 'editing'} it.`, 409, 'reading_conflict');
-	}
 }

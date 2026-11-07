@@ -8,6 +8,7 @@ import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { readServerEncryption } from '../sync/encryption/server-encryption';
 import { SECRET_KEYS } from '../platform/secret-keys';
 import { captureServerConnection } from './server-request';
+import type { CrateSettings } from './settings-types';
 
 /** A Worker API client for the current server connection, and a check that it is still current. */
 export function openEncryptionConnection(plugin: CratePlugin): { http: WorkerApiHttpClient; assertCurrent: () => void } {
@@ -35,6 +36,23 @@ export function loadDeviceEncryptionKeys(plugin: CratePlugin, state: EncryptionS
 		if (!state) throw error;
 		return null;
 	}
+}
+
+type EncryptionModalState =
+	| { kind: 'resetting' }
+	| { kind: 'locked'; state: EncryptionServerState }
+	| { kind: 'ready'; state: EncryptionServerState; keys: VaultKeyBundle }
+	/** This vault synced encrypted before, but the server now reports no encryption. */
+	| { kind: 'downgraded' }
+	| { kind: 'setup'; keys: VaultKeyBundle | null };
+
+/** What the encryption dialog offers for the server's state and this device's keys. */
+export function encryptionModalState(state: EncryptionServerState | null, keys: VaultKeyBundle | null, settings: Pick<CrateSettings, 'encryptedVaultId'>): EncryptionModalState {
+	if (state?.mode === 'resetting') return { kind: 'resetting' };
+	if (state) return keys ? { kind: 'ready', state, keys } : { kind: 'locked', state };
+	if (!keys && settings.encryptedVaultId) return { kind: 'downgraded' };
+	// Only an unencrypted server reaches setup: an encrypted one is unlocked or managed above.
+	return { kind: 'setup', keys };
 }
 
 type PreparedKeys = { bundle: VaultKeyBundle; recovery: string };
@@ -79,6 +97,13 @@ export async function unlockVaultWithPairedKeys(plugin: CratePlugin, state: Encr
 		assertCurrent();
 		savePairedEncryptionKeys(plugin.secretStorage, bundle);
 	});
+}
+
+/** Accept that a vault which synced encrypted now syncs with this server as readable text. */
+export async function syncWithoutEncryption(plugin: CratePlugin, assertCurrent: () => void): Promise<void> {
+	assertCurrent();
+	await plugin.writeSettings({ encryptedVaultId: null }, assertCurrent);
+	plugin.syncRuntime.getApiClient()?.refusePlaintext(false);
 }
 
 export async function unlockVault(plugin: CratePlugin, state: EncryptionServerState, recoveryCode: string, assertCurrent: () => void): Promise<void> {

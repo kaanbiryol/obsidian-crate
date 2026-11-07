@@ -3,7 +3,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleReadingRoute } from './routes';
+import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { publishCapture, runCapture, type PendingCapture } from './captures';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';

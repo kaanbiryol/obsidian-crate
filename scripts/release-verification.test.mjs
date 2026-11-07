@@ -220,6 +220,43 @@ test('CI mirrors check:source step by step and the local release gate runs the p
 	assert.ok(scripts['release:check'].split(' && ').includes('npm run test:server-package'));
 });
 
+test('every command in the local release gate also runs in CI', async () => {
+	const verify = parse(await readFile(new URL('../.github/workflows/verify.yml', import.meta.url), 'utf8'));
+	const { scripts } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+	// Steps and jobs that run only for a release input (reuse, parent reuse or tag) are not coverage.
+	const releaseInputOnly = item => item.if?.includes("!= ''");
+	const ci = new Set();
+	for (const job of Object.values(verify.jobs).filter(job => !releaseInputOnly(job))) {
+		const matrix = Object.entries(job.strategy?.matrix ?? {});
+		for (const step of job.steps.filter(step => step.run && !releaseInputOnly(step))) {
+			const sharded = /--shard=\$\{\{ matrix\.shard \}\}\/(\d+)/.exec(step.run);
+			if (sharded) assert.deepEqual(job.strategy.matrix.shard, Array.from({ length: Number(sharded[1]) }, (_, index) => index + 1), step.run);
+			// Keep the matrix template, which split commands name, and each expanded value.
+			const runs = matrix.reduce((all, [key, values]) => all.flatMap(run => values.map(value => run.replaceAll(`\${{ matrix.${key} }}`, value))), [step.run]);
+			for (const run of [step.run, ...runs]) for (const command of run.split(' && ')) ci.add(command);
+		}
+	}
+	// Commands CI runs in another form: sharded across jobs or invoked without the wrapping script.
+	const splitInCi = {
+		'playwright test --config tests/editor-contract/playwright.config.ts': ['npx playwright test --config tests/editor-contract/playwright.config.ts --shard=${{ matrix.shard }}/4'],
+		'npm run test:pwa-browser': ['npm run test:pwa-browser -- --platform=linux --shard=${{ matrix.shard }}/4', 'npm run test:pwa-browser -- --platform=macos --shard=${{ matrix.shard }}/3'],
+	};
+	const releaseOnly = new Set([
+		// Lets the local gate reuse its single Worker build; each CI job builds its own.
+		'export CRATE_WORKER_PREBUILT=1',
+	]);
+	const missing = [];
+	const check = command => {
+		if (ci.has(command) || releaseOnly.has(command)) return;
+		if (splitInCi[command]) return missing.push(...splitInCi[command].filter(part => !ci.has(part)));
+		const script = /^npm run ([\w:-]+)$/.exec(command)?.[1];
+		if (scripts[script]?.includes(' && ')) return scripts[script].split(' && ').forEach(check);
+		missing.push(command);
+	};
+	scripts['release:check'].split(' && ').forEach(check);
+	assert.deepEqual(missing, []);
+});
+
 test('artifact checks still report after an earlier failure, but release staging needs every step', async () => {
 	const verify = parse(await readFile(new URL('../.github/workflows/verify.yml', import.meta.url), 'utf8'));
 	const step = name => verify.jobs.checks.steps.find(item => item.name === name);

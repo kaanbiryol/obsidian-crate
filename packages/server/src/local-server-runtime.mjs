@@ -1,11 +1,14 @@
 import { assertLocalMigrationPath, migrateLocalDatabase } from './local-server-migrations.mjs';
-import { packaged, runtimeVersion, serverAssetPath, workerPath } from './assets.mjs';
+import { coordinatorPath, packaged, revocationPath, runtimeVersion, serverAssetPath, workerPath } from './assets.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { uptime as osUptime } from 'node:os';
+import { pathToFileURL } from 'node:url';
 const { Miniflare, convertV4MiniflareOptions } = await import(packaged
 	? '../vendor/miniflare/dist/src/index.js' : 'miniflare');
+const { revokeCredential } = await import(pathToFileURL(revocationPath).href);
+const { revokeCoordinatedCredential } = await import(pathToFileURL(coordinatorPath).href);
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 
@@ -96,14 +99,16 @@ export async function lockLocalData(dataDir) {
 export async function openLocalRuntime({ dataDir, origin = 'http://localhost:8787', administrative = false, handleSignals = true, upgradeBackup }) {
 	dataDir = resolve(dataDir);
 	origin = normalizeLocalOrigin(origin);
-	const [schema, releaseText, worker] = await Promise.all([
+	const [schema, releaseText, runtimeText, worker] = await Promise.all([
 		readFile(serverAssetPath('schema.sql'), 'utf8'),
 		readFile(serverAssetPath('server-release.json'), 'utf8'),
+		readFile(serverAssetPath('worker-runtime.json'), 'utf8'),
 		readFile(workerPath, 'utf8').catch(() => {
 			throw new Error('Build the server first with npm run build:worker.');
 		}),
 	]);
 	const release = JSON.parse(releaseText);
+	const { compatibilityDate, compatibilityFlags, bindings, durableObjectClass, notificationRateLimit } = JSON.parse(runtimeText);
 	const unlock = await lockLocalData(dataDir);
 	let mf;
 	const createRuntime = options => {
@@ -145,14 +150,13 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 			schemaHash: digest(schema), schemaVersion: release.schemaVersion, runtimeVersion, serverRevision: release.revision };
 		const options = {
 			name: 'crate-local', modules: true, script: worker,
-			compatibilityDate: '2026-08-18',
-      compatibilityFlags: ['global_fetch_strictly_public'],
-      ...localNetworkOptions(),
+			compatibilityDate, compatibilityFlags,
+			...localNetworkOptions(),
 			host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false },
 			resourcePersistencePath: join(dataDir, 'resources'),
 			isolatedResourcePersistencePath: join(dataDir, 'isolated'),
 			bindings: { CRATE_PUBLIC_ORIGIN: origin, CRATE_DEPLOYMENT_FINGERPRINT: localDeploymentFingerprint({ worker, schema, release }) },
-			d1Databases: { DB: 'crate-local-db' },
+			d1Databases: { [bindings.database]: 'crate-local-db' },
 		};
 		// Validate and initialize with no Durable Objects registered: overdue
 		// alarms must not execute against an unverified database or during admin.
@@ -162,7 +166,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		if (info.serverRevision !== release.revision || info.schemaVersion !== release.schemaVersion) {
 			throw new Error('The Worker build is out of date. Run npm run build:worker before starting the server.');
 		}
-		let db = await mf.getD1Database('DB');
+		let db = await mf.getD1Database(bindings.database);
 		const { results: tables } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").all();
 		if (tables.length === 0) {
 			if (previous) throw new Error('The existing server database is missing. Restore a complete backup; refusing to create an empty replacement.');
@@ -179,15 +183,18 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		if (!administrative) {
 			await mf.dispose();
 			mf = createRuntime({ ...options,
-				r2Buckets: { BUCKET: 'crate-local-files' },
-				durableObjects: { REMINDER_ALARMS: { className: 'ReminderAlarm', useSQLite: true } },
-				ratelimits: { NOTIFICATION_REQUEST_LIMITER: { namespace_id: '1001', simple: { limit: 60, period: 60 } } },
+				r2Buckets: { [bindings.bucket]: 'crate-local-files' },
+				durableObjects: { [bindings.reminderAlarms]: { className: durableObjectClass, useSQLite: true } },
+				ratelimits: { [bindings.notificationRateLimiter]: { namespace_id: '1001', simple: notificationRateLimit } },
 			});
 			await mf.ready;
-			db = await mf.getD1Database('DB');
+			db = await mf.getD1Database(bindings.database);
 		}
 		let closed = false;
-		return { mf, db, dataDir, origin, async close() {
+		// Administrative runtimes register no Durable Objects, so they revoke directly.
+		const revoke = administrative ? id => revokeCredential(db, id)
+			: async id => revokeCoordinatedCredential({ REMINDER_ALARMS: await mf.getDurableObjectNamespace(bindings.reminderAlarms) }, id);
+		return { mf, db, dataDir, origin, revoke, async close() {
 			if (closed) return;
 			closed = true;
 			await mf.dispose();
@@ -226,14 +233,11 @@ export async function listLocalDevices(db) {
 	return results;
 }
 
-/** Matches the Worker's device revocation: the credential, its push subscriptions
- * and the shortcut capture credentials it issued go together. */
-export async function revokeLocalDevice(db, id) {
+/** The Worker's device revocation: the credential, its push subscriptions and the
+ * shortcut capture credentials it issued go together. A running server revokes under
+ * the coordinator lock, like the Worker, so no request the credential authenticated
+ * there commits after this returns. */
+export async function revokeLocalDevice(runtime, id) {
 	if (typeof id !== 'string' || !id.trim() || id.length > 128) throw new Error('Provide --id with a token ID from the devices command.');
-	const results = await db.batch([
-		db.prepare('DELETE FROM push_subscriptions WHERE owner_token_id = ?').bind(id),
-		db.prepare("DELETE FROM auth_tokens WHERE scope = 'reading_capture' AND device_id = ?").bind(id),
-		db.prepare('DELETE FROM auth_tokens WHERE id = ?').bind(id),
-	]);
-	return results[2].meta.changes === 1;
+	return runtime.revoke(id);
 }

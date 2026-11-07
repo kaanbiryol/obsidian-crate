@@ -5,6 +5,7 @@ import { readingSyncStatus } from '../sync/reading-status';
 import type { ToastKind } from '../types';
 import type { PendingReading } from './outbox';
 import { presentReadingItems } from './pending-view';
+import { youtubeVideoId } from '@/reading/core/youtube';
 
 /** Outbox work that belongs to one open article, including its own pending capture. */
 export function readingItemPending(pending: PendingReading[], id: string): PendingReading[] {
@@ -52,4 +53,16 @@ export function readingFailureFeedback(op: PendingReading): ReaderToast {
 	if (changes.favorite !== undefined) return { kind: 'error', message: changes.favorite ? 'Couldn’t favorite' : 'Couldn’t remove favorite', action };
 	if (changes.tags !== undefined) return { kind: 'error', message: 'Tags didn’t sync', action };
 	return { kind: 'error', message: 'Change didn’t sync', action };
+}
+
+/** The open article's download state: a link saved only here, a capture the server is
+ * still downloading, or a copy kept for offline reading. */
+export function readerStatus(reader: { item: ReadingItem; availableOffline: boolean }, cache: { items: readonly ReadingItem[] } | null | undefined): string | undefined {
+	const video = youtubeVideoId(reader.item.source_url);
+	if (!reader.item.path) {
+		if (!cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id)) return 'Saved on this device';
+		return video ? 'Fetching video details' : 'Fetching article';
+	}
+	if (reader.availableOffline) return video ? 'Details available offline' : 'Available offline';
+	return undefined;
 }

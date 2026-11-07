@@ -1,0 +1,12 @@
+{
+  "compatibilityDate": "2026-08-18",
+  "compatibilityFlags": ["global_fetch_strictly_public"],
+  "bindings": {
+    "database": "DB",
+    "bucket": "BUCKET",
+    "reminderAlarms": "REMINDER_ALARMS",
+    "notificationRateLimiter": "NOTIFICATION_REQUEST_LIMITER"
+  },
+  "durableObjectClass": "ReminderAlarm",
+  "notificationRateLimit": { "limit": 60, "period": 60 }
+}

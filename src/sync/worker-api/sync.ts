@@ -12,6 +12,7 @@ import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
 import { errorMessage } from '../../platform/logger';
 import { refusedUploadResult } from '../failures';
+import { runConcurrentTasks } from '../concurrency';
 import type {
 	BatchDeleteResponse,
 	BatchDeleteFile,
@@ -287,7 +288,7 @@ export class SyncWorkerApi {
 			revision: getHeader(headers, REVISION_HEADER) || undefined,
 		};
 		if (!this.encryption) return result;
-		const opened = await this.encryption.download(wire, body, result, path);
+		const opened = await this.encryption.download(wire, body, { check: result, expected: path });
 		return { ...result, content: opened.content, ...opened.metadata, verified: true };
 	}
 
@@ -386,21 +387,14 @@ export class SyncWorkerApi {
 		}
 		const encryption = this.encryption;
 		if (!encryption) return response;
-		const files = new Array<DownloadedBatchFile>(response.files.length);
 		// Each sealed note is checked against the Reading folder's synced files; read them once.
 		const synced = encryption.syncedSnapshot();
-		let next = 0;
-		const worker = async () => {
-			while (next < response.files.length) {
-				const index = next++;
-				const { content, ...file } = response.files[index]!;
-				const path = plainByWire.get(file.path) ?? file.path;
-				if (file.error) { files[index] = { ...file, path, content }; continue; }
-				const opened = await encryption.download(file.path, base64ToArrayBuffer(content), file, path, true, synced);
-				files[index] = { ...file, ...opened.metadata, path, verifiedContent: opened.content };
-			}
-		};
-		await Promise.all(Array.from({ length: Math.min(DECRYPT_CONCURRENCY, response.files.length) }, worker));
+		const files = await runConcurrentTasks(response.files.map(({ content, ...file }) => async (): Promise<DownloadedBatchFile> => {
+			const path = plainByWire.get(file.path) ?? file.path;
+			if (file.error) return { ...file, path, content };
+			const opened = await encryption.download(file.path, base64ToArrayBuffer(content), { check: file, expected: path, synced });
+			return { ...file, ...opened.metadata, path, verifiedContent: opened.content };
+		}), DECRYPT_CONCURRENCY, () => false);
 		return { files };
 	}
 
@@ -435,7 +429,7 @@ export class SyncWorkerApi {
 		const wire = version.wire ?? await this.wireFor(version.path);
 		const params = new URLSearchParams({ path: wire, storageKey: version.storage_key });
 		let { body } = await this.http.requestBinary(`/sync/version-preview?${params}`, {}, TRANSFER_TIMEOUT_MS);
-		if (this.encryption) body = (await this.encryption.download(wire, body, undefined, version.path, false)).content;
+		if (this.encryption) body = (await this.encryption.download(wire, body, { expected: version.path, historical: true })).content;
 		if (body.byteLength > MAX_PREVIEW_BYTES || body.byteLength !== version.size || await sha256Hex(body) !== version.hash) {
 			throw new Error('Saved version failed integrity validation.');
 		}
@@ -451,7 +445,7 @@ export class SyncWorkerApi {
 		const result = parseFileVersions(await this.http.requestJson<unknown>(`/sync/versions?${params.toString()}`));
 		if (!this.encryption) return result;
 		const versions = await this.encryption.metadata(result.versions.map(version => ({ path: version.path,
-			entry: { ...version, revision: version.storage_key } })), false);
+			entry: { ...version, revision: version.storage_key } })), { historical: true });
 		return { ...result, versions: versions.map(({ path, wire, entry: { revision: _revision, ...version } }) => ({ ...version, path, wire })) };
 	}
 

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleListReminders } from './routes/list';
+import { handleListReminders } from './handlers/list';
 import { saveReminderFileCache } from './cache/index';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';

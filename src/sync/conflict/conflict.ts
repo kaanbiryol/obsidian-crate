@@ -15,8 +15,15 @@ export function isIncomingReview(conflict: Pick<ConflictRecord, 'cause' | 'copyS
 	return conflict.cause === 'incoming-review' && conflict.copySide === 'remote';
 }
 
+const INCOMING_CONFLICT_MARKER = '(conflict remote ';
+
 export function getIncomingConflictFileName(path: string, hash: string, variant = 0): string {
-	return insertBeforeExtension(path, ` (conflict remote ${hash}${variant ? `-${variant}` : ''})`);
+	return insertBeforeExtension(path, ` ${INCOMING_CONFLICT_MARKER}${hash}${variant ? `-${variant}` : ''})`);
+}
+
+/** Whether a conflict copy holds an incoming server version rather than the local one. */
+export function isIncomingConflictFile(path: string): boolean {
+	return path.includes(INCOMING_CONFLICT_MARKER);
 }
 
 /**

@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { drainNotificationProjections } from '../notifications/projection';
-import { revalidateReminderSources } from './source-migration';
+import { reminderSourceScanKey, revalidateReminderSources } from './source-migration';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from '../notifications/push';
@@ -14,7 +14,7 @@ import { runNotificationCoordinator } from '../notifications/coordinator';
 import { countD1Queries, type D1QueryCount } from '../d1/d1-query-count';
 import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 import { dispatchNotificationJobs } from '../notifications/outbox';
-import { handleListReminders } from './routes/list';
+import { handleListReminders } from './handlers/list';
 import { sha256Hex } from '../../../platform/sha256';
 
 vi.mock('../notifications/push', () => ({ listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
@@ -188,7 +188,7 @@ it('initializes source verification and waits for a selected folder before disco
 
 	expect(await revalidateReminderSources(env, 4)).toBe(true);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state').first()).toEqual({ count: 100 });
-	expect(await env.DB.prepare(`SELECT value FROM maintenance_state WHERE key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:Notes'`).first()).toEqual({ value: 'Notes/099.md' });
+	expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(reminderSourceScanKey('Notes')).first()).toEqual({ value: 'Notes/099.md' });
 	let pending = await revalidateReminderSources(env, 4);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state').first()).toEqual({ count: 105 });
 	for (let attempt = 0; attempt < 30 && pending; attempt++) pending = await revalidateReminderSources(env, 4);

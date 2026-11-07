@@ -282,7 +282,7 @@ Crate's own plugin folder (`<config folder>/plugins/crate/`, which holds its che
 
 ### Crate update bundles
 
-Crate's releases travel through a separate synced folder, `<config folder>/crate-update/`, so the plugin folder and its device state stay local. Code lives in `src/plugin/crate-update-*.ts`.
+Crate's releases travel through a separate synced folder, `<config folder>/crate-update/`, so the plugin folder and its device state stay local. Code lives in `src/plugin/crate-update/`.
 
 - **Publish:** after the startup sync, a device whose installed `manifest.json` version is newer than every bundle writes `<version>.json`, holding `main.js`, `styles.css` and `manifest.json` with a SHA-256 for each. Bytes are deterministic, so two devices publishing one release write the same file. Any device then removes bundles older than the newest; no device installs them.
 - **Accept:** a device installs only the newest bundle, and only when it is strictly newer than its installed version (never a downgrade), its hashes and manifest match, and Obsidian meets its `minAppVersion`. An encrypted vault installs automatically, because AES-GCM proves a paired device wrote it. Without encryption the person confirms first, since anyone with write access to the server could otherwise plant code. Other names in the folder, such as conflict copies, are ignored.

@@ -1,12 +1,11 @@
-import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import type { SyncApiClient } from '../sync/worker-api/client';
 import type { NotificationPolicy } from '../protocol/notification-policy';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
-import { normalizeRemindersFolderPath } from './settings';
+import { captureSyncApiConnection } from '../plugin/server-request';
+import { cachedSettingsRequest } from '../plugin/settings-ui-state';
+import { errorMessage } from '../platform/logger';
 import { createLogger } from './logger';
-import { validateReadingFolder } from '../reading/settings';
-import { getPortablePathIssue } from '../protocol/portable-path';
 
 const logger = createLogger('Reminders');
 interface PolicySyncState {
@@ -50,29 +49,58 @@ export async function saveNotificationPolicy(
 	return policy;
 }
 
+/** The shared policy as one settings render sees it: read once from the connection
+ * captured when it opened, and saved only while that connection is current. */
+interface OpenedNotificationPolicy {
+	/** The sync client the policy is read from, or null without a connection. */
+	readonly api: SyncApiClient | null;
+	/** Settles once the first read finishes, whether or not it succeeded. */
+	readonly loaded: Promise<void>;
+	/** The latest policy read or saved; null before it loads, after a failed read, or when the server has none. */
+	readonly policy: NotificationPolicy | null;
+	readonly loadError: unknown;
+	readonly assertCurrent: () => void;
+	save(patch: Partial<NotificationPolicy>): Promise<void>;
+}
+
+export function openNotificationPolicy(plugin: CratePlugin): OpenedNotificationPolicy {
+	// The policy and the local copy of its settings must come from the same server.
+	const { api, assertCurrent } = captureSyncApiConnection(plugin);
+	let policy: NotificationPolicy | null = null;
+	let loadError: unknown;
+	const loaded = api ? cachedNotificationPolicy(plugin, api).then(result => { policy = result; }).catch(error => { loadError = error; }) : Promise.resolve();
+	return {
+		api, loaded, assertCurrent,
+		get policy() { return policy; },
+		get loadError() { return loadError; },
+		async save(patch) {
+			await loaded;
+			if (loadError) throw new Error(errorMessage(loadError));
+			if (!api) throw new Error('Connect to the sync server before changing notifications');
+			assertCurrent();
+			try {
+				await saveNotificationPolicy(api, plugin, policy, patch, saved => {
+					policy = saved;
+					plugin.settingsUiState.notificationPolicy = { client: api, folderPath: plugin.remindersSettings.remindersFolderPath, value: Promise.resolve(saved) };
+				});
+			} catch (error) {
+				// Another device may have changed the policy; the next render loads it again.
+				plugin.settingsUiState.notificationPolicy = null;
+				throw error;
+			}
+		},
+	};
+}
+
+/** Settings re-render on every toggle; reuse this connection's policy until the tab closes. */
+function cachedNotificationPolicy(plugin: CratePlugin, client: SyncApiClient): Promise<NotificationPolicy | null> {
+	return cachedSettingsRequest(plugin.settingsUiState, 'notificationPolicy', { client, folderPath: plugin.remindersSettings.remindersFolderPath },
+		() => client.getNotificationPolicy().then(result => result.policy));
+}
+
 function pendingFolder(plugin: CratePlugin, workerUrl: string) {
 	const pending = plugin.remindersSettings.pendingServerFolder;
 	return pending?.workerUrl === workerUrl ? pending : undefined;
-}
-
-/** Folder and retry intent share one local save, before any network request. */
-export async function changeReminderFolder(plugin: CratePlugin, folderPath: string): Promise<void> {
-	const folder = normalizeRemindersFolderPath(folderPath);
-	// Windows devices skip paths they cannot store, which would hide every reminder there.
-	const issue = getPortablePathIssue(folder);
-	if (issue) throw new Error(`Invalid reminders folder: ${issue}.`);
-	if (plugin.settings.reading?.enabled) validateReadingFolder(plugin.settings.reading.folderPath, folder, plugin.app.vault.configDir);
-	await plugin.writeRemindersSettings({ remindersFolderPath: folder,
-		pendingServerFolder: plugin.settings.workerUrl
-			? { id: crypto.randomUUID(), workerUrl: plugin.settings.workerUrl, folderPath: folder } : undefined });
-	void ensureReminderNotificationPolicy(plugin);
-	void plugin.syncRuntime.republishReminderNotes(folder).catch(error => {
-		new Notice(`Reminders in ${folder} will schedule notifications after their next edit. ${error instanceof Error ? error.message : ''}`.trim());
-	});
-	if (!plugin.remindersSettings.enabled) return;
-	// Loaded on demand: plugin integration also imports this module.
-	const { reinitializeWithFolder } = await import('./plugin-integration');
-	await reinitializeWithFolder(plugin, folder);
 }
 
 async function synchronizePolicy(plugin: CratePlugin, state: PolicySyncState): Promise<void> {

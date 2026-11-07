@@ -116,7 +116,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /reading/session': { scopes: LIBRARY, keylessEncryptedRead: true },
 	// Plaintext list and item reads authenticate here and answer a complete index from one D1
 	// snapshot. An index rebuild, which writes, and full list pages run under the coordinator
-	// lock (see `reading/routes.ts`); they wake notification processing only when a rebuild ran.
+	// lock (see `reading/library-read.ts`); they wake notification processing only when a rebuild ran.
 	'GET /reading/list': { scopes: LIBRARY },
 	'GET /reading/item': { scopes: LIBRARY },
 	[`POST ${shortcut.preparePath}`]: { scopes: ['reading_capture'], execution: COORDINATOR, rateLimit: 30 },

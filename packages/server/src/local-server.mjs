@@ -80,7 +80,7 @@ async function administer(dataDir, method, path, body, offline) {
 	// Never initialize an empty directory as a side effect of administration.
 	await access(join(dataDir, 'server.json')).catch(() => { throw new Error(`No Crate server data in ${dataDir}. Pass the server's --data-dir.`); });
 	const admin = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
-	try { return await offline(admin.db); } finally { await admin.close(); }
+	try { return await offline(admin); } finally { await admin.close(); }
 }
 
 function printDevices(devices) {
@@ -131,11 +131,11 @@ try {
 			const checked = await checkLocalUpgrade(dataDir);
 			console.log(`Compatible: server revision ${checked.from} → ${checked.to}, runtime ${checked.runtime}.${checked.requiresMigration ? ' The database needs a migration: run upgrade with a new --output backup directory before starting.' : ''} Back up before updating; no data was changed by this check.`);
 		} else if (command === 'devices') {
-			printDevices((await administer(dataDir, 'GET', '/devices', undefined, async db => ({ devices: await listLocalDevices(db) }))).devices);
+			printDevices((await administer(dataDir, 'GET', '/devices', undefined, async admin => ({ devices: await listLocalDevices(admin.db) }))).devices);
 		} else if (command === 'revoke') {
 			if (!values.id?.trim()) throw new Error('Provide --id with a token ID from the devices command.');
 			const id = values.id.trim();
-			const { revoked } = await administer(dataDir, 'POST', '/revoke', { id }, async db => ({ revoked: await revokeLocalDevice(db, id) }));
+			const { revoked } = await administer(dataDir, 'POST', '/revoke', { id }, async admin => ({ revoked: await revokeLocalDevice(admin, id) }));
 			if (!revoked) throw new Error('No device has that token ID. Run the devices command to list current IDs.');
 			console.log('Device revoked. It can no longer sync; pair it again to reconnect.');
 		} else if (command === 'pair') {
@@ -213,7 +213,7 @@ try {
 				const instance = randomUUID();
 				const pairing = createPairing({ db: runtime.db });
 				server = await listenLocalServer(runtime, { host, port, pairing, instance, tunnel: Boolean(remote) });
-				control = await startLocalControl({ dataDir, pairing, origin, db: runtime.db });
+				control = await startLocalControl({ dataDir, pairing, origin, runtime });
 				const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
 				if (existing.count === 0) printPairing(pairing.issue(values.name?.trim() || computerName().slice(0, 128)));
 				shutdown.signal.throwIfAborted();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import type { PendingReading } from './outbox';
-import { presentReadingItems } from './pending-view';
+import { blockedReadingItemIds, presentReadingItems } from './pending-view';
 
 const article: ReadingItem = {
 	crate_reading_version: 1,
@@ -53,5 +53,20 @@ describe('pending Reading presentation', () => {
 		const pending: PendingReading = { id: 'retry', sessionId: 'session', action: 'retry', intent: { id: article.crate_reading_id } };
 		expect(presentReadingItems([article], [pending])[0]?.extraction_status).toBe('pending');
 		expect(presentReadingItems([article], [{ ...pending, review: true }])[0]?.extraction_status).toBe('ready');
+	});
+});
+
+describe('items that take no edits yet', () => {
+	it('blocks unsaved links, pending captures, rejected changes and downloads, but not ordinary edits', () => {
+		const local = { ...article, crate_reading_id: 'local-id', path: '' };
+		const edit = (id: string, extra: Partial<PendingReading> = {}): PendingReading => ({ id: `edit-${id}`, sessionId: 'session', action: 'update',
+			intent: { id, changes: { favorite: true }, before: { favorite: false } }, ...extra } as PendingReading);
+		const pending: PendingReading[] = [
+			{ id: 'capture-id', sessionId: 'session', action: 'capture', intent: { url: 'https://example.com/new' } },
+			edit('sending'), edit('rejected', { review: true }),
+			{ id: 'retry', sessionId: 'session', action: 'retry', intent: { id: 'downloading' } },
+		];
+		expect([...blockedReadingItemIds([article, local], pending)].sort()).toEqual(['capture-id', 'downloading', 'local-id', 'rejected']);
+		expect(blockedReadingItemIds([article], []).size).toBe(0);
 	});
 });

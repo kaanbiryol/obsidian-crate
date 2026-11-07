@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleReorderReminders } from './routes/reorder';
+import { handleReorderReminders } from './handlers/reorder';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 

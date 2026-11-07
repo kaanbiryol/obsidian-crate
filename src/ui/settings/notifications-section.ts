@@ -4,41 +4,15 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../platform/logger';
 import { openConfirmationModal } from '../plugin/confirmation-modal';
 import { normalizeTimeString } from '../../platform/validation';
-import { saveNotificationPolicy } from '../../reminders/notification-policy-sync';
-import { captureSyncApiConnection } from '../../plugin/server-request';
-import type { NotificationPolicy } from '../../protocol/notification-policy';
+import { openNotificationPolicy } from '../../reminders/notification-policy-sync';
 import type { SyncApiClient } from '../../sync/worker-api/client';
 import type { SettingsSectionContext } from './section-helpers';
-import { cachedSettingsRequest } from '../../plugin/settings-ui-state';
 
 export function renderNotificationsSection(context: SettingsSectionContext): () => void {
 	const { containerEl, plugin } = context;
 	let active = true;
 	const isActive = () => active;
-
-
-	// The policy and the local copy of its settings must come from the same server.
-	const connection = captureSyncApiConnection(plugin);
-	const policyApi = connection.api;
-	let policy: NotificationPolicy | null = null;
-	let loadError: unknown;
-	const openedPolicy = policyApi ? cachedNotificationPolicy(plugin, policyApi).then(result => { policy = result; }).catch(error => { loadError = error; }) : Promise.resolve();
-	const savePolicy = async (patch: Partial<NotificationPolicy>) => {
-		await openedPolicy;
-		if (loadError) throw new Error(errorMessage(loadError));
-		if (!policyApi) throw new Error('Connect to the sync server before changing notifications');
-		connection.assertCurrent();
-		try {
-			await saveNotificationPolicy(policyApi, plugin, policy, patch, saved => {
-				policy = saved;
-				plugin.settingsUiState.notificationPolicy = { client: policyApi, folderPath: plugin.remindersSettings.remindersFolderPath, value: Promise.resolve(saved) };
-			});
-		} catch (error) {
-			// Another device may have changed the policy; the next render loads it again.
-			plugin.settingsUiState.notificationPolicy = null;
-			throw error;
-		}
-	};
+	const opened = openNotificationPolicy(plugin);
 	const content = createSettingsDisclosure(containerEl, 'Notifications', {
 		summary: plugin.settings.pushEnabled ? 'On · schedule, timezone, and devices' : 'Off',
 		onOpen: notificationContent => {
@@ -52,25 +26,21 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 					toggle.setValue(plugin.settings.pushEnabled).onChange(async value => {
 						toggle.setDisabled(true);
 						try {
-							await savePolicy({ enabled: value });
-							await plugin.writeSettings({ pushEnabled: value }, connection.assertCurrent);
+							await opened.save({ enabled: value });
+							await plugin.writeSettings({ pushEnabled: value }, opened.assertCurrent);
 							if (active) context.rerender();
 						} catch (error) {
 							new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
-							toggle.setValue(policy?.enabled ?? plugin.settings.pushEnabled);
+							toggle.setValue(opened.policy?.enabled ?? plugin.settings.pushEnabled);
 						} finally { toggle.setDisabled(false); }
 					});
 				});
-			void openedPolicy.then(() => { if (active && policy) enabledToggle.setValue(policy.enabled !== false); });
 
 			const options = notificationContent.createDiv();
 			options.hidden = !plugin.settings.pushEnabled;
-			void openedPolicy.then(() => {
-				if (active && !loadError) options.hidden = !(policy?.enabled ?? plugin.settings.pushEnabled);
-			});
 			const saveAllDayTime = async (time: string | null) => {
-				await savePolicy({ allDayTime: time });
-				await plugin.writeRemindersSettings({ allDayNotificationTime: time }, connection.assertCurrent);
+				await opened.save({ allDayTime: time });
+				await plugin.writeRemindersSettings({ allDayNotificationTime: time }, opened.assertCurrent);
 			};
 			let timeInput: TextComponent;
 			const timeSetting = new Setting(options)
@@ -123,16 +93,16 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 					}
 				}));
 
-			void openedPolicy.then(() => {
+			const policyDescription = options.createEl('p', { cls: 'setting-item-description' });
+			void opened.loaded.then(() => {
 				if (!active) return;
+				const { policy, loadError } = opened;
+				if (policy) enabledToggle.setValue(policy.enabled !== false);
+				if (!loadError) options.hidden = !(policy?.enabled ?? plugin.settings.pushEnabled);
 				if (policy) timeInput.setValue(policy.allDayTime ?? '');
 				timeSetting.setDesc(loadError
 					? 'Could not load the notification timezone. Reopen settings to retry.'
 					: `All devices · timezone: ${policy?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}. An empty time means off.`);
-			});
-			const policyDescription = options.createEl('p', { cls: 'setting-item-description' });
-			void openedPolicy.then(() => {
-				if (!active) return;
 				policyDescription.textContent = loadError ? 'Shared settings could not be loaded. Reopen settings to retry.'
 					: policy ? `Server notifications: ${policy.folderPath} · ${policy.timezone}` : 'The first enabled device saves the shared folder and timezone.';
 			});
@@ -141,29 +111,22 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 				.addButton(button => button.setButtonText('Use this device’s settings').onClick(async () => {
 					button.setDisabled(true);
 					try {
-						await savePolicy({ folderPath: plugin.remindersSettings.remindersFolderPath, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+						await opened.save({ folderPath: plugin.remindersSettings.remindersFolderPath, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
 						if (active) context.rerender();
 					} catch (error) { new Notice(`Failed to save shared settings: ${errorMessage(error)}`); }
 					finally { button.setDisabled(false); }
 				}));
-			const apiClient = plugin.syncRuntime.getApiClient();
-			if (apiClient) renderEnabledDevices(options, plugin, apiClient, isActive);
+			if (opened.api) renderEnabledDevices(options, plugin, opened.api, isActive);
 		},
 	});
-	void openedPolicy.then(() => {
-		if (!active || loadError) return;
+	void opened.loaded.then(() => {
+		if (!active || opened.loadError) return;
 		const summary = content.parentElement?.querySelector('.crate-settings-disclosure-summary');
-		if (summary) summary.textContent = (policy?.enabled ?? plugin.settings.pushEnabled)
+		if (summary) summary.textContent = (opened.policy?.enabled ?? plugin.settings.pushEnabled)
 			? 'On · schedule, timezone, and devices' : 'Off';
 	});
 
 	return () => { active = false; };
-}
-
-/** Settings re-render on every toggle; reuse this connection's policy until the tab closes. */
-function cachedNotificationPolicy(plugin: CratePlugin, client: SyncApiClient): Promise<NotificationPolicy | null> {
-	return cachedSettingsRequest(plugin.settingsUiState, 'notificationPolicy', { client, folderPath: plugin.remindersSettings.remindersFolderPath },
-		() => client.getNotificationPolicy().then(result => result.policy));
 }
 
 function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, apiClient: SyncApiClient, isActive: () => boolean): void {
@@ -176,7 +139,7 @@ function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, api
 		const revision = ++requestRevision;
 		if (!listContainer || !isActive()) return;
 		testButton?.setDisabled(true);
-		await loadSubscriptions(listContainer, plugin, () => isActive() && revision === requestRevision, count => {
+		await loadSubscriptions(listContainer, plugin, apiClient, () => isActive() && revision === requestRevision, count => {
 			enabledCount = count;
 			testButton.setDisabled(count === 0);
 		}, refresh);
@@ -224,10 +187,7 @@ function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, api
 		});
 }
 
-async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin, isActive: () => boolean, onCount: (count: number) => void, refresh: () => Promise<void>): Promise<void> {
-	const apiClient = plugin.syncRuntime.getApiClient();
-	if (!apiClient) return;
-
+async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin, apiClient: SyncApiClient, isActive: () => boolean, onCount: (count: number) => void, refresh: () => Promise<void>): Promise<void> {
 	try {
 		const { subscriptions } = await apiClient.getPushSubscriptions();
 		if (!isActive()) return;

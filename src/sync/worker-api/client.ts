@@ -50,15 +50,15 @@ export class SyncApiClient {
 	async configureEncryption(bundle: VaultKeyBundle, reminderFolders: () => readonly string[], readingFolder?: () => string | null): Promise<void> {
 		const notifications = await importNotificationKeys(bundle.vaultId, bundle.notifications);
 		const encryption = await EncryptedFiles.create(this.http, bundle, (path, bytes) => createReminderProjection(notifications, reminderFolders(), path, bytes), readingFolder);
+		const folderKey = await importEncryptionSecret(bundle.vault);
+		// Assign only after every key imports, so a failure leaves no request encrypted.
 		this.syncApi.setEncryption(encryption);
 		this.sharedHistory.setEncryption(encryption);
 		this.sharedSettingsApi.setEncryption(encryption);
 		this.http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
-		this.titleLookupEncrypted = true;
-		this.folderKeys = { tags: encryption.paths.tags, key: await importEncryptionSecret(bundle.vault), vaultId: bundle.vaultId };
+		this.folderKeys = { tags: encryption.paths.tags, key: folderKey, vaultId: bundle.vaultId };
 	}
 	private folderKeys?: { tags: PathTags; key: EncryptionKey; vaultId: string };
-	private titleLookupEncrypted = false;
 
 	isEncrypted(): boolean { return this.folderKeys !== undefined; }
 
@@ -119,7 +119,7 @@ export class SyncApiClient {
 	 * A device that has not unlocked an encrypted vault skips the lookup, and so does a
 	 * vault that last synced encrypted until syncing without encryption is confirmed. */
 	async fetchPageTitle(url: string): Promise<string | null> {
-		if (!this.titleLookupEncrypted && (this.http.refusesPlaintext() || await readServerEncryption(this.http, 7000))) return null;
+		if (!this.isEncrypted() && (this.http.refusesPlaintext() || await readServerEncryption(this.http, 7000))) return null;
 		const result = await this.http.requestJson<{ title?: unknown }>('/links/title', {
 			method: 'POST', body: JSON.stringify({ url }),
 		}, 7000);

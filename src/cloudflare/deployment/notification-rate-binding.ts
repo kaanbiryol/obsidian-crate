@@ -1,4 +1,3 @@
-export const NOTIFICATION_RATE_BINDING = 'NOTIFICATION_REQUEST_LIMITER';
 export function notificationRateNamespace(bucketName: string): string {
 	// Vault resource names contain a stable random hexadecimal suffix. Keep the
 	// namespace within the exact integer range supported by JS and the API.

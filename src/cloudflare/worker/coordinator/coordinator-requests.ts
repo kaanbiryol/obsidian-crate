@@ -1,9 +1,9 @@
-import { armNotificationCoordinator } from '../notifications/lifecycle';
+import { armNotificationCoordinator, PROJECTION_PARSER_VERSION_KEY } from '../notifications/lifecycle';
 import { fetchWorkerRequest } from '../request-handler';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import type { Env } from '../types';
 
-import { publishExtraction, type Publication } from '../reading/extraction/jobs';
+import { armReadingCoordinator, publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { commitSealedReadingNote, type SealedReadingNote } from '../reading/sealed-note';
 import { getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
 import { drainNotificationJobs } from '../notifications/outbox';
@@ -13,7 +13,9 @@ import { handleBatchDownload } from '../sync/batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/staging/bulk-upload-dispatch';
 import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../sync/staging/staged-upload-dispatch';
 import { scheduleMaintenance } from '../maintenance/schedule';
+import { armMaintenanceCoordinator, MAINTENANCE_COORDINATOR_KEY } from '../maintenance/lifecycle';
 import { isCrateMutation } from '../../../protocol/server-info';
+import { revokeCredential } from '../auth/revocation';
 
 export type StateLock = <T>(action: () => Promise<T>) => Promise<T>;
 
@@ -41,18 +43,17 @@ export async function handleCoordinatorRequest(
 	// Every poll ensures the projection coordinator. Once armed for this parser
 	// version, answer without queuing behind mutations or notification passes.
 	if (path === COORDINATOR_PATHS.ensure && request.method === 'POST'
-		&& await state.storage.get<number>('projectionParserVersion') === REMINDER_CACHE_PARSER_VERSION) return new Response(null, { status: 204 });
+		&& await state.storage.get<number>(PROJECTION_PARSER_VERSION_KEY) === REMINDER_CACHE_PARSER_VERSION) return new Response(null, { status: 204 });
 	// An already scheduled maintenance episode needs no state change; a running
 	// pass holds this object's lock, and mutations must not wait for it.
-	if (path === COORDINATOR_PATHS.maintain && request.method === 'POST' && await state.storage.get<boolean>('maintenanceCoordinator')
+	if (path === COORDINATOR_PATHS.maintain && request.method === 'POST' && await state.storage.get<boolean>(MAINTENANCE_COORDINATOR_KEY)
 		&& await state.storage.getAlarm() !== null) return new Response(null, { status: 204 });
 	// Schedule cleanup before queuing, so a running maintenance pass delays only
 	// this request rather than every coordinated mutation behind it. Reads arm nothing.
 	if (request.headers.get(INTERNAL_MUTATION_HEADER) === '1' && isCrateMutation(path, request.method)) await scheduleMaintenance(env, state);
 	return withStateLock(async () => {
 		if (path === COORDINATOR_PATHS.readingWake && request.method === 'POST') {
-			await state.storage.put('readingCoordinator', true);
-			if (await state.storage.getAlarm() === null) await state.storage.setAlarm(Date.now() + 100);
+			await armReadingCoordinator(state);
 			return new Response(null, { status: 204 });
 		}
 		if (path === COORDINATOR_PATHS.readingPublish && request.method === 'POST') {
@@ -84,18 +85,18 @@ async function handleLockedCoordinatorRequest(request: Request, state: DurableOb
 		original.headers.delete(INTERNAL_MUTATION_HEADER);
 		return fetchWorkerRequest(original, env, { kind: 'coordinator', state });
 	}
+	if (new URL(request.url).pathname === COORDINATOR_PATHS.revokeCredential && request.method === 'POST') {
+		const { id } = await request.json() as { id: string };
+		return Response.json({ revoked: await revokeCredential(env.DB, id) });
+	}
 	if (new URL(request.url).pathname === COORDINATOR_PATHS.maintain && request.method === 'POST') {
-		await state.storage.put('maintenanceCoordinator', true);
-		if (await state.storage.getAlarm() === null) {
-			await state.storage.put('maintenancePass', 0);
-			await state.storage.setAlarm(Date.now() + 24 * 60 * 60 * 1000);
-		}
+		await armMaintenanceCoordinator(state);
 		return new Response(null, { status: 204 });
 	}
 	if (new URL(request.url).pathname === COORDINATOR_PATHS.ensure && request.method === 'POST') {
-		if (await state.storage.get<number>('projectionParserVersion') !== REMINDER_CACHE_PARSER_VERSION) {
+		if (await state.storage.get<number>(PROJECTION_PARSER_VERSION_KEY) !== REMINDER_CACHE_PARSER_VERSION) {
 			await armNotificationCoordinator(state);
-			await state.storage.put('projectionParserVersion', REMINDER_CACHE_PARSER_VERSION);
+			await state.storage.put(PROJECTION_PARSER_VERSION_KEY, REMINDER_CACHE_PARSER_VERSION);
 		}
 		return new Response(null, { status: 204 });
 	}

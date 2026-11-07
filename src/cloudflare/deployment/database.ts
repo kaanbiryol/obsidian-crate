@@ -4,10 +4,12 @@ import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { type DeploymentFence } from './fence';
 import { migrationTransaction, planDatabaseUpgrade, validateMigrationHistory, SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
-import { quoteName } from '../restore/archive';
+import { quoteName } from '../d1-sql';
 
 /** Saved in D1 so an interrupted upgrade backup resumes on any device instead of restarting. */
 export const UPGRADE_PROGRESS_KEY = 'crate_upgrade_backup';
+/** Names the verified backup of the upgrade in progress. */
+export const UPGRADE_CHECKPOINT_KEY = 'crate_upgrade_checkpoint';
 /** Lists the write-guard triggers an upgrade has created. */
 export const UPGRADE_GUARD_TRIGGERS = "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'crate_upgrade_%';";
 const CONTROL = new Set(['maintenance_state', 'crate_schema', 'crate_migrations', 'crate_release']);

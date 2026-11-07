@@ -123,12 +123,7 @@ function createFlushHarness(overrides: Partial<{
 					}),
 				};
 			},
-			api: {
-				isConfigured: vi.fn(() => overrides.configured ?? true),
-				uploadFile: (path: string, content: ArrayBuffer, hash: string, size: number, contentType: string) =>
-					uploadFile({ path, content, hash, size, contentType }),
-				batchDelete,
-			},
+			apiConfigured: vi.fn(() => overrides.configured ?? true),
 			localManifest: {
 				getEntry: vi.fn(() => ({
 					hash: 'd'.repeat(64), revision: 'version-1',
@@ -144,7 +139,7 @@ function createFlushHarness(overrides: Partial<{
 			setLastSync,
 			reconnectNotice: new ReconnectNotice(),
 			isDestroyed: () => false,
-			currentStatus: () => state.status,
+			getStatus: () => state.status,
 			prepareUploadFromPath,
 			assertLocalFileAbsent: harnessContext.assertLocalFileAbsent,
 			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),

@@ -5,36 +5,12 @@ import release from '../../cloudflare/server-release.json';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/deployment/embedded-artifacts';
 import type { CrateServerInfo } from '../../protocol/server-info';
 import { isManagedDeploymentUrl } from '../../cloudflare/deployment/worker-origin';
+import { checkServerVersion } from '../../plugin/cloudflare/server-version';
 
 function localRevision(plugin: CratePlugin): number | undefined {
 	const deployment = plugin.settings.cloudflareDeployment;
 	if (!deployment || !isManagedDeploymentUrl(plugin.settings)) return undefined;
 	return deployment.lastKnownRevision;
-}
-
-async function checkVersion(plugin: CratePlugin) {
-	const deployment = plugin.settings.cloudflareDeployment;
-	const url = plugin.settings.workerUrl;
-	const info = await plugin.syncRuntime.getVersionInfo();
-	const current = plugin.settings.cloudflareDeployment;
-	if (url !== plugin.settings.workerUrl || deployment?.workerName !== current?.workerName
-		|| deployment?.accountId !== current?.accountId || deployment?.d1DatabaseId !== current?.d1DatabaseId) throw new Error('Server connection changed');
-	if (deployment && deployment === plugin.settings.cloudflareDeployment && url === plugin.settings.workerUrl
-		&& isManagedDeploymentUrl(plugin.settings)
-		&& info.serverRevision && deployment.lastKnownRevision !== info.serverRevision) {
-		await plugin.writeSettings({ cloudflareDeployment: { ...deployment, lastKnownRevision: info.serverRevision } });
-	}
-	return info;
-}
-
-/** True when the live server runs an older revision, or a different build this plugin's bundled server can replace. */
-export function isBundledServerNewer(info: Pick<CrateServerInfo, 'serverRevision' | 'deploymentFingerprint' | 'developmentBuild'>): boolean {
-	const bundled = { revision: release.revision, fingerprint: EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint, development: EMBEDDED_CLOUDFLARE_ARTIFACT.development };
-	if (!info.serverRevision) return false;
-	if (info.serverRevision < bundled.revision) return true;
-	const fingerprint = info.deploymentFingerprint;
-	return Boolean(fingerprint && fingerprint !== bundled.fingerprint
-		&& canReplaceServerBuild({ revision: info.serverRevision, fingerprint, development: info.developmentBuild }, bundled));
 }
 
 export function renderVersionSettings(container: HTMLElement, plugin: CratePlugin): void {
@@ -47,7 +23,7 @@ export function renderVersionSettings(container: HTMLElement, plugin: CratePlugi
 		button.setDisabled(true);
 		server.setDesc('Checking version…');
 		try {
-			const info = await checkVersion(plugin);
+			const info = await checkServerVersion(plugin);
 			const version = info.serverRevision ? `Revision ${serverBuildLabel(info.serverRevision, info.developmentBuild)}` : 'Revision unknown';
 			const comparison = info.deploymentFingerprint
 				? info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint
@@ -128,7 +104,7 @@ export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMa
 			button.setDisabled(true).setButtonText('Checking…');
 			setting.setDesc('Checking live server…');
 			try {
-				showVersion(await checkVersion(plugin));
+				showVersion(await checkServerVersion(plugin));
 			} catch {
 				setting.setDesc(`${saved}. Could not check the server. Try again.`);
 			} finally {

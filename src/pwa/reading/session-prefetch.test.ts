@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { connectReadingFromReminders, prefetchReadingSession } from './api';
+import { connectReadingFromReminders, prefetchReadingSession } from './session/reminders-session';
 import { AUTH_TOKEN_KEY } from '../config';
 import { READING_SESSION_KEY } from './session/session';
 

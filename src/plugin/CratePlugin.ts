@@ -17,7 +17,7 @@ import type { CrateSettingTab } from '../ui/settings/settings-tab';
 import { configureSyncLogger } from '../sync/logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';
-import { createSettingsUiState, type SettingsUiState } from './settings-ui-state';
+import { clearSettingsUiState, createSettingsUiState, type SettingsUiState } from './settings-ui-state';
 import { SecretStorageService } from './secret-storage';
 import { keepLastGoodPluginData, loadPluginData } from './plugin-data';
 import {
@@ -118,10 +118,7 @@ export default class CratePlugin extends Plugin {
 	}
 
 	clearSettingsUiState(): void {
-		this.settingsUiState.diagnostics = null;
-		this.settingsUiState.devices = null;
-		this.settingsUiState.encryptionStatus = null;
-		this.settingsUiState.notificationPolicy = null;
+		clearSettingsUiState(this.settingsUiState);
 	}
 
 	registerSettingsTab(settingTab: CrateSettingTab): void {

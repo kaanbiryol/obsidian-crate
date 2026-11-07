@@ -1,6 +1,6 @@
 import type { DataAdapter } from 'obsidian';
-import { sha256Hex } from '../platform/sha256';
-import { isRecord, isSha256Hex } from '../platform/validation';
+import { sha256Hex } from '../../platform/sha256';
+import { isRecord, isSha256Hex } from '../../platform/validation';
 import {
 	CRATE_UPDATE_FILES,
 	buildCrateUpdate,
@@ -13,7 +13,7 @@ import {
 	serializeCrateUpdate,
 	type CrateUpdateBundle,
 	type CrateUpdateFile,
-} from './crate-update-bundle';
+} from './bundle';
 
 export interface CrateUpdateHost {
 	adapter: Pick<DataAdapter, 'exists' | 'read' | 'write' | 'remove' | 'rename' | 'mkdir' | 'rmdir' | 'list'>;

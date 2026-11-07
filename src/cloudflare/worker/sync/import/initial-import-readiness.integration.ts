@@ -12,7 +12,8 @@ import { meterD1Writes } from '../../test-support/d1-write-meter-test-harness';
 import { meterD1Usage } from '../../d1/d1-usage';
 import { SyncTestDevice } from '../../test-support/sync-engine-test-harness';
 import { REMINDER_CACHE_PARSER_VERSION } from '../../reminders/cache/types';
-import { handleListReminders } from '../../reminders/routes/list';
+import { reminderSourceScanKey } from '../../reminders/source-migration';
+import { handleListReminders } from '../../reminders/handlers/list';
 import type { ReminderSetupStatus } from '../../../../protocol/initial-import';
 import { countD1Queries } from '../../d1/d1-query-count';
 import { D1_QUERIES_PER_INVOCATION } from '../../d1/platform-limits';
@@ -154,7 +155,7 @@ it('probes ten thousand verified files with bounded reads', async () => {
     INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified)
     SELECT 'Reminders/'||x||'.md', 'key-'||x, ?, 1 FROM n`).bind(REMINDER_CACHE_PARSER_VERSION).run();
 	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)')
-		.bind(`reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:Reminders`, '').run();
+		.bind(reminderSourceScanKey('Reminders'), '').run();
 	const batch = env.DB.batch.bind(env.DB);
 	let reads = 0;
 	vi.spyOn(env.DB, 'batch').mockImplementation(async statements => {

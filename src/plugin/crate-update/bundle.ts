@@ -1,5 +1,5 @@
-import { sha256Hex } from '../platform/sha256';
-import { isRecord, isSha256Hex } from '../platform/validation';
+import { sha256Hex } from '../../platform/sha256';
+import { isRecord, isSha256Hex } from '../../platform/validation';
 
 /**
  * A Crate release copied between this person's own devices through the vault.

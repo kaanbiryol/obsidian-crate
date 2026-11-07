@@ -1,9 +1,9 @@
 import { Notice, requireApiVersion } from 'obsidian';
-import type CratePlugin from './CratePlugin';
-import { createLogger } from '../sync/logger';
-import { errorMessage } from '../platform/logger';
-import type { SyncResult } from '../sync/types';
-import { compareVersions, crateUpdatePath, isCrateUpdatePath, parseCrateUpdate, type CrateUpdateBundle } from './crate-update-bundle';
+import type CratePlugin from '../CratePlugin';
+import { createLogger } from '../../sync/logger';
+import { errorMessage } from '../../platform/logger';
+import type { SyncResult } from '../../sync/types';
+import { compareVersions, crateUpdatePath, isCrateUpdatePath, parseCrateUpdate, type CrateUpdateBundle } from './bundle';
 import {
 	installCrateUpdate,
 	installedCrateVersion,
@@ -11,7 +11,7 @@ import {
 	publishCrateUpdate,
 	resumeCrateUpdate,
 	type CrateUpdateHost,
-} from './crate-update-install';
+} from './install';
 
 const logger = createLogger('CrateUpdate');
 const RESTART_MESSAGE = (version: string) => `Crate updated to ${version} from another device. Restart Obsidian to apply it.`;

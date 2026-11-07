@@ -1,5 +1,6 @@
 import { SyncIssueError } from '../issues';
 import { isAbortError } from '../abort';
+import { runConcurrentTasks } from '../concurrency';
 /**
  * File discovery — merges Obsidian-indexed files with hidden (dot) files
  * discovered via the low-level vault adapter.
@@ -177,15 +178,7 @@ async function addStatFiles(
 	assertActive?: () => void,
 ): Promise<void> {
 	const candidates = [...new Set(filePaths)].filter(filePath => !seen.has(filePath) && !shouldIgnore(filePath));
-	const stats = new Array<Awaited<ReturnType<typeof safeStat>>>(candidates.length);
-	let next = 0;
-	const worker = async () => {
-		while (next < candidates.length) {
-			const index = next++;
-			stats[index] = await safeStat(vault, candidates[index]!, assertActive);
-		}
-	};
-	await Promise.all(Array.from({ length: Math.min(STAT_CONCURRENCY, candidates.length) }, worker));
+	const stats = await runConcurrentTasks(candidates.map(filePath => () => safeStat(vault, filePath, assertActive)), STAT_CONCURRENCY, () => false);
 	candidates.forEach((filePath, index) => {
 		const stat = stats[index];
 		if (!stat || stat.type !== 'file') return;

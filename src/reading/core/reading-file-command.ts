@@ -22,7 +22,7 @@ export type ReadingFileCommandPlan =
 	| { kind: 'issue'; issue: ReadingFileCommandIssue; message?: string };
 
 /** Plan one edit to an existing note. The Worker and the encrypted web app writer share
- * these rules; fetch consent, identity checks, wording and the commit stay with the caller. */
+ * these rules; fetch consent, identity checks and the commit stay with the caller. */
 export async function planReadingFileCommand(item: ReadingMetadata, content: string, command: ReadingFileCommand): Promise<ReadingFileCommandPlan> {
 	if (command.action === 'delete') {
 		// The note must still be what the client showed, so a stale delete never removes newer edits.
@@ -40,4 +40,15 @@ export async function planReadingFileCommand(item: ReadingMetadata, content: str
 	if (issue) return { kind: 'issue', issue };
 	try { return { kind: 'write', content: updateReadingNote(content, item.crate_reading_id, changes) }; }
 	catch (error) { return { kind: 'issue', issue: 'invalid', ...error instanceof Error ? { message: error.message } : {} }; }
+}
+
+/** How a refused edit is answered. The Worker sends this wording and status, and the
+ * encrypted web app writer raises the same, so a queued change settles alike in both. */
+export function readingFileCommandRefusal(plan: Extract<ReadingFileCommandPlan, { kind: 'issue' }>, action: ReadingFileCommand['action']): { message: string; status: 400 | 409; code?: 'reading_conflict' } {
+	switch (plan.issue) {
+		case 'invalid': return { message: plan.message ?? 'Choose a Reading change.', status: 400 };
+		case 'unsupported': return { message: 'Unsupported Reading change.', status: 400 };
+		case 'not-empty': return { message: 'Only URL captures with an unchanged article section can be extracted.', status: 400 };
+		case 'conflict': return { message: `This item changed on another device. Refresh before ${action === 'delete' ? 'deleting' : 'editing'} it.`, status: 409, code: 'reading_conflict' };
+	}
 }

@@ -11,7 +11,8 @@ import type { SyncSettings } from '../settings';
 interface EngineHistoryContext {
 	vault: Vault;
 	api: SyncApiClient;
-	pluginDir: string;
+	/** Where originals are saved while a checkpoint restore applies. */
+	recoveryRoot: string;
 	getSettings(): Pick<SyncSettings, 'ignorePatterns'>;
 	getManifest(): LocalManifestView;
 	shouldIgnore: (path: string) => boolean;
@@ -78,7 +79,7 @@ export function createEngineHistory(context: EngineHistoryContext) {
 				const review = await createHistoryRestore({
 					vault: context.vault, api: context.api, target: snapshot.files, baseline: context.getManifest().files,
 					readTarget: (path, file) => context.api.sharedHistory.download(checkpoint, path, file),
-					recoveryRoot: `${context.pluginDir}/state-recovery`, shouldIgnore: context.shouldIgnore,
+					recoveryRoot: context.recoveryRoot, shouldIgnore: context.shouldIgnore,
 					verify, beforeApply, applied: context.applied,
 				});
 				return { ...review,

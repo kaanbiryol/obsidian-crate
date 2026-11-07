@@ -7,7 +7,7 @@ import {
 	crateUpdateVersion,
 	parseCrateUpdate,
 	serializeCrateUpdate,
-} from './crate-update-bundle';
+} from './bundle';
 
 type Mutable = Omit<CrateUpdateBundle, 'format'> & { format: number };
 const manifest = (version: string, id = 'crate') => JSON.stringify({ id, name: 'Crate', version, minAppVersion: '1.13.0' });

@@ -1,5 +1,4 @@
-import type CratePlugin from '../plugin/CratePlugin';
-import { captureSyncApiConnection, serverRequest } from '../plugin/server-request';
+import { captureSyncApiConnection, serverRequest, type SyncApiConnectionHost } from '../plugin/server-request';
 import { isRecord } from '../platform/validation';
 import { parseReadingPolicy, type ReadingPolicy, type ReadingPolicyUpdate } from '../protocol/reading-policy';
 import { SECRET_KEYS } from '../platform/secret-keys';
@@ -21,11 +20,11 @@ async function responsePolicy({ api, assertCurrent }: SyncApiConnection, respons
 	assertCurrent();
 	return { ...plain, folder_path: folderPath };
 }
-export async function readReadingPolicy(plugin: CratePlugin): Promise<ReadingPolicy | null> {
+export async function readReadingPolicy(plugin: SyncApiConnectionHost): Promise<ReadingPolicy | null> {
 	const connection = captureSyncApiConnection(plugin);
 	return responsePolicy(connection, await serverRequest<unknown>(plugin, '/reading/policy'));
 }
-export async function writeReadingPolicy(plugin: CratePlugin, update: ReadingPolicyUpdate): Promise<ReadingPolicy> {
+export async function writeReadingPolicy(plugin: SyncApiConnectionHost, update: ReadingPolicyUpdate): Promise<ReadingPolicy> {
 	const connection = captureSyncApiConnection(plugin);
 	// With saved keys the folder is sent only as its tag, never under its readable name,
 	// including after an encryption reset whose upload has not finished.

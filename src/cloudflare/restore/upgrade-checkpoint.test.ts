@@ -2,11 +2,11 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createUpgradeCheckpoint } from './upgrade-checkpoint';
-import { releaseUpgradeGuards, removeUpgradeGuards, upgradeGuards } from './database';
-import { migrationTransaction, SERVER_RELEASE } from './database-upgrades';
+import { releaseUpgradeGuards, removeUpgradeGuards, upgradeGuards } from '../deployment/database';
+import { migrationTransaction, SERVER_RELEASE } from '../deployment/database-upgrades';
 import { CloudflareApiClient, CloudflareApiError } from '../cloudflare-api';
 import type { HttpTransport } from '../http';
-import type { DeploymentFence } from './fence';
+import type { DeploymentFence } from '../deployment/fence';
 import { sha256Hex } from '../../platform/sha256';
 import { upgradeBackupStoreKey } from '../../protocol/storage-keys';
 

@@ -1,12 +1,12 @@
 import type CratePlugin from './CratePlugin';
 
 // Keyed by instance so a reloaded plugin never sees its predecessor's state.
-const lifetimes = new WeakMap<CratePlugin, AbortController>();
+const lifetimes = new WeakMap<object, AbortController>();
 const syncReadiness = new WeakMap<CratePlugin, Promise<void>>();
 
 /** Work that starts before onload begins a lifecycle gets a provisional signal,
  * which the next beginPluginLifecycle aborts because that lifecycle did not start it. */
-export function getPluginLifecycleSignal(plugin: CratePlugin): AbortSignal {
+export function getPluginLifecycleSignal(plugin: object): AbortSignal {
 	let controller = lifetimes.get(plugin);
 	if (!controller) {
 		controller = new AbortController();

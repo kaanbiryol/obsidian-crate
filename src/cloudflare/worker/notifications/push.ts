@@ -1,20 +1,12 @@
 import { readableLinkText } from '../../../reminders/core/grammar/markdownLinks';
 import { fitPushDisplay } from './payload-budget';
-import {
-	deserializeVapidKeys,
-	generateVapidKeys,
-	serializeVapidKeys,
-} from 'web-push-browser';
 import { queryRows } from '../d1/db';
+import { mapBounded } from '../../../platform/map-bounded';
+import { getOrCreateVapidKeys, importVapidKeys } from './vapid-keys';
 import { sendPushNotificationWithoutContact } from './web-push';
 import { PUSH_RECIPIENT_AUTHORITY } from './recipient-authority';
 import { parseEncryptedNotification, type EncryptedNotification } from '../../../encryption/notification-format';
 import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../d1/platform-limits';
-
-interface SerializedVapidKeys {
-	publicKey: string;
-	privateKey: string;
-}
 
 export interface PushSubscriptionRow {
 	id: string;
@@ -87,63 +79,10 @@ export function createDeclarativePushPayload(payload: PushNotificationPayload, o
 	});
 }
 
-export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVapidKeys> {
-	const readPersistedKeys = async (): Promise<SerializedVapidKeys | null> => {
-		const rows = await queryRows<{ public_key: string; private_key: string }>(
-			db.prepare('SELECT public_key, private_key FROM vapid_keys WHERE id = 1'),
-		);
-		const row = rows[0];
-		return row ? { publicKey: row.public_key, privateKey: row.private_key } : null;
-	};
-
-	const existingKeys = await readPersistedKeys();
-	if (existingKeys) return existingKeys;
-
-	const keyPair = await generateVapidKeys();
-	const serialized = await serializeVapidKeys(keyPair);
-	await db.prepare(
-		'INSERT OR IGNORE INTO vapid_keys (id, public_key, private_key) VALUES (1, ?, ?)',
-	).bind(serialized.publicKey, serialized.privateKey).run();
-
-	const persistedKeys = await readPersistedKeys();
-	if (!persistedKeys) throw new Error('Failed to persist VAPID keys');
-	return persistedKeys;
-}
-
 export function listPushSubscriptions(db: D1Database): Promise<PushSubscriptionRow[]> {
 	return queryRows<PushSubscriptionRow>(
 		db.prepare(`SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE ${PUSH_RECIPIENT_AUTHORITY}`).bind(Date.now()),
 	);
-}
-
-// Imported keys are reused by this isolate until the stored key pair changes.
-let importedVapidKeys: { id: string; keys: Promise<CryptoKeyPair> } | undefined;
-
-function importVapidKeys(serialized: SerializedVapidKeys): Promise<CryptoKeyPair> {
-	const id = `${serialized.publicKey}.${serialized.privateKey}`;
-	if (importedVapidKeys?.id === id) return importedVapidKeys.keys;
-	const keys = deserializeVapidKeys(serialized);
-	importedVapidKeys = { id, keys };
-	keys.catch(() => {
-		if (importedVapidKeys?.keys === keys) importedVapidKeys = undefined;
-	});
-	return keys;
-}
-
-async function runBounded<T>(items: readonly T[], worker: (item: T) => Promise<void>): Promise<void> {
-	let nextIndex = 0;
-	const workers = Array.from(
-		{ length: Math.min(SIMULTANEOUS_OPEN_CONNECTIONS, items.length) },
-		async () => {
-			while (nextIndex < items.length) {
-				const index = nextIndex;
-				nextIndex += 1;
-				const item = items[index];
-				if (item !== undefined) await worker(item);
-			}
-		},
-	);
-	await Promise.all(workers);
 }
 
 function isExpiredSubscriptionStatus(status: number): boolean {
@@ -188,7 +127,8 @@ export async function sendToAllSubscriptions(
 	const errors: string[] = [];
 	const failedSubscriptionIds: string[] = [];
 
-	await runBounded(subscriptions, async (subscription) => {
+	// Each delivery records its own failure, so one failed push never stops the others.
+	await mapBounded(subscriptions, SIMULTANEOUS_OPEN_CONNECTIONS, async (subscription) => {
 		try {
 			const response = await sendPushNotificationWithoutContact(
 				keys,

@@ -1,6 +1,7 @@
 import { CloudflareApiError, queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, upgradeBackupStoreKey } from '../../protocol/storage-keys';
-import { BACKUP_OBJECT, completeManifest, listBackupKeys, manifestKey, type UpgradeBackup } from './archive';
+import { BACKUP_OBJECT, completeManifest, listBackupKeys, manifestKey, pagedListing, type UpgradeBackup } from './archive';
+import { UPGRADE_CHECKPOINT_KEY, UPGRADE_PROGRESS_KEY } from '../deployment/database';
 
 /** A pending restore on any device records the backup it reads from the original server. */
 const RESTORE_HOLD_PREFIX = 'crate_restore_hold:';
@@ -9,16 +10,12 @@ const KEEP_COMPLETE_BACKUPS = 1;
 
 /** Keys below `prefix` mapped to their reported sizes. */
 export async function listBackupObjects(api: Pick<CloudflareApiClient, 'listR2ObjectSizes' | 'throttle'>, account: string, bucket: string, prefix: string): Promise<Map<string, number | null>> {
-	const objects = new Map<string, number | null>(), cursors = new Set<string>();
-	let cursor: string | undefined;
-	do {
+	const objects = new Map<string, number | null>();
+	for await (const object of pagedListing(async cursor => {
 		await api.throttle();
 		const page = await api.listR2ObjectSizes(account, bucket, cursor, prefix);
-		for (const object of page.objects) objects.set(object.key.slice(prefix.length), object.size);
-		cursor = page.cursor;
-		if (cursor && cursors.has(cursor)) throw new Error('Backup listing did not advance');
-		if (cursor) cursors.add(cursor);
-	} while (cursor);
+		return { items: page.objects, cursor: page.cursor };
+	})) objects.set(object.key.slice(prefix.length), object.size);
 	return objects;
 }
 
@@ -43,9 +40,9 @@ export async function releaseUpgradeBackupHold(api: BackupQueryApi, source: Sour
 
 /** Backups that an interrupted upgrade or a pending restore still needs. */
 async function protectedBackups(api: CloudflareApiClient, account: string, database: string): Promise<Set<string>> {
-	const rows = await queryD1Rows(api, account, database, `SELECT key, value FROM maintenance_state WHERE key IN ('crate_upgrade_checkpoint', 'crate_upgrade_backup') OR (key >= '${RESTORE_HOLD_PREFIX}' AND key < 'crate_restore_hold;');`);
+	const rows = await queryD1Rows(api, account, database, `SELECT key, value FROM maintenance_state WHERE key IN ('${UPGRADE_CHECKPOINT_KEY}', '${UPGRADE_PROGRESS_KEY}') OR (key >= '${RESTORE_HOLD_PREFIX}' AND key < 'crate_restore_hold;');`);
 	return new Set(rows.map(row => {
-		if (row.key !== 'crate_upgrade_backup') return String(row.value);
+		if (row.key !== UPGRADE_PROGRESS_KEY) return String(row.value);
 		try { return String((JSON.parse(String(row.value)) as { prefix?: unknown }).prefix); } catch { throw new Error('The saved upgrade backup progress is invalid. The update stopped before changing the database schema.'); }
 	}));
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from '../test/factories/sync-vault';
-import { buildCrateUpdate, crateUpdatePath } from './crate-update-bundle';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
+import { buildCrateUpdate, crateUpdatePath } from './bundle';
 import {
 	installCrateUpdate,
 	installedCrateVersion,
@@ -9,7 +9,7 @@ import {
 	publishCrateUpdate,
 	resumeCrateUpdate,
 	type CrateUpdateHost,
-} from './crate-update-install';
+} from './install';
 
 const manifest = (version: string) => JSON.stringify({ id: 'crate', name: 'Crate', version, minAppVersion: '1.13.0' });
 const release = (version: string) => ({ 'main.js': `main ${version}`, 'styles.css': `styles ${version}`, 'manifest.json': manifest(version) });

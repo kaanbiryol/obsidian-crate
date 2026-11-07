@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './worker-upload-payload';
+import runtime from '../worker-runtime.json';
 
 const artifacts = {
 	version: '0.1.0',
@@ -23,11 +24,14 @@ describe('Worker upload payloads', () => {
 		const body = new TextDecoder().decode(multipart.body);
 
 		expect(multipart.contentType).toMatch(/^multipart\/form-data; boundary=crate-/);
-		expect(body).toContain('"type":"d1","name":"DB"');
+		expect(body).toContain(`"compatibility_date":"${runtime.compatibilityDate}","compatibility_flags":${JSON.stringify(runtime.compatibilityFlags)}`);
+		expect(body).toContain(`"type":"d1","name":"${runtime.bindings.database}"`);
 		expect(body).toContain('"name":"CRATE_PUBLIC_ORIGIN","text":"https://worker.test"');
 		expect(body).toContain('"name":"CRATE_VAULT_NAME","text":"Notes"');
-		expect(body).toContain('"type":"r2_bucket","name":"BUCKET"');
-		expect(body).toContain('"name":"REMINDER_ALARMS","class_name":"ReminderAlarm"');
+		expect(body).toContain(`"type":"r2_bucket","name":"${runtime.bindings.bucket}"`);
+		expect(body).toContain(`"name":"${runtime.bindings.reminderAlarms}","class_name":"${runtime.durableObjectClass}"`);
+		expect(body).toContain(`"name":"${runtime.bindings.notificationRateLimiter}","namespace_id":"${0x89abcdef + 1}","simple":${JSON.stringify(runtime.notificationRateLimit)}`);
+		expect(body).toContain(`"exports":{"${runtime.durableObjectClass}":`);
 		expect(body).not.toContain('"name":"SETUP"');
 		expect(body).not.toContain('SetupCoordinator');
 		expect(body).toContain('"storage":"sqlite","state":"created"');

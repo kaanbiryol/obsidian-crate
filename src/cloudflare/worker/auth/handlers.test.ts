@@ -58,7 +58,7 @@ function createDb() {
 						return {};
 					}
 
-					if (sql.includes('DELETE FROM auth_tokens WHERE token_hash = ?')) {
+					if (sql.includes('DELETE FROM auth_tokens WHERE id IN (SELECT id FROM auth_tokens WHERE token_hash = ?)')) {
 						tokens.delete(getBoundString(statement._args, 0));
 					}
 

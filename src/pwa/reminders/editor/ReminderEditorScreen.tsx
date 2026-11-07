@@ -24,7 +24,7 @@ import {
 	formatModalDueSummary,
 } from './editor-draft';
 import type { ModalDraft, ModalPickerId, ModalState } from '../types';
-import { DEFAULT_PROJECT } from '@/reminders/core/constants';
+import { DEFAULT_PROJECT, togglePriority as toggledPriority } from '@/reminders/core/constants';
 import { clampCaretToReminderTitle, getReminderTitleCaret } from '@/reminders/ui/reminder-editor/reminderEditorEdits';
 import { saveCursorPosition } from '@/ui/shared/cursor-position';
 
@@ -154,7 +154,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 
 	const togglePriority = useCallback(() => {
 		const patch = applyReminderTextUpdate(draft, projectOptions, {
-			priority: draft.priority === 1 ? 4 : 1,
+			priority: toggledPriority(draft.priority),
 		});
 		if (typeof patch.content === 'string') {
 			const caret = saveCursorPosition(richTextInputRef.current?.getElement() ?? null);

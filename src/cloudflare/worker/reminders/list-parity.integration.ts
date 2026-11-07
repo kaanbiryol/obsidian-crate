@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { handleListReminders } from './routes/list';
+import { handleListReminders } from './handlers/list';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { createVaultKeyBundle } from '@/encryption/key-bundle';
 import { importEncryptionSecret } from '@/encryption/envelope';

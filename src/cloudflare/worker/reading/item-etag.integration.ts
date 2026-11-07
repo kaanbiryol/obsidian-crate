@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
-import { handleReadingRoute } from './routes';
+import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { ensureReadingIndex } from './library-index';
 import { policy, readStoredNote } from './common';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';

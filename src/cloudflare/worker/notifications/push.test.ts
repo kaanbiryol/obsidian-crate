@@ -4,7 +4,8 @@ import {
 	generateVapidKeys,
 	serializeVapidKeys,
 } from 'web-push-browser';
-import { createDeclarativePushPayload, getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
+import { createDeclarativePushPayload, sendToAllSubscriptions } from './push';
+import { getOrCreateVapidKeys } from './vapid-keys';
 import { createVapidAuthorizationToken, sendPushNotificationWithoutContact } from './web-push';
 
 vi.mock('web-push-browser', async (importOriginal) => {

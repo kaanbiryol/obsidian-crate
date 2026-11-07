@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FakeDocumentFragment } from '../test/factories/obsidian';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from '../test/factories/sync-vault';
-import { buildCrateUpdate, crateUpdatePath, serializeCrateUpdate, type CrateUpdateBundle } from './crate-update-bundle';
-import type { SyncResult } from '../sync/types';
+import { FakeDocumentFragment } from '../../test/factories/obsidian';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
+import { buildCrateUpdate, crateUpdatePath, serializeCrateUpdate, type CrateUpdateBundle } from './bundle';
+import type { SyncResult } from '../../sync/types';
 
 const notices: Array<string | FakeDocumentFragment> = [];
 let appVersionSupported = true;
@@ -16,7 +16,7 @@ async function load() {
 		requireApiVersion: () => appVersionSupported,
 	}));
 	vi.stubGlobal('DocumentFragment', FakeDocumentFragment);
-	return import('./crate-update-sync');
+	return import('./sync');
 }
 
 type Mutable = Omit<CrateUpdateBundle, 'format'> & { format: number };

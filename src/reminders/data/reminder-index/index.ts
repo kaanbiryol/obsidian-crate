@@ -342,7 +342,7 @@ export function createReminderIndex(
 				reminder.project = newProject;
 			}
 			lookupStore.addReminders(moved);
-			notifyListeners();
+			publishChange();
 		},
 
 		onIndexChange(listener: IndexChangeListener) {

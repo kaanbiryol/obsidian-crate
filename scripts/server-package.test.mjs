@@ -27,7 +27,7 @@ test('packed npx installation starts without repository files and preserves data
 	assert.equal(shrinkwrap.packages[''].version, version);
 	const paths = packed.files.map(file => file.path);
 	assert.ok(paths.includes('assets/worker.mjs'));
-	assert.ok(paths.includes('assets/database-upgrade-rules.mjs'));
+	for (const asset of ['database-upgrade-rules.mjs', 'credential-revocation.mjs', 'coordinator.mjs', 'worker-runtime.json']) assert.ok(paths.includes(`assets/${asset}`));
 	assert.ok(paths.includes('scripts/assets.mjs'));
 	assert.ok(paths.includes('vendor/miniflare/LICENSE'));
 	assert.ok(!paths.some(path => /node_modules\/.*(workerd|sharp)/.test(path)));
@@ -118,6 +118,7 @@ setInterval(() => {}, 1000);
 	// repository's dependencies. No private-network fixture may be contacted.
 	const { localNetworkOptions } = await import(pathToFileURL(join(install, 'scripts/local-server-runtime.mjs')).href);
 	const { Miniflare, convertV4MiniflareOptions } = miniflareRequire('./index.js');
+	const workerRuntime = JSON.parse(await readFile(join(install, 'assets/worker-runtime.json'), 'utf8'));
 	let hits = 0;
 	const privateServer = createServer((_request, reply) => { hits++; reply.end('private fixture'); });
 	await new Promise((resolve, reject) => { privateServer.once('error', reject); privateServer.listen(0, '127.0.0.1', resolve); });
@@ -128,7 +129,7 @@ setInterval(() => {}, 1000);
 		hits = 0;
 		network = new Miniflare(convertV4MiniflareOptions({
 			name: 'packed-network-regression', modules: true, host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false },
-			compatibilityDate: '2026-08-18', compatibilityFlags: ['global_fetch_strictly_public'],
+			compatibilityDate: workerRuntime.compatibilityDate, compatibilityFlags: workerRuntime.compatibilityFlags,
 			...localNetworkOptions(), bindings: { TARGET: target },
 			script: `export default { async fetch(request, env) {
 				try { const response = await (new URL(request.url).pathname === '/bound' ? env.READING_FETCH.fetch(env.TARGET) : fetch(env.TARGET));

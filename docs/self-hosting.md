@@ -267,6 +267,8 @@ npm run server -- revoke --id TOKEN_ID
 With Docker, use `docker compose exec crate crate devices` and
 `docker compose exec crate crate revoke --id TOKEN_ID`. Revoking a device also
 removes its push subscriptions and the Reading shortcut credentials it issued.
+While the server runs, the command revokes under the same coordinator lock as
+revoking from another device.
 
 When this plugin bundles a newer server than the one you run, Crate settings show
 **Server update available**. Update the server on its computer as described in

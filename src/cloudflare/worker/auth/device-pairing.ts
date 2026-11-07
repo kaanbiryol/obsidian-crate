@@ -5,6 +5,7 @@ import { parseJsonObject, parseOptionalString } from '../http/request-validation
 import { isSha256Hex } from '../../../platform/validation';
 import { sha256Hex } from '../../../platform/sha256';
 import { DEVICE_PAIRING_END, DEVICE_PAIRING_PREFIX, parseDevicePairingRecord, type DevicePairingRecord } from '../../../protocol/device-pairing';
+import { revokeCredentialStatements } from './revocation';
 
 const respond = (body: unknown, status = 200) => corsResponse(body, status, { 'Cache-Control': 'no-store' });
 const invalid = () => respond({ error: 'This pairing code expired or was already used. Create a new one on your desktop.' }, 410);
@@ -36,15 +37,14 @@ export async function exchangeDevicePairing(request: Request, db: D1Database): P
 	const grant = `EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? AND value = ?
 		AND json_extract(value, '$.resetGeneration') = COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), ''))`;
 	const created = 'EXISTS (SELECT 1 FROM auth_tokens WHERE id = ? AND token_hash = ?)';
-	// Re-pairing a device replaces its previous credential and what that credential owned.
-	const previous = "SELECT id FROM auth_tokens WHERE device_id = ? AND scope = 'vault' AND id != ?";
+	// Re-pairing a device replaces its previous credential and what that credential owned,
+	// only once this redemption has created its token.
+	const previous = `SELECT id FROM auth_tokens WHERE device_id = ? AND scope = 'vault' AND id != ? AND ${created}`;
 	const results = await db.batch([
 		db.prepare(`INSERT INTO auth_tokens (id, token_hash, device_id, device_name, platform, scope, last_seen_at)
 			SELECT ?, ?, ?, ?, ?, 'vault', datetime('now') WHERE ${grant}`)
 			.bind(record.id, body.tokenHash, deviceId, deviceName, platform, key, stored),
-		db.prepare(`DELETE FROM push_subscriptions WHERE owner_token_id IN (${previous}) AND ${created}`).bind(deviceId, record.id, record.id, body.tokenHash),
-		db.prepare(`DELETE FROM auth_tokens WHERE scope = 'reading_capture' AND device_id IN (${previous}) AND ${created}`).bind(deviceId, record.id, record.id, body.tokenHash),
-		db.prepare(`DELETE FROM auth_tokens WHERE id IN (${previous}) AND ${created}`).bind(deviceId, record.id, record.id, body.tokenHash),
+		...revokeCredentialStatements(db, previous, deviceId, record.id, record.id, body.tokenHash),
 		db.prepare(`UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? AND ${created}`)
 			.bind(JSON.stringify({ ...record, redeemed: body.tokenHash }), key, stored, record.id, body.tokenHash),
 	]);

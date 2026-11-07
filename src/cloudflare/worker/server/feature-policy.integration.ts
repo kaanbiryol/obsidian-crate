@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { featurePolicy, handleFeaturePolicy } from './feature-policy';
-import { handleReadingRoute } from '../reading/routes';
+import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { createReadingNote } from '@/reading/core/notes';
 import type { PendingCapture } from '../reading/captures';
 import { publishExtraction, type Publication } from '../reading/extraction/jobs';

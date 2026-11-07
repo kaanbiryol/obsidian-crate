@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
 import { buildInitialReminderContent } from '@/reminders/core/reminderDraft';
-import { DEFAULT_PROJECT } from '@/reminders/core/constants';
+import { DEFAULT_PRIORITY, DEFAULT_PROJECT } from '@/reminders/core/constants';
 import type { ModalDraft, ModalState, ReminderRecord } from '../types';
 import { isStoredReminderModal } from './reminder-draft-validation';
 import { privateStorage, REMINDER_DRAFT_PREFIX } from '../private-storage';
@@ -20,7 +20,7 @@ export function buildModalDraft(reminder: ReminderRecord | null, selectedProject
 		description: reminder?.description ?? '',
 		project: reminder?.project ?? defaultProject,
 		defaultProject,
-		priority: reminder?.priority ?? 4,
+		priority: reminder?.priority ?? DEFAULT_PRIORITY,
 		dueDate: parsedDate ? formatLocalDateKey(parsedDate) : '',
 		dueTime: reminder?.dueDatetime
 			? `${String(parsedDate?.getHours() ?? 0).padStart(2, '0')}:${String(parsedDate?.getMinutes() ?? 0).padStart(2, '0')}`

@@ -1,5 +1,8 @@
 import { readingUrlIdentity, type ReadingItem } from './model';
 
+/** Listed for every note sharing a Reading ID, and the refusal to change one, in each host. */
+export const READING_DUPLICATE_ID_ISSUE = 'Several notes have this Reading ID. Fix the duplicates in Obsidian.';
+
 /** Split items into those with a unique Reading ID and those sharing one.
  * Both lists keep input order; neither copy of a duplicate is chosen. */
 export function filterUniqueReadingIds<T extends Pick<ReadingItem, 'crate_reading_id'>>(items: readonly T[]): { unique: T[]; duplicates: T[] } {

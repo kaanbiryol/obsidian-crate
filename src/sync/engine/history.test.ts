@@ -35,7 +35,7 @@ async function harness(local: Record<string, string>, saved: Record<string, stri
 	} };
 	const settings = { ignorePatterns: ['excluded/'] };
 	const context = {
-		vault: vault as never, api: api as never, pluginDir: '.obsidian/plugins/crate',
+		vault: vault as never, api: api as never, recoveryRoot: '.obsidian/plugins/crate/state-recovery',
 		getSettings: () => settings,
 		// A deliberately stale sync baseline must never hide unsynced edits.
 		getManifest: vi.fn(() => ({ version: 1, files: target })),

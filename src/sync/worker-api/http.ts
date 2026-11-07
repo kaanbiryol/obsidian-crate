@@ -16,6 +16,10 @@ import { EncryptionDowngradeGuard } from './encryption-guard';
 const logger = createLogger('ApiClient');
 
 export const TRANSFER_TIMEOUT_MS = 120_000;
+/** Default for ordinary requests, and the most a preflight check may wait. */
+const REQUEST_TIMEOUT_MS = 30_000;
+/** How long compatibility metadata is reused before it is read again. */
+const SERVER_INFO_CACHE_MS = 30_000;
 /** Slowest sustained link a body transfer still completes on, about 0.26 Mbit/s. */
 const MIN_TRANSFER_BYTES_PER_SECOND = 32 * 1024;
 
@@ -159,17 +163,27 @@ export class WorkerApiHttpClient {
 	private workerUrl: string;
 	private authToken: string;
 	private encryptionHeaders: Record<string, string> = {};
-	setEncryptionAuthority(vaultId: string, generation: number): void {
-		this.encryptionHeaders = { [ENCRYPTION_VAULT_HEADER]: vaultId, [ENCRYPTION_GENERATION_HEADER]: String(generation) };
-	}
 	private externalSignal: AbortSignal | undefined;
 	private requestTimings = emptyRequestTimings();
-	resetRequestTimings(): void { this.requestTimings = emptyRequestTimings(); }
-	getRequestTimings() { return { ...this.requestTimings, ...(this.requestTimings.d1 ? { d1: { ...this.requestTimings.d1 } } : {}) }; }
 	private serverInfo?: { expires: number; value: CrateServerInfo };
 	private serverInfoRequest?: Promise<CrateServerInfo>;
 	private requestGeneration = 0;
 	private readonly encryptionGuard = new EncryptionDowngradeGuard();
+
+	constructor(
+		workerUrl: string,
+		authToken: string,
+		private readonly transport: ApiHttpTransport = obsidianHttpTransport,
+	) {
+		this.workerUrl = normalizeWorkerUrl(workerUrl);
+		this.authToken = authToken;
+	}
+
+	setEncryptionAuthority(vaultId: string, generation: number): void {
+		this.encryptionHeaders = { [ENCRYPTION_VAULT_HEADER]: vaultId, [ENCRYPTION_GENERATION_HEADER]: String(generation) };
+	}
+	resetRequestTimings(): void { this.requestTimings = emptyRequestTimings(); }
+	getRequestTimings() { return { ...this.requestTimings, ...(this.requestTimings.d1 ? { d1: { ...this.requestTimings.d1 } } : {}) }; }
 
 	refusePlaintext(refused: boolean): void { this.encryptionGuard.refusePlaintext(refused); }
 	refusesPlaintext(): boolean { return this.encryptionGuard.refusesPlaintext(); }
@@ -188,7 +202,7 @@ export class WorkerApiHttpClient {
 	}
 
 	/** Bound metadata reuse; the Worker still fences every mutation by protocol. */
-	async getServerInfo(timeout = 30_000): Promise<CrateServerInfo> {
+	async getServerInfo(timeout = REQUEST_TIMEOUT_MS): Promise<CrateServerInfo> {
 		if (this.externalSignal?.aborted) throw createAbortError('Sync request aborted');
 		if (this.serverInfo && this.serverInfo.expires > performance.now()) return this.serverInfo.value;
 		if (this.serverInfoRequest) return this.serverInfoRequest;
@@ -196,22 +210,13 @@ export class WorkerApiHttpClient {
 			if (this.serverInfoRequest !== pending) throw createAbortError('Server compatibility check was superseded');
 			const info = parseCrateServerInfo(value);
 			if (!info) throw new Error('Server returned invalid Crate compatibility metadata');
-			if (this.serverInfoRequest === pending) this.serverInfo = { value: info, expires: performance.now() + 30_000 };
+			if (this.serverInfoRequest === pending) this.serverInfo = { value: info, expires: performance.now() + SERVER_INFO_CACHE_MS };
 			return info;
 		}).finally(() => {
 			if (this.serverInfoRequest === pending) this.serverInfoRequest = undefined;
 		});
 		this.serverInfoRequest = pending;
 		return pending;
-	}
-
-	constructor(
-		workerUrl: string,
-		authToken: string,
-		private readonly transport: ApiHttpTransport = obsidianHttpTransport,
-	) {
-		this.workerUrl = normalizeWorkerUrl(workerUrl);
-		this.authToken = authToken;
 	}
 
 	setAbortSignal(signal: AbortSignal): void {
@@ -231,6 +236,35 @@ export class WorkerApiHttpClient {
 		return normalizeRequestDiagnostics({ clientSession: this.clientSession, requests: this.requestDiagnostics })!;
 	}
 
+	/** Checks compatibility before a mutation, and that the server stores plaintext
+	 * before a request would send or read it unencrypted. Resolves to the protocol to
+	 * send, or is null when the request needs no check. */
+	private preflight(path: string, options: ApiRequestOptions, timeout: number, generation: number): Promise<number> | null {
+		const keyed = Boolean(this.encryptionHeaders[ENCRYPTION_VAULT_HEADER]);
+		const mutation = isCrateMutation(path, options.method);
+		if (!mutation && !this.encryptionGuard.readNeedsProbe(path, options.method, keyed)) return null;
+		const checkTimeout = Math.min(timeout, REQUEST_TIMEOUT_MS);
+		// Probe without a private body before dispatching plaintext.
+		const probeEncryption = async (capable: boolean) => {
+			if (!capable) throw encryptionDowngradeError();
+			const state = await this.requestJson<{ encryption: unknown }>('/encryption', {}, checkTimeout);
+			if (state.encryption !== null) throw new HttpError('Unlock this vault in Manage encryption before sending changes', 428, null, 'encryption_required');
+			if (this.encryptionGuard.refusesPlaintext()) throw encryptionDowngradeError();
+		};
+		return (async () => {
+			const info = await this.getServerInfo(checkTimeout);
+			this.assertRequestCurrent(generation);
+			if (!mutation) {
+				await probeEncryption(info.capabilities.includes(ENCRYPTION_CAPABILITY));
+				return CRATE_PLUGIN_PROTOCOL.current;
+			}
+			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
+			const capable = info.capabilities.includes(ENCRYPTION_CAPABILITY);
+			if (this.encryptionGuard.mutationNeedsProbe(path, capable, keyed)) await probeEncryption(capable);
+			return Math.min(CRATE_PLUGIN_PROTOCOL.current, info.protocol.current);
+		})();
+	}
+
 	private async runRequest(
 		path: string,
 		options: ApiRequestOptions,
@@ -240,27 +274,9 @@ export class WorkerApiHttpClient {
 		const generation = this.requestGeneration;
 		const { workerUrl, authToken, externalSignal } = this;
 		this.assertRequestCurrent(generation);
-		let protocol = CRATE_PLUGIN_PROTOCOL.current;
-		const keyed = Boolean(this.encryptionHeaders[ENCRYPTION_VAULT_HEADER]);
-		// Probe without a private body before dispatching plaintext.
-		const probeEncryption = async (capable: boolean) => {
-			if (!capable) throw encryptionDowngradeError();
-			const state = await this.requestJson<{ encryption: unknown }>('/encryption', {}, Math.min(timeout, 30_000));
-			if (state.encryption !== null) throw new HttpError('Unlock this vault in Manage encryption before sending changes', 428, null, 'encryption_required');
-			if (this.encryptionGuard.refusesPlaintext()) throw encryptionDowngradeError();
-		};
-		if (isCrateMutation(path, options.method)) {
-			const info = await this.getServerInfo(Math.min(timeout, 30_000));
-			this.assertRequestCurrent(generation);
-			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
-			protocol = Math.min(protocol, info.protocol.current);
-			const capable = info.capabilities.includes(ENCRYPTION_CAPABILITY);
-			if (this.encryptionGuard.mutationNeedsProbe(path, capable, keyed)) await probeEncryption(capable);
-		} else if (this.encryptionGuard.readNeedsProbe(path, options.method, keyed)) {
-			const info = await this.getServerInfo(Math.min(timeout, 30_000));
-			this.assertRequestCurrent(generation);
-			await probeEncryption(info.capabilities.includes(ENCRYPTION_CAPABILITY));
-		}
+		const checks = this.preflight(path, options, timeout, generation);
+		// Without checks, the request dispatches before this call returns.
+		const protocol = checks ? await checks : CRATE_PLUGIN_PROTOCOL.current;
 
 		const headersWithoutContentType = Object.fromEntries(
 			Object.entries(options.headers ?? {}).filter(([key]) => key.toLowerCase() !== 'content-type'),
@@ -340,33 +356,34 @@ export class WorkerApiHttpClient {
 	async requestJson<T>(
 		path: string,
 		options: ApiRequestOptions = {},
-		timeout: number = 30_000,
+		timeout: number = REQUEST_TIMEOUT_MS,
 	): Promise<T> {
-		const generation = this.requestGeneration;
-		logger.info(`${options.method ?? 'GET'} ${path}`);
-		const response = await this.runRequest(path, {
+		const response = await this.requestChecked(path, {
 			...options,
 			contentType: options.contentType ?? getHeader(options.headers ?? {}, 'Content-Type') ?? 'application/json',
 		}, timeout);
-		this.assertRequestCurrent(generation);
-		throwForErrorResponse(response, options.method ?? 'GET', path);
-
-		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, REQUEST_ID_HEADER) ?? 'unavailable'}]`);
 		return parseJsonResponse<T>(response.text, path);
 	}
 
 	async requestBinary(
 		path: string,
 		options: ApiRequestOptions = {},
-		timeout: number = 30_000,
+		timeout: number = REQUEST_TIMEOUT_MS,
 	): Promise<{ body: ArrayBuffer; headers: Record<string, string> }> {
+		const response = await this.requestChecked(path, options, timeout, ' (binary)');
+		return { body: response.arrayBuffer, headers: response.headers };
+	}
+
+	/** Sends a request on the current connection and raises an error response. */
+	private async requestChecked(path: string, options: ApiRequestOptions, timeout: number, logSuffix = ''): Promise<ApiHttpResponse> {
 		const generation = this.requestGeneration;
-		logger.info(`${options.method ?? 'GET'} ${path} (binary)`);
+		const method = options.method ?? 'GET';
+		logger.info(`${method} ${path}${logSuffix}`);
 		const response = await this.runRequest(path, options, timeout);
 		this.assertRequestCurrent(generation);
-		throwForErrorResponse(response, options.method ?? 'GET', path);
+		throwForErrorResponse(response, method, path);
 
-		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, REQUEST_ID_HEADER) ?? 'unavailable'}] (binary)`);
-		return { body: response.arrayBuffer, headers: response.headers };
+		logger.info(`${method} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, REQUEST_ID_HEADER) ?? 'unavailable'}]${logSuffix}`);
+		return response;
 	}
 }

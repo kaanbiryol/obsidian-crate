@@ -42,8 +42,8 @@ import { mergeSyncResults } from '../sync-result';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { LocalContentVerifier } from './content-verifier';
 import { verifyUnchangedPendingPaths } from '../pending/pending-verification';
-import { assertNoOpenInitialImport } from './initial-import';
-import { MAX_DEBOUNCE_WAIT_MS, type SyncSettings } from '../settings';
+import type { SyncSettings } from '../settings';
+import { syncStoragePaths } from '../manifest/storage-paths';
 import { isMarkdownNoteInFolder } from '../../protocol/note-paths';
 
 const logger = createLogger('SyncEngine');
@@ -78,6 +78,7 @@ export class SyncEngine {
 	private readonly conflicts: ConflictTracking;
 	/** Per engine, so new credentials (a new engine) can show the notice again. */
 	private readonly reconnectNotice = new ReconnectNotice();
+	private readonly storage: ReturnType<typeof syncStoragePaths>;
 
 	constructor(
 		plugin: Plugin,
@@ -95,10 +96,14 @@ export class SyncEngine {
 		this.vault = plugin.app.vault;
 		this.api = api;
 		this.settings = settings;
+		// Plugin files keep the folder as Obsidian reports it, as the manifest and conflict
+		// stores do; matching vault paths needs it without a trailing slash.
+		this.storage = syncStoragePaths(`${plugin.manifest.dir}`);
+		const pluginFolder = plugin.manifest.dir!.replace(/\/+$/, '');
 		this.localManifest = stores.localManifest ?? new LocalManifest(plugin.app, plugin.manifest, getCheckpointAuthority(settings) || 'unconfigured');
 		this.contentVerifier = new LocalContentVerifier({
 			adapter: this.vault.adapter,
-			path: `${plugin.manifest.dir}/content-verification.json`,
+			path: this.storage.contentVerification,
 			authority: getCheckpointAuthority(settings) || 'unconfigured',
 		});
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
@@ -121,9 +126,8 @@ export class SyncEngine {
 		};
 		this.conflictStore = stores.createConflictStore?.(onActiveCountChange)
 			?? new ConflictStore(plugin.app, plugin.manifest, onActiveCountChange);
-		const pluginDir = plugin.manifest.dir?.replace(/\/+$/, '');
 		this.ignore = createSyncIgnoreMatcher(
-			() => [...(pluginDir ? [`${pluginDir}/`] : []), this.markdownBaseCache.getIgnoredPrefix()],
+			() => [...(pluginFolder ? [`${pluginFolder}/`] : []), this.markdownBaseCache.getIgnoredPrefix()],
 			() => this.settings.ignorePatterns,
 		);
 		this.pendingScanPatterns = [...settings.ignorePatterns];
@@ -160,7 +164,7 @@ export class SyncEngine {
 		this.contexts = new SyncEngineContexts({
 			prepareReminderScope: async () => { await this.prepareReminderScope?.(); },
 			vault: this.vault,
-			pluginDir: this.plugin.manifest.dir!.replace(/\/+$/, ''),
+			pluginDir: pluginFolder,
 			fileManager: this.plugin.app.fileManager,
 			api: this.api,
 			files: this.files,
@@ -179,33 +183,13 @@ export class SyncEngine {
 			updateState: this.updateState.bind(this),
 			reconnectNotice: this.reconnectNotice,
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
-		});
-		this.queueController = new SyncQueueController({
-			finishInitialSetup: this.contexts.finishInitialSetup,
-			uploadPreparedFiles: this.contexts.uploadPreparedFiles,
-			deleteRemoteFiles: this.contexts.deleteRemoteFiles,
-			automaticSyncEnabled: () => this.settings.automaticSync,
-			recoverUploads: async () => {
-				void this.retryReminderScope();
-				await assertNoOpenInitialImport(this.api);
-				await this.contexts.recoverUploads();
-				this.updateState({ work: { phase: 'applying' } });
-			},
-			api: {
-				isConfigured: () => this.api.isConfigured(),
-			},
-			localManifest: this.localManifest,
-			shouldIgnore: this.ignore.shouldIgnore,
-			...this.contexts.completion,
 			isDestroyed: () => this.lifecycle.isDestroyed,
-			currentStatus: () => this.state.status,
+			retryReminderScope: () => this.retryReminderScope(),
 			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
-			prepareUploadFromPath: this.contexts.prepareUploadFromPath,
-			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
-			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
-			reconcile: (queueKeys) => this.reconcileFromQueue(queueKeys),
-			onFlushResult: (result) => this.onAutomaticSyncResult?.(result),
+			reconcileQueue: queueKeys => this.reconcileFromQueue(queueKeys),
+			onFlushResult: result => this.onAutomaticSyncResult?.(result),
 		});
+		this.queueController = new SyncQueueController(this.contexts.queue);
 		this.rawConfigEvents = createRawConfigEventHandler({
 			vault: this.vault,
 			manifest: this.localManifest,
@@ -301,7 +285,7 @@ export class SyncEngine {
 		return createEnginePendingChanges({
 			vault: this.vault, api: this.api, manifest: this.localManifest,
 			cache: this.markdownBaseCache, queue: this.queueController,
-			backupRoot: `${this.plugin.manifest.dir}/discard-recovery`,
+			backupRoot: this.storage.discardRecovery,
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			beforeBinaryReplace: path => this.prepareRecoverableReplacement(path),
@@ -326,7 +310,7 @@ export class SyncEngine {
 
 	private history() {
 		return createEngineHistory({
-			vault: this.vault, api: this.api, pluginDir: `${this.plugin.manifest.dir}`,
+			vault: this.vault, api: this.api, recoveryRoot: this.storage.stateRecovery,
 			getSettings: () => this.settings, getManifest: () => this.localManifest.getManifest(),
 			shouldIgnore: this.ignore.shouldIgnore,
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
@@ -631,9 +615,7 @@ export class SyncEngine {
 	}
 
 	private async reconcilePaths(queueKeys: string[], recover = true, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> {
-		this.contexts.assertNoVaultReplacement();
-		await assertNoOpenInitialImport(this.api);
-		if (recover) await this.contexts.recoverUploads();
+		await this.contexts.beforeTargetedTransfer({ recover });
 		this.lifecycle.throwIfDestroyed();
 		return this.contexts.reconcileQueuePaths(queueKeys, onFailure);
 	}

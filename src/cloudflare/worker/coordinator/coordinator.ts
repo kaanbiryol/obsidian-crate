@@ -4,6 +4,9 @@
  * imports, checkpoints, Reading publication and maintenance. Each reminder's
  * delivery state lives in an instance named by its reminder ID. Renaming a role
  * orphans the state stored under its old name.
+ *
+ * The local server package loads this module too, directly through type stripping or
+ * as a transpiled copy, so keep it free of imports and use only erasable syntax.
  */
 const COORDINATOR_NAME = '__crate__/projection';
 const NOTIFICATION_DISPATCHER_NAME = '__crate__/notification-dispatch';
@@ -23,6 +26,7 @@ export const COORDINATOR_PATHS = {
 	dispatchJobs: '/dispatch-jobs',
 	commitUpload: '/commit-upload',
 	commitNewFiles: '/commit-new-files',
+	revokeCredential: '/revoke-credential',
 } as const;
 type CoordinatorPath = typeof COORDINATOR_PATHS[keyof typeof COORDINATOR_PATHS];
 
@@ -109,6 +113,14 @@ export async function dispatchNotifications(env: AlarmBinding, remindersEnabled?
 /** Commits a staged upload under the coordinator lock. */
 export function commitCoordinatorUpload(env: AlarmBinding, init: Omit<RequestInit, 'method'>): Promise<Response> {
 	return post(coordinatorStub(env), COORDINATOR_PATHS.commitUpload, init);
+}
+
+/** Revokes a credential under the coordinator lock, which coordinator routes authenticate
+ * under, so no request it authenticated there commits afterward. Returns whether it existed. */
+export async function revokeCoordinatedCredential(env: AlarmBinding, id: string): Promise<boolean> {
+	const response = await post(coordinatorStub(env), COORDINATOR_PATHS.revokeCredential, { body: JSON.stringify({ id }) });
+	if (!response.ok) throw new Error('The server could not revoke this credential. Try again.');
+	return (await response.json() as { revoked: boolean }).revoked;
 }
 
 /** Schedules one reminder's delivery on its own instance; the method selects the command. */

@@ -49,7 +49,7 @@ export async function readSmallJson(request, limit = 2048) {
 
 /** Administration stays on a private local socket and additionally requires a
  * random secret stored in the owner's private data directory. Never proxied. */
-export async function startLocalControl({ dataDir, pairing, origin, db }) {
+export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 	const file = join(dataDir, 'control.json');
 	const id = randomBytes(16).toString('hex');
 	const socket = process.platform === 'win32' ? `\\\\.\\pipe\\crate-${id}` : join(tmpdir(), `crate-${id}.sock`);
@@ -57,14 +57,14 @@ export async function startLocalControl({ dataDir, pairing, origin, db }) {
 	const server = createServer(async (request, response) => {
 		if (request.headers.authorization !== `Bearer ${secret}`) { sendJson(response, 403, { error: 'Not authorized' }); return; }
 		if (request.method === 'GET' && request.url === '/devices') {
-			try { sendJson(response, 200, { devices: await listLocalDevices(db) }); }
+			try { sendJson(response, 200, { devices: await listLocalDevices(runtime.db) }); }
 			catch { sendJson(response, 500, { error: 'Could not list devices.' }); }
 			return;
 		}
 		if (request.method === 'POST' && request.url === '/revoke') {
 			try {
 				const { id } = await readSmallJson(request);
-				sendJson(response, 200, { revoked: await revokeLocalDevice(db, id) });
+				sendJson(response, 200, { revoked: await revokeLocalDevice(runtime, id) });
 			} catch (error) { sendJson(response, 400, { error: error.message }); }
 			return;
 		}

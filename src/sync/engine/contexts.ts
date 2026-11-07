@@ -21,10 +21,10 @@ import { uploadPreparedFiles as transferUploadPreparedFiles } from '../transfer/
 import { PREPARE_CONCURRENCY, DOWNLOAD_CONCURRENCY } from '../transfer/constants';
 import type { FileDiff, PreparedUpload, SyncResult, SyncState, SyncWork } from '../types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
-import { runInitialImport } from './initial-import';
+import { assertNoOpenInitialImport, runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
 import type { InitialConfigPull } from '../manifest/initial-config-pull';
-import { updateSyncProgress, type SyncSettings } from '../settings';
+import { MAX_DEBOUNCE_WAIT_MS, updateSyncProgress, type SyncSettings } from '../settings';
 import type { ReconnectNotice, WorkflowCompletionContext } from '../sync-outcome';
 import type { SyncWorkflowContext } from './standard-sync-workflow';
 import type { ForceSyncWorkflowContext } from './force-sync-workflow';
@@ -32,6 +32,7 @@ import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './full-sync-upload';
 import { createPathRecord } from '../../protocol/path-record';
 import { moveVaultToTrash } from '../local/vault-replacement';
+import type { SyncQueueControllerContext } from '../queue/controller';
 
 const VAULT_REPLACEMENT_UNFINISHED = 'Select Sync now to finish replacing this vault with your Crate server’s contents.';
 
@@ -57,6 +58,13 @@ interface SyncEngineContextDependencies {
 	updateState: (updates: Partial<SyncState>) => void;
 	reconnectNotice: ReconnectNotice;
 	throwIfDestroyed: () => void;
+	isDestroyed: () => boolean;
+	/** Prepares reminder settings again, logging rather than throwing a failure. */
+	retryReminderScope: () => Promise<void>;
+	verifyPendingPaths: (keys: string[], isCurrent: (key: string) => boolean) => Promise<string[]>;
+	/** Reconciles queue keys that lost a compare-and-swap race and publishes the outcome. */
+	reconcileQueue: (queueKeys: string[]) => Promise<SyncResult>;
+	onFlushResult: (result: SyncResult) => void | Promise<void>;
 }
 
 /** Contexts are built once: every member reads engine state when called. The
@@ -70,6 +78,7 @@ export class SyncEngineContexts {
 	readonly completion: WorkflowCompletionContext;
 	readonly syncWorkflow: SyncWorkflowContext;
 	readonly forceSyncWorkflow: ForceSyncWorkflowContext;
+	readonly queue: SyncQueueControllerContext;
 
 	constructor(private readonly dependencies: SyncEngineContextDependencies) {
 		const d = dependencies;
@@ -150,6 +159,29 @@ export class SyncEngineContexts {
 			prepareForceUpload: (file, expectedHash) => prepareUploadFromVaultFile(this.transfer, file, { force: true, expectedHash }),
 			encrypted: this.encrypted,
 		};
+		this.queue = {
+			finishInitialSetup: this.finishInitialSetup,
+			uploadPreparedFiles: this.uploadPreparedFiles,
+			deleteRemoteFiles: this.deleteRemoteFiles,
+			automaticSyncEnabled: () => d.getSettings().automaticSync,
+			recoverUploads: async () => {
+				void d.retryReminderScope();
+				await this.beforeTargetedTransfer({ recover: true });
+				this.reportWork({ phase: 'applying' });
+			},
+			apiConfigured: base.apiConfigured,
+			localManifest: d.localManifest,
+			shouldIgnore: d.shouldIgnore,
+			...this.completion,
+			isDestroyed: d.isDestroyed,
+			getStatus: d.getStatus,
+			verifyPendingPaths: d.verifyPendingPaths,
+			prepareUploadFromPath: this.prepareUploadFromPath,
+			getDebounceDelayMs: () => (d.getSettings().debounceDelay ?? 5) * 1000,
+			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
+			reconcile: d.reconcileQueue,
+			onFlushResult: d.onFlushResult,
+		};
 	}
 
 	clearPlannedContent(): void { this.plannedContent.clear(); }
@@ -228,10 +260,22 @@ export class SyncEngineContexts {
 	 * Every upload path recovers first, so none runs before a confirmed replacement. */
 	readonly recoverUploads = (): Promise<void> => {
 		this.assertNoVaultReplacement();
-		return this.dependencies.files.recoverUploads((current, total) => this.dependencies.updateState({ work: { phase: 'recovering', current, total } }));
+		return this.replayUploads();
 	};
 
-	assertNoVaultReplacement(): void {
+	/** Runs before a queue flush or a targeted reconciliation transfers anything. The local
+	 * replacement check comes first, so no server request runs before it passes. */
+	readonly beforeTargetedTransfer = async ({ recover }: { recover: boolean }): Promise<void> => {
+		this.assertNoVaultReplacement();
+		await assertNoOpenInitialImport(this.dependencies.api);
+		if (recover) await this.replayUploads();
+	};
+
+	private replayUploads(): Promise<void> {
+		return this.dependencies.files.recoverUploads((current, total) => this.dependencies.updateState({ work: { phase: 'recovering', current, total } }));
+	}
+
+	private assertNoVaultReplacement(): void {
 		if (this.dependencies.getSettings().replaceVault) throw new Error(VAULT_REPLACEMENT_UNFINISHED);
 	}
 

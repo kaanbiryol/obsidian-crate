@@ -4,7 +4,7 @@ import { errorMessage } from '../../platform/logger';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { LocalFilePresentError } from '../local/local-absence';
 import { BATCH_DELETE_CONCURRENCY } from './constants';
-import { HttpError } from '../worker-api/http';
+import { fileFailure } from '../failures';
 
 export interface ConditionalDeleteCandidate {
 	path: string;
@@ -75,23 +75,13 @@ export async function deleteFilesInBatches(
 			} catch (error) {
 				stopped = true;
 				if (isAbortError(error)) { cancelled = true; return; }
-				const status = error instanceof LocalFilePresentError ? 409 : error instanceof HttpError ? error.status : undefined;
-				const code = error instanceof LocalFilePresentError ? 'version_conflict' : error instanceof HttpError && isMutationFailureCode(error.code)
-					? error.code
-					: undefined;
-				const currentHash = error instanceof HttpError ? error.currentHash : undefined;
-				const message = errorMessage(error);
+				// A file that reappeared locally replans like a server-side version change.
+				const failure = (path: string): MutationFailure => error instanceof LocalFilePresentError
+					? { path, error: errorMessage(error), status: 409, code: 'version_conflict' }
+					: fileFailure(path, error);
 				const unsent = files.slice(nextIndex);
 				nextIndex = files.length;
-				for (const file of [...chunk, ...unsent]) {
-					errors.push({
-						path: file.path,
-						error: message,
-						...(status === undefined ? {} : { status }),
-						...(code === undefined ? {} : { code }),
-						...(currentHash === undefined ? {} : { currentHash }),
-					});
-				}
+				for (const file of [...chunk, ...unsent]) errors.push(failure(file.path));
 			}
 			onProcessed?.(chunk.length);
 		}
@@ -102,14 +92,4 @@ export async function deleteFilesInBatches(
 
 	const acknowledged = new Set(deleted);
 	return { outcome: cancelled ? 'cancelled' : errors.length === 0 ? 'completed' : 'failed', success: !cancelled && errors.length === 0, deleted: files.filter(file => acknowledged.has(file.path)).map(file => file.path), errors };
-}
-
-function isMutationFailureCode(value: string | undefined): value is NonNullable<MutationFailure['code']> {
-	return value === 'version_conflict'
-		|| value === 'namespace_conflict'
-		|| value === 'operation_expired'
-		|| value === 'operation_mismatch'
-		|| value === 'validation'
-		|| value === 'storage'
-		|| value === 'unknown';
 }

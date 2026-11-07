@@ -2,6 +2,7 @@ import type { CloudflareApiClient } from '../cloudflare-api';
 import { isSha256Hex } from '../../platform/validation';
 import { sha256Hex } from '../../platform/sha256';
 import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE } from '../../protocol/storage-keys';
+import { quoteName } from '../d1-sql';
 
 export interface BackupSource { account: string; database: string; bucket: string }
 interface BackupObject { key: string; sha256: string; size: number; contentType?: string }
@@ -17,28 +18,40 @@ export const BACKUP_PREFIX = /^__crate__\/backups\/schema-upgrade-[a-f0-9]{8}-(?
 /** A backup's manifest or one of its checksum-named objects. */
 export const BACKUP_OBJECT = new RegExp(`${BACKUP_PREFIX.source.slice(0, -1)}\\/(?:archive\\.json|objects\\/[a-f0-9]{64})$`);
 export const manifestKey = (prefix: string) => `${prefix}/archive.json`;
-/** Quotes any SQLite identifier, including write-guard trigger names. */
-export const quoteName = (name: string) => `"${name.replace(/"/g, '""')}"`;
 /** Quotes an identifier read from a downloaded backup, accepting only names like Crate's schema uses. */
 export const quote = (name: string) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('Unsupported backup identifier'); return quoteName(name); };
-export const literal = (value: unknown): string => value === null ? 'NULL' : typeof value === 'number' && Number.isFinite(value) ? String(value) : typeof value === 'string' ? `'${value.replace(/'/g, "''")}'` : (() => { throw new Error('Unsupported database value in upgrade checkpoint'); })();
+
+/** Items of a cursor-paged R2 listing in order. A repeated cursor throws `stalled`. */
+export async function* pagedListing<T>(listPage: (cursor: string | undefined) => Promise<{ items: readonly T[]; cursor?: string }>,
+	stalled = 'Backup listing did not advance'): AsyncGenerator<T> {
+	const cursors = new Set<string>();
+	let cursor: string | undefined;
+	do {
+		const page = await listPage(cursor);
+		yield* page.items;
+		cursor = page.cursor;
+		if (cursor && cursors.has(cursor)) throw new Error(stalled);
+		if (cursor) cursors.add(cursor);
+	} while (cursor);
+}
 
 /** Keys below the upgrade backup prefix in listing order, stopping at the shared
  * store, which sorts after every backup and holds no manifests. */
 export async function* listBackupKeys(api: Pick<CloudflareApiClient, 'listR2Objects'>, account: string, bucket: string, beforePage?: () => Promise<void>): AsyncGenerator<string> {
-	const cursors = new Set<string>();
-	let cursor: string | undefined;
-	do {
+	for await (const key of pagedListing(async cursor => {
 		await beforePage?.();
 		const page = await api.listR2Objects(account, bucket, cursor, UPGRADE_BACKUP_PREFIX);
-		for (const key of page.keys) {
-			if (key.startsWith(`${UPGRADE_BACKUP_STORE}/`)) return;
-			yield key;
-		}
-		cursor = page.cursor;
-		if (cursor && cursors.has(cursor)) throw new Error('Backup listing did not advance');
-		if (cursor) cursors.add(cursor);
-	} while (cursor);
+		return { items: page.keys, cursor: page.cursor };
+	})) {
+		if (key.startsWith(`${UPGRADE_BACKUP_STORE}/`)) return;
+		yield key;
+	}
+}
+
+/** Encodes a complete format 2 manifest, the bytes `completeManifest` decodes. */
+export function encodeManifest(manifest: Omit<UpgradeBackup, 'format' | 'complete'>): Uint8Array {
+	const { createdAt, source: { account, database, bucket }, databaseParts, objects } = manifest;
+	return new TextEncoder().encode(JSON.stringify({ format: 2, complete: true, createdAt, source: { account, database, bucket }, bookmark: null, databaseParts, objects }));
 }
 
 /** Decodes a manifest that claims to be a complete format 2 backup. Callers validate the rest. */

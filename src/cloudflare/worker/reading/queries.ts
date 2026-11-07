@@ -3,6 +3,7 @@ import { ReadingError, readingItemId, readingNotModified, readingResponse, readS
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { parseReadingNote } from '@/reading/core/notes';
+import { READING_DUPLICATE_ID_ISSUE } from '@/reading/core/inventory';
 import { validateReadingMetadata } from '@/reading/core/model';
 import { sha256Hex } from '@/platform/sha256';
 import { ARTICLE_EDITED_ERROR, readingIndexScope, type ReadingIndexState } from './library-index';
@@ -57,7 +58,7 @@ const queuedStatement = (env: Env, current: ReadingPolicy) =>
 function listedPage(current: ReadingPolicy, rows: ReadingRow[], queued: Array<{ note: string }>) {
 	const issue = (row: ReadingRow) => row.error
 		?? (row.article_edited && current.enabled ? ARTICLE_EDITED_ERROR : null)
-		?? (row.duplicate ? 'Several notes have this Reading ID. Fix the duplicates in Obsidian.' : null);
+		?? (row.duplicate ? READING_DUPLICATE_ID_ISSUE : null);
 	return { items: [...queued.map(row => ({ ...parseReadingNote(row.note)!, path: '' })), ...rows.filter(row => row.metadata_json && !row.duplicate).map(row => ({ ...validateReadingMetadata(JSON.parse(row.metadata_json!) as Record<string, unknown>), path: row.path }))],
 		issues: rows.flatMap(row => { const message = issue(row); return message ? [{ path: row.path, message }] : []; }) };
 }

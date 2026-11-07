@@ -4,7 +4,7 @@ import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../../cloudflare/deployment/emb
 import { serverBuildLabel } from '../../../protocol/server-build';
 import type { CrateServerInfo } from '../../../protocol/server-info';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { isBundledServerNewer } from '../version-settings';
+import { isBundledServerNewer } from '../../../plugin/cloudflare/server-version';
 import type { SettingsSectionContext } from '../section-helpers';
 
 const CHECK_INTERVAL_MS = 10 * 60_000;

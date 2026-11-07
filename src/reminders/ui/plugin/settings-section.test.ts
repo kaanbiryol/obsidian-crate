@@ -13,10 +13,12 @@ afterEach(() => {
 	vi.resetModules();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../../../ui/settings/folder-suggest');
+	vi.doUnmock('../../plugin-integration');
 });
 
 it('uses a startup toggle and preserves the saved reminder defaults', async () => {
 	vi.doMock('../../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
+	vi.doMock('../../plugin-integration', () => ({ changeReminderFolder: vi.fn() }));
 	const { renderRemindersSettings } = await import('./settings-section');
 	const plugin = {
 		app: {},

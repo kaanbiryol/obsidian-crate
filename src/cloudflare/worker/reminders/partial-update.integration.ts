@@ -5,8 +5,8 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
-import { handleListReminders } from './routes/list';
-import { handleUpdateReminder } from './routes/existing-reminder';
+import { handleListReminders } from './handlers/list';
+import { handleUpdateReminder } from './handlers/existing-reminder';
 import { appendCreatedReminderBlock, buildCreatedReminderBlock } from '@/reminders/core/markdownReminderMutation';
 import type { ReminderRecord } from '@/pwa/reminders/types';
 

@@ -1,6 +1,6 @@
 import { confirmFeatureFolder, setSharedFeature } from '../../../plugin/feature-settings';
 import { Notice, Setting } from 'obsidian';
-import { changeReminderFolder } from '../../notification-policy-sync';
+import { changeReminderFolder } from '../../plugin-integration';
 import {
 	normalizeRemindersFolderPath,
 	type DueDateDefaultSetting,

@@ -1,12 +1,22 @@
-/** Files sync keeps in the plugin folder. Connection changes back them up and
- * checkpoint cleanup recognizes those backups, so all three share these names. */
+/** Files and folders sync keeps in the plugin folder. Connection changes back up the
+ * checkpoint files and checkpoint cleanup recognizes those backups, so all three share
+ * these names. */
 export function syncStoragePaths(pluginDir: string) {
 	const manifest = `${pluginDir}/file-manifest.json`;
+	const conflicts = `${pluginDir}/conflicts.json`;
 	return {
 		manifest,
 		manifestTmp: `${manifest}.tmp`,
 		manifestLog: `${pluginDir}/file-manifest.log`,
 		uploadJournal: `${pluginDir}/pending-uploads`,
+		conflicts,
+		conflictsTmp: `${conflicts}.tmp`,
+		contentVerification: `${pluginDir}/content-verification.json`,
+		markdownBaseCache: `${pluginDir}/markdown-base-cache`,
+		/** Originals saved while discarding local changes. */
+		discardRecovery: `${pluginDir}/discard-recovery`,
+		/** Originals saved while restoring a history checkpoint. */
+		stateRecovery: `${pluginDir}/state-recovery`,
 	};
 }
 

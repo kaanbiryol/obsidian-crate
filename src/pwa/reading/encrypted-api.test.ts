@@ -4,6 +4,9 @@ import { openFile, sealFile, type FileEncryptionAuthority } from '@/encryption/f
 import type { EncryptedInventoryFile } from '@/encryption/file-inventory';
 import { EncryptedReadingApi, type EncryptedReadingIndexEntry } from './encrypted-api';
 import { createReadingNote, parseReadingNote } from '../../reading/core/notes';
+import { READING_DUPLICATE_ID_ISSUE } from '../../reading/core/inventory';
+import { managedArticle } from '../../reading/core/article';
+import { readingFileCommandRefusal } from '../../reading/core/reading-file-command';
 import { captureServerArticle } from './capture-article';
 import { PathTags } from '@/encryption/path-tags';
 
@@ -320,7 +323,7 @@ it('saves links and edits other notes while two notes share a Reading ID, withou
 	const first = await note(readingId(222), 'First', 'https://example.com/first'), second = await note(readingId(222), 'Second', 'https://example.com/second');
 	const { api, commits } = library([unique, first, second]);
 	await expect(api.request('/reading/list')).resolves.toMatchObject({ items: [{ title: 'Unique' }], issues: [{}, {}] });
-	const duplicate = { ...retryable, message: 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.' };
+	const duplicate = { ...retryable, message: READING_DUPLICATE_ID_ISSUE };
 	await expect(api.request('/reading/update', favorite(readingId(222), 'edit-duplicate'))).rejects.toMatchObject(duplicate);
 	// The link is saved, but its ID cannot be answered until the duplicates are resolved.
 	await expect(api.request('/reading/capture', save('https://example.com/second', 'save-duplicate'))).rejects.toMatchObject(duplicate);
@@ -328,6 +331,26 @@ it('saves links and edits other notes while two notes share a Reading ID, withou
 	await expect(api.request('/reading/update', favorite(readingId(221), 'edit-unique'))).resolves.toMatchObject({ saved: true });
 	await expect(api.request('/reading/capture', save('https://example.com/new', 'save-new'))).resolves.toMatchObject({ saved: true });
 	expect(commits()).toBe(2);
+});
+
+it('refuses edits with the wording and status the plaintext Worker sends', async () => {
+	const plain = await note(readingId(231), 'Plain', 'https://example.com/plain');
+	// A capture whose article was already saved cannot be downloaded again.
+	const empty = createReadingNote({ id: readingId(232), url: 'https://example.com/saved', title: 'Saved', savedAt: '2026-10-01T12:00:00Z' });
+	const block = managedArticle(empty)!, text = `${empty.slice(0, block.start)}\nSaved text\n${empty.slice(block.end)}`;
+	const sealed = await sealFile({ path: 'Reading/Saved.md', content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: null }, authority);
+	const { api, commits } = library([plain, { bytes: sealed.bytes, file: { path: await paths.wire('Reading/Saved.md'), hash: sealed.hash, size: sealed.bytes.length, revision: 'r1' } }]);
+	let operations = 0;
+	const edit = (action: string, body: Record<string, unknown>) => api.request(`/reading/${action}`, JSON.stringify({ operationId: `refused-${++operations}`, ...body }));
+	const refused = (issue: 'invalid' | 'unsupported' | 'conflict' | 'not-empty', action: 'delete' | 'retry' | 'update') => readingFileCommandRefusal({ kind: 'issue', issue }, action);
+	await expect(edit('update', { id: readingId(231), changes: [], before: {} })).rejects.toMatchObject(refused('invalid', 'update'));
+	await expect(edit('update', { id: readingId(231), changes: { source_url: 'https://other.example' }, before: {} })).rejects.toMatchObject(refused('unsupported', 'update'));
+	await expect(edit('update', { id: readingId(231), changes: { favorite: false }, before: { favorite: true } })).rejects.toMatchObject(refused('conflict', 'update'));
+	await expect(edit('delete', { id: readingId(231), before: { favorite: true }, markdownHash: '0'.repeat(64) })).rejects.toMatchObject(refused('conflict', 'delete'));
+	await expect(edit('retry', { id: readingId(232) })).rejects.toMatchObject(refused('not-empty', 'retry'));
+	expect(commits()).toBe(0);
+	// The case the two clients used to word differently: both now settle it for review with status 400.
+	expect(refused('not-empty', 'retry')).toEqual({ message: 'Only URL captures with an unchanged article section can be extracted.', status: 400 });
 });
 
 it('names a failed note by its plaintext path and retries it at the same sequence', async () => {

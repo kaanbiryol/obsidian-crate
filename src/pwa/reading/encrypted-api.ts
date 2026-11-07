@@ -1,5 +1,5 @@
 import { applyLocalArticle } from '../../reading/core/article';
-import { planReadingFileCommand, type ReadingFileCommandPlan } from '../../reading/core/reading-file-command';
+import { planReadingFileCommand, readingFileCommandRefusal } from '../../reading/core/reading-file-command';
 import type { CapturedArticle } from '../../reading/extraction/types';
 import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
 import { decryptJson, encryptJson } from '@/encryption/envelope';
@@ -7,23 +7,22 @@ import { createReadingNote, parseReadingNote, readingImportId } from '../../read
 import { readReadingFrontmatter, patchReadingFrontmatter } from '../../reading/core/frontmatter';
 import { MAX_READING_BYTES, readingUrl, type ReadingItem } from '../../reading/core/model';
 import { readingCapturePath, retitledCapturePath } from '../../reading/core/filename';
-import { filterUniqueReadingIds, findSavedReadingLink } from '../../reading/core/inventory';
+import { filterUniqueReadingIds, findSavedReadingLink, READING_DUPLICATE_ID_ISSUE } from '../../reading/core/inventory';
 import { portablePathKey } from '@/protocol/portable-path';
-import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, openVerifiedInventoryFile, sameInventoryFile } from '@/encryption/file-inventory';
+import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, sameInventoryFile } from '@/encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
 import { responseError } from '@/pwa/connection/response-error';
 import type { PathTags } from '@/encryption/path-tags';
-import { resolveEncryptedPath } from '@/encryption/path-binding';
 import { acceptsSealedNote } from './sealed-notes';
+import { encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
 
 // The documented device budget: each refresh seals the whole list and index.
 export const MAX_READING_FILES = 10_000;
 const MAX_READING_METADATA_BYTES = 12 * 1024 * 1024;
 // Changed notes download in parallel, a few at a time, in page order.
 const SOURCE_CONCURRENCY = 6;
-const DUPLICATE_ID_ISSUE = 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.';
 const SEALED_ISSUE = 'The server created a note that would replace or take the name of another note. It was not opened.';
 // Article opens reuse the last confirmed inventory this long; a list refresh or a commit reads it again.
 const ITEM_INVENTORY_REUSE_MS = 30_000;
@@ -93,10 +92,7 @@ export class EncryptedReadingApi {
 		}
 		return await response.json() as T;
 	}
-	// 'reminder' is the shared envelope purpose for operation objects in every scope, Reading
-	// included. The plugin binds it into each protected header, so it is a wire value, not a
-	// feature label: renaming it here breaks decryption with the plugin and stored ciphertext.
-	private context(id: string) { return { vaultId: this.options.authority.vaultId, scopeId: this.options.authority.scopeId, objectId: id, purpose: 'reminder' as const }; }
+	private context(id: string) { return encryptedOperationContext(this.options.authority.vaultId, this.options.authority.scopeId, id); }
 	private async source(file: WireFile, sources = this.sources): Promise<Source> {
 		const folder = encodeURIComponent(this.options.wireFolder);
 		let source = sources.get(file.path);
@@ -104,10 +100,8 @@ export class EncryptedReadingApi {
 			if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new Error('This Reading note is too large.');
 			const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`).catch(() => undefined);
 			if (!response?.ok) throw new NoteUnavailableError('Article changed or is unavailable. Refresh to retry.');
-			const reading = { plain: this.options.folderPath, wire: this.options.wireFolder };
-			let sealed = false;
-			const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, this.options.authority,
-				'Encrypted article failed integrity verification.', (metadataPath, isSealed) => { sealed = isSealed; return resolveEncryptedPath(this.options.paths, file.path, metadataPath, sealed, reading); });
+			const { opened, sealed } = await openEncryptedNote(response, file, { authority: this.options.authority, integrityError: 'Encrypted article failed integrity verification.',
+				paths: this.options.paths, sealedFolder: { plain: this.options.folderPath, wire: this.options.wireFolder } });
 			if (opened.content.byteLength > MAX_READING_BYTES) throw new Error('Reading notes must be smaller than 1 MB.');
 			const content = new TextDecoder('utf-8', { fatal: true }).decode(opened.content);
 			const metadata = parseReadingNote(content);
@@ -197,7 +191,7 @@ export class EncryptedReadingApi {
 		for (const path of nextSources.keys()) if (!next.has(path)) nextSources.delete(path);
 		this.sources = nextSources;
 		const { unique: items, duplicates } = filterUniqueReadingIds(candidates);
-		for (const item of duplicates) issues.push({ path: item.path, message: DUPLICATE_ID_ISSUE });
+		for (const item of duplicates) issues.push({ path: item.path, message: READING_DUPLICATE_ID_ISSUE });
 		this.library = { readable: candidates, duplicateIds: new Set(duplicates.map(item => item.crate_reading_id)), unreadable };
 		// Unrelated vault edits advance the sequence; an unchanged fingerprint lets
 		// callers keep their saved library instead of rewriting and redrawing it.
@@ -229,19 +223,20 @@ export class EncryptedReadingApi {
 				if ('response' in prepared) return prepared.response;
 				attempt = prepared.attempt;
 			}
-			const response = await this.options.request('/reading/encrypted-commit', attempt.body);
-			const result = await response.json() as { encrypted?: string; error?: string; code?: string };
-			if (response.status === 409 && result.code === 'version_conflict') {
-				// The Worker replays a committed copy of this operation before reporting a
-				// conflict, so the immutable attempt never committed. Rebuild it once against
-				// the current note under the same operation ID; a second conflict needs review.
+			const outcome = await postEncryptedCommit((path, body) => this.options.request(path, body), '/reading', attempt.body);
+			if (outcome.kind === 'conflict') {
+				// The immutable attempt never committed. Rebuild it once against the current
+				// note under the same operation ID; a second conflict needs review.
 				attempt = { ...attempt, rejected: true };
 				await this.options.writeAttempt(id, attempt);
-				if (rebuilt) throw this.options.error(result.error ?? 'A note changed. Refresh before retrying.', response.status, result.code);
+				if (rebuilt) throw this.options.error(outcome.answer.error ?? 'A note changed. Refresh before retrying.', outcome.response.status, outcome.answer.code);
 				continue;
 			}
-			if (!response.ok || typeof result.encrypted !== 'string') throw this.options.error(result.error ?? 'Reading request failed.', response.status, result.code);
-			const receipt = await decryptJson(result.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
+			if (outcome.kind === 'failed') {
+				const answer = outcome.answer ?? await outcome.response.json() as { error?: string; code?: string };
+				throw this.options.error(answer.error ?? 'Reading request failed.', outcome.response.status, answer.code);
+			}
+			const receipt = await decryptJson(outcome.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
 			if (receipt.requestHash !== requestHash) throw new Error('The encrypted Reading acknowledgment does not match this change.');
 			// Other decrypted notes stay valid; `sameInventoryFile` rejects any that changed elsewhere.
 			const committed = JSON.parse(attempt.body) as { files: Array<{ path: string }>; remove?: Array<{ path: string }> };
@@ -267,14 +262,6 @@ export class EncryptedReadingApi {
 			catch (error) { if (!reused || !(error instanceof NoteUnavailableError)) throw error; }
 		}
 	}
-	private commandError(plan: Extract<ReadingFileCommandPlan, { kind: 'issue' }>, action: 'delete' | 'retry' | 'update'): Error {
-		switch (plan.issue) {
-			case 'invalid': return new Error(plan.message ?? 'Choose a Reading change.');
-			case 'unsupported': return this.options.error('Unsupported Reading change.', 400);
-			case 'not-empty': return this.options.error('Only empty saved links can be downloaded.', 409);
-			case 'conflict': return this.options.error(`This article changed on another device. Refresh before ${action === 'delete' ? 'deleting' : 'editing'}.`, 409, 'reading_conflict');
-		}
-	}
 	/** Build and persist exact ciphertext for one operation against the current
 	 * library, or answer from a receipt the operation already committed. */
 	private async prepare(action: string, body: Record<string, unknown>, id: string, rawBody: string, requestHash: string): Promise<{ attempt: Attempt } | { response: unknown }> {
@@ -289,7 +276,7 @@ export class EncryptedReadingApi {
 			const link = readingUrl(body.url), saved = findSavedReadingLink(readable, link);
 			if (saved.kind === 'many') throw this.options.error('Several notes already save this link.', 409);
 			if (saved.kind === 'one') {
-				if (duplicateIds.has(saved.item.crate_reading_id)) throw unavailable(DUPLICATE_ID_ISSUE);
+				if (duplicateIds.has(saved.item.crate_reading_id)) throw unavailable(READING_DUPLICATE_ID_ISSUE);
 				return { response: { saved: true, alreadySaved: true, id: saved.item.crate_reading_id } };
 			}
 			// Stable even if preparation is interrupted before ciphertext persistence.
@@ -298,7 +285,7 @@ export class EncryptedReadingApi {
 			if (body.fetchArticle === false) content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' });
 		} else {
 			// Never choose between notes sharing the target's ID.
-			if (typeof body.id === 'string' && duplicateIds.has(body.id)) throw unavailable(DUPLICATE_ID_ISSUE);
+			if (typeof body.id === 'string' && duplicateIds.has(body.id)) throw unavailable(READING_DUPLICATE_ID_ISSUE);
 			const item = list.items.find(item => item.crate_reading_id === body.id);
 			// An unreadable note may be the target: one last verified with its ID, or any
 			// note when the target is not listed. Other unreadable notes do not block it.
@@ -308,7 +295,10 @@ export class EncryptedReadingApi {
 			const source = await this.source(this.files.get(wire)!); path = item.path; previous = source.file; itemId = item.crate_reading_id; before = item;
 			const command = action === 'delete' || action === 'retry' ? action : 'update';
 			const plan = await planReadingFileCommand(item, source.content, { action: command, before: body.before, changes: body.changes, markdownHash: body.markdownHash });
-			if (plan.kind === 'issue') throw this.commandError(plan, command);
+			if (plan.kind === 'issue') {
+				const refusal = readingFileCommandRefusal(plan, command);
+				throw this.options.error(refusal.message, refusal.status, refusal.code);
+			}
 			if (plan.kind === 'remove') {
 				const response = { deleted: true, id: itemId };
 				const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));

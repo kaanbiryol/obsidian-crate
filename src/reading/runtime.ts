@@ -10,6 +10,9 @@ import { validateReadingFolder, type ReadingSettings } from './settings';
 
 export const READING_VIEW_TYPE = 'crate-reading';
 
+/** The plugin settings, vault, sync state and server credentials Reading runs on. */
+type ReadingRuntimeHost = Pick<CratePlugin, 'app' | 'settings' | 'remindersSettings' | 'secretStorage' | 'syncRuntime' | 'writeSettings'>;
+
 /** Reading state of one plugin instance. Only `runtime` ends with a stop; the rest outlives restarts. */
 interface ReadingPluginState {
 	/** The running library, replaced by every restart. */
@@ -20,47 +23,47 @@ interface ReadingPluginState {
 	/** A saved article may arrive by sync after the link opens Obsidian, so the request waits briefly for it. */
 	requested?: { id: string; until: number };
 }
-const states = new WeakMap<CratePlugin, ReadingPluginState>();
-function readingState(plugin: CratePlugin): ReadingPluginState {
+const states = new WeakMap<ReadingRuntimeHost, ReadingPluginState>();
+function readingState(plugin: ReadingRuntimeHost): ReadingPluginState {
 	let state = states.get(plugin);
 	if (!state) { state = { listeners: new Set() }; states.set(plugin, state); }
 	return state;
 }
-export function subscribeReadingRuntime(plugin: CratePlugin, listener: () => void): () => void {
+export function subscribeReadingRuntime(plugin: ReadingRuntimeHost, listener: () => void): () => void {
 	const { listeners } = readingState(plugin);
 	listeners.add(listener);
 	return () => { listeners.delete(listener); };
 }
-function notifyRuntime(plugin: CratePlugin): void { states.get(plugin)?.listeners.forEach(listener => listener()); }
-export function requestReadingItem(plugin: CratePlugin, id: string): void {
+function notifyRuntime(plugin: ReadingRuntimeHost): void { states.get(plugin)?.listeners.forEach(listener => listener()); }
+export function requestReadingItem(plugin: ReadingRuntimeHost, id: string): void {
 	readingState(plugin).requested = { id, until: Date.now() + 120_000 }; notifyRuntime(plugin);
 }
-export function requestedReadingItem(plugin: CratePlugin): string | undefined {
+export function requestedReadingItem(plugin: ReadingRuntimeHost): string | undefined {
 	const state = states.get(plugin);
 	if (state?.requested && state.requested.until <= Date.now()) state.requested = undefined;
 	return state?.requested?.id;
 }
-export function clearRequestedReadingItem(plugin: CratePlugin): void {
+export function clearRequestedReadingItem(plugin: ReadingRuntimeHost): void {
 	const state = states.get(plugin);
 	if (state) state.requested = undefined;
 }
-export function getReadingLibrary(plugin: CratePlugin): ReadingLibrary | undefined { return states.get(plugin)?.runtime?.library; }
-export function stopReading(plugin: CratePlugin): void {
+export function getReadingLibrary(plugin: ReadingRuntimeHost): ReadingLibrary | undefined { return states.get(plugin)?.runtime?.library; }
+export function stopReading(plugin: ReadingRuntimeHost): void {
 	const state = states.get(plugin);
 	if (state?.runtime) state.stopping = Promise.allSettled([state.stopping, state.runtime.stop()]).then(() => {});
 	if (state) state.runtime = undefined;
 	notifyRuntime(plugin);
 }
-export async function waitForStoppedReading(plugin: CratePlugin): Promise<void> { await states.get(plugin)?.stopping; }
+export async function waitForStoppedReading(plugin: ReadingRuntimeHost): Promise<void> { await states.get(plugin)?.stopping; }
 
 // Compiled patterns are keyed by their text, so one cache serves every check.
 const readingPatternCache = new Map<string, RegExp>();
-function allowedReadingPath(plugin: CratePlugin, path: string): boolean {
+function allowedReadingPath(plugin: ReadingRuntimeHost, path: string): boolean {
 	return !shouldIgnoreSyncPath(path, createIgnoreMatcherContext(
 		[`${plugin.app.vault.configDir}/`], plugin.settings.ignorePatterns, readingPatternCache));
 }
 
-export function validateReadingConfiguration(plugin: CratePlugin, settings: ReadingSettings): string {
+export function validateReadingConfiguration(plugin: ReadingRuntimeHost, settings: ReadingSettings): string {
 	const folder = validateReadingFolder(settings.folderPath, plugin.remindersSettings.remindersFolderPath, plugin.app.vault.configDir);
 	if (!allowedReadingPath(plugin, `${folder}/reading.md`)) throw new Error('The reading folder is excluded from sync. Choose a folder that can sync.');
 	const existing = plugin.app.vault.getAbstractFileByPath(folder);
@@ -71,7 +74,7 @@ export function validateReadingConfiguration(plugin: CratePlugin, settings: Read
 /** Agrees on one Reading folder with the server. A missing or paused server policy is
  * turned on, keeping the server's folder when it has one. Returns true after adopting
  * a different server folder into settings, which needs a restart. */
-async function reconcileReadingPolicy(plugin: CratePlugin, folder: string, assertCurrent: () => void): Promise<boolean> {
+async function reconcileReadingPolicy(plugin: ReadingRuntimeHost, folder: string, assertCurrent: () => void): Promise<boolean> {
 	const policy = await readReadingPolicy(plugin);
 	assertCurrent();
 	if (!policy || !policy.enabled) {
@@ -86,7 +89,7 @@ async function reconcileReadingPolicy(plugin: CratePlugin, folder: string, asser
 	return true;
 }
 
-export function startReading(plugin: CratePlugin): void {
+export function startReading(plugin: ReadingRuntimeHost): void {
 	stopReading(plugin);
 	if (!plugin.settings.reading.enabled) return;
 	const lifetime = getPluginLifecycleSignal(plugin);
@@ -166,7 +169,7 @@ export function startReading(plugin: CratePlugin): void {
 }
 
 /** Applies changed Reading settings; open views close because they hold the previous library. */
-export function restartReading(plugin: CratePlugin, start = true): void {
+export function restartReading(plugin: ReadingRuntimeHost, start = true): void {
 	stopReading(plugin);
 	plugin.app.workspace.detachLeavesOfType(READING_VIEW_TYPE);
 	if (start) startReading(plugin);

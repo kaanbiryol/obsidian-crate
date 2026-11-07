@@ -21,6 +21,7 @@ import { renderCrateWebApp } from './reminders-web-app';
 import { renderReadingSettings } from '../../reading/ui/plugin/settings-section';
 import { captureSettingsView, restoreSettingsView } from './settings-view-state';
 import { sharedSettingsSync } from '../../plugin/shared-settings-sync';
+import { clearSettingsRequests } from '../../plugin/settings-ui-state';
 import { renderGetStartedSection, renderShowGetStartedSetting } from './get-started-section';
 
 export class CrateSettingTab extends PluginSettingTab {
@@ -126,9 +127,7 @@ export class CrateSettingTab extends PluginSettingTab {
 	hide(): void {
 		void this.sharedSettings.push();
 		this.cleanup();
-		// Reopening settings checks the server again.
-		this.plugin.settingsUiState.encryptionStatus = null;
-		this.plugin.settingsUiState.notificationPolicy = null;
+		clearSettingsRequests(this.plugin.settingsUiState);
 	}
 
 	private cleanup(): void {

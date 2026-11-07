@@ -29,6 +29,13 @@ export interface ExpectedHashRequest { path: string; expected: string | null; re
 export type UploadPreconditions = Map<string, { expected: string | null; result: string | null | HttpError }>;
 /** A verified file listed at server path `wire`: its plaintext path, and the entry with plaintext hash and size. */
 export interface PlainEntry<T> { path: string; wire: string; entry: T }
+/** How a server file is opened. A `historical` one, such as a retained version or a
+ * checkpoint copy, neither teaches the path index nor is accepted as a sealed note.
+ * `synced` shares one read of the Reading folder's synced files across a listing or batch. */
+interface OpenOptions { historical?: boolean; synced?: (folder: string) => Promise<SyncedFile[]> }
+/** `check` is the transferred ciphertext's size and hash. With `expected`, the file
+ * must be the one this device knows by that plaintext path. */
+interface DownloadOptions extends OpenOptions { check?: Pick<WireMetadata, 'hash' | 'size'>; expected?: string }
 
 function conflictError(): HttpError {
 	return new HttpError('Remote file changed; sync again before writing', 409, null, 'version_conflict');
@@ -70,16 +77,15 @@ export class EncryptedFiles {
 	}
 
 	/** Checks a file's claimed path against its server path. Live files also teach the
-	 * index where they are stored; retained versions must not. `synced` shares one read
-	 * of the Reading folder's synced files across a listing. */
-	private binding(wire: string, live: boolean, synced?: (folder: string) => Promise<SyncedFile[]>): PathBinding {
+	 * index where they are stored; historical ones must not. */
+	private binding(wire: string, { historical = false, synced }: OpenOptions): PathBinding {
 		return async (metadataPath, sealed, hash) => {
 			const reading = await this.reading();
 			const path = await resolveEncryptedPath(this.paths.tags, wire, metadataPath, sealed, reading);
-			if (sealed && live && reading) {
+			if (sealed && !historical && reading) {
 				await this.acceptSealed(path, wire, hash, await (synced ? synced(reading.plain) : this.paths.syncedIn(reading.plain)));
 			}
-			if (live) await this.paths.learn(path, wire);
+			if (!historical) await this.paths.learn(path, wire);
 			return path;
 		};
 	}
@@ -106,7 +112,7 @@ export class EncryptedFiles {
 	}
 
 	/** Open the metadata of files listed by server path, returning their plaintext paths. */
-	async metadata<T extends WireMetadata>(entries: Array<{ path: string; entry: T }>, live = true): Promise<Array<PlainEntry<T>>> {
+	async metadata<T extends WireMetadata>(entries: Array<{ path: string; entry: T }>, { historical = false }: Pick<OpenOptions, 'historical'> = {}): Promise<Array<PlainEntry<T>>> {
 		// Bound both unverified descriptors and retained metadata during large
 		// inventories, while a few requests overlap their round trips.
 		const chunks: Array<Array<{ path: string; entry: T }>> = [];
@@ -114,14 +120,13 @@ export class EncryptedFiles {
 		const results: Array<Array<PlainEntry<T>>> = [];
 		const syncedOnce = this.syncedSnapshot();
 		for (let start = 0; start < chunks.length; start += METADATA_CONCURRENCY) {
-			const group = await Promise.all(chunks.slice(start, start + METADATA_CONCURRENCY).map(chunk => this.metadataChunk(chunk, live, syncedOnce)));
+			const group = await Promise.all(chunks.slice(start, start + METADATA_CONCURRENCY).map(chunk => this.metadataChunk(chunk, { historical, synced: syncedOnce })));
 			results.push(...group);
 		}
 		return results.flat();
 	}
 
-	private async metadataChunk<T extends WireMetadata>(chunk: Array<{ path: string; entry: T }>, live: boolean,
-		synced: (folder: string) => Promise<SyncedFile[]>): Promise<Array<PlainEntry<T>>> {
+	private async metadataChunk<T extends WireMetadata>(chunk: Array<{ path: string; entry: T }>, options: OpenOptions): Promise<Array<PlainEntry<T>>> {
 		const result: Array<PlainEntry<T>> = [];
 		const cached = new Map<string, VerifiedRevision>();
 		const missing = new Set<string>();
@@ -140,7 +145,7 @@ export class EncryptedFiles {
 				const descriptor = response?.descriptors?.[entry.revision!];
 				validateFileDescriptor(descriptor);
 				let metadata: PrivateFileMetadata;
-				try { metadata = await openFileMetadata(descriptor, this.binding(path, live, synced), this.keys.forPath(path)); }
+				try { metadata = await openFileMetadata(descriptor, this.binding(path, options), this.keys.forPath(path)); }
 				catch (error) {
 					// Listed but never cached or learned, so sync reports it without applying it.
 					if (!(error instanceof SealedReplacementError)) throw error;
@@ -215,7 +220,7 @@ export class EncryptedFiles {
 		if (revision) {
 			const result = await this.http.requestJson<{ receipt: { hash: string } | null }>(`/encryption/deletion-precondition?${new URLSearchParams({ path: wire, revision })}`);
 			if (result.receipt) {
-				const [plain] = await this.metadata([{ path: wire, entry: { hash: result.receipt.hash, size: 0, revision } }], false);
+				const [plain] = await this.metadata([{ path: wire, entry: { hash: result.receipt.hash, size: 0, revision } }], { historical: true });
 				if (plain?.path === path && plain.entry.hash === expected) return result.receipt.hash;
 			}
 		}
@@ -242,16 +247,15 @@ export class EncryptedFiles {
 	async verifyPrepared(file: JournalUpload): Promise<void> {
 		if (!file.encryptedWire) throw new Error('A plaintext upload is unresolved. Recover it before enabling encryption.');
 		if (this.sealed.has(file.encryptedWire)) return;
-		const plain = await this.download(file.encryptedWire.path, base64ToArrayBuffer(file.encryptedWire.content), file.encryptedWire, file.path);
+		const plain = await this.download(file.encryptedWire.path, base64ToArrayBuffer(file.encryptedWire.content), { check: file.encryptedWire, expected: file.path });
 		if (plain.metadata.hash !== file.hash || plain.metadata.size !== file.size) throw new Error('Encrypted upload does not match its saved local content');
 	}
 
-	/** Open a file downloaded from server path `wire`. With `expected`, it must be the
-	 * file this device knows by that plaintext path. A batch passes one `syncedSnapshot`. */
-	async download(wire: string, bytes: ArrayBuffer, check?: Pick<WireMetadata, 'hash' | 'size'>, expected?: string, live = true,
-		synced?: (folder: string) => Promise<SyncedFile[]>): Promise<{ content: ArrayBuffer; metadata: PrivateFileMetadata }> {
+	/** Open a file downloaded from server path `wire`. A batch passes one `syncedSnapshot`. */
+	async download(wire: string, bytes: ArrayBuffer, options: DownloadOptions = {}): Promise<{ content: ArrayBuffer; metadata: PrivateFileMetadata }> {
+		const { check, expected } = options;
 		if (check && (bytes.byteLength !== check.size || await sha256Hex(bytes) !== check.hash)) throw new Error('Encrypted transfer failed integrity validation');
-		const opened = await openFile(new Uint8Array(bytes), this.binding(wire, live, synced), this.keys.forPath(wire));
+		const opened = await openFile(new Uint8Array(bytes), this.binding(wire, options), this.keys.forPath(wire));
 		if (expected !== undefined && opened.metadata.path !== expected && await this.paths.plainFor(wire) !== expected) {
 			throw new Error('Encrypted file metadata does not match the requested file');
 		}
@@ -273,7 +277,7 @@ export class EncryptedFiles {
 			const page = parseFileVersions(await this.http.requestJson(`/sync/versions?${query}`));
 			const raw = page.versions.find(version => version.storage_key === intent.version.storage_key);
 			if (raw) {
-				const [plain] = await this.metadata([{ path: raw.path, entry: { ...raw, revision: raw.storage_key } }], false);
+				const [plain] = await this.metadata([{ path: raw.path, entry: { ...raw, revision: raw.storage_key } }], { historical: true });
 				if (plain!.path !== intent.version.path || plain!.entry.hash !== intent.version.hash || plain!.entry.size !== intent.version.size) {
 					throw new Error('Retained encrypted version does not match the requested restore');
 				}
