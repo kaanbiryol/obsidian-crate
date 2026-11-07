@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const releasePath = 'src/cloudflare/server-release.json';
@@ -97,7 +97,10 @@ export function checkServerRevision(root, base, inputs) {
 		throw new Error('schema.sql changed without a schemaVersion increase and migration plan.');
 	}
 	for (const migration of initialRevision === undefined ? before.migrations : []) {
-		if (JSON.stringify(migration) !== JSON.stringify(current.migrations.find(step => step.id === migration.id)) || changed(`src/cloudflare/migrations/${migration.file}`)) {
+		const sqlPath = `src/cloudflare/migrations/${migration.file}`;
+		// Entries are permanent; only SQL entirely below the support floor may be deleted.
+		const retired = migration.to <= current.minimumSchemaVersion && !existsSync(resolve(root, sqlPath));
+		if (JSON.stringify(migration) !== JSON.stringify(current.migrations.find(step => step.id === migration.id)) || (!retired && changed(sqlPath))) {
 			throw new Error(`Released migration ${migration.id} cannot be edited or removed.`);
 		}
 	}

@@ -89,6 +89,24 @@ test('never permits editing or deleting an already released migration', () => {
 	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot be edited or removed/);
 });
 
+test('lets a raised support floor delete retired migration SQL but never its manifest entry', () => {
+	const h = fixture();
+	const migrations = [{ id: 'example', file: 'example.sql', from: 1, to: 2, checksum: 'a'.repeat(64) }];
+	h.write('src/cloudflare/migrations/example.sql', 'ALTER TABLE example ADD title TEXT;');
+	h.release({ revision: 2, schemaVersion: 2, migrations });
+	const base = h.commit();
+	rmSync(join(h.root, 'src/cloudflare/migrations/example.sql'));
+	h.release({ revision: 3, schemaVersion: 2, migrations });
+	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot be edited or removed/);
+	h.release({ revision: 3, schemaVersion: 2, minimumSchemaVersion: 2, migrations });
+	assert.equal(checkServerRevision(h.root, base, h.inputs).revision, 3);
+	h.write('src/cloudflare/migrations/example.sql', 'ALTER TABLE example ADD name TEXT;');
+	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot be edited or removed/);
+	rmSync(join(h.root, 'src/cloudflare/migrations/example.sql'));
+	h.release({ revision: 3, schemaVersion: 2, minimumSchemaVersion: 2 });
+	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot be edited or removed/);
+});
+
 test('recognizes the initial manifest without silently accepting a missing Git baseline', () => {
 	const h = fixture();
 	h.git('rm', 'src/cloudflare/server-release.json');

@@ -35,8 +35,8 @@ export async function releaseUpgradeGuards(api: Pick<CloudflareApiClient, 'query
 
 /** The saved server can only be replaced: retrying the update cannot succeed. */
 export class UnupgradableServerError extends Error {
-	constructor() {
-		super('This server was created by an earlier beta and its database cannot be upgraded.');
+	constructor(message = 'This server was created by an earlier beta and its database cannot be upgraded.') {
+		super(message);
 		this.name = 'UnupgradableServerError';
 	}
 }
@@ -60,6 +60,10 @@ export async function inspectDeploymentDatabase(input: DeploymentDatabase): Prom
 	const version = versions[0].version;
 	const createdVersion = versions[0].created_version;
 	if (!Number.isSafeInteger(createdVersion) || Number(createdVersion) < 1 || Number(createdVersion) > version) throw new Error('Unsupported database schema baseline');
+	// Migrations below the support floor are no longer bundled, so only replacement remains.
+	if (Number.isSafeInteger(version) && version < SERVER_RELEASE.minimumSchemaVersion) {
+		throw new UnupgradableServerError('This server’s database is too old for this version of Crate to upgrade.');
+	}
 	planDatabaseUpgrade(version);
 	const releases = await query('SELECT revision, fingerprint, schema_version, schema_hash FROM crate_release WHERE id = 1;');
 	const deployed = releases[0];

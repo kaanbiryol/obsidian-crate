@@ -75,7 +75,7 @@
 		"release:prepare": "node scripts/prepare-release.mjs",
 		"release:candidate": "node scripts/release-candidate.mjs",
 		"check:server-revision": "npm run build:worker && node scripts/check-server-revision.mjs",
-		"test:server-revision": "node --test scripts/check-server-revision.test.mjs scripts/development-build.test.mjs",
+		"test:server-revision": "node --test scripts/check-server-revision.test.mjs scripts/development-build.test.mjs scripts/vite/cloudflare-artifacts-vite-plugin.test.mjs",
 		"test:file-history-browser": "node scripts/browser-tests.mjs --group=file-history",
 		"test:plugin-dialogs": "node scripts/browser-tests.mjs --group=plugin-dialogs",
 		"test:activity-browser": "node scripts/browser-tests.mjs --group=activity",

@@ -9,7 +9,7 @@ The current candidate uses server revision 4 and schema 1, with no registered mi
 - `revision` is the public server release number. Advance it exactly once from the last published release when server inputs change, and keep it fixed throughout development of that release. Never distribute different stable server artifacts under the same revision. The plugin package version can change independently.
 - `schemaVersion` identifies the complete persisted database shape. Increment it for any change to `schema.sql`, including indexes. Never silently apply the fresh schema to an existing database.
 - `minimumSchemaVersion` is the oldest supported database source, currently 1. Future released migration history remains immutable.
-- `migrations` is an ordered, contiguous registry. It is currently empty. Once released, their IDs, SQL bytes and SHA-256 checksums are immutable.
+- `migrations` is an ordered, contiguous registry. It is currently empty. Once released, their IDs, SQL bytes and SHA-256 checksums are immutable. SQL below `minimumSchemaVersion` may be deleted; see [retiring migrations](#retiring-migrations).
 
 The artifact fingerprint includes the Worker/PWA bundle, fresh schema and release manifest. Migration files are checked against manifest checksums at build time and again before execution. D1 stores the successfully deployed revision, fingerprint, schema version and schema hash in `crate_release`. An older revision, a different stable fingerprint at the same revision, or a changed schema hash at the same schema version is rejected before deployment. Development builds additionally store a fingerprint-bound identity in `maintenance_state`, in the same transaction as the verified release record.
 
@@ -58,13 +58,19 @@ The standalone local server validates the manifest and receipts and builds each 
 
 For a large data copy, storage replacement, or Durable Object architecture change, add a dedicated resumable workflow with persisted progress. Do not put an unbounded copy in a single SQL step. Introduce the destination, backfill in bounded batches, verify references/counts/content hashes, switch access under the fence, then retire old structures in a later release. Decide explicitly whether writers can continue during backfill. Preserve R2 object references and retry receipts; a metadata redesign should not require client re-upload.
 
+## Retiring migrations
+
+Migration SQL ships inside the plugin bundle. To keep it bounded, raise `minimumSchemaVersion` and delete the SQL files of steps whose `to` is at or below the new floor. Keep every manifest entry: receipt validation still needs each released step's ID and checksum, so a database created before the floor keeps verifying. The artifact build skips missing SQL only for those steps and still checks the bytes of any retired file left in place. The revision gate allows deleting only those files; editing or removing an entry still fails. Raising the floor changes the manifest, so it needs the next server revision.
+
+A server below the floor cannot update. The update reports that the server can't be updated and points to **Delete server and all data**, then connecting again. Device vault files are kept; server-only data such as file history is lost. In-app restore also rejects backups below the floor; those need the plugin and recovery tools from a release that still supports their schema. Choose a generous window, because Obsidian installs only the latest plugin release.
+
 Keep a forward-fix path. Rolling Worker code back does not restore D1/R2 data. Historical recovery uses a matching paired archive in isolated resources and must account for writes after that archive.
 
 ## Release evidence
 
 `npm run check:server-revision` runs the server revision gate; CI verification and `npm run release:check` run it after the `check:source` commands, while `npm run check` does not. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. The committed `scripts/server-release-policy.json` pins the source baseline and initial public revision 1. Later published releases define the baseline for subsequent candidates. Until the first publication, schema 1 may change in place; after publication, migration immutability and schema/revision checks apply normally. The 0.9.0 beta is the first upgrade source, so its release commit must be reachable from the release branch for the gate to select it as the baseline. Keep the baseline fixed after launch. Repositories without an explicit baseline use their earliest manifest commit before first publication. `--base <git-ref>` explicitly overrides baseline selection for audits.
 
-A changed server requires exactly the next public revision; skipped numbers, decreases, schema edits without a schema version increase, and edits/removal of released migrations fail. Worker, PWA, provisioner, shared UI, Sass, build configuration and dependency-lock inputs are covered. Plugin package version and descriptive metadata changes alone do not require a server revision.
+A changed server requires exactly the next public revision; skipped numbers, decreases, schema edits without a schema version increase, and edits/removal of released migrations fail, except deleting SQL retired below the floor. Worker, PWA, provisioner, shared UI, Sass, build configuration and dependency-lock inputs are covered. Plugin package version and descriptive metadata changes alone do not require a server revision.
 
 ## Testing development deployments
 

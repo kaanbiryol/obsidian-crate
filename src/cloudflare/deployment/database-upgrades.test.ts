@@ -37,7 +37,8 @@ it('bundles migration SQL from the folder that server packaging and recovery rea
 	const module = 'src/cloudflare/deployment/database-upgrades.ts';
 	const pattern = /import\.meta\.glob<string>\('([^']+)'/.exec(readFileSync(module, 'utf8'))?.[1];
 	expect(pattern && relative('.', resolve(module, '..', pattern))).toBe('src/cloudflare/migrations/*.sql');
-	for (const migration of SERVER_RELEASE.migrations) {
+	// SQL entirely below the support floor may be removed; its manifest entry stays.
+	for (const migration of SERVER_RELEASE.migrations.filter(step => step.to > SERVER_RELEASE.minimumSchemaVersion)) {
 		const sql = readFileSync(`src/cloudflare/migrations/${migration.file}`, 'utf8');
 		await expect(migrationTransaction(migration)).resolves.toContain(sql);
 	}

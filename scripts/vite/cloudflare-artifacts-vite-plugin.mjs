@@ -1,7 +1,7 @@
 import { readBuiltIdentity } from '../development-build.mjs';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const VIRTUAL_ID = 'virtual:crate-cloudflare-artifacts';
@@ -39,7 +39,12 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
           || migration.file !== `${migration.id}.sql`) throw new Error('Invalid database migration chain');
         migrationIds.add(migration.id);
         schemaVersion = migration.to;
-        if (!/^[a-z0-9-]+\.sql$/.test(migration.file) || sha256(readFileSync(resolve(rootDir, 'src/cloudflare/migrations', migration.file))) !== migration.checksum) throw new Error('Invalid database migration artifact');
+        if (!/^[a-z0-9-]+\.sql$/.test(migration.file)) throw new Error('Invalid database migration artifact');
+        const sqlPath = resolve(rootDir, 'src/cloudflare/migrations', migration.file);
+        // A step below the support floor never runs, so its SQL may leave the bundle.
+        // Its manifest entry stays so receipts on older databases still validate.
+        if (migration.to <= serverRelease.minimumSchemaVersion && !existsSync(sqlPath)) continue;
+        if (sha256(readFileSync(sqlPath)) !== migration.checksum) throw new Error('Invalid database migration artifact');
       }
       if (schemaVersion !== serverRelease.schemaVersion) throw new Error('Missing database migration path');
       const artifactFingerprint = sha256(JSON.stringify({ workerBundleSha256, d1SchemaSha256, serverRelease }));
