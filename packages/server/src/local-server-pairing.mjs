@@ -3,7 +3,7 @@ import { createServer, request as httpRequest } from 'node:http';
 import { chmod, readFile, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { issueLocalDevice, listLocalDevices, revokeLocalDevice } from './local-server-runtime.mjs';
+import { issueLocalDevice, listLocalDevices, readResetGeneration, revokeLocalDevice } from './local-server-runtime.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const codePattern = /^crate-pair-[a-f0-9]{64}$/;
@@ -16,7 +16,9 @@ export function createPairing({ db, now = Date.now, lifetime = 10 * 60_000 }) {
 			for (const [key, entry] of codes) if (entry.expiresAt <= now()) codes.delete(key);
 			if (codes.size >= 20) throw new Error('Too many pending pairings. Wait for a code to expire before creating another.');
 			const code = `crate-pair-${randomBytes(32).toString('hex')}`;
-			const entry = { name: name.trim(), expiresAt: now() + lifetime };
+			// An encryption reset replaces every credential, so a code issued before it is void.
+			const resetGeneration = readResetGeneration(db).catch(() => undefined);
+			const entry = { name: name.trim(), expiresAt: now() + lifetime, resetGeneration };
 			codes.set(hash(code), entry);
 			return { code, expiresAt: entry.expiresAt };
 		},
@@ -28,7 +30,9 @@ export function createPairing({ db, now = Date.now, lifetime = 10 * 60_000 }) {
 			// redeem a code twice. A failed exchange requires a fresh pairing code.
 			codes.delete(key);
 			if (!entry || entry.expiresAt <= now()) return null;
-			return issueLocalDevice(db, entry.name);
+			const resetGeneration = await entry.resetGeneration;
+			if (resetGeneration === undefined) return null;
+			return issueLocalDevice(db, entry.name, resetGeneration);
 		},
 	};
 }

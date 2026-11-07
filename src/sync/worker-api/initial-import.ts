@@ -1,4 +1,4 @@
-import { INITIAL_IMPORT_CAPABILITY, importInventoryPages, type InitialImport, type ReminderSetupProgress, type ReminderSetupStatus } from '@/protocol/initial-import';
+import { INITIAL_IMPORT_CAPABILITY, INITIAL_IMPORT_PRUNE_MAX_FILES, importInventoryPages, type InitialImport, type ReminderSetupProgress, type ReminderSetupStatus } from '@/protocol/initial-import';
 import { normalizeSyncIssues, SyncIssueError } from '../issues';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { transferTimeout, type WorkerApiHttpClient } from './http';
@@ -38,8 +38,8 @@ export class InitialImportApi {
 	}
 
 	async prune(token: string, files: Array<{ path: string; hash: string }>): Promise<void> {
-		for (let offset = 0; offset < files.length; offset += 50) {
-			await this.http.requestJson('/sync/import/prune', { method: 'POST', body: JSON.stringify({ token, files: files.slice(offset, offset + 50) }) });
+		for (let offset = 0; offset < files.length; offset += INITIAL_IMPORT_PRUNE_MAX_FILES) {
+			await this.http.requestJson('/sync/import/prune', { method: 'POST', body: JSON.stringify({ token, files: files.slice(offset, offset + INITIAL_IMPORT_PRUNE_MAX_FILES) }) });
 		}
 	}
 

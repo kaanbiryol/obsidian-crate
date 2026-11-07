@@ -1,4 +1,4 @@
-import { pendingChangeKey, decodePendingChange } from '../pending/pending-change';
+import { pendingChangeKey, decodePendingChange, type PendingKey } from '../pending/pending-change';
 import type { Vault } from 'obsidian';
 import { MAX_FILE_SIZE_BYTES, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import type { SyncApiClient } from '../worker-api/client';
@@ -12,14 +12,13 @@ import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
 import { loadRemotePendingBase } from '../pending/pending-baseline';
 import { loadPendingDiff } from '../pending/pending-diff';
 import { createPendingDiscard } from '../pending/pending-discard';
-import { createEmptySyncResult } from '../sync-result';
 
 interface EnginePendingChangesContext {
 	vault: Vault;
 	api: Pick<SyncApiClient, 'getFileMetadata' | 'downloadFile' | 'listFileVersions' | 'previewFileVersion'>;
 	manifest: Pick<LocalManifest, 'getEntry' | 'setEntry' | 'removeEntry' | 'save'>;
 	cache: Pick<MarkdownBaseCache, 'readBase'>;
-	queue: Pick<SyncQueueController, 'getPendingKeys' | 'snapshotPendingRevisions' | 'clearSyncedPendingPaths'>;
+	queue: Pick<SyncQueueController, 'getPendingKeys' | 'snapshotPendingRevisions' | 'settleSyncResult' | 'settleKeys'>;
 	backupRoot: string;
 	throwIfDestroyed(): void;
 	isDestroyed(): boolean;
@@ -59,16 +58,14 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 				applied: async (path, remote, content) => {
 					if (remote && content) {
 						const local = await readLocalFileEntry(context.vault, path);
-						context.manifest.setEntry(path, { ...remote, modified: local?.hash === remote.hash ? local.modified : 'unverified' });
+						context.manifest.setEntry(path, { ...remote, modified: local?.hash === remote.hash ? local.modified : UNVERIFIED_MODIFIED });
 					}
 					else context.manifest.removeEntry(path);
 					await context.manifest.save();
 					const revisions = context.queue.snapshotPendingRevisions();
 					const local = await readLocalFileEntry(context.vault, path);
 					if ((local?.hash ?? null) === (remote?.hash ?? null)) {
-						const result = createEmptySyncResult();
-						result.settledPaths = [pendingChangeKey('upload', path), pendingChangeKey('delete', path)];
-						context.queue.clearSyncedPendingPaths(result, revisions);
+						context.queue.settleKeys([pendingChangeKey('upload', path), pendingChangeKey('delete', path)], revisions);
 					}
 				},
 			}, keys);
@@ -76,7 +73,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 
 		async settleSynced(result: SyncResult, revisions: ReadonlyMap<string, number>): Promise<void> {
 			if (context.isDestroyed()) return;
-			context.queue.clearSyncedPendingPaths(result, revisions);
+			context.queue.settleSyncResult(result, revisions);
 			if (!result.success) return;
 			// Applying remote bytes emits vault events too. Verify those events against
 			// the committed baseline instead of requiring another sync to clear them.
@@ -88,7 +85,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 				...result.unresolvedConflicts.map(conflict => conflict.path),
 			]);
 			const snapshot = context.queue.snapshotPendingRevisions();
-			const settled = createEmptySyncResult();
+			const settled: PendingKey[] = [];
 			for (const key of context.queue.getPendingKeys()) {
 				if (context.isDestroyed()) return;
 				const path = decodePendingChange(key).path;
@@ -103,20 +100,20 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 						if (context.manifest.getEntry(path) !== baseline) continue;
 						if (stat?.type === 'file' && stat.size === baseline.size
 							&& new Date(stat.mtime).toISOString() === baseline.modified) {
-							settled.settledPaths.push(key);
+							settled.push(key);
 							continue;
 						}
 					}
 					const local = await readLocalFileEntry(context.vault, path);
 					if (context.isDestroyed()) return;
 					if (context.manifest.getEntry(path) !== baseline) continue;
-					if (local?.hash === baseline?.hash) settled.settledPaths.push(key);
+					if (local?.hash === baseline?.hash) settled.push(key);
 				} catch {
 					// Unreadable files remain pending for the next sync.
 				}
 			}
 			// Events arriving during verification must still remain pending.
-			context.queue.clearSyncedPendingPaths(settled, snapshot);
+			context.queue.settleKeys(settled, snapshot);
 		},
 	};
 }

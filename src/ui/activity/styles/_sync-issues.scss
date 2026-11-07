@@ -1,0 +1,129 @@
+@use "../../shared/styles/action";
+
+/* Sync error notices and the sync issue list. Included in place by `_activity.scss`, so the cascade order is unchanged. */
+@mixin styles {
+	.crate-sync-error-notice {
+		display: flex;
+		align-items: flex-start;
+		max-height: min(45vh, 420px);
+		overflow-y: auto;
+		gap: 8px;
+		margin: 8px var(--crate-activity-space-inline) 16px;
+		padding: 12px 12px;
+		border: 1px solid color-mix(in srgb, var(--text-error) 18%, var(--background-modifier-border));
+		border-radius: var(--radius-m, 8px);
+		background: color-mix(in srgb, var(--text-error) 3%, var(--background-primary));
+	}
+
+	.crate-sync-error-icon {
+		display: flex;
+		flex: 0 0 auto;
+		margin-top: 1px;
+		color: var(--text-error);
+
+		svg {
+			width: var(--icon-s, 16px);
+			height: var(--icon-s, 16px);
+			stroke-width: var(--icon-s-stroke-width, 2px);
+		}
+	}
+
+	.crate-sync-error-copy {
+		display: flex;
+		min-width: 0;
+		width: 100%;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.crate-sync-error-title {
+		font-size: var(--font-ui-smaller);
+		font-weight: var(--font-semibold);
+		color: var(--text-error);
+	}
+
+	.crate-sync-error-message {
+		font-size: var(--font-ui-smaller);
+		line-height: 1.45;
+		color: var(--text-muted);
+		overflow-wrap: anywhere;
+		user-select: text;
+	}
+
+	.crate-sync-issues {
+		display: grid;
+		gap: 12px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: var(--font-ui-smaller);
+		line-height: 1.45;
+		overflow-wrap: anywhere;
+		user-select: text;
+	}
+	.crate-sync-issue { min-width: 0; margin: 0; padding: 0; }
+	.crate-sync-issue + .crate-sync-issue { border-top: 1px solid var(--background-modifier-border); padding-top: 12px; }
+	.crate-sync-issue-path { display: block; color: var(--text-normal); margin-bottom: 3px; font-weight: var(--font-semibold, 600); }
+	.crate-sync-issue-summary { color: var(--text-normal); }
+	.crate-sync-issue-recovery { color: var(--text-muted); margin-top: 3px; }
+	.crate-sync-issue-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+	.crate-reminders-ui .crate-activity-modal .crate-sync-issue-actions button {
+	    @include action.control;
+	    height: auto;
+	    min-height: 28px;
+	    @media (pointer: coarse) { min-height: 44px; }
+	}
+	.crate-sync-issue-copy { min-width: 11ch; }
+	.crate-sync-issue-toggle {
+	    gap: 6px;
+	    &::after {
+	        content: '';
+	        width: 5px;
+	        height: 5px;
+	        margin-top: -3px;
+	        border-right: 1px solid currentColor;
+	        border-bottom: 1px solid currentColor;
+	        transform: rotate(45deg);
+	    }
+	    &[aria-expanded="true"]::after { transform: rotate(225deg); margin-top: 3px; }
+	}
+	.crate-sync-issue-details {
+	    margin-top: 12px;
+	    padding-top: 12px;
+	    border-top: 1px solid var(--background-modifier-border);
+	    color: var(--text-muted);
+	    &[hidden] { display: none; }
+	    pre {
+	        margin: 4px 0 0;
+	        padding: 8px 8px;
+	        border-radius: var(--radius-s, 4px);
+	        background: var(--background-secondary);
+	        font-family: var(--font-monospace, monospace);
+	        font-size: var(--font-ui-smaller, 12px);
+	        line-height: 1.5;
+	        white-space: pre-wrap;
+	        overflow-wrap: anywhere;
+	        user-select: text;
+	    }
+	}
+	.crate-sync-issue-detail-label { color: var(--text-normal); font-weight: var(--font-medium, 500); }
+	.crate-sync-issue-repair { margin: 4px 0 12px; max-width: 80ch; }
+	.crate-sync-issues-more {
+	    margin-top: 8px;
+	    color: var(--text-muted);
+	    > summary { cursor: pointer; min-height: 28px; padding-block: 4px; }
+	    @media (pointer: coarse) { > summary { min-height: 44px; padding-block: 12px; } }
+	}
+	.crate-sync-issue-feedback {
+	    color: var(--text-muted);
+	    &:not(:empty):not(.is-status-only) { margin-top: 6px; }
+	    &.is-status-only {
+	        position: absolute;
+	        width: 1px;
+	        height: 1px;
+	        overflow: hidden;
+	        clip-path: inset(50%);
+	        white-space: nowrap;
+	    }
+	}
+}

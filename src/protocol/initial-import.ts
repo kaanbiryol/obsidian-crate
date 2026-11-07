@@ -7,6 +7,8 @@ export const INITIAL_IMPORT_MAX_FILES = 32;
 export interface InitialImport { token: string; state: 'importing' | 'complete' }
 
 export const INITIAL_IMPORT_VERIFY_PAGE = 2000;
+/** Files per prune request; servers refuse a larger page. */
+export const INITIAL_IMPORT_PRUNE_MAX_FILES = 50;
 export type ImportInventoryEntry = [path: string, hash: string, size: number];
 
 /** Pages follow the server's primary key (portable path, binary collation), so

@@ -1,5 +1,6 @@
 import { prepareRows } from './prepare-rows';
-import { CloudflareApiError, queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
+import { queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
+import { isNotFound, nullOn404 } from '../cloudflare-api-error';
 import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { completePublishedDeployment, recoverDeployment } from '../deployment/update-recovery';
@@ -97,8 +98,7 @@ export async function restoreUpgradeBackup(input: {
 		const found = await api.getD1Database(account, database);
 		if (found?.name !== target.d1DatabaseName) throw new Error('Restore database identity changed');
 		// No Worker may be attached while data is being copied.
-		try { await api.getWorkerSettings(account, target.workerName); throw new Error('Restore target already has a Worker'); }
-		catch (error) { if (!(error instanceof CloudflareApiError && error.status === 404)) throw error; }
+		if (await nullOn404(api.getWorkerSettings(account, target.workerName)) !== null) throw new Error('Restore target already has a Worker');
 		if (!await api.getR2Bucket(account, target.r2BucketName)) await api.createR2Bucket(account, target.r2BucketName);
 		const query = (sql: string) => queryD1Rows(api, account, database, sql);
 		const tables = await query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';");
@@ -117,7 +117,7 @@ export async function restoreUpgradeBackup(input: {
 			let bytes: Uint8Array;
 			try { bytes = await api.getRecoveryObject(account, target.r2BucketName, item.key); }
 			catch (error) {
-				if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
+				if (!isNotFound(error)) throw error;
 				const original = await api.getRecoveryObject(account, source.bucket, upgradeBackupStoreKey(item.sha256));
 				if (original.length !== item.size || await sha256Hex(original) !== item.sha256) throw new Error('Backup file changed during restore');
 				await api.putRestoredObject(account, source.bucket, target.r2BucketName, item.key, original);

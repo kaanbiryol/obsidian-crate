@@ -159,7 +159,7 @@ export class DeploymentFence {
 
 	/** Each dispatch has a fresh provider-visible receipt; never retry this request. */
 	async uploadWorker(operation: (tag: string) => Promise<void>): Promise<void> {
-		const tag = `crate-${crypto.randomUUID()}`;
+		const tag = newUploadTag();
 		await this.mutate(() => operation(tag), 'upload-worker', undefined, tag);
 	}
 
@@ -235,4 +235,13 @@ export async function withDeploymentFence<T>(input: {
 	}
 	if (!outcome.ok) throw outcome.error;
 	return outcome.value;
+}
+
+/** A provider-visible `workers/tag` that identifies one Worker upload dispatch. */
+export function newUploadTag(): string {
+	return `crate-${crypto.randomUUID()}`;
+}
+
+export function isUploadTag(value: unknown): value is string {
+	return typeof value === 'string' && /^crate-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 }

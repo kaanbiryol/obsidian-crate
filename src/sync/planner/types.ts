@@ -4,6 +4,7 @@ import type { ChangelogEntry, FileEntry, MutationFailure } from '../../protocol/
 import type { DownloadDiff, FileDiff, PreparedUpload, SyncIssue, SyncResult, SyncWork, UploadDiff } from '../types';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
+import type { PendingKey } from '../pending/pending-change';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { VaultFile } from '../local/file-discovery';
 import type { InitialConfigPull } from '../manifest/initial-config-pull';
@@ -84,7 +85,7 @@ export interface IncrementalSyncPlannerContext {
 		result: SyncResult,
 		options: UploadPreparedFilesOptions,
 	): Promise<void>;
-	reconcileVersionConflicts(paths: string[], result: SyncResult): Promise<void>;
+	reconcileVersionConflicts(keys: PendingKey[], result: SyncResult): Promise<void>;
 	/** Paths whose incoming version is saved for review. */
 	awaitingReviewPaths?(): string[];
 	getRemoteEntries(paths: string[]): Promise<Record<string, FileEntry>>;

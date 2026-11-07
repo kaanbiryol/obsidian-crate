@@ -22,7 +22,7 @@ function createContext(overrides: Partial<{
 		getStatus: () => status,
 		getSyncIntervalSeconds: () => overrides.syncIntervalSeconds ?? 60,
 		getLastSeq: () => 10,
-		getPendingPathCount: () => overrides.pendingPathCount ?? 0,
+		getQueuedKeyCount: () => overrides.pendingPathCount ?? 0,
 		hasLocalFileChanges,
 		checkForChanges,
 		sync,

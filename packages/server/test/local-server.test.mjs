@@ -11,6 +11,7 @@ import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { openLocalRuntime, issueLocalDevice, isLockFromEarlierBoot, lockLocalData, normalizeLocalOrigin, revokeLocalDevice } from '../src/local-server-runtime.mjs';
 import { listenLocalServer } from '../src/local-server-http.mjs';
+import { createPairing } from '../src/local-server-pairing.mjs';
 
 test('local origin requires HTTPS except on the server computer', () => {
 	assert.equal(normalizeLocalOrigin('http://localhost:8787/'), 'http://localhost:8787');
@@ -197,6 +198,25 @@ test('interrupting CLI during storage startup still releases its lock', { timeou
 		assert.equal(await stat(join(dataDir, 'server.lock')).catch(() => null), null);
 	} finally {
 		if (child.exitCode === null) { child.kill('SIGKILL'); await exited; }
+		await rm(dataDir, { recursive: true, force: true });
+	}
+});
+
+test('an encryption reset voids pairing codes issued before it', { timeout: 20_000 }, async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-test-'));
+	const runtime = await openLocalRuntime({ dataDir });
+	try {
+		const pairing = createPairing({ db: runtime.db });
+		const before = pairing.issue('Phone');
+		await runtime.db.prepare("INSERT INTO server_state(id, reset_generation) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET reset_generation = excluded.reset_generation")
+			.bind(randomUUID()).run();
+		assert.equal(await pairing.exchange(before.code), null);
+		const after = pairing.issue('Phone');
+		assert.ok(await pairing.exchange(after.code));
+		const { count } = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
+		assert.equal(count, 1);
+	} finally {
+		await runtime.close();
 		await rm(dataDir, { recursive: true, force: true });
 	}
 });

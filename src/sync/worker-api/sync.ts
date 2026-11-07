@@ -8,8 +8,8 @@ import type { RestoreIntent } from '../durability/restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { parseFileVersions } from './version-contract';
-import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
+import { requestFileVersions } from './version-contract';
+import { parseChanges, parseChangesCheck, parseManifestPage, requestFileMetadata } from './read-contracts';
 import { errorMessage } from '../../platform/logger';
 import { refusedUploadResult } from '../failures';
 import { runConcurrentTasks } from '../concurrency';
@@ -52,6 +52,10 @@ import { sha256Hex } from '@/platform/sha256';
 
 // Bounds decrypted plaintext held at once while overlapping batch decryption.
 const DECRYPT_CONCURRENCY = 4;
+/** Plaintext bytes in one encrypted batch upload. Encryption and base64 grow the body,
+ * which must stay within the Worker's 15 MiB JSON request limit; larger batches upload
+ * file by file. */
+const ENCRYPTED_BATCH_MAX_BYTES = 8 * 1024 * 1024;
 /** With encryption, `content` is plaintext whose `hash` and `size` decryption verified. */
 export interface DownloadedFile { content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string; verified?: true }
 type BatchDownloadEntry = BatchDownloadResponse['files'][number];
@@ -230,10 +234,7 @@ export class SyncWorkerApi {
 
 		for (let index = 0; index < uniquePaths.length; index += BATCH_DOWNLOAD_MAX_FILES) {
 			const chunk = uniquePaths.slice(index, index + BATCH_DOWNLOAD_MAX_FILES);
-			const response = parseFileMetadata(await this.http.requestJson<unknown>('/sync/metadata', {
-				method: 'POST',
-				body: JSON.stringify({ paths: chunk }),
-			}), chunk);
+			const response = await requestFileMetadata(this.http, chunk);
 			Object.assign(files, response.files);
 		}
 
@@ -332,7 +333,7 @@ export class SyncWorkerApi {
 
 	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
 		for (const file of files) this.assertWireContentType(file.contentType);
-		if (this.encryption && (files.some(file => file.size > BATCH_FILE_SIZE_LIMIT) || files.reduce((bytes, file) => bytes + file.size, 0) > 8 * 1024 * 1024)) {
+		if (this.encryption && (files.some(file => file.size > BATCH_FILE_SIZE_LIMIT) || files.reduce((bytes, file) => bytes + file.size, 0) > ENCRYPTED_BATCH_MAX_BYTES)) {
 			const results: UploadResult[] = [];
 			for (const file of files) {
 				try {
@@ -442,7 +443,7 @@ export class SyncWorkerApi {
 		// Encrypted names cannot be searched on the server.
 		if (query.search && !this.encryption) params.set('search', query.search);
 		if (query.cursor) params.set('cursor', query.cursor);
-		const result = parseFileVersions(await this.http.requestJson<unknown>(`/sync/versions?${params.toString()}`));
+		const result = await requestFileVersions(this.http, params);
 		if (!this.encryption) return result;
 		const versions = await this.encryption.metadata(result.versions.map(version => ({ path: version.path,
 			entry: { ...version, revision: version.storage_key } })), { historical: true });

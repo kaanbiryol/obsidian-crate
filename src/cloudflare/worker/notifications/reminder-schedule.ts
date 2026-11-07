@@ -6,6 +6,7 @@ import { parseJsonObject, parseOptionalString } from '../http/request-validation
 import { listPushSubscriptions, sendToAllSubscriptions, type PushSubscriptionRow } from './push';
 import { hasNotificationAuthority } from '../reminders/source-state';
 import { NOTIFICATION_DELIVERY_WINDOW_MS } from './projection-plan';
+import { notificationRetryDelayMs } from './queue';
 import { isD1DailyLimitError, nextD1DailyReset } from '../d1/d1-usage';
 
 /** The per-reminder role of the `ReminderAlarm` Durable Object: one schedule,
@@ -51,8 +52,6 @@ interface DeliveryFailure { attempts: number; failedAt: string; error: string }
 const PENDING_SUBSCRIPTION_IDS_KEY = 'pendingSubscriptionIds';
 const DELIVERY_COMPLETE_KEY = 'deliveryComplete';
 const RETRY_ATTEMPT_KEY = 'retryAttempt';
-const RETRY_BASE_DELAY_MS = 60_000;
-const RETRY_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 const MAX_DELIVERY_RETRY_ATTEMPTS = 10;
 const MAX_DELIVERY_RETRY_AGE_MS = NOTIFICATION_DELIVERY_WINDOW_MS;
 const DELIVERY_FAILURE_KEY = 'deliveryFailure';
@@ -62,10 +61,6 @@ const REMINDER_KEY = 'reminder';
 const DELIVERY_STATE_KEYS = [PENDING_SUBSCRIPTION_IDS_KEY, DELIVERY_COMPLETE_KEY, RETRY_ATTEMPT_KEY, DELIVERY_FAILURE_KEY];
 /** Everything a cleared schedule removes. The last completed occurrence is kept. */
 const SCHEDULE_STATE_KEYS = [REMINDER_KEY, ...DELIVERY_STATE_KEYS];
-
-function retryDelayMs(attempt: number): number {
-	return Math.min(RETRY_BASE_DELAY_MS * (2 ** Math.min(attempt, 8)), RETRY_MAX_DELAY_MS);
-}
 
 // A new schedule can arrive while a push request is in flight. Every delivery
 // write checks its schedule token (or occurrence) under the state lock.
@@ -294,7 +289,7 @@ async function scheduleRetry({ state, env }: ReminderScheduleContext, reminder: 
 		console.error(`Reminder alarm ${reminder.reminderId} exhausted delivery retries:`, errorMessage);
 		return;
 	}
-	const delay = retryDelayMs(attempt);
+	const delay = notificationRetryDelayMs(attempt);
 	await state.storage.put(RETRY_ATTEMPT_KEY, attempt + 1);
 	await state.storage.setAlarm(Date.now() + delay);
 	console.error(

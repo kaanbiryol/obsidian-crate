@@ -1,4 +1,5 @@
 import { isEncryptionId } from './encoding';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { validateP256PublicKey } from './p256';
 
 export const ENCRYPTED_FILE_CONTENT_TYPE = 'application/vnd.crate.encrypted-file';
@@ -77,7 +78,7 @@ export function parseEncryptedFile(bytes: Uint8Array | string): EncryptedFilePac
 }
 
 export function fileTransportLimit(contentType: string | undefined): number {
-	return contentType === ENCRYPTED_FILE_CONTENT_TYPE ? MAX_ENCRYPTED_FILE_BYTES : 25 * 1024 * 1024;
+	return contentType === ENCRYPTED_FILE_CONTENT_TYPE ? MAX_ENCRYPTED_FILE_BYTES : MAX_FILE_SIZE_BYTES;
 }
 
 function validatePublicData(value: unknown): void {

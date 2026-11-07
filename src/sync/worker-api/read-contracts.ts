@@ -1,6 +1,7 @@
 import { isRecord, isSha256Hex } from '../../platform/validation';
 import { isSyncDate, isSyncPath, isSyncRevision, isSyncSequence, parseSyncFiles } from '../../protocol/sync-validation';
 import type { ChangesResponse, CheckResponse, FileManifest, FileMetadataResponse } from '../../protocol/sync-types';
+import type { WorkerApiHttpClient } from './http';
 
 const invalid = (): never => { throw new Error('Invalid or unsupported sync response. Sync stopped before applying remote state.'); };
 const optionalBoolean = (value: unknown): value is boolean | undefined => value === undefined || typeof value === 'boolean';
@@ -15,6 +16,14 @@ export function parseManifestPage(value: unknown): FileManifest & { lastSeq: num
 	if (!value.hasMore && value.nextCursor !== undefined) return invalid();
 	return { version: 1, files, lastSeq: value.lastSeq, snapshotSeq: value.snapshotSeq, hasMore: value.hasMore,
 		...(value.hasMore ? { nextCursor: value.nextCursor as string } : {}) };
+}
+
+/** Metadata of up to `BATCH_DOWNLOAD_MAX_FILES` server paths, as stored (still encrypted
+ * in an encrypted vault). */
+export async function requestFileMetadata(http: WorkerApiHttpClient, paths: string[]): Promise<FileMetadataResponse> {
+	return parseFileMetadata(await http.requestJson<unknown>('/sync/metadata', {
+		method: 'POST', body: JSON.stringify({ paths: [...new Set(paths)] }),
+	}), paths);
 }
 
 export function parseFileMetadata(value: unknown, requested: string[]): FileMetadataResponse {

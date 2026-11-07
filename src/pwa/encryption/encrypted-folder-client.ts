@@ -7,6 +7,18 @@ import type { PathTags } from '@/encryption/path-tags';
 /** Reminders and Reading serve the same encrypted folder routes under their own prefix. */
 export type EncryptedFolderPrefix = '/reminders' | '/reading';
 
+/** One inventory page of the server folder `wireFolder`, after server path `after`. */
+export function encryptedFilesPath(prefix: EncryptedFolderPrefix, wireFolder: string, after?: string): string {
+	const query = new URLSearchParams({ folderPath: wireFolder });
+	if (after) query.set('after', after);
+	return `${prefix}/encrypted-files?${query}`;
+}
+
+/** One listed file's ciphertext, at the revision the inventory listed. */
+export function encryptedFilePath(prefix: EncryptedFolderPrefix, wireFolder: string, file: { path: string; revision: string }): string {
+	return `${prefix}/encrypted-file?${new URLSearchParams({ folderPath: wireFolder, path: file.path, revision: file.revision })}`;
+}
+
 /** The envelope context of an operation's encrypted acknowledgment.
  * 'reminder' is the shared envelope purpose for operation objects in every scope, Reading
  * included. The plugin binds it into each protected header, so it is a wire value, not a

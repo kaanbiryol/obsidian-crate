@@ -26,7 +26,7 @@ import type { HistoryRestoreReview } from '../../sync/history/restore';
 import type { SyncHistoryEntry } from '../../sync/types';
 import { renderConflictsPanel, renderPendingPanel } from './panels';
 import { renderLoadingState } from './rendering';
-import { resetPendingChecks, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
+import type { PendingChecks, PendingDiffLoader, PendingBrowserState } from './pending-browser';
 
 export interface ActivityModalDeps extends FileHistoryRuntime {
 	loadHistoryComparison(entry: SyncHistoryEntry): Promise<HistoryComparison>;
@@ -65,6 +65,7 @@ export class ActivityModal extends BaseUiModal {
 	private conflictsCount!: HTMLSpanElement;
 	private pendingPanel!: HTMLDivElement;
 	private readonly pendingBrowserState: PendingBrowserState = {};
+	private pendingChecks?: PendingChecks;
 	private conflictsPanel!: HTMLDivElement;
 	private renderedConflicts: string | undefined;
 	private historyPanel!: HTMLDivElement;
@@ -126,10 +127,10 @@ export class ActivityModal extends BaseUiModal {
 			return;
 		}
 		this.renderedBrowserPaths = showsBrowser ? paths : undefined;
-		resetPendingChecks(this.pendingBrowserState);
+		this.pendingChecks?.dispose();
 		this.pendingPanel.empty();
 		this.pendingBrowserState.configDir = this.app.vault.configDir;
-		renderPendingPanel(this.pendingPanel, {
+		this.pendingChecks = renderPendingPanel(this.pendingPanel, {
 			paths, loadDiff: (path, deleted) => this.deps.loadPendingDiff(path, deleted), state, progress,
 			lastSyncLabel: this.getActivityStatus().lastSyncLabel, browserState: this.pendingBrowserState,
 			actions: {
@@ -226,8 +227,8 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	private switchTab(tab: ActivityTab): void {
-		if (tab === 'pending') this.pendingBrowserState.startChecks?.();
-		else this.pendingBrowserState.pauseChecks?.();
+		if (tab === 'pending') this.pendingChecks?.start();
+		else this.pendingChecks?.pause();
 		this.currentTab = tab;
 		if (tab === 'history') { this.renderHistory(); void this.sharedHistory?.refresh(); }
 		this.header.updateSyncBtn();
@@ -304,7 +305,7 @@ export class ActivityModal extends BaseUiModal {
 		this.sharedHistory = undefined;
 		this.activityHistory?.dispose();
 		this.activityHistory = undefined;
-		this.pendingBrowserState.dispose?.();
+		this.pendingChecks?.dispose();
 		this.deps.removeStateChangeListener(this.onStateChange);
 		this.deps.removeProgressListener(this.onProgress);
 		this.header?.dispose();
@@ -315,4 +316,9 @@ export class ActivityModal extends BaseUiModal {
 		this.contentEl.empty();
 		this.contentEl.removeClasses(['crate-reminder-editor-modal__content', 'crate-reminders-ui']);
 	}
+}
+
+/** Opens sync activity for the plugin's runtime. */
+export function openSyncActivity(plugin: { app: App; settings: CrateSettings; syncRuntime: ActivityModalDeps }, tab?: ActivityTab): void {
+	new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime, tab).open();
 }

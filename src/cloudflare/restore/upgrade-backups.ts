@@ -1,4 +1,5 @@
 import { CloudflareApiError, queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
+import { isNotFound } from '../cloudflare-api-error';
 import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 import { BACKUP_OBJECT, completeManifest, listBackupKeys, manifestKey, pagedListing, type UpgradeBackup } from './archive';
 import { UPGRADE_CHECKPOINT_KEY, UPGRADE_PROGRESS_KEY } from '../deployment/database';
@@ -53,7 +54,7 @@ async function readManifest(api: CloudflareApiClient, account: string, bucket: s
 		const value = completeManifest(await api.getRecoveryObject(account, bucket, manifestKey(prefix)));
 		return value && typeof value.createdAt === 'string' && value.objects.every(item => typeof item?.sha256 === 'string') ? value : null;
 	} catch (error) {
-		if (error instanceof SyntaxError || error instanceof CloudflareApiError && error.status === 404) return null;
+		if (error instanceof SyntaxError || isNotFound(error)) return null;
 		throw error;
 	}
 }

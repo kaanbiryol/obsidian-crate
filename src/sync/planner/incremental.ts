@@ -53,7 +53,7 @@ export async function runIncrementalSync(
 		logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
 		logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);
 
-		result.settledPaths.push(...unchangedPaths.filter(path => !changesByPath.has(path)).map(path => pendingChangeKey('upload', path)));
+		result.settledKeys.push(...unchangedPaths.filter(path => !changesByPath.has(path)).map(path => pendingChangeKey('upload', path)));
 
 		if (changesByPath.size === 0 && localChanges.length === 0 && localDeletes.length === 0) {
 			if (unchangedPaths.length > 0) await context.localManifest.save();
@@ -150,7 +150,7 @@ export async function runIncrementalSync(
 			},
 			retry: true,
 			onFailure: options.onFailure,
-			onVersionConflicts: (paths, syncResult) => context.reconcileVersionConflicts(paths, syncResult),
+			onVersionConflicts: (keys, syncResult) => context.reconcileVersionConflicts(keys, syncResult),
 			beforeChunk: () => {
 				context.throwIfDestroyed();
 				context.reportWork?.({ phase: 'uploading', current: uploadsProcessed, total: localOnlyChanges.length });

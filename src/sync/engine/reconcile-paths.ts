@@ -186,7 +186,7 @@ async function reconcile(state: ReconcileState, queueKey: string, mode: Reconcil
 	const { context, result } = state;
 	const path = decodePendingChange(queueKey).path;
 	if (context.shouldIgnore(path)) {
-		result.settledPaths.push(queueKey);
+		result.settledKeys.push(queueKey);
 		countProcessed(state, 1);
 		return;
 	}
@@ -284,7 +284,7 @@ async function attemptPath(state: ReconcileState, queueKey: string, path: string
 		if (outcome.status === 'deferred') recordDeferredChange(result, outcome, path);
 	}
 
-	result.settledPaths.push(queueKey);
+	result.settledKeys.push(queueKey);
 	return 'settled';
 }
 
@@ -309,7 +309,7 @@ async function deleteDeferred(state: ReconcileState, queueKeys: readonly string[
 			// The batch counted this file; each retried key counts itself.
 			state.processed -= 1;
 			for (const key of candidate.keys) await reconcile(state, key, 'delete-retry');
-		} else if (deleted.has(path)) result.settledPaths.push(...candidate.keys);
+		} else if (deleted.has(path)) result.settledKeys.push(...candidate.keys);
 	}
 }
 
@@ -322,7 +322,7 @@ async function uploadCollected(state: ReconcileState): Promise<void> {
 	const uploadedPaths = new Set(result.uploadedPaths);
 	for (const [path, upload] of uploads) {
 		if (!retryPaths.has(path)) {
-			if (uploadedPaths.has(path)) result.settledPaths.push(...upload.keys);
+			if (uploadedPaths.has(path)) result.settledKeys.push(...upload.keys);
 			countProcessed(state, upload.keys.length);
 		} else if (await refreshOrRecordFailure(state, path)) {
 			for (const key of upload.keys) await reconcile(state, key, 'upload-retry');

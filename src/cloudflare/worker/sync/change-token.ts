@@ -1,11 +1,10 @@
-import { getChangelogBounds, LAST_SEQ_SQL } from './storage';
+import { getChangelogBounds, LAST_SEQ_SQL, type ChangelogBounds } from './storage';
 import { serverStateValue } from '../d1/server-state';
 import { sha256Hex } from '../../../platform/sha256';
 
 export interface VaultChangeState { seq: number; importGeneration: number; resetGeneration: string }
 
 /** The changelog's retained range, read with the change state so a delta needs no second read. */
-export interface ChangelogBounds { lastSeq: number; minSeq: number | null; snapshotSeq: number }
 
 export async function readVaultChangeState(db: D1Database): Promise<VaultChangeState & { bounds: ChangelogBounds }> {
 	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS seq,

@@ -7,6 +7,7 @@ import type { SyncApiClient } from '../worker-api/client';
 import type { SyncIgnoreMatcher } from '../local/ignore';
 import type { ConflictRecord } from '../types';
 import { createLogger } from '../logger';
+import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
 import { errorMessage } from '../../platform/logger';
 
 const logger = createLogger('SyncEngine');
@@ -15,7 +16,7 @@ interface ConflictTrackingContext {
 	store: ConflictStore;
 	api: Pick<SyncApiClient, 'getFileMetadata'>;
 	manifest: Pick<LocalManifest, 'getEntry' | 'setEntry' | 'save'>;
-	queue: Pick<SyncQueueController, 'restorePendingPaths'>;
+	queue: Pick<SyncQueueController, 'restorePendingKeys'>;
 	ignore: Pick<SyncIgnoreMatcher, 'configuredMatcher'>;
 	trackWork: <T>(operation: () => Promise<T>) => Promise<T>;
 	isDestroyed: () => boolean;
@@ -72,10 +73,10 @@ export class ConflictTracking {
 			throw new Error('The server file changed. Sync again and review the latest incoming copy. Both versions were kept.');
 		}
 		throwIfDestroyed();
-		manifest.setEntry(record.originalPath, { ...remote, modified: 'unverified' });
+		manifest.setEntry(record.originalPath, { ...remote, modified: UNVERIFIED_MODIFIED });
 		await manifest.save();
 		throwIfDestroyed();
-		queue.restorePendingPaths([pendingChangeKey('upload', record.originalPath)]);
+		queue.restorePendingKeys([pendingChangeKey('upload', record.originalPath)]);
 	}
 
 	destroy(): void {

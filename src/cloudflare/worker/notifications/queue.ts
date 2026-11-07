@@ -20,3 +20,11 @@ export const NEXT_NOTIFICATION_WORK_SQL = `SELECT
 
 export const NEXT_SOURCE_RETRY_SQL = `SELECT available_at AS retryAt FROM notification_file_retries
   WHERE available_at >= 0 ORDER BY available_at, path LIMIT 1`;
+
+const RETRY_BASE_DELAY_MS = 60_000;
+const RETRY_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
+
+/** Backoff before retry `attempt` of a schedule job or a reminder delivery. */
+export function notificationRetryDelayMs(attempt: number): number {
+	return Math.min(RETRY_BASE_DELAY_MS * (2 ** Math.min(attempt, 8)), RETRY_MAX_DELAY_MS);
+}

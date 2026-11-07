@@ -3,11 +3,11 @@ import { TFile, TFolder, type Command, type Menu, type MenuItem, type TAbstractF
 import type CratePlugin from './CratePlugin';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
 import { registerSyncCommands, startVaultReplacement } from './sync-integration';
-import { ActivityModal } from '../ui/activity/activity-modal';
+import { openSyncActivity } from '../ui/activity/activity-modal';
 import { setSyncReady } from './lifecycle-state';
 
 vi.mock('../ui/activity/file-history-modal', () => ({ openFileHistoryModal: vi.fn() }));
-vi.mock('../ui/activity/activity-modal', () => ({ ActivityModal: vi.fn() }));
+vi.mock('../ui/activity/activity-modal', () => ({ openSyncActivity: vi.fn() }));
 vi.mock('../sync/runtime/runtime', () => ({ SyncRuntime: vi.fn() }));
 vi.mock('../reminders/notification-policy-sync', () => ({ ensureReminderNotificationPolicy: vi.fn(), refreshReminderNotificationPolicy: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
@@ -73,8 +73,7 @@ it('waits for startup sync initialization before running sync now', async () => 
 });
 
 it('opens activity and syncs only when a confirmed replacement is pending', async () => {
- const open = vi.fn();
- vi.mocked(ActivityModal).mockImplementation(function () { return { open }; });
+ const open = vi.mocked(openSyncActivity);
  const sync = vi.fn(async () => ({ outcome: 'completed', success: true, conflicts: [] }));
  const plugin = { app: {}, settings: { replaceVault: false }, syncRuntime: { isConfigured: () => true, sync } } as unknown as CratePlugin;
  expect(startVaultReplacement(plugin)).toBe(false);

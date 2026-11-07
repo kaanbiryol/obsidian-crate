@@ -3,7 +3,7 @@ import { MAX_SHARED_SETTINGS_BYTES } from '../../../encryption/settings-format';
 import { normalizeSharedSettingsValue } from '../../../protocol/shared-settings';
 import { corsResponse } from '../http/cors';
 import { parseJsonObject, sanitizePath } from '../http/request-validation';
-import { CHANGELOG_BOUNDS_SQL, getChangelogBounds } from './storage';
+import { CHANGELOG_BOUNDS_SQL, getChangelogBounds, isChangelogCursorExpired, parseChangelogSince } from './storage';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import type { FileEntry } from '../../../protocol/sync-types';
 import { createPathRecord } from '../../../protocol/path-record';
@@ -15,23 +15,17 @@ function batchRows<T>(result: unknown): T[] {
 	return Array.isArray(rows) ? rows as T[] : [];
 }
 
-export async function handleHealth(): Promise<Response> {
-	return corsResponse({ status: 'ok', timestamp: new Date().toISOString() });
-}
-
 export async function handleCheckChanges(request: Request, db: D1Database): Promise<Response> {
-	const url = new URL(request.url);
-	const since = parseInt(url.searchParams.get('since') || '0', 10);
-	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
-	const { lastSeq, minSeq, snapshotSeq } = await getChangelogBounds(db);
-	const cursorExpired = since < snapshotSeq || since > 0 && since !== lastSeq && (minSeq === null || since + 1 < minSeq);
-	return corsResponse({ lastSeq, hasChanges: lastSeq > since, ...(cursorExpired && { cursorExpired: true }) });
+	const since = parseChangelogSince(new URL(request.url));
+	if (since === null) return corsResponse({ error: 'Invalid since parameter' }, 400);
+	const bounds = await getChangelogBounds(db);
+	const cursorExpired = isChangelogCursorExpired(since, bounds);
+	return corsResponse({ lastSeq: bounds.lastSeq, hasChanges: bounds.lastSeq > since, ...(cursorExpired && { cursorExpired: true }) });
 }
 
 export async function handleGetChanges(request: Request, db: D1Database): Promise<Response> {
-	const url = new URL(request.url);
-	const since = parseInt(url.searchParams.get('since') || '0', 10);
-	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
+	const since = parseChangelogSince(new URL(request.url));
+	if (since === null) return corsResponse({ error: 'Invalid since parameter' }, 400);
 
 	const [changesResult, boundsResult] = await db.batch([
 		db.prepare('SELECT seq, path, action, hash, size, revision, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since),
@@ -40,8 +34,7 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 	const changeRows = batchRows(changesResult);
 	const [bounds] = batchRows<{ lastSeq: number | null; minSeq: number | null; snapshotSeq?: number }>(boundsResult);
 	const lastSeq = bounds?.lastSeq ?? 0;
-	const minSeq = bounds?.minSeq ?? null;
-	const cursorExpired = since < (bounds?.snapshotSeq ?? 0) || since > 0 && since !== lastSeq && (minSeq === null || since + 1 < minSeq);
+	const cursorExpired = isChangelogCursorExpired(since, { lastSeq, minSeq: bounds?.minSeq ?? null, snapshotSeq: bounds?.snapshotSeq ?? 0 });
 
 	return corsResponse({
 		changes: changeRows,

@@ -34,7 +34,7 @@ export interface QueueFlushContext extends WorkflowCompletionContext {
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
 	deleteRemoteFiles: DeleteRemoteFiles;
 	recoverUploads(): Promise<void>;
-	getPendingPathCount(): number;
+	getQueuedKeyCount(): number;
 	beginBatch(): QueueFlushBatch;
 	apiConfigured(): boolean;
 	localManifest: QueueManifest;
@@ -76,14 +76,14 @@ function buildQueueSyncResult(
 /** What one flush settled so far, shared by its upload and delete phases. */
 interface FlushState {
 	completedQueueKeys: Set<string>;
-	reconciliationPaths: Set<string>;
+	reconciliationKeys: Set<string>;
 	skipped: SyncIssue[];
 	hasTerminalFailure: boolean;
 }
 
 /** A version conflict goes to reconciliation; a terminal failure stops automatic retries. */
 function routeFailure(state: FlushState, key: string, failure: { status?: number; code?: string }): void {
-	if (isVersionConflict(failure.status, failure.code)) state.reconciliationPaths.add(key);
+	if (isVersionConflict(failure.status, failure.code)) state.reconciliationKeys.add(key);
 	if (isQueueTerminalFailure(failure.status, failure.code)) state.hasTerminalFailure = true;
 }
 
@@ -133,7 +133,7 @@ async function uploadQueuedChanges(
 			},
 			retry: false,
 			onFailure: failure => { chunkFailures.push(failure); },
-			onVersionConflicts: async paths => { chunkConflicts.push(...paths); },
+			onVersionConflicts: async keys => { chunkConflicts.push(...keys); },
 			beforeChunk: chunk => {
 				uploads.push(...chunk.map(upload => ({ path: upload.path })));
 			},
@@ -173,7 +173,7 @@ export async function processPendingChanges(
 ): Promise<void> {
 	if (context.isDestroyed()) return;
 
-	if (context.getPendingPathCount() === 0) {
+	if (context.getQueuedKeyCount() === 0) {
 		context.updateState({ pendingChanges: 0 });
 		return;
 	}
@@ -182,10 +182,10 @@ export async function processPendingChanges(
 	const startFailure = beginSyncAttempt(context, () => {
 		batch = context.beginBatch();
 		logger.info(`Processing ${batch.paths.length} pending changes`);
-		return { pendingChanges: context.getPendingPathCount() };
+		return { pendingChanges: context.getQueuedKeyCount() };
 	});
 	if (startFailure) {
-		context.updateState({ pendingChanges: context.getPendingPathCount() });
+		context.updateState({ pendingChanges: context.getQueuedKeyCount() });
 		if (context.getStatus() === 'syncing') context.triggerDebouncedSync();
 		return;
 	}
@@ -194,8 +194,8 @@ export async function processPendingChanges(
 	const changes = paths.map(decodePendingChange);
 	const uploadPaths = changes.filter(change => change.kind === 'upload').map(change => change.path);
 	const deletedPaths = changes.filter(change => change.kind === 'delete').map(change => change.path);
-	const state: FlushState = { completedQueueKeys: new Set(), reconciliationPaths: new Set(), skipped: [], hasTerminalFailure: false };
-	const { completedQueueKeys, reconciliationPaths, skipped } = state;
+	const state: FlushState = { completedQueueKeys: new Set(), reconciliationKeys: new Set(), skipped: [], hasTerminalFailure: false };
+	const { completedQueueKeys, reconciliationKeys, skipped } = state;
 	let flushFailed = false;
 
 	try {
@@ -230,13 +230,13 @@ export async function processPendingChanges(
 		for (const failure of uploadFailures) failedUploads.add(failure.path);
 
 		const otherDeletes = deletes.filter(file => uploadConflict(file.path) === undefined);
-		const reconciling = reconciliationPaths.size > 0;
+		const reconciling = reconciliationKeys.size > 0;
 		const { ready, deferred } = planQueueDeletes(otherDeletes, { failures, failedUploads, reconciling, hasTerminalFailure: state.hasTerminalFailure },
 			path => context.localManifest.renameDestination(path));
 		for (const file of deferred) {
 			const key = pendingChangeKey('delete', file.path);
 			batch.requeue([key]);
-			if (reconciling) reconciliationPaths.add(key);
+			if (reconciling) reconciliationKeys.add(key);
 			failures.push({ path: file.path, error: 'Remote deletion deferred until uploads finish successfully' });
 		}
 		if (ready.length > 0) {
@@ -255,10 +255,10 @@ export async function processPendingChanges(
 			const failed = { ...buildQueueSyncResult(uploads, deletes, completedQueueKeys, errors), issues };
 			completeTransferResult(context, failed, failures, {
 				errorFallback: FLUSH_FAILURE, errorSummary: errors.join('; '), failureLogPrefix: FLUSH_FAILURE, logger,
-				pendingChanges: context.getPendingPathCount(),
+				pendingChanges: context.getQueuedKeyCount(),
 			});
 			await reportFlushResult(context, failed);
-			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
+			if (reconciliationKeys.size > 0) context.requestReconciliation([...reconciliationKeys]);
 			return;
 		}
 
@@ -267,17 +267,17 @@ export async function processPendingChanges(
 		const didWork = uploads.length > 0 || deletes.length > 0 || skipped.length > 0;
 		await context.finishInitialSetup();
 		if (!didWork) {
-			context.updateState({ status: 'idle', pendingChanges: context.getPendingPathCount() });
+			context.updateState({ status: 'idle', pendingChanges: context.getQueuedKeyCount() });
 			return;
 		}
 		const synced = { ...buildQueueSyncResult(uploads, deletes, completedQueueKeys), ...(skipped.length ? { issues: skipped } : {}) };
-		completeWorkflowResult(context, synced, { errorFallback: FLUSH_FAILURE, pendingChanges: context.getPendingPathCount() });
+		completeWorkflowResult(context, synced, { errorFallback: FLUSH_FAILURE, pendingChanges: context.getQueuedKeyCount() });
 		await reportFlushResult(context, synced);
 	} catch (error) {
 		if (isAbortError(error)) {
 			batch.requeue(paths.filter(path => !completedQueueKeys.has(path)));
 			batch.release();
-			if (!context.isDestroyed()) context.updateState({ status: 'idle', pendingChanges: context.getPendingPathCount() });
+			if (!context.isDestroyed()) context.updateState({ status: 'idle', pendingChanges: context.getQueuedKeyCount() });
 			logger.info('Queue processing aborted');
 		} else {
 			flushFailed = true;
@@ -286,7 +286,7 @@ export async function processPendingChanges(
 			if (!retryable) {
 				if (isVersionConflictError(error)) {
 					for (const path of paths) {
-						if (!completedQueueKeys.has(path)) reconciliationPaths.add(path);
+						if (!completedQueueKeys.has(path)) reconciliationKeys.add(path);
 					}
 				} else {
 					state.hasTerminalFailure = true;
@@ -303,18 +303,18 @@ export async function processPendingChanges(
 				failureLogPrefix: FLUSH_FAILURE,
 				logger,
 				errorSummary: syncErrorIssues(error).map(formatSyncIssue).join('; '),
-				pendingChanges: context.getPendingPathCount(),
+				pendingChanges: context.getQueuedKeyCount(),
 			});
 			finalizeSyncResult(failed);
 			await reportFlushResult(context, failed);
-			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
+			if (reconciliationKeys.size > 0) context.requestReconciliation([...reconciliationKeys]);
 		}
 	} finally {
 		batch.release();
 		if (
 			!context.isDestroyed()
-			&& context.getPendingPathCount() > 0
-			&& reconciliationPaths.size === 0
+			&& context.getQueuedKeyCount() > 0
+			&& reconciliationKeys.size === 0
 			&& !state.hasTerminalFailure
 		) {
 			if (flushFailed) context.retryAfterFailure();

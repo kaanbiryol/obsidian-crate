@@ -12,7 +12,7 @@ import type { MutationFailure } from '../../protocol/sync-types';
 import { fileFailure, isAuthError, isTransientSyncFailure } from '../failures';
 import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
-import { BATCH_DOWNLOAD_CONCURRENCY, DOWNLOAD_APPLY_CONCURRENCY } from './constants';
+import { getBatchDownloadConcurrency, getDownloadApplyConcurrency } from './budget';
 
 const logger = createLogger("SyncTransfer");
 
@@ -189,7 +189,7 @@ export async function parallelDownloadAndSaveFiles(
 					} finally {
 						onProcessed?.();
 					}
-				}), DOWNLOAD_APPLY_CONCURRENCY);
+				}), getDownloadApplyConcurrency());
 				for (const request of chunk) {
 					if (!seenPaths.has(request.path)) {
 						recordSyncError(result, `Missing from batch download response`, request.path);
@@ -210,7 +210,7 @@ export async function parallelDownloadAndSaveFiles(
 				logger.warn("Batch download failed, falling back to individual downloads:", errorMessage(error));
 				individual.push(...chunk);
 			}
-		}), BATCH_DOWNLOAD_CONCURRENCY);
+		}), getBatchDownloadConcurrency());
 	}
 
 	if (individual.length > 0) {

@@ -1,4 +1,5 @@
-import { CloudflareApiError, type CloudflareApiClient, type CloudflareWorkerSettings } from '../cloudflare-api';
+import type { CloudflareApiClient, CloudflareWorkerSettings } from '../cloudflare-api';
+import { nullOn404 } from '../cloudflare-api-error';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { isSha256Hex } from '../../platform/validation';
 import { deletionWorkerMessage } from '../deployment/discovery';
@@ -25,11 +26,7 @@ export function assertDeletionIdentity(accountId: string, metadata: CloudflareDe
 }
 
 export async function deletionWorkerSettings(api: DeleteApi, accountId: string, name: string): Promise<CloudflareWorkerSettings | null> {
-	try { return await api.getWorkerSettings(accountId, name); }
-	catch (error) {
-		if (error instanceof CloudflareApiError && error.status === 404) return null;
-		throw error;
-	}
+	return nullOn404(api.getWorkerSettings(accountId, name));
 }
 
 /** Only the helper with our persisted identity and exact bucket capability may be reused. */

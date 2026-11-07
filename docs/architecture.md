@@ -638,6 +638,14 @@ helpers. `coordinator-requests.ts` dispatches those endpoints with that lock,
 keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
 maintenance, and projection roles; other alarms deliver the instance's reminder.
 
+`worker/sync/` is also the committed-file store every feature writes through.
+Reminders, Reading, notifications and encrypted folders use its file identity guards
+(`file-identity.ts`), Markdown reads and staging (`markdown-files.ts`,
+`markdown-file-staging.ts`), commits (`mutations.ts`, `atomic-markdown-*.ts`) and
+change tokens (`change-token.ts`). These commits share the staged-upload guards in
+`worker/sync/staging/`, so the store stays in `worker/sync/` rather than in a folder of
+its own. A change there affects every feature's writes, not only the sync API.
+
 `worker/sync/import/` holds the server side of the initial import and its reminder
 readiness. `worker/sync/staging/` holds staged uploads, bulk new-file commits and
 the upload committers that publish them.

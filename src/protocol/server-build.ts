@@ -1,3 +1,7 @@
+/** Worker, database and bucket names Crate creates: `crate-` and the 16-digit deployment ID. */
+export const CRATE_RESOURCE_NAME = /^crate-([a-f0-9]{16})$/;
+export const isCrateResourceName = (value: string): boolean => CRATE_RESOURCE_NAME.test(value);
+
 /** Development identities never change the public server revision. */
 export interface DevelopmentBuild {
 	number: number;
@@ -11,7 +15,7 @@ export function parseDevelopmentBuild(value: unknown): DevelopmentBuild | undefi
 	if (!value || typeof value !== 'object') return undefined;
 	const build = value as Partial<DevelopmentBuild>;
 	return Number.isSafeInteger(build.number) && Number(build.number) > 0
-		&& typeof build.worker === 'string' && /^crate-[a-f0-9]{16}$/.test(build.worker)
+		&& typeof build.worker === 'string' && isCrateResourceName(build.worker)
 		? { number: Number(build.number), worker: build.worker } : undefined;
 }
 

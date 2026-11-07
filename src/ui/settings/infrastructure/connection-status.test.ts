@@ -5,7 +5,7 @@ import { showSyncErrorNotice } from '../../sync-error-notice';
 import { notifyConflicts } from '../../../sync/conflict/conflict';
 
 vi.mock('obsidian', () => createObsidianUiModule());
-vi.mock('../../activity/activity-modal', () => ({ ActivityModal: vi.fn() }));
+vi.mock('../../activity/activity-modal', () => ({ openSyncActivity: vi.fn() }));
 vi.mock('../../sync-error-notice', () => ({ showSyncErrorNotice: vi.fn() }));
 vi.mock('../../../sync/conflict/conflict', () => ({ notifyConflicts: vi.fn() }));
 import { renderConnectionStatus } from './connection-status';

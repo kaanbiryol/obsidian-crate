@@ -1,6 +1,6 @@
-import { CloudflareApiError, isDefinitiveRejection } from '../cloudflare-api-error';
+import { isDefinitiveRejection, nullOn404 } from '../cloudflare-api-error';
 import { createRandomHexToken } from '../../platform/random-hex';
-import { DeploymentRecoveryRequiredError, withDeploymentFence, type DeploymentFence, type FenceStep } from '../deployment/fence';
+import { DeploymentRecoveryRequiredError, newUploadTag, withDeploymentFence, type DeploymentFence, type FenceStep } from '../deployment/fence';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { workersDevOrigin } from '../deployment/worker-origin';
 import { clearBucketObjects } from './reset-objects';
@@ -36,8 +36,7 @@ export async function deleteCrateServer(input: {
 	const cleanupToken = createRandomHexToken(32), tokenHash = await sha256Hex(cleanupToken);
 	const phase = async (next: typeof job.phase) => { job.phase = next; await input.persist(); };
 	const removeIfPresent = async (operation: () => Promise<void>) => {
-		try { await operation(); }
-		catch (error) { if (!(error instanceof CloudflareApiError && error.status === 404)) throw error; }
+		await nullOn404(operation());
 	};
 	const removeResources = async (fence?: DeploymentFence) => {
 		const mutate = async (step: FenceStep, operation: () => Promise<void>, batchHash?: string) => {
@@ -68,7 +67,7 @@ export async function deleteCrateServer(input: {
 			};
 			if (fence) await fence.uploadWorker(publish);
 			else {
-				const tag = `crate-${crypto.randomUUID()}`;
+				const tag = newUploadTag();
 				job.helperUploadPending = tag;
 				try { await input.persist(); }
 				catch (error) { delete job.helperUploadPending; throw error; }

@@ -78,7 +78,7 @@ describe('queue event handlers', () => {
 		h.controller.onFileDelete({ path: 'note.md', kind: 'file' });
 		const revisions = h.controller.snapshotPendingRevisions();
 		h.controller.onFileChange({ path: 'delete:note.md', kind: 'file' });
-		h.controller.clearSyncedPendingPaths(createSyncResult({ uploadedPaths: ['delete:note.md'], deletedPaths: ['note.md'] }), revisions);
+		h.controller.settleSyncResult(createSyncResult({ uploadedPaths: ['delete:note.md'], deletedPaths: ['note.md'] }), revisions);
 		expect(h.pending()).toEqual(['delete:note.md']);
 		expect(h.revisions()).toEqual(['delete:note.md']);
 	});
@@ -172,7 +172,7 @@ describe('debounced flush', () => {
 	});
 });
 
-describe('clearSyncedPendingPaths', () => {
+describe('settleSyncResult', () => {
 	it('removes successful uploaded, downloaded, merged, and deleted paths from the queue', async () => {
 		const h = createController({ automaticSync: true });
 		h.controller.onFileChange({ path: 'notes/uploaded.md', kind: 'file' });
@@ -181,7 +181,7 @@ describe('clearSyncedPendingPaths', () => {
 		h.controller.onFileDelete({ path: 'notes/deleted.md', kind: 'file' });
 		h.updateState.mockClear();
 
-		h.controller.clearSyncedPendingPaths(
+		h.controller.settleSyncResult(
 			createSyncResult({
 				uploadedPaths: ['notes/uploaded.md'],
 				downloadedPaths: ['notes/downloaded.md'],
@@ -204,7 +204,7 @@ describe('clearSyncedPendingPaths', () => {
 		h.controller.onFileChange({ path: 'notes/still-pending.md', kind: 'file' });
 		h.updateState.mockClear();
 
-		h.controller.clearSyncedPendingPaths(
+		h.controller.settleSyncResult(
 			createSyncResult({ uploadedPaths: ['notes/uploaded.md'] }),
 			h.controller.snapshotPendingRevisions(),
 		);
@@ -220,7 +220,7 @@ describe('clearSyncedPendingPaths', () => {
 		h.controller.onFileChange({ path: 'notes/a.md', kind: 'file' });
 		h.updateState.mockClear();
 
-		h.controller.clearSyncedPendingPaths(
+		h.controller.settleSyncResult(
 			createSyncResult({ success: false, uploadedPaths: ['notes/a.md'] }),
 			h.controller.snapshotPendingRevisions(),
 		);
@@ -250,7 +250,7 @@ describe('clearSyncedPendingPaths', () => {
 		const newer = h.controller.snapshotPendingRevisions().get('notes/a.md');
 		h.updateState.mockClear();
 
-		h.controller.clearSyncedPendingPaths(
+		h.controller.settleSyncResult(
 			createSyncResult({ uploadedPaths: ['notes/a.md'] }),
 			revisions,
 		);

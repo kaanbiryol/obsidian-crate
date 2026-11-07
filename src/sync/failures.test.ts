@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileFailure, isQueueTerminalFailure, isVersionConflict, isVersionConflictError, refusedUploadResult } from './failures';
+import { fileFailure, isQueueTerminalFailure, isVersionConflict, isVersionConflictError, refusedUploadResult, uploadResultError } from './failures';
 import { HttpError } from './worker-api/http';
 
 describe('sync failure classification', () => {
@@ -51,5 +51,12 @@ describe('sync failure classification', () => {
 		expect(() => refusedUploadResult('a.md', unavailable)).toThrow(unavailable);
 		const local = new Error('Disk full');
 		expect(() => refusedUploadResult('a.md', local)).toThrow(local);
+	});
+
+	it('turns a failed upload receipt back into its HTTP error', () => {
+		const error = uploadResultError({ success: false, path: 'a.md', status: 409, code: 'namespace_conflict', error: 'Taken' });
+		expect(error).toMatchObject({ message: 'Taken', status: 409, code: 'namespace_conflict' });
+		// A receipt without a status is treated as a transient server failure.
+		expect(uploadResultError({ success: false, path: 'a.md' })).toMatchObject({ message: 'Upload failed', status: 503 });
 	});
 });

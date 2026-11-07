@@ -232,7 +232,7 @@ describe('runIncrementalSync', () => {
 		const reconcileVersionConflicts = vi.fn(async (paths: string[], result: SyncResult) => {
 			result.downloaded++;
 			result.downloadedPaths.push('notes/changed-remotely.md');
-			result.settledPaths.push(...paths);
+			result.settledKeys.push(...paths);
 		});
 		harness.context.reconcileVersionConflicts = reconcileVersionConflicts;
 

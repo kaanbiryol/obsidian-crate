@@ -19,17 +19,14 @@ export interface PendingBrowserState extends PendingRowSelectionState {
 	statusLabels?: Map<string, string>;
 	showDetail?: boolean;
 	scrollTop?: number;
-	startChecks?: () => void;
-	pauseChecks?: () => void;
-	dispose?: () => void;
 }
 
-/** Stops the rendered browser's checks before a rebuild, which installs new ones. */
-export function resetPendingChecks(state: PendingBrowserState): void {
-	state.dispose?.();
-	state.startChecks = undefined;
-	state.pauseChecks = undefined;
-	state.dispose = undefined;
+/** The rendered browser's file checks. Its owner pauses them while the list is hidden
+ * and disposes them before a rebuild renders a new browser. */
+export interface PendingChecks {
+	start(): void;
+	pause(): void;
+	dispose(): void;
 }
 
 let nextBrowserId = 0;
@@ -53,7 +50,7 @@ export function pendingRowWindow(scrollTop: number, viewport: number, rowPx: num
 }
 
 /** Check file statuses on opening, or on selection in long lists; keep one selected comparison in view. */
-export function renderPendingBrowser(container: HTMLElement, paths: string[], load: PendingDiffLoader, state: PendingBrowserState = {}, actions?: PendingActions): void {
+export function renderPendingBrowser(container: HTMLElement, paths: string[], load: PendingDiffLoader, state: PendingBrowserState = {}, actions?: PendingActions): PendingChecks {
 	const changes = paths.map(decodePendingChange);
 	const browser = container.createDiv({ cls: 'crate-pending-browser' });
 	const sidebar = browser.createDiv({ cls: 'crate-browser-sidebar' });
@@ -258,9 +255,6 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	});
 	const resize = new ResizeObserver(() => renderWindow());
 	resize.observe(list);
-	state.startChecks = () => { renderWindow(); comparisons.start(); };
-	state.pauseChecks = () => comparisons.pause();
-	state.dispose = () => { resize.disconnect(); comparisons.dispose(); };
 
 	const previousIndex = paths.findIndex(key => key === state.selectedKey);
 	focusIndex = Math.max(previousIndex, 0);
@@ -272,6 +266,11 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	queueMicrotask(() => {
 		if (browser.isConnected && browser.getClientRects().length > 0) comparisons.start();
 	});
+	return {
+		start: () => { renderWindow(); comparisons.start(); },
+		pause: () => comparisons.pause(),
+		dispose: () => { resize.disconnect(); comparisons.dispose(); },
+	};
 }
 
 function describeSnapshot(snapshot: PendingDiff): string {

@@ -117,6 +117,26 @@ describe('renderNotificationsSection', () => {
 		expect(getSettingByName('Test notification').descEl.textContent).toBe('Send a test notification to all enabled devices.');
 	});
 
+	it('shows the subscription date from the server UTC timestamp', async () => {
+		const originalTimezone = process.env.TZ;
+		process.env.TZ = 'America/Los_Angeles';
+		try {
+			const { renderNotificationsSection } = await loadNotificationsSectionModule();
+			const getPushSubscriptions = vi.fn(async () => ({ subscriptions: [{ id: 'sub-1', device_name: 'iPhone', created_at: '2026-06-04 02:00:00', disabled_at: null }] }));
+			renderNotificationsSection({
+				containerEl: new FakeElement('div') as never,
+				plugin: createPlugin({ getPushSubscriptions, deletePushSubscription: vi.fn(), testPush: vi.fn() }),
+				rerender: vi.fn(),
+			});
+			await flushMicrotasks();
+
+			// 02:00 UTC on June 4 is still June 3 in Los Angeles.
+			expect(getSettingByName('iPhone').descEl.textContent).toBe(`Subscribed ${new Date('2026-06-04T02:00:00Z').toLocaleDateString()}`);
+		} finally {
+			process.env.TZ = originalTimezone;
+		}
+	});
+
 	it('ignores late subscription results after settings close', async () => {
 		const { renderNotificationsSection } = await loadNotificationsSectionModule();
 		let resolve!: (value: { subscriptions: unknown[] }) => void;

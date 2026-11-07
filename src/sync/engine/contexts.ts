@@ -11,6 +11,7 @@ import type { DiffApplyOutcome, TransferContext } from '../transfer/types';
 import type { VaultFile } from '../local/file-discovery';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { LocalDiffPlannerContext } from '../planner/types';
+import type { PendingKey } from '../pending/pending-change';
 import { createFullSyncPlan } from '../planner/full';
 import { runIncrementalSync } from '../planner/incremental';
 import { getLocalChanges as planLocalChanges, getLocalDeletes as planLocalDeletes } from '../planner/local';
@@ -54,7 +55,7 @@ interface SyncEngineContextDependencies {
 	getModifiedIso: (path: string, fallbackMtime?: number) => Promise<string>;
 	getPendingKeys: () => string[];
 	verifyContent: (files: VaultFile[]) => Promise<boolean>;
-	reconcileVersionConflicts: (paths: string[], result: SyncResult) => Promise<void>;
+	reconcileVersionConflicts: (keys: PendingKey[], result: SyncResult) => Promise<void>;
 	updateState: (updates: Partial<SyncState>) => void;
 	reconnectNotice: ReconnectNotice;
 	throwIfDestroyed: () => void;
@@ -222,7 +223,7 @@ export class SyncEngineContexts {
 					prepareFullSyncUpload: diff => this.syncWorkflow.prepareFullSyncUpload(diff),
 					uploadPreparedFiles: this.uploadPreparedFiles,
 					// Conflicted paths return to the queue pass for a fresh reconciliation.
-					reconcileVersionConflicts: async paths => { retryPaths.push(...paths); },
+					reconcileVersionConflicts: async keys => { retryPaths.push(...keys); },
 					localManifest: d.localManifest,
 					throwIfDestroyed: d.throwIfDestroyed,
 				}, diffs, createPathRecord<FileEntry>(), result, () => {});

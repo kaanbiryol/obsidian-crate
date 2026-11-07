@@ -8,24 +8,6 @@ import { PathTags } from '@/encryption/path-tags';
 import { createOpaqueWireName } from '@/protocol/encrypted-path';
 import { createReadingNote } from '../../reading/core/notes';
 import { EncryptedReadingApi, type EncryptedReadingIndexEntry } from './encrypted-api';
-import { acceptsSealedNote } from './sealed-notes';
-
-describe('acceptsSealedNote', () => {
-	const note = { wire: 'R/new.md', path: 'Reading/Article.md', hash: 'a' };
-	it('accepts a note at a new server path under a free name', () => {
-		expect(acceptsSealedNote(note, [])).toBe(true);
-		expect(acceptsSealedNote(note, [{ wire: 'R/other.md', path: 'Reading/Other.md', hash: 'b' }])).toBe(true);
-	});
-	it('accepts a known server path only with the plaintext and name held there', () => {
-		expect(acceptsSealedNote(note, [{ ...note }])).toBe(true);
-		expect(acceptsSealedNote(note, [{ ...note, hash: 'b' }])).toBe(false);
-		expect(acceptsSealedNote(note, [{ ...note, path: 'Reading/Renamed.md' }])).toBe(false);
-	});
-	it('rejects the name of a note at another server path, in any letter case', () => {
-		expect(acceptsSealedNote(note, [{ wire: 'R/old.md', path: 'Reading/Article.md', hash: 'a' }])).toBe(false);
-		expect(acceptsSealedNote(note, [{ wire: 'R/old.md', path: 'reading/ARTICLE.md', hash: 'b' }])).toBe(false);
-	});
-});
 
 let authority: FileEncryptionAuthority, recipient: SealRecipient, paths: PathTags, wireFolder: string;
 beforeAll(async () => {

@@ -1,3 +1,4 @@
+import { CRATE_RESOURCE_NAME } from '../../protocol/server-build';
 import { readVaultName } from './vault-name';
 import type { CloudflareDeploymentMetadata } from './types';
 import type {
@@ -8,7 +9,6 @@ import type {
 	CloudflareWorkerSettings,
 } from '../cloudflare-api';
 
-const CRATE_RESOURCE_NAME = /^crate-([a-f0-9]{16})$/;
 
 export interface DiscoveredCloudflareDeployment {
 	metadata: CloudflareDeploymentMetadata;
@@ -26,6 +26,11 @@ function findBinding(
 /** `workers/message` annotations identifying what Crate uploaded. Readers compare
  * against these exactly, so the format lives in one place. */
 export const releaseWorkerMessage = (version: string, fingerprint: string): string => `Crate ${version} ${fingerprint}`;
+/** A release message exactly as `releaseWorkerMessage` writes it, or null. */
+export function parseReleaseWorkerMessage(message: string): { version: string; fingerprint: string } | null {
+	const match = /^Crate (\d+\.\d+\.\d+) ([a-f0-9]{64})$/.exec(message);
+	return match ? { version: match[1]!, fingerprint: match[2]! } : null;
+}
 export const deletionWorkerMessage = (deletionId: string): string => `Crate deletion ${deletionId}`;
 
 /** The live Worker's storage, when it binds exactly one database as `DB` and one

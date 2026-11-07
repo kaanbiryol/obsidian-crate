@@ -5,7 +5,7 @@ import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import type { CloudflareDeploymentMetadata } from './types';
 import { workersDevOrigin } from './worker-origin';
 import { CloudflareApiClient, CloudflareApiError, queryD1Rows } from '../cloudflare-api';
-import { isDefinitiveRejection } from '../cloudflare-api-error';
+import { isDefinitiveRejection, isNotFound } from '../cloudflare-api-error';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { createRandomHexToken } from '../../platform/random-hex';
 import { deployedArtifact, workerStorageBindings } from './discovery';
@@ -94,7 +94,7 @@ async function checkRemoteDeployment(input: { api: CloudflareApiClient; accountI
 		if (vaultName) input.metadata.vaultName = vaultName;
 		return JSON.stringify([message, storage.databaseId, storage.bucketName, vaultName]);
 	} catch (error) {
-		if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
+		if (!isNotFound(error)) throw error;
 		return null;
 	}
 }

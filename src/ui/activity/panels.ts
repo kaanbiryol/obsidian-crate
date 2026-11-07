@@ -2,7 +2,7 @@ import type { PendingActions } from './pending-actions';
 import { formatSyncProgress } from './progress-label';
 import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, renderLoadingState } from './rendering';
-import { renderPendingBrowser, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
+import { renderPendingBrowser, type PendingChecks, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
 
 interface PendingPanelOptions {
 	paths: string[];
@@ -14,7 +14,8 @@ interface PendingPanelOptions {
 	actions?: PendingActions;
 }
 
-export function renderPendingPanel(container: HTMLElement, { paths, loadDiff, state, progress, lastSyncLabel = 'Your vault is up to date.', browserState, actions }: PendingPanelOptions): void {
+/** Returns the file browser's checks when the panel shows one. */
+export function renderPendingPanel(container: HTMLElement, { paths, loadDiff, state, progress, lastSyncLabel = 'Your vault is up to date.', browserState, actions }: PendingPanelOptions): PendingChecks | undefined {
 	const hasError = state?.status === 'error';
 	const syncing = state?.status === 'syncing';
 	const checking = state?.initializing && !hasError && state.status !== 'offline';
@@ -40,7 +41,7 @@ export function renderPendingPanel(container: HTMLElement, { paths, loadDiff, st
 		return;
 	}
 
-	renderPendingBrowser(container, paths, loadDiff, browserState, actions);
+	return renderPendingBrowser(container, paths, loadDiff, browserState, actions);
 }
 
 export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[], checking: boolean, onReview?: (conflict: ConflictRecord) => void): void {

@@ -16,7 +16,7 @@ export function createEmptySyncResult(): SyncResult {
 		conflicts: [],
 		unresolvedConflicts: [],
 		resolvedRaces: [],
-		settledPaths: [],
+		settledKeys: [],
 		errors: [],
 		uploadedPaths: [],
 		downloadedPaths: [],
@@ -64,7 +64,7 @@ export function mergeSyncResults(target: SyncResult, source: SyncResult): void {
 		}
 	}
 	for (const race of source.resolvedRaces) recordResolvedRace(target, race.path, race.resolution);
-	appendUnique(target.settledPaths, source.settledPaths);
+	appendUnique(target.settledKeys, source.settledKeys);
 	target.errors.push(...source.errors);
 	if (source.issues?.length) (target.issues ??= []).push(...source.issues);
 	appendUnique(target.uploadedPaths, source.uploadedPaths);

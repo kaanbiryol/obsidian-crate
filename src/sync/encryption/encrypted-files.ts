@@ -7,15 +7,15 @@ import { resolveEncryptedPath, type ReadingFolderForms } from '../../encryption/
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
 import type { EncryptedUploadWire, JournalUpload } from '../durability/upload-intent';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
-import { parseFileMetadata } from '../worker-api/read-contracts';
+import { requestFileMetadata } from '../worker-api/read-contracts';
 import { decryptJson, encryptJson } from '../../encryption/envelope';
 import { validateEncryptedSettings, type EncryptedSettings } from '../../encryption/settings-format';
 import type { RestoreIntent } from '../durability/restore-intent';
-import { parseFileVersions } from '../worker-api/version-contract';
+import { requestFileVersions } from '../worker-api/version-contract';
 import { BATCH_DOWNLOAD_MAX_FILES, ENCRYPTION_METADATA_BATCH } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 import { distinctLocalName, PathIndex, type SyncedFile } from './path-index';
-import { portablePathKey } from '../../protocol/portable-path';
+import { sealedNoteRefusal } from '../../encryption/sealed-note';
 
 interface WireMetadata { hash: string; size: number; revision?: string }
 const METADATA_CONCURRENCY = 4;
@@ -90,19 +90,11 @@ export class EncryptedFiles {
 		};
 	}
 
-	/** The server may only create sealed notes. One is accepted at a server path this
-	 * device already holds only with the bytes it holds, and never under the name of a
-	 * note stored at another server path. This includes an untouched Shortcut note. */
+	/** Applies `sealedNoteRefusal` to the files synced in the note's folder. */
 	private async acceptSealed(path: string, wire: string, hash: string, synced: SyncedFile[]): Promise<void> {
-		const held = synced.find(file => file.wire === wire);
-		if (held) {
-			if (held.path === path && held.hash === hash) return;
-			throw new SealedReplacementError(held.path, hash);
-		}
-		const key = portablePathKey(path);
-		if (synced.some(file => portablePathKey(file.path) === key)) {
-			throw new SealedReplacementError(distinctLocalName(path, wire), hash);
-		}
+		const refusal = sealedNoteRefusal({ wire, path, hash }, synced);
+		if (refusal?.kind === 'replaces') throw new SealedReplacementError(refusal.held.path, hash);
+		if (refusal?.kind === 'name-taken') throw new SealedReplacementError(distinctLocalName(path, wire), hash);
 	}
 
 	/** One read of the files synced in a folder, shared by the files of one listing or batch. */
@@ -200,9 +192,7 @@ export class EncryptedFiles {
 		for (let offset = 0; offset < remote.length; offset += BATCH_DOWNLOAD_MAX_FILES) {
 			const chunk = remote.slice(offset, offset + BATCH_DOWNLOAD_MAX_FILES);
 			const wires = await Promise.all(chunk.map(index => this.paths.wireFor(requests[index]!.path)));
-			const files = parseFileMetadata(await this.http.requestJson('/sync/metadata', {
-				method: 'POST', body: JSON.stringify({ paths: [...new Set(wires)] }),
-			}), wires).files;
+			const { files } = await requestFileMetadata(this.http, wires);
 			const present = wires.filter(wire => files[wire]);
 			const opened = new Map((await this.metadata(present.map(wire => ({ path: wire, entry: files[wire]! })))).map(item => [item.wire, item]));
 			for (const [position, index] of chunk.entries()) {
@@ -274,7 +264,7 @@ export class EncryptedFiles {
 		while (true) {
 			const query = new URLSearchParams({ path: wire });
 			if (cursor) query.set('cursor', cursor);
-			const page = parseFileVersions(await this.http.requestJson(`/sync/versions?${query}`));
+			const page = await requestFileVersions(this.http, query);
 			const raw = page.versions.find(version => version.storage_key === intent.version.storage_key);
 			if (raw) {
 				const [plain] = await this.metadata([{ path: raw.path, entry: { ...raw, revision: raw.storage_key } }], { historical: true });

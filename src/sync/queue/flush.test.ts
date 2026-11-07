@@ -108,7 +108,7 @@ function createFlushHarness(overrides: Partial<{
 			flushSucceeded: vi.fn(),
 			finishInitialSetup: vi.fn(async () => {}),
 			recoverUploads: vi.fn(async () => {}),
-			getPendingPathCount: () => pendingKeys.size,
+			getQueuedKeyCount: () => pendingKeys.size,
 			beginBatch: () => {
 				const paths = [...pendingKeys];
 				const revisions = new Map(pendingRevisions);

@@ -1,4 +1,5 @@
-import { CloudflareApiError, queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
+import { queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
+import { isNotFound } from '../cloudflare-api-error';
 import type { DeploymentFence } from '../deployment/fence';
 import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, SHARED_SETTINGS_KEY, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 import { sha256Hex } from '../../platform/sha256';
@@ -111,7 +112,7 @@ async function copyToStore(context: BackupContext, file: FileReference, stored: 
 	try { bytes = await api.getRecoveryObject(accountId, bucketName, file.key); }
 	catch (error) {
 		// Writers continue while files are copied; a file removed after its reference was read is no longer needed.
-		if (!required && error instanceof CloudflareApiError && error.status === 404) return;
+		if (!required && isNotFound(error)) return;
 		throw error;
 	}
 	if (bytes.byteLength !== file.size || await sha256Hex(bytes) !== file.sha256) throw new Error('A server file could not be verified. Upgrade has not started.');
@@ -256,7 +257,7 @@ async function finishArchive(context: BackupContext, input: { databaseId: string
 			await api.putRecoveryObject(accountId, bucketName, upgradeBackupStoreKey(sha256), bytes);
 		}
 		objects.push({ key: SHARED_SETTINGS_KEY, sha256, size: bytes.byteLength, contentType: 'application/json' });
-	} catch (error) { if (!(error instanceof CloudflareApiError && error.status === 404)) throw error; }
+	} catch (error) { if (!isNotFound(error)) throw error; }
 	objects.sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 	const parts = await listBackupObjects(api, accountId, bucketName, `${progress.prefix}/objects/`);
 	if (progress.parts.some(part => !isStored(parts, part.sha256, part.size))) throw new Error('Database checkpoint verification failed');

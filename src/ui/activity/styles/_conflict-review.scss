@@ -1,0 +1,171 @@
+@use "./sync-review";
+
+/* Conflict list rows and the conflict review modal. Included in place by `_activity.scss`, so the cascade order is unchanged. */
+@mixin styles {
+	.crate-activity-list:has(> .crate-conflict-row) {
+	    // File cards already contribute 5px of top padding.
+	    padding-top: sync-review.$section-heading-gap - 5px;
+	}
+	.crate-conflict-row-folder { color: var(--text-muted); font-weight: normal; }
+	.crate-conflict-row {
+	    display: flex;
+	    align-items: center;
+	    gap: 12px;
+	    border-bottom: 1px solid sync-review.$row-divider;
+	    padding-bottom: 8px;
+	    &:last-child { border-bottom: 0; }
+	    .crate-activity-file-card { flex: 1; min-width: 0; }
+	    > button { flex-shrink: 0; }
+	}
+	.modal.crate-shared-modal.crate-conflict-review-modal {
+	    width: min(800px, calc(100vw - 48px));
+	    max-width: 800px;
+	    height: min(560px, calc(100dvh - 48px));
+	    max-height: calc(100dvh - 48px);
+	    box-sizing: border-box;
+	    &.is-mobile { width: 100%; max-width: none; height: calc(85dvh - var(--keyboard-height, 0px)); max-height: calc(90dvh - var(--keyboard-height, 0px)); margin-bottom: var(--keyboard-height, 0px); }
+	    .modal-content {
+	        display: flex;
+	        flex-direction: column;
+	        min-height: 0;
+	        height: 100%;
+	        max-height: none;
+	        overflow: hidden;
+	    }
+	    .crate-modal-header-host { flex-shrink: 0; }
+	    .crate-modal-body {
+	        min-height: 0;
+	        overflow-y: auto;
+	        overscroll-behavior: contain;
+	        flex: 1;
+	        padding: var(--crate-dialog-padding);
+	    }
+	}
+	.crate-conflict-intro { display: flex; align-items: center; gap: 12px; }
+	.crate-conflict-file-heading { min-width: 0; }
+	.crate-conflict-review-path { margin: 0; @include sync-review.title; overflow-wrap: anywhere; }
+	.crate-conflict-review-folder { color: var(--text-muted); font-weight: normal; }
+	.crate-conflict-review-help { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; overflow-wrap: anywhere; }
+	.crate-conflict-load-error {
+	    display: flex;
+	    flex-direction: column;
+	    align-items: flex-start;
+	    gap: 12px;
+	    padding: 12px 0;
+	    h3, p { margin: 0; }
+	    h3 { font-size: var(--font-ui-medium); }
+	    button { max-width: 100%; white-space: normal; }
+	}
+	.crate-conflict-retry { margin-top: 12px; }
+	.crate-conflict-toolbar {
+	    display: flex;
+	    gap: 8px;
+	    margin-left: auto;
+	    flex-shrink: 0;
+
+	}
+	.crate-conflict-compare {
+	    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0;
+	    border: 0; border-radius: 0; overflow: hidden; @include sync-review.diff-colors;
+	}
+	.crate-conflict-version {
+	    min-width: 0;
+	    + .crate-conflict-version { border-left: 1px solid sync-review.$pane-divider; }
+	    h3 { margin: 0; padding: 8px 12px; border: 0; background: transparent; @include sync-review.title; }
+	    p { padding: 16px; color: var(--text-muted); font-size: var(--font-ui-small); }
+	    h3 > button {
+	        display: flex; align-items: center; justify-content: space-between;
+	        width: 100%; height: auto; padding: 2px 0;
+	        background: transparent; box-shadow: none; font-weight: var(--font-semibold); color: var(--text-normal);
+	        cursor: pointer;
+	        &:disabled { cursor: default; }
+	        @media (hover: hover) and (pointer: fine) { &:hover { color: var(--text-normal); } }
+	        svg { width: 14px; height: 14px; color: var(--text-faint); }
+	    }
+	}
+	.crate-conflict-code {
+	    margin: 0; padding: 12px 0; min-height: 260px; max-height: 44dvh;
+	    overflow: auto; font-size: var(--font-ui-smaller); line-height: 1.6;
+	    background: var(--background-primary); white-space: pre; user-select: text;
+	}
+	.crate-conflict-line {
+	    display: flex;
+	    min-width: 100%;
+	    width: max-content;
+	    min-height: 1.6em;
+	    border-left: 2px solid transparent;
+	    padding-right: 12px;
+	    &.is-removed { --conflict-diff-color: var(--crate-diff-removed); }
+	    &.is-added { --conflict-diff-color: var(--crate-diff-added); }
+	    &.is-removed, &.is-added {
+	        background: color-mix(in srgb, var(--conflict-diff-color) var(--crate-diff-row-tint), transparent);
+	        border-left-color: var(--conflict-diff-color);
+	    }
+	    &.is-empty { background: transparent; }
+	}
+	.crate-conflict-line-number { width: 3ch; flex-shrink: 0; text-align: right; color: var(--text-faint); user-select: none; }
+	.crate-conflict-line-sign { width: 2ch; flex-shrink: 0; text-align: center; color: var(--conflict-diff-color, var(--text-faint)); user-select: none; }
+	.crate-conflict-line .crate-diff-word { background: color-mix(in srgb, var(--conflict-diff-color) var(--crate-diff-word-tint), transparent); border-radius: 2px; }
+
+	.crate-conflict-actions {
+	    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px;
+	    flex-shrink: 0;
+	    align-items: end; margin-top: 0; background: var(--background-primary);
+	    > .crate-conflict-primary-action { grid-column: 2; grid-row: 3; justify-self: end; }
+	}
+	.crate-conflict-resolution-help { grid-column: 1 / -1; grid-row: 2; margin: 0; min-height: 1.5em; }
+	.crate-conflict-choices {
+	    grid-column: 1 / -1;
+	    display: flex;
+	    flex-wrap: wrap;
+	    gap: 6px;
+	    padding: 0;
+	    margin: 0;
+	    border: 0;
+	    min-width: 0;
+	    legend {
+	        padding: 0;
+	        font-size: var(--font-ui-smaller);
+	        color: var(--text-muted);
+	        margin-bottom: 12px;
+	    }
+	    label {
+	        position: relative;
+	        display: inline-flex;
+	        align-items: center;
+	        justify-content: center;
+	        cursor: pointer;
+	        line-height: 1.4;
+	        background: transparent;
+	        transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+	        @media (hover: hover) and (pointer: fine) { &:not(:has(input:disabled)):hover { background: var(--crate-control-hover-bg); } }
+	        &:not(:has(input:disabled)):active { background: var(--crate-control-active-bg); }
+	        gap: 5px;
+	        &:has(input:checked) {
+	            background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+	            --crate-choice-border: var(--interactive-accent);
+	        }
+	        &:has(input:focus-visible) { outline: 2px solid var(--crate-focus-ring); outline-offset: 1px; }
+	        &:has(input:disabled) { opacity: 0.5; cursor: default; }
+	    }
+
+	    input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+	}
+	.crate-conflict-manual {
+	    min-width: 0;
+	    margin-top: 16px;
+	    font-size: var(--font-ui-small);
+	    h3 { margin: 0; @include sync-review.title; }
+	    p { margin: 8px 0 12px; }
+	    label { display: block; }
+	}
+	.crate-conflict-editor { display: block; width: 100%; min-height: 260px; margin-top: 8px; padding: 12px; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); line-height: 1.6; resize: vertical; }
+	@media (max-width: sync-review.$compact-width) {
+	    .crate-conflict-intro { flex-wrap: wrap; }
+	    .crate-conflict-toolbar { width: 100%; margin-left: 0; }
+	    .crate-conflict-compare { grid-template-columns: 1fr; }
+	    .crate-conflict-version + .crate-conflict-version { border: 0; margin-top: 20px; }
+	    .crate-conflict-code { min-height: 120px; max-height: 28dvh; }
+	    .crate-conflict-actions { grid-template-columns: 1fr; > .crate-conflict-primary-action { grid-column: 1; grid-row: 3; width: 100%; } }
+	}
+}

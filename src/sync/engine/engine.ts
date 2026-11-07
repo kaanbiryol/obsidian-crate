@@ -1,4 +1,4 @@
-import { pendingChangeKey } from '../pending/pending-change';
+import { pendingChangeKey, type PendingKey } from '../pending/pending-change';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
 import { createEngineFileOperations, type EngineFileOperations } from './file-operations';
 import { createEngineHistory } from './history';
@@ -137,7 +137,7 @@ export class SyncEngine {
 			automaticSyncEnabled: () => this.settings.automaticSync,
 			getSyncIntervalSeconds: () => this.settings.automaticSync ? this.settings.syncInterval : 0,
 			getLastSeq: () => this.settings.lastSeq,
-			getPendingPathCount: () => this.queueController.getPendingPathCount(),
+			getQueuedKeyCount: () => this.queueController.getQueuedKeyCount(),
 			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await this.hasUnsyncedLocalChanges(),
 			verifyLocalContent: () => this.verifyTrackedContent(),
 			checkForChanges: async (lastSeq: number) => {
@@ -179,7 +179,7 @@ export class SyncEngine {
 			getModifiedIso: (path, fallbackMtime) => getModifiedIso(this.vault.adapter, path, fallbackMtime),
 			getPendingKeys: () => this.queueController.getPendingKeys(),
 			verifyContent: files => this.verifyContent(files),
-			reconcileVersionConflicts: (paths, result) => this.reconcileVersionConflicts(paths, result),
+			reconcileVersionConflicts: (keys, result) => this.reconcileVersionConflicts(keys, result),
 			updateState: this.updateState.bind(this),
 			reconnectNotice: this.reconnectNotice,
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
@@ -318,7 +318,7 @@ export class SyncEngine {
 				|| this.localManifest.uploadJournal.pending().length || this.files.getPendingRestores().length),
 			canCheckpoint: () => !this.lifecycle.isDestroyed && this.state.status !== 'syncing',
 			runExclusive: operation => this.runExclusiveOperation(operation),
-			applied: (path, removed) => this.queueController.restorePendingPaths([pendingChangeKey(removed ? 'delete' : 'upload', path)]),
+			applied: (path, removed) => this.queueController.restorePendingKeys([pendingChangeKey(removed ? 'delete' : 'upload', path)]),
 		});
 	}
 
@@ -498,7 +498,7 @@ export class SyncEngine {
 					runConcurrent: (tasks, concurrency) => this.lifecycle.runConcurrent(tasks, concurrency),
 				}, PREPARE_CONCURRENCY);
 				if (activityCurrent() && !this.settings.automaticSync) {
-					this.queueController.restorePendingPaths(paths);
+					this.queueController.restorePendingKeys(paths);
 				}
 			} catch (error) {
 				if (!isAbortError(error) && activityCurrent()) {
@@ -578,7 +578,7 @@ export class SyncEngine {
 		await this.trackWork(async () => {
 			const changed = await this.contentVerifier.verifyTracked(this.vault, this.localManifest, this.ignore.shouldIgnore, this.lifecycle.abortSignal);
 			if (changed.length && activityCurrent() && !this.settings.automaticSync) {
-				this.queueController.restorePendingPaths(changed.map(path => pendingChangeKey('upload', path)));
+				this.queueController.restorePendingKeys(changed.map(path => pendingChangeKey('upload', path)));
 			}
 		});
 	}
@@ -608,13 +608,13 @@ export class SyncEngine {
 		}, queueKeys, selectedOnly));
 	}
 
-	private async reconcileVersionConflicts(paths: string[], result: SyncResult): Promise<void> {
-		const reconciliation = await this.reconcilePaths(paths);
+	private async reconcileVersionConflicts(keys: PendingKey[], result: SyncResult): Promise<void> {
+		const reconciliation = await this.reconcilePaths(keys);
 		mergeSyncResults(result, reconciliation);
 		if (reconciliation.outcome === 'cancelled') throw createAbortError('Sync reconciliation aborted');
 	}
 
-	private async reconcilePaths(queueKeys: string[], recover = true, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> {
+	private async reconcilePaths(queueKeys: PendingKey[], recover = true, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> {
 		await this.contexts.beforeTargetedTransfer({ recover });
 		this.lifecycle.throwIfDestroyed();
 		return this.contexts.reconcileQueuePaths(queueKeys, onFailure);

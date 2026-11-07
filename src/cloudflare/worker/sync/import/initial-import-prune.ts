@@ -1,4 +1,5 @@
 import { portablePathKey } from '../../../../protocol/portable-path';
+import { INITIAL_IMPORT_PRUNE_MAX_FILES } from '../../../../protocol/initial-import';
 import { readInitialImport } from './initial-import';
 import { corsResponse } from '../../http/cors';
 import { parseJsonObject, sanitizePath } from '../../http/request-validation';
@@ -12,7 +13,7 @@ export async function pruneInitialImport(request: Request, db: D1Database): Prom
 	const current = await readInitialImport(db);
 	if (!current || current.state !== 'importing' || current.token !== parsed.value.token) return corsResponse({ error: 'Initial import is closed or unavailable' }, 409);
 	const files = parsed.value.files;
-	if (!Array.isArray(files) || files.length > 50 || files.some((value: unknown) => {
+	if (!Array.isArray(files) || files.length > INITIAL_IMPORT_PRUNE_MAX_FILES || files.some((value: unknown) => {
 		if (!value || typeof value !== 'object') return true;
 		const file = value as Record<string, unknown>;
 		return typeof file.path !== 'string' || !sanitizePath(file.path) || !isSha256Hex(file.hash);

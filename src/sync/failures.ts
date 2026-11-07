@@ -1,4 +1,4 @@
-import type { MutationFailure, UploadResult } from '../protocol/sync-types';
+import { MUTATION_FAILURE_CODES, type MutationFailure, type UploadResult } from '../protocol/sync-types';
 import { HttpError, SyncTransportError } from './worker-api/http';
 import { errorMessage } from '../platform/logger';
 
@@ -29,13 +29,7 @@ export function fileFailure(path: string, error: unknown): MutationFailure {
 }
 
 function isMutationFailureCode(value: string | undefined): value is NonNullable<MutationFailure['code']> {
-	return value === 'version_conflict'
-		|| value === 'namespace_conflict'
-		|| value === 'operation_expired'
-		|| value === 'operation_mismatch'
-		|| value === 'validation'
-		|| value === 'storage'
-		|| value === 'unknown';
+	return (MUTATION_FAILURE_CODES as readonly (string | undefined)[]).includes(value);
 }
 
 /** Request retries and queue requeues: anything but a non-retryable server status may succeed later. */
@@ -78,6 +72,11 @@ export function isRefusedWrite(status: number | undefined, code?: string): boole
  * from its batch; any other error fails the batch. */
 export function isStalePreparedUpload(error: unknown): boolean {
 	return error instanceof HttpError && error.status === 409 && error.code === 'version_conflict';
+}
+
+/** The error for a failed upload receipt; the inverse of `refusedUploadResult`. */
+export function uploadResultError(result: UploadResult): HttpError {
+	return new HttpError(result.error || 'Upload failed', result.status ?? 503, null, result.code);
 }
 
 /** The failed upload receipt for a refused write; any other error is rethrown. */

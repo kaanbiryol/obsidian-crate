@@ -6,9 +6,10 @@ import { isMarkdownPath } from "../../protocol/note-paths";
 import type { TransferContext } from "./types";
 import type { BatchUploadFile, MutationFailure } from '../../protocol/sync-types';
 import type { PreparedUpload, SyncResult } from '../types';
+import { pendingChangeKey, type PendingKey } from '../pending/pending-change';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
-import { fileFailure, isAuthError, isTransientSyncFailure, isVersionConflict, isVersionConflictError } from '../failures';
+import { fileFailure, isAuthError, isTransientSyncFailure, isVersionConflict, isVersionConflictError, uploadResultError } from '../failures';
 import { UPLOAD_CONCURRENCY } from './constants';
 import { getBatchUploadConcurrency } from './budget';
 import { HttpError } from '../worker-api/http';
@@ -84,7 +85,7 @@ export async function uploadPreparedFiles(
 					} else if (isVersionConflict(fileResult.status, fileResult.code)) {
 						versionConflictPaths.add(upload.path);
 					} else {
-						recordUploadError(result, new HttpError(fileResult.error || "Upload failed", fileResult.status ?? 503, null, fileResult.code), upload.path, options);
+						recordUploadError(result, uploadResultError(fileResult), upload.path, options);
 					}
 				}
 			} catch (error) {
@@ -112,7 +113,7 @@ export async function uploadPreparedFiles(
 		const paths = [...versionConflictPaths];
 		if (options.onVersionConflicts) {
 			try {
-				await options.onVersionConflicts(paths, result);
+				await options.onVersionConflicts(paths.map(path => pendingChangeKey('upload', path)), result);
 			} catch (error) {
 				if (isAbortError(error)) throw error;
 				const message = error instanceof Error ? error.message : 'Version-conflict reconciliation failed';
@@ -131,7 +132,7 @@ export interface UploadPreparedFilesOptions {
 	retry: boolean;
 	onProcessed?: (count: number) => void;
 	onFailure?: (failure: MutationFailure) => void;
-	onVersionConflicts?: (paths: string[], result: SyncResult) => Promise<void>;
+	onVersionConflicts?: (keys: PendingKey[], result: SyncResult) => Promise<void>;
 }
 
 async function uploadPreparedFilesIndividually(
@@ -162,7 +163,7 @@ async function uploadPreparedFilesIndividually(
 			if (isVersionConflict(uploadResult.status, uploadResult.code)) {
 				return upload.path;
 			}
-			recordUploadError(result, new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code), upload.path, options);
+			recordUploadError(result, uploadResultError(uploadResult), upload.path, options);
 		} catch (error) {
 			if (isAbortError(error)) throw error;
 			if (isVersionConflictError(error)) {

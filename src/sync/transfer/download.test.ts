@@ -8,7 +8,7 @@ import { Platform } from 'obsidian';
 import { runConcurrentTasks } from '../concurrency';
 import { HttpError, SyncTransportError } from '../worker-api/http';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
-import { BATCH_DOWNLOAD_CONCURRENCY, DOWNLOAD_APPLY_CONCURRENCY } from './constants';
+import { getBatchDownloadConcurrency, getDownloadApplyConcurrency } from './budget';
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
@@ -403,7 +403,7 @@ it.each([
 	const result = emptyResult();
 	await parallelDownloadAndSaveFiles({ ...harness.context, runConcurrent }, requests, result, 2, onProcessed, onFailure);
 	// Only the batches already in flight were sent.
-	expect(harness.api.batchDownload).toHaveBeenCalledTimes(BATCH_DOWNLOAD_CONCURRENCY);
+	expect(harness.api.batchDownload).toHaveBeenCalledTimes(getBatchDownloadConcurrency());
 	expect(harness.api.downloadFile).not.toHaveBeenCalled();
 	expect(result.errors).toHaveLength(251);
 	expect(onProcessed).toHaveBeenCalledTimes(251);
@@ -428,7 +428,7 @@ it('writes the files of one downloaded batch through a bounded pool', async () =
 	await parallelDownloadAndSaveFiles({ ...harness.context, runConcurrent }, paths.map(path => ({ path, expectedLocalHash: null, expectedRemoteHash: hash, remoteSize: content.byteLength })), result, 2);
 	expect(result.downloaded).toBe(10);
 	// Before: one file of a batch at a time.
-	expect(peak).toBe(DOWNLOAD_APPLY_CONCURRENCY);
+	expect(peak).toBe(getDownloadApplyConcurrency());
 });
 
 it('still downloads each file when a batch response does not match its request', async () => {

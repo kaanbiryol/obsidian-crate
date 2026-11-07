@@ -2,6 +2,12 @@ import { isRecord, isSha256Hex } from '../../platform/validation';
 import { isSyncDate, isSyncPath, isSyncRevision, isSyncSequence } from '../../protocol/sync-validation';
 import type { FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 import { isWirePath } from '../../protocol/encrypted-path';
+import type { WorkerApiHttpClient } from './http';
+
+/** One page of retained versions, as stored (still encrypted in an encrypted vault). */
+export async function requestFileVersions(http: WorkerApiHttpClient, query: URLSearchParams): Promise<FileVersionsPage> {
+	return parseFileVersions(await http.requestJson<unknown>(`/sync/versions?${query.toString()}`));
+}
 
 export function parseFileVersions(value: unknown): FileVersionsPage {
 	if (!isRecord(value) || !Array.isArray(value.versions) || value.versions.length > 100 || typeof value.hasMore !== 'boolean') {

@@ -1,18 +1,19 @@
-import { canReplaceServerBuild } from '../../protocol/server-build';
+import { canReplaceServerBuild, isCrateResourceName } from '../../protocol/server-build';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { isSha256Hex } from '../../platform/validation';
-import { CloudflareApiError, queryD1Rows, type CloudflareApiClient, type CloudflareWorkerSettings } from '../cloudflare-api';
+import { queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
+import { nullOn404 } from '../cloudflare-api-error';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild, releaseUpgradeGuards } from './database';
 import { SERVER_RELEASE } from './database-upgrades';
 import {
 	awaitsPublicationVerification, type DeploymentFenceRecord, DeploymentRecoveryRequiredError, isPendingAddressActivation,
-	isRejectedWorkerUpload, isSettledStep, parseFenceRecord, readStoredFence, UPDATE_STEPS, withDeploymentFence,
+	isRejectedWorkerUpload, isSettledStep, isUploadTag, parseFenceRecord, readStoredFence, UPDATE_STEPS, withDeploymentFence,
 } from './fence';
 import { provisionCloudflareDeployment } from './provisioner';
 import type { CloudflareDeploymentMetadata } from './types';
 import { workersDevOrigin } from './worker-origin';
-import { releaseWorkerMessage, workerStorageBindings } from './discovery';
+import { parseReleaseWorkerMessage, releaseWorkerMessage, workerStorageBindings } from './discovery';
 
 type RecoveryApi = Pick<CloudflareApiClient, 'queryD1' | 'getWorkerSettings'>;
 export interface DeploymentRecoveryResult {
@@ -34,21 +35,17 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 	const report: Record<string, unknown> = { worker: target.workerName, database, checkedAt: new Date().toISOString(), currentFingerprint: fingerprint };
 	const result = (status: DeploymentRecoveryResult['status'], message: string): DeploymentRecoveryResult =>
 		({ status, message, diagnostics: JSON.stringify({ ...report, status }, null, 2) });
-	let settings: CloudflareWorkerSettings | null;
-	try { settings = await api.getWorkerSettings(account, target.workerName); }
-	catch (error) {
-		if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
-		settings = null; // First installation may stop before creating the Worker.
-	}
+	// First installation may stop before creating the Worker.
+	const settings = await nullOn404(api.getWorkerSettings(account, target.workerName));
 	const storage = settings && workerStorageBindings(settings);
 	if (settings && (storage?.databaseId !== database || storage.bucketName !== target.r2BucketName)) {
 		return result('blocked', 'The live server uses different storage. Recovery stopped without changing it.');
 	}
 	const message = settings?.annotations?.['workers/message'] ?? '';
-	const build = /^Crate (\d+\.\d+\.\d+) ([a-f0-9]{64})$/.exec(message);
+	const build = parseReleaseWorkerMessage(message);
 	if (settings && !build) return result('blocked', 'The live server could not be identified as a supported Crate deployment.');
-	report.liveVersion = build?.[1];
-	report.liveFingerprint = build?.[2];
+	report.liveVersion = build?.version;
+	report.liveFingerprint = build?.fingerprint;
 	const tables = await queryD1Rows(api, account, database,
 		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'maintenance_state';");
 	if (!tables.length) return result('ready', 'No interrupted update is blocking this server.');
@@ -71,10 +68,9 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 	// establishes publication even if the response/checkpoint was lost.
 	if (record.recoveryProtocol === 1 && record.verificationPending === true
 		&& record.step === 'upload-worker' && record.stepState === 'started'
-		&& typeof record.uploadTag === 'string'
-		&& /^crate-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(record.uploadTag)
+		&& isUploadTag(record.uploadTag)
 		&& settings?.annotations?.['workers/tag'] === record.uploadTag
-		&& build?.[1] === record.version && build?.[2] === record.fingerprint
+		&& build?.version === record.version && build?.fingerprint === record.fingerprint
 		&& fingerprint === record.fingerprint) {
 		const confirmed = JSON.stringify({ ...record, stepState: 'confirmed' });
 		const changed = await queryD1Rows(api, account, database,
@@ -96,7 +92,7 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 		return result('blocked', 'Cloudflare has not confirmed that the interrupted request finished. Crate cannot safely resume this update yet.');
 	}
 	if (record.verificationPending === true) {
-		if (build?.[2] === record.fingerprint && build?.[1] === record.version && awaitsPublicationVerification(record)) {
+		if (build?.fingerprint === record.fingerprint && build?.version === record.version && awaitsPublicationVerification(record)) {
 			return { ...result('verify', 'The published update can be verified under new ownership.'), resumeValue: value };
 		}
 		if (pendingAddress) return result('blocked', 'The pending address activation belongs to a different published build. No lock was cleared.');
@@ -132,7 +128,7 @@ export async function completePublishedDeployment(
 	const fingerprint = record.fingerprint;
 	const version = record.version;
 	// Resolve the address from the selected server, never from the operation record.
-	if (!/^crate-[a-f0-9]{16}$/.test(target.workerName) || !/^[a-z0-9-]+$/.test(target.workersSubdomain ?? '')) {
+	if (!isCrateResourceName(target.workerName) || !/^[a-z0-9-]+$/.test(target.workersSubdomain ?? '')) {
 		throw new Error('The saved server address is invalid.');
 	}
 	const publishedArtifacts = { ...artifacts, version, fingerprint };

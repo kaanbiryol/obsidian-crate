@@ -145,7 +145,7 @@ export async function reconcileIncrementalRemoteChanges(
 
 			if (!decision) {
 				context.localManifest.setEntry(path, { ...localEntry, revision: entry.revision });
-				result.settledPaths.push(pendingChangeKey('upload', path));
+				result.settledKeys.push(pendingChangeKey('upload', path));
 			} else if (decision.action === 'upload') {
 				if (!localChangedPaths.has(path)) {
 					localChangedPaths.add(path);

@@ -4,7 +4,7 @@
 @use "plugin-ui/app-density";
 @use "plugin-ui/reminder-editor";
 @use "plugin-ui/modal";
-@use "plugin-ui/recovery";
+@use "../ui/activity/styles/file-history";
 @use "plugin-ui/settings-alignment";
 @source "../**/*.{ts,tsx,js,jsx}";
 @source not "../**/*.test.ts";
@@ -17,7 +17,7 @@
   @include plugin-theme.styles;
   @include reminder-editor.styles;
   @include modal.styles;
-  @include recovery.styles;
+  @include file-history.styles;
   @include app-density.styles;
 }
 

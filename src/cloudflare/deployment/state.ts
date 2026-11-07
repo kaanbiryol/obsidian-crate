@@ -1,5 +1,6 @@
 import { isRecord, isSha256Hex } from '../../platform/validation';
 import { normalizeVaultName } from './vault-name';
+import { isCrateResourceName } from '../../protocol/server-build';
 import type { CloudflareDeploymentMetadata } from './types';
 
 function normalizeString(value: unknown, fallback = ''): string {
@@ -26,9 +27,9 @@ export function normalizeCloudflareDeployment(value: unknown): CloudflareDeploym
 	const d1DatabaseName = normalizeString(value.d1DatabaseName).toLowerCase();
 	const r2BucketName = normalizeString(value.r2BucketName).toLowerCase();
 	if (!/^[a-f0-9]{16}$/.test(deploymentId)
-		|| !/^crate-[a-f0-9]{16}$/.test(workerName)
-		|| !/^crate-[a-f0-9]{16}$/.test(d1DatabaseName)
-		|| !/^crate-[a-f0-9]{16}$/.test(r2BucketName)) {
+		|| !isCrateResourceName(workerName)
+		|| !isCrateResourceName(d1DatabaseName)
+		|| !isCrateResourceName(r2BucketName)) {
 		return null;
 	}
 

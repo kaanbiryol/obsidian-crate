@@ -75,6 +75,6 @@ describe('literal path names in reconciliation', () => {
 		expect(processDiff.mock.calls[1]![0]).toMatchObject({ remoteHash: entry.hash });
 		expect(Object.keys(processDiff.mock.calls[1]![1])).toEqual([path]);
 		expect(result.success).toBe(true);
-		expect(result.settledPaths).toEqual([path]);
+		expect(result.settledKeys).toEqual([path]);
 	});
 });

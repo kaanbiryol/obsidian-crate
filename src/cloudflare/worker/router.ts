@@ -67,8 +67,8 @@ export async function handleAuthenticatedRoute(
 		// Sessions follow reminders folder changes; the web app switches to the folder named here.
 		if (folder !== principal.folderPath) return corsResponse({ error: 'The reminders folder changed', code: REMINDERS_FOLDER_CHANGED, folderPath: principal.folderPath }, 403);
 	}
-	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, coordinatorState, encryption, featurePolicyValue,
-		coordinatorState ? undefined : () => forwardToCoordinator(env, request));
+	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, { state: coordinatorState, encryption, featurePolicy: featurePolicyValue,
+		forward: coordinatorState ? undefined : () => forwardToCoordinator(env, request) });
 	// Charged once for every remaining route.
 	const limited = await chargeRouteAction(request, env.DB, principal.tokenId);
 	if (limited) return limited;

@@ -6,9 +6,8 @@ import { QRModal } from './qr-modal';
 import { AddDeviceModal, canAddDeviceWithCode } from './add-device-modal';
 import { loadConnectedDevices } from '../../plugin/settings-ui-state';
 import { buildEnrollmentUrl } from './reminders-web-app';
-import { showSyncErrorNotice } from '../sync-error-notice';
-import { ActivityModal } from '../activity/activity-modal';
-import { notifyConflicts } from '../../sync/conflict/conflict';
+import { openSyncActivity } from '../activity/activity-modal';
+import { runSyncNow } from '../../plugin/sync-integration';
 import type { SettingsSectionContext } from './section-helpers';
 
 interface GetStartedStep {
@@ -122,15 +121,8 @@ function buildSteps({ containerEl, plugin }: SettingsSectionContext, devices: Re
 			done: Boolean(plugin.settings.lastSync),
 			action: { label: 'Sync now', run: async () => {
 				// The first sync is often the longest, so show its progress.
-				new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
-				try {
-					const result = await plugin.syncRuntime.sync();
-					if (result.outcome === 'cancelled') return;
-					if (!result.success) showSyncErrorNotice(plugin, 'Sync completed with errors.');
-					notifyConflicts(result.conflicts);
-				} catch (error) {
-					new Notice(`Sync failed: ${errorMessage(error)}`);
-				}
+				openSyncActivity(plugin);
+				await runSyncNow(plugin);
 			} },
 		},
 		{

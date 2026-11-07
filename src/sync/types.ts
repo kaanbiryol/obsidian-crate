@@ -48,7 +48,8 @@ export interface SyncResult {
 	conflicts: string[];
 	unresolvedConflicts: UnresolvedConflict[];
 	resolvedRaces: ResolvedSyncRace[];
-	settledPaths: string[];
+	/** Queue keys (`PendingKey`) the result settled without a transfer. */
+	settledKeys: string[];
 	errors: string[];
 	issues?: SyncIssue[];
 	uploadedPaths: string[];

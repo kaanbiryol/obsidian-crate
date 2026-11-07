@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type CratePlugin from './CratePlugin';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../encryption/key-bundle';
 import { createEncryptionState } from '../encryption/server-state';
-import { openWebAppPairing } from './web-app-pairing';
+import { openDeviceKeyRequest, openWebAppPairing } from './web-app-pairing';
 import { PAIRING_CAPABILITY, type PairingContext } from '../encryption/pairing/protocol';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
@@ -10,7 +10,11 @@ const mocks = vi.hoisted(() => ({
 	info: vi.fn(async () => ({ capabilities: ['web-pairing-v1'] })),
 	request: vi.fn(async () => ({})),
 	state: vi.fn(),
+	unlock: vi.fn(async () => {}),
+	pairing: vi.fn(async () => ({})),
 }));
+vi.mock('./encryption-setup', () => ({ unlockVaultWithPairedKeys: mocks.unlock }));
+vi.mock('../encryption/pairing/session', () => ({ requestAppPairing: mocks.pairing }));
 vi.mock('../sync/worker-api/http', () => ({ obsidianHttpTransport: vi.fn(), WorkerApiHttpClient: class {
 	setAbortSignal() {} setEncryptionAuthority() {}
 	getServerInfo = mocks.info;
@@ -62,4 +66,32 @@ it('fences a pending approval when the modal closes during its state read', asyn
 	// Closing the UI can still cancel an accepted relay record.
 	await session.cancel(f.context.id);
 	expect(mocks.request).toHaveBeenCalledWith('/encryption/pairing', expect.objectContaining({ method: 'POST' }), 5000);
+});
+
+it('unlocks with requested keys only while the vault is unchanged', async () => {
+	const f = await fixture();
+	const request = openDeviceKeyRequest(f.plugin, f.controller.signal);
+	await expect(request.unlock({ bundle: f.bundle })).rejects.toThrow('The vault changed');
+	await request.start();
+	expect(mocks.pairing).toHaveBeenCalledWith(expect.objectContaining({ vaultId: f.state.vaultId, generation: f.state.generation, origin: 'https://server.test' }), expect.anything(), expect.any(Function));
+	await request.unlock({ bundle: f.bundle });
+	expect(mocks.unlock).toHaveBeenCalledWith(f.plugin, f.state, f.bundle, expect.any(Function));
+	mocks.state.mockResolvedValue({ ...f.state, generation: f.state.generation + 1 });
+	await expect(request.unlock({ bundle: f.bundle })).rejects.toThrow('The vault changed');
+	expect(mocks.unlock).toHaveBeenCalledOnce();
+});
+
+it.each([['extra fields', (bundle: unknown) => ({ bundle, note: 'x' })], ['an invalid bundle', () => ({ bundle: { vaultId: 'x' } })]])('refuses a key transfer with %s', async (_name, packet) => {
+	const f = await fixture();
+	const request = openDeviceKeyRequest(f.plugin, f.controller.signal);
+	await request.start();
+	await expect(request.unlock(packet(f.bundle))).rejects.toThrow('Invalid key transfer.');
+	expect(mocks.unlock).not.toHaveBeenCalled();
+});
+
+it('requests keys only from an encrypted vault', async () => {
+	const f = await fixture();
+	mocks.state.mockResolvedValue({ ...f.state, mode: 'resetting' });
+	await expect(openDeviceKeyRequest(f.plugin, f.controller.signal).start()).rejects.toThrow('This vault is not encrypted');
+	expect(mocks.pairing).not.toHaveBeenCalled();
 });

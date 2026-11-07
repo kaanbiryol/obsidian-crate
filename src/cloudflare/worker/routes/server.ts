@@ -1,6 +1,6 @@
 import { handleDiagnostics } from '../maintenance/diagnostics';
-import { handleHealth } from '../sync/index';
-import { handleFeaturePolicy } from '../server/feature-policy';
+import { handleHealth } from '../server/server-info';
+import { handleFeaturePolicy } from '../server/feature-policy-handler';
 import { handleLinkTitle } from '../server/link-title';
 import { corsResponse } from '../http/cors';
 import type { Env } from '../types';

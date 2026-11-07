@@ -14,3 +14,18 @@ export class CloudflareApiError extends Error {
 export function isDefinitiveRejection(error: unknown): boolean {
 	return error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408;
 }
+
+/** Cloudflare answered that the resource does not exist. */
+export function isNotFound(error: unknown): boolean {
+	return error instanceof CloudflareApiError && error.status === 404;
+}
+
+/** Resolves a lookup whose 404 means the resource does not exist. */
+export async function nullOn404<T>(request: Promise<T>): Promise<T | null> {
+	try {
+		return await request;
+	} catch (error) {
+		if (isNotFound(error)) return null;
+		throw error;
+	}
+}

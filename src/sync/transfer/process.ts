@@ -9,14 +9,13 @@ import { awaitingReview, downloadAndSaveFile, validateDownloadedContent } from "
 import { prepareUploadFromPath } from "./prepare";
 import type { DiffApplyOutcome, TransferContext } from "./types";
 import type { ConflictDiff, FileDiff, SyncResult } from '../types';
-import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
+import type { FileEntry, MutationFailure, UploadResult } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 import { recordDeferredChange, recordSyncError } from '../issues';
 import { errorMessage } from '../../platform/logger';
 import { isAbortError } from '../abort';
-import { fileFailure } from '../failures';
-import { HttpError } from '../worker-api/http';
+import { fileFailure, uploadResultError } from '../failures';
 
 export async function processDiff(
 	context: TransferContext,
@@ -46,12 +45,7 @@ export async function processDiff(
 				uploadFile.contentType || "application/octet-stream",
 				uploadFile.expectedHash ?? null,
 			);
-			if (!uploadResult.success) {
-				throw new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code);
-			}
-			if (uploadResult.hash && uploadResult.hash !== uploadFile.hash) {
-				throw new Error(`Hash mismatch after upload (expected ${uploadFile.hash}, got ${uploadResult.hash})`);
-			}
+			assertAcceptedUpload(uploadResult, uploadFile.hash);
 
 			result.uploaded++;
 			result.uploadedPaths.push(uploadFile.path);
@@ -216,12 +210,7 @@ async function tryAutoMergeMarkdownConflict(
 		undefined,
 		localContent,
 	);
-	if (!uploadResult.success) {
-		throw new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code);
-	}
-	if (uploadResult.hash && uploadResult.hash !== mergedHash) {
-		throw new Error(`Hash mismatch after upload (expected ${mergedHash}, got ${uploadResult.hash})`);
-	}
+	assertAcceptedUpload(uploadResult, mergedHash);
 
 	// The remote compare-and-swap happens first. Revalidate the local file before
 	// replacing it so an edit made while the request was in flight is retained.
@@ -293,4 +282,10 @@ export async function applyDiffs(
 		}
 		options.afterDiff?.(diff);
 	}
+}
+
+/** Throws unless the server accepted the upload with the bytes that were sent. */
+function assertAcceptedUpload(result: UploadResult, hash: string): void {
+	if (!result.success) throw uploadResultError(result);
+	if (result.hash && result.hash !== hash) throw new Error(`Hash mismatch after upload (expected ${hash}, got ${result.hash})`);
 }

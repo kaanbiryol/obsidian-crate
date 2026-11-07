@@ -4,11 +4,14 @@ import { parseEncryptedNotification } from '../../../encryption/notification-for
 /** Reminder alarms never deliver an occurrence this long after its due time. */
 export const NOTIFICATION_DELIVERY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-interface SchedulePayload {
+/** A schedule job's `notification_jobs.payload_json`. */
+export interface SchedulePayload {
 	reminderId: string;
 	content: string;
 	project?: string | null;
 	dueDatetime: string;
+	/** Set when re-enabling Reminders requeues an installed schedule. */
+	resume?: boolean;
 }
 export type NotificationOperation =
 	| { id: string; operation: 'schedule'; payload: SchedulePayload }

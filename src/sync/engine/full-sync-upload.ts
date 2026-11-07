@@ -4,6 +4,7 @@ import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import { uploadPipelined } from '../transfer/upload-pipeline';
 import type { UploadDiff, PreparedUpload, SyncResult, SyncWork } from '../types';
+import { decodePendingChange, type PendingKey } from '../pending/pending-change';
 import { recordResolvedRace } from '../sync-result';
 import { isAbortError } from '../abort';
 import type { LocalManifest } from '../manifest/manifest';
@@ -12,7 +13,7 @@ export interface FullSyncUploadContext {
 	reportWork?(work: SyncWork): void;
 	prepareFullSyncUpload(diff: UploadDiff): Promise<PreparedUpload | null>;
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
-	reconcileVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
+	reconcileVersionConflicts?(keys: PendingKey[], result: SyncResult): Promise<void>;
 	localManifest: Pick<LocalManifest, 'getEntry'>;
 	throwIfDestroyed(): void;
 }
@@ -39,10 +40,10 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 		},
 		retry: false,
 		onFailure: failure => { failures.push(failure); },
-		...(context.reconcileVersionConflicts ? { onVersionConflicts: async (paths: string[], syncResult: SyncResult) => {
-			await context.reconcileVersionConflicts!(paths, syncResult);
+		...(context.reconcileVersionConflicts ? { onVersionConflicts: async (keys: PendingKey[], syncResult: SyncResult) => {
+			await context.reconcileVersionConflicts!(keys, syncResult);
 			// Full sync saves this snapshot later; retain the reconciled baseline.
-			for (const path of paths) {
+			for (const { path } of keys.map(decodePendingChange)) {
 				const entry = context.localManifest.getEntry(path);
 				if (entry) localFiles[path] = entry;
 				else delete localFiles[path];

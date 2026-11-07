@@ -1,9 +1,7 @@
-import { Notice, Setting } from 'obsidian';
+import { Setting } from 'obsidian';
 import type { SettingsSectionContext } from '../section-helpers';
-import { ActivityModal } from '../../activity/activity-modal';
-import { notifyConflicts } from '../../../sync/conflict/conflict';
-import { showSyncErrorNotice } from '../../sync-error-notice';
-import { errorMessage } from '../../../platform/logger';
+import { openSyncActivity } from '../../activity/activity-modal';
+import { runSyncNow, stopSyncNow } from '../../../plugin/sync-integration';
 import { syncConnectionFailureMessage } from './self-hosted-errors';
 
 export function renderConnectionStatus({ containerEl, plugin }: Omit<SettingsSectionContext, 'rerender'>): () => void {
@@ -23,27 +21,14 @@ export function renderConnectionStatus({ containerEl, plugin }: Omit<SettingsSec
 	};
 	setting.addButton(button => button.setButtonText('Sync now').onClick(async () => {
 		button.setDisabled(true);
-		try {
-			const result = await runtime.sync();
-			if (result.outcome === 'cancelled') return;
-			if (!result.success) showSyncErrorNotice(plugin, 'Sync completed with errors.');
-			notifyConflicts(result.conflicts);
-		} catch (error) {
-			new Notice(`Sync failed: ${errorMessage(error)}`);
-		} finally { button.setDisabled(false); }
+		try { await runSyncNow(plugin); } finally { button.setDisabled(false); }
 	}));
 	setting.addButton(button => button.setButtonText('Stop sync').onClick(async () => {
 		button.setDisabled(true);
-		try {
-			await runtime.stopSync();
-			plugin.refreshSettingsTab();
-			new Notice('Sync stopped. Automatic sync is off on this device.');
-		} catch (error) {
-			new Notice(`Could not finish stopping sync: ${errorMessage(error)}`);
-		} finally { button.setDisabled(false); render(); }
+		try { await stopSyncNow(plugin); } finally { button.setDisabled(false); render(); }
 	}));
 	setting.addButton(button => button.setButtonText('View activity').onClick(() => {
-		new ActivityModal(plugin.app, plugin.settings, runtime).open();
+		openSyncActivity(plugin);
 	}));
 	render();
 	runtime.addStateChangeListener(render);

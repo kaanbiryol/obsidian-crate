@@ -2,14 +2,8 @@ import { featureEnabled } from '../server/feature-policy';
 import { queryRows } from '../d1/db';
 import type { Env } from '../types';
 import { cancelReminderDelivery, dispatchNotifications, scheduleReminderDelivery } from '../coordinator/coordinator';
-
-interface SchedulePayload {
-	reminderId: string;
-	content: string;
-	project?: string | null;
-	dueDatetime: string;
-	resume?: boolean;
-}
+import type { SchedulePayload } from './projection-plan';
+import { notificationRetryDelayMs } from './queue';
 
 interface NotificationJobRow {
 	reminder_id: string;
@@ -22,7 +16,6 @@ interface NotificationJobRow {
 // One read plus one acknowledgement batch per group of five jobs stays within
 // D1_QUERIES_PER_INVOCATION.
 export const OUTBOX_BATCH_SIZE = 200;
-const OUTBOX_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 
 /** The existing class supplies a separate request budget; no extra persistent state. */
 export async function dispatchNotificationJobs(env: Env, remindersEnabled?: boolean): Promise<void> {
@@ -37,10 +30,6 @@ export async function drainNotificationCancellations(env: Env): Promise<boolean>
 	await env.DB.prepare("UPDATE notification_jobs SET available_at = 0 WHERE operation = 'cancel' AND available_at != 0").run();
 	await dispatchNotificationJobs(env, true);
 	return Boolean(await env.DB.prepare('SELECT 1 FROM notification_jobs UNION SELECT 1 FROM scheduled_reminders LIMIT 1').first());
-}
-
-function retryDelayMs(attempt: number): number {
-	return Math.min(60_000 * (2 ** Math.min(attempt, 8)), OUTBOX_MAX_DELAY_MS);
 }
 
 async function runJob(env: Env, job: NotificationJobRow): Promise<void> {
@@ -72,7 +61,7 @@ async function runNotificationJob(env: Env, job: NotificationJobRow): Promise<D1
 			last_error = ?,
 			updated_at = datetime('now')
 			WHERE reminder_id = ? AND job_token = ?`)
-			.bind(job.attempts + 1 >= 8 ? -1 : Date.now() + retryDelayMs(job.attempts), message.slice(0, 1024), job.reminder_id, job.job_token);
+			.bind(job.attempts + 1 >= 8 ? -1 : Date.now() + notificationRetryDelayMs(job.attempts), message.slice(0, 1024), job.reminder_id, job.job_token);
 	}
 }
 

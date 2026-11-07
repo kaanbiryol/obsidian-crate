@@ -15,8 +15,8 @@ import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
 import { responseError } from '@/pwa/connection/response-error';
 import type { PathTags } from '@/encryption/path-tags';
-import { acceptsSealedNote } from './sealed-notes';
-import { encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
+import { sealedNoteRefusal } from '@/encryption/sealed-note';
+import { encryptedFilePath, encryptedFilesPath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
 
 // The documented device budget: each refresh seals the whole list and index.
 export const MAX_READING_FILES = 10_000;
@@ -37,6 +37,12 @@ interface Source { file: WireFile; content: string; item: ReadingItem; hash: str
 export interface EncryptedReadingIndexEntry { file: WireFile; item: ReadingItem; hash: string }
 /** `rejected` marks an attempt the Worker refused with `version_conflict`; it is rebuilt, never resent. */
 interface Attempt { requestHash: string; body: string; generation: number; rejected?: true }
+/** What `prepare` commits: the answer when nothing needs writing, a note removal, or a
+ * note write. A capture has no path until its note is named. */
+type PreparedPlan =
+	| { response: unknown }
+	| { kind: 'remove'; itemId: string; file: WireFile }
+	| { kind: 'write'; itemId: string; content: string; path: string; wire: string; previous?: WireFile; before?: ReadingItem };
 interface EncryptedReadingOptions {
 	/** The plaintext Reading folder; requests name `wireFolder`, its server form. */
 	folderPath: string; wireFolder: string; paths: PathTags; generation: number; authority: FileEncryptionAuthority;
@@ -94,11 +100,10 @@ export class EncryptedReadingApi {
 	}
 	private context(id: string) { return encryptedOperationContext(this.options.authority.vaultId, this.options.authority.scopeId, id); }
 	private async source(file: WireFile, sources = this.sources): Promise<Source> {
-		const folder = encodeURIComponent(this.options.wireFolder);
 		let source = sources.get(file.path);
 		if (!source || !sameInventoryFile(source.file, file)) {
 			if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new Error('This Reading note is too large.');
-			const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`).catch(() => undefined);
+			const response = await this.options.request(encryptedFilePath('/reading', this.options.wireFolder, file)).catch(() => undefined);
 			if (!response?.ok) throw new NoteUnavailableError('Article changed or is unavailable. Refresh to retry.');
 			const { opened, sealed } = await openEncryptedNote(response, file, { authority: this.options.authority, integrityError: 'Encrypted article failed integrity verification.',
 				paths: this.options.paths, sealedFolder: { plain: this.options.folderPath, wire: this.options.wireFolder } });
@@ -114,8 +119,7 @@ export class EncryptedReadingApi {
 		return source;
 	}
 	private async inventory(): Promise<EncryptedReadingInventory> {
-		const folder = encodeURIComponent(this.options.wireFolder);
-		const fetchPage = async (after?: string) => parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}${after ? '&after=' + encodeURIComponent(after) : ''}`), this.options.wireFolder, this.options.generation);
+		const fetchPage = async (after?: string) => parseEncryptedInventoryPage(await this.json(encryptedFilesPath('/reading', this.options.wireFolder, after)), this.options.wireFolder, this.options.generation);
 		const first = await fetchPage();
 		if (this.confirmed?.sequence === first.sequence) { if (this.confirmedAt !== undefined) this.confirmedAt = Date.now(); return this.confirmed.result; }
 		if (!this.indexLoaded) {
@@ -150,7 +154,7 @@ export class EncryptedReadingApi {
 					if (result.sealed) {
 						// The server may only create notes, so a sealed one may not replace a note known here.
 						const held = this.indexed.get(file.path);
-						if (held && !acceptsSealedNote(known(entry), [known(held)])) {
+						if (held && sealedNoteRefusal(known(entry), [known(held)])) {
 							nextSources.delete(file.path);
 							throw new Error(SEALED_ISSUE);
 						}
@@ -177,7 +181,7 @@ export class EncryptedReadingApi {
 		// Nor may it take the name of another note, listed now or kept from a failed download.
 		for (const file of newSealed) {
 			const entry = nextIndex.get(file.path);
-			if (!entry || acceptsSealedNote(known(entry), [...nextIndex.values()].filter(other => other !== entry).map(known))) continue;
+			if (!entry || !sealedNoteRefusal(known(entry), [...nextIndex.values()].filter(other => other !== entry).map(known))) continue;
 			nextIndex.delete(file.path); nextSources.delete(file.path);
 			candidates.splice(candidates.indexOf(entry.item), 1);
 			unreadable.push(undefined);
@@ -265,50 +269,12 @@ export class EncryptedReadingApi {
 	/** Build and persist exact ciphertext for one operation against the current
 	 * library, or answer from a receipt the operation already committed. */
 	private async prepare(action: string, body: Record<string, unknown>, id: string, rawBody: string, requestHash: string): Promise<{ attempt: Attempt } | { response: unknown }> {
-		const list = await this.inventory(), { readable, duplicateIds, unreadable } = this.library;
-		// An unreadable note may be a failed download, so a change it blocks stays queued
-		// and retries; a rejection here would strand it for review once the note recovers.
-		const unavailable = (message = 'Refresh or resolve unreadable Reading notes before saving changes.') => this.options.error(message, 503, 'reading_unavailable');
-		let path = '', wire = '', content: string, previous: WireFile | undefined, itemId: string, before: ReadingItem | undefined;
-		if (action === 'capture') {
-			// Any unreadable note may already save this link; a new note would duplicate it.
-			if (unreadable.length) throw unavailable();
-			const link = readingUrl(body.url), saved = findSavedReadingLink(readable, link);
-			if (saved.kind === 'many') throw this.options.error('Several notes already save this link.', 409);
-			if (saved.kind === 'one') {
-				if (duplicateIds.has(saved.item.crate_reading_id)) throw unavailable(READING_DUPLICATE_ID_ISSUE);
-				return { response: { saved: true, alreadySaved: true, id: saved.item.crate_reading_id } };
-			}
-			// Stable even if preparation is interrupted before ciphertext persistence.
-			itemId = typeof body.captureId === 'string' ? body.captureId : await readingImportId(id, rawBody);
-			content = createReadingNote({ id: itemId, url: link, title: typeof body.title === 'string' ? body.title : undefined, savedAt: new Date().toISOString() });
-			if (body.fetchArticle === false) content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' });
-		} else {
-			// Never choose between notes sharing the target's ID.
-			if (typeof body.id === 'string' && duplicateIds.has(body.id)) throw unavailable(READING_DUPLICATE_ID_ISSUE);
-			const item = list.items.find(item => item.crate_reading_id === body.id);
-			// An unreadable note may be the target: one last verified with its ID, or any
-			// note when the target is not listed. Other unreadable notes do not block it.
-			if (unreadable.length && (!item || unreadable.includes(item.crate_reading_id))) throw unavailable();
-			if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
-			wire = this.wires.get(item.path)!;
-			const source = await this.source(this.files.get(wire)!); path = item.path; previous = source.file; itemId = item.crate_reading_id; before = item;
-			const command = action === 'delete' || action === 'retry' ? action : 'update';
-			const plan = await planReadingFileCommand(item, source.content, { action: command, before: body.before, changes: body.changes, markdownHash: body.markdownHash });
-			if (plan.kind === 'issue') {
-				const refusal = readingFileCommandRefusal(plan, command);
-				throw this.options.error(refusal.message, refusal.status, refusal.code);
-			}
-			if (plan.kind === 'remove') {
-				const response = { deleted: true, id: itemId };
-				const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
-				const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id,
-					files: [], remove: [{ path: previous.path, expectedHash: previous.hash, expectedRevision: previous.revision }], acknowledgment }) };
-				await this.options.writeAttempt(id, attempt);
-				return { attempt };
-			}
-			content = plan.content;
-		}
+		const list = await this.inventory();
+		const plan = action === 'capture' ? await this.planCapture(body, id, rawBody) : await this.planEdit(action, body, list);
+		if ('response' in plan) return plan;
+		const { itemId } = plan;
+		if (plan.kind === 'remove') return { attempt: await this.persistAttempt(id, requestHash, { deleted: true, id: itemId }, [], [plan.file]) };
+		let { content, path, wire, previous } = plan;
 		if ((action === 'capture' && body.fetchArticle !== false || action === 'retry') && this.options.captureArticle) {
 			const item = parseReadingNote(content)!;
 			try {
@@ -319,22 +285,68 @@ export class EncryptedReadingApi {
 		// Notes are named after the article once its title is known; a name the user chose is kept.
 		const saved = parseReadingNote(content)!, source = { title: saved.title, url: saved.source_url };
 		// Notes sharing a Reading ID are unlisted but still own their names.
-		const occupied = (candidate: string) => readable.some(item => item.crate_reading_id !== itemId && portablePathKey(item.path) === portablePathKey(candidate));
+		const occupied = (candidate: string) => this.library.readable.some(item => item.crate_reading_id !== itemId && portablePathKey(item.path) === portablePathKey(candidate));
 		let removed: WireFile | undefined;
 		if (action === 'capture') {
 			path = await readingCapturePath(this.options.folderPath, source, itemId, occupied);
 			wire = await this.options.paths.wire(path);
-		} else if (action === 'retry' && before) {
-			const renamed = await retitledCapturePath(path, this.options.folderPath, { title: before.title, url: before.source_url }, source, itemId, occupied);
+		} else if (action === 'retry' && plan.before) {
+			const renamed = await retitledCapturePath(path, this.options.folderPath, { title: plan.before.title, url: plan.before.source_url }, source, itemId, occupied);
 			if (renamed) { removed = previous; previous = undefined; path = renamed; wire = await this.options.paths.wire(renamed); }
 		}
 		const sealed = await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: null }, this.options.authority);
-		const response = { saved: true, id: itemId };
+		const file = { path: wire, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) };
+		return { attempt: await this.persistAttempt(id, requestHash, { saved: true, id: itemId }, [file], removed ? [removed] : []) };
+	}
+	/** A new note for a captured link, or the answer when a note already saves it. */
+	private async planCapture(body: Record<string, unknown>, id: string, rawBody: string): Promise<PreparedPlan> {
+		const { readable, duplicateIds, unreadable } = this.library;
+		// Any unreadable note may already save this link; a new note would duplicate it.
+		if (unreadable.length) throw this.unavailable();
+		const link = readingUrl(body.url), saved = findSavedReadingLink(readable, link);
+		if (saved.kind === 'many') throw this.options.error('Several notes already save this link.', 409);
+		if (saved.kind === 'one') {
+			if (duplicateIds.has(saved.item.crate_reading_id)) throw this.unavailable(READING_DUPLICATE_ID_ISSUE);
+			return { response: { saved: true, alreadySaved: true, id: saved.item.crate_reading_id } };
+		}
+		// Stable even if preparation is interrupted before ciphertext persistence.
+		const itemId = typeof body.captureId === 'string' ? body.captureId : await readingImportId(id, rawBody);
+		let content = createReadingNote({ id: itemId, url: link, title: typeof body.title === 'string' ? body.title : undefined, savedAt: new Date().toISOString() });
+		if (body.fetchArticle === false) content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' });
+		return { kind: 'write', itemId, content, path: '', wire: '' };
+	}
+	/** The note an update, retry or delete targets, with its new content or its removal. */
+	private async planEdit(action: string, body: Record<string, unknown>, list: EncryptedReadingInventory): Promise<PreparedPlan> {
+		const { duplicateIds, unreadable } = this.library;
+		// Never choose between notes sharing the target's ID.
+		if (typeof body.id === 'string' && duplicateIds.has(body.id)) throw this.unavailable(READING_DUPLICATE_ID_ISSUE);
+		const item = list.items.find(item => item.crate_reading_id === body.id);
+		// An unreadable note may be the target: one last verified with its ID, or any
+		// note when the target is not listed. Other unreadable notes do not block it.
+		if (unreadable.length && (!item || unreadable.includes(item.crate_reading_id))) throw this.unavailable();
+		if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
+		const wire = this.wires.get(item.path)!;
+		const source = await this.source(this.files.get(wire)!);
+		const command = action === 'delete' || action === 'retry' ? action : 'update';
+		const plan = await planReadingFileCommand(item, source.content, { action: command, before: body.before, changes: body.changes, markdownHash: body.markdownHash });
+		if (plan.kind === 'issue') {
+			const refusal = readingFileCommandRefusal(plan, command);
+			throw this.options.error(refusal.message, refusal.status, refusal.code);
+		}
+		if (plan.kind === 'remove') return { kind: 'remove', itemId: item.crate_reading_id, file: source.file };
+		return { kind: 'write', itemId: item.crate_reading_id, content: plan.content, path: item.path, wire, previous: source.file, before: item };
+	}
+	/** An unreadable note may be a failed download, so a change it blocks stays queued
+	 * and retries; a rejection here would strand it for review once the note recovers. */
+	private unavailable(message = 'Refresh or resolve unreadable Reading notes before saving changes.'): Error {
+		return this.options.error(message, 503, 'reading_unavailable');
+	}
+	/** Stores the exact commit body, with the encrypted receipt `response` answers with. */
+	private async persistAttempt(id: string, requestHash: string, response: unknown, files: unknown[], remove: WireFile[]): Promise<Attempt> {
 		const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
-		const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id,
-			files: [{ path: wire, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) }],
-			...(removed ? { remove: [{ path: removed.path, expectedHash: removed.hash, expectedRevision: removed.revision }] } : {}), acknowledgment }) };
+		const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id, files,
+			...(remove.length ? { remove: remove.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision })) } : {}), acknowledgment }) };
 		await this.options.writeAttempt(id, attempt);
-		return { attempt };
+		return attempt;
 	}
 }

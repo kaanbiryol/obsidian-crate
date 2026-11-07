@@ -99,11 +99,9 @@ export const CHANGELOG_BOUNDS_SQL = `SELECT ${LAST_SEQ_SQL} AS lastSeq,
   (SELECT MIN(seq) FROM changelog) AS minSeq,
   COALESCE((SELECT snapshot_seq FROM initial_import), 0) AS snapshotSeq`;
 
-export async function getChangelogBounds(db: D1Database): Promise<{
-	lastSeq: number;
-	minSeq: number | null;
-	snapshotSeq: number;
-}> {
+export interface ChangelogBounds { lastSeq: number; minSeq: number | null; snapshotSeq: number }
+
+export async function getChangelogBounds(db: D1Database): Promise<ChangelogBounds> {
 	const rows = await queryRows<{ lastSeq: number | null; minSeq: number | null; snapshotSeq: number }>(
 		db.prepare(CHANGELOG_BOUNDS_SQL),
 	);
@@ -112,4 +110,16 @@ export async function getChangelogBounds(db: D1Database): Promise<{
 		minSeq: rows[0]?.minSeq ?? null,
 		snapshotSeq: rows[0]?.snapshotSeq ?? 0,
 	};
+}
+
+/** The `since` changelog cursor of a request, or null when it is not a sequence number. */
+export function parseChangelogSince(url: URL): number | null {
+	const since = parseInt(url.searchParams.get('since') || '0', 10);
+	return isNaN(since) || since < 0 ? null : since;
+}
+
+/** A cursor the retained changelog cannot continue: from before the initial import
+ * snapshot, or behind pruned rows. Its client must rescan so it cannot miss deletions. */
+export function isChangelogCursorExpired(since: number, { lastSeq, minSeq, snapshotSeq }: ChangelogBounds): boolean {
+	return since < snapshotSeq || since > 0 && since !== lastSeq && (minSeq === null || since + 1 < minSeq);
 }

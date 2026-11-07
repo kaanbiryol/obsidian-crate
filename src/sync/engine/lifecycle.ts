@@ -19,7 +19,7 @@ interface SyncEngineLifecycleDependencies {
 	getStatus(): SyncState['status'];
 	getSyncIntervalSeconds(): number;
 	getLastSeq(): number;
-	getPendingPathCount(): number;
+	getQueuedKeyCount(): number;
 	hasLocalFileChanges(): Promise<boolean>;
 	/** Advance the rotating content check without network access. */
 	verifyLocalContent?(): Promise<void>;
@@ -130,7 +130,7 @@ export class SyncEngineLifecycle {
 			const { hasChanges, cursorExpired } = await dependencies.checkForChanges(dependencies.getLastSeq());
 			// A sync walks the vault itself, so only look for missed local edits
 			// when nothing else would start one.
-			const syncNeeded = hasChanges || cursorExpired || dependencies.getPendingPathCount() > 0
+			const syncNeeded = hasChanges || cursorExpired || dependencies.getQueuedKeyCount() > 0
 				|| await dependencies.hasLocalFileChanges();
 
 			if (!syncNeeded) {

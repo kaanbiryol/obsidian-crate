@@ -215,14 +215,27 @@ async function writePrivateJson(path, value) {
 	await rename(temporary, path);
 }
 
-export async function issueLocalDevice(db, name) {
+export async function readResetGeneration(db) {
+	const row = await db.prepare('SELECT reset_generation AS generation FROM server_state WHERE id = 1').first();
+	return row?.generation ?? '';
+}
+
+/** With `resetGeneration`, the device is added only while no encryption reset has
+ * happened since it was read, as the Worker's pairing does. Returns null otherwise. */
+export async function issueLocalDevice(db, name, resetGeneration) {
 	name = name?.trim();
 	if (!name || name.length > 128) throw new Error('Provide a device name between 1 and 128 characters.');
 	const token = randomBytes(32).toString('hex');
 	const id = randomUUID();
-	await db.prepare("INSERT INTO auth_tokens (id, token_hash, device_name, platform, scope) VALUES (?, ?, ?, 'self-hosted', 'vault')")
-		.bind(id, digest(token), name).run();
-	return { id, token };
+	if (resetGeneration === undefined) {
+		await db.prepare("INSERT INTO auth_tokens (id, token_hash, device_name, platform, scope) VALUES (?, ?, ?, 'self-hosted', 'vault')")
+			.bind(id, digest(token), name).run();
+		return { id, token };
+	}
+	const result = await db.prepare(`INSERT INTO auth_tokens (id, token_hash, device_name, platform, scope)
+		SELECT ?, ?, ?, 'self-hosted', 'vault' WHERE COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), '') = ?`)
+		.bind(id, digest(token), name, resetGeneration).run();
+	return result.meta.changes === 1 ? { id, token } : null;
 }
 
 /** Every credential the server holds, newest activity first. Shortcut capture

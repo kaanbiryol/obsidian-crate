@@ -82,7 +82,7 @@ describe('reconcileQueuePaths', () => {
 		expect(deleteRemoteFiles).toHaveBeenCalledTimes(3);
 		expect(h.getRemoteEntries).toHaveBeenCalledTimes(3);
 		expect(result.errors).toEqual(['old.md: Remote changed again']);
-		expect(result.settledPaths).toEqual([]);
+		expect(result.settledKeys).toEqual([]);
 		expect(h.processDiff).not.toHaveBeenCalled();
 	});
 
@@ -101,7 +101,7 @@ describe('reconcileQueuePaths', () => {
 		expect(deleteRemoteFiles).toHaveBeenCalledOnce();
 		expect(h.processDiff.mock.calls[0]?.[0]).toMatchObject({ path, action: 'download', remoteHash: 'remote-edit', cause: 'local-deleted' });
 		expect(result.success).toBe(true);
-		expect(result.settledPaths).toEqual([pendingChangeKey('delete', path)]);
+		expect(result.settledKeys).toEqual([pendingChangeKey('delete', path)]);
 	});
 
 	it('keeps acknowledged results when a later path is cancelled', async () => {
@@ -143,7 +143,7 @@ describe('reconcileQueuePaths', () => {
 		expect(h.processDiff.mock.calls[0]?.[0]).toMatchObject({ action: 'conflict', remoteHash: 'remote-edit' });
 		expect(h.getRemoteEntries).toHaveBeenCalledTimes(3);
 		expect(result.success).toBe(false);
-		expect(result.settledPaths).toEqual([]);
+		expect(result.settledKeys).toEqual([]);
 		expect(reportWork.mock.calls.map(([work]) => work).filter(work => work.current === 1)).toEqual([
 			{ phase: 'applying', current: 1, total: 1 },
 		]);
@@ -159,7 +159,7 @@ describe('reconcileQueuePaths', () => {
 		};
 		const result = await reconcileQueuePaths(h.context, ['a.md', 'b.md']);
 		expect(result.success).toBe(false);
-		expect(result.settledPaths).toEqual(['a.md']);
+		expect(result.settledKeys).toEqual(['a.md']);
 		expect(h.processDiff).not.toHaveBeenCalled();
 	});
 
@@ -179,7 +179,7 @@ describe('reconcileQueuePaths', () => {
 		const result = await reconcileQueuePaths(harness.context, ['ignored.md', 'a.md', 'a.md', 'b.md']);
 
 		expect(result.success).toBe(false);
-		expect(result.settledPaths).toEqual(['ignored.md', 'a.md']);
+		expect(result.settledKeys).toEqual(['ignored.md', 'a.md']);
 		expect(harness.processDiff).toHaveBeenCalledTimes(3);
 		expect(reportWork.mock.calls.map(([work]) => work)).toEqual([
 			{ phase: 'server' },
@@ -217,7 +217,7 @@ describe('reconcileQueuePaths', () => {
 			});
 		expect(harness.processDiff.mock.calls[0]?.[1]['notes/a.md']?.hash).toBe(localHash);
 		expect(harness.adapter.readBinary).toHaveBeenCalledTimes(1);
-		expect(result.settledPaths).toEqual(['notes/a.md']);
+		expect(result.settledKeys).toEqual(['notes/a.md']);
 		expect(result.success).toBe(true);
 	});
 
@@ -245,7 +245,7 @@ describe('reconcileQueuePaths', () => {
 		expect(harness.getRemoteEntries).toHaveBeenNthCalledWith(2, ['notes/a.md']);
 		expect(harness.processDiff).toHaveBeenCalledTimes(2);
 		expect(harness.processDiff.mock.calls[1]?.[0]).toEqual(expect.objectContaining({ remoteHash: 'remote-v3' }));
-		expect(result.settledPaths).toEqual(['notes/a.md']);
+		expect(result.settledKeys).toEqual(['notes/a.md']);
 		expect(result.errors).toEqual([]);
 	});
 
@@ -266,7 +266,7 @@ describe('reconcileQueuePaths', () => {
 
 		expect(harness.getRemoteEntries).toHaveBeenCalledTimes(2);
 		expect(harness.processDiff).toHaveBeenCalledTimes(2);
-		expect(result.settledPaths).toEqual(['notes/a.md']);
+		expect(result.settledKeys).toEqual(['notes/a.md']);
 		expect(result.errors).toEqual([]);
 	});
 
@@ -283,7 +283,7 @@ describe('reconcileQueuePaths', () => {
 
 		expect(harness.getRemoteEntries).toHaveBeenCalledOnce();
 		expect(harness.processDiff).toHaveBeenCalledOnce();
-		expect(result).toMatchObject({ success: true, errors: [], settledPaths: ['notes/a.md'] });
+		expect(result).toMatchObject({ success: true, errors: [], settledKeys: ['notes/a.md'] });
 		expect(result.issues).toEqual([{ path: 'notes/a.md', message: reason, code: 'incoming-review' }]);
 		expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
 	});
@@ -306,7 +306,7 @@ describe('reconcileQueuePaths', () => {
 		expect(harness.getRemoteEntries).toHaveBeenCalledTimes(2);
 		expect(harness.processDiff).toHaveBeenCalledTimes(2);
 		expect(harness.processDiff.mock.calls[1]?.[0]).toEqual(expect.objectContaining({ remoteHash: 'remote-v3' }));
-		expect(result.settledPaths).toEqual(['notes/a.md']);
+		expect(result.settledKeys).toEqual(['notes/a.md']);
 		expect(result.errors).toEqual([]);
 	});
 });

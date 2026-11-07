@@ -6,7 +6,7 @@ import { Notice, Platform, TFile, type Events, type TAbstractFile } from 'obsidi
 import type CratePlugin from './CratePlugin';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import { notifyConflicts } from '../sync/conflict/conflict';
-import { ActivityModal } from '../ui/activity/activity-modal';
+import { openSyncActivity } from '../ui/activity/activity-modal';
 import { errorMessage } from '../platform/logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from './lifecycle-state';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/notification-policy-sync';
@@ -23,9 +23,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		() => [plugin.remindersSettings.remindersFolderPath],
 		() => plugin.settings.reading?.enabled ? plugin.settings.reading.folderPath : null,
 	);
-	registerSyncStatus(plugin, plugin.syncRuntime, () => {
-		new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
-	});
+	registerSyncStatus(plugin, plugin.syncRuntime, () => openSyncActivity(plugin));
 	registerSyncResultNotices({
 		configDir: plugin.app.vault.configDir,
 		isMobile: Platform.isMobile,
@@ -79,11 +77,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 		name: 'Stop sync',
 		checkCallback: checking => {
 			const available = plugin.syncRuntime.isConfigured();
-			if (!checking && available) {
-				void plugin.syncRuntime.stopSync()
-					.then(() => { plugin.refreshSettingsTab(); new Notice('Sync stopped. Automatic sync is off on this device.'); })
-					.catch(error => { new Notice(`Could not finish stopping sync: ${errorMessage(error)}`); });
-			}
+			if (!checking && available) void stopSyncNow(plugin);
 			return available;
 		},
 	});
@@ -91,9 +85,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 	plugin.addCommand({
 		id: 'show-activity',
 		name: 'Show sync activity',
-		callback: () => {
-			new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
-		},
+		callback: () => openSyncActivity(plugin),
 	});
 }
 
@@ -108,12 +100,13 @@ function openFileHistoryWhenReady(plugin: CratePlugin, path: string): void {
  * progress, so selecting Replace visibly replaces the vault. Resolves whether it started. */
 export function startVaultReplacement(plugin: CratePlugin): boolean {
 	if (!plugin.settings.replaceVault || !plugin.syncRuntime.isConfigured()) return false;
-	new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
+	openSyncActivity(plugin);
 	void runSyncNow(plugin);
 	return true;
 }
 
-async function runSyncNow(plugin: CratePlugin): Promise<void> {
+/** A sync the user started: reports errors and conflicts instead of throwing. */
+export async function runSyncNow(plugin: CratePlugin): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	try {
 		// Startup initialization runs after the workspace is ready.
@@ -127,6 +120,17 @@ async function runSyncNow(plugin: CratePlugin): Promise<void> {
 		notifyConflicts(result.conflicts);
 	} catch (error) {
 		new Notice(`Sync failed: ${errorMessage(error)}`);
+	}
+}
+
+/** Stops sync the user asked to stop and turns automatic sync off on this device. */
+export async function stopSyncNow(plugin: CratePlugin): Promise<void> {
+	try {
+		await plugin.syncRuntime.stopSync();
+		plugin.refreshSettingsTab();
+		new Notice('Sync stopped. Automatic sync is off on this device.');
+	} catch (error) {
+		new Notice(`Could not finish stopping sync: ${errorMessage(error)}`);
 	}
 }
 

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { parseHTML } from 'linkedom';
 import type { PendingDiff } from '../../sync/pending/pending-diff';
-import type { PendingBrowserState } from './pending-browser';
+import type { PendingBrowserState, PendingChecks } from './pending-browser';
 
 const { window, document } = parseHTML('<html><body></body></html>');
 const modified: PendingDiff = { before: 'old', after: 'new', beforeSize: 3, afterSize: 3, kind: 'modified' };
@@ -23,11 +23,12 @@ async function fixture(paths: string[]) {
 	const { renderPendingBrowser } = await import('./pending-browser');
 	const load = vi.fn(async () => modified);
 	const state: PendingBrowserState = {};
+	let checks: PendingChecks | undefined;
 	const mount = (keys: string[]) => {
-		state.dispose?.();
+		checks?.dispose();
 		const panel = document.createElement('div');
 		document.body.replaceChildren(panel);
-		renderPendingBrowser(panel, keys, load, state);
+		checks = renderPendingBrowser(panel, keys, load, state);
 		return panel;
 	};
 	return { load, state, mount, panel: mount(paths) };
@@ -71,7 +72,7 @@ it('renders only rows near the viewport while selection, navigation and sync cov
 	const panel = document.createElement('div');
 	document.body.replaceChildren(panel);
 	const state: PendingBrowserState = {};
-	renderPendingBrowser(panel, paths, vi.fn(async () => modified), state, { syncSelected, discard: vi.fn() });
+	const checks = renderPendingBrowser(panel, paths, vi.fn(async () => modified), state, { syncSelected, discard: vi.fn() });
 	const names = () => [...panel.querySelectorAll('.crate-browser-file-name')].map(name => name.textContent);
 	// An unsized list renders a bounded window instead of 5,000 rows.
 	expect(names().length).toBeLessThanOrEqual(50);
@@ -95,7 +96,7 @@ it('renders only rows near the viewport while selection, navigation and sync cov
 	(panel.querySelector('.crate-browser-sync') as HTMLButtonElement).click();
 	await vi.waitFor(() => expect(syncSelected).toHaveBeenCalledOnce());
 	expect(syncSelected.mock.calls[0]).toEqual([paths]);
-	state.dispose?.();
+	checks.dispose();
 });
 
 it('shows a Crate update bundle as an update listing its files, without diffing it', async () => {
@@ -105,7 +106,7 @@ it('shows a Crate update bundle as an update listing its files, without diffing 
 	const state: PendingBrowserState = { configDir: '.obsidian' };
 	const panel = document.createElement('div');
 	document.body.replaceChildren(panel);
-	renderPendingBrowser(panel, ['.obsidian/crate-update/0.11.0.json', pendingChangeKey('delete', '.obsidian/crate-update/0.10.0.json')], load, state);
+	const checks = renderPendingBrowser(panel, ['.obsidian/crate-update/0.11.0.json', pendingChangeKey('delete', '.obsidian/crate-update/0.10.0.json')], load, state);
 	await new Promise(resolve => setTimeout(resolve, 0));
 	const names = [...panel.querySelectorAll('.crate-browser-file-name')].map(name => name.textContent);
 	expect(names).toEqual(['Crate 0.11.0 update', 'Crate 0.10.0 update']);
@@ -114,7 +115,7 @@ it('shows a Crate update bundle as an update listing its files, without diffing 
 	panel.querySelector<HTMLButtonElement>('.crate-browser-file')!.click();
 	expect([...panel.querySelectorAll('.crate-file-diff li')].map(item => item.textContent)).toEqual(['styles.css', 'main.js', 'manifest.json']);
 	expect(load).not.toHaveBeenCalled();
-	state.dispose?.();
+	checks.dispose();
 });
 
 it('renders the rows in view plus overscan, clamped to the list', async () => {

@@ -25,7 +25,7 @@ describe('reverted edits', () => {
 			expect(h.engine.getState().pendingChanges).toBe(1);
 			const result = await h.engine.sync();
 			expect(result.success).toBe(true);
-			expect(result.settledPaths).toContain(path);
+			expect(result.settledKeys).toContain(path);
 			expect(h.engine.getPendingKeys()).toEqual([]);
 			expect(h.engine.getState().pendingChanges).toBe(0);
 			expect(h.api.uploadFile).not.toHaveBeenCalled();
@@ -40,7 +40,7 @@ describe('reverted edits', () => {
 		const { h, path } = await revertedEdit(1, 1000);
 		try {
 			const result = await h.engine.sync();
-			expect(result.settledPaths).toContain(path);
+			expect(result.settledKeys).toContain(path);
 			expect(h.engine.getPendingKeys()).toEqual([]);
 		} finally { h.engine.destroy(); }
 	});
@@ -54,7 +54,7 @@ describe('reverted edits', () => {
 			});
 			const result = await h.engine.sync();
 			expect(result.success).toBe(true);
-			expect(result.settledPaths).toContain(path);
+			expect(result.settledKeys).toContain(path);
 			expect(h.engine.getPendingKeys()).toEqual([path]);
 			expect(h.engine.getState().pendingChanges).toBe(1);
 		} finally { h.engine.destroy(); }

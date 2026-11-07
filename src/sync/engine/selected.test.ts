@@ -147,7 +147,7 @@ describe('selected sync with durable file operations', () => {
 		const h = await harness();
 		const result = await h.engine.syncSelected(['a.md']);
 		expect(result.success).toBe(true);
-		expect(result.settledPaths).toEqual(['a.md']);
+		expect(result.settledKeys).toEqual(['a.md']);
 		expect(h.remote.metadata).toHaveBeenCalledWith(['a.md']);
 		// The open-import check reads the cached server capabilities first.
 		expect(h.transport.mock.calls.map(([request]) => new URL(request.url).pathname)).toEqual(['/.well-known/crate', '/sync/metadata']);

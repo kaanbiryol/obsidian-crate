@@ -50,7 +50,8 @@ export interface CheckResponse {
 	cursorExpired?: boolean;
 }
 
-type MutationFailureCode = 'version_conflict' | 'namespace_conflict' | 'validation' | 'operation_expired' | 'operation_mismatch' | 'storage' | 'unknown';
+export const MUTATION_FAILURE_CODES = ['version_conflict', 'namespace_conflict', 'validation', 'operation_expired', 'operation_mismatch', 'storage', 'unknown'] as const;
+type MutationFailureCode = typeof MUTATION_FAILURE_CODES[number];
 
 export interface UploadResult {
 	success: boolean;

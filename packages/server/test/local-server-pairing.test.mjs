@@ -7,7 +7,7 @@ import { monitorPublicReadiness } from '../src/local-server-readiness.mjs';
 test('pairing codes expire, are claimed once under concurrent requests, and store only token hashes', async () => {
 	let time = 100;
 	const registered = [];
-	const db = { prepare: () => ({ bind: (...args) => ({ async run() { await delay(5); registered.push(args); } }) }) };
+	const db = { prepare: () => ({ async first() { return { generation: null }; }, bind: (...args) => ({ async run() { await delay(5); registered.push(args); return { meta: { changes: 1 } }; } }) }) };
 	const pairing = createPairing({ db, now: () => time, lifetime: 10 });
 	const first = pairing.issue('Phone');
 	assert.equal(await pairing.exchange('invalid'), null);

@@ -131,7 +131,7 @@ describe('runIncrementalSync', () => {
 			conflicts: [],
 			unresolvedConflicts: [],
 			resolvedRaces: [],
-			settledPaths: [],
+			settledKeys: [],
 			errors: [],
 			uploadedPaths: [],
 			downloadedPaths: [],

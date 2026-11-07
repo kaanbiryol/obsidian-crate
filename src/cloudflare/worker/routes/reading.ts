@@ -15,10 +15,20 @@ import { mutateReading } from '../reading/mutations';
 import { extractForEncryptedReading } from '../reading/encrypted-extract';
 import { isLibraryRead, loadLibraryRead, readLibrary } from '../reading/library-read';
 
+export interface ReadingRouteOptions {
+	/** The coordinator's state, when the request runs under its lock. */
+	state?: DurableObjectState;
+	/** The encryption state authentication loaded with the token; read when omitted. */
+	encryption?: EncryptionServerState | null;
+	/** The stored feature policy authentication loaded with the token. */
+	featurePolicy?: string | null;
+	/** Runs the request under the coordinator lock; see `readLibrary`. */
+	forward?: () => Promise<Response>;
+}
+
 /** Dispatches `/reading/` routes. Each charges its own action budget once its authority
- * is known. `forward` runs the request under the coordinator lock; see `readLibrary`. */
-export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, state?: DurableObjectState, authenticatedEncryption?: EncryptionServerState | null, featurePolicyValue?: string | null,
-	forward?: () => Promise<Response>): Promise<Response> {
+ * is known. */
+export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, { state, encryption: authenticatedEncryption, featurePolicy: featurePolicyValue, forward }: ReadingRouteOptions = {}): Promise<Response> {
 	const url = new URL(request.url), path = url.pathname;
 	// Authentication loads the encryption state with the token.
 	const encryption = authenticatedEncryption !== undefined ? authenticatedEncryption : await readEncryptionState(env.DB);

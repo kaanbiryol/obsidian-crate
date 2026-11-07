@@ -1,5 +1,5 @@
-@use "../../ui/activity/styles/sync-review";
-@use "../../ui/shared/styles/navigation-row";
+@use "sync-review";
+@use "../../shared/styles/navigation-row";
 
 @mixin styles {
   .crate-file-history-link { flex-shrink: 0; @include sync-review.action; }

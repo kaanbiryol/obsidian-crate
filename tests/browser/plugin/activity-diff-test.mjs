@@ -46,11 +46,12 @@ const { outputFiles } = await build({
                 noteFont: '', monospaceFont: '', interfaceFont: '',
             }, null, 2);
             const after = JSON.stringify({ ...JSON.parse(before), theme: 'dark', baseFontSize: 17 }, null, 2);
+            let checks;
             window.mount = () => {
-                state.dispose?.();
+                checks?.dispose();
                 const panel = document.querySelector('.crate-activity-panel');
                 panel.replaceChildren();
-                renderPendingPanel(panel, {
+                checks = renderPendingPanel(panel, {
                     paths: window.paths,
                     loadDiff: async (path, deleted) => {
                         window.calls++;
@@ -64,7 +65,8 @@ const { outputFiles } = await build({
             };
             window.mount();
             window.showSyncProgress = work => {
-                state.dispose?.();
+                checks?.dispose();
+                checks = undefined;
                 const panel = document.querySelector('.crate-activity-panel');
                 panel.empty();
                 renderPendingPanel(panel, {

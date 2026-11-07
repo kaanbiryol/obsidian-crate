@@ -5,7 +5,7 @@ import { deleteFilesInBatches, type ConditionalDeleteApi, type ConditionalDelete
 import { recordSyncError } from '../issues';
 import { assertLocalFileAbsent } from '../local/local-absence';
 import { isVersionConflict } from '../failures';
-import { pendingChangeKey } from '../pending/pending-change';
+import { pendingChangeKey, type PendingKey } from '../pending/pending-change';
 import type { SyncResult, SyncWork } from '../types';
 
 interface DeleteContext {
@@ -17,7 +17,7 @@ interface DeleteContext {
 
 export interface DeleteOptions {
 	onProcessed?(count: number): void;
-	onVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
+	onVersionConflicts?(keys: PendingKey[], result: SyncResult): Promise<void>;
 }
 
 export type DeleteRemoteFiles = (files: ConditionalDeleteCandidate[], result: SyncResult, options?: DeleteOptions) => Promise<MutationFailure[]>;

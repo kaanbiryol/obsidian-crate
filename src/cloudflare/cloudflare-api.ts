@@ -1,6 +1,7 @@
 import { buildWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './deployment/worker-upload-payload';
-import { CloudflareApiError } from './cloudflare-api-error';
+import { CloudflareApiError, nullOn404 } from './cloudflare-api-error';
 import { BACKUPS_PREFIX } from '../protocol/storage-keys';
+import { isCrateResourceName } from '../protocol/server-build';
 import { BACKUP_OBJECT } from './restore/archive';
 export { CloudflareApiError } from './cloudflare-api-error';
 import { verifyWorkerDeployment } from './deployment/verify-worker';
@@ -108,16 +109,6 @@ function retryAfterMilliseconds(headers: Record<string, string> | undefined): nu
 /** An API path with every interpolated identifier encoded. Valid identifiers are unchanged. */
 function apiPath(strings: TemplateStringsArray, ...values: string[]): string {
 	return strings.reduce((path, part, index) => `${path}${encodeURIComponent(values[index - 1]!)}${part}`);
-}
-
-/** Resolves a lookup whose 404 means the resource does not exist. */
-async function nullOn404<T>(request: Promise<T>): Promise<T | null> {
-	try {
-		return await request;
-	} catch (error) {
-		if (error instanceof CloudflareApiError && error.status === 404) return null;
-		throw error;
-	}
 }
 
 export interface CloudflareApiOptions {
@@ -286,13 +277,12 @@ export class CloudflareApiClient {
 	/** Removes one generated upgrade backup object; an already missing object counts as removed. */
 	async deleteRecoveryObject(accountId: string, bucketName: string, key: string): Promise<void> {
 		if (!BACKUP_OBJECT.test(key)) throw new Error('Invalid backup object');
-		try { await this.request(this.r2ObjectPath(accountId, bucketName, key), { method: 'DELETE' }); }
-		catch (error) { if (!(error instanceof CloudflareApiError && error.status === 404)) throw error; }
+		await nullOn404(this.request(this.r2ObjectPath(accountId, bucketName, key), { method: 'DELETE' }));
 	}
 
 	/** Only the isolated restore workflow can write original object keys. */
 	async putRestoredObject(accountId: string, sourceBucket: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
-		if (bucketName === sourceBucket || !/^crate-[a-f0-9]{16}$/.test(bucketName)) throw new Error('Restore requires a separate bucket');
+		if (bucketName === sourceBucket || !isCrateResourceName(bucketName)) throw new Error('Restore requires a separate bucket');
 		await this.request(this.r2ObjectPath(accountId, bucketName, key), {
 			method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
 		});

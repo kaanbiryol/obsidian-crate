@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { discoverCloudflareDeployments } from './discovery';
+import { discoverCloudflareDeployments, parseReleaseWorkerMessage, releaseWorkerMessage } from './discovery';
+import { isUploadTag, newUploadTag } from './fence';
 
 describe('discoverCloudflareDeployments', () => {
 	it('finds Crate Workers by their resource name and bindings', async () => {
@@ -67,5 +68,16 @@ describe('discoverCloudflareDeployments', () => {
 			id: 'account-id',
 			name: 'Personal',
 		})).rejects.toThrow('Cloudflare settings unavailable');
+	});
+});
+
+describe('upload identity formats', () => {
+	it('reads back exactly the release message and upload tag Crate writes', () => {
+		const fingerprint = 'a'.repeat(64);
+		expect(parseReleaseWorkerMessage(releaseWorkerMessage('1.2.3', fingerprint))).toEqual({ version: '1.2.3', fingerprint });
+		expect(parseReleaseWorkerMessage(`Crate 1.2.3 ${fingerprint} extra`)).toBeNull();
+		expect(parseReleaseWorkerMessage('Crate 1.2 abc')).toBeNull();
+		expect(isUploadTag(newUploadTag())).toBe(true);
+		expect(isUploadTag('crate-not-a-tag')).toBe(false);
 	});
 });

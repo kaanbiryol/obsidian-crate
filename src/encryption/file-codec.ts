@@ -3,6 +3,7 @@ import { encodeEncryptedFile, parseEncryptedFile, validateFileDescriptor, type E
 import { sha256Hex } from '../platform/sha256';
 import { openSealedFileKey, type SealOpenKey } from './sealed-file-key';
 import { isSha256Hex } from '../platform/validation';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export interface PrivateFileMetadata {
 	version: 1;
@@ -51,7 +52,7 @@ function validateMetadata(value: unknown): asserts value is PrivateFileMetadata 
 	if (!value || typeof value !== 'object') throw new Error('Invalid encrypted file metadata');
 	const item = value as Partial<PrivateFileMetadata>;
 	if (item.version !== 1 || typeof item.path !== 'string' || !item.path || item.path.length > 4096 || !isSha256Hex(item.hash)
-		|| typeof item.size !== 'number' || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > 25 * 1024 * 1024
+		|| typeof item.size !== 'number' || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > MAX_FILE_SIZE_BYTES
 		|| typeof item.contentType !== 'string' || item.contentType.length > 256
 		|| !isSha256Hex(item.publicDataHash)) {
 		throw new Error('Encrypted file metadata does not match the requested file');

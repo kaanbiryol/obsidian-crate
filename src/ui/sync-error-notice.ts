@@ -1,6 +1,6 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
-import { ActivityModal } from './activity/activity-modal';
+import { openSyncActivity } from './activity/activity-modal';
 
 let lastShownAt = 0;
 
@@ -17,6 +17,6 @@ export function showSyncErrorNotice(plugin: CratePlugin, message: string): void 
 		event.preventDefault();
 		event.stopPropagation();
 		notice.hide();
-		new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime, 'history').open();
+		openSyncActivity(plugin, 'history');
 	});
 }

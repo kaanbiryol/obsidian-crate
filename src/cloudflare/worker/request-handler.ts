@@ -111,7 +111,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	const routeExecution = routePolicy?.execution;
 	const placement = requestPlacement(routeExecution, execution.kind, shortcut?.kind === 'prepare');
 	if (placement === 'forward-grant') return forwardedResponse(await forwardToCoordinator(env, request), context);
-	if (placement === 'redeem-grant' && execution.kind === 'coordinator') return handleReadingRoute(request, env, undefined, execution.state);
+	if (placement === 'redeem-grant' && execution.kind === 'coordinator') return handleReadingRoute(request, env, undefined, { state: execution.state });
 	const publicResponse = await handlePublicRoute(request, env, path, method);
 	if (publicResponse) return publicResponse;
 	// Coordinator routes authenticate once, under the coordinator lock that every

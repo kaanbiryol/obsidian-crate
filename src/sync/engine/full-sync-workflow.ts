@@ -47,7 +47,7 @@ export async function runFullSync(
 		} = plan;
 		if (plan.issues?.length) (result.issues ??= []).push(...plan.issues);
 		for (const [path, entry] of Object.entries(localFiles)) {
-			if (entry.hash === getPathEntry(remoteManifest.files, path)?.hash) result.settledPaths.push(pendingChangeKey('upload', path));
+			if (entry.hash === getPathEntry(remoteManifest.files, path)?.hash) result.settledKeys.push(pendingChangeKey('upload', path));
 		}
 
 		const conflictDiffs = diffs.filter(diff => diff.action === 'conflict');

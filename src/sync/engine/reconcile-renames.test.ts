@@ -75,7 +75,7 @@ describe('targeted rename reconciliation', () => {
 		h.context.reportWork = reportWork;
 		const result = await reconcileQueuePaths(h.context, [pendingChangeKey('delete', h.source), h.destination]);
 		expect(result.success).toBe(true);
-		expect(result.settledPaths).toEqual([h.destination, pendingChangeKey('delete', h.source)]);
+		expect(result.settledKeys).toEqual([h.destination, pendingChangeKey('delete', h.source)]);
 		expect(h.deleted).toHaveBeenCalledWith(h.source);
 		expect(h.remote[h.destination]?.revision).toBe('v2');
 		expect(reportWork.mock.calls.map(([work]) => work)).toEqual([
@@ -97,7 +97,7 @@ describe('targeted rename reconciliation', () => {
 		h.processDiff.mockRejectedValueOnce(new Error('Upload failed'));
 		const result = await reconcileQueuePaths(h.context, [pendingChangeKey('delete', h.source), h.destination]);
 		expect(result.success).toBe(false);
-		expect(result.settledPaths).toEqual([]);
+		expect(result.settledKeys).toEqual([]);
 		expect(h.deleted).not.toHaveBeenCalled();
 		expect(h.remote[h.source]).toEqual(h.entry);
 	});
@@ -136,7 +136,7 @@ describe('targeted rename reconciliation', () => {
 		}, [pendingChangeKey('delete', 'todo.md'), 'TODO.md']);
 		expect(result.success).toBe(true);
 		expect(calls).toEqual(['delete todo.md', 'upload TODO.md']);
-		expect(result.settledPaths).toEqual([pendingChangeKey('delete', 'todo.md'), 'TODO.md']);
+		expect(result.settledKeys).toEqual([pendingChangeKey('delete', 'todo.md'), 'TODO.md']);
 	});
 
 	it.each(['dashboard.md', 'Dashboard.md/notes.md'])('lets the source go first when the server cannot store it beside %s', async destination => {

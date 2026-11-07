@@ -24,7 +24,7 @@ import { isSyncPath } from '@/protocol/sync-validation';
 import { REMINDER_OUTBOX_LOCK } from '@/pwa/reminders/private-storage';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
-import { encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
+import { encryptedFilePath, encryptedFilesPath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
 import { compareCodePoints } from '@/protocol/portable-path';
 
 const NOTE_CONCURRENCY = 6;
@@ -113,9 +113,7 @@ export class EncryptedReminderApi {
 	}
 
 	private async page(after?: string): Promise<FilePage> {
-		const query = new URLSearchParams({ folderPath: this.keys.wireFolder });
-		if (after) query.set('after', after);
-		return parseEncryptedInventoryPage(await json<unknown>(await this.fetch(`/reminders/encrypted-files?${query}`)), this.keys.wireFolder, this.keys.generation);
+		return parseEncryptedInventoryPage(await json<unknown>(await this.fetch(encryptedFilesPath('/reminders', this.keys.wireFolder, after))), this.keys.wireFolder, this.keys.generation);
 	}
 
 	private async inventory(first?: FilePage): Promise<{ files: RemoteFile[]; sequence: number }> {
@@ -137,8 +135,7 @@ export class EncryptedReminderApi {
 		if (cached && sameInventoryFile(cached.file, file)) return cached;
 		// Coarse ciphertext bound before download; the 1 MiB plaintext limit is checked after opening.
 		if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
-		const query = new URLSearchParams({ folderPath: this.keys.wireFolder, path: file.path, revision: file.revision });
-		const response = await this.fetch(`/reminders/encrypted-file?${query}`);
+		const response = await this.fetch(encryptedFilePath('/reminders', this.keys.wireFolder, file));
 		if (!response.ok) await json(response);
 		const { opened } = await openEncryptedNote(response, file, { authority: this.authority(file.path),
 			integrityError: 'Encrypted reminder transfer failed integrity validation', paths: this.keys.paths, sealedFolder: null });

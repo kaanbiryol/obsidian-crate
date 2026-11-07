@@ -2,6 +2,7 @@ import { Notice, Setting, type TextComponent, type ToggleComponent, type ButtonC
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../platform/logger';
+import { parseServerTimestamp } from '../shared/format';
 import { openConfirmationModal } from '../plugin/confirmation-modal';
 import { normalizeTimeString } from '../../platform/validation';
 import { openNotificationPolicy } from '../../reminders/notification-policy-sync';
@@ -207,7 +208,7 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin, ap
 				.setName(sub.device_name || 'Unknown device')
 				.setDesc(sub.disabled_at
 					? 'Notifications paused. Remove this device, sign out in its web app, then open a fresh Crate link to enable notifications again.'
-					: `Subscribed ${new Date(sub.created_at).toLocaleDateString()}`)
+					: `Subscribed ${parseServerTimestamp(sub.created_at).toLocaleDateString()}`)
 				.addButton(button => {
 					button.setButtonText('Remove notification subscription');
 					button.setDestructive();

@@ -35,7 +35,7 @@ function runtime(overrides: Partial<ActivityModalDeps>): ActivityModalDeps {
 /** ActivityTabs mounts these panels and the runtime calls these handlers; React is mocked here. */
 interface ModalInternals {
 	pendingPanel: FakeElement; conflictsPanel: FakeElement; pendingCount: FakeElement; conflictsCount: FakeElement;
-	header: ActivityHeader; pendingBrowserState: { dispose?: () => void };
+	header: ActivityHeader; pendingChecks?: { start(): void; pause(): void; dispose(): void };
 	onProgress(): void; onStateChange(): void; refresh(): void; renderPending(): void;
 	createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
 }
@@ -137,7 +137,7 @@ it('keeps the pending file browser and its comparisons while the pending set is 
 	const browser = internal.pendingPanel.querySelector('.crate-pending-browser');
 	expect(browser).toBeTruthy();
 	const dispose = vi.fn();
-	internal.pendingBrowserState.dispose = dispose;
+	internal.pendingChecks = { start: vi.fn(), pause: vi.fn(), dispose };
 
 	internal.renderPending();
 	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).toBe(browser);

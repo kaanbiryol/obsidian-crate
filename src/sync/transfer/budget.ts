@@ -18,6 +18,17 @@ export function getBatchUploadConcurrency(): number {
 	return Platform.isMobile ? 2 : 4;
 }
 
+/** Batch download requests in flight. Each batch runs in one of the Worker's eight
+ * transfer Durable Objects. */
+export function getBatchDownloadConcurrency(): number {
+	return Platform.isMobile ? 2 : 4;
+}
+
+/** Files of one downloaded batch written to the vault at once. */
+export function getDownloadApplyConcurrency(): number {
+	return Platform.isMobile ? 2 : 4;
+}
+
 /** A transfer in flight holds several full-size copies of the file (base64, ciphertext,
  * decrypted bytes), so two 25 MiB files at once can exhaust a phone's memory. */
 export const MOBILE_LARGE_TRANSFER_BYTES = 8 * MIB;
