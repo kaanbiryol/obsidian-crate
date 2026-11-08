@@ -5,8 +5,9 @@ import { createLogger } from '../sync/logger';
 
 const logger = createLogger('Plugin data');
 
-/** Plugin data as it last loaded, kept beside `data.json`. Startup writes it, so the saves
- * after every sync never pay for it. Like `data.json`, it holds no secrets. */
+/** Plugin data as it last loaded, or as of the last save of a Cloudflare restore or deletion
+ * record, kept beside `data.json`. Only startup and those saves write it, so the saves after
+ * every sync never pay for it. Like `data.json`, it holds no secrets. */
 const LAST_GOOD = 'data.last-good.json';
 
 function parseRecord(text: string): Record<string, unknown> | null {

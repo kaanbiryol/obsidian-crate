@@ -8,7 +8,7 @@ import { exchangeDevicePairing } from './device-pairing';
 import { issueDevicePairingCode } from '../../deployment/device-pairing';
 import type { CloudflareDeploymentMetadata } from '../../deployment/types';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
-import { DEVICE_PAIRING_PAGE, DEVICE_PAIRING_PATH } from '../../../protocol/device-pairing';
+import { DEVICE_PAIRING_END, DEVICE_PAIRING_LIFETIME, DEVICE_PAIRING_PAGE, DEVICE_PAIRING_PATH, DEVICE_PAIRING_PREFIX } from '../../../protocol/device-pairing';
 import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => { await applySchema(env.DB); });
@@ -53,13 +53,24 @@ it('allows only one of concurrent redemptions', async () => {
 	expect(await vaultTokens()).toHaveLength(1);
 });
 
+const storedPairing = () => env.DB.prepare('SELECT value FROM maintenance_state WHERE key >= ? AND key < ?').bind(DEVICE_PAIRING_PREFIX, DEVICE_PAIRING_END);
+
 it.each(['expired', 'replaced', 'reset', 'malformed'])('rejects a %s code without creating a credential', async reason => {
-	const issued = await issue(reason === 'expired' ? Date.now() - 11 * 60_000 : Date.now());
+	const issued = await issue();
+	if (reason === 'expired') await env.DB.prepare("UPDATE maintenance_state SET value = json_set(value, '$.expiresAt', ?) WHERE key >= ? AND key < ?")
+		.bind(Date.now() - 1, DEVICE_PAIRING_PREFIX, DEVICE_PAIRING_END).run();
 	if (reason === 'replaced') await issue();
 	if (reason === 'reset') await env.DB.prepare("INSERT INTO server_state (id, reset_generation) VALUES (1, 'after-reset') ON CONFLICT(id) DO UPDATE SET reset_generation = excluded.reset_generation").run();
 	const response = await exchange(reason === 'malformed' ? 'not-a-code' : issued.code, await device('phone-token'));
 	expect(response.status).toBe(reason === 'malformed' ? 400 : 410);
 	expect(await vaultTokens()).toEqual([]);
+});
+
+it.each([['ahead', 24 * 60 * 60_000], ['behind', -11 * 60_000]])('times the code by the server clock when the desktop clock is %s', async (_label, skew) => {
+	const issued = await issue(Date.now() + skew);
+	const { expiresAt } = JSON.parse((await storedPairing().first<{ value: string }>())!.value) as { expiresAt: number };
+	expect(Math.abs(expiresAt - (Date.now() + DEVICE_PAIRING_LIFETIME))).toBeLessThan(5_000);
+	expect((await exchange(issued.code, await device('phone-token'))).status).toBe(200);
 });
 
 it('replaces only the re-paired device credential and what it owned', async () => {

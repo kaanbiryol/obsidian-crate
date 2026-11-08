@@ -7,6 +7,8 @@ import { issueLocalDevice, listLocalDevices, readResetGeneration, revokeLocalDev
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const codePattern = /^crate-pair-[a-f0-9]{64}$/;
+// sun_path holds 104 bytes on macOS (108 on Linux), including the terminating NUL.
+const socketPathLimit = 103;
 
 export function createPairing({ db, now = Date.now, lifetime = 10 * 60_000 }) {
 	const codes = new Map();
@@ -56,7 +58,13 @@ export async function readSmallJson(request, limit = 2048) {
 export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 	const file = join(dataDir, 'control.json');
 	const id = randomBytes(16).toString('hex');
-	const socket = process.platform === 'win32' ? `\\\\.\\pipe\\crate-${id}` : join(tmpdir(), `crate-${id}.sock`);
+	// Scheduled temp cleanup can delete a long-running server's socket, so prefer the
+	// data directory and use the temp directory only when that path is too long.
+	const inData = join(dataDir, 'control.sock');
+	const socket = process.platform === 'win32' ? `\\\\.\\pipe\\crate-${id}`
+		: Buffer.byteLength(inData) <= socketPathLimit ? inData : join(tmpdir(), `crate-${id}.sock`);
+	// The caller holds the data directory lock, so a socket already there was left by a crash.
+	if (socket === inData) await unlink(socket).catch(error => { if (error.code !== 'ENOENT') throw error; });
 	const secret = randomBytes(32).toString('hex');
 	const server = createServer(async (request, response) => {
 		if (request.headers.authorization !== `Bearer ${secret}`) { sendJson(response, 403, { error: 'Not authorized' }); return; }

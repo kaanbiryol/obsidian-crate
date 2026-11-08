@@ -6,7 +6,7 @@ import { parseReadingNote } from '@/reading/core/notes';
 import { READING_DUPLICATE_ID_ISSUE } from '@/reading/core/inventory';
 import { validateReadingMetadata } from '@/reading/core/model';
 import { sha256Hex } from '@/platform/sha256';
-import { ARTICLE_EDITED_ERROR, readingIndexScope, type ReadingIndexState } from './library-index';
+import { ARTICLE_EDITED_ERROR, readingIndexScope, readingIndexStatement, type ReadingIndexRow, type ReadingIndexState } from './library-index';
 
 /** A queued capture with this ID and the index rows that name it, read together. */
 export const readingItemStatements = (db: D1Database, id: string) => [
@@ -96,13 +96,15 @@ export async function readingDeltaBase(current: ReadingPolicy, index: Pick<Readi
  * the future, or more notes changed than one page holds. */
 export async function readingListDelta(env: Env, current: ReadingPolicy, index: Pick<ReadingIndexState, 'seq' | 'removedSeq'>, since: number) {
 	if (since < index.removedSeq || since > index.seq) return null;
-	// One snapshot: changed rows, removals and the capture queue cannot disagree.
-	const [{ results: rows }, { results: removed }, { results: queued }] = await env.DB.batch([
+	// One snapshot: changed rows, removals, the capture queue and the pruned position cannot
+	// disagree. Maintenance can prune removals after `index` was read, so this batch rechecks it.
+	const [{ results: rows }, { results: removed }, { results: queued }, { results: [snapshot] }] = await env.DB.batch([
 		env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE change_seq > ? ORDER BY change_seq LIMIT ${READING_LIST_PAGE + 1}`).bind(since),
 		env.DB.prepare(`SELECT path FROM reading_removals WHERE change_seq > ? ORDER BY change_seq LIMIT ${READING_LIST_PAGE + 1}`).bind(since),
 		queuedStatement(env, current),
-	]) as [Rows<ReadingRow>, Rows<{ path: string }>, Rows<{ note: string }>];
-	if (rows.length > READING_LIST_PAGE || removed.length > READING_LIST_PAGE) return null;
+		readingIndexStatement(env.DB),
+	]) as [Rows<ReadingRow>, Rows<{ path: string }>, Rows<{ note: string }>, Rows<ReadingIndexRow>];
+	if (!snapshot || since < snapshot.removedSeq || rows.length > READING_LIST_PAGE || removed.length > READING_LIST_PAGE) return null;
 	const changedPaths = [...new Set([...removed.map(row => row.path), ...rows.map(row => row.path)])];
 	return { delta: true as const, changedPaths, ...listedPage(current, rows, queued), cursor: null };
 }

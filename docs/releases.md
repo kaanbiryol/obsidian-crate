@@ -139,12 +139,16 @@ release commit, so it always carries the plugin's version. Packaging takes the
 version from the root `package.json`; `packages/server` has none of its own.
 
 Publishing the GitHub release starts **Publish server package**
-(`.github/workflows/publish-server.yml`). It checks out the release tag, refuses a
-draft or a tag that does not match the version, then runs `npm run publish:server`:
-it builds the stable Worker into `dist/server`, runs the packed `npx` installation
-test and publishes the staged package. Prereleases are skipped, and a version
-already on npm is left alone, so rerunning it is safe. To retry or publish an
-older published release, run the workflow from **Actions** with its tag.
+(`.github/workflows/publish-server.yml`). Its build job checks out the release tag,
+refuses a draft or a tag that does not match the version, then runs
+`npm run test:server-package`: it builds the stable Worker into `dist/server` and
+runs the packed `npx` installation test. It packs `dist/server` and uploads the
+tarball. Only the publish job can request the trusted publishing token; it has no
+checkout, installs nothing and runs `npm publish` on that tarball with scripts
+ignored. Prereleases are skipped, and a version already on npm is left alone, so
+rerunning it is safe. To retry or publish an older published release, run the
+workflow from **Actions** with its tag. A version older than npm's `latest` is
+published with the `previous` tag, so `latest` never moves backwards.
 
 The workflow uses npm trusted publishing: npm accepts it only from this
 repository's workflow, needs no stored token and records provenance for each

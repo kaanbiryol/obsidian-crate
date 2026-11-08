@@ -27,6 +27,10 @@ export interface PersistedSyncSettings {
 	/** Set when this vault joined a server with files and the user chose to replace
 	 * its contents. The first sync moves the vault to trash before anything else. */
 	replaceVault: boolean;
+	/** Set when an exclusion was removed: incremental syncs skipped the server's changes
+	 * under it while moving the cursor past them, so the next standard sync compares the
+	 * whole server inventory. A successful full sync clears it. */
+	fullSyncRequested?: boolean;
 }
 
 export interface SyncSettings extends PersistedSyncSettings {
@@ -93,6 +97,7 @@ export function normalizePersistedSyncSettings(
 		debounceDelay: Math.min(normalizeNonNegativeInteger(value?.debounceDelay, defaults.debounceDelay), MAX_TIMER_SECONDS),
 		encryptedVaultId: normalizeNullableString(value?.encryptedVaultId),
 		replaceVault: normalizeBoolean(value?.replaceVault, defaults.replaceVault),
+		...(value?.fullSyncRequested === true ? { fullSyncRequested: true } : {}),
 	};
 }
 

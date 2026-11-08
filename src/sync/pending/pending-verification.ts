@@ -13,6 +13,9 @@ interface PendingVerificationContext {
 		save(): Promise<void>;
 	};
 	isCurrent: (key: string) => boolean;
+	/** Events replayed after the startup sync, mostly echoes of its own downloads. One whose
+	 * file keeps the size and modification time verified with its baseline settles unread. */
+	replayed?: ReadonlySet<string>;
 }
 
 /** Settle local file events by content, without contacting the server. */
@@ -35,6 +38,11 @@ export async function verifyUnchangedPendingPaths(context: PendingVerificationCo
 			if (kind === 'delete') continue;
 			const before = await adapter.stat(path);
 			if (!before || before.type !== 'file' || before.size > MAX_FILE_SIZE_BYTES || !isCurrent(key)) continue;
+			// An unverified baseline time does not parse, so it never matches.
+			if (context.replayed?.has(key) && before.size === baseline.size && Date.parse(baseline.modified) === before.mtime) {
+				matches.push({ key, path, baseline, modified: baseline.modified });
+				continue;
+			}
 			const bytes = await adapter.readBinary(path);
 			if (bytes.byteLength > MAX_FILE_SIZE_BYTES || !isCurrent(key)) continue;
 			const hash = await sha256Hex(bytes);

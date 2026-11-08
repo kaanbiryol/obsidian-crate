@@ -152,6 +152,18 @@ export function useReminderSync({
 		await saveCachedReminderSnapshot({ folderPath: config.folderPath, reminders: nextReminders, projects: nextProjects,
 			savedAt: unsaved.savedAt, etag: cursor.persistedEtag, issues: issuesRef.current, deltaBase: cursor.deltaBase });
 	}, [config.folderPath, cursor]);
+	// The outbox has already removed confirmed commands, so a hidden app killed mid-drain
+	// would otherwise lose them from this device until the next read. Save them now.
+	useEffect(() => {
+		const persist = () => { void persistReminderState(); };
+		const persistHidden = () => { if (document.visibilityState === 'hidden') persist(); };
+		document.addEventListener('visibilitychange', persistHidden);
+		window.addEventListener('pagehide', persist);
+		return () => {
+			document.removeEventListener('visibilitychange', persistHidden);
+			window.removeEventListener('pagehide', persist);
+		};
+	}, [persistReminderState]);
 
 	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
 		hydratedCacheRef.current = true;

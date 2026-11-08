@@ -7,11 +7,14 @@ import type { WorkerApiHttpClient } from '../worker-api/http';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 
 /** Verify the encrypted identity before copying connection-scoped secrets.
- * The authenticated recovery bundle proves identity independently of generation. */
+ * The authenticated recovery bundle proves identity independently of generation.
+ * Pairing never transfers the recovery key, so without one the server must name this
+ * device's own keys; any vault session can read the recovery bundle, so it proves no more.
+ * Later requests through `http` then carry the verified keys. */
 export async function prepareEncryptedAddressChange(storage: SecretStorageService, http: WorkerApiHttpClient, workerUrl: string) {
 	if (storage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before changing this connection.');
 	const keys = loadEncryptionKeys(storage), recovery = storage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
-	if (!keys || !recovery) throw new Error('Recover this device’s encryption keys before changing the server address.');
+	if (!keys) throw new Error('Recover this device’s encryption keys before changing the server address.');
 	const snapshot = [SECRET_KEYS.AUTH_TOKEN, SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]
 		.map(key => ({ key, value: storage.get(key) }));
 	const assertCurrent = () => {
@@ -21,12 +24,13 @@ export async function prepareEncryptedAddressChange(storage: SecretStorageServic
 	};
 	const state = await readServerEncryption(http);
 	if (!state) throw new Error('The new address does not identify your encrypted vault');
-	const remote = await openRecoveryBundle(state.recovery, recovery);
+	const remote = recovery ? await openRecoveryBundle(state.recovery, recovery) : keys;
 	assertEncryptionKeys(state, remote);
 	if (remote.vaultId !== keys.vaultId || remote.vault.id !== keys.vault.id || remote.vault.secret !== keys.vault.secret) {
 		throw new Error('The new address belongs to a different encrypted vault');
 	}
 	assertCurrent();
+	http.setEncryptionAuthority(state.vaultId, state.generation);
 	return () => {
 		assertCurrent();
 		const target = storage.forScope(workerUrl);

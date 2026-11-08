@@ -8,7 +8,8 @@ export type RequestPlacement =
 	/** One-use public Reading grants are redeemed under the coordinator lock. */
 	| 'forward-grant'
 	| 'redeem-grant'
-	/** Coordinator routes authenticate once, under the lock every revocation also takes. */
+	/** Coordinator routes authenticate under the lock every revocation also takes; an
+	 * unrecognized bearer is checked at the edge first, so it cannot queue on that lock. */
 	| 'forward-before-auth'
 	/** The shortcut capture authenticates at the edge, where an encrypted vault downloads its page. */
 	| 'forward-after-auth'

@@ -69,6 +69,9 @@ export class SyncEngine {
 	private contentVerifier: LocalContentVerifier;
 	private periodicCheckFailed = false;
 	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
+	private persistSettings: () => Promise<void> = async () => {};
+	/** Counts full-sync requests, so a sync clears only the requests made before it read them. */
+	private fullSyncRequests = 0;
 	private prepareReminderScope?: () => Promise<void>;
 	private readonly rawConfigEvents: (path: string) => Promise<void>;
 	private readonly ignore: SyncIgnoreMatcher;
@@ -138,6 +141,7 @@ export class SyncEngine {
 			getSyncIntervalSeconds: () => this.settings.automaticSync ? this.settings.syncInterval : 0,
 			getLastSeq: () => this.settings.lastSeq,
 			getQueuedKeyCount: () => this.queueController.getQueuedKeyCount(),
+			fullSyncRequested: () => this.settings.fullSyncRequested === true,
 			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await this.hasUnsyncedLocalChanges(),
 			verifyLocalContent: () => this.verifyTrackedContent(),
 			checkForChanges: async (lastSeq: number) => {
@@ -172,6 +176,8 @@ export class SyncEngine {
 			markdownBaseCache: this.markdownBaseCache,
 			conflictStore: this.conflictStore,
 			getSettings: () => this.settings,
+			persistSettings: () => this.persistSettings(),
+			fullSyncRequest: () => this.fullSyncRequest(),
 			getStatus: () => this.state.status,
 			shouldIgnore: this.ignore.shouldIgnore,
 			runConcurrent: (tasks, concurrency) => this.lifecycle.runConcurrent(tasks, concurrency),
@@ -185,7 +191,7 @@ export class SyncEngine {
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			retryReminderScope: () => this.retryReminderScope(),
-			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
+			verifyPendingPaths: (keys, isCurrent, replayed) => this.verifyPendingPaths(keys, isCurrent, replayed),
 			reconcileQueue: async queueKeys => {
 				const result = await this.reconcileFromQueue(queueKeys);
 				// A refusal because another sync is running is not an attempt; that sync covers these keys.
@@ -260,6 +266,11 @@ export class SyncEngine {
 		this.onAutomaticSyncResult = callback;
 	}
 
+	/** Lets a sync save settings before it finishes, when a restart must not lose a change. */
+	setSettingsPersistence(persist: () => Promise<void>): void {
+		this.persistSettings = persist;
+	}
+
 	updateSettings(settings: SyncSettings): void {
 		this.settings = settings;
 		this.ignore.reset();
@@ -269,6 +280,24 @@ export class SyncEngine {
 		this.queueController.settingsChanged();
 		// Files a removed exclusion now includes fire no vault events; list them like the startup scan does.
 		if (removedPattern && this.state.initializing === false && !settings.automaticSync) this.restoreLocalPendingChanges();
+		if (removedPattern) {
+			void this.requestFullSync().catch(error => logger.warn('Could not save the full sync request:', errorMessage(error)));
+		}
+	}
+
+	/** Server files under a removed exclusion are already behind the changelog cursor, so
+	 * only a full sync finds them. Saved at once, so a restart still runs it. */
+	private async requestFullSync(): Promise<void> {
+		this.fullSyncRequests++;
+		this.settings.fullSyncRequested = true;
+		await this.persistSettings();
+	}
+
+	/** The pending full-sync request. `complete` clears it unless a newer one arrived. */
+	private fullSyncRequest(): { complete(): void } | null {
+		if (!this.settings.fullSyncRequested) return null;
+		const requests = this.fullSyncRequests;
+		return { complete: () => { if (requests === this.fullSyncRequests) delete this.settings.fullSyncRequested; } };
 	}
 
 	setReminderScopePreparation(prepare?: () => Promise<void>): void {
@@ -533,11 +562,12 @@ export class SyncEngine {
 	}
 
 
-	private verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean): Promise<string[]> {
+	private verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean, replayed?: ReadonlySet<string>): Promise<string[]> {
 		const activityCurrent = this.captureSyncActivity();
 		return verifyUnchangedPendingPaths({
 			adapter: this.vault.adapter,
 			manifest: this.localManifest,
+			replayed,
 			isCurrent: key => isCurrent(key) && activityCurrent()
 				&& this.localManifest.uploadJournal.pending().length === 0
 				&& this.files.getPendingRestores().length === 0,

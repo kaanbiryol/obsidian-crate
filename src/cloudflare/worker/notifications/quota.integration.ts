@@ -29,14 +29,14 @@ it.each([2000, 10000])('uses bounded row reads to select work from %i queued fil
     INSERT INTO notification_projection_jobs(path, job_token) SELECT 'note-'||x, 'token-'||x FROM n`).bind(count).run();
 	const before = await env.DB.prepare(oldSelection).bind(1).all() as MeasuredRows;
 	const beforeCounts = await env.DB.prepare(oldCounts).bind(Date.now()).all() as MeasuredRows;
-	const after = await env.DB.prepare(READY_PROJECTION_JOBS_SQL).bind(1, 1, 1).all() as MeasuredRows;
+	const after = await env.DB.prepare(READY_PROJECTION_JOBS_SQL).bind('[]', 1, 1, 1).all() as MeasuredRows;
 	const next = await env.DB.prepare(NEXT_NOTIFICATION_WORK_SQL).all() as MeasuredRows;
 	expect(after.results).toEqual(before.results);
 	const oldReads = before.meta.rows_read + beforeCounts.meta.rows_read;
 	const newReads = after.meta.rows_read + next.meta.rows_read;
 	if (count === 2000) expect({ oldReads, newReads }).toMatchInlineSnapshot(`
     {
-      "newReads": 6,
+      "newReads": 7,
       "oldReads": 8001,
     }
   `);
@@ -47,7 +47,7 @@ it.each([2000, 10000])('uses bounded row reads to select work from %i queued fil
 	await env.DB.prepare("UPDATE notification_projection_jobs SET last_error = 'temporary failure'").run();
 	await env.DB.prepare(`INSERT INTO notification_file_retries(path, attempts, available_at, error)
     SELECT path, 1, ?, last_error FROM notification_projection_jobs`).bind(Date.now() + 3600_000).run();
-	const sleeping = await env.DB.prepare(READY_PROJECTION_JOBS_SQL).bind(1, 1, 1).all() as MeasuredRows;
+	const sleeping = await env.DB.prepare(READY_PROJECTION_JOBS_SQL).bind('[]', 1, 1, 1).all() as MeasuredRows;
 	const retry = await env.DB.prepare(NEXT_NOTIFICATION_WORK_SQL).all() as MeasuredRows;
 	expect(sleeping.results).toEqual([]);
 	expect(sleeping.meta.rows_read + retry.meta.rows_read).toBeLessThanOrEqual(10);
@@ -60,7 +60,7 @@ it('selects both ready and due retry work without starving either', async () => 
     ('later', '3', 'retry', datetime('now'))`).run();
 	await env.DB.prepare(`INSERT INTO notification_file_retries(path, attempts, available_at, error)
     SELECT path, 1, (unixepoch(updated_at) + 3600)*1000, last_error FROM notification_projection_jobs WHERE last_error IS NOT NULL`).run();
-	expect((await env.DB.prepare(READY_PROJECTION_JOBS_SQL).bind(2, 2, 2).all()).results)
+	expect((await env.DB.prepare(READY_PROJECTION_JOBS_SQL).bind('[]', 2, 2, 2).all()).results)
 		.toEqual([{ path: 'due', job_token: '2' }, { path: 'ready', job_token: '1' }]);
 });
 

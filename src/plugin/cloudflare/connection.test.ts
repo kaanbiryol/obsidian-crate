@@ -179,3 +179,12 @@ it('connects to an empty server, or reconnects, without asking', async () => {
 	expect(confirm).not.toHaveBeenCalled();
 	for (const [config] of owner.syncRuntime.applyInfrastructureConfig.mock.calls as unknown as Array<[object]>) expect(config).not.toHaveProperty('replaceVault');
 });
+
+it('joins a restored server with files without asking, so the first sync merges', async () => {
+	const owner = plugin();
+	server.hasFiles.mockResolvedValue(true);
+	await configureCloudflareAuthorizedDevice(owner as never, 'https://crate-restored.example.workers.dev', 'token', undefined, true);
+	expect(confirm).not.toHaveBeenCalled();
+	expect(owner.syncRuntime.applyInfrastructureConfig).toHaveBeenCalledExactlyOnceWith(
+		{ workerUrl: 'https://crate-restored.example.workers.dev', authToken: 'token' }, expect.any(AbortSignal));
+});

@@ -44,7 +44,7 @@ export function createReminderOutboxSession({ storage, recovery, settlement, isC
 		onScan: refreshQuarantine,
 		onError: message => { onStorageError(message); current().showToast('error', message); },
 		// Confirmed results stay in memory during a drain; the offline copy is saved
-		// once before the reload that replaces the edited notes.
+		// once before the reload that replaces the edited notes, or earlier if the page hides.
 		onSettled: () => {
 			const host = current();
 			void (async () => {

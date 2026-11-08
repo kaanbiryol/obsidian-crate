@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { authenticateWorkerRequest } from './auth/index';
+import { authenticatedAdmissionKey } from './admission/admission-state';
 import { handleCoordinatorRequest } from './coordinator/coordinator-requests';
 import { fetchWorkerRequest } from './request-handler';
 import { handleAuthenticatedRoute, isAuthenticatedRouteAllowed } from './router';
@@ -15,7 +16,7 @@ vi.mock('./router', () => ({
 	isAuthenticatedRouteAllowed: vi.fn(() => true),
 }));
 vi.mock('./admission/rate-limit', () => ({ admitApiRequest: vi.fn(async () => null) }));
-vi.mock('./admission/admission-state', () => ({ rememberAuthenticatedRequest: vi.fn() }));
+vi.mock('./admission/admission-state', () => ({ rememberAuthenticatedRequest: vi.fn(), authenticatedAdmissionKey: vi.fn() }));
 vi.mock('./sync/transfer-dispatch', () => ({ forwardTransferRequest: vi.fn() }));
 
 const env = { DB: {} } as Env;
@@ -73,20 +74,43 @@ it('reauthenticates inside the transfer queue before a revoked upload can be dis
 	expect(handleAuthenticatedRoute).not.toHaveBeenCalled();
 });
 
-it.each([['POST', '/reading/handoff'], ['PUT', '/settings']])('returns the coordinator request ID for a forwarded %s %s', async (method, path) => {
-	const forwarded: Request[] = [];
-	const coordinatorEnv = { DB: {}, REMINDER_ALARMS: {
+function coordinatorEnv(forwarded: Request[]): Env {
+	return { DB: {}, REMINDER_ALARMS: {
 		idFromName: (name: string) => name,
 		get: () => ({ fetch: async (request: Request) => {
 			forwarded.push(request);
 			return new Response(null, { status: 204, headers: { 'X-Crate-Request-Id': 'coordinator-request' } });
 		} }),
 	} } as unknown as Env;
+}
+function settings() {
+	return new Request('https://worker.test/settings', {
+		method: 'PUT', body: '{}', headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer device' },
+	});
+}
+
+it.each([['POST', '/reading/handoff'], ['PUT', '/settings']])('returns the coordinator request ID for a forwarded %s %s', async (method, path) => {
+	const forwarded: Request[] = [];
 	const response = await fetchWorkerRequest(new Request(`https://worker.test${path}`, {
 		method, body: '{}', headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer device' },
-	}), coordinatorEnv);
+	}), coordinatorEnv(forwarded));
 	expect(response.headers.get('X-Crate-Request-Id')).toBe('coordinator-request');
 	expect(forwarded).toHaveLength(1);
 	expect(forwarded[0]!.headers.get('X-Crate-Internal-Mutation')).toBe('1');
 	expect(handleAuthenticatedRoute).not.toHaveBeenCalled();
+});
+
+it('rejects an unrecognized invalid bearer at the edge instead of queuing it on the coordinator lock', async () => {
+	vi.mocked(authenticateWorkerRequest).mockResolvedValue({ response: new Response(null, { status: 401 }) });
+	const forwarded: Request[] = [];
+	expect((await fetchWorkerRequest(settings(), coordinatorEnv(forwarded))).status).toBe(401);
+	expect(forwarded).toHaveLength(0);
+});
+
+it('forwards a recently authenticated bearer to authenticate once under the coordinator lock', async () => {
+	vi.mocked(authenticatedAdmissionKey).mockResolvedValue('device-hint');
+	const forwarded: Request[] = [];
+	expect((await fetchWorkerRequest(settings(), coordinatorEnv(forwarded))).status).toBe(204);
+	expect(forwarded).toHaveLength(1);
+	expect(authenticateWorkerRequest).not.toHaveBeenCalled();
 });

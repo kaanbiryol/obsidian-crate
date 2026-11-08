@@ -54,7 +54,9 @@ A newly paired Obsidian device uses the same protocol as the requester. After
 and shows **Unlock this vault**; the desktop answers in **Approve new device**.
 Both confirmations stay required. The device stores the vault key bundle without
 a recovery key, because pairing never transfers it, so **Copy recovery key** is
-unavailable there. A device cannot list or accept its own request. A locked
+unavailable there. **Server details → Update server address** still works on such a
+device: it checks that the new address names this device's own vault keys. A device
+cannot list or accept its own request. A locked
 Obsidian device can start a request again from **Manage encryption → Request
 keys**; an unlocked device approves it in **Manage encryption → Connect web app**.
 
@@ -72,7 +74,7 @@ Crate saves a reset checkpoint before contacting the server. Sync and notificati
 
 After the wipe, uploads and retries use normal conflict-aware sync. Changes made by another device that reconnects during recovery are preserved. If the server definitively rejects the first reset request, Crate releases the checkpoint so you can reconnect; an uncertain response keeps the recovery checkpoint. If a self-hosted tunnel changes address during a reset, select **Server details → Update server address**, then **Manage encryption → Resume reset**. Crate verifies the original vault or reset receipt before moving the saved connection.
 
-Other Obsidian devices must **Disconnect this device** and reconnect. Existing local files on those devices are preserved and may sync back after reconnecting; review them first if you want to keep only the initiating device’s contents. In each PWA, select **Log out**, including from the expired-session screen, then open a fresh app link. Logout discards that browser’s keys, drafts and pending edits. Enable notifications again. An offline browser cannot be remotely erased; it retains its encrypted local copy until it reconnects or its data is cleared.
+Other Obsidian devices must **Disconnect this device** and reconnect. Existing local files on those devices are preserved and may sync back after reconnecting; review them first if you want to keep only the initiating device’s contents. The server refuses requests that carry vault keys while encryption is off, so a device that kept its keys stores nothing until **Manage encryption** removes them, through **Sync without encryption** or **Turn on encryption**. In each PWA, select **Log out**, including from the expired-session screen, then open a fresh app link. Logout discards that browser’s keys, drafts and pending edits. Enable notifications again. An offline browser cannot be remotely erased; it retains its encrypted local copy until it reconnects or its data is cleared.
 
 This works on Cloudflare and self-hosted servers. External backups, provider snapshots and copies on other devices are unchanged; keep the old recovery key if you need to decrypt encrypted backups. Disconnecting an Obsidian device removes its saved encryption keys too.
 

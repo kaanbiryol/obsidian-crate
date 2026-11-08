@@ -30,7 +30,9 @@ export function markdownTaskContexts(lines: readonly string[]): Map<number, Mark
 	};
 	let comment = false;
 	let frontmatter = false;
-	for (const [lineNumber, line] of lines.entries()) {
+	for (const [lineNumber, source] of lines.entries()) {
+		// A byte order mark starts the file, not the first line's Markdown; writers keep it in place.
+		const line = lineNumber === 0 ? source.replace(/^\uFEFF/, '') : source;
 		const trimmed = line.trim();
 		if (lineNumber === 0 && trimmed === '---') { frontmatter = true; continue; }
 		if (frontmatter) {

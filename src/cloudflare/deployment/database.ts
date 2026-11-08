@@ -77,8 +77,9 @@ export async function inspectDeploymentDatabase(input: DeploymentDatabase): Prom
 		throw new Error('This server uses a newer or different build of this server revision. Install its matching plugin or a newer server revision; server downgrades are not supported.');
 	}
 	if (deployed && deployed.schema_version === SERVER_RELEASE.schemaVersion && deployed.schema_hash !== input.artifacts.d1SchemaSha256) {
-		// Released schemas only change with a version increase.
-		throw new Error('The server database has a different schema at the same schema version, so this build cannot update it.');
+		// Released schemas only change with a version increase, so this database comes
+		// from a pre-release beta that has no upgrade path.
+		throw new UnupgradableServerError('The server database has a different schema at the same schema version, so this build cannot update it.');
 	}
 	const receipts = await query('SELECT id, checksum FROM crate_migrations;');
 	validateMigrationHistory(version, createdVersion, receipts);

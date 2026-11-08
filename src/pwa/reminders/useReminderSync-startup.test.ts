@@ -96,3 +96,26 @@ it('saves confirmed results committed for later once, when asked', async () => {
 	expect(saveCachedReminderSnapshot).toHaveBeenCalledOnce();
 	expect(vi.mocked(saveCachedReminderSnapshot).mock.calls[0]![0].reminders.map(item => item.id)).toEqual(['one', 'two']);
 });
+
+it.each([
+	['visibilitychange', () => document, 'hidden'],
+	['pagehide', () => window, 'visible'],
+] as const)('saves confirmed results committed for later when the page hides (%s)', async (event, target, visibility) => {
+	encryption.evidence = true;
+	const harness = startup();
+	await finishStartup(harness, 'unencrypted');
+	const { rendered } = harness;
+	vi.mocked(saveCachedReminderSnapshot).mockClear();
+	await act(() => rendered.current.commitReminderState([record('one')], ['Inbox'], { persist: 'later' }));
+	// Returning to the foreground leaves the write to the end of the drain.
+	Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+	await act(async () => { document.dispatchEvent(new window.Event('visibilitychange')); });
+	expect(saveCachedReminderSnapshot).not.toHaveBeenCalled();
+	Object.defineProperty(document, 'visibilityState', { configurable: true, value: visibility });
+	await act(async () => { target().dispatchEvent(new window.Event(event)); });
+	expect(saveCachedReminderSnapshot).toHaveBeenCalledOnce();
+	expect(vi.mocked(saveCachedReminderSnapshot).mock.calls[0]![0].reminders.map(item => item.id)).toEqual(['one']);
+	// The drain's own write then has nothing left to save.
+	await act(() => rendered.current.persistReminderState());
+	expect(saveCachedReminderSnapshot).toHaveBeenCalledOnce();
+});

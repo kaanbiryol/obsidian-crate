@@ -323,6 +323,7 @@ export class SyncRuntime {
 		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
 		const syncEngine = this.syncEngine;
 		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
+		syncEngine.setSettingsPersistence(() => this.persistSettings());
 		syncEngine.setReminderScopePreparation(this.prepareReminderScope);
 
 		this.emitCurrentState();

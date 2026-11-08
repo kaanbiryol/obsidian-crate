@@ -119,10 +119,12 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'setup', undefined, expect.any(AbortSignal));
 		expect(plugin.openSettingsTab.mock.invocationCallOrder[0])
 			.toBeLessThan(openCloudflareDeploymentModal.mock.invocationCallOrder[0] ?? 0);
+		// A restore's switch merges this vault with the restored server instead of asking to replace it.
 		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(
 			plugin,
 			'https://crate.example.workers.dev',
 			'device-token',
+			...(intent === 'switch' ? [undefined, true] : []),
 		);
 		expect(plugin.refreshSettingsTab).toHaveBeenCalledTimes(1);
 		expect(plugin.refreshSettingsTab.mock.invocationCallOrder[0])

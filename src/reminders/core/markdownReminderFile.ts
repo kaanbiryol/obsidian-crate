@@ -169,6 +169,8 @@ export function deleteReminderBlockFromContent(
 		throw new ReminderMarkdownContextError('This reminder has nested tasks or supporting text. Move or remove it in Markdown to preserve that content; nothing was changed.');
 	}
 	lines.splice(lineNumber, 1 + descCount);
+	// A byte order mark belongs to the note, not to a reminder on its first line.
+	if (lineNumber === 0 && fileContent.startsWith('\uFEFF')) lines[0] = `\uFEFF${lines[0] ?? ''}`;
 	return {
 		content: lines.join("\n"),
 		lineNumber,
@@ -179,7 +181,9 @@ export function deleteReminderBlockFromContent(
 export class ReminderReorderConflictError extends ReminderMarkdownContextError {}
 
 export function reorderReminderBlocksInContent(fileContent: string, orderedIds: string[]): string {
-	const lines = fileContent.split("\n");
+	// A byte order mark stays at the start of the note, whichever block moves there or away.
+	const bom = fileContent.startsWith('\uFEFF') ? '\uFEFF' : '';
+	const lines = fileContent.slice(bom.length).split("\n");
 	const taskContexts = markdownTaskContexts(lines);
 
 	interface FileSegment {
@@ -291,7 +295,7 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 
 	// Endings stay with positions: in a CRLF note without a final newline only the
 	// last line lacks a CR, whichever block moves there or away.
-	return result.map((line, position) => {
+	return bom + result.map((line, position) => {
 		const content = line.endsWith('\r') ? line.slice(0, -1) : line;
 		return lines[position]!.endsWith('\r') ? `${content}\r` : content;
 	}).join("\n");

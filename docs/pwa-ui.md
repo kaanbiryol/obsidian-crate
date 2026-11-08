@@ -17,6 +17,10 @@ At launch, a found update downloads and applies behind the Reminders launch spla
 saved work needs review or a restored editor or capture form is open);
 after launch, applying an update requires an explicit action. Feature readiness
 and durable pending commands are checked before reload.
+An update found after launch is still prepared in the background, and the browser
+activates a waiting service worker once every client has closed, so a later cold
+launch can start on the new version without these checks. That is safe because the
+pending reminder outbox and Reading queue formats are frozen, so the new version still reads them.
 
 ## Launch appearance
 

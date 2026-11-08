@@ -11,6 +11,7 @@ import { SyncEngine } from '../engine/engine';
 import { createRuntimeHarness } from './runtime-test-harness';
 import { resetStoredSyncState } from './sync-activity';
 import { SECRET_KEYS } from '../../platform/secret-keys';
+import { syncStoragePaths } from '../manifest/storage-paths';
 
 afterEach(() => vi.restoreAllMocks());
 const oldUrl = 'https://old.trycloudflare.com', newUrl = 'https://new.trycloudflare.com';
@@ -28,12 +29,14 @@ async function setup() {
 	storage.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(bundle));
 	storage.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);
 	const state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, recovery)), mode: 'active' as const };
-	const request = vi.spyOn(WorkerApiHttpClient.prototype, 'requestJson').mockResolvedValue({ encryption: state });
+	const changes = { lastSeq: 17, hasChanges: false };
+	const request = vi.spyOn(WorkerApiHttpClient.prototype, 'requestJson')
+		.mockImplementation(async (path: string) => path.startsWith('/sync/check') ? changes : { encryption: state });
 	vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 	const controller = new AbortController();
 	const move = (address = newUrl) => h.runtime.updateEncryptedServerAddress(address, controller.signal,
 		{ workerUrl: h.settings.workerUrl, authToken: 'token' });
-	return { ...h, storage, setSecret, bundle, recovery, request, state, move, controller };
+	return { ...h, storage, setSecret, bundle, recovery, request, state, changes, move, controller };
 }
 
 it('relocates the encrypted connection and preserves all local recovery work across restarts', async () => {
@@ -62,6 +65,19 @@ it('relocates the encrypted connection and preserves all local recovery work acr
 	await reopened.close(); h.runtime.destroy();
 });
 
+it('reconciles from scratch at an address whose server is behind this device, as after a restore from a backup', async () => {
+	const h = await setup();
+	h.changes.lastSeq = 5;
+	await h.move();
+	expect(h.settings.workerUrl).toBe(newUrl);
+	expect(h.settings.lastSeq).toBe(0);
+	// The checkpoint is set aside like a new server's, so no retained baseline rolls the restored files back.
+	expect(h.plugin.app.vault.adapter.exists).toHaveBeenCalledWith(syncStoragePaths(h.plugin.manifest.dir).manifest);
+	expect(h.request).toHaveBeenCalledWith('/sync/check?since=17');
+	expect(h.storage.get(SECRET_KEYS.ENCRYPTION_KEYS)).toBe(JSON.stringify(h.bundle));
+	h.runtime.destroy();
+});
+
 it('retains the original checkpoint identity across successive tunnel changes and clears it on a different connection', async () => {
 	const h = await setup();
 	await h.move(); await h.move('https://third.trycloudflare.com');
@@ -82,6 +98,27 @@ it.each(['plaintext', 'different-vault', 'forged-identity'] as const)('rejects %
 	expect(h.settings.workerUrl).toBe(oldUrl);
 	expect(h.storage.forScope(newUrl).get(SECRET_KEYS.AUTH_TOKEN)).toBeNull();
 	expect(h.persistSettings).not.toHaveBeenCalled();
+});
+
+it.each(['same', 'different'] as const)('verifies a paired device without a recovery key against its own keys (%s vault)', async vault => {
+	const h = await setup();
+	h.storage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
+	if (vault === 'different') {
+		const foreign = await createVaultKeyBundle();
+		const state = { ...createEncryptionState(foreign, await sealRecoveryBundle(foreign, await generateRecoveryCode())), mode: 'active' as const };
+		h.request.mockImplementation(async (path: string) => path.startsWith('/sync/check') ? h.changes : { encryption: state });
+		await expect(h.move()).rejects.toThrow();
+		expect(h.settings.workerUrl).toBe(oldUrl);
+		expect(h.storage.forScope(newUrl).get(SECRET_KEYS.AUTH_TOKEN)).toBeNull();
+		expect(h.persistSettings).not.toHaveBeenCalled();
+	} else {
+		await h.move();
+		expect(h.settings.workerUrl).toBe(newUrl);
+		expect(h.settings.lastSeq).toBe(17);
+		expect(h.storage.get(SECRET_KEYS.ENCRYPTION_KEYS)).toBe(JSON.stringify(h.bundle));
+		expect(h.storage.get(SECRET_KEYS.ENCRYPTION_RECOVERY)).toBeNull();
+	}
+	h.runtime.destroy();
 });
 
 it.each(['reset', 'vault'] as const)('preserves the destination’s existing %s recovery', async kind => {

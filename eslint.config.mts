@@ -224,9 +224,9 @@ export default tseslint.config(
 		rules: { 'obsidianmd/no-forbidden-elements': 'off' },
 	},
 	{
-		// Remote deletions must remain recoverable even when the user's host
-		// preference is permanent deletion. Vault.trash(file, false) forces .trash.
-		files: ['src/sync/local/local-delete.ts'],
+		// Remote deletions and replaced vault contents must remain recoverable even when
+		// the user's host preference is permanent deletion. Vault.trash(file, false) forces .trash.
+		files: ['src/sync/local/local-delete.ts', 'src/sync/local/vault-replacement.ts'],
 		rules: { 'obsidianmd/prefer-file-manager-trash-file': 'off' },
 	},
 	{
@@ -262,6 +262,7 @@ export default tseslint.config(
 		".claude/**",
 		"test-results/**",
 		"playwright-report/**",
+		"coverage/**",
 		"esbuild.config.mjs",
 		"eslint.config.js",
 		"deploy.yml",

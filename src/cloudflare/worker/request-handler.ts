@@ -10,7 +10,7 @@ import { ReminderFileSizeError } from './reminders/limits';
 import { ReminderIdentityConflictError } from './reminders/source-identity';
 import { logMutation } from './http/request-diagnostics';
 import { admitApiRequest } from './admission/rate-limit';
-import { rememberAuthenticatedRequest } from './admission/admission-state';
+import { authenticatedAdmissionKey, rememberAuthenticatedRequest } from './admission/admission-state';
 import { coordinatedUpload } from './sync/staging/staged-upload-dispatch';
 import { apiRoutePolicy } from './routes/policy';
 import { requestPlacement } from './routes/placement';
@@ -114,10 +114,17 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	if (placement === 'redeem-grant' && execution.kind === 'coordinator') return handleReadingRoute(request, env, undefined, { state: execution.state });
 	const publicResponse = await handlePublicRoute(request, env, path, method);
 	if (publicResponse) return publicResponse;
-	// Coordinator routes authenticate once, under the coordinator lock that every
-	// revocation also takes. The encrypted shortcut capture downloads its page here
-	// before entering the coordinator, so it still authenticates at the edge.
+	// Coordinator routes authenticate under the coordinator lock that every revocation
+	// also takes. A bearer this isolate has not recently authenticated is checked here
+	// first, so invalid credentials never queue on that lock. The encrypted shortcut
+	// capture downloads its page here before entering the coordinator, so it always
+	// authenticates at the edge.
 	if (placement === 'forward-before-auth') {
+		if (!await authenticatedAdmissionKey(request, admissionDb)) {
+			const authResult = await authenticateWorkerRequest(request, db);
+			await rememberAuthenticatedRequest(request, admissionDb, !authResult.response);
+			if (authResult.response) return authResult.response;
+		}
 		const response = await forwardToCoordinator(env, request);
 		// Only an authenticated coordinator response carries the encryption state.
 		if (response.headers.has(ENCRYPTION_STATE_HEADER)) await rememberAuthenticatedRequest(request, admissionDb, true);

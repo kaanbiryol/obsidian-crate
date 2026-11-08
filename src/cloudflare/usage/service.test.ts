@@ -70,7 +70,7 @@ describe('Cloudflare usage', () => {
 			? { status: 403, text: 'secret detail' }
 			: { status: 200, text: JSON.stringify({ data: { viewer: { accounts: [{ usage: [] }] } } }) }));
 		const result = await fetchCloudflareUsage(transport, 'token', 'account');
-		expect(result[0]?.error).toContain('Reconnect Cloudflare usage');
+		expect(result[0]?.error).toBe('Select Reconnect under Account and devices to authorize Cloudflare usage for this account.');
 		expect(result[1]?.metrics.map(m => m.used)).toEqual([0, 0]);
 		expect(JSON.stringify(result)).not.toContain('secret detail');
 		expect(result[3]?.error).toBeTruthy();

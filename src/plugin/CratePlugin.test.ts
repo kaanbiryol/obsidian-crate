@@ -421,6 +421,21 @@ describe('CratePlugin settings persistence', () => {
 			expect(file('data.last-good.json')).toBeUndefined();
 		});
 
+		it('refreshes the good copy when a deletion record is saved, so recovery keeps it', async () => {
+			const { plugin, file } = withDisk({ 'data.json': JSON.stringify(saved) });
+			await plugin.loadSettings();
+			await vi.waitFor(() => expect(file('data.last-good.json')).toBeDefined());
+			const id = 'a'.repeat(32), databaseId = '01234567-89ab-cdef-0123-456789abcdef', name = 'crate-0123456789abcdef';
+			const deployment = { deploymentId: '0123456789abcdef', accountId: 'b'.repeat(32), accountName: 'Example account',
+				workerName: name, d1DatabaseName: name, d1DatabaseId: databaseId, r2BucketName: name, workersSubdomain: 'example',
+				lastDeployedVersion: '0.1.0', lastDeployedFingerprint: null,
+				deletion: { id, phase: 'clearing-bucket' as const, databaseId, bucketCreatedAt: null, workerCreatedAt: null, helperName: `crate-delete-${id}` } };
+			await plugin.writeSettings({ cloudflareDeployment: deployment });
+			expect(JSON.parse(file('data.last-good.json')!)).toMatchObject({ workerUrl: 'https://crate.example', cloudflareDeployment: { deletion: deployment.deletion } });
+			await plugin.writeSettings({ syncInterval: 120 });
+			expect(JSON.parse(file('data.last-good.json')!)).not.toHaveProperty('syncInterval', 120);
+		});
+
 		it('keeps a good copy of normalized settings only, so stray fields such as old secrets are not duplicated', async () => {
 			const { plugin, file } = withDisk({ 'data.json': JSON.stringify({ ...saved, authToken: 'synthetic-secret', deviceId: 'synthetic-device' }) });
 			await plugin.loadSettings();

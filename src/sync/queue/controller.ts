@@ -13,7 +13,7 @@ export interface SyncQueueControllerContext extends Pick<QueueFlushContext,
 	| 'updateState' | 'setLastSync' | 'reconnectNotice' | 'isDestroyed' | 'getStatus' | 'prepareUploadFromPath'> {
 	automaticSyncEnabled?(): boolean;
 	shouldIgnore(path: string): boolean;
-	verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean): Promise<string[]>;
+	verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean, replayed?: ReadonlySet<string>): Promise<string[]>;
 	getDebounceDelayMs(): number;
 	maxDebounceWaitMs: number;
 	reconcile(queueKeys: string[]): Promise<SyncResult>;
@@ -39,6 +39,8 @@ export class SyncQueueController {
 	private reconciliationScheduled = false;
 	private reconciliationKeys = new Set<string>();
 	private verificationKeys = new Set<string>();
+	/** Dropped startup-sync events awaiting verification, until a live event replaces them. */
+	private replayedKeys = new Set<string>();
 	private verificationTimer: ReturnType<typeof setTimeout> | null = null;
 	private verificationTask: Promise<void> | null = null;
 
@@ -64,7 +66,10 @@ export class SyncQueueController {
 
 	restorePendingKeys(keys: PendingKey[]): void {
 		// Live events take precedence over the startup snapshot.
-		for (const key of keys) if (!this.context.shouldIgnore(decodePendingChange(key).path)) this.pending.restore(key);
+		for (const key of keys) {
+			this.replayedKeys.delete(key);
+			if (!this.context.shouldIgnore(decodePendingChange(key).path)) this.pending.restore(key);
+		}
 		this.context.updateState({ pendingChanges: this.pending.queuedCount });
 	}
 
@@ -72,7 +77,11 @@ export class SyncQueueController {
 	restoreDroppedEvents(keys: string[]): void {
 		if (!keys.length) return;
 		this.restorePendingKeys(keys);
-		for (const key of keys) if (this.pending.queuedKeys().has(key)) this.verificationKeys.add(key);
+		for (const key of keys) {
+			if (!this.pending.queuedKeys().has(key)) continue;
+			if (!this.verificationKeys.has(key)) this.replayedKeys.add(key);
+			this.verificationKeys.add(key);
+		}
 		this.debouncedSync(false);
 	}
 
@@ -106,6 +115,8 @@ export class SyncQueueController {
 		const { key, opposite, changed } = this.pending.add(change, Date.now());
 		this.verificationKeys.delete(opposite);
 		this.verificationKeys.add(key);
+		this.replayedKeys.delete(key);
+		this.replayedKeys.delete(opposite);
 		return changed;
 	}
 
@@ -148,6 +159,7 @@ export class SyncQueueController {
 		if (this.verificationTimer !== null) clearTimeout(this.verificationTimer);
 		this.verificationTimer = null;
 		this.verificationKeys.clear();
+		this.replayedKeys.clear();
 		this.pending.clear();
 		this.reconciliationScheduled = false;
 		this.reconciliationKeys.clear();
@@ -182,6 +194,7 @@ export class SyncQueueController {
 		for (const key of ignored) {
 			this.pending.drop(key);
 			this.verificationKeys.delete(key);
+			this.replayedKeys.delete(key);
 		}
 		if (this.pending.queuedCount > 0) this.debouncedSync();
 		else if (ignored.length > 0) this.context.updateState({ pendingChanges: 0 });
@@ -305,10 +318,11 @@ export class SyncQueueController {
 		if (this.context.isDestroyed() || this.context.getStatus() === 'syncing') return;
 		const keys = [...this.verificationKeys];
 		this.verificationKeys.clear();
+		const replayed = new Set(keys.filter(key => this.replayedKeys.delete(key)));
 		const revisions = this.snapshotPendingRevisions();
 		const isCurrent = (key: string) => !this.context.isDestroyed()
 			&& this.context.getStatus() !== 'syncing' && this.pending.isUnchangedSince(key, revisions);
-		this.settleKeys(await this.context.verifyPendingPaths(keys, isCurrent), revisions);
+		this.settleKeys(await this.context.verifyPendingPaths(keys, isCurrent, replayed), revisions);
 	}
 
 	private requestReconciliation(queueKeys: string[]): void {

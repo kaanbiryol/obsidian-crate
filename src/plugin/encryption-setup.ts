@@ -44,15 +44,16 @@ type EncryptionModalState =
 	| { kind: 'ready'; state: EncryptionServerState; keys: VaultKeyBundle }
 	/** This vault synced encrypted before, but the server now reports no encryption. */
 	| { kind: 'downgraded' }
-	| { kind: 'setup'; keys: VaultKeyBundle | null };
+	| { kind: 'setup' };
 
 /** What the encryption dialog offers for the server's state and this device's keys. */
 export function encryptionModalState(state: EncryptionServerState | null, keys: VaultKeyBundle | null, settings: Pick<CrateSettings, 'encryptedVaultId'>): EncryptionModalState {
 	if (state?.mode === 'resetting') return { kind: 'resetting' };
 	if (state) return keys ? { kind: 'ready', state, keys } : { kind: 'locked', state };
-	if (!keys && settings.encryptedVaultId) return { kind: 'downgraded' };
+	// Keys kept after encryption was turned off cannot sync with this server, which refuses them.
+	if (keys || settings.encryptedVaultId) return { kind: 'downgraded' };
 	// Only an unencrypted server reaches setup: an encrypted one is unlocked or managed above.
-	return { kind: 'setup', keys };
+	return { kind: 'setup' };
 }
 
 type PreparedKeys = { bundle: VaultKeyBundle; recovery: string };
@@ -61,9 +62,8 @@ type PreparedKeys = { bundle: VaultKeyBundle; recovery: string };
  * the recovery key the user may already have saved instead of a new one. */
 const preparedKeys = new WeakMap<CratePlugin, Map<string, PreparedKeys>>();
 
-/** Reuse this device's keys and recovery key, or the ones created for this server's setup, or create both. */
-export async function prepareEncryptionKeys(plugin: CratePlugin, keys: VaultKeyBundle | null): Promise<{ bundle: VaultKeyBundle; recovery: string | null }> {
-	if (keys) return { bundle: keys, recovery: plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY) };
+/** Reuse the keys created for this server's setup, or create them. */
+export async function prepareEncryptionKeys(plugin: CratePlugin): Promise<PreparedKeys> {
 	const { workerUrl } = plugin.settings;
 	const byServer = preparedKeys.get(plugin) ?? new Map<string, PreparedKeys>();
 	preparedKeys.set(plugin, byServer);
@@ -99,9 +99,21 @@ export async function unlockVaultWithPairedKeys(plugin: CratePlugin, state: Encr
 	});
 }
 
+/** Remove keys this device kept after its server turned encryption off, so sync stops
+ * sending them. The saved recovery key still opens encrypted backups. */
+export async function forgetStaleEncryptionKeys(plugin: CratePlugin, assertCurrent: () => void): Promise<void> {
+	if (!plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_KEYS)) return;
+	await plugin.syncRuntime.runEncryptionSetup(async () => {
+		assertCurrent();
+		plugin.secretStorage.delete(SECRET_KEYS.ENCRYPTION_KEYS);
+		plugin.secretStorage.delete(SECRET_KEYS.ENCRYPTION_RECOVERY);
+	});
+}
+
 /** Accept that a vault which synced encrypted now syncs with this server as readable text. */
 export async function syncWithoutEncryption(plugin: CratePlugin, assertCurrent: () => void): Promise<void> {
 	assertCurrent();
+	await forgetStaleEncryptionKeys(plugin, assertCurrent);
 	await plugin.writeSettings({ encryptedVaultId: null }, assertCurrent);
 	plugin.syncRuntime.getApiClient()?.refusePlaintext(false);
 }

@@ -247,8 +247,13 @@ async function connectDevice(operation: CloudflareOperation, workerUrl: string, 
 		// Verification awaited the network, so check again before saving.
 		assertDeviceConnectionUnchanged(operation);
 		if (isReconnect && !deviceToken && workerUrl === originalWorkerUrl) connection = { success: true };
-		else {
-			connection = await configureCloudflareAuthorizedDevice(plugin, workerUrl, token, ...(isReconnect ? [{ workerUrl: originalWorkerUrl, authToken: originalToken || '' }] : []));
+		else if (isReconnect) {
+			connection = await configureCloudflareAuthorizedDevice(plugin, workerUrl, token, { workerUrl: originalWorkerUrl, authToken: originalToken || '' });
+		} else if (operation.intent === 'switch') {
+			// Only a restore's Choose server… switches; its first sync merges instead of replacing the vault.
+			connection = await configureCloudflareAuthorizedDevice(plugin, workerUrl, token, undefined, true);
+		} else {
+			connection = await configureCloudflareAuthorizedDevice(plugin, workerUrl, token);
 		}
 		replacing = connection.success && !isReconnect && plugin.settings.replaceVault && !await isEncryptedServer(workerUrl, token, signal);
 	} catch (error) {

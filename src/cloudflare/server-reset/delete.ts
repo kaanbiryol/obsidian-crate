@@ -1,6 +1,6 @@
-import { isDefinitiveRejection, nullOn404 } from '../cloudflare-api-error';
+import { nullOn404 } from '../cloudflare-api-error';
 import { createRandomHexToken } from '../../platform/random-hex';
-import { DeploymentRecoveryRequiredError, newUploadTag, withDeploymentFence, type DeploymentFence, type FenceStep } from '../deployment/fence';
+import { DeploymentRecoveryRequiredError, isRefusedMutation, newUploadTag, withDeploymentFence, type DeploymentFence, type FenceStep } from '../deployment/fence';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { workersDevOrigin } from '../deployment/worker-origin';
 import { clearBucketObjects } from './reset-objects';
@@ -74,7 +74,7 @@ export async function deleteCrateServer(input: {
 				catch (error) { delete job.helperUploadPending; throw error; }
 				try { await publish(tag); }
 				catch (error) {
-					if (isDefinitiveRejection(error)) {
+					if (isRefusedMutation(error)) {
 						delete job.helperUploadPending;
 						await input.persist();
 					}

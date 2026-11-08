@@ -22,6 +22,10 @@ describe('Markdown task context', () => {
 		const lines = `${example}\n\n- [ ] Real`.split('\n');
 		expect([...markdownTaskContexts(lines).keys()]).toEqual([lines.length - 1]);
 	});
+	it('reads a task after the byte order mark that starts a note, but not one mid-note', () => {
+		expect([...markdownTaskContexts(['\uFEFF- [ ] First', '\uFEFF- [ ] Second']).keys()]).toEqual([0]);
+		expect([...markdownTaskContexts(['\uFEFF---', '- [ ] Property', '---', '- [ ] Body']).keys()]).toEqual([3]);
+	});
 	it('recognizes nested task lists while excluding indented code and fenced examples inside them', () => {
 		const lines = ['- [ ] Parent', '  - [ ] Child', '    - [ ] Grandchild', '          - [ ] Code',
 			'  ```md', '  - [ ] Fenced', '  ```', '- [ ] Sibling'];

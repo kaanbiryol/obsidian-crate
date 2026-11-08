@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { assertLocalMigrationPath } from './local-server-migrations.mjs';
 import { assertCompatibleLocalMetadata, localBuildInfo, lockLocalData, openLocalRuntime } from './local-server-runtime.mjs';
 
-const ephemeral = new Set(['server.lock', 'control.json', 'status.json', '.DS_Store']);
+const ephemeral = new Set(['server.lock', 'control.json', 'control.sock', 'status.json', '.DS_Store']);
 const inside = (parent, child) => { const path = relative(parent, child); return path === '' || (!path.startsWith('..') && !isAbsolute(path)); };
 async function digest(path) {
 	const hash = createHash('sha256');

@@ -125,7 +125,7 @@ it('keeps fallback budgets across real request-local metering wrappers and rotat
 	expect(prepare).not.toHaveBeenCalled();
 });
 
-it('authenticates coordinator routes once, inside the coordinator, and remembers its answer for admission', async () => {
+it('authenticates an unrecognized bearer at the edge, a recognized one only inside the coordinator, and remembers its answer for admission', async () => {
 	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope) VALUES ('owner',?,'vault')").bind(await sha256Hex('owner')).run();
 	await env.DB.prepare("INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, 0, 'Reading', 'g', 'r')").run();
 	const edgeStatements: string[] = [];
@@ -138,16 +138,23 @@ it('authenticates coordinator routes once, inside the coordinator, and remembers
 	// A reset status read is a coordinator read; it rejects this malformed reset ID after authenticating.
 	const attempt = (token: string) => worker.fetch(new Request('https://once.test/encryption/reset', { headers: { Authorization: `Bearer ${token}` } }),
 		{ ...env, DB: edgeDb, NOTIFICATION_REQUEST_LIMITER: { limit } });
+	const edgeAuthentications = () => edgeStatements.filter(sql => sql.includes('FROM auth_tokens')).length;
+	// An unrecognized bearer authenticates at the edge, so an invalid one never queues on the coordinator lock.
 	expect((await attempt('invalid')).status).toBe(401);
 	expect(limit).toHaveBeenCalledTimes(1);
+	expect(edgeAuthentications()).toBe(1);
 	for (let index = 0; index < 3; index++) expect((await attempt('owner')).status).toBe(400);
-	// The first accepted answer admits the credential to the authenticated budget.
+	// The first accepted answer admits the credential to the authenticated budget,
+	// and later requests authenticate only inside the coordinator.
 	expect(limit).toHaveBeenCalledTimes(2);
+	expect(edgeAuthentications()).toBe(2);
 	await env.DB.prepare("DELETE FROM auth_tokens WHERE id='owner'").run();
 	expect((await attempt('owner')).status).toBe(401);
+	expect(edgeAuthentications()).toBe(2);
+	// The coordinator's rejection removed the hint, so the edge checks the bearer again.
 	expect((await attempt('owner')).status).toBe(401);
 	expect(limit).toHaveBeenCalledTimes(3);
-	expect(edgeStatements.filter(sql => sql.includes('auth_tokens'))).toEqual([]);
+	expect(edgeAuthentications()).toBe(3);
 });
 
 it.each(['/reading/shortcut/v1/prepare', '/reading/shortcut/v1/exchange'])('returns a safe launch page when %s is denied at the edge', async path => {

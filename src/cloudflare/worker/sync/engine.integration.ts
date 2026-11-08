@@ -313,4 +313,35 @@ describe('multiple real sync engines across Worker and storage boundaries', () =
 		expect(second.disk.paths()).toEqual(first.disk.paths());
 		expect(Object.keys(second.checkpoint().files).sort()).toEqual(first.disk.paths());
 	});
+
+	it('downloads server files under a removed exclusion after incremental syncs passed them, across a restart', async () => {
+		const writer = await device('writer');
+		writer.disk.write('note.md', 'visible\n');
+		await sync(writer);
+		const reader = await device('reader');
+		reader.settings.ignorePatterns = [...reader.settings.ignorePatterns, 'Archive/'];
+		reader.engine.updateSettings(reader.settings);
+		await sync(reader);
+		await writer.disk.vault.createFolder('Archive');
+		writer.disk.write('Archive/old.md', 'archived\n');
+		await sync(writer);
+		// Incremental sync skips the excluded change but moves the cursor past it.
+		await sync(reader);
+		expect(reader.disk.has('Archive/old.md')).toBe(false);
+
+		const persist = vi.fn(async () => {});
+		reader.engine.setSettingsPersistence(persist);
+		reader.settings.ignorePatterns = reader.settings.ignorePatterns.filter(pattern => pattern !== 'Archive/');
+		reader.engine.updateSettings(reader.settings);
+		await vi.waitFor(() => expect(persist).toHaveBeenCalled());
+		expect(reader.settings.fullSyncRequested).toBe(true);
+		// A restarted engine cannot see the removal, so the saved request drives the full sync.
+		reader.close();
+		await reader.engine.waitForIdle();
+		await reader.open();
+		await sync(reader);
+		expect(reader.disk.text('Archive/old.md')).toBe('archived\n');
+		expect(reader.settings.fullSyncRequested).toBeUndefined();
+		expect(Object.keys(reader.checkpoint().files).sort()).toEqual(['Archive/old.md', 'note.md']);
+	});
 });

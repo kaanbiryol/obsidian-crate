@@ -6,6 +6,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { handleNotificationPolicy } from './policy';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { runNotificationCoordinator } from './coordinator';
+import { drainNotificationProjections } from './projection';
 import { dispatchNotificationJobs } from './outbox';
 import { armNotificationCoordinator } from './lifecycle';
 import { runCoordinatorAlarm } from '../coordinator/coordinator-alarms';
@@ -54,9 +55,11 @@ it('verifies and projects eight files per pass, reading each once, within the qu
 	await env.DB.prepare("INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, 1, 'Reading', 'g', 'r')").run();
 	for (let note = 0; note < 3; note++) await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Reading/${note}.md`, `# Note ${note}`, null);
 	// Worst case: every source needs the current parser, every projection succeeds and
-	// the Reading index rebuilds a page in the same pass.
+	// the Reading index rebuilds a page in the same pass. Jobs queued a second earlier
+	// than verification re-enqueues them must not put the unverified ninth note first.
 	await env.DB.batch([
 		env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0, verified = 0'),
+		env.DB.prepare("UPDATE notification_projection_jobs SET updated_at = datetime('now', '-1 second')"),
 		env.DB.prepare('DELETE FROM reading_index'),
 	]);
 	const state = { storage: { setAlarm: vi.fn(async () => {}) } } as unknown as DurableObjectState;
@@ -69,6 +72,30 @@ it('verifies and projects eight files per pass, reading each once, within the qu
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_source_state WHERE verified = 1 AND parser_version = ?')
 		.bind(REMINDER_CACHE_PARSER_VERSION).first()).toEqual({ n: 8 });
 	expect(await env.DB.prepare('SELECT COUNT(DISTINCT file_path) AS n FROM reminder_projections').first()).toEqual({ n: 8 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_file_retries').first()).toEqual({ n: 0 });
+});
+
+it('parses at most the verification byte budget per projection pass and leaves later jobs queued', async () => {
+	const text = 'a'.repeat(900 * 1024);
+	for (let index = 0; index < 5; index++) await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Reminders/${index}.md`, text, null);
+	const get = vi.spyOn(env.BUCKET, 'get');
+	await drainNotificationProjections(env, 8);
+	// 2 MiB admits two 900 KiB notes.
+	expect(get).toHaveBeenCalledTimes(2);
+	get.mockRestore();
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_projection_jobs WHERE last_error IS NULL').first()).toEqual({ n: 3 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_file_retries').first()).toEqual({ n: 0 });
+});
+
+it('does not read a source that awaits verification with the current parser', async () => {
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Old.md', `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`, null);
+	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0, verified = 0').run();
+	const get = vi.spyOn(env.BUCKET, 'get');
+	await drainNotificationProjections(env, 8);
+	expect(get).not.toHaveBeenCalled();
+	get.mockRestore();
+	expect(await env.DB.prepare('SELECT last_error FROM notification_projection_jobs').first())
+		.toEqual({ last_error: expect.stringContaining('awaiting verification') as string });
 });
 
 it('skips the dispatcher when no alarm update is due', async () => {

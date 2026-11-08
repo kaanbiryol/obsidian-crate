@@ -3,6 +3,7 @@ import { CloudflareApiError, type CloudflareWorkerSettings, type DurableObjectNa
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { createFenceQueryHarness } from '../deployment/fence-test-harness';
+import { CloudflareReauthorizationRequired } from '../oauth/client';
 import { deleteCrateServer } from './delete';
 
 // The cleanup Worker answers through the guarded transport. Each harness stands in for it
@@ -228,6 +229,17 @@ describe('terminal server deletion', () => {
 		expect(h.metadata.deletion?.helperUploadPending).toMatch(/^crate-/);
 		if (applied) { await deleteCrateServer(h.input); expect(h.metadata.deletion?.phase).toBe('complete'); }
 		else await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
+	});
+
+	it.each([
+		['a definitive rejection', () => new CloudflareApiError('Forbidden', 403, null)],
+		['a refused saved login', () => new CloudflareReauthorizationRequired()],
+	])('clears the helper upload checkpoint after %s when the database is absent', async (_label, refusal) => {
+		const h = harness(); h.remote.database = false;
+		h.api.uploadServerDeletionWorker.mockRejectedValueOnce(refusal());
+		await expect(deleteCrateServer(h.input)).rejects.toThrow();
+		expect(h.metadata.deletion?.helperUploadPending).toBeUndefined();
+		await deleteCrateServer(h.input); expect(h.metadata.deletion?.phase).toBe('complete');
 	});
 
 	it('does not publish a helper after its local dispatch checkpoint failed', async () => {

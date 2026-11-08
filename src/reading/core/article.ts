@@ -1,5 +1,5 @@
 import { youtubeVideoId } from './youtube';
-import { ARTICLE_START, ARTICLE_END, MAX_READING_BYTES, type ReadingItem, type ReadingMetadata } from './model';
+import { ARTICLE_START, ARTICLE_END, MAX_READING_BYTES, MAX_READING_TITLE_LENGTH, type ReadingItem, type ReadingMetadata } from './model';
 import { inertTemplater, parseReadingNote } from './notes';
 import { patchReadingFrontmatter } from './frontmatter';
 import { transcriptMetadata, type CapturedArticle } from '../extraction/types';
@@ -21,8 +21,9 @@ function replaceArticle(content: string, block: NonNullable<ReturnType<typeof ma
 
 // Dataview JS, Datacore, JS Engine, Meta Bind JS views and Tasks custom filter/group/sort
 // functions run these code blocks when the note renders. Every fence marker loses these
-// leading languages, wherever it sits, so list items and raw HTML cannot hide one.
-const EXECUTABLE_FENCE = /(`{3,}|~{3,})(?:[ \t]*(?:dataviewjs|datacorejsx?|datacoretsx?|js-engine|meta-bind-js-view|tasks)(?![\w-]))+/gi;
+// leading languages, wherever it sits, so list items and raw HTML cannot hide one. Markdown
+// decodes escapes and character references in a language, so any language with `\` or `&` goes too.
+const EXECUTABLE_FENCE = /(`{3,}|~{3,})(?:[ \t]*(?:dataviewjs|datacorejsx?|datacoretsx?|js-engine|meta-bind-js-view|tasks|[^\s`]*[\\&][^\s`]*)(?![\w-]))+/gi;
 // A zero-width space keeps the text readable while breaking a plugin's trigger.
 const BREAK = '\u200B';
 
@@ -37,9 +38,10 @@ function inertArticle(article: CapturedArticle): CapturedArticle {
 		// the break, which `trim()` keeps.
 		.split('$=').join(`$${BREAK}=`)
 		.replace(/<code\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, tag => tag + BREAK);
+	// The break lengthens the title and author, so their length limits apply after it.
 	return { ...article, markdown: inertTemplater(markdown),
-		...(article.title === undefined ? {} : { title: inertTemplater(article.title) }),
-		...(article.author === undefined ? {} : { author: inertTemplater(article.author) }) };
+		...(article.title === undefined ? {} : { title: inertTemplater(article.title).slice(0, MAX_READING_TITLE_LENGTH) }),
+		...(article.author === undefined ? {} : { author: inertTemplater(article.author).slice(0, 1000) }) };
 }
 
 /** Assemble verified source text; callers retain source eligibility and publication guards. */

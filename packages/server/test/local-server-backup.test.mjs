@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -34,7 +35,11 @@ test('verified backup restores files, credentials and durable alarm storage into
 		const before = await readFile(join(source, 'server.json'), 'utf8');
 		assert.ok((await checkLocalUpgrade(source)).to > 0);
 		assert.equal(await readFile(join(source, 'server.json'), 'utf8'), before);
-		await backupLocalServer(source, backup);
+		// A crash can leave the control socket in the data directory; backups skip it.
+		const leftover = createServer();
+		await new Promise(resolve => leftover.listen(join(source, 'control.sock'), resolve));
+		try { await backupLocalServer(source, backup); }
+		finally { await new Promise(resolve => leftover.close(resolve)); }
 		await assert.rejects(backupLocalServer(source, backup), /already exists/);
 		await restoreLocalServer(target, backup);
 		runtime = await openLocalRuntime({ dataDir: target });

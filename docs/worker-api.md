@@ -123,7 +123,8 @@ snapshot, so they do not wait behind writes in the coordinator. While the index 
 the public Worker answers items and unchanged libraries (304) itself. It forwards to the
 coordinator a read that must continue an index rebuild, which writes, and every list body:
 a page parses up to 1,000 notes, more CPU than the public Worker's budget allows. List pages
-and deltas read their rows and the capture queue in one batch as well.
+and deltas read their rows and the capture queue in one batch as well. A delta's batch also
+rereads the index row, so removals that maintenance pruned after the first read relist.
 
 `GET /reading/list` pages hold up to 1,000 notes, newest `saved_at` first, so the first
 page of a first load is the top of the library. Every index write gives the rows it adds,
@@ -404,7 +405,7 @@ Response: `{ success: true }`
 
 Vault credentials only. GET reads the shared folder, IANA timezone, all-day time, enabled state, and revision. POST initializes only an absent policy. PUT changes it explicitly with `expectedRevision`; stale changes receive 409. Starting a client never overwrites another device's policy. A PUT that changes the folder moves reminders web app credentials, their push subscriptions and unused enrollment links from the previous folder to the new one in the same transaction. A Reminders credential that then names the previous folder receives `403` with `code: "reminders_folder_changed"` and its current `folderPath`; the web app switches to that folder.
 
-Schedules derive from committed Markdown and the shared notification policy. File commits enqueue projection intent in the same D1 transaction. The Durable Object coordinator verifies and projects at most eight files per alarm, dispatches up to 200 outbox jobs in a separate invocation after releasing its lock, fences stale work with file/policy/job revisions, and rearms while work remains. Maintenance recovers missed wakeups.
+Schedules derive from committed Markdown and the shared notification policy. File commits enqueue projection intent in the same D1 transaction. The Durable Object coordinator verifies and then projects at most eight files and 2 MiB of stored source (one note when it is larger) per alarm, dispatches up to 200 outbox jobs in a separate invocation after releasing its lock, fences stale work with file/policy/job revisions, and rearms while work remains. Maintenance recovers missed wakeups.
 
 ## Notifications and PWA Endpoints
 
@@ -426,7 +427,7 @@ Response: `{ publicKey: "base64url-encoded-key" }`
 
 ### POST /auth/device-pairing (public)
 
-Servers advertising `device-pairing-v1` accept codes from **Add a device**. The issuing device generates a 256-bit code and writes its SHA-256 hash with the Cloudflare D1 API as a `crate_device_pairing:<hash>` row in `maintenance_state`, replacing any earlier unredeemed code. The row holds a token ID, a ten-minute expiry, the current `server_state.reset_generation`, and the deployment metadata without deletion progress. The QR code encodes `/notifications/pair#<code>`; the page reads the fragment, which browsers never send, removes it from the address bar and opens `obsidian://crate-pair?server=<origin>&code=<code>`.
+Servers advertising `device-pairing-v1` accept codes from **Add a device**. The issuing device generates a 256-bit code and writes its SHA-256 hash with the Cloudflare D1 API as a `crate_device_pairing:<hash>` row in `maintenance_state`, replacing any earlier unredeemed code. The row holds a token ID, a ten-minute expiry that D1 sets from its own clock, the current `server_state.reset_generation`, and the deployment metadata without deletion progress. The QR code encodes `/notifications/pair#<code>`; the page reads the fragment, which browsers never send, removes it from the address bar and opens `obsidian://crate-pair?server=<origin>&code=<code>`.
 
 Request: `{ code, tokenHash, deviceId, deviceName, platform }`. The new device generates its token locally and sends only its hash.
 
@@ -616,14 +617,18 @@ API budget. Other requests with unrecognized credentials, plus the sensitive
 Reading/notification actions, use the edge admission binding: 60 requests per
 minute per hashed source address and deployment host. Invalid rotating bearer
 tokens share that budget. The local server replaces client-supplied forwarding
-headers with the socket address. Behind its managed Cloudflare Tunnel, where every
-request arrives from loopback, it uses the client address Cloudflare forwards.
+headers with the socket address. Behind its managed Cloudflare Tunnel or Tailscale
+Funnel, where every request arrives from loopback, it uses the client address that
+tunnel forwards: `CF-Connecting-IP` from Cloudflare, `X-Forwarded-For` from Tailscale.
 
 A successful D1 authentication records only a bounded, 60-second credential-hash
 hint in the isolate. Subsequent ordinary requests use a separate local budget
 of 6,000 per minute per credential so vault bootstrap can proceed. Every request
 still checks token validity, expiry and authorization against D1; an authentication
-failure removes the hint. This is not an authentication cache. Action/day limits
+failure removes the hint. This is not an authentication cache. Coordinator routes
+forward a hinted credential, which authenticates under the coordinator lock. Any
+other credential authenticates at the edge first, so an invalid one never waits for
+that lock, and then again under it. Action/day limits
 remain enforced after authentication. Denial returns 429 with Retry-After: 60.
 Daily action budgets belong to each credential (1,000 per UTC day for management
 and push actions, 500 for Reading), so one token cannot exhaust another's.

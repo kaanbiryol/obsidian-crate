@@ -207,6 +207,17 @@ describe('vaultScanner', () => {
 		expect(process).toHaveBeenCalledOnce();
 	});
 
+	it('identifies and indexes a reminder on the first line of a note with a byte order mark', async () => {
+		let persisted = '\uFEFF- [ ] Task A';
+		const process = vi.fn(async (_file: TFile, mutation: (content: string) => string) => (persisted = mutation(persisted)));
+		const app = { vault: { read: vi.fn(async () => persisted), process } } as unknown as App;
+
+		const result = await scanFile(withBinaryReads(app), makeMockFile('Reminders/Work.md'), 'Reminders');
+
+		expect(persisted).toMatch(/^\uFEFF- \[ \] Task A <!-- crate-id:[0-9a-f-]{36} -->$/);
+		expect(result.reminders.map(reminder => reminder.content)).toEqual(['Task A']);
+	});
+
 	it('preserves edits made between the initial read and id normalization', async () => {
 		const latestContent = '# Added concurrently\n- [ ] Task A';
 		let persistedContent = '- [ ] Task A';

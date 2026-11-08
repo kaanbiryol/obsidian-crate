@@ -95,7 +95,10 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	await env.BUCKET.put('new-plaintext', 'new note');
 	await finish();
 	expect(await (await env.BUCKET.get('new-plaintext'))!.text()).toBe('new note');
-	expect((await request('/sync/manifest', nextToken)).status).toBe(200);
+	// Encryption is off now: the new token syncs as plaintext, and the old vault keys are refused.
+	expect((await request('/sync/manifest', nextToken)).status).toBe(428);
+	expect((await worker.fetch(new Request('https://test/sync/manifest', { headers: { Authorization: `Bearer ${nextToken}`,
+		'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) } }), env)).status).toBe(200);
 });
 
 it('cancels installed alarms and completes while Reminders is paused', async () => {

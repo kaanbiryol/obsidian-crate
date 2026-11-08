@@ -48,6 +48,9 @@ interface SyncEngineContextDependencies {
 	markdownBaseCache: MarkdownBaseCache;
 	conflictStore: ConflictStore;
 	getSettings: () => SyncSettings;
+	/** Saves the settings `getSettings` returns, as the runtime does after each sync. */
+	persistSettings: () => Promise<void>;
+	fullSyncRequest: () => { complete(): void } | null;
 	getStatus: () => SyncState['status'];
 	shouldIgnore: (path: string) => boolean;
 	runConcurrent: <T>(tasks: (() => Promise<T>)[], concurrency: number) => Promise<T[]>;
@@ -62,7 +65,7 @@ interface SyncEngineContextDependencies {
 	isDestroyed: () => boolean;
 	/** Prepares reminder settings again, logging rather than throwing a failure. */
 	retryReminderScope: () => Promise<void>;
-	verifyPendingPaths: (keys: string[], isCurrent: (key: string) => boolean) => Promise<string[]>;
+	verifyPendingPaths: (keys: string[], isCurrent: (key: string) => boolean, replayed?: ReadonlySet<string>) => Promise<string[]>;
 	/** Reconciles queue keys that lost a compare-and-swap race and publishes the outcome. */
 	reconcileQueue: (queueKeys: string[]) => Promise<SyncResult>;
 	onFlushResult: (result: SyncResult) => void | Promise<void>;
@@ -135,6 +138,7 @@ export class SyncEngineContexts {
 			}, result, progress),
 			// Resolved per call so tests can replace the incremental planner.
 			incrementalSync: (progressCallback, onFailure) => this.incrementalSync(progressCallback, onFailure),
+			fullSyncRequest: d.fullSyncRequest,
 			hasSyncCursor: () => d.getSettings().lastSeq > 0,
 			createFullSyncPlan: (remoteFiles, concurrency, options) => createFullSyncPlan({
 				...this.localDiffPlanner,
@@ -304,6 +308,7 @@ export class SyncEngineContexts {
 		return runIncrementalSync({
 			settings: d.getSettings(),
 			setLastSeq: this.setLastSeq,
+			persistSettings: d.persistSettings,
 			reportWork: this.reportWork,
 			throwIfDestroyed: d.throwIfDestroyed,
 			vault: d.vault,

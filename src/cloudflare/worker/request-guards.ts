@@ -1,5 +1,5 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '../../protocol/server-info';
-import type { EncryptionServerState } from '../../encryption/server-state';
+import { ENCRYPTION_VAULT_HEADER, type EncryptionServerState } from '../../encryption/server-state';
 import { corsResponse } from './http/cors';
 import { EncryptionStateError, hasEncryptionAuthority } from './encryption/state';
 import { shortcutCompatibility, shortcutTransport, type ShortcutTransport } from './reading/shortcut-transport';
@@ -26,6 +26,12 @@ export function checkRequestProtocol(request: Request, shortcut: ShortcutTranspo
 export function assertRequestEncryption(request: Request, encryption: EncryptionServerState | null): void {
 	const path = new URL(request.url).pathname;
 	const method = request.method;
+	const managesAccess = path === '/health' || path.startsWith('/encryption') || path.startsWith('/auth/');
+	// Keys kept after encryption was turned off would store ciphertext with random names
+	// that plaintext devices then download.
+	if (!encryption && request.headers.has(ENCRYPTION_VAULT_HEADER) && !managesAccess) {
+		throw new EncryptionStateError('Encryption is off on this server. Open Manage encryption on this device to choose how to sync.', 428);
+	}
 	if (encryption?.mode === 'resetting' && !ENCRYPTION_RESET_PATHS.includes(path)) {
 		throw new EncryptionStateError('Encryption reset is in progress. Resume it on the device that started it.', 423);
 	}
@@ -34,7 +40,7 @@ export function assertRequestEncryption(request: Request, encryption: Encryption
 		if (encryption.mode !== 'active') throw new EncryptionStateError('An encryption reset is in progress. Resume it on the device that started it.', 423);
 		return;
 	}
-	if (encryption && !(KEYLESS_ENCRYPTED_READ_PATHS.includes(path) && method === 'GET') && path !== '/health' && !path.startsWith('/encryption') && !path.startsWith('/auth/')) {
+	if (encryption && !(KEYLESS_ENCRYPTED_READ_PATHS.includes(path) && method === 'GET') && !managesAccess) {
 		if (!hasCompatibleProtocol(request)) throw new EncryptionStateError('Update Crate before accessing this encrypted vault', 428);
 		if (!hasEncryptionAuthority(request, encryption)) {
 			throw new EncryptionStateError('Unlock this vault with its current encryption keys before syncing', 428);

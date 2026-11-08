@@ -1,8 +1,36 @@
 import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createPairing } from '../src/local-server-pairing.mjs';
+import { createPairing, requestLocalControl, startLocalControl } from '../src/local-server-pairing.mjs';
 import { monitorPublicReadiness } from '../src/local-server-readiness.mjs';
+
+test('the control socket stays in the data directory unless its path is too long', { skip: process.platform === 'win32' }, async t => {
+	const directory = await mkdtemp(join(tmpdir(), 'crate-control-'));
+	t.after(() => rm(directory, { recursive: true, force: true }));
+	const pairing = { issue: name => ({ code: `code for ${name}`, expiresAt: 1 }) };
+	const start = async dataDir => {
+		const control = await startLocalControl({ dataDir, pairing, origin: 'https://crate.test', runtime: {} });
+		t.after(() => control.close());
+		assert.equal((await requestLocalControl(dataDir, 'POST', '/pair', { name: 'Phone' })).code, 'code for Phone');
+		return JSON.parse(await readFile(join(dataDir, 'control.json'), 'utf8')).socket;
+	};
+
+	const short = join(directory, 'data');
+	await mkdir(short);
+	assert.ok(Buffer.byteLength(join(short, 'control.sock')) <= 103, 'the test directory leaves room for the socket name');
+	// The data directory lock means a socket already there was left by a crash.
+	await writeFile(join(short, 'control.sock'), '');
+	assert.equal(await start(short), join(short, 'control.sock'));
+
+	const long = join(directory, 'd'.repeat(120));
+	await mkdir(long);
+	const fallback = await start(long);
+	assert.ok(fallback.startsWith(tmpdir()), fallback);
+	assert.match(fallback, /crate-[a-f0-9]{32}\.sock$/);
+});
 
 test('pairing codes expire, are claimed once under concurrent requests, and store only token hashes', async () => {
 	let time = 100;

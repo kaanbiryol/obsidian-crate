@@ -20,6 +20,8 @@ interface SyncEngineLifecycleDependencies {
 	getSyncIntervalSeconds(): number;
 	getLastSeq(): number;
 	getQueuedKeyCount(): number;
+	/** A standard sync must compare the whole server inventory, as after a removed exclusion. */
+	fullSyncRequested?(): boolean;
 	hasLocalFileChanges(): Promise<boolean>;
 	/** Advance the rotating content check without network access. */
 	verifyLocalContent?(): Promise<void>;
@@ -131,7 +133,7 @@ export class SyncEngineLifecycle {
 			// A sync walks the vault itself, so only look for missed local edits
 			// when nothing else would start one.
 			const syncNeeded = hasChanges || cursorExpired || dependencies.getQueuedKeyCount() > 0
-				|| await dependencies.hasLocalFileChanges();
+				|| dependencies.fullSyncRequested?.() || await dependencies.hasLocalFileChanges();
 
 			if (!syncNeeded) {
 				logger.debug('Periodic check: no changes');

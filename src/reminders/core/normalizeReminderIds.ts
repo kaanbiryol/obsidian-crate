@@ -22,19 +22,22 @@ function createUniqueReminderId(usedIds: Set<string>): string {
 	return reminderId;
 }
 
+/** `only`, when given, limits the rewrite to those line indexes; the whole note still decides which lines are tasks. */
 export function normalizeReminderIds(
 	content: string,
 	reservedIds: ReadonlySet<string> = new Set(),
 	parsePersisted: (line: string) => ParsedCheckbox | null = value => parseCheckboxLine(value, { persisted: true }),
+	only?: ReadonlySet<number>,
 ): ReminderIdNormalizationResult {
 	const lines = content.split("\n");
 	const usedIds = new Set(reservedIds);
 	let remindersUpdated = 0;
 	const tasks = new Set(markdownTaskContexts(lines).keys());
+	const rewritten = only ? [...tasks].filter(index => only.has(index)) : tasks;
 
 	// Enter just before the marker leaves `- [ ] <!-- crate-id -->` under its
 	// reminder; give the ID back so the reminder keeps its identity.
-	for (const index of tasks) {
+	for (const index of rewritten) {
 		const line = lines[index], below = lines[index + 1];
 		if (line === undefined || below === undefined || !tasks.has(index + 1) || extractReminderId(line)) continue;
 		const reminder = parseCheckboxLine(line), split = parseCheckboxLine(below);
@@ -44,7 +47,7 @@ export function normalizeReminderIds(
 		remindersUpdated++;
 	}
 
-	for (const index of tasks) {
+	for (const index of rewritten) {
 		const line = lines[index];
 		if (line === undefined) continue;
 		// Saved lines resolve in persisted mode; only unresolved drafts need the

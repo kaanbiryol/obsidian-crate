@@ -235,9 +235,11 @@ transfer execution with a tagged argument. `request-guards.ts` owns stateless
 protocol and encryption checks; the handler retains their ordering around
 admission, authentication, scope authorization and route dispatch. Transfer
 requests authenticate again after entering the queue. Coordinator routes are
-forwarded after edge admission and authenticate once, inside the coordinator,
-under the lock that device, session and reset revocations also take; the edge
-remembers a credential the coordinator accepted for admission. Two revocations run
+forwarded after edge admission and authenticate inside the coordinator, under the
+lock that device, session and reset revocations also take; the edge remembers a
+credential the coordinator accepted for admission. A credential the edge has not
+recently accepted authenticates there first, so an invalid one never queues on
+that lock. Two revocations run
 outside that lock: a web app enrollment exchange revokes the credential it replaces
 at the edge, and maintenance prunes expired tokens. A push subscription is therefore
 saved only while its owner token exists, and maintenance removes subscriptions

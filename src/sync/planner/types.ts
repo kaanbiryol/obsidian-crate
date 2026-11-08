@@ -62,6 +62,8 @@ export interface IncrementalSyncPlannerContext {
 	throwIfDestroyed(): void;
 	settings: Readonly<Pick<SyncSettings, 'lastSeq'>>;
 	setLastSeq(value: number): void;
+	/** Saves sync settings now, such as a cursor reset that must survive a restart mid-sync. */
+	persistSettings?(): Promise<void>;
 	vault: Vault;
 	fileManager: {
 		trashFile(file: TAbstractFile): Promise<void>;

@@ -9,7 +9,7 @@ import type { RemoteFileVersion } from '../../protocol/sync-types';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { requestFileVersions } from './version-contract';
-import { parseChanges, parseChangesCheck, parseManifestPage, requestFileMetadata } from './read-contracts';
+import { parseChanges, parseManifestPage, requestChangesCheck, requestFileMetadata } from './read-contracts';
 import { errorMessage } from '../../platform/logger';
 import { refusedUploadResult } from '../failures';
 import { runConcurrentTasks } from '../concurrency';
@@ -279,7 +279,7 @@ export class SyncWorkerApi {
 	}
 
 	async checkForChanges(since: number): Promise<CheckResponse> {
-		return parseChangesCheck(await this.http.requestJson<unknown>(`/sync/check?since=${since}`), since);
+		return requestChangesCheck(this.http, since);
 	}
 
 	async getChanges(since: number): Promise<ChangesPage> {

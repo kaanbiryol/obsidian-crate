@@ -5,8 +5,9 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { publishCapture, type PendingCapture } from './captures';
-import { pruneReadingRemovals } from './library-index';
-import { READING_LIST_PAGE } from './queries';
+import { completeReadingIndex, pruneReadingRemovals, readingIndexStatement, type ReadingIndexRow } from './library-index';
+import { READING_LIST_PAGE, readingListDelta } from './queries';
+import { policy } from './common';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
@@ -133,6 +134,17 @@ it('lists everything when a delta cannot be proven', async () => {
 	// And a rebuilt index, here for a new Reading generation.
 	await env.DB.prepare("UPDATE reading_policy SET generation = 'other'").run();
 	expect((await list(after.base)).body).not.toHaveProperty('delta');
+});
+
+it('lists everything when removals are pruned after the delta read its index state', async () => {
+	await note('Reading/A.md'); await note('Reading/B.md');
+	const first = await list();
+	await remove('Reading/B.md');
+	const current = (await policy(env.DB))!;
+	const index = completeReadingIndex(current, await readingIndexStatement(env.DB).first<ReadingIndexRow>())!;
+	// Maintenance prunes the removal between the route's index read and the delta's own batch.
+	expect(await pruneReadingRemovals(env.DB, Date.now() + 31 * 86400_000)).toBe(false);
+	expect(await readingListDelta(env, current, index, Number(first.base!.split('.')[0]))).toBeNull();
 });
 
 it('lists everything when more notes changed than one page holds', async () => {

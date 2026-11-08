@@ -85,24 +85,25 @@ export async function handleBatchDelete(
 
 	let metadataFailure = false;
 	for (const file of validFiles) {
+		const previousFile = previousFiles.get(file.path) ?? null;
+		// Like an absent file, a stale precondition is answered from the batch's snapshot,
+		// so a batch of stale deletes needs no write or second read per file.
+		if (previousFile && (previousFile.hash !== file.expectedHash || previousFile.storageKey !== file.expectedRevision)) {
+			errors.push(versionConflict(file.path, previousFile.hash));
+			continue;
+		}
 		try {
 			const commit = await commitFileDelete(db, {
 				path: file.path,
 				expectedHash: file.expectedHash,
 				expectedRevision: file.expectedRevision,
-				previousFile: previousFiles.get(file.path) ?? null,
+				previousFile,
 				audit,
 				reminderFolder: context.reminderFolder,
 				readingPolicy: context.readingPolicy,
 			});
 			if (!commit.committed) {
-				errors.push({
-					path: file.path,
-					error: 'Remote file changed since it was read',
-					code: 'version_conflict',
-					status: 409,
-					currentHash: commit.currentHash,
-				});
+				errors.push(versionConflict(file.path, commit.currentHash));
 				continue;
 			}
 			deleted.push(file.path);
@@ -128,4 +129,8 @@ export async function handleBatchDelete(
 
 function validationFailure(path: string, error: string): MutationFailure {
 	return { path, error, code: 'validation', status: 400 };
+}
+
+function versionConflict(path: string, currentHash: string | null): MutationFailure {
+	return { path, error: 'Remote file changed since it was read', code: 'version_conflict', status: 409, currentHash };
 }

@@ -13,6 +13,12 @@ export class DeploymentRecoveryRequiredError extends Error {
 
 type FenceApi = Pick<CloudflareApiClient, 'queryD1'>;
 
+/** Cloudflare refused a mutation, so it cannot still take effect. A saved login
+ * surfaces Cloudflare's 401/403 refusal as reauthorization. */
+export function isRefusedMutation(error: unknown): boolean {
+	return error instanceof CloudflareReauthorizationRequired || isDefinitiveRejection(error);
+}
+
 /** Steps an update records. Recovery resumes after any of them once it settles. */
 export const UPDATE_STEPS = [
 	'acquire-deployment', 'freeze-upgrade-data', 'verify-upgrade-checkpoint', 'resume-upgraded-server',
@@ -148,8 +154,7 @@ export class DeploymentFence {
 			this.uncertain = false;
 			return result;
 		} catch (error) {
-			// A saved login surfaces Cloudflare's 401/403 refusal as reauthorization.
-			if (error instanceof CloudflareReauthorizationRequired || isDefinitiveRejection(error)) {
+			if (isRefusedMutation(error)) {
 				await this.recordStep(step, 'rejected');
 				this.uncertain = false;
 			}

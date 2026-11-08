@@ -15,6 +15,7 @@ import { reconcileIncrementalRemoteChanges } from './incremental-remote-reconcil
 import { createPathRecord } from '../../protocol/path-record';
 import { namespaceConflictLookup } from '../namespace-conflicts';
 import { addAwaitingReviewChanges, readIncrementalChangelog } from './incremental-changelog';
+import { ServerBehindError } from '../worker-api/read-contracts';
 
 const logger = createLogger("SyncPlanner");
 
@@ -180,6 +181,18 @@ export async function runIncrementalSync(
 	} catch (error) {
 		if (isAbortError(error)) {
 			return cancelSyncResult(result);
+		}
+		if (error instanceof ServerBehindError) {
+			logger.warn("The server is behind this device's changelog cursor; merging with it as with a new server");
+			// Planning against these baselines would roll back newer local edits and trash
+			// files created after the server's backup. Without them, the full sync uploads
+			// local-only files and keeps both versions of a file that differs. The cleared
+			// baselines are saved before the cursor, so a restart repeats this, never the rollback.
+			for (const path of context.localManifest.getAllPaths()) context.localManifest.removeEntry(path);
+			await context.localManifest.save();
+			context.setLastSeq(0);
+			await context.persistSettings?.();
+			return null;
 		}
 
 		// Only an unreadable changelog needs a full sync. A dropped connection or busy

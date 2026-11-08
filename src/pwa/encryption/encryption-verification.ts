@@ -1,4 +1,5 @@
 import { reportExpiredConnection } from '../connection/expiration';
+import { responseError } from '../connection/response-error';
 import { EncryptionKeyRequiredError } from './encryption-onboarding';
 import { validateEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { readVaultKeys, type FeatureKeys } from './encryption-keys';
@@ -47,7 +48,10 @@ export async function loadEncryptionState({ token, purpose, fragment, request, c
 			throw new EncryptionVerificationUnavailableError(UNVERIFIED, { cause }, offlineCopy);
 		});
 		if (response.status === 401 && current()) reportExpiredConnection(token);
-		if (!response.ok) throw response.status === 401 ? new Error(UNVERIFIED) : new EncryptionVerificationUnavailableError(UNVERIFIED, undefined, offlineCopy);
+		if (response.status === 401) throw new Error(UNVERIFIED);
+		// A refusal (forbidden, an encryption reset in progress, rate limited) gives its reason.
+		if (!response.ok) throw new EncryptionVerificationUnavailableError([403, 423, 429].includes(response.status)
+			? (await responseError(response, UNVERIFIED)).message : UNVERIFIED, undefined, offlineCopy);
 		const data = await response.json().catch(() => null) as { encryption: unknown; folderLabel?: unknown; folderPath?: unknown } | null;
 		if (!data || typeof data !== 'object' || !('encryption' in data)) throw new EncryptionVerificationUnavailableError(UNVERIFIED, undefined, offlineCopy);
 		expected = data.encryption === null ? null : parseEncryptionState(data.encryption);

@@ -25,25 +25,31 @@ export function reminderIdChangesForLeftLines({ startState, state, changes, wasF
 	// Lines left by an unfocused editor were not being typed, so the scan writes them.
 	if (!wasFocused) return [];
 	const { doc } = state;
-	// Map back so Enter at a line's end keeps the old cursor on the line it left.
-	const previous = new Set(startState.selection.ranges.map(range => doc.lineAt(changes.mapPos(range.head, -1)).number));
+	// Map each old cursor's line start: Obsidian's Enter rewrites the line's last character, which would carry the cursor itself along.
+	const previous = new Set(startState.selection.ranges.map(range => doc.lineAt(changes.mapPos(startState.doc.lineAt(range.head).from, -1)).number));
 	const current = new Set(isFocused ? state.selection.ranges.map(range => doc.lineAt(range.head).number) : []);
 	const left = [...previous].filter(line => {
 		const { text } = doc.line(line);
 		return !current.has(line) && TASK_WITH_TEXT.test(text) && !extractReminderId(text);
 	});
 	if (!left.length) return [];
-	const normalized = normalizeReminderIds(doc.toString()).content.split('\n');
+	const normalized = normalizeReminderIds(doc.toString(), undefined, undefined, new Set(left.map(number => number - 1))).content.split('\n');
 	return left.flatMap(number => {
-		const line = doc.line(number), text = normalized[number - 1];
-		return text !== undefined && text !== line.text && extractReminderId(text) ? [{ from: line.from, to: line.to, insert: text }] : [];
+		const line = doc.line(number), text = normalized[number - 1], before = line.text;
+		if (text === undefined || text === before || !extractReminderId(text)) return [];
+		// Change only the differing span, so undo history keeps the typing on the line.
+		let start = 0, end = 0;
+		while (start < before.length && start < text.length && before[start] === text[start]) start++;
+		while (end < before.length - start && end < text.length - start && before[before.length - 1 - end] === text[text.length - 1 - end]) end++;
+		return [{ from: line.from + start, to: line.to - end, insert: text.slice(start, text.length - end) }];
 	});
 }
 
 /** Adds reminder IDs as the cursor leaves a line in an editor `canAssign` accepts. */
 export function createReminderLineLeaveExtension(canAssign: (state: EditorState) => boolean) {
 	return EditorView.updateListener.of(update => {
-		if (!update.selectionSet && !update.focusChanged) return;
+		// Obsidian's Enter in a list sets no selection, so a document change can leave a line too.
+		if (!update.docChanged && !update.selectionSet && !update.focusChanged) return;
 		const isFocused = update.view.hasFocus;
 		const wasFocused = update.focusChanged ? !isFocused : isFocused;
 		if (!canAssign(update.state)) return;
@@ -156,6 +162,32 @@ export function hiddenDescriptionRanges(doc: Text): { from: number; to: number }
 	return ranges;
 }
 
+/** Whether a line holds a comment marker besides its reminder's ID and rule markers. */
+function hasCommentMarker(text: string): boolean {
+	let rest = text;
+	for (const { from, to } of lineMarkers(text).reverse()) rest = rest.slice(0, from) + rest.slice(to);
+	return rest.includes('<!--') || rest.includes('-->');
+}
+
+/**
+ * Whether a change can open, close or detach a description block. Blocks start
+ * and end at comment markers and attach to the line above, so only a changed
+ * line holding a marker, or next to one, can.
+ */
+function touchesDescriptions(transaction: Transaction): boolean {
+	const near = (doc: Text, from: number, to: number) => {
+		for (let number = Math.max(1, doc.lineAt(from).number - 1), last = Math.min(doc.lines, doc.lineAt(to).number + 1); number <= last; number++) {
+			if (hasCommentMarker(doc.line(number).text)) return true;
+		}
+		return false;
+	};
+	let touched = false;
+	transaction.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+		touched ||= near(transaction.startState.doc, fromA, toA) || near(transaction.state.doc, fromB, toB);
+	});
+	return touched;
+}
+
 /** Where a line's text starts, after its indentation and any task checkbox. */
 const TEXT_START = /^\s*(?:-\s*\[[ xX]\]\s*)?/;
 
@@ -213,14 +245,20 @@ export function protectReminderIdMarker(transaction: Transaction): Transaction |
 	}
 	if (!transaction.selection) return transaction;
 	const next = transaction.state.doc;
+	// Keyboard moves, unlike clicks, can start at the visible end.
+	const keyboard = !transaction.docChanged && transaction.isUserEvent('select') && !transaction.isUserEvent('select.pointer')
+		&& startState.selection.ranges.length === transaction.newSelection.ranges.length;
 	let moved = false;
-	const ranges = transaction.newSelection.ranges.map(range => {
+	const ranges = transaction.newSelection.ranges.map((range, index) => {
 		const line = next.lineAt(range.head);
 		// A click past a hidden description lands at its end, where typing would break it.
 		const marker = range.empty ? endMarker(line) ?? (range.head === line.to ? tailEndingAt(next, range.head) : null) : null;
 		if (!marker || range.head <= marker.from) return range;
 		moved = true;
-		return EditorSelection.cursor(marker.from);
+		// ArrowRight from the visible end skips into the hidden tail; as at any line end, it moves on to the next line.
+		const start = keyboard ? startState.selection.ranges[index] : undefined;
+		const tail = start?.empty && start.head === marker.from ? hiddenTail(next, next.lineAt(marker.from)) : null;
+		return EditorSelection.cursor(tail && tail.to < next.length ? tail.to + 1 : marker.from);
 	});
 	return moved ? [transaction, { selection: EditorSelection.create(ranges, transaction.newSelection.mainIndex), sequential: true }] : transaction;
 }
@@ -245,7 +283,9 @@ export function createReminderMarkerHiding(isReminderEditor: (state: EditorState
 		: Decoration.none;
 	const descriptions = StateField.define<DecorationSet>({
 		create: decorateDescriptions,
-		update: (value, transaction) => transaction.docChanged ? decorateDescriptions(transaction.state) : value,
+		// Rescanning the note on every keystroke is slow in long notes; other edits only move the blocks.
+		update: (value, transaction) => !transaction.docChanged ? value
+			: touchesDescriptions(transaction) ? decorateDescriptions(transaction.state) : value.map(transaction.changes),
 		provide: field => EditorView.decorations.from(field),
 	});
 	return [

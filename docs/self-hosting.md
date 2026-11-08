@@ -169,8 +169,10 @@ Restore refuses non-empty destinations, modified backup files, unsupported
 schemas/runtimes, and downgrades. It validates the restored database with reminder
 alarms disabled before completing. It preserves device credentials, files, and
 Durable Object alarms. Keep the old server stopped; connect to the restored
-server's new public address. Use `-p crate-restored` for subsequent commands on
-that installation.
+server's new public address. Each device notices that the restored server is
+behind it and merges: edits made after the backup are kept, as conflict copies
+where both sides differ, and files created after it upload again. Use
+`-p crate-restored` for subsequent commands on that installation.
 
 Before an upgrade, create the verified backup above, stop the server, retain the
 current image, build the update, and run a read-only compatibility check:
@@ -682,6 +684,9 @@ do not copy just one of them or edit live SQLite files.
 To restore, stop clients, preserve the current directory, and copy the complete
 backup into a separate directory. Start the matching installation with that
 **--data-dir**. Review local edits and pending browser writes before reconnecting.
+Each Obsidian device then merges with the restored server: edits made after the
+backup are kept, as conflict copies where both sides differ, and files created
+after it upload again.
 Never run independent restored copies behind the same address. Cloudflare
 recovery scripts manage Cloudflare resources; use a cold directory backup here.
 

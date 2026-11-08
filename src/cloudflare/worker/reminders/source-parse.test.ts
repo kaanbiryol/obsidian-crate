@@ -11,6 +11,11 @@ it('parses ordinary reminders even when a plaintext note starts with encryption 
 	expect(encrypted.issue).toContain('invalid');
 });
 
+it('parses a reminder on the first line of a note that starts with a byte order mark', () => {
+	const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode('- [ ] Call the office <!-- crate-id:call -->')]).buffer;
+	expect(parseReminderSource('Reminders/Inbox.md', bytes, 'Reminders')).toMatchObject({ reminders: [{ id: 'call', content: 'Call the office', lineNumber: 0 }] });
+});
+
 it.each([
 	['an unsupported description', '- [ ] Task <!-- crate-id:a -->\n<!-- crate-desc:v2:x -->', { code: 'unsupported-description-encoding', line: 2 }],
 	['a broken description', '- [ ] Task <!-- crate-id:a -->\n<!-- crate-desc:unfinished', { code: 'invalid-description-block', line: 2 }],

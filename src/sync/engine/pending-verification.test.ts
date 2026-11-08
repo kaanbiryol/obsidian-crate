@@ -95,6 +95,22 @@ it('keeps a real edit pending even when size and timestamp match the checkpoint'
 	expectNoTransfers();
 });
 
+it('settles replayed startup-sync events by a stat matching their verified baseline, without reading', async () => {
+	h.vault.adapter.stat.mockResolvedValue({ ...stat, mtime: 1000 });
+	h.engine.restoreDroppedEvents([pendingChangeKey('upload', path)]);
+	await verify();
+	expect(h.engine.getPendingKeys()).toEqual([]);
+	expect(h.vault.adapter.readBinary).not.toHaveBeenCalled();
+	expect(h.localManifest.save).not.toHaveBeenCalled();
+	expectNoTransfers();
+	// A baseline whose time was never verified with its bytes is read as before.
+	h.localManifest.setEntry(path, { ...h.localManifest.getEntry(path)!, modified: 'unverified' });
+	h.engine.restoreDroppedEvents([pendingChangeKey('upload', path)]);
+	await verify();
+	expect(h.vault.adapter.readBinary).toHaveBeenCalledOnce();
+	expect(h.engine.getPendingKeys()).toEqual([]);
+});
+
 it('hashes binary files without relying on a text preview', async () => {
 	const bytes = new Uint8Array([255, 0, 128]).buffer;
 	h.localManifest.setEntry('image.png', { hash: await sha256Hex(bytes), size: 3, modified: '' });

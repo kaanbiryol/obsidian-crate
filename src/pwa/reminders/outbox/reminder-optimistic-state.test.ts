@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { applyReminderFileCommand } from '@/reminders/core/reminderFileCommand';
 import { applyReminderChanges, predictReminderCompletion, predictSavedReminder } from './reminder-optimistic-state';
 import type { PendingReminderChange } from './reminder-outbox-types';
-import type { ReminderRecord } from '../types';
+import type { ReminderMutationBody, ReminderRecord } from '../types';
 
 function reminder(id: string, overrides: Partial<ReminderRecord> = {}): ReminderRecord {
 	return { id, content: id, priority: 4, completed: false, project: 'Inbox',
@@ -72,6 +73,26 @@ describe('optimistic reminder projection', () => {
 			recurrence: { frequency: 'daily', timezone: 'UTC', count: 2, completedCount: 1 } });
 		expect(predictReminderCompletion(original, true)).toMatchObject({ completed: true, dueDate: '2099-01-01',
 			recurrence: { completedCount: 2 } });
+	});
+
+	it.each<[string, Partial<ReminderMutationBody>]>([
+		// A monthly rule gains its day of month from the date.
+		['a monthly rule', { dueDate: '2099-01-15', recurrence: { frequency: 'monthly', timezone: 'UTC' } }],
+		// A timed due also stores its calendar day.
+		['a timed due', { dueDatetime: '2099-01-15T09:30:00.000Z' }],
+	])('predicts an edit with %s as the server saves it', async (_name, edit) => {
+		const files = new Map<string, string>();
+		const run = async (action: string, body: Record<string, unknown>): Promise<ReminderRecord> => {
+			const result = await applyReminderFileCommand(action, body, 'Reminders', async path => files.get(path) ?? null);
+			for (const file of result.files) files.set(file.path, file.content);
+			if (!('reminder' in result.response)) throw new Error('Missing saved reminder');
+			return result.response.reminder;
+		};
+		const base = { folderPath: 'Reminders', content: 'Pay rent', description: null, project: 'Inbox', priority: 4 as const, dueDate: '2099-01-02', dueDatetime: null };
+		const previous = await run('create', { ...base, id: 'rent', operationId: 'rent' });
+		const input: ReminderMutationBody = { ...base, dueDate: null, recurrence: null, ...edit };
+		const { revision: _revision, ...saved } = await run('update', { ...input, id: previous.id, operationId: 'edit', filePath: previous.filePath, expectedRevision: previous.revision });
+		expect(predictSavedReminder(previous.id, input, previous)).toMatchObject(saved);
 	});
 
 	it('predicts a created reminder with a stable identity and project path', () => {

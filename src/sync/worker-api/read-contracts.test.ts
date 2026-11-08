@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
+import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage, ServerBehindError } from './read-contracts';
 import { parseFileVersions } from './version-contract';
 
 const entry = { hash: 'a'.repeat(64), size: 5, modified: '2026-09-09 12:00:00', revision: 'opaque revision/with space' };
@@ -34,7 +34,14 @@ describe('authoritative read contracts', () => {
 		expect(() => parseChangesCheck({ lastSeq: 1, hasChanges: false }, 0)).toThrow();
 	});
 	it('preserves cursor-expiry semantics', () => {
-		expect(parseChanges({ changes: [], lastSeq: 1, hasMore: false, cursorExpired: true }, 50).cursorExpired).toBe(true);
+		expect(parseChanges({ changes: [], lastSeq: 120, hasMore: false, cursorExpired: true }, 5).cursorExpired).toBe(true);
+	});
+	it.each([undefined, true])('reports a server behind this cursor, as after a restore from a backup (expired: %s)', cursorExpired => {
+		const behind = { changes: [], lastSeq: 1, hasMore: false, ...(cursorExpired ? { cursorExpired } : {}) };
+		expect(() => parseChanges(behind, 50)).toThrow(ServerBehindError);
+		// The periodic check starts the sync that finds out.
+		expect(parseChangesCheck({ lastSeq: 1, hasChanges: false, ...(cursorExpired ? { cursorExpired } : {}) }, 50))
+			.toEqual({ lastSeq: 1, hasChanges: false, cursorExpired: true });
 	});
 	it('requires paginated history support instead of presenting a silently truncated older response', () => {
 		expect(() => parseFileVersions({ versions: [] })).toThrow('Update the Crate server');

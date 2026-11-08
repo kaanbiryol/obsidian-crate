@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 4 and schema 1, with no registered migrations. Every installation starts at revision 4 (0.12.0), the first supported upgrade source; servers from earlier betas are not supported. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 4 and schema 1, with no registered migrations. Revision 3 servers (0.11.0) have the same schema and update in place. Servers from earlier betas have a different schema at schema 1 and cannot be upgraded: **Update server** directs them to **Delete server and all data** and a new server. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 

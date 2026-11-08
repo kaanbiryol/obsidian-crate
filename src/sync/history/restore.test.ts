@@ -207,6 +207,20 @@ describe('whole synced vault restore', () => {
 		expect(h.files.has('later.md')).toBe(true);
 	});
 
+	it.each([
+		['the preview is stale', (h: Awaited<ReturnType<typeof harness>>) => { h.files.set('a.md', bytes('edited after preview')); }],
+		['staging fails', (h: Awaited<ReturnType<typeof harness>>) => { h.readTarget.mockRejectedValueOnce(new Error('Offline')); }],
+	])('removes its staged copies when %s, since no file changed', async (_case, change) => {
+		const h = await harness({ 'a.md': 'current', 'later.md': 'new' }, { 'a.md': 'old', 'b.md': 'deleted' });
+		const review = await createHistoryRestore(h.context);
+		change(h);
+		await expect(review.restore()).rejects.toThrow();
+		const folders = h.adapter.mkdir.mock.calls.map(([path]) => path).filter(path => path.startsWith('.crate/state-recovery/'));
+		expect(folders).toHaveLength(1);
+		expect(h.adapter.rmdir).toHaveBeenCalledExactlyOnceWith(folders[0], true);
+		expect(h.context.beforeApply).not.toHaveBeenCalled();
+	});
+
 	it('refuses corrupt downloaded bytes before applying anything', async () => {
 		const h = await harness({ 'a.md': 'current' }, { 'a.md': 'old' });
 		h.readTarget.mockResolvedValue(bytes('wrong'));
@@ -219,6 +233,8 @@ describe('whole synced vault restore', () => {
 		h.process.mockImplementationOnce(async (path, update) => { h.files.set(path, bytes('new edit')); update('new edit'); });
 		await expect((await createHistoryRestore(h.context)).restore()).rejects.toThrow('Automatic sync is off');
 		expect(h.files.get('a.md')).toEqual(bytes('new edit'));
+		// Files may have changed, so the recovery copies stay.
+		expect(h.adapter.rmdir).not.toHaveBeenCalled();
 	});
 
 	it('checks the entire local and remote result after syncing', async () => {

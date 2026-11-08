@@ -13,7 +13,7 @@ import { getNotificationPolicy } from './policy';
 import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, REMINDER_PROJECTION_SIZE_ISSUE, DUPLICATE_COMMITTED_REMINDER_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from '../reminders/source-parse';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import { reminderFileCacheUpsert } from '../reminders/cache/persist';
-import type { VerifiedSourceBytes } from '../reminders/source-migration';
+import { reparseByteBudget, type VerifiedSourceBytes } from '../reminders/source-migration';
 import type { Env } from '../types';
 import type { RemoteReminderRecord } from '../reminders/types';
 import type { NotificationPolicy } from '../../../protocol/notification-policy';
@@ -45,6 +45,8 @@ function operationChunks(operations: ReturnType<typeof planNotificationOperation
 	return chunks;
 }
 
+const AWAITING_VERIFICATION = 'Reminder source is awaiting verification with the current parser. Processing will retry within its retry budget. The vault file remains synced.';
+
 /** Bounded projection of committed files. Client reminder snapshots never schedule or cancel. */
 export async function drainNotificationProjections(env: Env, limit = 4, loaded?: {
 	features: FeaturePolicy; policy: NotificationPolicy | null; encryption: EncryptionServerState | null;
@@ -55,17 +57,17 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 	const policy = loaded ? loaded.policy : await getNotificationPolicy(env.DB);
 	if (!policy) return;
 	const jobs = await queryRows<{ path: string; job_token: string }>(env.DB.prepare(
-		READY_PROJECTION_JOBS_SQL).bind(limit, limit, limit));
+		READY_PROJECTION_JOBS_SQL).bind(JSON.stringify([...loaded?.verified?.keys() ?? []]), limit, limit, limit));
 	if (!jobs.length) return;
 	const encrypted = (loaded ? loaded.encryption : await readEncryptionState(env.DB))?.mode === 'active';
 	// Read every job's file, verification, source and projection rows once. Projection
 	// commits write only the projection rows, which are used to detect shared reminders
 	// below; a change to any other row replaces the job token each commit checks.
 	const paths = JSON.stringify(jobs.map(job => job.path));
-	const [files, verified, sourceRows, projectedRows] = await Promise.all([
+	const [files, states, sourceRows, projectedRows] = await Promise.all([
 		loadStoredFileRows(env.DB, jobs.map(job => job.path)),
-		queryRows<{ file_path: string; file_revision: string }>(env.DB.prepare(`SELECT file_path, file_revision FROM reminder_source_state
-      WHERE file_path IN (SELECT value FROM json_each(?)) AND parser_version = ? AND verified = 1`).bind(paths, REMINDER_CACHE_PARSER_VERSION)),
+		queryRows<{ file_path: string; file_revision: string; verified: number }>(env.DB.prepare(`SELECT file_path, file_revision, verified FROM reminder_source_state
+      WHERE file_path IN (SELECT value FROM json_each(?)) AND parser_version = ?`).bind(paths, REMINDER_CACHE_PARSER_VERSION)),
 		queryRows<{ file_path: string; reminder_id: string; due_key: string; first_seen_at: number | null }>(env.DB.prepare(
 			`SELECT s.file_path, s.reminder_id, s.due_key, o.first_seen_at FROM reminder_sources s
         LEFT JOIN reminder_occurrences o ON o.reminder_id = s.reminder_id AND o.due_key = s.due_key
@@ -73,17 +75,30 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 		queryRows<{ file_path: string; reminder_id: string }>(env.DB.prepare(
 			'SELECT file_path, reminder_id FROM reminder_projections WHERE file_path IN (SELECT value FROM json_each(?))').bind(paths)),
 	]);
-	const verifiedRevisions = new Map(verified.map(row => [row.file_path, row.file_revision]));
-	// Parse every job first, so the reads below serve the whole pass.
+	const sourceStates = new Map(states.map(row => [row.file_path, row]));
+	// Parsing shares verification's byte budget; later jobs wait for the next pass.
+	const sourceLimit = reminderSourceByteLimit(encrypted), budget = reparseByteBudget(encrypted);
+	let bytes = 0, admitted = 0;
+	for (const job of jobs) {
+		const size = files.get(job.path)?.size ?? 0;
+		const readable = size <= sourceLimit ? size : 0;
+		if (bytes + readable > budget) break;
+		bytes += readable; admitted++;
+	}
+	// Parse every admitted job first, so the reads below serve the whole pass.
 	type Parsed = { job: typeof jobs[number]; file: FileStorageRow | null; reminders: RemoteReminderRecord[]; cacheWrite: D1PreparedStatement | null } | { job: typeof jobs[number]; error: unknown };
-	const parsed = await Promise.all(jobs.map(async (job): Promise<Parsed> => {
+	const parsed = await Promise.all(jobs.slice(0, admitted).map(async (job): Promise<Parsed> => {
 		try {
 			const file = files.get(job.path) ?? null;
 			let reminders: RemoteReminderRecord[] = [];
 			// The web app's list reuses this parse instead of reading the note again.
 			let cacheWrite: D1PreparedStatement | null = null;
 			if (file && isReminderPath(job.path, policy.folderPath)) {
-				if (file.size > reminderSourceByteLimit(encrypted)) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
+				if (file.size > sourceLimit) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
+				// A revision this parser has not checked waits for verification, which reads it.
+				// One it checked and rejected is still parsed, so a retry reports the same issue.
+				const state = sourceStates.get(job.path);
+				if (state?.file_revision !== file.storageKey) throw new Error(AWAITING_VERIFICATION);
 				const reused = loaded?.verified?.get(job.path);
 				const [text] = reused?.storageKey === file.storageKey ? [reused] : await readStoredMarkdownFiles(env.BUCKET, [{ path: job.path, ...file }]);
 				if (!text) throw new Error('Committed reminder content could not be verified');
@@ -91,7 +106,7 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 				// uncertain content still cannot authorize removal of prior reminders.
 				const source = parseReminderSource(job.path, text.content, policy.folderPath, encrypted);
 				if (source.issue) throw new PermanentReminderSourceError(source.issue);
-				if (verifiedRevisions.get(job.path) !== file.storageKey) throw new Error('Reminder source is awaiting verification with the current parser. Processing will retry within its retry budget. The vault file remains synced.');
+				if (!state.verified) throw new Error(AWAITING_VERIFICATION);
 				if (job.path.startsWith(`${policy.folderPath}/`)) {
 					reminders = source.reminders;
 					if (!encrypted) cacheWrite = reminderFileCacheUpsert(env.DB, policy.folderPath, { filePath: job.path, fileHash: file.hash, reminders });

@@ -91,6 +91,11 @@ export default class CratePlugin extends Plugin {
 				this.app.vault.configDir,
 			);
 			await this.persist(nextSettings);
+			// Restore and deletion records identify remote resources, so recovery from a
+			// damaged data.json must not fall back to a copy saved before them.
+			if ('cloudflareRestore' in requested || 'cloudflareDeployment' in requested) {
+				await keepLastGoodPluginData(this, { ...nextSettings, reminders: this.remindersSettings });
+			}
 			signal.throwIfAborted();
 			assertCurrent?.();
 			publishSavedSettings(this.settings, requested, nextSettings);

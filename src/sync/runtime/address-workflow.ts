@@ -6,8 +6,9 @@ import type { RuntimeConfigurationTransition } from './runtime';
 import { resetStoredSyncState } from './sync-activity';
 import { getCheckpointAuthority, requireNormalizedWorkerUrl } from '../connection/worker-url';
 import { WorkerApiHttpClient } from '../worker-api/http';
+import { requestChangesCheck } from '../worker-api/read-contracts';
 import { SECRET_KEYS } from '../../platform/secret-keys';
-import type { SyncRuntimeSettings } from '../settings';
+import { updateSyncProgress, type SyncRuntimeSettings } from '../settings';
 
 interface AddressWorkflowContext {
 	settings: SyncRuntimeSettings;
@@ -19,7 +20,7 @@ interface AddressWorkflowContext {
 }
 
 export async function changeEncryptedServerAddress(
-	{ settings, secretStorage, transition, persistSettings }: AddressWorkflowContext,
+	{ settings, secretStorage, transition, persistSettings, clearLocalState }: AddressWorkflowContext,
 	address: string, signal: AbortSignal, expected: { workerUrl: string; authToken: string },
 ): Promise<void> {
 	const workerUrl = requireNormalizedWorkerUrl(address);
@@ -35,10 +36,20 @@ export async function changeEncryptedServerAddress(
 	const copy = await prepareEncryptedAddressChange(secretStorage, http, workerUrl);
 	verify();
 	if (workerUrl === expected.workerUrl) return;
+	const serverSeq = (await requestChangesCheck(http, settings.lastSeq)).lastSeq;
+	verify();
 	transition.stop();
 	await transition.waitForIdle();
 	verify();
 	copy();
+	// A server behind this device's changelog cursor lost history, as after a restore
+	// from an older backup, so the retained baselines would roll its files back.
+	// Reconcile from scratch, as with a new server; recovery copies keep the old checkpoint.
+	if (serverSeq < settings.lastSeq) {
+		await clearLocalState();
+		verify();
+		updateSyncProgress(settings, { lastSeq: 0 });
+	}
 	const previous = settings.checkpointScope;
 	settings.checkpointScope = { workerUrl, authority: getCheckpointAuthority(settings) };
 	settings.workerUrl = workerUrl;

@@ -1,24 +1,25 @@
-import { buildCreatedReminderBlock } from '@/reminders/core/markdownReminderMutation';
+import { buildCreatedReminderBlock, buildUpdatedReminderBlock, reminderBlockFields } from '@/reminders/core/markdownReminderMutation';
 import { planReminderCompletion } from '@/reminders/core/reminderCompletion';
 import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
 import { parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
+import { buildReminderUpdate } from '@/reminders/core/reminderMutationPlan';
+import { parseReminderUpdateParams } from '@/reminders/core/reminderMutationInput';
 import { applyReminderListEffect, type ReminderList } from './reminder-list-state';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import type { ReminderMutationBody, ReminderRecord } from '../types';
 
+/** The reminder the server saves: its dates and repeat rule come from the same block builders. */
 export function predictSavedReminder(id: string, input: ReminderMutationBody, previous?: ReminderRecord): ReminderRecord {
-	const dates = buildCreatedReminderBlock({
-		reminderId: id, content: input.content, description: input.description ?? undefined,
-		dueDate: parseReminderDateValue(input.dueDatetime ?? input.dueDate ?? undefined, Boolean(input.dueDatetime)),
-		priority: input.priority, recurrence: input.recurrence ?? undefined,
-		hasTime: input.dueDatetime ? true : input.dueDate ? false : undefined,
-	});
+	const block = previous
+		? buildUpdatedReminderBlock({ ...previous, lineNumber: previous.lineNumber ?? 0, rawLine: '' }, buildReminderUpdate(parseReminderUpdateParams({ ...input })))
+		: buildCreatedReminderBlock({
+			reminderId: id, content: input.content, description: input.description ?? undefined,
+			dueDate: parseReminderDateValue(input.dueDatetime ?? input.dueDate ?? undefined, Boolean(input.dueDatetime)),
+			priority: input.priority, recurrence: input.recurrence ?? undefined,
+			hasTime: input.dueDatetime ? true : input.dueDate ? false : undefined,
+		});
 	return {
-		...previous, id, content: input.content, description: input.description ?? undefined,
-		project: input.project, priority: input.priority, completed: previous?.completed ?? false,
-		dueDate: previous ? input.dueDate ?? undefined : dates.dueDateKey,
-		dueDatetime: previous ? input.dueDatetime ?? undefined : dates.dueDatetime,
-		recurrence: input.recurrence ?? undefined,
+		...previous, id, ...reminderBlockFields(block), project: input.project, completed: previous?.completed ?? false,
 		filePath: previous?.project === input.project ? previous.filePath : getReminderProjectFilePath(input.folderPath, input.project),
 	};
 }

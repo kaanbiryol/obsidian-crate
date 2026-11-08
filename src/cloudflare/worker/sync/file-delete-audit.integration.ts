@@ -126,12 +126,21 @@ it('returns original per-file receipts when a whole batch response is lost', asy
 	expect(await receipts()).toEqual(before);
 });
 
-it('keeps a maximum delete batch and its absent-file retry within the Free-plan D1 query budget', async () => {
+it('keeps a maximum delete batch, its stale-revision and absent-file retries within the Free-plan D1 query budget', async () => {
 	const files = [];
 	for (let index = 0; index < BATCH_DELETE_MAX_FILES; index++) files.push(await upload(`Notes/${index}.md`));
 	const body = JSON.stringify({ files: files.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision })) });
+	const stale = JSON.stringify({ files: files.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: `${file.revision}-stale` })) });
 	// Counts the public Worker and the coordinator together, so each fits on its own.
 	const count = installD1QueryCounter(env.DB);
+	const conflicts = await request('/sync/batch-delete', { method: 'POST', body: stale });
+	expect(conflicts.status).toBe(200);
+	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
+	expect(await conflicts.json()).toEqual({
+		success: false, deleted: [],
+		errors: files.map(file => ({ path: file.path, error: 'Remote file changed since it was read', code: 'version_conflict', status: 409, currentHash: file.hash })),
+	});
+	count.reset();
 	expect((await request('/sync/batch-delete', { method: 'POST', body })).status).toBe(200);
 	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
 	count.reset();

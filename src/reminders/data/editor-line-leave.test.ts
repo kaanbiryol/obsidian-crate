@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EditorSelection, EditorState, Transaction, type TransactionSpec } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
-import { createReminderLineLeaveExtension, hiddenDescriptionRanges, hiddenReminderMarkerRanges, protectReminderIdMarker, reminderIdChangesForLeftLines } from './editor-line-leave';
+import { createReminderLineLeaveExtension, createReminderMarkerHiding, hiddenDescriptionRanges, hiddenReminderMarkerRanges, protectReminderIdMarker, reminderIdChangesForLeftLines } from './editor-line-leave';
 import { normalizeReminderIds } from '../core/normalizeReminderIds';
+import { readDescriptionBlock } from '../core/reminderDescription';
 
 vi.mock('../core/normalizeReminderIds', async importOriginal => {
 	const actual = await importOriginal<typeof import('../core/normalizeReminderIds')>();
 	return { ...actual, normalizeReminderIds: vi.fn(actual.normalizeReminderIds) };
+});
+vi.mock('../core/reminderDescription', async importOriginal => {
+	const actual = await importOriginal<typeof import('../core/reminderDescription')>();
+	return { ...actual, readDescriptionBlock: vi.fn(actual.readDescriptionBlock) };
 });
 
 const ID = /^- \[ \] (.+) <!-- crate-id:[0-9a-f-]{36} -->$/;
@@ -72,6 +77,32 @@ describe('reminder IDs on line leave', () => {
 		expect(written.annotation(Transaction.addToHistory)).toBe(false);
 	});
 
+	it("adds the ID when Obsidian's Enter rewrites the last character, and undo still removes the typing", async () => {
+		const typed = '- [ ] Buy mil';
+		const startState = EditorState.create({ doc: typed, selection: EditorSelection.cursor(typed.length), extensions: createReminderLineLeaveExtension(() => true) });
+		const typing = startState.update({ changes: { from: typed.length, insert: 'k' }, selection: { anchor: typed.length + 1 }, userEvent: 'input.type' });
+		// Smart-list Enter sends no selection: it replaces the character before the cursor with itself, a line break and the list prefix.
+		const enter = typing.state.update({ changes: { from: typed.length, to: typed.length + 1, insert: 'k\n- [ ] ' }, userEvent: 'input.type' });
+		const dispatch = vi.fn<(spec: TransactionSpec) => void>();
+		const view = { hasFocus: true, state: enter.state, dispatch };
+		const update = { view, state: enter.state, startState: typing.state, changes: enter.changes, docChanged: true, selectionSet: false, focusChanged: false } as unknown as ViewUpdate;
+		vi.mocked(normalizeReminderIds).mockClear();
+		for (const listener of startState.facet(EditorView.updateListener)) listener(update);
+		await Promise.resolve();
+		expect(dispatch).toHaveBeenCalledOnce();
+		// Only the line left is rewritten.
+		expect(vi.mocked(normalizeReminderIds).mock.calls.map(call => call[3])).toEqual([new Set([0])]);
+		const written = enter.state.update(dispatch.mock.calls[0]![0]);
+		expect(written.annotation(Transaction.addToHistory)).toBe(false);
+		const [left, next] = written.state.doc.toString().split('\n');
+		expect(left).toMatch(ID);
+		expect(left!.match(ID)![1]).toBe('Buy milk');
+		expect(next).toBe('- [ ] ');
+		// History maps its inverted steps through changes kept out of it; a whole-line rewrite would swallow the typing's inverse.
+		const undo = typing.changes.compose(enter.changes).invert(startState.doc).map(written.changes);
+		expect(undo.apply(written.state.doc).toString()).toMatch(/^- \[ \] Buy mil <!-- crate-id:[0-9a-f-]{36} -->$/);
+	});
+
 	it('does nothing for an editor that was not focused', () => {
 		const text = '- [ ] Call Sam\nNotes';
 		expect(leave(text, 5, { selection: { anchor: text.length } }, { wasFocused: false })[0]).toBe('- [ ] Call Sam');
@@ -115,6 +146,42 @@ describe('reminder description hiding', () => {
 		expect(hidden('- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:never closed')).toEqual([]);
 		expect(hidden('Notes\n<!-- crate-desc:Oat milk -->')).toEqual([]);
 	});
+
+	describe('while editing', () => {
+		const extensions = createReminderMarkerHiding(() => true);
+		const reminder = '- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:Oat milk -->';
+		/** Text under the description decorations; the marker plugin's decorations need a view. */
+		const decorated = (state: EditorState) => state.facet(EditorView.decorations).flatMap(set => {
+			if (typeof set === 'function') return [];
+			const ranges: string[] = [];
+			for (const iter = set.iter(); iter.value; iter.next()) ranges.push(state.doc.sliceString(iter.from, iter.to));
+			return ranges;
+		});
+
+		it('moves hidden descriptions with edits away from comments without rescanning the note', () => {
+			let state = EditorState.create({ doc: `Intro\n- [ ] Call Sam <!-- crate-id:b -->\n\n${reminder}\n\nNotes`, extensions });
+			vi.mocked(readDescriptionBlock).mockClear();
+			for (const text of ['Intro', 'Call Sam', 'Notes']) {
+				const at = state.doc.toString().indexOf(text) + text.length;
+				state = state.update({ changes: { from: at, insert: '!' }, userEvent: 'input.type' }).state;
+			}
+			expect(readDescriptionBlock).not.toHaveBeenCalled();
+			expect(decorated(state)).toEqual(['\n<!-- crate-desc:Oat milk -->']);
+		});
+
+		it('rescans when an edit can detach or close a description', () => {
+			// Removing the checkbox detaches the description under it.
+			let state = EditorState.create({ doc: `${reminder}\nNotes`, extensions });
+			state = state.update({ changes: { from: 0, to: '- [ ] '.length } }).state;
+			expect(decorated(state)).toEqual([]);
+			// Closing a multiline description far below its first line hides it.
+			const open = '- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:One\ntwo\nthree\nfour';
+			state = EditorState.create({ doc: open, extensions });
+			expect(decorated(state)).toEqual([]);
+			state = state.update({ changes: { from: open.length, insert: ' -->' }, userEvent: 'input.type' }).state;
+			expect(decorated(state)).toEqual(['\n<!-- crate-desc:One\ntwo\nthree\nfour -->']);
+		});
+	});
 });
 
 describe('reminder ID marker protection', () => {
@@ -129,6 +196,16 @@ describe('reminder ID marker protection', () => {
 
 	it('keeps the cursor in front of the marker', () => {
 		expect(edit(line, 0, { selection: { anchor: line.length } }).cursor).toBe(end);
+	});
+
+	/** The selection `cursorCharRight` dispatches after skipping the atomic hidden span. */
+	const arrowRight = (head: number) => ({ selection: EditorSelection.cursor(head, -1), scrollIntoView: true, userEvent: 'select' });
+
+	it('moves ArrowRight from the visible end past the marker to the next line', () => {
+		expect(edit(`${line}\nNext`, end, arrowRight(line.length)).cursor).toBe(line.length + 1);
+		// The last line has no next line, and a click past the marker stays in front of it.
+		expect(edit(line, end, arrowRight(line.length)).cursor).toBe(end);
+		expect(edit(`${line}\nNext`, end, { selection: EditorSelection.cursor(line.length, -1), userEvent: 'select.pointer' }).cursor).toBe(end);
 	});
 
 	it('splits Enter after the marker so the ID stays on its reminder', () => {
@@ -184,6 +261,13 @@ describe('reminder ID marker protection', () => {
 
 		it('keeps the cursor in front of the markers when it lands after the description', () => {
 			expect(edit(block, 0, { selection: { anchor: block.length } }).cursor).toBe(end);
+		});
+
+		it('moves ArrowRight from the visible end past the description to the next line', () => {
+			expect(edit(`${block}\nNext`, end, arrowRight(line.length)).cursor).toBe(block.length + 1);
+			// Without markers, ArrowRight skips the description itself and lands at its end.
+			const unmarked = `- [ ] Buy milk\n${description}`;
+			expect(edit(`${unmarked}\nNext`, '- [ ] Buy milk'.length, arrowRight(unmarked.length)).cursor).toBe(unmarked.length + 1);
 		});
 
 		it('deletes the description with a selection of the whole reminder text', () => {

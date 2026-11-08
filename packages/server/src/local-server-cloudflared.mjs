@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { chmod, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { gunzipSync } from 'node:zlib';
 import { runProcess } from './local-server-process.mjs';
 
@@ -16,6 +17,23 @@ const assets = {
 	'win32-x64': ['cloudflared-windows-amd64.exe', '76b2805253d0d6ffacb092a7acfbee99e7af6917835c0c5410e23f3ef5052da2'],
 };
 const hash = data => createHash('sha256').update(data).digest('hex');
+
+// Up to three attempts with a short growing backoff, each with its own timeout.
+// Only network errors, timeouts and server errors are retried; an abort stops at once.
+async function download(url, signal, fetchAsset) {
+	for (let attempt = 1; ; attempt++) {
+		let status;
+		try {
+			const response = await fetchAsset(url, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000) });
+			if (response.ok) return Buffer.from(await response.arrayBuffer());
+			status = response.status;
+		} catch (error) {
+			if (signal?.aborted || !['TypeError', 'TimeoutError'].includes(error?.name) || attempt === 3) throw error;
+		}
+		if (status !== undefined && (status < 500 || attempt === 3)) throw new Error(`Could not download cloudflared (HTTP ${status}). Retry when internet access is available.`);
+		await delay(1000 * attempt, undefined, { signal });
+	}
+}
 
 function extractCloudflared(archive) {
 	const tar = gunzipSync(archive, { maxOutputLength: 100 * 1024 * 1024 });
@@ -47,10 +65,7 @@ export async function installCloudflared({ signal, platform = process.platform, 
 	let archive = await readFile(archivePath).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
 	if (!archive || hash(archive) !== sha256) {
 		console.log(`Downloading cloudflared ${cloudflaredVersion} from Cloudflare's GitHub release...`);
-		const response = await fetchAsset(`https://github.com/cloudflare/cloudflared/releases/download/${cloudflaredVersion}/${filename}`,
-			{ signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000) });
-		if (!response.ok) throw new Error(`Could not download cloudflared (HTTP ${response.status}). Retry when internet access is available.`);
-		archive = Buffer.from(await response.arrayBuffer());
+		archive = await download(`https://github.com/cloudflare/cloudflared/releases/download/${cloudflaredVersion}/${filename}`, signal, fetchAsset);
 		if (hash(archive) !== sha256) throw new Error('Cloudflared checksum mismatch. The download was not installed or executed.');
 		await writeFile(archivePath, archive, { mode: 0o600 });
 	}

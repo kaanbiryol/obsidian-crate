@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { adoptReadingClip, createReadingNote, parseReadingNote, readingImportId, recordMarkdownHighlights, updateReadingNote } from './notes';
-import { readingFaviconUrl, readingUrl, readingUrlIdentity } from './model';
+import { MAX_READING_TITLE_LENGTH, readingFaviconUrl, readingUrl, readingUrlIdentity } from './model';
 import { validateReadingFolder } from '../settings';
 import { readReadingFrontmatter } from './frontmatter';
 import { readingDocument } from './markdown';
@@ -68,6 +68,11 @@ describe('reading Markdown', () => {
 		const markdown = createReadingNote({ id, url: 'https://example.com', title: '<%* await app.vault.adapter.remove("a") %> Article', savedAt });
 		expect(markdown).not.toContain('<%');
 		expect(parseReadingNote(markdown)!.title).toBe('<​%* await app.vault.adapter.remove("a") %> Article');
+	});
+	it('saves a shared title of the maximum length after breaking its Templater tags', () => {
+		const title = '<% ' + 'a'.repeat(MAX_READING_TITLE_LENGTH - 3);
+		const saved = parseReadingNote(createReadingNote({ id, url: 'https://example.com', title, savedAt }))!.title;
+		expect(saved).toBe(`<\u200B% ${'a'.repeat(MAX_READING_TITLE_LENGTH - 4)}`);
 	});
 	it('preserves unknown YAML, formatting, and every body byte during metadata edits', () => {
 		fc.assert(fc.property(fc.string(), body => {

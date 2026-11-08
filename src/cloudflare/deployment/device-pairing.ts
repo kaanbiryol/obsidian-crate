@@ -4,11 +4,13 @@ import { createRandomHexToken } from '../../platform/random-hex';
 import { sha256Hex } from '../../platform/sha256';
 import { DEVICE_PAIRING_END, DEVICE_PAIRING_LIFETIME, DEVICE_PAIRING_PREFIX } from '../../protocol/device-pairing';
 
+/** `expiresAt` is this device's display deadline; the stored code expires by D1's clock. */
 export interface IssuedDevicePairing { code: string; tokenId: string; expiresAt: number }
 
 /** Records a one-use code through the Cloudflare D1 API and replaces any earlier
  * unredeemed one. The Worker stores only the code's hash. The record carries this
- * server's identity, without its deletion progress, so the new device can manage it. */
+ * server's identity, without its deletion progress, so the new device can manage it.
+ * D1 sets the stored expiry, so a wrong desktop clock cannot extend the code's lifetime. */
 export async function issueDevicePairingCode(input: {
 	api: Pick<CloudflareApiClient, 'queryD1'>;
 	accountId: string;
@@ -22,7 +24,8 @@ export async function issueDevicePairingCode(input: {
 		'DELETE FROM maintenance_state WHERE key >= ? AND key < ?;', [DEVICE_PAIRING_PREFIX, DEVICE_PAIRING_END]);
 	await input.api.queryD1(input.accountId, input.databaseId,
 		`INSERT INTO maintenance_state (key, value)
-			SELECT ?, json_set(?, '$.resetGeneration', COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), ''));`,
-		[DEVICE_PAIRING_PREFIX + await sha256Hex(code), JSON.stringify({ id: tokenId, expiresAt, resetGeneration: '', deployment })]);
+			SELECT ?, json_set(?, '$.resetGeneration', COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), ''),
+				'$.expiresAt', unixepoch('now') * 1000 + ${DEVICE_PAIRING_LIFETIME});`,
+		[DEVICE_PAIRING_PREFIX + await sha256Hex(code), JSON.stringify({ id: tokenId, expiresAt: 0, resetGeneration: '', deployment })]);
 	return { code, tokenId, expiresAt };
 }

@@ -108,35 +108,43 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 			if (!await vault.adapter.exists(context.recoveryRoot)) await vault.adapter.mkdir(context.recoveryRoot);
 			await vault.adapter.mkdir(folder);
 			const staged = new Map<string, { original?: string; target?: string }>();
-			// Stage and verify every required byte before altering any vault file; the
-			// inventory check below then catches any other change since the preview.
-			// Originals and the inventory remain on disk across interruption/restart.
-			for (const [index, item] of items.entries()) {
-				context.verify();
-				const wanted = target[item.path];
-				let content: ArrayBuffer | undefined;
-				if (wanted && !unavailable.has(item.path)) {
-					try { content = await sources.get(item.path)!(); }
-					catch (error) { if (!(error instanceof HistoryVersionUnavailableError)) throw error; }
+			let restored: HistoryRestoreItem[];
+			try {
+				// Stage and verify every required byte before altering any vault file; the
+				// inventory check below then catches any other change since the preview.
+				// Originals and the inventory remain on disk across interruption/restart.
+				for (const [index, item] of items.entries()) {
+					context.verify();
+					const wanted = target[item.path];
+					let content: ArrayBuffer | undefined;
+					if (wanted && !unavailable.has(item.path)) {
+						try { content = await sources.get(item.path)!(); }
+						catch (error) { if (!(error instanceof HistoryVersionUnavailableError)) throw error; }
+					}
+					if (wanted && !content) { unavailable.add(item.path); continue; }
+					const entry: { original?: string; target?: string } = {};
+					const current = local[item.path];
+					if (current) {
+						entry.original = `${folder}/${index}.original`;
+						await stage(vault, entry.original, await vault.adapter.readBinary(item.path), current.hash);
+					}
+					if (wanted) {
+						entry.target = `${folder}/${index}.target`;
+						await stage(vault, entry.target, content!, wanted.hash);
+					}
+					staged.set(item.path, entry);
 				}
-				if (wanted && !content) { unavailable.add(item.path); continue; }
-				const entry: { original?: string; target?: string } = {};
-				const current = local[item.path];
-				if (current) {
-					entry.original = `${folder}/${index}.original`;
-					await stage(vault, entry.original, await vault.adapter.readBinary(item.path), current.hash);
-				}
-				if (wanted) {
-					entry.target = `${folder}/${index}.target`;
-					await stage(vault, entry.target, content!, wanted.hash);
-				}
-				staged.set(item.path, entry);
+				restored = items.filter(item => !unavailable.has(item.path));
+				const inventory = JSON.stringify({ version: 1, savedAt: new Date().toISOString(), items: restored.map(item => ({ ...item, ...staged.get(item.path), before: local[item.path], after: target[item.path] })) });
+				await vault.adapter.write(`${folder}/recovery.json`, inventory);
+				if (await vault.adapter.read(`${folder}/recovery.json`) !== inventory) throw new Error('Could not verify the recovery inventory. No files were changed.');
+				await verify();
+			} catch (error) {
+				// No vault file has changed, so these copies recover nothing; a stale review
+				// retried after each change would otherwise leave one folder per attempt.
+				await vault.adapter.rmdir(folder, true).catch(() => {});
+				throw error;
 			}
-			const restored = items.filter(item => !unavailable.has(item.path));
-			const inventory = JSON.stringify({ version: 1, savedAt: new Date().toISOString(), items: restored.map(item => ({ ...item, ...staged.get(item.path), before: local[item.path], after: target[item.path] })) });
-			await vault.adapter.write(`${folder}/recovery.json`, inventory);
-			if (await vault.adapter.read(`${folder}/recovery.json`) !== inventory) throw new Error('Could not verify the recovery inventory. No files were changed.');
-			await verify();
 			await context.beforeApply();
 			try {
 				// Remove later additions first, including files that now obstruct

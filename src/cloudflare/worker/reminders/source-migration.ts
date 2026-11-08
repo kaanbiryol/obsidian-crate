@@ -22,6 +22,8 @@ export interface VerifiedSourceBytes { storageKey: string; content: ArrayBuffer 
 export const reminderSourceScanKey = (folder: string) => `${SCAN_KEY}:${folder}`;
 const SCAN_BATCH_SIZE = 100;
 const MAX_REPARSE_BYTES = 2 * 1024 * 1024;
+/** Stored source bytes verification, and then projection, may parse in one pass. It always admits one valid file. */
+export const reparseByteBudget = (encrypted: boolean) => Math.max(MAX_REPARSE_BYTES, reminderSourceByteLimit(encrypted));
 
 /** One resumable pass per parser version. Normal file commits record their own source state. */
 async function seedSourceStates(db: D1Database, folder: string): Promise<boolean> {
@@ -74,7 +76,7 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 	const encrypted = sources.length > 0
 		&& (scope?.encryption !== undefined ? scope.encryption : await readEncryptionState(env.DB))?.mode === 'active';
 	const sourceLimit = reminderSourceByteLimit(encrypted);
-	const reparseBudget = Math.max(MAX_REPARSE_BYTES, sourceLimit);
+	const reparseBudget = reparseByteBudget(encrypted);
 	let bytes = 0;
 	for (const { path } of sources) {
 		const current = stored.get(path);

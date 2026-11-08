@@ -45,7 +45,7 @@ export async function fetchCloudflareUsage(
 				usage: ${dataset}(limit: ${LIMIT}, filter: { ${filter} }) { ${fields} }
 			} } }` }),
 		});
-		if (response.status === 401 || response.status === 403) throw new Error('Reconnect Cloudflare usage and authorize analytics for this account.');
+		if (response.status === 401 || response.status === 403) throw new Error('Select Reconnect under Account and devices to authorize Cloudflare usage for this account.');
 		if (response.status < 200 || response.status >= 300) throw new Error(`Cloudflare usage is unavailable (HTTP ${response.status}). Try again later.`);
 		const result = JSON.parse(response.text) as { errors?: unknown[]; data?: { viewer?: { accounts?: { usage?: Row[] }[] } } };
 		if (result.errors?.length) throw new Error('Cloudflare could not provide this metric. Check analytics permissions and availability.');

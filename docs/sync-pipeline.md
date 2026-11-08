@@ -34,6 +34,12 @@ With automatic sync off, removing or editing an exclusion pattern runs the same
 local scan, so files the old pattern hid appear as pending changes. Unchanged
 files fire no vault events, so without this scan they would only surface at the
 next full sync. With automatic sync on, the next periodic check finds them.
+Removing a pattern also makes the next standard sync a full sync: incremental
+sync skipped the server's changes under the pattern while moving its cursor past
+them, so only the full server inventory shows those files. The request is saved
+with the settings at once, so it survives a restart, and is cleared by a
+successful full sync. That sync reuses baseline hashes, so it costs one manifest
+read; with automatic sync on, the next periodic check starts it.
 Adding an exclusion drops queued uploads and deletes for the paths it covers. A
 transfer already in flight finishes, but a failed one is not queued again.
 
@@ -63,6 +69,17 @@ Primary sync mode. Fetches only changelog entries since `lastSeq`:
 6. Update local manifest and `lastSeq`
 
 Returns `null` to signal fallback to full sync only when the changelog cannot be used: on cursor expiry or a non-transient error while reading it. Transport failures and retryable server statuses (408, 425, 429, 5xx) return a failed result instead, so the next sync retries incrementally without re-reading the vault. Any other error after the changelog is read, such as a local scan, apply or save error, also returns a failed result: a full sync would read the whole server inventory and then fail on the same local error.
+
+A changelog that ends before this device's cursor means the server lost history,
+as after a restore from an older backup. Planning against the retained baselines
+would download the backup's versions over newer local edits and trash files
+created after the backup. Instead the device drops its baselines and cursor, as
+when it connects to a new server, saves both, and runs the full sync without
+baselines: local-only files upload, server-only files download, and a file that
+differs on both sides keeps the local version as a conflict copy. Upload journals,
+restore intents and local files are kept. The periodic check reports such a server
+as an expired cursor, so a sync starts. A restored server whose sequence has since
+reached this device's cursor again is not detected.
 
 Entry point: `planner/incremental.ts:runIncrementalSync()`.
 The coordinator retains phase ordering, progress, manifest saves and cursor
@@ -106,7 +123,9 @@ Before saving the connection, pairing, **Connect with Cloudflare** and
 **Connect to your server** read one manifest entry. If the server has files, or
 the read fails, they ask the user to confirm the replacement. **Cancel** leaves
 the vault disconnected and unchanged. A new or empty server and a reconnect to
-the same server ask nothing.
+the same server ask nothing. **Choose server…** after a Cloudflare backup
+restore also asks nothing; its first sync merges the vault with the restored
+server.
 
 The confirmation is saved with the connection (`replaceVault` in plugin data).
 The next **Sync now** first moves everything in the vault to Obsidian's local
@@ -441,8 +460,9 @@ Implementation: `manifest.ts:LocalManifest`
 - **Local deletion recovery:** visible files use Obsidian's local vault trash (`vault.trash(file, false)`); hidden/unindexed files use the adapter's local trash. The vault's `.trash/` directory is always excluded from sync. A trash failure never falls back to permanent removal. The hash check and deletion are not atomic: an edit arriving between them remains recoverable in trash.
 - **Upload memory:** incremental and queued uploads reserve room for the next maximum-size file before preparation, using the 48 MiB mobile / 128 MiB desktop budget and a 128-file cap. Chunks finish uploading before further contents are prepared; history retains paths rather than file buffers. Up to 2 files prepare at once, and each preparation in progress reserves a maximum-size file, so on mobile the 48 MiB budget prepares one file at a time. These budgets cover prepared binary contents, not total process memory or request encoding overhead. Because a transfer in flight holds several full-size copies (base64, ciphertext, decrypted bytes), mobile uploads and downloads of files of 8 MiB or more run one at a time, while smaller files keep transferring in parallel.
 - **Incremental-to-full fallback:** if incremental sync returns `null` (changelog read error or cursor expiry), engine runs full sync
+- **Restored server:** a changelog behind this device's cursor drops the baselines and cursor before the full sync, so it merges instead of rolling local files back (see [incremental sync](#3-incremental-sync))
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
-- **Startup event recovery:** the startup sync scans the vault itself, and vault events that arrive while it runs are queued once it finishes, keeping the latest change per path. Pending verification settles download echoes and other files that still match their baseline; real edits flush like live events
+- **Startup event recovery:** the startup sync scans the vault itself, and vault events that arrive while it runs are queued once it finishes, keeping the latest change per path. Pending verification settles download echoes and other files that still match their baseline; real edits flush like live events. A replayed event whose file keeps the size and modification time verified with its baseline, as after a download, settles without reading the file; live events always compare contents
 - **Conflict recovery:** the durable conflict registry recovers from `.tmp` and discovers visible or hidden conflict copies that were created before their metadata was committed
 - **Revoked access:** a 401 shows the reconnect message in the status bar and Activity on every sync path. Full, incremental and forced syncs, queue flushes and queue reconciliation treat a 401 reported for one downloaded, uploaded or deleted file the same way. Its notice appears once until a sync succeeds or the connection changes, so background flushes that keep failing do not repeat it
 - **Queue retry:** retryable flush failures are re-added to `pendingKeys`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts
@@ -549,7 +569,8 @@ the rest of the vault is restored, and the completion notice lists those files b
 Verification then expects their current contents instead of the saved state.
 Confirmation stages and verifies all required bytes and originals under
 `state-recovery/`, rechecks the complete local and remote inventories, then
-persistently pauses automatic sync before applying changes. Replacements use atomic text comparison or
+persistently pauses automatic sync before applying changes. If staging or that
+recheck fails, no file has changed and the staged copies are removed. Replacements use atomic text comparison or
 local trash and checked creation; deleted files always go to local trash.
 
 Explicit removals sync before restored uploads to support file/folder namespace

@@ -49,7 +49,7 @@ it.each([null, -1])('does not scan ten thousand paused files looking for runnabl
     INSERT INTO notification_projection_jobs(path, job_token, last_error) SELECT 'note-'||x, 'token', 'failed' FROM n`).run();
 	await env.DB.prepare(`INSERT INTO notification_file_retries(path, attempts, available_at, error)
     SELECT path, 8, ?, 'failed' FROM notification_projection_jobs`).bind(deadline).run();
-	const selected = await env.DB.prepare(READY_PROJECTION_JOBS_SQL).bind(1, 1, 1).all() as unknown as { results: unknown[]; meta: { rows_read: number } };
+	const selected = await env.DB.prepare(READY_PROJECTION_JOBS_SQL).bind('[]', 1, 1, 1).all() as unknown as { results: unknown[]; meta: { rows_read: number } };
 	const next = await env.DB.prepare(NEXT_NOTIFICATION_WORK_SQL).all() as unknown as { meta: { rows_read: number } };
 	expect(selected.results).toEqual([]);
 	expect(selected.meta.rows_read + next.meta.rows_read).toBeLessThanOrEqual(10);

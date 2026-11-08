@@ -94,7 +94,7 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 			|| typeof file.content !== 'string' || new TextEncoder().encode(file.content).byteLength > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES
 			|| (file.expectedHash !== null && (typeof file.expectedHash !== 'string' || !isSha256Hex(file.expectedHash)))
 			|| (file.expectedHash !== null && !isSyncRevision(file.expectedRevision))) return corsResponse({ error: 'Invalid encrypted file precondition' }, 400);
-		await prepareEncryptedFileCommit(env.DB, filePath, file.content);
+		await prepareEncryptedFileCommit(env.DB, filePath, file.content, state);
 		files.push({ path: filePath, content: file.content, expectedHash: file.expectedHash!, expectedRevision: file.expectedRevision });
 	}
 	if (new Set(files.map(file => file.path)).size !== files.length) return corsResponse({ error: 'Duplicate file path' }, 400);
@@ -125,8 +125,9 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 		} else {
 			const file = files[0]!;
 			const staged = await stageMarkdownFile(env.BUCKET, env.DB, file.path, file.content, file.expectedHash, true);
+			// Publication rechecks this state in its own transaction.
 			const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content: file.content,
-				expectedRevision: file.expectedRevision, effects });
+				expectedRevision: file.expectedRevision, effects, encryptionState: state });
 			if (!result.committed) throw new FileVersionConflictError(file.path, result.currentHash);
 		}
 		return corsResponse(response);

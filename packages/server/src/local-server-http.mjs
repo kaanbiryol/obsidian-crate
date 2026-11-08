@@ -5,17 +5,23 @@ import { readSmallJson, sendJson } from './local-server-pairing.mjs';
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
-/** A managed tunnel connects from loopback and forwards each client's address from
- * Cloudflare's edge, so per-address admission limits stay per client. */
+// The header each managed tunnel sets to the client's address, replacing any value
+// the client sent. Each passes the other's header through, so trust only its own.
+// Tailscale serve and Funnel drop inbound X-Forwarded-* and set X-Forwarded-For to
+// the single source address.
+const FORWARDED_ADDRESS = { cloudflare: 'cf-connecting-ip', tailscale: 'x-forwarded-for' };
+
+/** A managed tunnel ('cloudflare' or 'tailscale') connects from loopback and forwards
+ * each client's address, so per-address admission limits stay per client. */
 export function clientAddress(request, tunnel) {
 	const peer = request.socket.remoteAddress ?? '127.0.0.1';
-	const forwarded = request.headers['cf-connecting-ip'];
-	return tunnel && LOOPBACK.has(peer) && typeof forwarded === 'string' && forwarded ? forwarded : peer;
+	const forwarded = tunnel ? request.headers[FORWARDED_ADDRESS[tunnel]] : undefined;
+	return LOOPBACK.has(peer) && typeof forwarded === 'string' && forwarded ? forwarded : peer;
 }
 
 // Expose only the application fetch handler. Miniflare's development HTTP
 // endpoints and inspector stay on their own private loopback listener.
-export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 8787, pairing, instance, tunnel = false } = {}) {
+export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 8787, pairing, instance, tunnel = null } = {}) {
 	const server = createServer(async (request, response) => {
 		try {
 			const active = typeof runtime === 'function' ? runtime() : runtime;

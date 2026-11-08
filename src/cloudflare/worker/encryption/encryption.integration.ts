@@ -26,6 +26,7 @@ import { createManagedObjectKey } from '../../../protocol/storage-keys';
 import { sha256Hex } from '../../../platform/sha256';
 import { sealFolderLabel } from '../../../encryption/folder-label';
 import { importEncryptionSecret } from '../../../encryption/envelope';
+import { handleEncryptedFolderFiles } from './encrypted-folder-files';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
@@ -77,6 +78,21 @@ it('rejects an in-flight plaintext publication whose SQL was prepared before enc
 	await pending.run();
 	expect(await getStoredFileRow(env.DB, path)).toBeNull();
 	await expect(trackStagedUpload(env.DB, createManagedObjectKey(hash), 'new-plaintext.md')).rejects.toThrow('Encryption changed');
+});
+
+it('commits a web app note with the encryption state authentication already read', async () => {
+	const { state, keys, paths } = await configure();
+	const path = await paths.wire('Reminders/Inbox.md');
+	const sealed = await sealFile({ path: 'Reminders/Inbox.md', content: new TextEncoder().encode('- [ ] Private task'), contentType: 'text/markdown; charset=utf-8' }, keys.forPath(path));
+	const body = JSON.stringify({ folderPath: path.slice(0, path.lastIndexOf('/')), operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)),
+		files: [{ path, content: new TextDecoder().decode(sealed.bytes), expectedHash: null }], acknowledgment: 'a.b.c.d.e' });
+	const prepare = vi.spyOn(env.DB, 'prepare');
+	const response = await handleEncryptedFolderFiles(new Request('https://test/reminders/encrypted-commit', { method: 'POST', body }), env,
+		'/reminders/encrypted-commit', 'reminders', undefined, state);
+	expect(response!.status, await response!.clone().text()).toBe(200);
+	// Before: validating each file and committing it read the state again.
+	expect(prepare.mock.calls.filter(([sql]) => sql.includes('encryption AS value FROM server_state'))).toEqual([]);
+	expect(await getStoredFileRow(env.DB, path)).not.toBeNull();
 });
 
 it('fences old clients and keeps scoped sessions away from vault secrets, history and sibling files', async () => {

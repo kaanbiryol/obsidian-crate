@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim() !== 'false') {
 	throw new Error('Secret scanning requires complete Git history. Run git fetch --unshallow --tags and retry.');
@@ -19,12 +20,27 @@ const hashes = {
 };
 const expected = hashes[`${platform}_${arch}`];
 if (!expected) throw new Error('Secret scanning requires Linux or macOS on x64 or arm64');
+// Up to three attempts with a short growing backoff, each with its own timeout.
+// Only network errors, timeouts and server errors are retried.
+async function download(url) {
+	for (let attempt = 1; ; attempt++) {
+		let status;
+		try {
+			const response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+			if (response.ok) return Buffer.from(await response.arrayBuffer());
+			status = response.status;
+		} catch (error) {
+			if (!['TypeError', 'TimeoutError'].includes(error?.name) || attempt === 3) throw error;
+		}
+		if (status !== undefined && (status < 500 || attempt === 3)) throw new Error(`Could not download pinned Gitleaks: ${status}`);
+		await delay(1000 * attempt);
+	}
+}
+
 const temporary = mkdtempSync(join(tmpdir(), 'crate-secrets-'));
 try {
 	const asset = `gitleaks_${version}_${platform}_${arch}.tar.gz`;
-	const response = await fetch(`https://github.com/gitleaks/gitleaks/releases/download/v${version}/${asset}`, { signal: AbortSignal.timeout(60_000) });
-	if (!response.ok) throw new Error(`Could not download pinned Gitleaks: ${response.status}`);
-	const bytes = Buffer.from(await response.arrayBuffer());
+	const bytes = await download(`https://github.com/gitleaks/gitleaks/releases/download/v${version}/${asset}`);
 	if (createHash('sha256').update(bytes).digest('hex') !== expected) throw new Error('Gitleaks checksum mismatch');
 	const archive = join(temporary, asset);
 	writeFileSync(archive, bytes);

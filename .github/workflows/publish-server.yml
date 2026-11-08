@@ -2,6 +2,9 @@ name: Publish server package
 
 # Publishes @kaanbiryol/crate-server with the plugin's version once its GitHub
 # release is published, never from a draft. npm accepts each version only once.
+# The build job installs, tests and packs without publishing rights. The publish
+# job only uploads that tested tarball, so no dependency or repository script
+# runs while it can request the trusted publishing token.
 on:
   release:
     types: [published]
@@ -23,15 +26,17 @@ permissions:
   contents: read
 
 jobs:
-  publish:
-    name: Publish to npm
+  build:
+    name: Build and test the package
     if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
-      # npm trusted publishing: no stored token, and npm records provenance.
-      id-token: write
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      node-version: ${{ steps.check.outputs.node-version }}
+      published: ${{ steps.check.outputs.published }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,7 +45,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          registry-url: https://registry.npmjs.org
       - name: Check the release
         id: check
         env:
@@ -50,14 +54,65 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           test "$version" = "$RELEASE_TAG" || { echo "Tag $RELEASE_TAG does not match package version $version"; exit 1; }
           test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = "false" || { echo "Refusing to publish a draft release"; exit 1; }
-          node -e "const [a, b, c] = process.argv[1].split('.').map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)" "$(npm --version)" \
-            || { echo "Trusted publishing needs npm 11.5.1 or later"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "node-version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
           if npm view "@kaanbiryol/crate-server@$version" version >/dev/null 2>&1; then
             echo "@kaanbiryol/crate-server@$version is already on npm; nothing to publish."
             echo "published=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.check.outputs.published != 'true'
         run: npm ci --no-audit --no-fund
-      - name: Build, test and publish the packed server
+      - name: Build and test the packed server
         if: steps.check.outputs.published != 'true'
-        run: npm run publish:server
+        run: npm run test:server-package
+      - name: Pack the tested server
+        if: steps.check.outputs.published != 'true'
+        run: npm pack ./dist/server --pack-destination dist
+      - name: Upload the package for publishing
+        if: steps.check.outputs.published != 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: server-package
+          path: dist/kaanbiryol-crate-server-${{ steps.check.outputs.version }}.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to npm
+    needs: build
+    if: needs.build.outputs.published != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # npm trusted publishing: no stored token, and npm records provenance.
+      id-token: write
+    steps:
+      # No checkout or install: this job runs only npm on the tarball the build job tested.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ needs.build.outputs.node-version }}
+          registry-url: https://registry.npmjs.org
+      - name: Download the tested package
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: server-package
+          path: package
+      - name: Publish the tested package
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          node -e "const [a, b, c] = process.argv[1].split('.').map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)" "$(npm --version)" \
+            || { echo "Trusted publishing needs npm 11.5.1 or later"; exit 1; }
+          # A rerun of only this job must not try to publish the same version twice.
+          if npm view "@kaanbiryol/crate-server@$VERSION" version >/dev/null 2>&1; then
+            echo "@kaanbiryol/crate-server@$VERSION is already on npm; nothing to publish."
+            exit 0
+          fi
+          # Publishing an older release keeps latest on the newest version.
+          latest="$(npm view @kaanbiryol/crate-server dist-tags.latest)"
+          older="$(node -e 'const [v, l] = process.argv.slice(1).map(s => { if (!/^\d+\.\d+\.\d+$/.test(s)) throw new Error(`Not a release version: ${s}`); return s.split(".").map(Number); }); const i = v.findIndex((n, k) => n !== l[k]); console.log(i >= 0 && v[i] < l[i])' "$VERSION" "$latest")"
+          tag=latest
+          if [ "$older" = "true" ]; then tag=previous; fi
+          echo "Publishing $VERSION with tag $tag (latest is $latest)."
+          npm publish "./package/kaanbiryol-crate-server-$VERSION.tgz" --tag "$tag" --ignore-scripts

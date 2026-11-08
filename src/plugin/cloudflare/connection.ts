@@ -21,6 +21,7 @@ export async function configureCloudflareAuthorizedDevice(
 	workerUrl: string,
 	authToken: string,
 	expected?: { workerUrl: string; authToken: string },
+	mergeVault = false,
 ): Promise<ConnectionTestResult> {
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
@@ -36,8 +37,9 @@ export async function configureCloudflareAuthorizedDevice(
 		// Shared settings are optional during first connection.
 	}
 	signal.throwIfAborted();
-	// A reconnect keeps this vault's sync history with the same server.
-	const replaceVault = !expected && await confirmVaultReplacement(plugin.app, api);
+	// A reconnect keeps this vault's sync history with the same server, and a
+	// restored server's first sync merges this vault's later changes with the backup.
+	const replaceVault = !expected && !mergeVault && await confirmVaultReplacement(plugin.app, api);
 	signal.throwIfAborted();
 
 	await plugin.syncRuntime.applyInfrastructureConfig({

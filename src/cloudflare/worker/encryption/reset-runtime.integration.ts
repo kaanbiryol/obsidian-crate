@@ -365,3 +365,25 @@ describe('a device without keys for an encrypted vault', () => {
 		expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
 	});
 });
+
+it('refuses keyed uploads to a server whose encryption was turned off', async () => {
+	const keyed = new SyncTestDevice('keyed-device', env); clients.push(keyed);
+	await keyed.authorize(); await keyed.open();
+	await keyed.api.configureEncryption(loadEncryptionKeys(storage)!, () => ['Reminders'], () => 'Reading');
+	keyed.disk.write('note.md', 'encrypted copy\n');
+	expect((await keyed.engine.sync()).success).toBe(true);
+	// Another device turned encryption off, or a backup from before encryption was restored.
+	await env.DB.batch([
+		env.DB.prepare('UPDATE server_state SET encryption = NULL WHERE id = 1'),
+		env.DB.prepare('DELETE FROM files'), env.DB.prepare('DELETE FROM changelog'),
+	]);
+	const other = new SyncTestDevice('plaintext-device', env); clients.push(other);
+	await other.authorize(); await other.open();
+	other.disk.write('from-other.md', 'plaintext\n');
+	expect((await other.engine.sync()).success).toBe(true);
+	keyed.disk.write('note.md', 'edited with stale keys\n'); keyed.engine.onFileChange({ path: 'note.md' } as never);
+	const result = await keyed.engine.syncSelected(['note.md']);
+	expect(result.success).toBe(false);
+	expect(result.errors.join('\n')).toContain('Encryption is off on this server');
+	expect(Object.keys((await other.api.getManifest()).files)).toEqual(['from-other.md']);
+});

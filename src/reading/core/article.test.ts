@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DOMParser, parseHTML } from 'linkedom';
 import { applyLocalArticle, assembleReadingArticle, managedArticle } from './article';
-import { ARTICLE_END, ARTICLE_START, MAX_READING_BYTES } from './model';
+import { ARTICLE_END, ARTICLE_START, MAX_READING_BYTES, MAX_READING_TITLE_LENGTH } from './model';
 import { createReadingNote, parseReadingNote } from './notes';
 import { patchReadingFrontmatter, readReadingFrontmatter } from './frontmatter';
 
@@ -139,6 +139,16 @@ describe('Reading article assembly', () => {
 		if (title !== undefined) expect(title).toBe('<\u200B%* tR += app.vault.getName() %>');
 	});
 
+	it.each(['capture', 'extraction', 'local'] as const)('saves a maximum-length title and author with Templater tags in a %s', kind => {
+		const source = note(), block = managedArticle(source)!;
+		const long = '<% ' + 'a'.repeat(MAX_READING_TITLE_LENGTH - 3), saved = `<\u200B% ${'a'.repeat(MAX_READING_TITLE_LENGTH - 4)}`;
+		const article = { markdown: 'Article text.', title: long, author: long };
+		const content = kind === 'local'
+			? applyLocalArticle(source, { ...parseReadingNote(source)!, path: 'Reading/Article.md' }, article)
+			: assembleReadingArticle(source, parseReadingNote(source)!, { kind, article, block }).content;
+		expect(parseReadingNote(content)).toMatchObject({ title: saved, author: saved });
+	});
+
 	it('keeps ordinary code blocks and drops executable languages even from fence examples', () => {
 		const source = note(), metadata = parseReadingNote(source)!;
 		const kept = [
@@ -207,6 +217,23 @@ describe('Reading article assembly', () => {
 			expect(text).toContain('```\ndv.paragraph("x")\n```');
 			expect(text).toContain('```\nreturn 1\n```');
 			expect(text).toContain('```ts\nconst value = 1;\n```');
+		} finally { vi.unstubAllGlobals(); }
+	});
+
+	it('breaks plugin code languages that Markdown decodes from escapes or entities', async () => {
+		vi.stubGlobal('window', { DOMParser });
+		try {
+			const { articleMarkdown } = await import('../extraction/markdown');
+			// Markdown decodes backslash escapes and character references in a fence's language,
+			// so `js\-engine` reads as `js-engine` and `dataview&#106;s` as `dataviewjs`.
+			const html = `<pre><code data-lang="js\\-engine">return 1</code></pre>
+				<pre><code data-lang="dataview&amp;amp;#106;s">dv.el("p", "x")</code></pre>
+				<pre><code data-lang="dataview&amp;amp;amp;#106;s">dv.el("p", "y")</code></pre>`;
+			const markdown = articleMarkdown(parseHTML(`<html><body>${html}</body></html>`).document.body, 'https://example.com/article');
+			const source = note();
+			const text = managedArticle(applyLocalArticle(source, { ...parseReadingNote(source)!, path: 'Reading/Article.md' }, { markdown }))!.text;
+			expect(text).not.toMatch(/^[\t >]*`{3,}[ \t]*[^\s`]*[\\&]/m);
+			expect(text).toContain('```\nreturn 1\n```');
 		} finally { vi.unstubAllGlobals(); }
 	});
 

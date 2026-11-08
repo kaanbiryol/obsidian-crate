@@ -82,6 +82,15 @@ describe('markdownReminderFile', () => {
 			.toBe(`${second}\n${first}\n`);
 	});
 
+	it('keeps a byte order mark at the start of the note when its first reminder is deleted or reordered', () => {
+		const first = '- [ ] First <!-- crate-id:r1 -->';
+		const second = '- [ ] Second <!-- crate-id:r2 -->';
+		expect(reorderReminderBlocksInContent(`\uFEFF${first}\n${second}\n`, ['r2', 'r1'])).toBe(`\uFEFF${second}\n${first}\n`);
+		const reminder = makeRecord({ content: 'First', rawLine: `\uFEFF${first}` });
+		expect(deleteReminderBlockFromContent(`\uFEFF${first}\n${second}\n`, reminder).content).toBe(`\uFEFF${second}\n`);
+		expect(deleteReminderBlockFromContent(`\uFEFF${first}`, reminder).content).toBe('\uFEFF');
+	});
+
 	it('keeps each line ending in place when a CRLF note without a final newline is reordered', () => {
 		const first = '- [ ] First <!-- crate-id:r1 -->';
 		const second = '- [ ] Second <!-- crate-id:r2 -->';

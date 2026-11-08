@@ -13,9 +13,19 @@ function metaCharset(bytes: ArrayBuffer | Uint8Array): string | undefined {
 	return label && /^utf-16/i.test(label) ? 'utf-8' : label;
 }
 
-/** Decodes a fetched page with its Content-Type charset, else its `<meta>`
- * charset, else UTF-8. An unknown label is skipped instead of failing the capture. */
+/** A byte order mark, which browsers trust over any declared charset. */
+function bomCharset(bytes: Uint8Array): string | undefined {
+	if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return 'utf-8';
+	if (bytes[0] === 0xfe && bytes[1] === 0xff) return 'utf-16be';
+	if (bytes[0] === 0xff && bytes[1] === 0xfe) return 'utf-16le';
+	return undefined;
+}
+
+/** Decodes a fetched page with its byte order mark, else its Content-Type charset,
+ * else its `<meta>` charset, else UTF-8. An unknown label is skipped instead of
+ * failing the capture. */
 export function decodeHtml(bytes: ArrayBuffer | Uint8Array, contentType: string | null): string {
+	const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
 	const declared = /charset=["']?([\w-]+)/i.exec(contentType ?? '')?.[1];
-	return (decoderFor(declared) ?? decoderFor(metaCharset(bytes)) ?? new TextDecoder()).decode(bytes);
+	return (decoderFor(bomCharset(view)) ?? decoderFor(declared) ?? decoderFor(metaCharset(view)) ?? new TextDecoder()).decode(view);
 }

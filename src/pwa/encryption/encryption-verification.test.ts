@@ -65,6 +65,14 @@ describe('encryption verification', () => {
 		await expect(load(async () => new Response(null, { status: 401 }))).rejects.not.toBeInstanceOf(EncryptionVerificationUnavailableError);
 	});
 
+	it.each([403, 423, 429])('shows the server’s reason for a %i refusal as an unavailable check', async status => {
+		const refusal = load(async () => Response.json({ error: 'Too many requests. Try again later.' }, { status }));
+		await expect(refusal).rejects.toBeInstanceOf(EncryptionVerificationUnavailableError);
+		await expect(refusal).rejects.toThrow('Too many requests. Try again later.');
+		await expect(load(async () => new Response('<html>Blocked</html>', { status }))).rejects.toThrow('Could not verify encryption');
+		await expect(load(async () => Response.json({ error: 'Deploying' }, { status: 503 }))).rejects.toThrow('Could not verify encryption');
+	});
+
 	it('offers the plaintext offline copy for an unanswered check only without encryption evidence', async () => {
 		const unanswered = async () => { throw new TypeError('network'); };
 		await expect(load(unanswered)).rejects.toMatchObject({ offlineCopy: true });

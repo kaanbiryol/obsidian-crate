@@ -22,6 +22,43 @@ test('automatic installation refuses an unverified download', async t => {
 	assert.deepEqual(await readdir(join(cacheDir, cloudflaredVersion, 'linux-x64')), []);
 });
 
+test('automatic installation retries network and server errors three times', async t => {
+	const cacheDir = await mkdtemp(join(tmpdir(), 'crate-download-retry-test-'));
+	t.after(() => rm(cacheDir, { recursive: true, force: true }));
+	const run = async () => { throw Object.assign(new Error('missing'), { code: 'ENOENT' }); };
+	const install = (responses, signal) => {
+		const signals = [];
+		const fetchAsset = async (url, init) => {
+			signals.push(init.signal);
+			const next = responses.shift();
+			return typeof next === 'function' ? next() : next;
+		};
+		return { signals, result: installCloudflared({ cacheDir, platform: 'linux', arch: 'x64', run, fetchAsset, signal }) };
+	};
+	// Stub bytes never match the pinned checksum, so reaching that check proves the 200 after a failure was used.
+	let attempt = install([new Response(null, { status: 504 }), new Response('stub binary')]);
+	await assert.rejects(attempt.result, /checksum mismatch/);
+	assert.equal(attempt.signals.length, 2);
+	assert.notEqual(attempt.signals[0], attempt.signals[1], 'each attempt gets its own timeout');
+
+	attempt = install([() => { throw new TypeError('fetch failed'); }, new Response('stub binary')]);
+	await assert.rejects(attempt.result, /checksum mismatch/);
+	assert.equal(attempt.signals.length, 2);
+
+	attempt = install([504, 502, 504].map(status => new Response(null, { status })));
+	await assert.rejects(attempt.result, /HTTP 504/);
+	assert.equal(attempt.signals.length, 3);
+
+	attempt = install([new Response(null, { status: 404 }), new Response('stub binary')]);
+	await assert.rejects(attempt.result, /HTTP 404/);
+	assert.equal(attempt.signals.length, 1, 'client errors are not retried');
+
+	const controller = new AbortController();
+	attempt = install([() => { controller.abort(); return new Response(null, { status: 503 }); }, new Response('stub binary')], controller.signal);
+	await assert.rejects(attempt.result, { name: 'AbortError' });
+	assert.equal(attempt.signals.length, 1, 'an abort stops before the next attempt');
+});
+
 test('Quick Tunnel reads split output, isolates configuration, and stops its child', async t => {
 	const directory = await mkdtemp(join(tmpdir(), 'crate-quick-test-'));
 	t.after(() => rm(directory, { recursive: true, force: true }));

@@ -3,7 +3,7 @@ import { createModalActions, SharedModal } from '../../plugin/shared-modal';
 import { openConfirmationModal } from '../../plugin/confirmation-modal';
 import { Setting } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { encryptionModalState, encryptVault, loadDeviceEncryptionKeys, openEncryptionConnection, prepareEncryptionKeys, syncWithoutEncryption, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
+import { encryptionModalState, encryptVault, forgetStaleEncryptionKeys, loadDeviceEncryptionKeys, openEncryptionConnection, prepareEncryptionKeys, syncWithoutEncryption, unlockVault, verifySetupRecovery } from '../../../plugin/encryption-setup';
 import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import type { WorkerApiHttpClient } from '../../../sync/worker-api/http';
 import { readServerEncryption } from '../../../sync/encryption/server-encryption';
@@ -73,12 +73,11 @@ export class EncryptionModal extends SharedModal {
 			}
 			case 'ready': this.clearContent(); this.ready(view.keys, view.state); return;
 			case 'downgraded': this.clearContent(); this.downgraded(); return;
-			case 'setup': await this.setup(view.keys);
+			case 'setup': await this.setup();
 		}
 	}
-	private async setup(keys: VaultKeyBundle | null): Promise<void> {
-		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin, keys);
-		if (!recovery) { this.clearContent(); this.bodyEl.createEl('p', { text: 'Restore the recovery key from your saved copy before enabling encryption.' }); return; }
+	private async setup(): Promise<void> {
+		const { bundle, recovery } = await prepareEncryptionKeys(this.plugin);
 		await verifySetupRecovery(null, bundle, recovery);
 		this.assertConnection();
 		this.clearContent();
@@ -117,8 +116,9 @@ export class EncryptionModal extends SharedModal {
 			button.setDisabled(true);
 			try {
 				this.assertConnection();
+				await forgetStaleEncryptionKeys(this.plugin, () => this.assertConnection());
 				this.clearContent();
-				await this.setup(null);
+				await this.setup();
 			} catch (error) { this.unavailable(error); }
 		}));
 		actions.addButton(button => button.setButtonText('Sync without encryption').setDestructive().onClick(async () => {

@@ -18,6 +18,10 @@ describe('reminder ID normalization', () => {
 		}
 	});
 
+	it('adds an ID to a task right after a byte order mark and keeps the mark', () => {
+		expect(normalizeReminderIds('\uFEFF- [ ] Task A\n').content).toMatch(/^\uFEFF- \[ \] Task A <!-- crate-id:[0-9a-f-]{36} -->\n$/);
+	});
+
 	it('moves a marker that edits pushed off the line end back to it', () => {
 		expect(normalizeReminderIds('- [ ] Buy milk <!-- crate-id:r1 --> and eggs')).toEqual({
 			content: '- [ ] Buy milk and eggs <!-- crate-id:r1 -->', remindersUpdated: 1,

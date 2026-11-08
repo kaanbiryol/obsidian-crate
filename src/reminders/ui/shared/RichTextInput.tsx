@@ -122,6 +122,8 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 		if (!editor || !element) return;
 		editor.setEditable(!props.readOnly);
 		if (props.autoComplete) element.setAttribute('autocomplete', props.autoComplete);
+		// The value lags the text an IME is still composing; writing it would replace that text. Composition end publishes it.
+		if (editor.isComposing()) return;
 		const changed = editor.getEditorState().read($readReminder) !== props.value;
 		const projectKey = (props.knownProjects ?? []).join('\u0000');
 		const projectsChanged = projectKey !== projectKeyRef.current;
