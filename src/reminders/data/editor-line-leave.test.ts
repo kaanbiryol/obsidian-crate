@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EditorSelection, EditorState, Transaction, type TransactionSpec } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
-import { createReminderLineLeaveExtension, hiddenReminderIdRanges, protectReminderIdMarker, reminderIdChangesForLeftLines } from './editor-line-leave';
+import { createReminderLineLeaveExtension, hiddenDescriptionRanges, hiddenReminderMarkerRanges, protectReminderIdMarker, reminderIdChangesForLeftLines } from './editor-line-leave';
 import { normalizeReminderIds } from '../core/normalizeReminderIds';
 
 vi.mock('../core/normalizeReminderIds', async importOriginal => {
@@ -83,7 +83,7 @@ describe('reminder ID marker hiding', () => {
 
 	function hidden(cursor: number, visible = [{ from: 0, to: doc.length }]) {
 		const state = EditorState.create({ doc, selection: EditorSelection.cursor(cursor) });
-		return hiddenReminderIdRanges(state, visible).map(({ from, to }) => doc.slice(from, to));
+		return hiddenReminderMarkerRanges(state, visible).map(({ from, to }) => doc.slice(from, to));
 	}
 
 	it('hides every marker with its leading space, including the cursor line', () => {
@@ -92,6 +92,28 @@ describe('reminder ID marker hiding', () => {
 
 	it('hides a line shared by adjacent visible ranges once', () => {
 		expect(hidden(doc.indexOf('Notes'), [{ from: 0, to: 5 }, { from: 5, to: doc.length }])).toEqual([' <!-- crate-id:a -->', ' <!-- crate-id:b -->']);
+	});
+
+	it('hides a rule marker together with the ID marker after it', () => {
+		const text = '- [ ] Water plants <!-- crate-rule:%7B%22frequency%22%3A%22daily%22%7D --> <!-- crate-id:a -->';
+		const state = EditorState.create({ doc: text });
+		expect(hiddenReminderMarkerRanges(state, [{ from: 0, to: text.length }]).map(({ from, to }) => text.slice(from, to)))
+			.toEqual([' <!-- crate-rule:%7B%22frequency%22%3A%22daily%22%7D --> <!-- crate-id:a -->']);
+	});
+});
+
+describe('reminder description hiding', () => {
+	const hidden = (text: string) => hiddenDescriptionRanges(EditorState.create({ doc: text }).doc).map(({ from, to }) => text.slice(from, to));
+
+	it('hides one-line and multiline descriptions with the line break before them', () => {
+		const text = '- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:Oat milk -->\n- [ ] Call Sam <!-- crate-id:b -->\n<!-- crate-desc:About\nthe trip -->\nNotes';
+		expect(hidden(text)).toEqual(['\n<!-- crate-desc:Oat milk -->', '\n<!-- crate-desc:About\nthe trip -->']);
+	});
+
+	it('leaves broken and unattached descriptions visible so they can be repaired', () => {
+		expect(hidden('- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:v1:%invalid -->')).toEqual([]);
+		expect(hidden('- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:never closed')).toEqual([]);
+		expect(hidden('Notes\n<!-- crate-desc:Oat milk -->')).toEqual([]);
 	});
 });
 
@@ -140,6 +162,33 @@ describe('reminder ID marker protection', () => {
 	it('joins the next line instead of deleting the marker alone', () => {
 		expect(edit(`${line}\nNext`, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' }).text).toBe(`${line}Next`);
 		expect(edit(line, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' }).text).toBe(line);
+	});
+
+	describe('with a description', () => {
+		const description = '<!-- crate-desc:Oat milk -->';
+		const block = `${line}\n${description}`;
+
+		it('continues Enter after the description so it stays on its reminder', () => {
+			const { text, cursor } = edit(block, end, { changes: { from: end, insert: '\n- [ ] ' }, userEvent: 'input' });
+			expect(text).toBe(`${block}\n- [ ] `);
+			expect(cursor).toBe(text.length);
+		});
+
+		it('joins the line after the description to the reminder text on forward delete or backspace', () => {
+			const doc = `${block}\nNext`;
+			// The editor skips the hidden span, so a forward delete covers the markers and the description.
+			expect(edit(doc, end, { changes: { from: end, to: block.length }, userEvent: 'delete.forward' })).toEqual({ text: `- [ ] Buy milkNext <!-- crate-id:a -->\n${description}`, cursor: end });
+			expect(edit(doc, block.length + 1, { changes: { from: block.length, to: block.length + 1 }, userEvent: 'delete.backward' }).text).toBe(`- [ ] Buy milkNext <!-- crate-id:a -->\n${description}`);
+			expect(edit(block, end, { changes: { from: end, to: block.length }, userEvent: 'delete.forward' }).text).toBe(block);
+		});
+
+		it('keeps the cursor in front of the markers when it lands after the description', () => {
+			expect(edit(block, 0, { selection: { anchor: block.length } }).cursor).toBe(end);
+		});
+
+		it('deletes the description with a selection of the whole reminder text', () => {
+			expect(edit(`${block}\nNext`, 0, { changes: { from: 0, to: end }, userEvent: 'delete.cut' }, end).text).toBe('\nNext');
+		});
 	});
 
 	it('leaves edits by Crate and deletes of whole lines alone', () => {
